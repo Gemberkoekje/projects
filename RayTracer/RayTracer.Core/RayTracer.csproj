@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\00115_spectral.csv" />
+    <EmbeddedResource Include="Data\01085_spectral.csv" />
+    <EmbeddedResource Include="Data\01138_spectral.csv" />
+    <EmbeddedResource Include="Data\CIE_xyz_1931_2deg.csv" />
+    <EmbeddedResource Include="Data\materials_data.csv" />
+  </ItemGroup>
+
+</Project>

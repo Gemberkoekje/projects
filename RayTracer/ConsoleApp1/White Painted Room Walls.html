@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="description" content="Material Measurement Data">
+		<title>White Painted Room Walls</title>
+		
+		<link rel="stylesheet" href="../../css/pure-1.0.0/pure-min.css">
+		<!--[if lte IE 8]>
+			<link rel="stylesheet" href="../../css/pure-1.0.0/grids-responsive-old-ie-min.css">
+		<![endif]-->
+		<!--[if gt IE 8]><!-->
+			<link rel="stylesheet" href="../../css/pure-1.0.0/grids-responsive-min.css">
+		<!--<![endif]-->
+		
+		<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway:200">
+		
+		<script src="../../meta/d3/d3.v4.min.js"></script>
+		<script src="../../meta/d3/d3-legend.min.js"></script>
+		
+		<style>
+			<!-- Custom CSS -->
+			.right-nav {
+				float: none !important;
+			}
+			
+			@media screen and (min-width: 64em) {
+				.right-nav {
+					float: right !important;
+					margin-right: 1em;
+				}
+			}
+			
+			#site-title {
+				color: #000;
+				padding-left: 0em !important;
+				font-weight: bold;
+			}
+			
+			.main-content {
+				margin: .5em 1em !important;
+			}
+			
+			.mono {
+			font-family: monospace;
+			font-size: 120%
+			}
+			
+			.container {
+				max-width: 1024px;
+				width: 100%;
+				margin: 0 auto;
+			}
+			
+			.img-adaptive {
+				width: 100%;
+			}
+			
+			.footer {
+				background: #111;
+				position: fixed;
+				bottom: 0px;
+				width: 100%;
+				text-align: right;
+				color: white;
+				font-size: 80%;
+				height: 50px;
+			}
+			
+			.pure-g {
+				margin-left: 2em;
+				margin-right: 2em;
+			}
+			
+			.tooltip {
+				fill: white;
+				stroke: #000;
+			}
+
+			.tooltip-WL, .tooltip-reflectance {
+				font-weight: bold;
+			}
+			
+			.line {
+				fill: none;
+				stroke-width: 3px;
+			}
+			
+			.tick { 
+				font: 1.5em sans-serif; 
+			}
+			
+			body {
+				padding-bottom: 80px;
+			}
+			
+			
+		</style>		
+	</head>
+
+	<body>
+		<!-- Navigation start -->
+		<div class="pure-g">
+			<div class="container">
+			
+				<div class="pure-u-1 pure-u-lg-1-3">
+					<div class="home-menu pure-menu pure-menu-horizontal">
+						<a href="../../" class="pure-menu-heading" id="site-title">Spectral Materials Database</a>
+					</div>
+				</div>	
+			
+				<div class="pure-u-1 pure-u-lg-2-3">
+					<div class="home-menu pure-menu pure-menu-horizontal">
+						<ul class="pure-menu-list right-nav">
+								<li class="pure-menu-item pure-menu-selected"><a href="../../" class="pure-menu-link">Database Home</a></li>
+								<li class="pure-menu-item pure-menu-selected"><a href="../../about.html" class="pure-menu-link">About</a></li>
+								<li class="pure-menu-item pure-menu-selected"><a href="../../contact.html" class="pure-menu-link">Contact</a></li>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Navigation end -->
+		
+		<div class="pure-g">
+			<div class="container">
+				<div class="pure-u-1" id="graph">
+					<h1>White Painted Room Walls</h1>
+					<script>
+						// set the dimensions and margins of the graph
+						var margin = {top: 20, right: 20, bottom: 50, left: 50},
+							width = 1024 - margin.left - margin.right,
+							height = 550 - margin.top - margin.bottom;
+
+						// set the ranges
+						var x = d3.scaleLinear().range([0, width]);
+						var y = d3.scaleLinear().range([height, 0]);
+
+						// define the 1st line
+						var sciline = d3.line()
+							.x(function(d) { return x(d.wl); })
+							.y(function(d) { return y(d.sci); });
+
+						// define the 2nd line
+						var sceline = d3.line()
+							.x(function(d) { return x(d.wl); })
+							.y(function(d) { return y(d.sce); });
+
+						// append the svg obgect to the body of the page
+						// appends a 'group' element to 'svg'
+						// moves the 'group' element to the top left margin
+						var svg = d3.select("#graph").append("svg")
+							.attr("viewBox", `0 0 1024 550`)
+							.append("g")
+							.attr("transform",
+								"translate(" + margin.left + "," + margin.top + ")");
+
+						// Get the data
+						d3.csv("spectral.csv", function(error, data) {
+						if (error) throw error;
+
+						// format the data
+						data.forEach(function(d) {
+							d.wl = +d.wl;
+							d.sci = +d.sci;
+							d.sce = +d.sce;
+						});
+
+						// Scale the range of the data
+						x.domain(d3.extent(data, function(d) { return d.wl; }));
+						y.domain([0, 100]);
+
+						// Add the valueline path.
+						svg.append("path")
+							.data([data])
+							.attr("class", "line")
+							.style("stroke", "black")
+							.attr("d", sciline);
+
+						// Add the valueline2 path.
+						svg.append("path")
+							.data([data])
+							.attr("class", "line")
+							.style("stroke", "grey")
+							.style("stroke-dasharray", ("3, 3"))
+							.attr("d", sceline);
+
+						// Add the X Axis
+						svg.append("g")
+							.attr("transform", "translate(0," + height + ")")
+							.call(d3.axisBottom(x));
+						
+						svg.append("text")             
+							.attr("transform",
+								"translate(" + (width/2) + " ," + 
+											(height + margin.top + 20) + ")")
+							.style("text-anchor", "middle")
+							.style("font-weight", "bold")
+							.text("Wavelength (nm)");
+
+						// Add the Y Axis
+						svg.append("g")
+							.call(d3.axisLeft(y));
+						
+						svg.append("text")
+							.attr("transform", "rotate(-90)")
+							.attr("y", 0 - margin.left)
+							.attr("x",0 - (height / 2))
+							.attr("dy", "1em")
+							.style("text-anchor", "middle")
+							.style("font-weight", "bold")
+							.text("Reflectance (%)");  
+							
+						          
+						var ordinal = d3.scaleOrdinal()
+						  .domain(["Specular Component Included", "Specular Component Excluded"])
+						  .range([ "black", "grey"]);
+
+						svg.append("g")
+						  .attr("class", "legendOrdinal")
+						  .attr("transform", "translate(20,7)");
+
+						var legendOrdinal = d3.legendColor()
+						  .shape("path", d3.symbol().type(d3.symbolCircle).size(150)())
+						  .shapePadding(10)
+						  //use cellFilter to hide the "e" cell
+						  .cellFilter(function(d){ return d.label !== "e" })
+						  .scale(ordinal);
+
+						svg.select(".legendOrdinal")
+						  .call(legendOrdinal);
+
+						});
+					</script>
+
+				</div>
+			</div>
+		</div>
+		
+		<p>&nbsp;</p>
+		
+		<div class="pure-g">
+			<div class="container">
+				<div class="pure-u-1 pure-u-lg-2-5">
+					<h2>Physical Properties</h2>
+					<table class="pure-table pure-table-striped pure-table-horizontal">
+						<thead>
+							<tr>
+								<th>Property</th>
+								<th>Value</th>
+							</tr>
+						</thead>
+						
+						<tbody>
+							<tr>
+								<td>V(&lambda;) Reflectance</td>
+								<td>81.19%</td>
+							</tr>
+							
+							<tr>
+								<td>M(&lambda;) Reflectance</td>
+								<td>76.96%</td>
+							</tr>
+							
+							<tr>
+								<td>M/P Ratio</td>
+								<td>0.95</td>
+							</tr>
+							
+							<tr>
+								<td>L*</td>
+								<td>91.99</td>
+							</tr>
+							
+							<tr>
+								<td>a*</td>
+								<td>-0.28</td>
+							</tr>
+							
+							<tr>
+								<td>b*</td>
+								<td>5.53</td>
+							</tr>
+							
+							<tr>
+								<td>R<sub>reflectance</sub></td>
+								<td>83.16%</td>
+							</tr>
+							
+							<tr>
+								<td>G<sub>reflectance</sub></td>
+								<td>81.16%</td>
+							</tr>
+							
+							<tr>
+								<td>B<sub>reflectance</sub></td>
+								<td>72.26%</td>
+							</tr>
+							
+							<tr>
+								<td>Specularity</td>
+								<td>0.36%</td>
+							</tr>
+							
+							<tr>
+								<td>Roughness</td>
+								<td>0.20</td>
+							</tr>
+						</tbody>
+					</table>
+						
+				</div>
+				
+				<div class="pure-u-1 pure-u-lg-2-5">
+					<h2>Radiance Definition</h2>
+					<p class="mono">
+					void plastic white_painted_room_walls<br>0<br>0<br>5 0.8316 0.8116 0.7226 0.0036 0.2000
+					</p>
+					
+					<h2>Download Data</h2>
+					<p>
+					Download a <a href="./spectral.csv">CSV file</a> of this measured data.
+					</p>
+					
+					<h2>Metadata</h2>
+					<p><u>Measurement device</u> Spectrophotometer</p>
+					<p><u>Surface type</u> Wall</p>
+					<p><u>Location</u> Singapore, Singapore</p>
+					<p><u>Measured by</u> Design for Climate and Comfort Lab</p>
+					<p><u>Method</u> Spectrophotometer</p>
+					<p><u>Comment</u> Measured by SUTD undergraduate researchers Kevin Josiah Neo and Caroline.</p>
+					
+				</div>
+				
+				<div class="pure-u-1 pure-u-lg-1-5">
+					<h2>Rendering Sample</h2>
+					<img src="./render.jpg" class="img-adaptive">
+				</div>
+				
+			</div>
+		</div>
+		
+		<div class="footer">
+			<div class="container">
+				<div class="main-content" style="padding: 0.5em 0;">
+					&copy; Design for Climate &amp; Comfort Lab 2021. E-mail alstan.jakubiec (at) daniels.utoronto.ca for comments and inquiries.
+				</div>
+			</div>
+		</div>
+	</body>
+
+</html>
