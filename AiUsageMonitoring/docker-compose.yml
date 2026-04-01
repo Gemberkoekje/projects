@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  aiusagemonitor:
+    build:
+      context: ./src/AiUsageMonitor
+      dockerfile: Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Smtp__Host=${SMTP_HOST}
+      - Smtp__Port=${SMTP_PORT}
+      - Smtp__User=${SMTP_USER}
+      - Smtp__Password=${SMTP_PASSWORD}
+      - CoPilot__ApiToken=${COPILOT_API_TOKEN}
+      - CoPilot__Organization=${COPILOT_ORG}
+      - Claude__ApiToken=${CLAUDE_API_TOKEN}
+      - ConnectionStrings__Marten=${MARTEN_CONNECTION}
+      - Email__From=${EMAIL_FROM}
+      - Email__To=${EMAIL_TO}
+    restart: "no"

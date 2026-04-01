@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="Raytracing.hlsl" />
+  </Folder>
+  <Project Path=".net.csproj" />
+  <Project Path="Benchmark/Benchmarks.csproj" />
+  <Project Path="ConsoleApp1/ConsoleApp1.csproj" />
+  <Project Path="RayTracer.Core/RayTracer.csproj" />
+  <Project Path="RayTracer.Tests/RayTracer.Tests.csproj" />
+  <Project Path="RayTracer/RayTracer.App.csproj" />
+</Solution>

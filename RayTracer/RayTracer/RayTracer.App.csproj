@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -15,10 +15,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="**/*.csv" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Qowaiv.Validation.Abstractions" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>
