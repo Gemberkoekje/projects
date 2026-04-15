@@ -7,9 +7,9 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RayTracer;
 
-public class JobSystem
+public partial class JobSystem
 {
-    WavelengthLookup WavelengthLookup { get; init; } = new();
+    private WavelengthLookup WavelengthLookup { get; init; } = new();
 
     public Vector3[] AccumXYZ { get; init; }
     public uint[] SampleCount { get; init; }
@@ -183,6 +183,17 @@ public class JobSystem
     private bool _taaHasPrevCamera;
     private long _clampEventCount;
 
+    private readonly TileScheduler _tileScheduler;
+    private readonly PathTracer _pathTracer;
+    private readonly AccumulationBuffer _accumulationBuffer;
+    private readonly TaaResolver _taaResolver;
+    private readonly DisplayResolver _displayResolver;
+    private readonly DebugBufferRenderer _debugBufferRenderer;
+
+    public PerPixelState PerPixel { get; }
+    public HistoryState History { get; }
+    public DebugState Debug { get; }
+
     public double RejectedHistoryPercent { get; private set; }
     public double ClampedPixelPercent { get; private set; }
     public double AverageVariance { get; private set; }
@@ -254,6 +265,35 @@ public class JobSystem
         _taaNextHitPoint = new Vector3[width * height];
         _taaNextValid = new bool[width * height];
 
+        PerPixel = new PerPixelState(AccumXYZ, SampleCount, WavelengthCounter, LastHit, HitPointWorld);
+        History = new HistoryState(_taaHistoryXYZ, _taaHistoryHitPoint, _taaHistoryValid, _taaNextXYZ, _taaNextHitPoint, _taaNextValid);
+        Debug = new DebugState(
+            _lumaVariance,
+            _historyWeight,
+            _historyRejected,
+            _clampAmount,
+            _clampHitFrame,
+            _depthDistance,
+            _albedoScalar,
+            _normalWorld,
+            _directLightingXYZ,
+            _indirectLightingXYZ,
+            _emissiveLightingXYZ,
+            _bounce0XYZ,
+            _bounce1XYZ,
+            _bounce2PlusXYZ,
+            _diffCurrentVsAccum,
+            _diffUnfilteredVsFiltered,
+            _diffReprojectedVsCurrent,
+            _lastUpdatedFrame);
+
+        _pathTracer = new PathTracer(this);
+        _displayResolver = new DisplayResolver(this);
+        _accumulationBuffer = new AccumulationBuffer(this);
+        _taaResolver = new TaaResolver(this);
+        _debugBufferRenderer = new DebugBufferRenderer(this);
+        _tileScheduler = new TileScheduler(this, _pathTracer, _displayResolver);
+
         // Compute total tile count for pass tracking
         int tilesX = (width + tilesize - 1) / tilesize;
         int tilesY = (height + tilesize - 1) / tilesize;
@@ -262,303 +302,17 @@ public class JobSystem
 
     public void SetupJobs(CancellationToken cancellationToken)
     {
-        int n = Environment.ProcessorCount;
-        int workerCount = ThrottleCpu switch
-        {
-            CpuThrottle.BelowNormal => n,
-            CpuThrottle.MinusOne    => Math.Max(1, n - 1),
-            CpuThrottle.Half        => Math.Max(1, n / 2),
-            CpuThrottle.One         => 1,
-            _                       => n
-        };
-        bool lowerPriority = ThrottleCpu != CpuThrottle.Normal;
-        for (int x = 0; x < workerCount; x++)
-        {
-            Task.Run(async () =>
-            {
-                while (!cancellationToken.IsCancellationRequested)
-                {
-                    var job = await Jobs.Reader.ReadAsync(cancellationToken);
-                    if (lowerPriority)
-                        Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
-                    int phase = _checkerPhase;
-                    for(var y = job.Y; y < job.Y + job.Height; y++)
-                    {
-                        for (var x = job.X; x < job.X + job.Width; x++)
-                        {
-                            if (CheckerboardMotion && IsMoving && ((x + y) & 1) != phase)
-                            {
-                                Render(Stride, DisplayBuffer, y, x);
-                                continue;
-                            }
-                            for (var s = 0; s < SppPerJob; s++)
-                                    Trace(Camera, y, x);
-                            Render(Stride, DisplayBuffer, y, x);
-                        }
-                    }
-                    var pixels = job.Width * job.Height;
-                    var spp = SppPerJob;
-                    TotalRays += pixels * spp;
-                    TotalTileCompletions++;
-                    Jobs.Writer.TryWrite(job);
-                }
-            }, cancellationToken);
-        }
+        _tileScheduler.SetupJobs(cancellationToken);
     }
 
     private void Render(int stride, byte[] buffer, int y, int x)
     {
-        Vector3 xyz = ResolveFilteredXYZ(y, x);
-
-        var linearColor = ToSRGB(xyz);
-
-        // Apply gamma correction for sRGB
-        var color = new Vector3(
-            LinearToSRGB(linearColor.X),
-            LinearToSRGB(linearColor.Y),
-            LinearToSRGB(linearColor.Z)
-        );
-
-        int i = y * stride + x * 4;
-        buffer[i + 0] = (byte)Math.Clamp(color.Z * 255f, 0, 255); // B
-        buffer[i + 1] = (byte)Math.Clamp(color.Y * 255f, 0, 255); // G
-        buffer[i + 2] = (byte)Math.Clamp(color.X * 255f, 0, 255); // R
-        buffer[i + 3] = 255;                                      // A
-
+        _displayResolver.Render(stride, buffer, y, x);
     }
 
     public void ResolveDisplayBufferWithTaa()
     {
-        bool useTaa = EnableTaa && TemporalBlendAlpha > 0f && _taaHasPrevCamera;
-        // Base alpha comes from the preset, but make it motion-aware so
-        // history is discounted while the camera is moving (reduces ghosting).
-        float alpha = Math.Clamp(TemporalBlendAlpha, 0.01f, 1f);
-        if (IsMoving)
-        {
-            // Boost the lerp towards the current frame when moving. Multiply
-            // so small configured alphas (e.g. 0.04-0.05) become more aggressive
-            // (0.4-0.5), reducing history influence during motion.
-            alpha = Math.Clamp(alpha * 10f, 0.01f, 1f);
-        }
-        long rejected = 0;
-        double histWeightSum = 0;
-        double varianceSum = 0;
-        double sppSum = 0;
-        uint maxSpp = 0;
-        long clampedPixelCount = 0;
-
-        for (int y = 0; y < Height; y++)
-        {
-            int row = y * Width;
-            for (int x = 0; x < Width; x++)
-            {
-                int ix = row + x;
-                Vector3 current = ResolveFilteredXYZ(y, x);
-                Vector3 unfiltered = AccumXYZ[ix];
-                Vector3 resolved = current;
-                float historyWeight = 0f;
-                bool rejectedThisPixel = false;
-                float reprojectionDelta = 0f;
-
-                bool currentHit = LastHit[ix];
-                Vector3 currentHitPoint = HitPointWorld[ix];
-
-                if (useTaa && currentHit &&
-                    TryProjectToPrevPixel(currentHitPoint, out float pxf, out float pyf))
-                {
-                    // Use fractional previous coordinates (proper motion vectors)
-                    // and bilinearly sample the history buffers to avoid rounding
-                    // artifacts. We require a minimum valid weight from the
-                    // neighboring history pixels to accept the reprojection.
-                    int ix0 = (int)MathF.Floor(pxf);
-                    int iy0 = (int)MathF.Floor(pyf);
-                    float wx = pxf - ix0;
-                    float wy = pyf - iy0;
-
-                    // Clamp sample indices to image bounds
-                    int x0 = Math.Clamp(ix0, 0, Width - 1);
-                    int y0 = Math.Clamp(iy0, 0, Height - 1);
-                    int x1 = Math.Clamp(ix0 + 1, 0, Width - 1);
-                    int y1 = Math.Clamp(iy0 + 1, 0, Height - 1);
-
-                    // Fetch four neighbors
-                    int i00 = y0 * Width + x0;
-                    int i10 = y0 * Width + x1;
-                    int i01 = y1 * Width + x0;
-                    int i11 = y1 * Width + x1;
-
-                    // Bilinear weights
-                    float w00 = (1f - wx) * (1f - wy);
-                    float w10 = wx * (1f - wy);
-                    float w01 = (1f - wx) * wy;
-                    float w11 = wx * wy;
-
-                    // Determine how much valid history contributes
-                    float validWeight = (_taaHistoryValid[i00] ? w00 : 0f) + (_taaHistoryValid[i10] ? w10 : 0f) + (_taaHistoryValid[i01] ? w01 : 0f) + (_taaHistoryValid[i11] ? w11 : 0f);
-
-                    if (validWeight > 0.25f)
-                    {
-                        // Bilinear sample history color and hit point
-                        Vector3 history = _taaHistoryXYZ[i00] * w00 + _taaHistoryXYZ[i10] * w10 + _taaHistoryXYZ[i01] * w01 + _taaHistoryXYZ[i11] * w11;
-                        Vector3 historyHit = _taaHistoryHitPoint[i00] * w00 + _taaHistoryHitPoint[i10] * w10 + _taaHistoryHitPoint[i01] * w01 + _taaHistoryHitPoint[i11] * w11;
-
-                        float reprojErr = Vector3.DistanceSquared(historyHit, currentHitPoint);
-
-                        // Disocclusion + normal-consistency checks.
-                        float reprojThreshold = IsMoving ? 0.0625f : 0.25f; // squared distance
-                        bool accept = reprojErr < reprojThreshold;
-
-                        // Normal agreement check (cheap): sample current normals at history neighbors
-                        var histNormal = Vector3.Zero;
-                        histNormal += _normalWorld[i00] * w00;
-                        histNormal += _normalWorld[i10] * w10;
-                        histNormal += _normalWorld[i01] * w01;
-                        histNormal += _normalWorld[i11] * w11;
-                        var currNormal = _normalWorld[ix];
-                        if (accept && histNormal != Vector3.Zero && currNormal != Vector3.Zero)
-                        {
-                            float ndot = Math.Clamp(Vector3.Dot(Vector3.Normalize(histNormal), Vector3.Normalize(currNormal)), -1f, 1f);
-                            if (ndot < 0.90f)
-                                accept = false;
-                        }
-
-                        if (accept)
-                        {
-                            ComputeNeighborhoodMinMax(y, x, out Vector3 nMin, out Vector3 nMax);
-                            history = Vector3.Clamp(history, nMin, nMax);
-                            resolved = Vector3.Lerp(history, current, alpha);
-                            historyWeight = 1f - alpha;
-                            reprojectionDelta = Vector3.Distance(history, current);
-                        }
-                        else
-                        {
-                            rejectedThisPixel = true;
-                        }
-                    }
-                    else
-                    {
-                        rejectedThisPixel = true;
-                    }
-                }
-                else if (useTaa && currentHit)
-                {
-                    rejectedThisPixel = true;
-                }
-
-                _taaNextXYZ[ix] = resolved;
-                _taaNextHitPoint[ix] = currentHitPoint;
-                _taaNextValid[ix] = currentHit;
-                _historyWeight[ix] = historyWeight;
-                _historyRejected[ix] = rejectedThisPixel ? (byte)1 : (byte)0;
-                _diffReprojectedVsCurrent[ix] = reprojectionDelta;
-                _diffCurrentVsAccum[ix] = Vector3.Distance(current, resolved);
-                _diffUnfilteredVsFiltered[ix] = Vector3.Distance(unfiltered, current);
-
-                if (rejectedThisPixel)
-                    rejected++;
-
-                histWeightSum += historyWeight;
-                varianceSum += _lumaVariance[ix];
-                uint spp = SampleCount[ix];
-                sppSum += spp;
-                if (spp > maxSpp)
-                    maxSpp = spp;
-                if (_clampHitFrame[ix])
-                {
-                    clampedPixelCount++;
-                }
-
-                WriteColorToBuffer(y, x, resolved);
-            }
-        }
-
-        if (useTaa || !_taaHasPrevCamera)
-        {
-            Array.Copy(_taaNextXYZ, _taaHistoryXYZ, _taaNextXYZ.Length);
-            Array.Copy(_taaNextHitPoint, _taaHistoryHitPoint, _taaNextHitPoint.Length);
-            Array.Copy(_taaNextValid, _taaHistoryValid, _taaNextValid.Length);
-        }
-        else
-        {
-            // Keep history coherent when TAA is toggled off.
-            for (int i = 0; i < _taaHistoryXYZ.Length; i++)
-            {
-                _taaHistoryXYZ[i] = _taaNextXYZ[i];
-                _taaHistoryHitPoint[i] = _taaNextHitPoint[i];
-                _taaHistoryValid[i] = _taaNextValid[i];
-            }
-        }
-
-        _taaPrevCamPos = Camera.Position;
-        _taaPrevCamRot = Camera.Rotation;
-        _taaHasPrevCamera = true;
-        FrameIndex++;
-
-        int pixels = Width * Height;
-        RejectedHistoryPercent = pixels > 0 ? (double)rejected / pixels * 100.0 : 0.0;
-        ClampedPixelPercent = pixels > 0 ? (double)clampedPixelCount / pixels * 100.0 : 0.0;
-        AverageVariance = pixels > 0 ? varianceSum / pixels : 0.0;
-        AverageHistoryWeight = pixels > 0 ? histWeightSum / pixels : 0.0;
-        AverageEffectiveSpp = pixels > 0 ? sppSum / pixels : 0.0;
-        MaxObservedSampleCount = maxSpp;
-        Array.Clear(_clampHitFrame);
-    }
-
-    private void ComputeNeighborhoodMinMax(int y, int x, out Vector3 nMin, out Vector3 nMax)
-    {
-        nMin = new Vector3(float.MaxValue);
-        nMax = new Vector3(float.MinValue);
-        int yMin = Math.Max(y - 1, 0);
-        int yMax = Math.Min(y + 1, Height - 1);
-        int xMin = Math.Max(x - 1, 0);
-        int xMax = Math.Min(x + 1, Width - 1);
-        for (int ny = yMin; ny <= yMax; ny++)
-        {
-            int rowOff = ny * Width;
-            for (int nx = xMin; nx <= xMax; nx++)
-            {
-                Vector3 v = ResolveFilteredXYZ(ny, nx);
-                nMin = Vector3.Min(nMin, v);
-                nMax = Vector3.Max(nMax, v);
-            }
-        }
-    }
-
-    private bool TryProjectToPrevPixel(Vector3 worldPoint, out float px, out float py)
-    {
-        Quaternion invRot = Quaternion.Inverse(_taaPrevCamRot);
-        Vector3 local = Vector3.Transform(worldPoint - _taaPrevCamPos, invRot);
-        if (local.Z <= 1e-4f)
-        {
-            px = py = 0f;
-            return false;
-        }
-
-        float ndcX = local.X / (local.Z * _aspectTanHalfFov);
-        float ndcY = local.Y / (local.Z * _tanHalfFov);
-
-        float fx = ((ndcX + 1f) * 0.5f) * Width - 0.5f;
-        float fy = ((1f - ndcY) * 0.5f) * Height - 0.5f;
-
-        px = fx;
-        py = fy;
-        return px >= 0f && px < Width && py >= 0f && py < Height;
-    }
-
-    private void WriteColorToBuffer(int y, int x, Vector3 xyz)
-    {
-        var linearColor = ToSRGB(xyz);
-        var color = new Vector3(
-            LinearToSRGB(linearColor.X),
-            LinearToSRGB(linearColor.Y),
-            LinearToSRGB(linearColor.Z)
-        );
-
-        int i = y * Stride + x * 4;
-        DisplayBuffer[i + 0] = (byte)Math.Clamp(color.Z * 255f, 0, 255);
-        DisplayBuffer[i + 1] = (byte)Math.Clamp(color.Y * 255f, 0, 255);
-        DisplayBuffer[i + 2] = (byte)Math.Clamp(color.X * 255f, 0, 255);
-        DisplayBuffer[i + 3] = 255;
+        _taaResolver.ResolveDisplayBufferWithTaa();
     }
 
     /// <summary>
@@ -684,6 +438,11 @@ public class JobSystem
     /// </summary>
     public void ResetAccumulation()
     {
+        _accumulationBuffer.ResetAccumulation();
+    }
+
+    internal void ResetAccumulationCore()
+    {
         Array.Clear(AccumXYZ);
         Array.Clear(SampleCount);
         Array.Clear(LastHit);
@@ -744,6 +503,11 @@ public class JobSystem
     /// </summary>
     public void SoftResetAccumulation()
     {
+        _accumulationBuffer.SoftResetAccumulation();
+    }
+
+    internal void SoftResetAccumulationCore()
+    {
         _checkerPhase ^= 1;
         for (int i = 0; i < SampleCount.Length; i++)
             if (SampleCount[i] > MotionSampleCap)
@@ -752,15 +516,7 @@ public class JobSystem
 
     public async Task AddJobs()
     {
-        for (int y = 0; y < Height; y += TileSize)
-        {
-            for (int x = 0; x < Width; x += TileSize)
-            {
-                int w = Math.Min(TileSize, Width - x);
-                int h = Math.Min(TileSize, Height - y);
-                await Jobs.Writer.WriteAsync(new Tile(x, y, w, h));
-            }
-        }
+        await _tileScheduler.AddJobs();
     }
 
     static uint Hash2D(int x, int y)
@@ -778,6 +534,11 @@ public class JobSystem
     private const int CompanionCount = 4;
 
     private void Trace(Camera camera, int y, int x)
+    {
+        _pathTracer.Trace(camera, y, x);
+    }
+
+    internal void TraceCore(Camera camera, int y, int x)
     {
         var ix = y * Width + x;
 
@@ -1246,6 +1007,11 @@ public class JobSystem
 
     public string GetDebugLegend(DebugViewMode mode)
     {
+        return _debugBufferRenderer.GetDebugLegend(mode);
+    }
+
+    internal string GetDebugLegendCore(DebugViewMode mode)
+    {
         return mode switch
         {
             DebugViewMode.Beauty => "Debug: Beauty | Range: scene-referred color",
@@ -1269,6 +1035,11 @@ public class JobSystem
     }
 
     public void RenderDebugModeToBuffer(DebugViewMode mode, byte[] targetBuffer, int targetStride)
+    {
+        _debugBufferRenderer.RenderDebugModeToBuffer(mode, targetBuffer, targetStride);
+    }
+
+    internal void RenderDebugModeToBufferCore(DebugViewMode mode, byte[] targetBuffer, int targetStride)
     {
         for (int y = 0; y < Height; y++)
         {
@@ -1349,11 +1120,10 @@ public class JobSystem
                     DebugViewMode.CurrentVsAccumDiff => PaletteDifference(_diffCurrentVsAccum[ix]),
                     DebugViewMode.DirectVariance => PaletteVariance(_lumaDirectVariance[ix], (float)Math.Max(0.0001, AverageVariance * 8)),
                     DebugViewMode.IndirectVariance => PaletteVariance(_lumaIndirectVariance[ix], (float)Math.Max(0.0001, AverageVariance * 8)),
-                    DebugViewMode.VarianceSplit =>
-                        // composite: R = indirect, G = direct, B = average variance
-                        new Vector3(Math.Clamp(_lumaIndirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                                    Math.Clamp(_lumaDirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                                    Math.Clamp(_lumaVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f)),
+                    DebugViewMode.VarianceSplit => new Vector3(
+                    Math.Clamp(_lumaIndirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
+                    Math.Clamp(_lumaDirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
+                    Math.Clamp(_lumaVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f)),
                     DebugViewMode.UnfilteredVsFilteredDiff => PaletteDifference(_diffUnfilteredVsFiltered[ix]),
                     DebugViewMode.ReprojectedVsCurrentDiff => PaletteDifference(_diffReprojectedVsCurrent[ix]),
                     DebugViewMode.Bounce0 => ColorFromXyz(_bounce0XYZ[ix]),
