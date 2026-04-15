@@ -1,0 +1,305 @@
+@page
+@model Sts2Viewer.Pages.IndexModel
+@{
+    ViewData["Title"] = "STS2 Knowledge Viewer";
+}
+
+<style>
+    .index-shell { display:grid; gap:16px; }
+    .panel { padding:14px 16px; border:1px solid #d7dbe2; border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(15, 23, 42, 0.04); }
+    .panel-title { margin:0 0 10px 0; font-size:1.05rem; }
+    .diagnostic-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+    .diagnostic-card { padding:10px 12px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; }
+    .diagnostic-label { display:block; font-size:11px; color:#526071; margin-bottom:4px; }
+    .diagnostic-value { font-size:1.15rem; font-weight:600; }
+    .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end; }
+    .filter-actions { display:flex; align-items:end; }
+    .filter-actions button { width:100%; }
+    .muted { color:#667085; }
+    .table-wrap { max-height:70vh; overflow:auto; border:1px solid #d7dbe2; border-radius:12px; }
+    .data-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .data-table th,
+    .data-table td { border-bottom:1px solid #e5e7eb; border-right:0; border-left:0; font-size:12px; }
+    .data-table thead th { position:sticky; top:0; z-index:1; background:#f8fafc; }
+    .data-table tbody tr:nth-child(even) { background:#fbfdff; }
+    .data-table tbody tr:hover { background:#eef6ff; }
+    .sort-link { color:inherit; text-decoration:none; display:inline-flex; gap:4px; align-items:center; }
+    .sort-link:hover { text-decoration:underline; }
+    .type-badge { display:inline-block; padding:3px 9px; border-radius:999px; color:#fff; font-size:11px; font-weight:600; letter-spacing:0.02em; text-transform:lowercase; }
+    .type-card { background:#2f6fed; }
+    .type-relic { background:#b68a00; }
+    .type-potion { background:#0b8d8d; }
+    .type-event { background:#7a3db8; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:4px; }
+    .tag-chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef3ff; color:#243b53; font-size:10px; line-height:1.5; }
+    .tags-cell { font-size:11px; min-width:220px; }
+    .rating-cell { display:grid; grid-template-columns:minmax(70px, 1fr) 28px; gap:8px; align-items:center; min-width:118px; }
+    .rating-track { height:8px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
+    .rating-fill { height:100%; border-radius:999px; }
+    .rating-low { background:#7d8794; }
+    .rating-medium { background:#d4a64f; }
+    .rating-high { background:#2f9e44; }
+    .rating-anti-low { background:#2f9e44; }
+    .rating-anti-high { background:#c92a2a; }
+    .rating-value { font-variant-numeric:tabular-nums; color:#344054; }
+    .title-cell { min-width:220px; }
+    .id-cell { white-space:nowrap; }
+</style>
+
+<h1>STS2 Knowledge Viewer</h1>
+
+@if (!Model.HasConnectionString)
+{
+    <p>Set <code>Database:ConnectionString</code> in <code>sts2_Viewer/appsettings.json</code> or set <code>STS2_POSTGRES_CONNECTION_STRING</code>.</p>
+}
+else
+{
+    <div class="index-shell">
+        <section class="panel">
+            <h2 class="panel-title">Pipeline diagnostics</h2>
+            <div class="diagnostic-grid">
+                <div class="diagnostic-card">
+                    <span class="diagnostic-label">entity_synergy_edges</span>
+                    <span class="diagnostic-value">@Model.PipelineDiagnostics.SynergyEdgeCount</span>
+                </div>
+                <div class="diagnostic-card">
+                    <span class="diagnostic-label">synergy_clusters</span>
+                    <span class="diagnostic-value">@Model.PipelineDiagnostics.SynergyClusterCount</span>
+                </div>
+                <div class="diagnostic-card">
+                    <span class="diagnostic-label">entity_strength_ratings</span>
+                    <span class="diagnostic-value">@Model.PipelineDiagnostics.EntityStrengthRatingCount</span>
+                </div>
+                <div class="diagnostic-card">
+                    <span class="diagnostic-label">entity_archetype_affinity</span>
+                    <span class="diagnostic-value">@Model.PipelineDiagnostics.EntityArchetypeAffinityCount</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">Browse entities</h2>
+            <form method="get" class="filter-grid">
+                <label>
+                    Search<br />
+                    <input type="text" name="Search" value="@Model.Search" />
+                </label>
+
+                <label>
+                    Entity type<br />
+                    <select name="EntityType">
+                        <option value="" selected="@(Model.EntityType == "")">all</option>
+                        <option value="card" selected="@(Model.EntityType == "card")">card</option>
+                        <option value="relic" selected="@(Model.EntityType == "relic")">relic</option>
+                        <option value="potion" selected="@(Model.EntityType == "potion")">potion</option>
+                        <option value="event_option" selected="@(Model.EntityType == "event_option")">event option</option>
+                    </select>
+                </label>
+
+                <label>
+                    Character<br />
+                    <select name="CharacterId">
+                        <option value="" selected="@(Model.CharacterId == "")">all</option>
+                        @foreach (var character in Model.AvailableCharacters)
+                        {
+                            <option value="@character.Id" selected="@(Model.CharacterId == character.Id)">@character.Title</option>
+                        }
+                    </select>
+                </label>
+
+                <label>
+                    Tag<br />
+                    <select name="Tag">
+                        <option value="" selected="@(Model.Tag == "")">all</option>
+                        @foreach (string tag in Model.AvailableTags)
+                        {
+                            <option value="@tag" selected="@(Model.Tag == tag)">@tag</option>
+                        }
+                    </select>
+                </label>
+
+                <label>
+                    Min synergy<br />
+                    <input type="number" name="MinSynergy" min="1" max="10" value="@Model.MinSynergy" />
+                </label>
+
+                <label>
+                    Min flexibility<br />
+                    <input type="number" name="MinFlexibility" min="1" max="10" value="@Model.MinFlexibility" />
+                </label>
+
+                <label>
+                    Max anti-synergy<br />
+                    <input type="number" name="MaxAntiSynergy" min="1" max="10" value="@Model.MaxAntiSynergy" />
+                </label>
+
+                <label>
+                    Entity limit<br />
+                    <input type="number" name="EntityLimit" min="1" max="10000" value="@Model.EntityLimit" />
+                </label>
+
+                <input type="hidden" name="SortBy" value="@Model.SortBy" />
+                <input type="hidden" name="SortDirection" value="@Model.SortDirection" />
+
+                <div class="filter-actions">
+                    <button type="submit">Apply filters</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">Entities (@Model.Entities.Count)</h2>
+            @if (Model.Entities.Count == 0)
+            {
+                <p class="muted">No entities match the current filters.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Id</th>
+                                <th>Title</th>
+                                <th>Tags</th>
+                                <th>
+                                    <a class="sort-link"
+                                       asp-page="/Index"
+                                       asp-route-Search="@Model.Search"
+                                       asp-route-EntityType="@Model.EntityType"
+                                       asp-route-CharacterId="@Model.CharacterId"
+                                       asp-route-Tag="@Model.Tag"
+                                       asp-route-MinSynergy="@Model.MinSynergy"
+                                       asp-route-MinFlexibility="@Model.MinFlexibility"
+                                       asp-route-MaxAntiSynergy="@Model.MaxAntiSynergy"
+                                       asp-route-EntityLimit="@Model.EntityLimit"
+                                       asp-route-SortBy="synergy"
+                                       asp-route-SortDirection="@Model.NextSortDirection("synergy")">
+                                        <span>Synergy</span>
+                                        <span>@Model.SortIndicator("synergy")</span>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a class="sort-link"
+                                       asp-page="/Index"
+                                       asp-route-Search="@Model.Search"
+                                       asp-route-EntityType="@Model.EntityType"
+                                       asp-route-CharacterId="@Model.CharacterId"
+                                       asp-route-Tag="@Model.Tag"
+                                       asp-route-MinSynergy="@Model.MinSynergy"
+                                       asp-route-MinFlexibility="@Model.MinFlexibility"
+                                       asp-route-MaxAntiSynergy="@Model.MaxAntiSynergy"
+                                       asp-route-EntityLimit="@Model.EntityLimit"
+                                       asp-route-SortBy="flexibility"
+                                       asp-route-SortDirection="@Model.NextSortDirection("flexibility")">
+                                        <span>Flexibility</span>
+                                        <span>@Model.SortIndicator("flexibility")</span>
+                                    </a>
+                                </th>
+                                <th>
+                                    <a class="sort-link"
+                                       asp-page="/Index"
+                                       asp-route-Search="@Model.Search"
+                                       asp-route-EntityType="@Model.EntityType"
+                                       asp-route-CharacterId="@Model.CharacterId"
+                                       asp-route-Tag="@Model.Tag"
+                                       asp-route-MinSynergy="@Model.MinSynergy"
+                                       asp-route-MinFlexibility="@Model.MinFlexibility"
+                                       asp-route-MaxAntiSynergy="@Model.MaxAntiSynergy"
+                                       asp-route-EntityLimit="@Model.EntityLimit"
+                                       asp-route-SortBy="anti"
+                                       asp-route-SortDirection="@Model.NextSortDirection("anti")">
+                                        <span>Anti</span>
+                                        <span>@Model.SortIndicator("anti")</span>
+                                    </a>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entity in Model.Entities)
+                            {
+                                <tr>
+                                    <td><span class="@Model.TypeBadgeClass(entity.EntityType)">@entity.EntityType</span></td>
+                                    <td class="id-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.EntityId</a></td>
+                                    <td class="title-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.Title</a></td>
+                                    <td class="tags-cell">
+                                        @if (entity.Tags.Count == 0)
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="tag-list">
+                                                @foreach (string tag in entity.Tags)
+                                                {
+                                                    <span class="tag-chip">@tag</span>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.SynergyRating, false)" style="width:@(Math.Clamp(entity.SynergyRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.SynergyRating</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.FlexibilityRating, false)" style="width:@(Math.Clamp(entity.FlexibilityRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.FlexibilityRating</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.AntiSynergyRating, true)" style="width:@(Math.Clamp(entity.AntiSynergyRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.AntiSynergyRating</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">Synergy clusters (@Model.SynergyClusters.Count)</h2>
+            @if (Model.SynergyClusters.Count == 0)
+            {
+                <p><em>No rows found in <code>synergy_clusters</code>. Pairwise synergy edges can still exist in <code>entity_synergy_edges</code>, but archetype cluster data must be generated/populated separately.</em></p>
+            }
+            else
+            {
+                <div class="table-wrap" style="max-height:28rem;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Archetype</th>
+                                <th>Type</th>
+                                <th>Entity</th>
+                                <th>Role</th>
+                                <th>Score</th>
+                                <th>Explanation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var cluster in Model.SynergyClusters)
+                            {
+                                <tr>
+                                    <td>@cluster.ArchetypeName</td>
+                                    <td>@cluster.EntityType</td>
+                                    <td>@cluster.EntityId</td>
+                                    <td>@cluster.Role</td>
+                                    <td>@cluster.Score</td>
+                                    <td>@cluster.Explanation</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+}

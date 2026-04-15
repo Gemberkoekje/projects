@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        body { font-family: Segoe UI, Arial, sans-serif; margin: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 12px; vertical-align: top; }
+        th { background: #f4f4f4; }
+        input, select { width: 100%; box-sizing: border-box; }
+        nav a { margin-right: 12px; }
+    </style>
+</head>
+<body>
+    <nav style="margin-bottom:12px;">
+        <a href="/">Viewer</a>
+        <a href="/PickAdvisor">Pick Advisor</a>
+    </nav>
+    @RenderBody()
+</body>
+</html>

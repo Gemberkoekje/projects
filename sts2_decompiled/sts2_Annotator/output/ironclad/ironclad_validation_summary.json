@@ -1,0 +1,9 @@
+{
+    "expected_card_count":  87,
+    "extracted_card_count":  87,
+    "preview_card_count":  87,
+    "low_confidence_count":  3,
+    "missing_card_ids":  [
+
+                         ]
+}

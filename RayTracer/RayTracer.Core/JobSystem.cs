@@ -153,6 +153,12 @@ public class JobSystem
     public LightingMode Lighting { get; init; }
 
     /// <summary>
+    /// Controls how many worker threads are spawned and at what OS priority they run.
+    /// See <see cref="CpuThrottle"/> for the available levels.
+    /// </summary>
+    public CpuThrottle ThrottleCpu { get; init; }
+
+    /// <summary>
     /// Controls how aggressively the bilateral filter preserves edges.
     /// Higher = more edge-preserving.  25 works well for normalised
     /// XYZ Y values in the 0-1 range.
@@ -256,13 +262,25 @@ public class JobSystem
 
     public void SetupJobs(CancellationToken cancellationToken)
     {
-        for (int x = 0; x < Environment.ProcessorCount; x++)
+        int n = Environment.ProcessorCount;
+        int workerCount = ThrottleCpu switch
+        {
+            CpuThrottle.BelowNormal => n,
+            CpuThrottle.MinusOne    => Math.Max(1, n - 1),
+            CpuThrottle.Half        => Math.Max(1, n / 2),
+            CpuThrottle.One         => 1,
+            _                       => n
+        };
+        bool lowerPriority = ThrottleCpu != CpuThrottle.Normal;
+        for (int x = 0; x < workerCount; x++)
         {
             Task.Run(async () =>
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var job = await Jobs.Reader.ReadAsync(cancellationToken);
+                    if (lowerPriority)
+                        Thread.CurrentThread.Priority = ThreadPriority.BelowNormal;
                     int phase = _checkerPhase;
                     for(var y = job.Y; y < job.Y + job.Height; y++)
                     {

@@ -1,0 +1,1667 @@
+[
+    {
+        "card_id":  "Aggression",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Aggression power to self",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self-buff"
+                        ]
+    },
+    {
+        "card_id":  "Anger",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 6 damage to enemy, add clone to discard pile",
+        "anti_synergy_tags":  [
+                                  "discard_heavy"
+                              ],
+        "resources_generated":  [
+                                    "card_copy"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "card_generation"
+                        ]
+    },
+    {
+        "card_id":  "Armaments",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 5 block, optionally upgrade card in hand (upgraded: upgrade all upgradable cards in hand)",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "block",
+                            "card_upgrade"
+                        ]
+    },
+    {
+        "card_id":  "AshenStrike",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage based on calculated scaling",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack"
+                        ]
+    },
+    {
+        "card_id":  "Barricade",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Barricade power to self",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self-buff",
+                            "defensive"
+                        ]
+    },
+    {
+        "card_id":  "Bash",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 8 damage and apply 2 Vulnerable to enemy",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "vulnerable"
+                        ]
+    },
+    {
+        "card_id":  "BattleTrance",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Draw cards, apply NoDrawPower to self",
+        "anti_synergy_tags":  [
+                                  "draw_heavy"
+                              ],
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "draw",
+                            "power",
+                            "card_selection"
+                        ]
+    },
+    {
+        "card_id":  "Bloodletting",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "hp"
+                               ],
+        "effect_description":  "Lose 6 HP, gain 2 energy",
+        "anti_synergy_tags":  [
+                                  "low_hp"
+                              ],
+        "resources_generated":  [
+                                    "energy"
+                                ],
+        "effect_tags":  [
+                            "self-damage",
+                            "energy_generation"
+                        ]
+    },
+    {
+        "card_id":  "BloodWall",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hp"
+                               ],
+        "effect_description":  "Lose 10 HP, gain 16 block",
+        "anti_synergy_tags":  [
+                                  "low_hp"
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "self-damage",
+                            "block"
+                        ]
+    },
+    {
+        "card_id":  "Bludgeon",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 32 damage to enemy",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "high_damage"
+                        ]
+    },
+    {
+        "card_id":  "BodySlam",
+        "scaling_type":  "block_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage equal to current block to enemy",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "block_scaling"
+                        ]
+    },
+    {
+        "card_id":  "Brand",
+        "scaling_type":  "strength",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hp",
+                                   "card"
+                               ],
+        "effect_description":  "Lose 4 HP, exhaust card from hand, gain 1 Strength",
+        "anti_synergy_tags":  [
+                                  "low_hp",
+                                  "no_cards"
+                              ],
+        "resources_generated":  [
+                                    "strength"
+                                ],
+        "effect_tags":  [
+                            "self-damage",
+                            "exhaust",
+                            "buff"
+                        ]
+    },
+    {
+        "card_id":  "Break",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 20 damage to target enemy and apply 5 vulnerable.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "vulnerable",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "Breakthrough",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hp"
+                               ],
+        "effect_description":  "Deal 9 damage to all enemies. Lose 1 HP (unblockable).",
+        "anti_synergy_tags":  [
+                                  "self_damage"
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "aoe",
+                            "self_damage"
+                        ]
+    },
+    {
+        "card_id":  "Bully",
+        "scaling_type":  "vulnerability_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage based on target enemy\u0027s vulnerable.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "vulnerable_scaling",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "BurningPact",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Exhaust 1 card from hand. Draw 2 cards.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "card_draw",
+                            "exhaust",
+                            "self_targeted"
+                        ]
+    },
+    {
+        "card_id":  "Cascade",
+        "scaling_type":  "x_scaling",
+        "resources_consumed":  [
+
+                               ],
+        "effect_description":  "Auto-play X cards from top of draw pile.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_play"
+                                ],
+        "effect_tags":  [
+                            "card_play",
+                            "energy_generation",
+                            "x_cost"
+                        ]
+    },
+    {
+        "card_id":  "Cinder",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 17 damage to target enemy. Exhaust 1 card from draw pile.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "exhaust",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "Colossus",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 5 block. Apply 1 Colossus power (gains block when attacked).",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "block",
+                            "power",
+                            "self_targeted"
+                        ]
+    },
+    {
+        "card_id":  "Conflagration",
+        "scaling_type":  "strength_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage to all enemies based on strength.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "strength_scaling",
+                            "aoe"
+                        ]
+    },
+    {
+        "card_id":  "Corruption",
+        "scaling_type":  "Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Corruption power to self. Upgrades reduce energy cost by 1.",
+        "anti_synergy_tags":  [
+                                  "Exhaust Heavy"
+                              ],
+        "resources_generated":  [
+                                    "Power"
+                                ],
+        "effect_tags":  [
+                            "Self-Buff",
+                            "Power Generation",
+                            "Ancient"
+                        ]
+    },
+    {
+        "card_id":  "CrimsonMantle",
+        "scaling_type":  "Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Crimson Mantle power (8) to self, incrementing self-damage scaling.",
+        "anti_synergy_tags":  [
+                                  "Low Damage Output"
+                              ],
+        "resources_generated":  [
+                                    "Power",
+                                    "Self-Damage Scaling"
+                                ],
+        "effect_tags":  [
+                            "Self-Buff",
+                            "Damage Scaling",
+                            "Power Generation"
+                        ]
+    },
+    {
+        "card_id":  "Cruelty",
+        "scaling_type":  "Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Cruelty power (25) to self. Upgrades increase power value by 25.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Power"
+                                ],
+        "effect_tags":  [
+                            "Self-Buff",
+                            "Power Generation",
+                            "Strength-like"
+                        ]
+    },
+    {
+        "card_id":  "DarkEmbrace",
+        "scaling_type":  "Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Dark Embrace power (1) to self. Upgrades reduce energy cost by 1.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Power"
+                                ],
+        "effect_tags":  [
+                            "Self-Buff",
+                            "Power Generation",
+                            "Exhaust Synergy"
+                        ]
+    },
+    {
+        "card_id":  "DefendIronclad",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 5 block (8 upgraded)",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "defensive",
+                            "basic"
+                        ]
+    },
+    {
+        "card_id":  "DemonForm",
+        "scaling_type":  "power_stacking",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply 2 Strength (2 upgraded) to self via DemonFormPower",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "strength"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "strength_scaling",
+                            "rare"
+                        ]
+    },
+    {
+        "card_id":  "DemonicShield",
+        "scaling_type":  "self_damage_scaling",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hp"
+                               ],
+        "effect_description":  "Sacrifice HP to grant target ally block equal to HP lost",
+        "anti_synergy_tags":  [
+                                  "exhaust"
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "defensive",
+                            "ally_support",
+                            "self_damage"
+                        ]
+    },
+    {
+        "card_id":  "Dismantle",
+        "scaling_type":  "conditional_hitcount",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 8 damage (10 upgraded) with 2 hits if target is Vulnerable, 1 hit otherwise",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "damage"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "vulnerable_synergy"
+                        ]
+    },
+    {
+        "card_id":  "Dominate",
+        "scaling_type":  "enemy_power_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Strength to self equal to target\u0027s Vulnerable amount",
+        "anti_synergy_tags":  [
+                                  "exhaust"
+                              ],
+        "resources_generated":  [
+                                    "strength"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "vulnerable_synergy",
+                            "power_steal"
+                        ]
+    },
+    {
+        "card_id":  "DrumOfBattle",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Draw 1 card (2 upgraded) and apply DrumOfBattlePower to self",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "card_draw",
+                            "power_stacking"
+                        ]
+    },
+    {
+        "card_id":  "EvilEye",
+        "scaling_type":  "conditional_multiplier",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 8 block (11 upgraded) twice if card was exhausted this turn, once otherwise",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "defensive",
+                            "exhaust_synergy"
+                        ]
+    },
+    {
+        "card_id":  "ExpectAFight",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain energy from calculated value",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "energy"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "energy_gain",
+                            "upgraded_cost_reduction"
+                        ]
+    },
+    {
+        "card_id":  "Feed",
+        "scaling_type":  "kill_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 10 damage (12 upgraded). If target dies, gain max HP",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "damage",
+                                    "max_hp"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "kill_reward",
+                            "rare",
+                            "scaling"
+                        ]
+    },
+    {
+        "card_id":  "FeelNoPain",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply 3 FeelNoPainPower to self",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "power"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "block_scaling"
+                        ]
+    },
+    {
+        "card_id":  "FiendFire",
+        "scaling_type":  "hand_size_scaling",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hand"
+                               ],
+        "effect_description":  "Exhaust all cards in hand, deal 7 damage (10 upgraded) per exhausted card",
+        "anti_synergy_tags":  [
+                                  "low_hand_size"
+                              ],
+        "resources_generated":  [
+                                    "damage"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "rare",
+                            "exhaust_synergy",
+                            "discard_payoff"
+                        ]
+    },
+    {
+        "card_id":  "FightMe",
+        "scaling_type":  "multi_hit_strength",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 5 damage (6 upgraded) twice, apply 2 Strength (3 upgraded) to self and target",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "damage",
+                                    "strength"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "strength_payoff",
+                            "multi_hit",
+                            "symmetric_strength"
+                        ]
+    },
+    {
+        "card_id":  "FlameBarrier",
+        "scaling_type":  "Block + Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Gain 12 block and apply Flame Barrier power (4 damage back) to self.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Block",
+                                    "Power",
+                                    "Reactive Damage"
+                                ],
+        "effect_tags":  [
+                            "Defense",
+                            "Power Generation",
+                            "Retaliation"
+                        ]
+    },
+    {
+        "card_id":  "ForgottenRitual",
+        "scaling_type":  "Conditional Energy",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "If a card was exhausted this turn, gain 1 energy. Upgrades increase energy gain by 1.",
+        "anti_synergy_tags":  [
+                                  "Low Exhaust Output"
+                              ],
+        "resources_generated":  [
+                                    "Energy"
+                                ],
+        "effect_tags":  [
+                            "Exhaust Synergy",
+                            "Energy Generation",
+                            "Conditional"
+                        ]
+    },
+    {
+        "card_id":  "Grapple",
+        "scaling_type":  "Damage + Power Stack",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Deal 7 damage to target enemy and apply Grapple power (5) to them.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Damage",
+                                    "Debuff Power"
+                                ],
+        "effect_tags":  [
+                            "Attack",
+                            "Damage",
+                            "Enemy Debuff",
+                            "Strength-like"
+                        ]
+    },
+    {
+        "card_id":  "Havoc",
+        "scaling_type":  "Card Draw",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Auto-play 1 card from top of draw pile, then exhaust it. Upgrades reduce energy cost by 1.",
+        "anti_synergy_tags":  [
+                                  "Hand Control Loss"
+                              ],
+        "resources_generated":  [
+                                    "Card Play",
+                                    "Exhaust"
+                                ],
+        "effect_tags":  [
+                            "Draw Manipulation",
+                            "Exhaust Generation",
+                            "Randomness"
+                        ]
+    },
+    {
+        "card_id":  "Headbutt",
+        "scaling_type":  "Damage",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Deal 9 damage to enemy. Select a card from discard and place it on top of draw pile.",
+        "anti_synergy_tags":  [
+                                  "Empty Discard"
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "Single Target",
+                            "Deck Manipulation",
+                            "Draw Acceleration"
+                        ]
+    },
+    {
+        "card_id":  "Hellraiser",
+        "scaling_type":  "Power Stacking",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Hellraiser Power to self.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Power"
+                                ],
+        "effect_tags":  [
+                            "Self Power",
+                            "Scaling"
+                        ]
+    },
+    {
+        "card_id":  "Hemokinesis",
+        "scaling_type":  "Damage",
+        "resources_consumed":  [
+                                   "Energy",
+                                   "HP"
+                               ],
+        "effect_description":  "Take unblockable damage equal to base value, then deal 14 damage to enemy.",
+        "anti_synergy_tags":  [
+                                  "Low HP",
+                                  "Fragile"
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "Single Target",
+                            "Self Damage",
+                            "High Damage"
+                        ]
+    },
+    {
+        "card_id":  "HowlFromBeyond",
+        "scaling_type":  "Damage",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Deal 16 damage to all enemies.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "All Enemies",
+                            "AOE",
+                            "High Energy Cost"
+                        ]
+    },
+    {
+        "card_id":  "Impervious",
+        "scaling_type":  "Block",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Gain 30 block.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Block"
+                                ],
+        "effect_tags":  [
+                            "Defense",
+                            "Scaling",
+                            "High Block Value"
+                        ]
+    },
+    {
+        "card_id":  "InfernalBlade",
+        "scaling_type":  "Generation",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Create a random free Attack card in hand this turn.",
+        "anti_synergy_tags":  [
+                                  "Full Hand"
+                              ],
+        "resources_generated":  [
+                                    "Card",
+                                    "Free Energy"
+                                ],
+        "effect_tags":  [
+                            "Card Generation",
+                            "Random",
+                            "Attack Synergy"
+                        ]
+    },
+    {
+        "card_id":  "Inferno",
+        "scaling_type":  "Power Stacking",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Inferno Power (6). Increment self damage counter.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Power"
+                                ],
+        "effect_tags":  [
+                            "Self Power",
+                            "Damage Scaling",
+                            "Passive"
+                        ]
+    },
+    {
+        "card_id":  "Inflame",
+        "scaling_type":  "Power Stacking",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply 2 Strength to self.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Strength"
+                                ],
+        "effect_tags":  [
+                            "Self Power",
+                            "Damage Scaling",
+                            "Passive"
+                        ]
+    },
+    {
+        "card_id":  "IronWave",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 5 damage and gain 5 block",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "block",
+                            "hybrid"
+                        ]
+    },
+    {
+        "card_id":  "Juggernaut",
+        "scaling_type":  "power_stacking",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Juggernaut power (5 stacks). Gain strength each turn",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "power_stack"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "strength_scaling",
+                            "passive"
+                        ]
+    },
+    {
+        "card_id":  "Juggling",
+        "scaling_type":  "power_stacking",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Juggling power. Gain card draw when drawing attacks",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "power_stack"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "card_draw",
+                            "passive",
+                            "innate_upgrade"
+                        ]
+    },
+    {
+        "card_id":  "Mangle",
+        "scaling_type":  "debuff_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 15 damage and apply strength loss debuff (10 stacks)",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "debuff"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "strength_loss",
+                            "debuff",
+                            "enemy_scaling"
+                        ]
+    },
+    {
+        "card_id":  "MoltenFist",
+        "scaling_type":  "conditional_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 10 damage. Duplicate enemy Vulnerable stacks on target",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "debuff"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "vulnerable_scaling",
+                            "conditional"
+                        ]
+    },
+    {
+        "card_id":  "Offering",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy",
+                                   "hp"
+                               ],
+        "effect_description":  "Lose HP, gain energy, draw cards",
+        "anti_synergy_tags":  [
+                                  "hp_loss"
+                              ],
+        "resources_generated":  [
+                                    "energy",
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "resource_conversion",
+                            "high_risk"
+                        ]
+    },
+    {
+        "card_id":  "OneTwoPunch",
+        "scaling_type":  "passive_effect",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply power causing next attack to play twice",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "power_stack"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "attack_duplication",
+                            "combo"
+                        ]
+    },
+    {
+        "card_id":  "PactsEnd",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+
+                               ],
+        "effect_description":  "Deal 17 damage to all enemies",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "damage"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "aoe",
+                            "zero_cost"
+                        ]
+    },
+    {
+        "card_id":  "PerfectedStrike",
+        "scaling_type":  "card_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage equal to base plus extra (scales with other attacks in deck)",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "damage"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "deck_scaling",
+                            "synergy"
+                        ]
+    },
+    {
+        "card_id":  "Pillage",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 6 damage and draw cards until non-attack drawn",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "card_draw",
+                            "conditional_draw"
+                        ]
+    },
+    {
+        "card_id":  "PommelStrike",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 9 damage and draw 1 card",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "card_draw",
+                            "hybrid"
+                        ]
+    },
+    {
+        "card_id":  "PrimalForce",
+        "scaling_type":  "transformation",
+        "resources_consumed":  [
+
+                               ],
+        "effect_description":  "Transform all Attack cards in hand to Giant Rock",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "card_transform"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "card_transform",
+                            "zero_cost",
+                            "synergy"
+                        ]
+    },
+    {
+        "card_id":  "Pyre",
+        "scaling_type":  "energy_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Pyre Power to self, scaling with current energy",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self_buff"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "Rage",
+        "scaling_type":  "power_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Rage Power to self, scaling with Power stat",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self_buff"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "Rampage",
+        "scaling_type":  "recursive_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage, then increase damage by scaling amount for subsequent plays",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "damage_scaling",
+                            "enemy_targeted"
+                        ],
+        "anti_synergy_tags":  [
+                                  "single_target_only"
+                              ]
+    },
+    {
+        "card_id":  "Rupture",
+        "scaling_type":  "strength_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Rupture Power to self, scaling with Strength stat",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self_buff",
+                            "strength_dependent"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "SecondWind",
+        "scaling_type":  "hand_size_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Exhaust all hand cards, gain block for each card exhausted",
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "exhaust",
+                            "block_generation"
+                        ],
+        "anti_synergy_tags":  [
+                                  "large_hand",
+                                  "card_draw_focus"
+                              ]
+    },
+    {
+        "card_id":  "SetupStrike",
+        "scaling_type":  "strength_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage and apply Setup Strike Power for Strength scaling",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "power_application",
+                            "strength_scaling",
+                            "enemy_targeted"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "ShrugItOff",
+        "scaling_type":  "none",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain block and draw cards",
+        "resources_generated":  [
+                                    "block",
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "block_generation",
+                            "card_draw"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "Spite",
+        "scaling_type":  "conditional",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage; if took damage this turn, draw cards",
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "conditional_draw",
+                            "enemy_targeted"
+                        ],
+        "anti_synergy_tags":  [
+                                  "low_damage_intake"
+                              ]
+    },
+    {
+        "card_id":  "Stampede",
+        "scaling_type":  "none",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Stampede Power to self",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "self_buff"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "Stoke",
+        "scaling_type":  "hand_size_scaling",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Exhaust all hand cards and redraw same number",
+        "resources_generated":  [
+                                    "card_draw"
+                                ],
+        "effect_tags":  [
+                            "skill",
+                            "exhaust",
+                            "card_cycle"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "Stomp",
+        "scaling_type":  "none",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal damage to all enemies",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "attack",
+                            "aoe",
+                            "all_enemies"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "StoneArmor",
+        "scaling_type":  "none",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Plating Power to self for damage reduction",
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "defensive",
+                            "plating"
+                        ],
+        "anti_synergy_tags":  [
+
+                              ]
+    },
+    {
+        "card_id":  "StrikeIronclad",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 6 damage to target enemy.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "SwordBoomerang",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 3 damage to random enemies 3 times.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "random_target",
+                            "multi_hit"
+                        ]
+    },
+    {
+        "card_id":  "Tank",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Tank power to self.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "tank_power"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "mitigation"
+                        ]
+    },
+    {
+        "card_id":  "Taunt",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 7 block and apply 1 Vulnerable to target enemy.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "block",
+                                    "vulnerable"
+                                ],
+        "effect_tags":  [
+                            "block",
+                            "debuff",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "TearAsunder",
+        "scaling_type":  "calculated",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 5 damage to target enemy multiple times based on calculated hits.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "single_target",
+                            "multi_hit",
+                            "scaling"
+                        ]
+    },
+    {
+        "card_id":  "Thrash",
+        "scaling_type":  "dynamic",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 4 damage twice to target. Exhaust a random Attack card from hand and add its damage to this card.",
+        "anti_synergy_tags":  [
+                                  "exhaustion_dependency"
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "single_target",
+                            "multi_hit",
+                            "exhaustion",
+                            "scaling"
+                        ]
+    },
+    {
+        "card_id":  "Thunderclap",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 4 damage to all enemies and apply 1 Vulnerable to all.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "vulnerable"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "aoe",
+                            "debuff"
+                        ]
+    },
+    {
+        "card_id":  "Tremble",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply 2 Vulnerable to target enemy.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "vulnerable"
+                                ],
+        "effect_tags":  [
+                            "debuff",
+                            "single_target"
+                        ]
+    },
+    {
+        "card_id":  "TrueGrit",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Gain 7 block and exhaust 1 card from hand.",
+        "anti_synergy_tags":  [
+                                  "exhaustion_cost"
+                              ],
+        "resources_generated":  [
+                                    "block"
+                                ],
+        "effect_tags":  [
+                            "block",
+                            "exhaustion"
+                        ]
+    },
+    {
+        "card_id":  "TwinStrike",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 5 damage to target enemy twice.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "single_target",
+                            "multi_hit"
+                        ]
+    },
+    {
+        "card_id":  "Unmovable",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Apply Unmovable power to self.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "unmovable_power"
+                                ],
+        "effect_tags":  [
+                            "power",
+                            "mitigation"
+                        ]
+    },
+    {
+        "card_id":  "Unrelenting",
+        "scaling_type":  "flat",
+        "resources_consumed":  [
+                                   "energy"
+                               ],
+        "effect_description":  "Deal 12 damage to target and gain 1 free Attack.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "free_attack"
+                                ],
+        "effect_tags":  [
+                            "damage",
+                            "single_target",
+                            "tempo"
+                        ]
+    },
+    {
+        "card_id":  "Uppercut",
+        "scaling_type":  "Power",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Deal 13 damage. Apply 1 Weak and 1 Vulnerable to target enemy.",
+        "anti_synergy_tags":  [
+                                  "Scaling"
+                              ],
+        "resources_generated":  [
+                                    "Weak",
+                                    "Vulnerable"
+                                ],
+        "effect_tags":  [
+                            "Damage",
+                            "Debuff",
+                            "Single-target"
+                        ]
+    },
+    {
+        "card_id":  "Vicious",
+        "scaling_type":  "Cards",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Apply Vicious Power scaling with card count.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Vicious"
+                                ],
+        "effect_tags":  [
+                            "Power",
+                            "Self-buff",
+                            "Scaling"
+                        ]
+    },
+    {
+        "card_id":  "Whirlwind",
+        "scaling_type":  "Energy",
+        "resources_consumed":  [
+                                   "Energy"
+                               ],
+        "effect_description":  "Deal 5 damage to all enemies, hit count scales with X energy spent.",
+        "anti_synergy_tags":  [
+
+                              ],
+        "resources_generated":  [
+                                    "Damage"
+                                ],
+        "effect_tags":  [
+                            "Damage",
+                            "AoE",
+                            "X-cost",
+                            "Multi-hit"
+                        ]
+    }
+]

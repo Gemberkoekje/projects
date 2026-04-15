@@ -13,8 +13,8 @@ public class CalibrationForm : Form
 {
     // ── Layout constants ───────────────────────────────────────────
     private const int FormWidth = 540;
-    private const int CollapsedHeight = 350;
-    private const int ExpandedHeight = 610;
+    private const int CollapsedHeight = 375;
+    private const int ExpandedHeight = 640;
 
     // ── Top-level controls ─────────────────────────────────────────
     private readonly ProgressBar _progressBar;
@@ -40,6 +40,8 @@ public class CalibrationForm : Form
     private CheckBox _chkEma;
     private CheckBox _chkClamp;
     private ComboBox _cboLighting;
+    private Label _lblThrottle;
+    private ComboBox _cboThrottle;
     private Label _lblEffective;
     private Label _lblAdvancedFps;
 
@@ -63,6 +65,15 @@ public class CalibrationForm : Form
 
     private static readonly (string label, LightingMode mode)[] LightingOptions =
         [("None", LightingMode.None), ("Direct", LightingMode.Direct), ("NEE", LightingMode.NEE)];
+
+    private static readonly (string label, CpuThrottle value)[] ThrottleOptions =
+    [
+        ("Normal (all cores)",                                      CpuThrottle.Normal),
+        ("Below normal priority",                                   CpuThrottle.BelowNormal),
+        ($"Minus 1 ({Math.Max(1, Environment.ProcessorCount - 1)} cores)", CpuThrottle.MinusOne),
+        ($"Half ({Math.Max(1, Environment.ProcessorCount / 2)} cores)",    CpuThrottle.Half),
+        ("1 core",                                                  CpuThrottle.One)
+    ];
 
     // ── State ──────────────────────────────────────────────────────
     private readonly Tracable[] _scene;
@@ -148,24 +159,37 @@ public class CalibrationForm : Form
         // Seed the dropdowns with Medium defaults
         PopulateAdvancedFrom(RenderPreset.Medium);
 
+        // ── CPU throttle dropdown ──────────────────────────────────
+        _lblThrottle = new Label
+        {
+            Text = "CPU usage:",
+            Location = new Point(20, 304),
+            AutoSize = true,
+            Visible = false
+        };
+        _cboThrottle = Cbo(120, 300, 230, ThrottleOptions.Select(t => t.label));
+        _cboThrottle.Visible = false;
+
         // ── Start button ───────────────────────────────────────────
         _startButton = new Button
         {
             Text = "Start Maze",
             Size = new Size(120, 35),
-            Location = new Point(210, 305),
+            Location = new Point(210, 330),
             Enabled = false
         };
         _startButton.Click += (_, _) =>
         {
             if (_customRadio.Checked)
                 ChosenPreset = BuildPresetFromAdvanced();
+            else
+                ChosenPreset = ChosenPreset with { ThrottleCpu = ThrottleOptions[Safe(_cboThrottle)].value };
             DialogResult = DialogResult.OK;
             Close();
         };
 
         Controls.AddRange([_statusLabel, _progressBar, _resultLabel,
-                           _presetPanel, _advancedGroup, _startButton]);
+                           _presetPanel, _lblThrottle, _cboThrottle, _advancedGroup, _startButton]);
 
         Load += async (_, _) => await RunCalibrationAsync();
     }
@@ -176,7 +200,7 @@ public class CalibrationForm : Form
         var grp = new GroupBox
         {
             Text = "Advanced Settings",
-            Location = new Point(20, 300),
+            Location = new Point(20, 330),
             Size = new Size(500, 255),
             Visible = false
         };
@@ -342,6 +366,8 @@ public class CalibrationForm : Form
         }
 
         _presetPanel.Visible = true;
+        _lblThrottle.Visible = true;
+        _cboThrottle.Visible = true;
         _startButton.Enabled = true;
     }
 
@@ -368,14 +394,14 @@ public class CalibrationForm : Form
     private void CollapseAdvanced()
     {
         _advancedGroup.Visible = false;
-        _startButton.Location = new Point(210, 305);
+        _startButton.Location = new Point(210, 330);
         ClientSize = new Size(FormWidth, CollapsedHeight);
     }
 
     private void ExpandAdvanced()
     {
         _advancedGroup.Visible = true;
-        _startButton.Location = new Point(210, 565);
+        _startButton.Location = new Point(210, 595);
         ClientSize = new Size(FormWidth, ExpandedHeight);
     }
 
@@ -425,7 +451,8 @@ public class CalibrationForm : Form
             lighting,
             CheckerboardMotion: _chkChecker.Checked,
             TemporalBlendAlpha: _chkEma.Checked ? 0.05f : 0f,
-            SampleClamp: _chkClamp.Checked ? 10f : 0f);
+            SampleClamp: _chkClamp.Checked ? 10f : 0f,
+            ThrottleCpu: ThrottleOptions[Safe(_cboThrottle)].value);
     }
 
     private void UpdateAdvancedFps()

@@ -1,0 +1,464 @@
+@page
+@model Sts2Viewer.Pages.PickAdvisorModel
+@{
+    ViewData["Title"] = "Pick Advisor";
+}
+
+<h1>Pick Advisor</h1>
+
+@if (!Model.HasConnectionString)
+{
+    <p>Set <code>Database:ConnectionString</code> in <code>sts2_Viewer/appsettings.json</code> or set <code>STS2_POSTGRES_CONNECTION_STRING</code>.</p>
+}
+else
+{
+    <form id="advise-form" method="post" asp-page-handler="Advise" style="display:grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap:12px; margin-bottom:16px;">
+        <label>
+            Character<br />
+            <select name="CharacterId" id="character-id">
+                @foreach (var item in Model.CharacterItems())
+                {
+                    <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            Archetype<br />
+            <select name="ArchetypeId" id="archetype-id">
+                @foreach (var item in Model.ArchetypeItems())
+                {
+                    <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+                }
+            </select>
+        </label>
+
+        <label style="display:flex; gap:8px; align-items:center;">
+            <input type="checkbox" name="IncludeColorless" value="true" checked="@Model.IncludeColorless" />
+            Include colorless cards
+        </label>
+
+        <div></div>
+
+        <div>
+            Deck cards
+            <input type="hidden" name="DeckCsv" id="deck-csv" value="@Model.DeckCsv" />
+            <div class="chip-input" data-hidden="deck-csv" data-input="deck-input" data-list="card-options"></div>
+            <input type="text" id="deck-input" list="card-options" placeholder="Type card ID and press Enter" />
+        </div>
+
+        <div>
+            Relics
+            <input type="hidden" name="RelicsCsv" id="relics-csv" value="@Model.RelicsCsv" />
+            <div class="chip-input" data-hidden="relics-csv" data-input="relics-input" data-list="relic-options"></div>
+            <input type="text" id="relics-input" list="relic-options" placeholder="Type relic ID and press Enter" />
+        </div>
+
+        <label>
+            Offered option 1<br />
+            <input type="text" name="Option1Id" id="option-1" value="@Model.Option1Id" list="all-options" />
+        </label>
+
+        <label>
+            Offered option 2<br />
+            <input type="text" name="Option2Id" id="option-2" value="@Model.Option2Id" list="all-options" />
+        </label>
+
+        <label>
+            Offered option 3<br />
+            <input type="text" name="Option3Id" id="option-3" value="@Model.Option3Id" list="all-options" />
+        </label>
+
+        <div style="align-self:end;">
+            <button type="submit">Advise</button>
+        </div>
+    </form>
+
+    <datalist id="card-options">
+        @foreach (var card in Model.CardOptions)
+        {
+            <option value="@card.EntityId">@card.Title</option>
+        }
+    </datalist>
+
+    <datalist id="relic-options">
+        @foreach (var relic in Model.RelicOptions)
+        {
+            <option value="@relic.EntityId">@relic.Title</option>
+        }
+    </datalist>
+
+    <datalist id="all-options">
+        @foreach (var card in Model.CardOptions)
+        {
+            <option value="@card.EntityId">card - @card.Title</option>
+        }
+        @foreach (var relic in Model.RelicOptions)
+        {
+            <option value="@relic.EntityId">relic - @relic.Title</option>
+        }
+    </datalist>
+
+    <div style="margin:8px 0 16px 0;">
+        @foreach (var archetype in Model.Archetypes)
+        {
+            if (archetype.Id == Model.ArchetypeId)
+            {
+                <strong>Archetype tags:</strong>
+                <span>@string.Join(", ", archetype.KeyEffectTags)</span>
+            }
+        }
+    </div>
+
+    <h2>Ranked results (<span id="score-count">@Model.Scores.Count</span>)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Option</th>
+                <th>Composite</th>
+                <th>Deck fit</th>
+                <th>Archetype affinity</th>
+                <th>Anti</th>
+                <th>Flex</th>
+                <th>Synergy drivers</th>
+            </tr>
+        </thead>
+        <tbody id="scores-body">
+            @foreach (var score in Model.Scores)
+            {
+                <tr>
+                    <td>@score.Rank</td>
+                    <td>
+                        <a href="/EntityDetail?type=@score.EntityType&id=@score.EntityId">@score.EntityType:@score.EntityId</a>
+                    </td>
+                    <td>@RenderBar(score.CompositeScore, "bar-composite")</td>
+                    <td>@RenderBar(score.EdgeOverlapScore, "bar-deck")</td>
+                    <td>@RenderBar(score.ArchetypeFitScore, "bar-archetype")</td>
+                    <td>@RenderBar(score.AntiSynergyPenalty, "bar-anti")</td>
+                    <td>@RenderBar(score.FlexibilityScore, "bar-flex")</td>
+                    <td>@string.Join("; ", score.SynergyDrivers)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <form method="post" asp-page-handler="Explain" style="margin-top:12px;">
+        <input type="hidden" name="CharacterId" value="@Model.CharacterId" />
+        <input type="hidden" name="ArchetypeId" value="@Model.ArchetypeId" />
+        <input type="hidden" name="DeckCsv" value="@Model.DeckCsv" />
+        <input type="hidden" name="RelicsCsv" value="@Model.RelicsCsv" />
+        <input type="hidden" name="Option1Id" value="@Model.Option1Id" />
+        <input type="hidden" name="Option2Id" value="@Model.Option2Id" />
+        <input type="hidden" name="Option3Id" value="@Model.Option3Id" />
+        <input type="hidden" name="IncludeColorless" value="@Model.IncludeColorless" />
+        <button type="submit">Explain (LLM)</button>
+    </form>
+
+    @if (!string.IsNullOrWhiteSpace(Model.LlmNarrative))
+    {
+        <div style="margin-top:10px; padding:10px; border:1px solid #d5d5d5; background:#fafafa;">
+            @Model.LlmNarrative
+        </div>
+    }
+
+    <h3 style="margin-top:16px;">Recent cached advice for offered options</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>When</th>
+                <th>Option</th>
+                <th>Rank</th>
+                <th>Composite</th>
+                <th>Deck fit</th>
+                <th>Affinity</th>
+                <th>Anti</th>
+            </tr>
+        </thead>
+        <tbody id="recent-advice-body">
+            @foreach (var row in Model.RecentAdvice)
+            {
+                <tr>
+                    <td>@row.CreatedAt.LocalDateTime.ToString("g")</td>
+                    <td><a href="/EntityDetail?type=@row.OptionEntityType&id=@row.OptionEntityId">@row.OptionEntityType:@row.OptionEntityId</a></td>
+                    <td>@row.Rank</td>
+                    <td>@(row.CompositeScore * 10.0).ToString("F2")</td>
+                    <td>@(row.EdgeOverlapScore * 10.0).ToString("F1")</td>
+                    <td>@(row.ArchetypeFitScore * 10.0).ToString("F1")</td>
+                    <td>@(row.AntiSynergyPenalty * 10.0).ToString("F1")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h2 style="margin-top:24px;">Saved run states</h2>
+    <form method="post" asp-page-handler="SaveRunState" style="display:flex; gap:8px; margin-bottom:10px;">
+        <input type="hidden" name="CharacterId" value="@Model.CharacterId" />
+        <input type="hidden" name="ArchetypeId" value="@Model.ArchetypeId" />
+        <input type="hidden" name="DeckCsv" value="@Model.DeckCsv" />
+        <input type="hidden" name="RelicsCsv" value="@Model.RelicsCsv" />
+        <input type="hidden" name="Option1Id" value="@Model.Option1Id" />
+        <input type="hidden" name="Option2Id" value="@Model.Option2Id" />
+        <input type="hidden" name="Option3Id" value="@Model.Option3Id" />
+        <input type="hidden" name="IncludeColorless" value="@Model.IncludeColorless" />
+        <input type="text" name="RunStateName" value="@Model.RunStateName" placeholder="Name" />
+        <button type="submit">Save</button>
+    </form>
+
+    <form method="post" asp-page-handler="LoadRunState" style="display:flex; gap:8px; margin-bottom:8px;">
+        <input type="hidden" name="CharacterId" value="@Model.CharacterId" />
+        <input type="hidden" name="ArchetypeId" value="@Model.ArchetypeId" />
+        <input type="hidden" name="DeckCsv" value="@Model.DeckCsv" />
+        <input type="hidden" name="RelicsCsv" value="@Model.RelicsCsv" />
+        <input type="hidden" name="Option1Id" value="@Model.Option1Id" />
+        <input type="hidden" name="Option2Id" value="@Model.Option2Id" />
+        <input type="hidden" name="Option3Id" value="@Model.Option3Id" />
+        <input type="hidden" name="IncludeColorless" value="@Model.IncludeColorless" />
+        <select name="SelectedRunStateId">
+            <option value="0">Select run state</option>
+            @foreach (var runState in Model.RunStates)
+            {
+                <option value="@runState.Id">@runState.Name (@runState.CharacterId) - @runState.CreatedAt.LocalDateTime.ToString("g")</option>
+            }
+        </select>
+        <button type="submit">Load</button>
+    </form>
+
+    <form method="post" asp-page-handler="DeleteRunState" style="display:flex; gap:8px;">
+        <input type="hidden" name="CharacterId" value="@Model.CharacterId" />
+        <input type="hidden" name="ArchetypeId" value="@Model.ArchetypeId" />
+        <input type="hidden" name="DeckCsv" value="@Model.DeckCsv" />
+        <input type="hidden" name="RelicsCsv" value="@Model.RelicsCsv" />
+        <input type="hidden" name="Option1Id" value="@Model.Option1Id" />
+        <input type="hidden" name="Option2Id" value="@Model.Option2Id" />
+        <input type="hidden" name="Option3Id" value="@Model.Option3Id" />
+        <input type="hidden" name="IncludeColorless" value="@Model.IncludeColorless" />
+        <select name="SelectedRunStateId">
+            <option value="0">Select run state</option>
+            @foreach (var runState in Model.RunStates)
+            {
+                <option value="@runState.Id">@runState.Name (@runState.CharacterId)</option>
+            }
+        </select>
+        <button type="submit">Delete</button>
+    </form>
+}
+
+@functions {
+    private static Microsoft.AspNetCore.Html.HtmlString RenderBar(double value, string cssClass)
+    {
+        double clamped = System.Math.Max(0.0, System.Math.Min(1.0, value));
+        string percent = (clamped * 100.0).ToString("F0", System.Globalization.CultureInfo.InvariantCulture);
+        string label = (clamped * 10.0).ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        return new Microsoft.AspNetCore.Html.HtmlString("<div class='score-bar'><div class='score-fill " + cssClass + "' style='width:" + percent + "%'></div><span class='score-label'>" + label + "</span></div>");
+    }
+}
+
+<style>
+    .chip-input {
+        min-height: 28px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        background: #fff;
+        margin: 4px 0;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #edf2ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+    }
+
+    .chip button {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    .score-bar {
+        width: 120px;
+        height: 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 4px;
+        position: relative;
+        background: #f6f8fa;
+        overflow: hidden;
+    }
+
+    .score-fill {
+        height: 100%;
+    }
+
+    .bar-composite { background: #2563eb; }
+    .bar-deck { background: #16a34a; }
+    .bar-archetype { background: #7c3aed; }
+    .bar-anti { background: #dc2626; }
+    .bar-flex { background: #0891b2; }
+
+    .score-label {
+        position: absolute;
+        top: 0;
+        right: 4px;
+        font-size: 11px;
+        line-height: 14px;
+        color: #111827;
+    }
+</style>
+
+<script>
+(function () {
+    function setupChips(container) {
+        const hidden = document.getElementById(container.dataset.hidden);
+        const input = document.getElementById(container.dataset.input);
+        if (!hidden || !input) {
+            return;
+        }
+
+        const values = new Set((hidden.value || '').split(',').map(v => v.trim()).filter(Boolean));
+
+        function render() {
+            container.innerHTML = '';
+            const ordered = Array.from(values.values());
+            hidden.value = ordered.join(',');
+            for (const value of ordered) {
+                const chip = document.createElement('span');
+                chip.className = 'chip';
+                chip.textContent = value;
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.setAttribute('aria-label', 'Remove ' + value);
+                remove.textContent = '×';
+                remove.addEventListener('click', function () {
+                    values.delete(value);
+                    render();
+                });
+
+                chip.appendChild(remove);
+                container.appendChild(chip);
+            }
+        }
+
+        function addValue(raw) {
+            const value = (raw || '').trim();
+            if (!value) {
+                return;
+            }
+
+            const normalized = Array.from(values.values()).find(v => v.toLowerCase() === value.toLowerCase()) || value;
+            values.add(normalized);
+            input.value = '';
+            render();
+        }
+
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault();
+                addValue(input.value);
+            }
+        });
+
+        input.addEventListener('change', function () {
+            addValue(input.value);
+        });
+
+        render();
+    }
+
+    function scoreBarCell(value, cssClass) {
+        const clamped = Math.max(0, Math.min(1, value || 0));
+        const width = Math.round(clamped * 100);
+        const label = (clamped * 10).toFixed(1);
+        return "<div class='score-bar'><div class='score-fill " + cssClass + "' style='width:" + width + "%'></div><span class='score-label'>" + label + "</span></div>";
+    }
+
+    function renderScores(scores) {
+        const tbody = document.getElementById('scores-body');
+        const count = document.getElementById('score-count');
+        if (!tbody || !count) {
+            return;
+        }
+
+        count.textContent = String(scores.length);
+        tbody.innerHTML = '';
+
+        for (const score of scores) {
+            const row = document.createElement('tr');
+            const detailUrl = '/EntityDetail?type=' + encodeURIComponent(score.entityType) + '&id=' + encodeURIComponent(score.entityId);
+            const drivers = Array.isArray(score.synergyDrivers) ? score.synergyDrivers.join('; ') : '';
+            row.innerHTML =
+                '<td>' + score.rank + '</td>' +
+                '<td><a href="' + detailUrl + '">' + score.entityType + ':' + score.entityId + '</a></td>' +
+                '<td>' + scoreBarCell(score.compositeScore, 'bar-composite') + '</td>' +
+                '<td>' + scoreBarCell(score.deckFitScore, 'bar-deck') + '</td>' +
+                '<td>' + scoreBarCell(score.archetypeAffinityScore, 'bar-archetype') + '</td>' +
+                '<td>' + scoreBarCell(score.antiSynergyPenalty, 'bar-anti') + '</td>' +
+                '<td>' + scoreBarCell(score.flexibilityScore, 'bar-flex') + '</td>' +
+                '<td>' + drivers + '</td>';
+            tbody.appendChild(row);
+        }
+    }
+
+    function renderRecentAdvice(rows) {
+        const tbody = document.getElementById('recent-advice-body');
+        if (!tbody) {
+            return;
+        }
+
+        tbody.innerHTML = '';
+        for (const row of rows) {
+            const tr = document.createElement('tr');
+            const created = new Date(row.createdAt).toLocaleString();
+            const detailUrl = '/EntityDetail?type=' + encodeURIComponent(row.optionEntityType) + '&id=' + encodeURIComponent(row.optionEntityId);
+            tr.innerHTML =
+                '<td>' + created + '</td>' +
+                '<td><a href="' + detailUrl + '">' + row.optionEntityType + ':' + row.optionEntityId + '</a></td>' +
+                '<td>' + row.rank + '</td>' +
+                '<td>' + ((row.compositeScore || 0) * 10).toFixed(2) + '</td>' +
+                '<td>' + ((row.edgeOverlapScore || 0) * 10).toFixed(1) + '</td>' +
+                '<td>' + ((row.archetypeFitScore || 0) * 10).toFixed(1) + '</td>' +
+                '<td>' + ((row.antiSynergyPenalty || 0) * 10).toFixed(1) + '</td>';
+            tbody.appendChild(tr);
+        }
+    }
+
+    document.querySelectorAll('.chip-input').forEach(setupChips);
+
+    const adviseForm = document.getElementById('advise-form');
+    if (!adviseForm) {
+        return;
+    }
+
+    adviseForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+
+        const formData = new FormData(adviseForm);
+        const url = window.location.pathname + '?handler=AdviseJson';
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if (!response.ok) {
+            adviseForm.submit();
+            return;
+        }
+
+        const payload = await response.json();
+        renderScores(payload.scores || []);
+        renderRecentAdvice(payload.recentAdvice || []);
+    });
+})();
+</script>

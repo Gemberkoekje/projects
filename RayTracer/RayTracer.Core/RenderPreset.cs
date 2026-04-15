@@ -46,7 +46,8 @@ public record RenderPreset(
     LightingMode Lighting = LightingMode.None,
     bool CheckerboardMotion = false,
     float TemporalBlendAlpha = 0f,
-    float SampleClamp = 0f)
+    float SampleClamp = 0f,
+    CpuThrottle ThrottleCpu = CpuThrottle.Normal)
 {
     // ── Presets ─────────────────────────────────────────────────────
     public static RenderPreset Low => new(

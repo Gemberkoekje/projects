@@ -1,0 +1,67 @@
+{
+  "profiles": {
+    "Sts2Extractor - Audit": {
+      "commandName": "Project",
+      "commandLineArgs": "audit --root .. --output ./pattern_audit.csv",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": ""
+      }
+    },
+
+    "Sts2Extractor - ExtractCards": {
+      "commandName": "Project",
+      "commandLineArgs": "extract-cards --cards 50 --relics 20 --powers 20 --root ..",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": ""
+      }
+    },
+
+    "Sts2Extractor - SeedTaxonomy": {
+      "commandName": "Project",
+      "commandLineArgs": "seed-taxonomy --root ..",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+
+    "Sts2Extractor - Annotate (Mechanical)": {
+      "commandName": "Project",
+      "commandLineArgs": "annotate --provider anthropic --task mechanical --prompt \"{\\\"ok\\\":true,\\\"source\\\":\\\"debug-mechanical\\\"}\"",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": ""
+      }
+    },
+
+    "Sts2Extractor - Annotate (Synergy)": {
+      "commandName": "Project",
+      "commandLineArgs": "annotate --provider anthropic --task synergy --prompt \"{\\\"ok\\\":true,\\\"source\\\":\\\"debug-synergy\\\"}\"",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": ""
+      }
+    },
+
+    "Sts2Extractor - ListModels": {
+      "commandName": "Project",
+      "commandLineArgs": "list-models",
+      "workingDirectory": "..\\sts2_Annotator",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ANTHROPIC_API_KEY": "",
+        "OPENAI_API_KEY": ""
+      }
+    }
+  }
+}

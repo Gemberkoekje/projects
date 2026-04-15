@@ -1,0 +1,12 @@
+{
+  "Llm": {
+    "AnthropicApiKey": "",
+    "OpenAiApiKey": ""
+  },
+  "Database": {
+    "ConnectionString": ""
+  },
+  "Localization": {
+    "EnglishDirectory": ""
+  }
+}

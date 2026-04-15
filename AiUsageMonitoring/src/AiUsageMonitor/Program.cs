@@ -9,17 +9,24 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 using var host = Host.CreateDefaultBuilder(args)
-    .ConfigureAppConfiguration((_, config) =>
-    {
-        config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false);
-        config.AddEnvironmentVariables();
-    })
     .ConfigureServices((context, services) =>
     {
         services.AddMarten(sp =>
         {
+            // Try the usual GetConnectionString first, then a few sensible fallbacks
             var connectionString = context.Configuration.GetConnectionString("Marten")
-                ?? throw new InvalidOperationException("Marten connection string not configured");
+                ?? context.Configuration["ConnectionStrings:Marten"]
+                ?? context.Configuration["Marten"]
+                ?? Environment.GetEnvironmentVariable("ConnectionStrings__Marten")
+                ?? Environment.GetEnvironmentVariable("MARTEN_CONNECTION_STRING");
+
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    "Marten connection string not configured. Checked: Configuration.GetConnectionString(\"Marten\"), " +
+                    "Configuration[\"ConnectionStrings:Marten\"], Configuration[\"Marten\"], and environment variables " +
+                    "ConnectionStrings__Marten / MARTEN_CONNECTION_STRING.");
+            }
 
             var options = new StoreOptions();
             options.Connection(connectionString);

@@ -1,0 +1,169 @@
+{
+    "task":  "mechanical_annotation",
+    "instruction":  "Return all cards provided. Do not omit any card_id. One output object per input card_id.",
+    "required_card_ids":  [
+                              "Headbutt",
+                              "Hellraiser",
+                              "Hemokinesis",
+                              "HowlFromBeyond",
+                              "Impervious",
+                              "InfernalBlade",
+                              "Inferno",
+                              "Inflame"
+                          ],
+    "schema":  {
+                   "card_id":  "string",
+                   "scaling_type":  "string",
+                   "resources_consumed":  [
+                                              "string"
+                                          ],
+                   "effect_description":  "string",
+                   "anti_synergy_tags":  [
+                                             "string"
+                                         ],
+                   "resources_generated":  [
+                                               "string"
+                                           ],
+                   "effect_tags":  [
+                                       "string"
+                                   ]
+               },
+    "cards":  [
+                  {
+                      "card_id":  "Headbutt",
+                      "energy_cost":  "1",
+                      "type":  "Attack",
+                      "rarity":  "Common",
+                      "target":  "AnyEnemy",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "9",
+                      "damage_upgraded":  "12",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tArgumentNullException.ThrowIfNull(cardPlay.Target, \"cardPlay.Target\");  \t\tawait DamageCmd.Attack(base.DynamicVars.Damage.BaseValue).FromCard(this).Targeting(cardPlay.Target)  \t\t\t.WithHitFx(\"vfx/vfx_attack_blunt\", null, \"blunt_attack.mp3\")  \t\t\t.Execute(choiceContext);  \t\tCardSelectorPrefs prefs = new CardSelectorPrefs(base.SelectionScreenPrompt, 1);  \t\tCardPile pile = PileType.Discard.GetPile(base.Owner);  \t\tCardModel cardModel = (await CardSelectCmd.FromSimpleGrid(choiceContext, pile.Cards, base.Owner, prefs)).FirstOrDefault();  \t\tif (cardModel != null)  \t\t{  \t\t\tawait CardPileCmd.Add(cardModel, PileType.Draw, CardPilePosition.Top);  \t\t}  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars.Damage.UpgradeValueBy(3m);  \t}"
+                  },
+                  {
+                      "card_id":  "Hellraiser",
+                      "energy_cost":  "2",
+                      "type":  "Power",
+                      "rarity":  "Rare",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tawait PowerCmd.Apply\u003cHellraiserPower\u003e(base.Owner.Creature, 1m, base.Owner.Creature, this);  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.EnergyCost.UpgradeBy(-1);  \t}"
+                  },
+                  {
+                      "card_id":  "Hemokinesis",
+                      "energy_cost":  "1",
+                      "type":  "Attack",
+                      "rarity":  "Uncommon",
+                      "target":  "AnyEnemy",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "14",
+                      "damage_upgraded":  "19",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tArgumentNullException.ThrowIfNull(cardPlay.Target, \"cardPlay.Target\");  \t\tawait CreatureCmd.Damage(choiceContext, base.Owner.Creature, base.DynamicVars.HpLoss.BaseValue, ValueProp.Unblockable | ValueProp.Unpowered | ValueProp.Move, this);  \t\tawait DamageCmd.Attack(base.DynamicVars.Damage.BaseValue).FromCard(this).Targeting(cardPlay.Target)  \t\t\t.WithHitFx(\"vfx/vfx_bloody_impact\")  \t\t\t.Execute(choiceContext);  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars.Damage.UpgradeValueBy(5m);  \t}"
+                  },
+                  {
+                      "card_id":  "HowlFromBeyond",
+                      "energy_cost":  "3",
+                      "type":  "Attack",
+                      "rarity":  "Uncommon",
+                      "target":  "AllEnemies",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "16",
+                      "damage_upgraded":  "21",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tawait DamageCmd.Attack(base.DynamicVars.Damage.BaseValue).FromCard(this).TargetingAllOpponents(base.CombatState)  \t\t\t.WithAttackerAnim(\"Cast\", base.Owner.Character.CastAnimDelay)  \t\t\t.WithHitFx(\"vfx/vfx_attack_blunt\", null, \"heavy_attack.mp3\")  \t\t\t.Execute(choiceContext);  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars.Damage.UpgradeValueBy(5m);  \t}"
+                  },
+                  {
+                      "card_id":  "Impervious",
+                      "energy_cost":  "2",
+                      "type":  "Skill",
+                      "rarity":  "Rare",
+                      "target":  "Self",
+                      "gains_block":  "true",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "30",
+                      "block_upgraded":  "40",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tawait CreatureCmd.GainBlock(base.Owner.Creature, base.DynamicVars.Block, cardPlay);  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars.Block.UpgradeValueBy(10m);  \t}"
+                  },
+                  {
+                      "card_id":  "InfernalBlade",
+                      "energy_cost":  "1",
+                      "type":  "Skill",
+                      "rarity":  "Uncommon",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tCardModel cardModel = CardFactory.GetDistinctForCombat(base.Owner, from c in base.Owner.Character.CardPool.GetUnlockedCards(base.Owner.UnlockState, base.Owner.RunState.CardMultiplayerConstraint)  \t\t\twhere c.Type == CardType.Attack  \t\t\tselect c, 1, base.Owner.RunState.Rng.CombatCardGeneration).FirstOrDefault();  \t\tif (cardModel != null)  \t\t{  \t\t\tcardModel.SetToFreeThisTurn();  \t\t\tawait CardPileCmd.AddGeneratedCardToCombat(cardModel, PileType.Hand, addedByPlayer: true);  \t\t}  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.EnergyCost.UpgradeBy(-1);  \t}"
+                  },
+                  {
+                      "card_id":  "Inferno",
+                      "energy_cost":  "1",
+                      "type":  "Power",
+                      "rarity":  "Uncommon",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "6",
+                      "magic_upgraded":  "6",
+                      "on_play_source":  "{  \t\tawait CreatureCmd.TriggerAnim(base.Owner.Creature, \"Cast\", base.Owner.Character.CastAnimDelay);  \t\t(await PowerCmd.Apply\u003cInfernoPower\u003e(base.Owner.Creature, base.DynamicVars[\"InfernoPower\"].BaseValue, base.Owner.Creature, this))?.IncrementSelfDamage();  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars[\"InfernoPower\"].UpgradeValueBy(3m);  \t}"
+                  },
+                  {
+                      "card_id":  "Inflame",
+                      "energy_cost":  "1",
+                      "type":  "Power",
+                      "rarity":  "Uncommon",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "2",
+                      "magic_upgraded":  "2",
+                      "on_play_source":  "{  \t\tNPowerUpVfx.CreateNormal(base.Owner.Creature);  \t\tawait PowerCmd.Apply\u003cStrengthPower\u003e(base.Owner.Creature, base.DynamicVars[\"StrengthPower\"].BaseValue, base.Owner.Creature, this);  \t}",
+                      "on_upgrade_source":  "{  \t\tbase.DynamicVars[\"StrengthPower\"].UpgradeValueBy(1m);  \t}"
+                  }
+              ]
+}

@@ -1,0 +1,13 @@
+{
+    "expected_card_count":  87,
+    "annotated_card_count":  87,
+    "missing_card_ids":  [
+
+                         ],
+    "invalid_record_ids":  [
+
+                           ],
+    "is_valid":  true,
+    "model":  "claude-haiku-4-5-20251001",
+    "provider":  "anthropic"
+}

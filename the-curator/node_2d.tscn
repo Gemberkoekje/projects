@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://dg8ec3xyhwnv3"]
+
+[ext_resource type="Texture2D" uid="uid://mjpo2mgta5om" path="res://Magical_Library.png" id="1_wtcfe"]
+
+[node name="Node2D" type="Node2D" unique_id=1932659748]
+
+[node name="MagicalLibrary" type="Sprite2D" parent="." unique_id=600195862]
+position = Vector2(577, 329.99997)
+scale = Vector2(1.1269531, 1.1269531)
+texture = ExtResource("1_wtcfe")

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="sts2/sts2.csproj" />
+  <Project Path="sts2_Annotator/sts2_Annotator.csproj" />
+  <Project Path="sts2_Viewer/sts2_Viewer.csproj" />
+</Solution>

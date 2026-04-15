@@ -1,0 +1,185 @@
+@page
+@model Sts2Viewer.Pages.EntityDetailModel
+@{
+    ViewData["Title"] = "Entity Detail";
+}
+
+<style>
+    .detail-wrap { display: grid; gap: 14px; }
+    .badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; color:#fff; background:#666; }
+    .badge-card { background:#2f6fed; }
+    .badge-relic { background:#b68a00; }
+    .badge-potion { background:#008b8b; }
+    .badge-event { background:#7a3db8; }
+    .tag-chip { display:inline-block; padding:2px 8px; border-radius:10px; margin:2px 4px 2px 0; background:#eef3ff; color:#223; font-size:11px; }
+    .rating-grid { display:grid; grid-template-columns: 130px 1fr 40px; gap:8px; align-items:center; }
+    .meter { height:12px; border-radius:8px; background:#e6e6e6; overflow:hidden; }
+    .meter-fill { height:100%; }
+    .meter-good { background: linear-gradient(90deg, #9aa0a6 0%, #d0a64b 50%, #2e8b57 100%); }
+    .meter-anti { background: linear-gradient(90deg, #2e8b57 0%, #d0a64b 50%, #b22222 100%); }
+    .muted { color:#666; }
+</style>
+
+<h1>Entity Detail</h1>
+
+@if (!Model.HasConnectionString)
+{
+    <p>Set <code>Database:ConnectionString</code> in <code>sts2_Viewer/appsettings.json</code> or set <code>STS2_POSTGRES_CONNECTION_STRING</code>.</p>
+}
+else if (!Model.IsFound)
+{
+    <p>Entity not found for <code>type=@Model.EntityType</code> and <code>id=@Model.EntityId</code>.</p>
+}
+else
+{
+    <div class="detail-wrap">
+        <section>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                <span class="@Model.TypeBadgeClass(Model.Entity.EntityType)">@Model.Entity.EntityType</span>
+                <strong>@Model.Entity.Title</strong>
+            </div>
+            <div class="muted">@Model.Entity.EntityId</div>
+            <p style="margin-top:8px;">@Model.Entity.Description</p>
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Strength ratings</h2>
+            <div class="rating-grid">
+                <div>Synergy</div>
+                <div class="meter"><div class="meter-fill meter-good" style="width:@(Math.Clamp(Model.Entity.SynergyRating, 0, 10) * 10)%"></div></div>
+                <div>@Model.Entity.SynergyRating</div>
+
+                <div>Flexibility</div>
+                <div class="meter"><div class="meter-fill meter-good" style="width:@(Math.Clamp(Model.Entity.FlexibilityRating, 0, 10) * 10)%"></div></div>
+                <div>@Model.Entity.FlexibilityRating</div>
+
+                <div>Anti-Synergy</div>
+                <div class="meter"><div class="meter-fill meter-anti" style="width:@(Math.Clamp(Model.Entity.AntiSynergyRating, 0, 10) * 10)%"></div></div>
+                <div>@Model.Entity.AntiSynergyRating</div>
+            </div>
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Quick verdict</h2>
+            <p><strong>@Model.QuickVerdict</strong></p>
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Effect tags</h2>
+            @if (Model.Entity.Tags.Count == 0)
+            {
+                <p class="muted">No effect tags.</p>
+            }
+            else
+            {
+                <div>
+                    @foreach (string tag in Model.Entity.Tags)
+                    {
+                        <span class="tag-chip">@tag</span>
+                    }
+                </div>
+            }
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Synergy edges (@Model.SynergyEdges.Count)</h2>
+            @if (Model.SynergyEdges.Count == 0)
+            {
+                <p class="muted">No pairwise edges found for this entity.</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Partner entity</th>
+                            <th>Strength</th>
+                            <th>Shared tags</th>
+                            <th>Anti-synergy</th>
+                            <th>Explanation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var edge in Model.SynergyEdges)
+                    {
+                        <tr>
+                            <td><a asp-page="/EntityDetail" asp-route-type="@edge.PartnerType" asp-route-id="@edge.PartnerId">@edge.PartnerType:@edge.PartnerId</a></td>
+                            <td>
+                                <div style="display:grid; grid-template-columns: 1fr 30px; align-items:center; gap:8px;">
+                                    <div class="meter"><div class="meter-fill @(edge.IsAntiSynergy ? "meter-anti" : "meter-good")" style="width:@(Math.Clamp(edge.Strength, 0, 10) * 10)%"></div></div>
+                                    <span>@edge.Strength</span>
+                                </div>
+                            </td>
+                            <td>@string.Join(", ", edge.SharedTags)</td>
+                            <td>@(edge.IsAntiSynergy ? "Yes" : "No")</td>
+                            <td>@edge.Explanation</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Archetype affinity (@Model.ArchetypeAffinities.Count)</h2>
+            @if (Model.ArchetypeAffinities.Count == 0)
+            {
+                <p class="muted">No archetype affinity rows found.</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Archetype</th>
+                            <th>Affinity score</th>
+                            <th>Character</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var affinity in Model.ArchetypeAffinities)
+                    {
+                        <tr>
+                            <td><a asp-page="/Index" asp-route-Search="@affinity.ArchetypeName">@affinity.ArchetypeName</a></td>
+                            <td>@affinity.AffinityScore</td>
+                            <td>@affinity.CharacterId</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section>
+            <h2 style="font-size:1.1rem; margin-bottom:8px;">Synergy cluster memberships (@Model.SynergyClusters.Count)</h2>
+            @if (Model.SynergyClusters.Count == 0)
+            {
+                <p class="muted">No synergy cluster rows found.</p>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Archetype</th>
+                            <th>Role</th>
+                            <th>Score</th>
+                            <th>Explanation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var cluster in Model.SynergyClusters)
+                    {
+                        <tr>
+                            <td>@cluster.ArchetypeName</td>
+                            <td>@cluster.Role</td>
+                            <td>@cluster.Score</td>
+                            <td>@cluster.Explanation</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </section>
+    </div>
+}

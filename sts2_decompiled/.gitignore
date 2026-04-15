@@ -1,0 +1,24 @@
+# Proprietary DLLs - do not commit game binaries
+sls2.dll
+sts2.dll
+*.nupkg
+
+# Build outputs
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+
+# Output files from annotator runs
+*.csv
+
+# Secrets (use dotnet user-secrets instead)
+secrets.json
+# JetBrains Rider
+*.sln.iml
+
+# STS2 game data (proprietary — localization files, decompiled assets, etc.)
+sts2/

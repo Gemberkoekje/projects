@@ -1,0 +1,73 @@
+{
+    "task":  "mechanical_annotation",
+    "schema":  {
+                   "card_id":  "string",
+                   "scaling_type":  "string",
+                   "resources_consumed":  [
+                                              "string"
+                                          ],
+                   "effect_description":  "string",
+                   "anti_synergy_tags":  [
+                                             "string"
+                                         ],
+                   "resources_generated":  [
+                                               "string"
+                                           ],
+                   "effect_tags":  [
+                                       "string"
+                                   ]
+               },
+    "cards":  [
+                  {
+                      "card_id":  "Armaments",
+                      "energy_cost":  "1",
+                      "type":  "Skill",
+                      "rarity":  "Common",
+                      "target":  "Self",
+                      "gains_block":  "true",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "5",
+                      "block_upgraded":  "5",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tawait CreatureCmd.GainBlock(base.Owner.Creature, base.DynamicVars.Block, cardPlay);  \t\tif (base.IsUpgraded)  \t\t{  \t\t\tforeach (CardModel item in PileType.Hand.GetPile(base.Owner).Cards.Where((CardModel c) =\u003e c.IsUpgradable))  \t\t\t{  \t\t\t\tCardCmd.Upgrade(item);  \t\t\t}  \t\t\treturn;  \t\t}  \t\tCardModel cardModel = await CardSelectCmd.FromHandForUpgrade(choiceContext, base.Owner, this);  \t\tif (cardModel != null)  \t\t{  \t\t\tCardCmd.Upgrade(cardModel);  \t\t}  \t}",
+                      "on_upgrade_source":  ""
+                  },
+                  {
+                      "card_id":  "Cascade",
+                      "energy_cost":  "-1",
+                      "type":  "Skill",
+                      "rarity":  "Rare",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tint num = ResolveEnergyXValue();  \t\tif (base.IsUpgraded)  \t\t{  \t\t\tnum++;  \t\t}  \t\tawait CardPileCmd.AutoPlayFromDrawPile(choiceContext, base.Owner, num, CardPilePosition.Top, forceExhaust: false);  \t}",
+                      "on_upgrade_source":  ""
+                  },
+                  {
+                      "card_id":  "PrimalForce",
+                      "energy_cost":  "0",
+                      "type":  "Skill",
+                      "rarity":  "Rare",
+                      "target":  "Self",
+                      "gains_block":  "false",
+                      "max_upgrade":  "1",
+                      "damage_base":  "",
+                      "damage_upgraded":  "",
+                      "block_base":  "",
+                      "block_upgraded":  "",
+                      "magic_base":  "",
+                      "magic_upgraded":  "",
+                      "on_play_source":  "{  \t\tawait CreatureCmd.TriggerAnim(base.Owner.Creature, \"Cast\", base.Owner.Character.CastAnimDelay);  \t\tList\u003cCardModel\u003e list = PileType.Hand.GetPile(base.Owner).Cards.Where((CardModel c) =\u003e c != null \u0026\u0026 c.IsTransformable \u0026\u0026 c.Type == CardType.Attack).ToList();  \t\tforeach (CardModel item in list)  \t\t{  \t\t\tCardModel cardModel = base.CombatState.CreateCard\u003cGiantRock\u003e(base.Owner);  \t\t\tif (base.IsUpgraded)  \t\t\t{  \t\t\t\tCardCmd.Upgrade(cardModel);  \t\t\t}  \t\t\tawait CardCmd.Transform(item, cardModel);  \t\t}  \t}",
+                      "on_upgrade_source":  ""
+                  }
+              ]
+}

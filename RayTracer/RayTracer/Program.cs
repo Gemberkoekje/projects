@@ -182,7 +182,8 @@ public class RayForm : Form
             CheckerboardMotion = preset.CheckerboardMotion,
             TemporalBlendAlpha = preset.TemporalBlendAlpha,
             EnableTaa = preset.TemporalBlendAlpha > 0f,
-            SampleClamp = preset.SampleClamp
+            SampleClamp = preset.SampleClamp,
+            ThrottleCpu = preset.ThrottleCpu
         };
 
         jobSystem.SetupJobs(CancellationToken.None);
