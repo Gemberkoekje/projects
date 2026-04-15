@@ -40,17 +40,24 @@ public static class PerformanceCalibrator
         };
 
         var js = new JobSystem(
-            benchW, benchH,
-            preset.TileSize, scene, benchCamera, stride, lights)
-        {
-            SppPerJob = preset.SppPerJob,
-            MaxSampleCount = preset.MaxSampleCount,
-            MotionSampleCap = preset.MotionSampleCap,
-            SubPixelJitter = preset.SubPixelJitter,
-            FilterRadius = preset.FilterRadius,
-            EdgeAwareFilter = preset.EdgeAwareFilter,
-            Lighting = preset.Lighting
-        };
+            benchW,
+            benchH,
+            scene,
+            benchCamera,
+            stride,
+            lights,
+            renderOptions: new RenderOptions(
+                TileSize: preset.TileSize,
+                SppPerJob: preset.SppPerJob,
+                MaxSampleCount: preset.MaxSampleCount,
+                Lighting: preset.Lighting),
+            samplingOptions: new SamplingOptions(
+                MotionSampleCap: preset.MotionSampleCap,
+                SubPixelJitter: preset.SubPixelJitter),
+            denoiseOptions: new DenoiseOptions(
+                FilterRadius: preset.FilterRadius,
+                EdgeAwareFilter: preset.EdgeAwareFilter),
+            debugOptions: new DebugOptions());
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 

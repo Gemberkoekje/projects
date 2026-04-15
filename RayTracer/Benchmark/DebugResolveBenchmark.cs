@@ -38,11 +38,19 @@ public class DebugResolveBenchmark
             ImgPlaneZ = 1f
         };
 
-        _jobSystem = new JobSystem(width, height, 32, scene, camera, _stride, lights)
-        {
-            EnableTaa = true,
-            TemporalBlendAlpha = 0.05f
-        };
+        _jobSystem = new JobSystem(
+            width,
+            height,
+            scene,
+            camera,
+            _stride,
+            lights,
+            renderOptions: new RenderOptions(TileSize: 32),
+            samplingOptions: new SamplingOptions(),
+            denoiseOptions: new DenoiseOptions(
+                TemporalBlendAlpha: 0.05f,
+                EnableTaa: true),
+            debugOptions: new DebugOptions());
         _debugBuffer = new byte[_stride * height];
 
         // Fill buffers with representative, deterministic content.

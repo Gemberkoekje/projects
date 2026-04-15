@@ -170,21 +170,30 @@ public class RayForm : Form
         bmp.UnlockBits(data);
         _debugScratchBuffer = new byte[stride * H];
 
-        jobSystem = new JobSystem(W, H, preset.TileSize, scene, camera, stride, lights)
-        {
-            SppPerJob = preset.SppPerJob,
-            MaxSampleCount = preset.MaxSampleCount,
-            MotionSampleCap = preset.MotionSampleCap,
-            SubPixelJitter = preset.SubPixelJitter,
-            FilterRadius = preset.FilterRadius,
-            EdgeAwareFilter = preset.EdgeAwareFilter,
-            Lighting = preset.Lighting,
-            CheckerboardMotion = preset.CheckerboardMotion,
-            TemporalBlendAlpha = preset.TemporalBlendAlpha,
-            EnableTaa = preset.TemporalBlendAlpha > 0f,
-            SampleClamp = preset.SampleClamp,
-            ThrottleCpu = preset.ThrottleCpu
-        };
+        jobSystem = new JobSystem(
+            W,
+            H,
+            scene,
+            camera,
+            stride,
+            lights,
+            renderOptions: new RenderOptions(
+                TileSize: preset.TileSize,
+                SppPerJob: preset.SppPerJob,
+                MaxSampleCount: preset.MaxSampleCount,
+                Lighting: preset.Lighting,
+                ThrottleCpu: preset.ThrottleCpu),
+            samplingOptions: new SamplingOptions(
+                MotionSampleCap: preset.MotionSampleCap,
+                SubPixelJitter: preset.SubPixelJitter),
+            denoiseOptions: new DenoiseOptions(
+                FilterRadius: preset.FilterRadius,
+                EdgeAwareFilter: preset.EdgeAwareFilter,
+                CheckerboardMotion: preset.CheckerboardMotion,
+                TemporalBlendAlpha: preset.TemporalBlendAlpha,
+                EnableTaa: preset.TemporalBlendAlpha > 0f,
+                SampleClamp: preset.SampleClamp),
+            debugOptions: new DebugOptions());
 
         jobSystem.SetupJobs(CancellationToken.None);
         jobSystem.AddJobs();

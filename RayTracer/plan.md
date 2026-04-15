@@ -131,6 +131,45 @@ Notes:
 - The decomposition has been applied as a behavior-preserving extraction step with dedicated components and state containers in place.
 - Remaining deep internals can now be migrated component-by-component with low risk in later phases.
 
+## Phase 3 Execution Status (2026-04-15)
+
+### 1) API/config option records introduced (completed)
+- ✅ Added `RayTracer.Core/Rendering/JobSystemOptions.cs` with:
+  - `RenderOptions`
+  - `SamplingOptions`
+  - `DenoiseOptions`
+  - `DebugOptions`
+- ✅ Added a new `JobSystem` constructor that consumes typed option records.
+- ✅ Kept legacy constructor overload as a compatibility shim to avoid breaking existing test/setup paths.
+- ✅ Migrated active runtime call sites to the new option-record constructor:
+  - `RayTracer/Program.cs`
+  - `RayTracer.Core/Rendering/PerformanceCalibrator.cs`
+  - `Benchmark/DebugResolveBenchmark.cs`
+
+### 2) Boundary validation (completed)
+- ✅ Added core argument guards in `JobSystem` constructor (width/height/stride/null checks).
+- ✅ Added option validation for:
+  - `TileSize`
+  - `SppPerJob`
+  - `MaxSampleCount`
+  - `MotionSampleCap`
+  - `FilterRadius`
+  - `TemporalBlendAlpha`
+  - `SampleClamp`
+- ✅ Added dedicated tests in `RayTracer.Tests/JobSystemOptionsValidationTests.cs`:
+  - `Constructor_InvalidWidth_Throws`
+  - `Constructor_InvalidStride_Throws`
+  - `Constructor_InvalidOptions_Throws`
+
+### 3) Cleanup + nullability tightening (completed for Phase 3 scope)
+- ✅ Removed unused imports from `RayTracer.Core/Rendering/JobSystem.cs`.
+- ✅ Removed unused `Correction` constructor path and dead `LinearToSRGB` instance helper.
+- ✅ Tightened immutability for configuration-backed members (`_bvh`, `_lights`, and option-backed properties now constructor-assigned).
+
+### 4) Validation snapshot after Phase 3 changes
+- ✅ Workspace build passes.
+- ✅ `RayTracer.Tests` test run passes: **104/104**.
+
 ## Goals
 - Reduce file size and cognitive load by splitting large classes into focused components.
 - Increase confidence with broader, faster, and more deterministic tests.
@@ -183,11 +222,11 @@ Notes:
 3. ✅ Keep `JobSystem` as orchestration/facade entrypoint for render lifecycle APIs.
 4. ✅ Validate behavior continuity with full build + test pass.
 
-## Phase 3 — API & Configuration Improvements
-1. Convert broad constructor parameters into option records:
-   - `RenderOptions`, `SamplingOptions`, `DenoiseOptions`, `DebugOptions`.
-2. Validate options at boundaries.
-3. Remove dead fields/imports and tighten nullability contracts.
+## Phase 3 — API & Configuration Improvements (completed)
+1. ✅ Convert broad constructor parameters into option records:
+   - ✅ `RenderOptions`, `SamplingOptions`, `DenoiseOptions`, `DebugOptions`.
+2. ✅ Validate options at boundaries.
+3. ✅ Remove dead fields/imports and tighten nullability contracts.
 
 ## Phase 4 — Testing Expansion
 1. Unit tests:

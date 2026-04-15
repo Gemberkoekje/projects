@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Numerics;
-using System.Reflection.PortableExecutable;
 using System.Threading.Channels;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace RayTracer;
 
@@ -42,21 +40,21 @@ public partial class JobSystem
 
     public int Width { get; init; }
     public int Height { get; init; }
-    public int TileSize { get; init; }
+    public int TileSize { get; }
 
-    public int SppPerJob { get; init; } = 4;
+    public int SppPerJob { get; }
 
-    public uint MaxSampleCount { get; init; } = 500;
+    public uint MaxSampleCount { get; }
 
     public Channel<Tile> Jobs { get; init; } = Channel.CreateBounded<Tile>(1000);
 
     public Tracable[] Scene { get; init; }
 
-    private BVH _bvh;
+    private readonly BVH _bvh;
 
     private volatile int _checkerPhase;
 
-    private Light[] _lights = [];
+    private readonly Light[] _lights;
 
     /// <summary>Base ambient illumination applied to every hit point.</summary>
     private const float AmbientLevel = 0.05f;
@@ -82,8 +80,6 @@ public partial class JobSystem
     /// </summary>
     public int TotalTiles { get; private set; }
 
-    private float Correction { get; init; } = 0;
-
     public int Stride { get; init; } = 0;
 
     public byte[] DisplayBuffer { get; init; }
@@ -100,49 +96,49 @@ public partial class JobSystem
     /// reasonable spectral coverage; the 3뿯½3 spatial filter in
     /// <see cref="Render"/> provides the remaining noise reduction.
     /// </summary>
-    public uint MotionSampleCap { get; init; } = 20;
+    public uint MotionSampleCap { get; }
 
     /// <summary>
     /// When true, each sample is jittered to a random sub-pixel position
     /// instead of the pixel centre. Converts aliasing into noise that
     /// the accumulator averages away.
     /// </summary>
-    public bool SubPixelJitter { get; init; }
+    public bool SubPixelJitter { get; }
 
     /// <summary>
     /// Radius of the spatial averaging filter applied during camera
     /// motion.  0 = disabled, 1 = 3뿯½3, 2 = 5뿯½5.
     /// </summary>
-    public int FilterRadius { get; init; } = 1;
+    public int FilterRadius { get; }
 
     /// <summary>
     /// When true the spatial filter uses luminance-based bilateral
     /// weighting: neighbours with similar brightness are averaged
     /// (denoised) while large luminance jumps (edges) are preserved.
     /// </summary>
-    public bool EdgeAwareFilter { get; init; }
+    public bool EdgeAwareFilter { get; }
 
     /// <summary>
     /// When true, only half the pixels are traced per tile during motion,
     /// alternating in a checkerboard pattern each soft-reset. The spatial
     /// filter fills the gaps, effectively doubling throughput while moving.
     /// </summary>
-    public bool CheckerboardMotion { get; init; }
+    public bool CheckerboardMotion { get; }
 
     /// <summary>
     /// Blend factor for exponential moving average during camera motion.
     /// 0 = disabled (uses running mean). Values around 0.2 give stable,
     /// responsive results. Ignored when the camera is stationary.
     /// </summary>
-    public float TemporalBlendAlpha { get; init; }
-    public bool EnableTaa { get; init; }
+    public float TemporalBlendAlpha { get; }
+    public bool EnableTaa { get; }
 
     /// <summary>
     /// Per-component XYZ clamp applied to each sample before accumulation.
     /// Suppresses firefly artifacts from extreme spectral contributions.
     /// 0 = disabled.
     /// </summary>
-    public float SampleClamp { get; init; }
+    public float SampleClamp { get; }
 
     /// <summary>
     /// Controls how surfaces are shaded: <see cref="LightingMode.None"/>
@@ -150,13 +146,15 @@ public partial class JobSystem
     /// Lambertian without shadows, or <see cref="LightingMode.NEE"/> for
     /// full next event estimation with stochastic shadow rays.
     /// </summary>
-    public LightingMode Lighting { get; init; }
+    public LightingMode Lighting { get; }
 
     /// <summary>
     /// Controls how many worker threads are spawned and at what OS priority they run.
     /// See <see cref="CpuThrottle"/> for the available levels.
     /// </summary>
-    public CpuThrottle ThrottleCpu { get; init; }
+    public CpuThrottle ThrottleCpu { get; }
+
+    public DebugOptions DebugOptions { get; }
 
     /// <summary>
     /// Controls how aggressively the bilateral filter preserves edges.
@@ -203,7 +201,61 @@ public partial class JobSystem
     public int FrameIndex { get; private set; }
 
     public JobSystem(int width, int height, int tilesize, Tracable[] scene, Camera camera, int stride, Light[]? lights = null)
+        : this(
+            width,
+            height,
+            scene,
+            camera,
+            stride,
+            lights,
+            new RenderOptions(TileSize: tilesize),
+            new SamplingOptions(),
+            new DenoiseOptions(),
+            new DebugOptions())
     {
+    }
+
+    public JobSystem(
+        int width,
+        int height,
+        Tracable[] scene,
+        Camera camera,
+        int stride,
+        Light[]? lights = null,
+        RenderOptions? renderOptions = null,
+        SamplingOptions? samplingOptions = null,
+        DenoiseOptions? denoiseOptions = null,
+        DebugOptions? debugOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+        ArgumentNullException.ThrowIfNull(camera);
+        ValidateCoreInputs(width, height, stride);
+
+        RenderOptions effectiveRenderOptions = renderOptions ?? new RenderOptions();
+        SamplingOptions effectiveSamplingOptions = samplingOptions ?? new SamplingOptions();
+        DenoiseOptions effectiveDenoiseOptions = denoiseOptions ?? new DenoiseOptions();
+        DebugOptions effectiveDebugOptions = debugOptions ?? new DebugOptions();
+
+        ValidateOptions(effectiveRenderOptions, effectiveSamplingOptions, effectiveDenoiseOptions);
+
+        TileSize = effectiveRenderOptions.TileSize;
+        SppPerJob = effectiveRenderOptions.SppPerJob;
+        MaxSampleCount = effectiveRenderOptions.MaxSampleCount;
+        Lighting = effectiveRenderOptions.Lighting;
+        ThrottleCpu = effectiveRenderOptions.ThrottleCpu;
+
+        MotionSampleCap = effectiveSamplingOptions.MotionSampleCap;
+        SubPixelJitter = effectiveSamplingOptions.SubPixelJitter;
+
+        FilterRadius = effectiveDenoiseOptions.FilterRadius;
+        EdgeAwareFilter = effectiveDenoiseOptions.EdgeAwareFilter;
+        CheckerboardMotion = effectiveDenoiseOptions.CheckerboardMotion;
+        TemporalBlendAlpha = effectiveDenoiseOptions.TemporalBlendAlpha;
+        EnableTaa = effectiveDenoiseOptions.EnableTaa;
+        SampleClamp = effectiveDenoiseOptions.SampleClamp;
+
+        DebugOptions = effectiveDebugOptions;
+
         AccumXYZ = new Vector3[width * height];
         SampleCount = new uint[width * height];
         WavelengthCounter = new long[width * height];
@@ -238,17 +290,6 @@ public partial class JobSystem
         _bvh = new BVH(scene);
         _lights = lights ?? [];
         Camera = camera;
-        var total = new Vector3(0, 0, 0);
-        for (var wl = 400; wl <= 700; wl++)
-        {
-            if (WavelengthLookup.TryGet(wl, out var xyz))
-            {
-                total += xyz;
-            }
-        }
-        var average = (total / new Vector3(300, 300, 300));
-        Correction = 1 / average.Y;
-        TileSize = tilesize;
         int byteCount = stride * height;
         DisplayBuffer = new byte[byteCount];
         Stride = stride;
@@ -295,9 +336,45 @@ public partial class JobSystem
         _tileScheduler = new TileScheduler(this, _pathTracer, _displayResolver);
 
         // Compute total tile count for pass tracking
-        int tilesX = (width + tilesize - 1) / tilesize;
-        int tilesY = (height + tilesize - 1) / tilesize;
+        int tilesX = (width + TileSize - 1) / TileSize;
+        int tilesY = (height + TileSize - 1) / TileSize;
         TotalTiles = tilesX * tilesY;
+    }
+
+    private static void ValidateCoreInputs(int width, int height, int stride)
+    {
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width), width, "Width must be greater than zero.");
+
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height), height, "Height must be greater than zero.");
+
+        if (stride < width * 4)
+            throw new ArgumentOutOfRangeException(nameof(stride), stride, "Stride must be at least width * 4 for 32bpp buffers.");
+    }
+
+    private static void ValidateOptions(RenderOptions renderOptions, SamplingOptions samplingOptions, DenoiseOptions denoiseOptions)
+    {
+        if (renderOptions.TileSize <= 0)
+            throw new ArgumentOutOfRangeException(nameof(renderOptions), renderOptions.TileSize, "TileSize must be greater than zero.");
+
+        if (renderOptions.SppPerJob <= 0)
+            throw new ArgumentOutOfRangeException(nameof(renderOptions), renderOptions.SppPerJob, "SppPerJob must be greater than zero.");
+
+        if (renderOptions.MaxSampleCount == 0)
+            throw new ArgumentOutOfRangeException(nameof(renderOptions), renderOptions.MaxSampleCount, "MaxSampleCount must be greater than zero.");
+
+        if (samplingOptions.MotionSampleCap == 0)
+            throw new ArgumentOutOfRangeException(nameof(samplingOptions), samplingOptions.MotionSampleCap, "MotionSampleCap must be greater than zero.");
+
+        if (denoiseOptions.FilterRadius < 0)
+            throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.FilterRadius, "FilterRadius cannot be negative.");
+
+        if (denoiseOptions.TemporalBlendAlpha is < 0f or > 1f)
+            throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.TemporalBlendAlpha, "TemporalBlendAlpha must be in [0, 1].");
+
+        if (denoiseOptions.SampleClamp < 0f)
+            throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.SampleClamp, "SampleClamp cannot be negative.");
     }
 
     public void SetupJobs(CancellationToken cancellationToken)
@@ -411,14 +488,6 @@ public partial class JobSystem
             }
         }
         return sum / count;
-    }
-
-    private float LinearToSRGB(float linear)
-    {
-        if (linear <= 0.0031308f)
-            return 12.92f * linear;
-        else
-            return 1.055f * MathF.Pow(linear, 1.0f / 2.4f) - 0.055f;
     }
 
     public static Matrix3x3 TosRGBMatrix => new(
