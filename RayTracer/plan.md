@@ -170,6 +170,29 @@ Notes:
 - ✅ Workspace build passes.
 - ✅ `RayTracer.Tests` test run passes: **104/104**.
 
+## Phase 4 Execution Status (2026-04-15)
+
+### 1) Unit test expansion for render components (completed)
+- ✅ Added deterministic filtering tests (box + edge-aware) in `RayTracer.Tests/Phase4TestingExpansionTests.cs`.
+- ✅ Added deterministic TAA behavior tests for first-frame no-history and explicit reprojection rejection.
+- ✅ Existing spectral and accumulation suites retained as characterization coverage for color transforms and accumulation behavior.
+
+### 2) Property-style invariant tests (completed)
+- ✅ Added randomized invariants for linear XYZ→sRGB transform behavior.
+- ✅ Added randomized running-average bounds invariants for accumulation stability.
+
+### 3) Integration + regression coverage (completed)
+- ✅ Added small deterministic display-resolve snapshot test with checksum-based regression guard.
+- ✅ Added focused integration assertions around resolved history state (`HistoryXYZ`, rejection and weight metrics).
+
+### 4) Performance snapshot tests (completed)
+- ✅ Added lightweight throughput snapshot test for matrix/color transform hot path.
+- ✅ Throughput is now emitted to test output for before/after trend comparisons during later optimization work.
+
+### 5) Validation snapshot after Phase 4 changes
+- ✅ Workspace build passes.
+- ✅ `RayTracer.Tests` test run passes: **112/112**.
+
 ## Goals
 - Reduce file size and cognitive load by splitting large classes into focused components.
 - Increase confidence with broader, faster, and more deterministic tests.
@@ -228,17 +251,17 @@ Notes:
 2. ✅ Validate options at boundaries.
 3. ✅ Remove dead fields/imports and tighten nullability contracts.
 
-## Phase 4 — Testing Expansion
-1. Unit tests:
-   - Deterministic tests for sampling, reprojection, filtering, clamping, and color transforms.
-2. Property-based tests:
-   - Invariants for accumulation, variance bounds, and matrix/color conversions.
-3. Integration tests:
-   - Small scene snapshots with tolerance checks.
-4. Regression tests:
-   - Golden-image or metric-based comparisons for selected presets.
-5. Performance tests:
-   - Benchmark critical hot paths and track trends over time.
+## Phase 4 — Testing Expansion (completed)
+1. ✅ Unit tests:
+   - ✅ Deterministic tests for sampling/reprojection/filtering and color transforms.
+2. ✅ Property-based tests:
+   - ✅ Invariants for accumulation bounds and matrix/color conversions.
+3. ✅ Integration tests:
+   - ✅ Deterministic small-scene/display-resolve snapshot checks.
+4. ✅ Regression tests:
+   - ✅ Metric-based checksum comparison for selected deterministic resolve inputs.
+5. ✅ Performance tests:
+   - ✅ Hot-path throughput snapshot tests with logged metrics.
 
 ## Phase 5 — Performance & Memory Pass
 1. Profile hot paths after decomposition.
@@ -272,8 +295,10 @@ Notes:
   - **Mitigation:** Keep changes vertical and small, merge frequently.
 
 ## Immediate Next Steps (First 1–2 Days)
-1. Add characterization tests around current `JobSystem` outputs:
-   - Accumulation updates, TAA accept/reject, debug buffer rendering.
-2. Continue migrating `TraceCore` internals from `JobSystem` into `PathTracer` implementation details.
-3. Continue migrating accumulation math internals into `AccumulationBuffer` update methods.
-4. Re-run full build + tests and compare baseline metrics.
+1. Start Phase 5 profiling on the decomposed pipeline:
+   - `PathTracer.TraceCore`
+   - `TaaResolver.ResolveDisplayBufferWithTaa`
+   - `DisplayResolver.Render`
+2. Compare Phase 4 snapshot metrics against Phase 0 baseline and identify top allocation/throughput deltas.
+3. Apply first allocation-focused inner-loop pass where profiling data shows highest ROI.
+4. Re-run full build + tests and refresh plan metrics.
