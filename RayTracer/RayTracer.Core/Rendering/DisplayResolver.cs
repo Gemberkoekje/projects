@@ -25,11 +25,13 @@ public partial class JobSystem
             buffer[i + 3] = 255;
         }
 
+        private const float InvGamma = 1.0f / 2.4f;
+
         private static float LinearToSRGB(float linear)
         {
             if (linear <= 0.0031308f)
                 return 12.92f * linear;
-            return 1.055f * MathF.Pow(linear, 1.0f / 2.4f) - 0.055f;
+            return 1.055f * MathF.Pow(linear, InvGamma) - 0.055f;
         }
     }
 }

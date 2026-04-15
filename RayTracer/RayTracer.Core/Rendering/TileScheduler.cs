@@ -53,8 +53,8 @@ public partial class JobSystem
 
                         var pixels = job.Width * job.Height;
                         var spp = _owner.SppPerJob;
-                        _owner.TotalRays += pixels * spp;
-                        _owner.TotalTileCompletions++;
+                        Interlocked.Add(ref _owner._totalRays, pixels * spp);
+                        Interlocked.Increment(ref _owner._totalTileCompletions);
                         _owner.Jobs.Writer.TryWrite(job);
                     }
                 }, cancellationToken);

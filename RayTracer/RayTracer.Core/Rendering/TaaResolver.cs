@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 
 namespace RayTracer;
@@ -7,13 +8,19 @@ public partial class JobSystem
     private sealed class TaaResolver(JobSystem owner)
     {
         private readonly JobSystem _owner = owner;
+        private readonly Stopwatch _resolveStopwatch = new();
+        private const float InvGamma = 1.0f / 2.4f;
 
         public void ResolveDisplayBufferWithTaa()
         {
+            _resolveStopwatch.Restart();
+
             bool useTaa = _owner.EnableTaa && _owner.TemporalBlendAlpha > 0f && _owner._taaHasPrevCamera;
             float alpha = Math.Clamp(_owner.TemporalBlendAlpha, 0.01f, 1f);
             if (_owner.IsMoving)
                 alpha = Math.Clamp(alpha * 10f, 0.01f, 1f);
+
+            Quaternion invPrevRot = useTaa ? Quaternion.Inverse(_owner._taaPrevCamRot) : default;
 
             long rejected = 0;
             double histWeightSum = 0;
@@ -38,7 +45,7 @@ public partial class JobSystem
                     bool currentHit = _owner.LastHit[ix];
                     Vector3 currentHitPoint = _owner.HitPointWorld[ix];
 
-                    if (useTaa && currentHit && TryProjectToPrevPixel(currentHitPoint, out float pxf, out float pyf))
+                    if (useTaa && currentHit && TryProjectToPrevPixel(currentHitPoint, invPrevRot, out float pxf, out float pyf))
                     {
                         int ix0 = (int)MathF.Floor(pxf);
                         int iy0 = (int)MathF.Floor(pyf);
@@ -161,6 +168,20 @@ public partial class JobSystem
             _owner.AverageEffectiveSpp = pixels > 0 ? sppSum / pixels : 0.0;
             _owner.MaxObservedSampleCount = maxSpp;
             Array.Clear(_owner._clampHitFrame);
+
+            _resolveStopwatch.Stop();
+            _owner.LastFrameDiagnostics = new FrameDiagnostics
+            {
+                ResolveTaaMs = _resolveStopwatch.Elapsed.TotalMilliseconds,
+                FrameIndex = _owner.FrameIndex,
+                RejectedHistoryPercent = _owner.RejectedHistoryPercent,
+                AverageHistoryWeight = _owner.AverageHistoryWeight,
+                AverageVariance = _owner.AverageVariance,
+                AverageEffectiveSpp = _owner.AverageEffectiveSpp,
+                ClampedPixelPercent = _owner.ClampedPixelPercent,
+                TotalRays = _owner.TotalRays,
+                TotalTileCompletions = _owner.TotalTileCompletions
+            };
         }
 
         private void ComputeNeighborhoodMinMax(int y, int x, out Vector3 nMin, out Vector3 nMax)
@@ -183,10 +204,9 @@ public partial class JobSystem
             }
         }
 
-        private bool TryProjectToPrevPixel(Vector3 worldPoint, out float px, out float py)
+        private bool TryProjectToPrevPixel(Vector3 worldPoint, Quaternion invPrevRot, out float px, out float py)
         {
-            Quaternion invRot = Quaternion.Inverse(_owner._taaPrevCamRot);
-            Vector3 local = Vector3.Transform(worldPoint - _owner._taaPrevCamPos, invRot);
+            Vector3 local = Vector3.Transform(worldPoint - _owner._taaPrevCamPos, invPrevRot);
             if (local.Z <= 1e-4f)
             {
                 px = py = 0f;
@@ -223,7 +243,7 @@ public partial class JobSystem
         {
             if (linear <= 0.0031308f)
                 return 12.92f * linear;
-            return 1.055f * MathF.Pow(linear, 1.0f / 2.4f) - 0.055f;
+            return 1.055f * MathF.Pow(linear, InvGamma) - 0.055f;
         }
     }
 }

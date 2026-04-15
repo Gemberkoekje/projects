@@ -38,6 +38,8 @@ public partial class JobSystem
     private readonly float[] _diffReprojectedVsCurrent;
     private readonly int[] _lastUpdatedFrame;
 
+    private readonly Vector3 _sampleClampVec;
+
     public int Width { get; init; }
     public int Height { get; init; }
     public int TileSize { get; }
@@ -67,13 +69,16 @@ public partial class JobSystem
 
     public Camera Camera { get; set; }
 
-    public long TotalRays { get; private set; }
+    private long _totalRays;
+    private long _totalTileCompletions;
+
+    public long TotalRays => _totalRays;
 
     /// <summary>
     /// Number of individual tile render completions since startup.
     /// Divide by <see cref="TotalTiles"/> to get full-screen passes.
     /// </summary>
-    public long TotalTileCompletions { get; private set; }
+    public long TotalTileCompletions => _totalTileCompletions;
 
     /// <summary>
     /// Total number of tiles that cover the full screen.
@@ -163,6 +168,9 @@ public partial class JobSystem
     /// </summary>
     private const float BilateralSharpness = 25f;
 
+    /// <summary>Exponent used in the sRGB gamma transfer function (1/2.4).</summary>
+    private const float InvGamma = 1.0f / 2.4f;
+
     // Precomputed projection constants (depend only on Fov/Aspect/resolution, not position/rotation)
     private readonly float _tanHalfFov;
     private readonly float _aspectTanHalfFov;
@@ -199,6 +207,12 @@ public partial class JobSystem
     public double AverageEffectiveSpp { get; private set; }
     public uint MaxObservedSampleCount { get; private set; }
     public int FrameIndex { get; private set; }
+
+    /// <summary>
+    /// Snapshot of per-frame diagnostics captured at the end of each
+    /// <see cref="ResolveDisplayBufferWithTaa"/> call.
+    /// </summary>
+    public FrameDiagnostics LastFrameDiagnostics { get; private set; }
 
     public JobSystem(int width, int height, int tilesize, Tracable[] scene, Camera camera, int stride, Light[]? lights = null)
         : this(
@@ -253,6 +267,8 @@ public partial class JobSystem
         TemporalBlendAlpha = effectiveDenoiseOptions.TemporalBlendAlpha;
         EnableTaa = effectiveDenoiseOptions.EnableTaa;
         SampleClamp = effectiveDenoiseOptions.SampleClamp;
+
+        _sampleClampVec = new Vector3(SampleClamp);
 
         DebugOptions = effectiveDebugOptions;
 
@@ -490,7 +506,7 @@ public partial class JobSystem
         return sum / count;
     }
 
-    public static Matrix3x3 TosRGBMatrix => new(
+    public static readonly Matrix3x3 TosRGBMatrix = new(
          3.2406f, -1.5372f, -0.4986f,
          -0.9689f, 1.8758f, 0.0415f,
          0.0557f, -0.2040f, 1.0570f
@@ -1013,8 +1029,7 @@ public partial class JobSystem
         if (SampleClamp > 0f)
         {
             Vector3 unclamped = correctedXYZ;
-            correctedXYZ = Vector3.Clamp(correctedXYZ, Vector3.Zero,
-                new Vector3(SampleClamp, SampleClamp, SampleClamp));
+            correctedXYZ = Vector3.Clamp(correctedXYZ, Vector3.Zero, _sampleClampVec);
             float clampDelta = MathF.Abs(unclamped.X - correctedXYZ.X) +
                 MathF.Abs(unclamped.Y - correctedXYZ.Y) +
                 MathF.Abs(unclamped.Z - correctedXYZ.Z);
@@ -1230,7 +1245,7 @@ public partial class JobSystem
     {
         if (linear <= 0.0031308f)
             return 12.92f * linear;
-        return 1.055f * MathF.Pow(linear, 1f / 2.4f) - 0.055f;
+        return 1.055f * MathF.Pow(linear, InvGamma) - 0.055f;
     }
 
     private static Vector3 PaletteSampleCount(uint sampleCount, uint maxSampleCount)
@@ -1347,17 +1362,4 @@ public readonly record struct PixelDebugInfo(
     Vector3 Bounce2Plus
 );
 
-public class Tile
-{
-    public int X { get; init; }
-    public int Y { get; init; }
-    public int Width { get; init; }
-    public int Height { get; init; }
-    public Tile(int x, int y, int width, int height)
-    {
-        X = x;
-        Y = y;
-        Width = width;
-        Height = height;
-    }
-}
+public readonly record struct Tile(int X, int Y, int Width, int Height);

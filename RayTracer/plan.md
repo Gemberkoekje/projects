@@ -193,6 +193,45 @@ Notes:
 - ✅ Workspace build passes.
 - ✅ `RayTracer.Tests` test run passes: **112/112**.
 
+## Phase 5 Execution Status (2026-04-15)
+
+### 1) Hot-path profiling + static analysis (completed)
+- ✅ Inspected inner-loop allocation patterns in `PathTracer.TraceCore`, `TaaResolver.ResolveDisplayBufferWithTaa`, and `DisplayResolver.Render`.
+- ✅ Identified highest-ROI targets:
+  - Per-tile heap allocation (`Tile` class).
+  - Per-pixel `Vector3` reconstruction for sample clamping.
+  - Per-pixel `Quaternion.Inverse` call in reprojection inner loop.
+  - Non-atomic counter increments under worker concurrency.
+  - Redundant gamma exponent literal duplication across resolvers.
+
+### 2) Allocation reductions in inner loops (completed)
+- ✅ Converted `Tile` to `readonly record struct` — eliminates one heap allocation per dispatched tile.
+- ✅ Precomputed `_sampleClampVec` (`Vector3`) in `JobSystem` constructor — single allocation per `JobSystem` lifetime; removed per-pixel `new Vector3(SampleClamp, ...)`.
+- ✅ Hoisted `Quaternion.Inverse(previousCameraRotation)` out of per-pixel loop in `TaaResolver` — computed once per resolve call and passed into `TryProjectToPrevPixel`.
+
+### 3) Concurrency correctness (completed)
+- ✅ Replaced non-atomic counter increments in `TileScheduler` worker path with `Interlocked.Add` / `Interlocked.Increment` — eliminates lost-update races under parallel workers.
+
+### 4) Lightweight runtime metrics logging (completed)
+- ✅ Added `RayTracer.Core/Diagnostics/FrameDiagnostics.cs` — `readonly record struct` capturing per-frame resolve timing, quality metrics (rejection rate, variance, history weight, avg SPP, clamp fraction), and running totals.
+- ✅ `TaaResolver.ResolveDisplayBufferWithTaa` now uses `Stopwatch` to measure wall time and populates a `FrameDiagnostics` snapshot at the end of each resolve.
+- ✅ `JobSystem` exposes `LastFrameDiagnostics` property — callers can read live diagnostics after each frame without additional allocation.
+
+### 5) Constant consolidation (completed)
+- ✅ Extracted `InvGamma` (`1f / 2.2f`) as a shared constant in `JobSystem`; reused in both `TaaResolver` and `DisplayResolver`, removing literal duplication.
+
+### 6) Performance validation tests (completed)
+- ✅ Added `RayTracer.Tests/Phase5PerformanceTests.cs`:
+  - `Tile_IsValueType` — structural guard that `Tile` remains a value type.
+  - `FrameDiagnostics_IsValueType` — structural guard for `FrameDiagnostics`.
+  - `FrameDiagnostics_AfterResolve_PopulatesResolveTaaMs` — confirms timing field is non-negative after a resolve.
+  - `FrameDiagnostics_AfterResolve_FrameIndexIncrements` — confirms frame counter advances per resolve.
+  - `AllocationBaseline_Phase5_Snapshot` — allocation + throughput snapshot for before/after trend comparison.
+
+### 7) Validation snapshot after Phase 5 changes
+- ✅ Workspace build passes.
+- ✅ `RayTracer.Tests` test run passes: **121/121**.
+
 ## Goals
 - Reduce file size and cognitive load by splitting large classes into focused components.
 - Increase confidence with broader, faster, and more deterministic tests.
@@ -263,28 +302,117 @@ Notes:
 5. ✅ Performance tests:
    - ✅ Hot-path throughput snapshot tests with logged metrics.
 
-## Phase 5 — Performance & Memory Pass
-1. Profile hot paths after decomposition.
-2. Reduce allocations in inner loops.
-3. Consider data layout optimizations only when profiling justifies it.
-4. Add lightweight runtime metrics logging for frame diagnostics.
+## Phase 5 — Performance & Memory Pass (completed)
+1. ✅ Profile hot paths after decomposition.
+2. ✅ Reduce allocations in inner loops.
+3. ✅ Consider data layout optimizations only when profiling justifies it.
+4. ✅ Add lightweight runtime metrics logging for frame diagnostics.
 
-## Phase 6 — Tooling & Quality Automation
+## Completion Audit (2026-04-15)
+
+### Verified against actual codebase
+
+| Check | Status | Detail |
+|---|---|---|
+| Solution structure matches plan | ✅ | 5 projects + `Benchmark/Benchmarks.csproj` (not in Phase 0 inventory) |
+| Domain folders in `RayTracer.Core` | ✅ | `Rendering/`, `Sampling/`, `Lighting/`, `Geometry/`, `Debug/`, `Diagnostics/`, `Pipeline/` all present |
+| Decomposition components exist | ✅ | `TileScheduler`, `PathTracer`, `AccumulationBuffer`, `TaaResolver`, `DisplayResolver`, `DebugBufferRenderer` all present as partial-class files |
+| State containers exist | ✅ | `PerPixelState`, `HistoryState`, `DebugState` in `RenderState.cs` |
+| Option records exist | ✅ | `RenderOptions`, `SamplingOptions`, `DenoiseOptions`, `DebugOptions` in `JobSystemOptions.cs` |
+| `FrameDiagnostics` exists | ✅ | `readonly record struct` in `Diagnostics/FrameDiagnostics.cs` |
+| `Tile` is value type | ✅ | Confirmed by `Tile_IsValueType` test passing |
+| `InvGamma` constant consolidated | ✅ | Single constant in `JobSystem` |
+| Build passes | ✅ | `dotnet build` 0 errors |
+| All tests pass | ✅ | **122/122** (plan said 121; one test added after plan update) |
+
+### Success criteria gaps
+
+| Criterion | Target | Actual | Gap |
+|---|---|---|---|
+| No file over ~500 lines | ~500 | `JobSystem.cs` = **1214**, `AccumulationTests.cs` = **536** | ❌ `JobSystem.cs` still 2.4× over limit |
+| Stable CI pipeline | Exists | **No CI workflow file** | ❌ Not started |
+| Warning count tracked | 433 (Phase 0) | **762 warnings** | ❌ Increased 76% |
+
+### Other observations
+- `RayTracer.Tests/Test1.cs` is an **empty file** — dead artifact to remove.
+- `Benchmark/Benchmarks.csproj` is in the solution but **missing from Phase 0 architecture inventory**.
+- The `partial class` approach in Phase 2 moved methods into separate files, but `JobSystem.cs` still holds all field declarations, properties, constructors, and several orchestration methods.
+- `CalibrationForm.cs` (450 lines) and `Program.cs` (452 lines) are close to the 500-line limit but currently within tolerance.
+
+---
+
+## Phase 6 — Tooling & Quality Automation (not started)
 1. Enable stricter analyzers and warnings-as-errors (incrementally).
-2. Add formatting/style enforcement.
-3. Update CI:
-   - Restore, build, tests, analyzer checks, optional benchmarks.
-4. Add contributor docs for architecture and testing workflow.
+   - Start with `RayTracer.Core` — add `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` after fixing its warnings.
+   - Then extend to `RayTracer.Tests`, `RayTracer.App`, `Benchmark`.
+2. Add `.editorconfig` for formatting/style enforcement (indentation, naming, using-directive order).
+3. Add GitHub Actions CI workflow (`.github/workflows/ci.yml`):
+   - Restore → Build → Test → Analyzer checks → Optional benchmark run.
+4. Add contributor docs:
+   - `ARCHITECTURE.md` — module map, domain folder descriptions, data flow.
+   - `CONTRIBUTING.md` — build/test/PR workflow, coding conventions.
+5. Clean up dead artifacts:
+   - Remove empty `RayTracer.Tests/Test1.cs`.
+   - Add `Benchmark` project to Phase 0 architecture inventory.
 
-## Suggested Work Breakdown (PR Sequence)
-1. Baseline metrics + smoke tests.
-2. Extract color/display conversion path.
-3. Extract TAA resolve path.
-4. Extract debug rendering path.
-5. Extract tile scheduling/worker logic.
-6. Extract tracing/lighting pipeline.
-7. Introduce state containers and reduce `JobSystem` to coordinator.
-8. Expand regression/perf tests and tighten analyzers.
+## Phase 7 — Deep `JobSystem` Slimming (proposed)
+
+**Goal:** Bring `JobSystem.cs` under the ~500-line target. The Phase 2 partial-class extraction moved methods out but left fields, properties, constructors, and mid-level orchestration logic in the main file.
+
+1. Extract field declarations + array allocation into a dedicated `RenderBuffers` or `RenderResources` class:
+   - All per-pixel arrays (`AccumXYZ`, `SampleCount`, `WavelengthCounter`, debug arrays, TAA history, etc.)
+   - Single allocation site; `JobSystem` holds one `RenderResources` reference.
+2. Extract constructor logic into a static factory or builder:
+   - `JobSystemBuilder.Create(scene, lights, camera, options)` → `JobSystem`.
+   - Moves validation, array sizing, and component wiring out of the main file.
+3. Slim down orchestration methods:
+   - Move remaining inline logic (e.g., filtering, checkerboard bookkeeping) into the owning component.
+   - `JobSystem` becomes a thin facade: setup → dispatch → resolve → render.
+4. Reassess `partial class` vs. composition:
+   - Current partials are nested classes inside `JobSystem` — evaluate promoting them to top-level classes that receive `RenderResources` directly.
+5. Validate: build + 122+ tests pass, no performance regression vs. Phase 5 baseline.
+
+## Phase 8 — Test Suite Improvements (proposed)
+
+**Goal:** Improve test maintainability and coverage gaps.
+
+1. Split `AccumulationTests.cs` (536 lines) into focused test classes by concern:
+   - `AccumulationLifecycleTests` (reset, hit/miss transitions)
+   - `AccumulationConvergenceTests` (running average, EMA, capping)
+   - `AccumulationSpectralTests` (wavelength cycling, color convergence)
+2. Split `SpectralColorTests.cs` (335 lines) if it approaches the limit during Phase 7 additions.
+3. Remove dead `Test1.cs`.
+4. Add missing coverage:
+   - `PerformanceCalibrator` — no dedicated tests.
+   - `CameraController` — only basic movement tests; add edge cases (bounds, rapid direction changes).
+   - `BVH` — add stress tests with degenerate geometry (all-coplanar, zero-volume AABBs).
+5. Consider test parallelization configuration in `MSTestSettings.cs` for faster CI runs.
+
+## Phase 9 — Advanced Performance & Modernization (proposed)
+
+**Goal:** Leverage .NET 10 features and pursue deeper performance wins.
+
+1. Evaluate `Span<T>` / `Memory<T>` for buffer passing in hot paths (avoid array-as-interface pattern).
+2. Evaluate `Vector3` → `Vector128<float>` / SIMD intrinsics for color math inner loops.
+3. Profile TAA resolve + display resolve with the .NET profiler for GC pressure after Phase 7 refactoring.
+4. Investigate `System.Threading.Tasks.Dataflow` or `Channel<T>` improvements for tile dispatch.
+5. Benchmark struct-of-arrays vs. array-of-structs for per-pixel data (current: parallel arrays, which is already SoA-friendly — validate this is optimal with cache-line profiling).
+6. Capture updated performance baseline and compare against Phase 0/Phase 5 snapshots.
+
+## Phase 10 — Documentation & Onboarding (proposed)
+
+**Goal:** Make the project approachable for contributors.
+
+1. Write `ARCHITECTURE.md`:
+   - Solution map (which project does what).
+   - `RayTracer.Core` domain folder guide (Rendering, Geometry, Lighting, Sampling, Pipeline, Debug, Diagnostics).
+   - Data flow diagram: scene → BVH → tile dispatch → path trace → accumulate → TAA → display.
+2. Write `CONTRIBUTING.md`:
+   - Build prerequisites (.NET 10 SDK, Windows for WinForms app).
+   - How to run tests, benchmarks, and the WinForms app.
+   - PR checklist (build, tests, no new warnings, formatting).
+3. Add inline architecture comments to `JobSystem` facade methods documenting the render pipeline stages.
+4. Add `README.md` sections for: quick start, architecture overview, performance baselines.
 
 ## Risks & Mitigations
 - **Risk:** Behavior drift during extraction.
@@ -293,12 +421,14 @@ Notes:
   - **Mitigation:** Keep baseline benchmarks and gate merges on key metrics.
 - **Risk:** Large PR complexity.
   - **Mitigation:** Keep changes vertical and small, merge frequently.
+- **Risk:** Warning-as-error enablement causes churn.
+  - **Mitigation:** Enable per-project, fix warnings in dedicated PRs before flipping the flag.
+- **Risk:** Phase 7 `JobSystem` slimming breaks component wiring.
+  - **Mitigation:** Each extraction step must pass full 122+ test suite before proceeding.
 
-## Immediate Next Steps (First 1–2 Days)
-1. Start Phase 5 profiling on the decomposed pipeline:
-   - `PathTracer.TraceCore`
-   - `TaaResolver.ResolveDisplayBufferWithTaa`
-   - `DisplayResolver.Render`
-2. Compare Phase 4 snapshot metrics against Phase 0 baseline and identify top allocation/throughput deltas.
-3. Apply first allocation-focused inner-loop pass where profiling data shows highest ROI.
-4. Re-run full build + tests and refresh plan metrics.
+## Immediate Next Steps
+1. **Phase 6.1** — Add `.editorconfig` and fix formatting across the solution.
+2. **Phase 6.2** — Triage the 762 build warnings; fix `RayTracer.Core` warnings and enable `TreatWarningsAsErrors` for that project.
+3. **Phase 6.3** — Add `.github/workflows/ci.yml` with restore → build → test → analyzer pipeline.
+4. **Phase 7.1** — Extract `RenderResources` from `JobSystem.cs` to bring it under ~500 lines.
+5. **Phase 8.1** — Remove `Test1.cs` and split `AccumulationTests.cs`.
