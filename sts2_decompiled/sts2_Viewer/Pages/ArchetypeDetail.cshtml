@@ -95,7 +95,7 @@ else
             <form method="get" class="filter-grid" style="margin-bottom:16px;">
                 <label>
                     Min Affinity Score<br />
-                    <input type="number" name="MinAffinityScore" min="0" max="100" value="@Model.MinAffinityScore" />
+                    <input type="number" name="MinAffinityScore" min="0" max="10" value="@Model.MinAffinityScore" />
                 </label>
 
                 <input type="hidden" name="Id" value="@Model.Id" />
@@ -119,9 +119,7 @@ else
                                 <th>Id</th>
                                 <th>Title</th>
                                 <th>Tags</th>
-                                <th>Synergy</th>
-                                <th>Flexibility</th>
-                                <th>Anti</th>
+                                <th>Affinity</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -129,8 +127,8 @@ else
                             {
                                 <tr>
                                     <td><span class="@Model.TypeBadgeClass(entity.EntityType)">@entity.EntityType</span></td>
-                                    <td class="id-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.EntityId</a></td>
-                                    <td class="title-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.Title</a></td>
+                                    <td class="id-cell"><a href="EntityDetail?type=@entity.EntityType&id=@entity.EntityId">@entity.EntityId</a></td>
+                                    <td class="title-cell"><a href="EntityDetail?type=@entity.EntityType&id=@entity.EntityId">@entity.Title</a></td>
                                     <td class="tags-cell">
                                         @if (entity.Tags.Count == 0)
                                         {
@@ -148,20 +146,8 @@ else
                                     </td>
                                     <td>
                                         <div class="rating-cell">
-                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.SynergyRating, false)" style="width:@(Math.Clamp(entity.SynergyRating, 0, 10) * 10)%"></div></div>
-                                            <span class="rating-value">@entity.SynergyRating</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="rating-cell">
-                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.FlexibilityRating, false)" style="width:@(Math.Clamp(entity.FlexibilityRating, 0, 10) * 10)%"></div></div>
-                                            <span class="rating-value">@entity.FlexibilityRating</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="rating-cell">
-                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.AntiSynergyRating, true)" style="width:@(Math.Clamp(entity.AntiSynergyRating, 0, 10) * 10)%"></div></div>
-                                            <span class="rating-value">@entity.AntiSynergyRating</span>
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.AffinityScore, false)" style="width:@(Math.Clamp(entity.AffinityScore, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.AffinityScore</span>
                                         </div>
                                     </td>
                                 </tr>

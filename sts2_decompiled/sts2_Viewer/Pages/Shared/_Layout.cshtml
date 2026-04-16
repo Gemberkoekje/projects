@@ -15,9 +15,9 @@
 </head>
 <body>
     <nav style="margin-bottom:12px;">
-        <a asp-page="/Index">Viewer</a>
-        <a asp-page="/Archetypes">Archetypes</a>
-        <a asp-page="/PickAdvisor">Pick Advisor</a>
+        <a href="@(Context.Request.PathBase + "/")">Viewer</a>
+        <a href="@(Context.Request.PathBase + "/Archetypes")">Archetypes</a>
+        <a href="@(Context.Request.PathBase + "/PickAdvisor")">Pick Advisor</a>
     </nav>
     @RenderBody()
 </body>

@@ -16,6 +16,8 @@ public sealed class EntityRow
 
     public IReadOnlyList<string> Tags { get; set; }
 
+    public int AffinityScore { get; set; }
+
     public int SynergyRating { get; set; }
 
     public int FlexibilityRating { get; set; }

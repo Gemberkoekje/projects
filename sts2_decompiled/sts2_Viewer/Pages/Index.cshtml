@@ -223,11 +223,10 @@ else
                                        asp-route-EntityLimit="@Model.EntityLimit"
                                        asp-route-SortBy="name"
                                        asp-route-SortDirection="@Model.NextSortDirection("name")">
-                                        <span>Name</span>
+                                        <span>Top Archetype</span>
                                         <span>@Model.SortIndicator("name")</span>
                                     </a>
                                 </th>
-                                <th>Top Archetype</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -235,8 +234,8 @@ else
                             {
                                 <tr>
                                     <td><span class="@Model.TypeBadgeClass(entity.Entity.EntityType)">@entity.Entity.EntityType</span></td>
-                                    <td class="id-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.Entity.EntityType" asp-route-id="@entity.Entity.EntityId">@entity.Entity.EntityId</a></td>
-                                    <td class="title-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.Entity.EntityType" asp-route-id="@entity.Entity.EntityId">@entity.Entity.Title</a></td>
+                                    <td class="id-cell"><a href="EntityDetail?type=@entity.Entity.EntityType&id=@entity.Entity.EntityId">@entity.Entity.EntityId</a></td>
+                                    <td class="title-cell"><a href="EntityDetail?type=@entity.Entity.EntityType&id=@entity.Entity.EntityId">@entity.Entity.Title</a></td>
                                     <td class="tags-cell">
                                         @if (entity.Entity.Tags.Count == 0)
                                         {

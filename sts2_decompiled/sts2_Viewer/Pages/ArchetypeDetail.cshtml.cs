@@ -8,7 +8,7 @@ namespace Sts2Viewer.Pages;
 
 public sealed class ArchetypeDetailModel : PageModel
 {
-    private const int DefaultAffinityThreshold = 70;
+    private const int DefaultAffinityThreshold = 7;
     private const int DefaultEntityLimit = 1000;
 
     private readonly PostgresReadService _service;

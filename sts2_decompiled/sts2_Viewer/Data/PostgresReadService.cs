@@ -929,27 +929,21 @@ SELECT
     e.title,
     e.description,
     e.tags,
+    ea.affinity_score,
     COALESCE(esr.synergy_rating, 0),
     COALESCE(esr.flexibility_rating, 0),
     COALESCE(esr.anti_synergy_rating, 0)
 FROM entities e
+INNER JOIN entity_archetype_affinity ea
+    ON ea.archetype_id = @archetype_id
+   AND LOWER(ea.entity_type) = LOWER(e.entity_type)
+   AND ea.entity_id = e.entity_id
+   AND ea.affinity_score >= @min_affinity_score
 LEFT JOIN entity_strength_ratings esr
     ON esr.entity_type = e.rating_entity_type
    AND esr.entity_id = e.entity_id
-WHERE EXISTS (
-    SELECT 1
-    FROM entity_archetype_affinity ea
-    WHERE ea.archetype_id = @archetype_id
-      AND LOWER(ea.entity_type) = LOWER(e.entity_type)
-      AND ea.entity_id = e.entity_id
-      AND ea.affinity_score >= @min_affinity_score
-)
 ORDER BY
-    (SELECT COALESCE(ea.affinity_score, 0)
-     FROM entity_archetype_affinity ea
-     WHERE ea.archetype_id = @archetype_id
-       AND LOWER(ea.entity_type) = LOWER(e.entity_type)
-       AND ea.entity_id = e.entity_id) DESC,
+    ea.affinity_score DESC,
     e.entity_type,
     e.entity_id
 LIMIT @limit;", connection);
@@ -970,9 +964,10 @@ LIMIT @limit;", connection);
                     Title = reader.GetString(3),
                     Description = reader.GetString(4),
                     Tags = tags,
-                    SynergyRating = reader.GetInt32(6),
-                    FlexibilityRating = reader.GetInt32(7),
-                    AntiSynergyRating = reader.GetInt32(8)
+                    AffinityScore = reader.GetInt32(6),
+                    SynergyRating = reader.GetInt32(7),
+                    FlexibilityRating = reader.GetInt32(8),
+                    AntiSynergyRating = reader.GetInt32(9)
                 });
             }
         }

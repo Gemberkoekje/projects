@@ -156,7 +156,7 @@ else
                 <tr>
                     <td>@score.Rank</td>
                     <td>
-                        <a asp-page="/EntityDetail" asp-route-type="@score.EntityType" asp-route-id="@score.EntityId">@score.EntityType:@score.EntityId</a>
+                        <a href="EntityDetail?type=@score.EntityType&id=@score.EntityId">@score.EntityType:@score.EntityId</a>
                     </td>
                     <td>@RenderBar(score.CompositeScore, "bar-composite")</td>
                     <td>@RenderBar(score.EdgeOverlapScore, "bar-deck")</td>
@@ -187,7 +187,7 @@ else
             {
                 <tr>
                     <td>@row.CreatedAt.LocalDateTime.ToString("g")</td>
-                    <td><a asp-page="/EntityDetail" asp-route-type="@row.OptionEntityType" asp-route-id="@row.OptionEntityId">@row.OptionEntityType:@row.OptionEntityId</a></td>
+                    <td><a href="EntityDetail?type=@row.OptionEntityType&id=@row.OptionEntityId">@row.OptionEntityType:@row.OptionEntityId</a></td>
                     <td>@row.Rank</td>
                     <td>@(row.CompositeScore * 10.0).ToString("F2")</td>
                     <td>@(row.EdgeOverlapScore * 10.0).ToString("F1")</td>

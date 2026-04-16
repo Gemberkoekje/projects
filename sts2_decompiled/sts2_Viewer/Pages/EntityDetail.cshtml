@@ -105,7 +105,7 @@ else
                     @foreach (var affinity in Model.ArchetypeAffinities)
                     {
                         <tr>
-                            <td><a asp-page="/Index" asp-route-Search="@affinity.ArchetypeName">@affinity.ArchetypeName</a></td>
+                            <td><a asp-page="/ArchetypeDetail" asp-route-id="@affinity.ArchetypeId">@affinity.ArchetypeName</a></td>
                             <td>@affinity.AffinityScore</td>
                             <td>@affinity.CharacterId</td>
                         </tr>

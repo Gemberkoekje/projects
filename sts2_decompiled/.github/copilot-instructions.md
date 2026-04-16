@@ -4,6 +4,7 @@
 - Under almost any circumstances, do not use nullables (?) - they are generally not needed. Only use them in very specific circumstances where there's no other way to differentiate between an entity and no entity, or consider using `Result<T>`. Do NOT add `#nullable enable` as a workaround for CS8632 warnings — remove the `?` annotations instead.
 - All enums should have an empty value.
 - Implicit usings are disabled in this workspace (via project build props). This is intentional. All System.* and SDK usings must be explicitly declared in `GlobalUsings.cs` or as local usings.
+- In this workspace, links must work when hosted under a base path (/sts2viewer), so avoid root-absolute URLs for page navigation and detail links.
 
 ## Project Guidelines
 - For this STS2 analysis project, user prefers practical recommendations for API-usable LLMs and wants low-cost model routing: use Haiku-class models for large mechanical annotation batches, and stronger models (Sonnet-class) for archetype discovery/synergy reasoning. User has personal Copilot Pro+ and Claude Pro subscriptions.
