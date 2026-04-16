@@ -62,8 +62,8 @@ public sealed class IndexModel : PageModel
         EntityType = string.Empty;
         CharacterId = string.Empty;
         Tag = string.Empty;
-        SortBy = "synergy";
-        SortDirection = "desc";
+        SortBy = "title";
+        SortDirection = "asc";
         MinSynergy = 1;
         MinFlexibility = 1;
         MaxAntiSynergy = 10;
@@ -185,15 +185,17 @@ public sealed class IndexModel : PageModel
         {
             "flexibility" => "flexibility",
             "anti" => "anti",
-            "name" => "name",
-            _ => "synergy"
+            "title" => "title",
+            "name" => "title",
+            "synergy" => "synergy",
+            _ => "title"
         };
     }
 
     private static string NormalizeSortDirection(string sortDirection)
     {
-        return string.Equals((sortDirection ?? string.Empty).Trim(), "asc", StringComparison.OrdinalIgnoreCase)
-            ? "asc"
-            : "desc";
+        return string.Equals((sortDirection ?? string.Empty).Trim(), "desc", StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
     }
 }

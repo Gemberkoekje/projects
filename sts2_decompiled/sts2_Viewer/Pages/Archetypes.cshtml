@@ -19,6 +19,8 @@
     .data-table thead th { position:sticky; top:0; z-index:1; background:#f8fafc; }
     .data-table tbody tr:nth-child(even) { background:#fbfdff; }
     .data-table tbody tr:hover { background:#eef6ff; }
+    .sort-link { color:inherit; text-decoration:none; display:inline-flex; gap:4px; align-items:center; }
+    .sort-link:hover { text-decoration:underline; }
     .tag-list { display:flex; flex-wrap:wrap; gap:4px; }
     .tag-chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef3ff; color:#243b53; font-size:10px; line-height:1.5; }
     .tags-cell { font-size:11px; min-width:220px; }
@@ -49,6 +51,9 @@ else
                     </select>
                 </label>
 
+                <input type="hidden" name="SortBy" value="@Model.SortBy" />
+                <input type="hidden" name="SortDirection" value="@Model.SortDirection" />
+
                 <div class="filter-actions">
                     <button type="submit">Apply filter</button>
                 </div>
@@ -67,7 +72,16 @@ else
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Name</th>
+                                <th>
+                                    <a class="sort-link"
+                                       asp-page="/Archetypes"
+                                       asp-route-characterId="@Model.CharacterId"
+                                       asp-route-SortBy="title"
+                                       asp-route-SortDirection="@Model.NextSortDirection("title")">
+                                        <span>Name</span>
+                                        <span>@Model.SortIndicator("title")</span>
+                                    </a>
+                                </th>
                                 <th>Character</th>
                                 <th>Description</th>
                                 <th>Key Effect Tags</th>

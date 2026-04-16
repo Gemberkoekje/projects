@@ -29,6 +29,8 @@ public sealed class EntityDetailModel : PageModel
 
     public string CharacterDisplayName { get; private set; }
 
+    public string ResourceCostSummary { get; private set; }
+
     public bool IsFound => Entity.EntityId.Length > 0;
 
     public EntityDetailModel(PostgresReadService service)
@@ -41,6 +43,7 @@ public sealed class EntityDetailModel : PageModel
         SynergyClusters = new List<SynergyClusterRow>();
         QuickVerdict = string.Empty;
         CharacterDisplayName = string.Empty;
+        ResourceCostSummary = string.Empty;
     }
 
     public void OnGet()
@@ -85,6 +88,7 @@ public sealed class EntityDetailModel : PageModel
         ArchetypeAffinities = _service.GetEntityArchetypeAffinities(normalizedType, normalizedId);
         SynergyClusters = _service.GetSynergyClustersForEntity(normalizedType, normalizedId);
         QuickVerdict = BuildVerdict(Entity);
+        ResourceCostSummary = BuildResourceCostSummary(Entity);
     }
 
     public string TypeBadgeClass(string entityType)
@@ -115,6 +119,95 @@ public sealed class EntityDetailModel : PageModel
         }
 
         return match.Title;
+    }
+
+    private static string BuildResourceCostSummary(EntityRow entity)
+    {
+        List<string> parts = new List<string>();
+
+        if (entity.EnergyCost != int.MinValue)
+        {
+            parts.Add(entity.EnergyCost.ToString(System.Globalization.CultureInfo.InvariantCulture) + " mana");
+        }
+
+        List<string> resourceCosts = new List<string>();
+        for (int i = 0; i < entity.ResourcesConsumed.Count; i++)
+        {
+            string normalized = NormalizeResourceTag(entity.ResourcesConsumed[i]);
+            if (normalized.Length == 0)
+            {
+                continue;
+            }
+
+            if (!resourceCosts.Any(existing => string.Equals(existing, normalized, StringComparison.OrdinalIgnoreCase)))
+            {
+                resourceCosts.Add(normalized);
+            }
+        }
+
+        if (resourceCosts.Count > 0)
+        {
+            parts.Add("requires " + string.Join(", ", resourceCosts));
+        }
+
+        if (parts.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(" + ", parts);
+    }
+
+    private static string NormalizeResourceTag(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return string.Empty;
+        }
+
+        string normalized = tag.Trim().ToLowerInvariant();
+        string[] prefixes =
+        {
+            "consume_",
+            "consumes_",
+            "spend_",
+            "spends_",
+            "pay_",
+            "pays_",
+            "use_",
+            "uses_",
+            "cost_",
+            "costs_",
+            "require_",
+            "requires_"
+        };
+
+        for (int i = 0; i < prefixes.Length; i++)
+        {
+            if (normalized.StartsWith(prefixes[i], StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(prefixes[i].Length);
+                break;
+            }
+        }
+
+        if (normalized.EndsWith("_cost", StringComparison.Ordinal))
+        {
+            normalized = normalized.Substring(0, normalized.Length - "_cost".Length);
+        }
+
+        normalized = normalized.Replace('_', ' ').Trim();
+        if (normalized.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (normalized.Contains("star", StringComparison.Ordinal))
+        {
+            return "stars";
+        }
+
+        return normalized;
     }
 
     private static string BuildVerdict(EntityRow entity)

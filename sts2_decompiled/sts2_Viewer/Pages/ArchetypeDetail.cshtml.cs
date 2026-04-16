@@ -19,6 +19,12 @@ public sealed class ArchetypeDetailModel : PageModel
     [BindProperty(SupportsGet = true)]
     public int MinAffinityScore { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string SortBy { get; set; }
+
+    [BindProperty(SupportsGet = true)]
+    public string SortDirection { get; set; }
+
     public bool HasConnectionString { get; private set; }
 
     public ArchetypeRow Archetype { get; private set; }
@@ -29,6 +35,8 @@ public sealed class ArchetypeDetailModel : PageModel
     {
         _service = service;
         MinAffinityScore = DefaultAffinityThreshold;
+        SortBy = "title";
+        SortDirection = "asc";
         Archetype = new ArchetypeRow();
         SynergyEntities = new List<EntityRow>();
     }
@@ -51,6 +59,9 @@ public sealed class ArchetypeDetailModel : PageModel
             MinAffinityScore = DefaultAffinityThreshold;
         }
 
+        SortBy = NormalizeSortBy(SortBy);
+        SortDirection = NormalizeSortDirection(SortDirection);
+
         var allArchetypes = _service.GetArchetypes(string.Empty);
         foreach (var archetype in allArchetypes)
         {
@@ -66,7 +77,28 @@ public sealed class ArchetypeDetailModel : PageModel
             return;
         }
 
-        SynergyEntities = _service.GetEntitiesSynergizingWithArchetype(Id, MinAffinityScore, DefaultEntityLimit);
+        SynergyEntities = ApplySort(_service.GetEntitiesSynergizingWithArchetype(Id, MinAffinityScore, DefaultEntityLimit), SortBy, SortDirection);
+    }
+
+    public string SortIndicator(string sortBy)
+    {
+        if (!string.Equals(SortBy, sortBy, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Empty;
+        }
+
+        return string.Equals(SortDirection, "asc", StringComparison.OrdinalIgnoreCase) ? "↑" : "↓";
+    }
+
+    public string NextSortDirection(string sortBy)
+    {
+        if (string.Equals(SortBy, sortBy, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(SortDirection, "desc", StringComparison.OrdinalIgnoreCase))
+        {
+            return "asc";
+        }
+
+        return "desc";
     }
 
     public string TypeBadgeClass(string entityType)
@@ -99,5 +131,58 @@ public sealed class ArchetypeDetailModel : PageModel
             <= 6 => "rating-fill rating-medium",
             _ => "rating-fill rating-high"
         };
+    }
+
+    private static IReadOnlyList<EntityRow> ApplySort(IReadOnlyList<EntityRow> rows, string sortBy, string sortDirection)
+    {
+        List<EntityRow> sorted = new List<EntityRow>(rows);
+
+        sorted.Sort((left, right) =>
+        {
+            int comparison = sortBy switch
+            {
+                "affinity" => left.AffinityScore.CompareTo(right.AffinityScore),
+                _ => string.Compare(left.Title, right.Title, StringComparison.OrdinalIgnoreCase)
+            };
+
+            if (string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase))
+            {
+                comparison = -comparison;
+            }
+
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+
+            int byType = string.Compare(left.EntityType, right.EntityType, StringComparison.OrdinalIgnoreCase);
+            if (byType != 0)
+            {
+                return byType;
+            }
+
+            return string.Compare(left.EntityId, right.EntityId, StringComparison.OrdinalIgnoreCase);
+        });
+
+        return sorted;
+    }
+
+    private static string NormalizeSortBy(string sortBy)
+    {
+        string normalized = (sortBy ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "affinity" => "affinity",
+            "title" => "title",
+            "name" => "title",
+            _ => "title"
+        };
+    }
+
+    private static string NormalizeSortDirection(string sortDirection)
+    {
+        return string.Equals((sortDirection ?? string.Empty).Trim(), "desc", StringComparison.OrdinalIgnoreCase)
+            ? "desc"
+            : "asc";
     }
 }

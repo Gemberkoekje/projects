@@ -47,7 +47,10 @@ WITH entities AS (
         'exclusive'::text AS character_scope_kind,
         COALESCE(NULLIF(c.title, ''), c.id) AS title,
         COALESCE(c.description, '') AS description,
-        COALESCE(c.effect_tags, ARRAY[]::text[]) AS tags
+        COALESCE(c.effect_tags, ARRAY[]::text[]) AS tags,
+        COALESCE(c.energy_cost, -2147483648) AS energy_cost,
+        COALESCE(c.resources_generated, ARRAY[]::text[]) AS resources_generated,
+        COALESCE(c.resources_consumed, ARRAY[]::text[]) AS resources_consumed
     FROM cards c
 
     UNION ALL
@@ -60,7 +63,10 @@ WITH entities AS (
         CASE WHEN r.character_id IS NULL THEN 'shared'::text ELSE 'exclusive'::text END,
         COALESCE(NULLIF(r.title, ''), r.id),
         COALESCE(r.description, ''),
-        COALESCE(r.effect_tags, ARRAY[]::text[])
+        COALESCE(r.effect_tags, ARRAY[]::text[]),
+        -2147483648,
+        COALESCE(r.resources_generated, ARRAY[]::text[]),
+        COALESCE(r.resources_consumed, ARRAY[]::text[])
     FROM relics r
 
     UNION ALL
@@ -73,7 +79,10 @@ WITH entities AS (
         CASE WHEN p.character_id IS NULL THEN 'shared'::text ELSE 'exclusive'::text END,
         COALESCE(NULLIF(p.title, ''), p.id),
         COALESCE(p.description, ''),
-        COALESCE(p.effect_tags, ARRAY[]::text[])
+        COALESCE(p.effect_tags, ARRAY[]::text[]),
+        -2147483648,
+        ARRAY[]::text[],
+        ARRAY[]::text[]
     FROM potions p
 
     UNION ALL
@@ -86,6 +95,9 @@ WITH entities AS (
         'none'::text,
         COALESCE(NULLIF(eo.title, ''), eo.option_key),
         COALESCE(NULLIF(eo.description, ''), COALESCE(eo.handler_method, '')),
+        ARRAY[]::text[],
+        -2147483648,
+        ARRAY[]::text[],
         ARRAY[]::text[]
     FROM event_options eo
 )
@@ -96,6 +108,9 @@ SELECT
     e.title,
     e.description,
     e.tags,
+    e.energy_cost,
+    e.resources_generated,
+    e.resources_consumed,
     COALESCE(esr.synergy_rating, 0),
     COALESCE(esr.flexibility_rating, 0),
     COALESCE(esr.anti_synergy_rating, 0)
@@ -122,8 +137,8 @@ ORDER BY
     CASE WHEN @sort_by = 'flexibility' AND @sort_direction <> 'asc' THEN COALESCE(esr.flexibility_rating, 0) END DESC,
     CASE WHEN @sort_by = 'anti' AND @sort_direction = 'asc' THEN COALESCE(esr.anti_synergy_rating, 0) END ASC,
     CASE WHEN @sort_by = 'anti' AND @sort_direction <> 'asc' THEN COALESCE(esr.anti_synergy_rating, 0) END DESC,
-    CASE WHEN @sort_by = 'name' AND @sort_direction = 'asc' THEN e.title END ASC,
-    CASE WHEN @sort_by = 'name' AND @sort_direction <> 'asc' THEN e.title END DESC,
+    CASE WHEN (@sort_by = 'title' OR @sort_by = 'name') AND @sort_direction = 'asc' THEN e.title END ASC,
+    CASE WHEN (@sort_by = 'title' OR @sort_by = 'name') AND @sort_direction <> 'asc' THEN e.title END DESC,
     e.entity_type,
     e.entity_id
 LIMIT @limit;", connection);
@@ -146,6 +161,8 @@ LIMIT @limit;", connection);
         while (reader.Read())
         {
             string[] tags = reader.IsDBNull(5) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(5);
+            string[] resourcesGenerated = reader.IsDBNull(7) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(7);
+            string[] resourcesConsumed = reader.IsDBNull(8) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(8);
             rows.Add(new EntityRow
             {
                 EntityType = reader.GetString(0),
@@ -154,9 +171,12 @@ LIMIT @limit;", connection);
                 Title = reader.GetString(3),
                 Description = reader.GetString(4),
                 Tags = tags,
-                SynergyRating = reader.GetInt32(6),
-                FlexibilityRating = reader.GetInt32(7),
-                AntiSynergyRating = reader.GetInt32(8)
+                EnergyCost = reader.GetInt32(6),
+                ResourcesGenerated = resourcesGenerated,
+                ResourcesConsumed = resourcesConsumed,
+                SynergyRating = reader.GetInt32(9),
+                FlexibilityRating = reader.GetInt32(10),
+                AntiSynergyRating = reader.GetInt32(11)
             });
         }
 
@@ -895,7 +915,10 @@ WITH entities AS (
         COALESCE(c.character_id, 'colorless') AS character_id,
         COALESCE(NULLIF(c.title, ''), c.id) AS title,
         COALESCE(c.description, '') AS description,
-        COALESCE(c.effect_tags, ARRAY[]::text[]) AS tags
+        COALESCE(c.effect_tags, ARRAY[]::text[]) AS tags,
+        COALESCE(c.energy_cost, -2147483648) AS energy_cost,
+        COALESCE(c.resources_generated, ARRAY[]::text[]) AS resources_generated,
+        COALESCE(c.resources_consumed, ARRAY[]::text[]) AS resources_consumed
     FROM cards c
 
     UNION ALL
@@ -907,7 +930,10 @@ WITH entities AS (
         COALESCE(r.character_id, ''),
         COALESCE(NULLIF(r.title, ''), r.id),
         COALESCE(r.description, ''),
-        COALESCE(r.effect_tags, ARRAY[]::text[])
+        COALESCE(r.effect_tags, ARRAY[]::text[]),
+        -2147483648,
+        COALESCE(r.resources_generated, ARRAY[]::text[]),
+        COALESCE(r.resources_consumed, ARRAY[]::text[])
     FROM relics r
 
     UNION ALL
@@ -919,7 +945,10 @@ WITH entities AS (
         COALESCE(p.character_id, ''),
         COALESCE(NULLIF(p.title, ''), p.id),
         COALESCE(p.description, ''),
-        COALESCE(p.effect_tags, ARRAY[]::text[])
+        COALESCE(p.effect_tags, ARRAY[]::text[]),
+        -2147483648,
+        ARRAY[]::text[],
+        ARRAY[]::text[]
     FROM potions p
 )
 SELECT
@@ -929,6 +958,9 @@ SELECT
     e.title,
     e.description,
     e.tags,
+    e.energy_cost,
+    e.resources_generated,
+    e.resources_consumed,
     ea.affinity_score,
     COALESCE(esr.synergy_rating, 0),
     COALESCE(esr.flexibility_rating, 0),
@@ -956,6 +988,8 @@ LIMIT @limit;", connection);
             while (reader.Read())
             {
                 string[] tags = reader.IsDBNull(5) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(5);
+                string[] resourcesGenerated = reader.IsDBNull(7) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(7);
+                string[] resourcesConsumed = reader.IsDBNull(8) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(8);
                 rows.Add(new EntityRow
                 {
                     EntityType = reader.GetString(0),
@@ -964,10 +998,13 @@ LIMIT @limit;", connection);
                     Title = reader.GetString(3),
                     Description = reader.GetString(4),
                     Tags = tags,
-                    AffinityScore = reader.GetInt32(6),
-                    SynergyRating = reader.GetInt32(7),
-                    FlexibilityRating = reader.GetInt32(8),
-                    AntiSynergyRating = reader.GetInt32(9)
+                    EnergyCost = reader.GetInt32(6),
+                    ResourcesGenerated = resourcesGenerated,
+                    ResourcesConsumed = resourcesConsumed,
+                    AffinityScore = reader.GetInt32(9),
+                    SynergyRating = reader.GetInt32(10),
+                    FlexibilityRating = reader.GetInt32(11),
+                    AntiSynergyRating = reader.GetInt32(12)
                 });
             }
         }

@@ -26,8 +26,8 @@ public sealed class EntityQueryRequest
         EntityType = string.Empty;
         CharacterId = string.Empty;
         Tag = string.Empty;
-        SortBy = "synergy";
-        SortDirection = "desc";
+        SortBy = "title";
+        SortDirection = "asc";
         MinSynergy = 1;
         MinFlexibility = 1;
         MaxAntiSynergy = 10;

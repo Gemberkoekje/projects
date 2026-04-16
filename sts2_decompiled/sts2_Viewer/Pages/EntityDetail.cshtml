@@ -43,6 +43,10 @@ else
             {
                 <div class="muted">Character: @Model.CharacterDisplayName</div>
             }
+            @if (Model.ResourceCostSummary.Length > 0)
+            {
+                <div class="muted">Cost: @Model.ResourceCostSummary</div>
+            }
             <p style="margin-top:8px;">@Model.Entity.Description</p>
         </section>
 
@@ -105,7 +109,7 @@ else
                     @foreach (var affinity in Model.ArchetypeAffinities)
                     {
                         <tr>
-                            <td><a asp-page="/ArchetypeDetail" asp-route-id="@affinity.ArchetypeId">@affinity.ArchetypeName</a></td>
+                            <td><a href="ArchetypeDetail?id=@affinity.ArchetypeId">@affinity.ArchetypeName</a></td>
                             <td>@affinity.AffinityScore</td>
                             <td>@affinity.CharacterId</td>
                         </tr>

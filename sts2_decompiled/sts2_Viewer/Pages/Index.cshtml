@@ -10,7 +10,7 @@
     .panel-title { margin:0 0 10px 0; font-size:1.05rem; }
     .diagnostic-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
     .diagnostic-card { padding:10px 12px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0; }
-    .diagnostic-label { display:block; font-size:11px; color:#526071; margin-bottom:4px; }
+    .diagnostic-label { display:block; font-size:11px, , #526071; margin-bottom:4px; }
     .diagnostic-value { font-size:1.15rem; font-weight:600; }
     .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end; }
     .filter-actions { display:flex; align-items:end; }
@@ -157,7 +157,23 @@ else
                             <tr>
                                 <th>Type</th>
                                 <th>Id</th>
-                                <th>Title</th>
+                                <th>
+                                    <a class="sort-link"
+                                       asp-page="/Index"
+                                       asp-route-Search="@Model.Search"
+                                       asp-route-EntityType="@Model.EntityType"
+                                       asp-route-CharacterId="@Model.CharacterId"
+                                       asp-route-Tag="@Model.Tag"
+                                       asp-route-MinSynergy="@Model.MinSynergy"
+                                       asp-route-MinFlexibility="@Model.MinFlexibility"
+                                       asp-route-MaxAntiSynergy="@Model.MaxAntiSynergy"
+                                       asp-route-EntityLimit="@Model.EntityLimit"
+                                       asp-route-SortBy="title"
+                                       asp-route-SortDirection="@Model.NextSortDirection("title")">
+                                        <span>Title</span>
+                                        <span>@Model.SortIndicator("title")</span>
+                                    </a>
+                                </th>
                                 <th>Tags</th>
                                 <th>
                                     <a class="sort-link"
@@ -210,23 +226,7 @@ else
                                         <span>@Model.SortIndicator("anti")</span>
                                     </a>
                                 </th>
-                                <th>
-                                    <a class="sort-link"
-                                       asp-page="/Index"
-                                       asp-route-Search="@Model.Search"
-                                       asp-route-EntityType="@Model.EntityType"
-                                       asp-route-CharacterId="@Model.CharacterId"
-                                       asp-route-Tag="@Model.Tag"
-                                       asp-route-MinSynergy="@Model.MinSynergy"
-                                       asp-route-MinFlexibility="@Model.MinFlexibility"
-                                       asp-route-MaxAntiSynergy="@Model.MaxAntiSynergy"
-                                       asp-route-EntityLimit="@Model.EntityLimit"
-                                       asp-route-SortBy="name"
-                                       asp-route-SortDirection="@Model.NextSortDirection("name")">
-                                        <span>Top Archetype</span>
-                                        <span>@Model.SortIndicator("name")</span>
-                                    </a>
-                                </th>
+                                <th>Top Archetype</th>
                             </tr>
                         </thead>
                         <tbody>

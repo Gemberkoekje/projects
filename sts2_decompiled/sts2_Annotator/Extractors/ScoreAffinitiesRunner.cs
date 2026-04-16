@@ -273,7 +273,7 @@ ORDER BY id;", connection);
         connection.Open();
 
         using (NpgsqlCommand cards = new NpgsqlCommand(@"
-SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), COALESCE(keywords, ARRAY[]::text[])
+SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), COALESCE(keywords, ARRAY[]::text[]), COALESCE(resources_generated, ARRAY[]::text[]), COALESCE(resources_consumed, ARRAY[]::text[])
 FROM cards
 WHERE LOWER(COALESCE(character_id, '')) = LOWER(@character_id) OR character_id IS NULL
 ORDER BY id;", connection))
@@ -289,13 +289,15 @@ ORDER BY id;", connection))
                     Title = reader.GetString(1),
                     Description = reader.GetString(2),
                     EffectTags = reader.GetFieldValue<string[]>(3),
-                    Keywords = reader.GetFieldValue<string[]>(4)
+                    Keywords = reader.GetFieldValue<string[]>(4),
+                    ResourcesGenerated = reader.GetFieldValue<string[]>(5),
+                    ResourcesConsumed = reader.GetFieldValue<string[]>(6)
                 });
             }
         }
 
         using (NpgsqlCommand relics = new NpgsqlCommand(@"
-SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[])
+SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), COALESCE(resources_generated, ARRAY[]::text[]), COALESCE(resources_consumed, ARRAY[]::text[])
 FROM relics
 WHERE LOWER(COALESCE(character_id, '')) = LOWER(@character_id) OR character_id IS NULL
 ORDER BY id;", connection))
@@ -311,13 +313,15 @@ ORDER BY id;", connection))
                     Title = reader.GetString(1),
                     Description = reader.GetString(2),
                     EffectTags = reader.GetFieldValue<string[]>(3),
-                    Keywords = Array.Empty<string>()
+                    Keywords = Array.Empty<string>(),
+                    ResourcesGenerated = reader.GetFieldValue<string[]>(4),
+                    ResourcesConsumed = reader.GetFieldValue<string[]>(5)
                 });
             }
         }
 
         using (NpgsqlCommand potions = new NpgsqlCommand(@"
-SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[])
+SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), ARRAY[]::text[], ARRAY[]::text[]
 FROM potions
 WHERE LOWER(COALESCE(character_id, '')) = LOWER(@character_id) OR character_id IS NULL
 ORDER BY id;", connection))
@@ -333,7 +337,9 @@ ORDER BY id;", connection))
                     Title = reader.GetString(1),
                     Description = reader.GetString(2),
                     EffectTags = reader.GetFieldValue<string[]>(3),
-                    Keywords = Array.Empty<string>()
+                    Keywords = Array.Empty<string>(),
+                    ResourcesGenerated = reader.GetFieldValue<string[]>(4),
+                    ResourcesConsumed = reader.GetFieldValue<string[]>(5)
                 });
             }
         }
@@ -382,8 +388,10 @@ ORDER BY id;", connection))
         }
 
         string sql = string.Equals(entityType, "card", StringComparison.OrdinalIgnoreCase)
-            ? "SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), COALESCE(keywords, ARRAY[]::text[]) FROM " + tableName + " WHERE id = ANY(@ids) ORDER BY id;"
-            : "SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), ARRAY[]::text[] FROM " + tableName + " WHERE id = ANY(@ids) ORDER BY id;";
+            ? "SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), COALESCE(keywords, ARRAY[]::text[]), COALESCE(resources_generated, ARRAY[]::text[]), COALESCE(resources_consumed, ARRAY[]::text[]) FROM " + tableName + " WHERE id = ANY(@ids) ORDER BY id;"
+            : string.Equals(entityType, "relic", StringComparison.OrdinalIgnoreCase)
+                ? "SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), ARRAY[]::text[], COALESCE(resources_generated, ARRAY[]::text[]), COALESCE(resources_consumed, ARRAY[]::text[]) FROM " + tableName + " WHERE id = ANY(@ids) ORDER BY id;"
+                : "SELECT id, COALESCE(title, id), COALESCE(description, ''), COALESCE(effect_tags, ARRAY[]::text[]), ARRAY[]::text[], ARRAY[]::text[], ARRAY[]::text[] FROM " + tableName + " WHERE id = ANY(@ids) ORDER BY id;";
 
         using NpgsqlCommand command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("ids", classNames.ToArray());
@@ -397,7 +405,9 @@ ORDER BY id;", connection))
                 Title = reader.GetString(1),
                 Description = reader.GetString(2),
                 EffectTags = reader.GetFieldValue<string[]>(3),
-                Keywords = reader.GetFieldValue<string[]>(4)
+                Keywords = reader.GetFieldValue<string[]>(4),
+                ResourcesGenerated = reader.GetFieldValue<string[]>(5),
+                ResourcesConsumed = reader.GetFieldValue<string[]>(6)
             });
         }
     }
@@ -494,6 +504,7 @@ WHERE LOWER(COALESCE(a.character_id, '')) = LOWER(@character_id);", connection);
         prompt.AppendLine("Only include affinities for archetypes listed in target_archetypes for that entity.");
         prompt.AppendLine("Use the exact archetype names provided, preserving spaces and capitalization.");
         prompt.AppendLine("Do not include analysis, explanations, or extra fields.");
+        prompt.AppendLine("Account for resource-gating: entities that consume niche resources (such as stars) should score low unless the archetype can reliably generate or support that resource.");
         prompt.AppendLine();
         prompt.AppendLine("Character:");
         prompt.AppendLine(characterId);
@@ -519,6 +530,8 @@ WHERE LOWER(COALESCE(a.character_id, '')) = LOWER(@character_id);", connection);
             description = row.Entity.Description,
             keywords = row.Entity.Keywords,
             effect_tags = row.Entity.EffectTags,
+            resources_generated = row.Entity.ResourcesGenerated,
+            resources_consumed = row.Entity.ResourcesConsumed,
             target_archetypes = row.Archetypes.Select(static archetype => archetype.Name).ToArray()
         }).ToList()));
 
@@ -940,6 +953,10 @@ DO UPDATE SET affinity_score = EXCLUDED.affinity_score;", connection, transactio
 
         public string[] Keywords { get; set; }
 
+        public string[] ResourcesGenerated { get; set; }
+
+        public string[] ResourcesConsumed { get; set; }
+
         public EntityPromptRow()
         {
             EntityType = string.Empty;
@@ -948,6 +965,8 @@ DO UPDATE SET affinity_score = EXCLUDED.affinity_score;", connection, transactio
             Description = string.Empty;
             EffectTags = Array.Empty<string>();
             Keywords = Array.Empty<string>();
+            ResourcesGenerated = Array.Empty<string>();
+            ResourcesConsumed = Array.Empty<string>();
         }
     }
 
