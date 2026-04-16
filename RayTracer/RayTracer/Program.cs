@@ -121,6 +121,7 @@ public class RayForm : Form
     byte[] _debugScratchBuffer;
     int _pickedX = -1;
     int _pickedY = -1;
+    bool _wasTurningLastFrame;
 
     public RayForm(RenderPreset preset, Tracable[] scene, Maze maze, Light[] lights)
     {
@@ -290,6 +291,9 @@ public class RayForm : Form
         if (dt > 0f)
             camController.Update(dt, jobSystem.Camera);
 
+        bool isTurning = camController.IsTurning;
+        jobSystem.IsTurning = isTurning;
+
         // If the camera moved, cap sample counts and enable spatial
         // denoising so the image stays smooth during motion.
         if (camController.Dirty)
@@ -298,10 +302,8 @@ public class RayForm : Form
             // Always apply a soft reset so sample counts are capped while moving.
             jobSystem.SoftResetAccumulation();
 
-            // For in-place turns, invalidate only the TAA/history validity so
-            // reprojection won't reuse stale pixels, but keep accumulated
-            // samples to avoid aggressive black/patchy artifacts.
-            if (camController.IsTurning)
+            // For in-place turns, invalidate TAA history once when entering a turn.
+            if (isTurning && !_wasTurningLastFrame)
                 jobSystem.InvalidateTaaHistory();
 
             camController.Dirty = false;
@@ -310,6 +312,8 @@ public class RayForm : Form
         {
             jobSystem.IsMoving = false;
         }
+
+        _wasTurningLastFrame = isTurning;
 
         jobSystem.ResolveDisplayBufferWithTaa();
 

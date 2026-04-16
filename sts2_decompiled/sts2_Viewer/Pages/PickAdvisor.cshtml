@@ -110,7 +110,33 @@ else
         }
     </div>
 
+    <div style="margin:8px 0 16px 0;">
+        <strong>Select archetypes to prioritize:</strong>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            @foreach (var archetype in Model.Archetypes)
+            {
+                <label style="display:flex; gap:4px; align-items:center; padding:4px 8px; border:1px solid #ddd; border-radius:4px;">
+                    <input type="checkbox" name="selectedArchetypes" value="@archetype.Id" />
+                    @archetype.Name
+                </label>
+            }
+        </div>
+    </div>
+
     <h2>Ranked results (<span id="score-count">@Model.Scores.Count</span>)</h2>
+    @if (Model.Scores.Count > 0)
+    {
+        <div style="margin-bottom:12px; padding:8px; background:#f0f8ff; border-left:4px solid #0066cc;">
+            <strong>Skip option score:</strong> @((Model.SkipScore * 10.0).ToString("F2"))
+            <div style="font-size:0.85em; color:#555; margin-top:4px;">
+                Deck: @Model.DrawProfile.TotalCards cards
+                (@Model.DrawProfile.PowerCards powers,
+                @Model.DrawProfile.ExhaustCards exhaust/ethereal,
+                @Model.DrawProfile.DrawCards draw cards,
+                @Model.DrawProfile.DrawRelics draw relics)
+            </div>
+        </div>
+    }
     <table>
         <thead>
             <tr>
@@ -142,25 +168,6 @@ else
             }
         </tbody>
     </table>
-
-    <form method="post" asp-page-handler="Explain" style="margin-top:12px;">
-        <input type="hidden" name="CharacterId" value="@Model.CharacterId" />
-        <input type="hidden" name="ArchetypeId" value="@Model.ArchetypeId" />
-        <input type="hidden" name="DeckCsv" value="@Model.DeckCsv" />
-        <input type="hidden" name="RelicsCsv" value="@Model.RelicsCsv" />
-        <input type="hidden" name="Option1Id" value="@Model.Option1Id" />
-        <input type="hidden" name="Option2Id" value="@Model.Option2Id" />
-        <input type="hidden" name="Option3Id" value="@Model.Option3Id" />
-        <input type="hidden" name="IncludeColorless" value="@Model.IncludeColorless" />
-        <button type="submit">Explain (LLM)</button>
-    </form>
-
-    @if (!string.IsNullOrWhiteSpace(Model.LlmNarrative))
-    {
-        <div style="margin-top:10px; padding:10px; border:1px solid #d5d5d5; background:#fafafa;">
-            @Model.LlmNarrative
-        </div>
-    }
 
     <h3 style="margin-top:16px;">Recent cached advice for offered options</h3>
     <table>

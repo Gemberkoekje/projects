@@ -27,6 +27,7 @@ public partial class JobSystem
             DebugViewMode.UnfilteredVsFilteredDiff => "Debug: abs(unfiltered - filtered)",
             DebugViewMode.ReprojectedVsCurrentDiff => "Debug: abs(reprojected_history - current)",
             DebugViewMode.HistoryAge => "Debug: History Age | Blue=fresh, Red=stale",
+            DebugViewMode.DiffuseCache => $"Debug: Diffuse Cache | Green=hit, Red=miss, Entries={_owner.DiffuseCacheEntryCount}, HitRate={_owner.DiffuseCacheHitRate:P1}",
             _ => "Debug: Unknown"
         };
 
@@ -41,41 +42,41 @@ public partial class JobSystem
                     float edgeDisagreement = 0f;
                     if (mode == DebugViewMode.EdgeDisagreement)
                     {
-                        float colorDiff = MathF.Max(_owner.DiffCurrentVsAccum[ix], MathF.Max(_owner.DiffUnfilteredVsFiltered[ix], _owner.DiffReprojectedVsCurrent[ix]));
+                        float colorDiff = MathF.Max(_owner._buffers.DiffCurrentVsAccum[ix], MathF.Max(_owner._buffers.DiffUnfilteredVsFiltered[ix], _owner._buffers.DiffReprojectedVsCurrent[ix]));
 
-                        float depth = _owner.DepthDistance[ix];
+                        float depth = _owner._buffers.DepthDistance[ix];
                         float maxDepthDelta = 0f;
-                        if (x > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner.DepthDistance[row + x - 1]));
-                        if (x + 1 < _owner.Width) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner.DepthDistance[row + x + 1]));
-                        if (y > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner.DepthDistance[(y - 1) * _owner.Width + x]));
-                        if (y + 1 < _owner.Height) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner.DepthDistance[(y + 1) * _owner.Width + x]));
+                        if (x > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner._buffers.DepthDistance[row + x - 1]));
+                        if (x + 1 < _owner.Width) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner._buffers.DepthDistance[row + x + 1]));
+                        if (y > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner._buffers.DepthDistance[(y - 1) * _owner.Width + x]));
+                        if (y + 1 < _owner.Height) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _owner._buffers.DepthDistance[(y + 1) * _owner.Width + x]));
                         float depthDiff = maxDepthDelta * 0.05f;
 
-                        Vector3 n = _owner.NormalWorld[ix];
+                        Vector3 n = _owner._buffers.NormalWorld[ix];
                         float maxNormalDiff = 0f;
                         if (n != Vector3.Zero)
                         {
                             if (x > 0)
                             {
-                                var nn = _owner.NormalWorld[row + x - 1];
+                                var nn = _owner._buffers.NormalWorld[row + x - 1];
                                 if (nn != Vector3.Zero)
-                            maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
+                                    maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
                             }
                             if (x + 1 < _owner.Width)
                             {
-                                var nn = _owner.NormalWorld[row + x + 1];
+                                var nn = _owner._buffers.NormalWorld[row + x + 1];
                                 if (nn != Vector3.Zero)
                                     maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
                             }
                             if (y > 0)
                             {
-                                var nn = _owner.NormalWorld[(y - 1) * _owner.Width + x];
+                                var nn = _owner._buffers.NormalWorld[(y - 1) * _owner.Width + x];
                                 if (nn != Vector3.Zero)
                                     maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
                             }
                             if (y + 1 < _owner.Height)
                             {
-                                var nn = _owner.NormalWorld[(y + 1) * _owner.Width + x];
+                                var nn = _owner._buffers.NormalWorld[(y + 1) * _owner.Width + x];
                                 if (nn != Vector3.Zero)
                                     maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
                             }
@@ -87,36 +88,37 @@ public partial class JobSystem
                     {
                         DebugViewMode.Beauty => ColorFromXyz(_owner.ResolveFilteredXYZ(y, x)),
                         DebugViewMode.SampleCount => PaletteSampleCount(_owner.SampleCount[ix], Math.Max(1u, _owner.MaxObservedSampleCount)),
-                        DebugViewMode.Variance => PaletteVariance(_owner.LumaVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
-                        DebugViewMode.HistoryWeight => PaletteHistoryWeight(_owner.HistoryWeight[ix]),
-                        DebugViewMode.RejectionMask => _owner.HistoryRejected[ix] > 0 ? new Vector3(1f, 0.1f, 0.1f) : new Vector3(0.1f, 0.9f, 0.1f),
-                        DebugViewMode.ClampHeatmap => PaletteClamp(_owner.ClampAmount[ix]),
-                        DebugViewMode.Depth => PaletteDepth(_owner.DepthDistance[ix]),
+                        DebugViewMode.Variance => PaletteVariance(_owner._buffers.LumaVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
+                        DebugViewMode.HistoryWeight => PaletteHistoryWeight(_owner._buffers.HistoryWeight[ix]),
+                        DebugViewMode.RejectionMask => _owner._buffers.HistoryRejected[ix] > 0 ? new Vector3(1f, 0.1f, 0.1f) : new Vector3(0.1f, 0.9f, 0.1f),
+                        DebugViewMode.ClampHeatmap => PaletteClamp(_owner._buffers.ClampAmount[ix]),
+                        DebugViewMode.Depth => PaletteDepth(_owner._buffers.DepthDistance[ix]),
                         DebugViewMode.HistoryAge =>
-                            PaletteDifference(MathF.Min(1f, (_owner.FrameIndex - _owner.LastUpdatedFrame[ix]) / 120f)),
-                        DebugViewMode.Albedo => PaletteAlbedo(_owner.AlbedoScalar[ix]),
-                        DebugViewMode.Normal => PaletteNormal(_owner.NormalWorld[ix]),
-                        DebugViewMode.DirectLighting => ColorFromXyz(_owner.DirectLightingXYZ[ix]),
-                        DebugViewMode.IndirectLighting => ColorFromXyz(_owner.IndirectLightingXYZ[ix]),
-                        DebugViewMode.EmissiveLighting => ColorFromXyz(_owner.EmissiveLightingXYZ[ix]),
-                        DebugViewMode.CurrentVsAccumDiff => PaletteDifference(_owner.DiffCurrentVsAccum[ix]),
-                        DebugViewMode.DirectVariance => PaletteVariance(_owner.LumaDirectVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
-                        DebugViewMode.IndirectVariance => PaletteVariance(_owner.LumaIndirectVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
+                            PaletteDifference(MathF.Min(1f, (_owner.FrameIndex - _owner._buffers.LastUpdatedFrame[ix]) / 120f)),
+                        DebugViewMode.Albedo => PaletteAlbedo(_owner._buffers.AlbedoScalar[ix]),
+                        DebugViewMode.Normal => PaletteNormal(_owner._buffers.NormalWorld[ix]),
+                        DebugViewMode.DirectLighting => ColorFromXyz(_owner._buffers.DirectLightingXYZ[ix]),
+                        DebugViewMode.IndirectLighting => ColorFromXyz(_owner._buffers.IndirectLightingXYZ[ix]),
+                        DebugViewMode.EmissiveLighting => ColorFromXyz(_owner._buffers.EmissiveLightingXYZ[ix]),
+                        DebugViewMode.CurrentVsAccumDiff => PaletteDifference(_owner._buffers.DiffCurrentVsAccum[ix]),
+                        DebugViewMode.DirectVariance => PaletteVariance(_owner._buffers.LumaDirectVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
+                        DebugViewMode.IndirectVariance => PaletteVariance(_owner._buffers.LumaIndirectVariance[ix], (float)Math.Max(0.0001, _owner.AverageVariance * 8)),
                         DebugViewMode.VarianceSplit => new Vector3(
-                        Math.Clamp(_owner.LumaIndirectVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
-                        Math.Clamp(_owner.LumaDirectVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
-                        Math.Clamp(_owner.LumaVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f)),
-                        DebugViewMode.UnfilteredVsFilteredDiff => PaletteDifference(_owner.DiffUnfilteredVsFiltered[ix]),
-                        DebugViewMode.ReprojectedVsCurrentDiff => PaletteDifference(_owner.DiffReprojectedVsCurrent[ix]),
-                        DebugViewMode.Bounce0 => ColorFromXyz(_owner.Bounce0XYZ[ix]),
-                        DebugViewMode.Bounce1 => ColorFromXyz(_owner.Bounce1XYZ[ix]),
-                        DebugViewMode.Bounce2Plus => ColorFromXyz(_owner.Bounce2PlusXYZ[ix]),
+                            Math.Clamp(_owner._buffers.LumaIndirectVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
+                            Math.Clamp(_owner._buffers.LumaDirectVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
+                            Math.Clamp(_owner._buffers.LumaVariance[ix] / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f)),
+                        DebugViewMode.UnfilteredVsFilteredDiff => PaletteDifference(_owner._buffers.DiffUnfilteredVsFiltered[ix]),
+                        DebugViewMode.ReprojectedVsCurrentDiff => PaletteDifference(_owner._buffers.DiffReprojectedVsCurrent[ix]),
+                        DebugViewMode.Bounce0 => ColorFromXyz(_owner._buffers.Bounce0XYZ[ix]),
+                        DebugViewMode.Bounce1 => ColorFromXyz(_owner._buffers.Bounce1XYZ[ix]),
+                        DebugViewMode.Bounce2Plus => ColorFromXyz(_owner._buffers.Bounce2PlusXYZ[ix]),
                         DebugViewMode.BounceRGB => new Vector3(
-                            Math.Clamp(_owner.Bounce2PlusXYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
-                            Math.Clamp(_owner.Bounce1XYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
-                            Math.Clamp(_owner.Bounce0XYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f)
+                            Math.Clamp(_owner._buffers.Bounce2PlusXYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
+                            Math.Clamp(_owner._buffers.Bounce1XYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f),
+                            Math.Clamp(_owner._buffers.Bounce0XYZ[ix].Y / (float)Math.Max(1e-6, _owner.AverageVariance * 8), 0f, 1f)
                         ),
                         DebugViewMode.EdgeDisagreement => PaletteDifference(edgeDisagreement),
+                        DebugViewMode.DiffuseCache => PaletteDiffuseCache(_owner._buffers.DiffuseCacheState[ix]),
                         _ => Vector3.Zero
                     };
 
@@ -139,23 +141,23 @@ public partial class JobSystem
             return new PixelDebugInfo(
                 _owner.AccumXYZ[ix],
                 filtered,
-                _owner.DiffCurrentVsAccum[ix],
-                _owner.ClampAmount[ix],
-                _owner.ClampHitFrame[ix],
+                _owner._buffers.DiffCurrentVsAccum[ix],
+                _owner._buffers.ClampAmount[ix],
+                _owner._buffers.ClampHitFrame[ix],
                 _owner.SampleCount[ix],
-                _owner.HistoryWeight[ix],
-                _owner.HistoryRejected[ix],
-                _owner.DepthDistance[ix],
-                _owner.AlbedoScalar[ix],
-                _owner.LastUpdatedFrame[ix],
-                _owner.NormalWorld[ix],
-                _owner.DirectLightingXYZ[ix],
-                _owner.IndirectLightingXYZ[ix],
-                _owner.DiffUnfilteredVsFiltered[ix],
-                _owner.DiffReprojectedVsCurrent[ix],
-                _owner.Bounce0XYZ[ix],
-                _owner.Bounce1XYZ[ix],
-                _owner.Bounce2PlusXYZ[ix]);
+                _owner._buffers.HistoryWeight[ix],
+                _owner._buffers.HistoryRejected[ix],
+                _owner._buffers.DepthDistance[ix],
+                _owner._buffers.AlbedoScalar[ix],
+                _owner._buffers.LastUpdatedFrame[ix],
+                _owner._buffers.NormalWorld[ix],
+                _owner._buffers.DirectLightingXYZ[ix],
+                _owner._buffers.IndirectLightingXYZ[ix],
+                _owner._buffers.DiffUnfilteredVsFiltered[ix],
+                _owner._buffers.DiffReprojectedVsCurrent[ix],
+                _owner._buffers.Bounce0XYZ[ix],
+                _owner._buffers.Bounce1XYZ[ix],
+                _owner._buffers.Bounce2PlusXYZ[ix]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -242,6 +244,16 @@ public partial class JobSystem
                 new Vector3(0.20f, 0.80f, 0.70f),
                 new Vector3(0.95f, 0.90f, 0.20f),
                 new Vector3(1.00f, 0.20f, 0.15f));
+        }
+
+        private static Vector3 PaletteDiffuseCache(byte state)
+        {
+            return state switch
+            {
+                1 => new Vector3(0.1f, 0.95f, 0.1f),
+                2 => new Vector3(0.95f, 0.15f, 0.1f),
+                _ => new Vector3(0.05f, 0.05f, 0.08f)
+            };
         }
 
         private static Vector3 PaletteAlbedo(float albedo)

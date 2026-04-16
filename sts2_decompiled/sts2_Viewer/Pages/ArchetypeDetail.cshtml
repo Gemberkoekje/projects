@@ -1,0 +1,175 @@
+@page
+@model Sts2Viewer.Pages.ArchetypeDetailModel
+@{
+    ViewData["Title"] = "Archetype: " + (Model.Archetype?.Name ?? "Unknown");
+}
+
+<style>
+    .detail-shell { display:grid; gap:16px; }
+    .panel { padding:14px 16px; border:1px solid #d7dbe2; border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(15, 23, 42, 0.04); }
+    .panel-title { margin:0 0 10px 0; font-size:1.05rem; }
+    .info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; }
+    .info-item { }
+    .info-label { display:block; font-size:11px; color:#526071; margin-bottom:4px; font-weight:600; }
+    .info-value { font-size:14px; color:#1a202c; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:4px; }
+    .tag-chip { display:inline-block; padding:4px 10px; border-radius:999px; background:#eef3ff; color:#243b53; font-size:11px; line-height:1.4; }
+    .muted { color:#667085; }
+    .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end; }
+    .filter-actions { display:flex; align-items:end; }
+    .filter-actions button { width:100%; }
+    .table-wrap { max-height:70vh; overflow:auto; border:1px solid #d7dbe2; border-radius:12px; }
+    .data-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .data-table th,
+    .data-table td { border-bottom:1px solid #e5e7eb; border-right:0; border-left:0; font-size:12px; padding:10px 12px; }
+    .data-table thead th { position:sticky; top:0; z-index:1; background:#f8fafc; }
+    .data-table tbody tr:nth-child(even) { background:#fbfdff; }
+    .data-table tbody tr:hover { background:#eef6ff; }
+    .type-badge { display:inline-block; padding:3px 9px; border-radius:999px; color:#fff; font-size:11px; font-weight:600; letter-spacing:0.02em; text-transform:lowercase; }
+    .type-card { background:#2f6fed; }
+    .type-relic { background:#b68a00; }
+    .type-potion { background:#0b8d8d; }
+    .type-event { background:#7a3db8; }
+    .rating-cell { display:grid; grid-template-columns:minmax(70px, 1fr) 28px; gap:8px; align-items:center; min-width:118px; }
+    .rating-track { height:8px; border-radius:999px; background:#e5e7eb; overflow:hidden; }
+    .rating-fill { height:100%; border-radius:999px; }
+    .rating-low { background:#7d8794; }
+    .rating-medium { background:#d4a64f; }
+    .rating-high { background:#2f9e44; }
+    .rating-anti-low { background:#2f9e44; }
+    .rating-anti-high { background:#c92a2a; }
+    .rating-value { font-variant-numeric:tabular-nums; color:#344054; }
+    .title-cell { min-width:220px; }
+    .id-cell { white-space:nowrap; }
+    .tags-cell { font-size:11px; min-width:220px; }
+</style>
+
+<h1>Archetype: @Model.Archetype?.Name</h1>
+
+@if (!Model.HasConnectionString)
+{
+    <p>Set <code>Database:ConnectionString</code> in <code>sts2_Viewer/appsettings.json</code> or set <code>STS2_POSTGRES_CONNECTION_STRING</code>.</p>
+}
+else if (Model.Archetype.Id == 0)
+{
+    <p class="muted">Archetype not found.</p>
+}
+else
+{
+    <div class="detail-shell">
+        <section class="panel">
+            <h2 class="panel-title">Archetype Details</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Name</span>
+                    <span class="info-value">@Model.Archetype.Name</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Character</span>
+                    <span class="info-value">@(string.IsNullOrEmpty(Model.Archetype.CharacterId) ? "—" : Model.Archetype.CharacterId)</span>
+                </div>
+            </div>
+            @if (!string.IsNullOrEmpty(Model.Archetype.Description))
+            {
+                <div style="margin-top:12px;">
+                    <span class="info-label">Description</span>
+                    <p class="info-value" style="margin:4px 0 0 0;">@Model.Archetype.Description</p>
+                </div>
+            }
+            @if (Model.Archetype.KeyEffectTags.Count > 0)
+            {
+                <div style="margin-top:12px;">
+                    <span class="info-label">Key Effect Tags</span>
+                    <div class="tag-list" style="margin-top:6px;">
+                        @foreach (string tag in Model.Archetype.KeyEffectTags)
+                        {
+                            <span class="tag-chip">@tag</span>
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">Synergizing Entities</h2>
+            <form method="get" class="filter-grid" style="margin-bottom:16px;">
+                <label>
+                    Min Affinity Score<br />
+                    <input type="number" name="MinAffinityScore" min="0" max="100" value="@Model.MinAffinityScore" />
+                </label>
+
+                <input type="hidden" name="Id" value="@Model.Id" />
+
+                <div class="filter-actions">
+                    <button type="submit">Apply filter</button>
+                </div>
+            </form>
+
+            @if (Model.SynergyEntities.Count == 0)
+            {
+                <p class="muted">No entities found with affinity score of at least @Model.MinAffinityScore.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Id</th>
+                                <th>Title</th>
+                                <th>Tags</th>
+                                <th>Synergy</th>
+                                <th>Flexibility</th>
+                                <th>Anti</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entity in Model.SynergyEntities)
+                            {
+                                <tr>
+                                    <td><span class="@Model.TypeBadgeClass(entity.EntityType)">@entity.EntityType</span></td>
+                                    <td class="id-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.EntityId</a></td>
+                                    <td class="title-cell"><a asp-page="/EntityDetail" asp-route-type="@entity.EntityType" asp-route-id="@entity.EntityId">@entity.Title</a></td>
+                                    <td class="tags-cell">
+                                        @if (entity.Tags.Count == 0)
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="tag-list">
+                                                @foreach (string tag in entity.Tags)
+                                                {
+                                                    <span class="tag-chip">@tag</span>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.SynergyRating, false)" style="width:@(Math.Clamp(entity.SynergyRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.SynergyRating</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.FlexibilityRating, false)" style="width:@(Math.Clamp(entity.FlexibilityRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.FlexibilityRating</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="rating-cell">
+                                            <div class="rating-track"><div class="@Model.RatingFillClass(entity.AntiSynergyRating, true)" style="width:@(Math.Clamp(entity.AntiSynergyRating, 0, 10) * 10)%"></div></div>
+                                            <span class="rating-value">@entity.AntiSynergyRating</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+}

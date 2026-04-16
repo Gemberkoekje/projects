@@ -44,135 +44,217 @@ internal sealed class PostgresSyncRunner
 
         Directory.CreateDirectory(stagingDirectory);
 
-        Console.WriteLine("[sync-postgres] Starting extraction phase...");
+        int annotatedEntityCount = 0;
+        int insertedRows = 0;
 
-        List<CardExtractionResult> cardResults = new List<CardExtractionResult>();
-        List<RelicExtractionResult> relicResults = new List<RelicExtractionResult>();
-        List<PotionExtractionResult> potionResults = new List<PotionExtractionResult>();
-        if (options.AllCharacters)
+        bool baseDataAlreadyLoaded = options.Resume && HasBaseData(connectionString);
+        bool archetypesAlreadyLoaded = options.Resume && TableHasRows(connectionString, "archetypes");
+        bool clustersAlreadyLoaded = options.Resume && TableHasRows(connectionString, "synergy_clusters");
+
+        if (!baseDataAlreadyLoaded)
         {
-            for (int i = 0; i < FullSyncCardCharacterIds.Length; i++)
+            Console.WriteLine("[sync-postgres] Starting extraction phase...");
+
+            List<CardExtractionResult> cardResults = new List<CardExtractionResult>();
+            List<RelicExtractionResult> relicResults = new List<RelicExtractionResult>();
+            List<PotionExtractionResult> potionResults = new List<PotionExtractionResult>();
+            if (options.AllCharacters)
             {
-                string characterId = FullSyncCardCharacterIds[i];
-                string characterDirectory = Path.Combine(stagingDirectory, characterId);
-                Directory.CreateDirectory(characterDirectory);
-
-                Console.WriteLine($"[sync-postgres] Extracting cards for '{characterId}'...");
-                CliOptions cardOptions = options.ForCommand(CliCommand.ExtractCards, Path.Combine(characterDirectory, "card_extract_preview.csv"));
-                cardOptions = cardOptions.WithCharacter(characterId);
-                cardResults.Add(new CardExtractionRunner().Run(cardOptions));
-
-                if (!string.Equals(characterId, "colorless", StringComparison.OrdinalIgnoreCase))
+                for (int i = 0; i < FullSyncCardCharacterIds.Length; i++)
                 {
-                    Console.WriteLine($"[sync-postgres] Extracting relics for '{characterId}'...");
-                    CliOptions relicOptions = options.ForCommand(CliCommand.ExtractRelics, Path.Combine(characterDirectory, "relic_extract_preview.csv"));
-                    relicOptions = relicOptions.WithCharacter(characterId);
-                    relicResults.Add(new RelicExtractionRunner().Run(relicOptions));
+                    string characterId = FullSyncCardCharacterIds[i];
+                    string characterDirectory = Path.Combine(stagingDirectory, characterId);
+                    Directory.CreateDirectory(characterDirectory);
 
-                    Console.WriteLine($"[sync-postgres] Extracting potions for '{characterId}'...");
-                    CliOptions potionOptions = options.ForCommand(CliCommand.ExtractPotions, Path.Combine(characterDirectory, "potion_extract_preview.csv"));
-                    potionOptions = potionOptions.WithCharacter(characterId);
-                    potionResults.Add(new PotionExtractionRunner().Run(potionOptions));
+                    Console.WriteLine($"[sync-postgres] Extracting cards for '{characterId}'...");
+                    CliOptions cardOptions = options.ForCommand(CliCommand.ExtractCards, Path.Combine(characterDirectory, "card_extract_preview.csv"));
+                    cardOptions = cardOptions.WithCharacter(characterId);
+                    cardResults.Add(new CardExtractionRunner().Run(cardOptions));
+
+                    try
+                    {
+                        Console.WriteLine($"[sync-postgres] Extracting relics for '{characterId}'...");
+                        CliOptions relicOptions = options.ForCommand(CliCommand.ExtractRelics, Path.Combine(characterDirectory, "relic_extract_preview.csv"));
+                        relicOptions = relicOptions.WithCharacter(characterId);
+                        relicResults.Add(new RelicExtractionRunner().Run(relicOptions));
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        Console.WriteLine($"[sync-postgres] Skipping '{characterId}' relic pool extract: {ex.Message}");
+                    }
+
+                    try
+                    {
+                        Console.WriteLine($"[sync-postgres] Extracting potions for '{characterId}'...");
+                        CliOptions potionOptions = options.ForCommand(CliCommand.ExtractPotions, Path.Combine(characterDirectory, "potion_extract_preview.csv"));
+                        potionOptions = potionOptions.WithCharacter(characterId);
+                        potionResults.Add(new PotionExtractionRunner().Run(potionOptions));
+                    }
+                    catch (FileNotFoundException ex)
+                    {
+                        Console.WriteLine($"[sync-postgres] Skipping '{characterId}' potion pool extract: {ex.Message}");
+                    }
                 }
+
+                string sharedDirectory = Path.Combine(stagingDirectory, "shared");
+                Directory.CreateDirectory(sharedDirectory);
+
+                Console.WriteLine("[sync-postgres] Extracting shared/unaffiliated relics...");
+                relicResults.Add(new RelicExtractionRunner().Run(
+                    options.ForCommand(CliCommand.ExtractRelics, Path.Combine(sharedDirectory, "relic_extract_preview.csv"))));
+
+                Console.WriteLine("[sync-postgres] Extracting shared/unaffiliated potions...");
+                potionResults.Add(new PotionExtractionRunner().Run(
+                    options.ForCommand(CliCommand.ExtractPotions, Path.Combine(sharedDirectory, "potion_extract_preview.csv"))));
+            }
+            else
+            {
+                Console.WriteLine("[sync-postgres] Extracting cards...");
+                cardResults.Add(new CardExtractionRunner().Run(options.ForCommand(CliCommand.ExtractCards, Path.Combine(stagingDirectory, "card_extract_preview.csv"))));
+
+                Console.WriteLine("[sync-postgres] Extracting relics...");
+                relicResults.Add(new RelicExtractionRunner().Run(options.ForCommand(CliCommand.ExtractRelics, Path.Combine(stagingDirectory, "relic_extract_preview.csv"))));
+
+                Console.WriteLine("[sync-postgres] Extracting potions...");
+                potionResults.Add(new PotionExtractionRunner().Run(options.ForCommand(CliCommand.ExtractPotions, Path.Combine(stagingDirectory, "potion_extract_preview.csv"))));
+            }
+
+            Console.WriteLine("[sync-postgres] Extracting events/powers/characters + taxonomy seed...");
+            EventExtractionResult eventResult = new EventExtractionRunner().Run(options.ForCommand(CliCommand.ExtractEvents, Path.Combine(stagingDirectory, "event_extract_preview.csv")));
+            PowerExtractionResult power = new PowerExtractionRunner().Run(options.ForCommand(CliCommand.ExtractPowers, Path.Combine(stagingDirectory, "power_extract_preview.csv")));
+            TaxonomySeedResult taxonomy = new TaxonomySeedRunner().Run(options.ForCommand(CliCommand.SeedTaxonomy, Path.Combine(stagingDirectory, "effect_taxonomy_seed.csv")));
+            CharacterExtractionResult characterResult = new CharacterExtractionRunner().Run(options.ForCommand(CliCommand.ExtractCharacters, Path.Combine(stagingDirectory, "character_extract_preview.csv")));
+
+            if (options.Annotate)
+            {
+                Console.WriteLine("[sync-postgres] Running mechanical annotation...");
+                List<string> cardIngestionPaths = new List<string>(cardResults.Count);
+                for (int i = 0; i < cardResults.Count; i++)
+                {
+                    cardIngestionPaths.Add(cardResults[i].IngestionOutputPath);
+                }
+
+                List<string> relicIngestionPaths = new List<string>(relicResults.Count);
+                for (int i = 0; i < relicResults.Count; i++)
+                {
+                    relicIngestionPaths.Add(relicResults[i].IngestionOutputPath);
+                }
+
+                List<string> potionIngestionPaths = new List<string>(potionResults.Count);
+                for (int i = 0; i < potionResults.Count; i++)
+                {
+                    potionIngestionPaths.Add(potionResults[i].IngestionOutputPath);
+                }
+
+                MechanicalAnnotationResult annotationResult = new MechanicalAnnotationRunner().Run(
+                    options,
+                    cardIngestionPaths,
+                    relicIngestionPaths,
+                    potionIngestionPaths,
+                    power.IngestionOutputPath);
+
+                annotatedEntityCount = annotationResult.AnnotatedCount;
+                Console.WriteLine($"[sync-postgres] Annotation complete: {annotationResult.AnnotatedCount} annotated, {annotationResult.SkippedCount} skipped, {annotationResult.BatchCount} batches.");
+            }
+
+            Console.WriteLine("[sync-postgres] Loading base tables...");
+            using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+            {
+                connection.Open();
+                using NpgsqlTransaction transaction = connection.BeginTransaction();
+
+                EnsureSupplementalTables(connection, transaction);
+                ClearExistingRows(connection, transaction);
+
+                insertedRows += InsertCharacters(connection, transaction, characterResult.IngestionOutputPath);
+
+                for (int i = 0; i < cardResults.Count; i++)
+                {
+                    CardExtractionResult cardResult = cardResults[i];
+                    insertedRows += InsertCards(connection, transaction, cardResult.IngestionOutputPath);
+                    insertedRows += InsertCardVariants(connection, transaction, cardResult.VariantOutputPath);
+                    insertedRows += InsertCompanionActions(connection, transaction, cardResult.CompanionOutputPath);
+                }
+
+                for (int i = 0; i < relicResults.Count; i++)
+                {
+                    RelicExtractionResult relicResult = relicResults[i];
+                    insertedRows += InsertRelics(connection, transaction, relicResult.IngestionOutputPath);
+                    insertedRows += InsertHookListeners(connection, transaction, relicResult.HooksOutputPath);
+                }
+
+                for (int i = 0; i < potionResults.Count; i++)
+                {
+                    PotionExtractionResult potionResult = potionResults[i];
+                    insertedRows += InsertPotions(connection, transaction, potionResult.IngestionOutputPath);
+                }
+
+                insertedRows += InsertEvents(connection, transaction, eventResult.IngestionOutputPath);
+                insertedRows += InsertEventOptions(connection, transaction, eventResult.OptionsOutputPath);
+                insertedRows += InsertEventOutcomes(connection, transaction, eventResult.OutcomesOutputPath);
+                insertedRows += InsertPowers(connection, transaction, power.IngestionOutputPath);
+                insertedRows += InsertHookListeners(connection, transaction, power.HooksOutputPath);
+                insertedRows += InsertTaxonomy(connection, transaction, taxonomy.OutputPath);
+
+                transaction.Commit();
             }
         }
         else
         {
-            Console.WriteLine("[sync-postgres] Extracting cards...");
-            cardResults.Add(new CardExtractionRunner().Run(options.ForCommand(CliCommand.ExtractCards, Path.Combine(stagingDirectory, "card_extract_preview.csv"))));
-
-            Console.WriteLine("[sync-postgres] Extracting relics...");
-            relicResults.Add(new RelicExtractionRunner().Run(options.ForCommand(CliCommand.ExtractRelics, Path.Combine(stagingDirectory, "relic_extract_preview.csv"))));
-
-            Console.WriteLine("[sync-postgres] Extracting potions...");
-            potionResults.Add(new PotionExtractionRunner().Run(options.ForCommand(CliCommand.ExtractPotions, Path.Combine(stagingDirectory, "potion_extract_preview.csv"))));
+            Console.WriteLine("[sync-postgres] Resume enabled: base tables already populated, skipping extraction/base load phase.");
         }
 
-        Console.WriteLine("[sync-postgres] Extracting events/powers/characters + taxonomy seed...");
-        EventExtractionResult eventResult = new EventExtractionRunner().Run(options.ForCommand(CliCommand.ExtractEvents, Path.Combine(stagingDirectory, "event_extract_preview.csv")));
-        PowerExtractionResult power = new PowerExtractionRunner().Run(options.ForCommand(CliCommand.ExtractPowers, Path.Combine(stagingDirectory, "power_extract_preview.csv")));
-        TaxonomySeedResult taxonomy = new TaxonomySeedRunner().Run(options.ForCommand(CliCommand.SeedTaxonomy, Path.Combine(stagingDirectory, "effect_taxonomy_seed.csv")));
-        CharacterExtractionResult characterResult = new CharacterExtractionRunner().Run(options.ForCommand(CliCommand.ExtractCharacters, Path.Combine(stagingDirectory, "character_extract_preview.csv")));
+        BuildSynergyClustersResult clusters = new BuildSynergyClustersResult();
+        DiscoverArchetypesResult discoveredArchetypes = new DiscoverArchetypesResult();
 
-        int annotatedEntityCount = 0;
-        if (options.Annotate)
+        if (!archetypesAlreadyLoaded || !clustersAlreadyLoaded)
         {
-            Console.WriteLine("[sync-postgres] Running mechanical annotation...");
-            List<string> cardIngestionPaths = new List<string>(cardResults.Count);
-            for (int i = 0; i < cardResults.Count; i++)
+            Console.WriteLine("[sync-postgres] [generation] Rebuilding archetypes + synergy_clusters...");
+            clusters = new BuildSynergyClustersRunner().Run(
+                options.ForCommand(CliCommand.BuildSynergyClusters, Path.Combine(stagingDirectory, "synergy_clusters_staging.csv")));
+            Console.WriteLine($"[sync-postgres] [generation] Cluster outputs: {clusters.ArchetypeCount} archetypes, {clusters.ClusterCount} cluster rows.");
+
+            using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
             {
-                cardIngestionPaths.Add(cardResults[i].IngestionOutputPath);
+                connection.Open();
+                using NpgsqlTransaction transaction = connection.BeginTransaction();
+                ExecuteNonQuery(connection, transaction, "DELETE FROM synergy_clusters;");
+                ExecuteNonQuery(connection, transaction, "DELETE FROM entity_archetype_affinity;");
+                ExecuteNonQuery(connection, transaction, "DELETE FROM archetypes;");
+                insertedRows += InsertArchetypes(connection, transaction, clusters.ArchetypesOutputPath);
+                insertedRows += InsertSynergyClusters(connection, transaction, clusters.ClustersOutputPath);
+                transaction.Commit();
             }
 
-            List<string> relicIngestionPaths = new List<string>(relicResults.Count);
-            for (int i = 0; i < relicResults.Count; i++)
-            {
-                relicIngestionPaths.Add(relicResults[i].IngestionOutputPath);
-            }
-
-            List<string> potionIngestionPaths = new List<string>(potionResults.Count);
-            for (int i = 0; i < potionResults.Count; i++)
-            {
-                potionIngestionPaths.Add(potionResults[i].IngestionOutputPath);
-            }
-
-            MechanicalAnnotationResult annotationResult = new MechanicalAnnotationRunner().Run(
-                options,
-                cardIngestionPaths,
-                relicIngestionPaths,
-                potionIngestionPaths,
-                power.IngestionOutputPath);
-
-            annotatedEntityCount = annotationResult.AnnotatedCount;
-            Console.WriteLine($"[sync-postgres] Annotation complete: {annotationResult.AnnotatedCount} annotated, {annotationResult.SkippedCount} skipped, {annotationResult.BatchCount} batches.");
+            string discoveredArchetypesPath = Path.Combine(stagingDirectory, "archetypes_discovery_staging.csv");
+            Console.WriteLine("[sync-postgres] [generation] Discovering concept archetypes...");
+            discoveredArchetypes = new DiscoverArchetypesRunner().Run(
+                options.ForCommand(CliCommand.DiscoverArchetypes, discoveredArchetypesPath));
+            Console.WriteLine($"[sync-postgres] [generation] Discovered {discoveredArchetypes.ArchetypeCount} archetypes across {discoveredArchetypes.CharacterCount} characters.");
         }
-
-        int insertedRows = 0;
-
-        Console.WriteLine("[sync-postgres] Loading base tables...");
-        using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+        else
         {
-            connection.Open();
-            using NpgsqlTransaction transaction = connection.BeginTransaction();
-
-            EnsureSupplementalTables(connection, transaction);
-            ClearExistingRows(connection, transaction, clearSynergyEdges: false);
-
-            insertedRows += InsertCharacters(connection, transaction, characterResult.IngestionOutputPath);
-
-            for (int i = 0; i < cardResults.Count; i++)
-            {
-                CardExtractionResult cardResult = cardResults[i];
-                insertedRows += InsertCards(connection, transaction, cardResult.IngestionOutputPath);
-                insertedRows += InsertCardVariants(connection, transaction, cardResult.VariantOutputPath);
-                insertedRows += InsertCompanionActions(connection, transaction, cardResult.CompanionOutputPath);
-            }
-
-            for (int i = 0; i < relicResults.Count; i++)
-            {
-                RelicExtractionResult relicResult = relicResults[i];
-                insertedRows += InsertRelics(connection, transaction, relicResult.IngestionOutputPath);
-                insertedRows += InsertHookListeners(connection, transaction, relicResult.HooksOutputPath);
-            }
-
-            for (int i = 0; i < potionResults.Count; i++)
-            {
-                PotionExtractionResult potionResult = potionResults[i];
-                insertedRows += InsertPotions(connection, transaction, potionResult.IngestionOutputPath);
-            }
-
-            insertedRows += InsertEvents(connection, transaction, eventResult.IngestionOutputPath);
-            insertedRows += InsertEventOptions(connection, transaction, eventResult.OptionsOutputPath);
-            insertedRows += InsertEventOutcomes(connection, transaction, eventResult.OutcomesOutputPath);
-            insertedRows += InsertPowers(connection, transaction, power.IngestionOutputPath);
-            insertedRows += InsertHookListeners(connection, transaction, power.HooksOutputPath);
-            insertedRows += InsertTaxonomy(connection, transaction, taxonomy.OutputPath);
-
-            transaction.Commit();
+            Console.WriteLine("[sync-postgres] Resume enabled: archetypes/clusters already present, skipping rebuild/discovery phase.");
+            clusters.ArchetypeCount = CountRows(connectionString, "archetypes");
+            clusters.ClusterCount = CountRows(connectionString, "synergy_clusters");
+            discoveredArchetypes.CharacterCount = options.AllCharacters ? FullSyncCardCharacterIds.Length - 1 : 1;
+            discoveredArchetypes.ArchetypeCount = clusters.ArchetypeCount;
         }
+
+        string affinitiesPath = Path.Combine(stagingDirectory, "entity_archetype_affinity_staging.csv");
+        Console.WriteLine("[sync-postgres] [generation] Scoring entity-archetype affinities...");
+        CliOptions affinityOptions = options.ForCommand(CliCommand.ScoreAffinities, affinitiesPath);
+        if (options.Resume && !affinityOptions.OnlyMissingAffinities)
+        {
+            affinityOptions = affinityOptions.WithOnlyMissingAffinities();
+            Console.WriteLine("[sync-postgres] Resume enabled: forcing --only-missing for affinity scoring.");
+        }
+
+        ScoreAffinitiesResult affinities = new ScoreAffinitiesRunner().Run(affinityOptions);
+        Console.WriteLine($"[sync-postgres] [generation] Affinities produced: {affinities.AffinityCount} rows.");
 
         string ratingsPath = Path.Combine(stagingDirectory, "entity_strength_ratings_staging.csv");
-        Console.WriteLine("[sync-postgres] [generation] Rebuilding entity_strength_ratings...");
+        Console.WriteLine("[sync-postgres] [generation] Rebuilding entity_strength_ratings from archetype affinities...");
         EntityStrengthRatingsResult ratings = new EntityStrengthRatingsRunner().Run(options.ForCommand(CliCommand.GenerateRatings, ratingsPath));
         Console.WriteLine($"[sync-postgres] [generation] Ratings produced: {ratings.RecordCount} records.");
 
@@ -185,35 +267,6 @@ internal sealed class PostgresSyncRunner
             transaction.Commit();
         }
 
-        Console.WriteLine("[sync-postgres] [generation] Rebuilding archetypes + synergy_clusters...");
-        BuildSynergyClustersResult clusters = new BuildSynergyClustersRunner().Run(
-            options.ForCommand(CliCommand.BuildSynergyClusters, Path.Combine(stagingDirectory, "synergy_clusters_staging.csv")));
-        Console.WriteLine($"[sync-postgres] [generation] Cluster outputs: {clusters.ArchetypeCount} archetypes, {clusters.ClusterCount} cluster rows.");
-
-        using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
-        {
-            connection.Open();
-            using NpgsqlTransaction transaction = connection.BeginTransaction();
-            ExecuteNonQuery(connection, transaction, "DELETE FROM synergy_clusters;");
-            ExecuteNonQuery(connection, transaction, "DELETE FROM entity_archetype_affinity;");
-            ExecuteNonQuery(connection, transaction, "DELETE FROM archetypes;");
-            insertedRows += InsertArchetypes(connection, transaction, clusters.ArchetypesOutputPath);
-            insertedRows += InsertSynergyClusters(connection, transaction, clusters.ClustersOutputPath);
-            transaction.Commit();
-        }
-
-        string discoveredArchetypesPath = Path.Combine(stagingDirectory, "archetypes_discovery_staging.csv");
-        Console.WriteLine("[sync-postgres] [generation] Discovering concept archetypes...");
-        DiscoverArchetypesResult discoveredArchetypes = new DiscoverArchetypesRunner().Run(
-            options.ForCommand(CliCommand.DiscoverArchetypes, discoveredArchetypesPath));
-        Console.WriteLine($"[sync-postgres] [generation] Discovered {discoveredArchetypes.ArchetypeCount} archetypes across {discoveredArchetypes.CharacterCount} characters.");
-
-        string affinitiesPath = Path.Combine(stagingDirectory, "entity_archetype_affinity_staging.csv");
-        Console.WriteLine("[sync-postgres] [generation] Scoring entity-archetype affinities...");
-        ScoreAffinitiesResult affinities = new ScoreAffinitiesRunner().Run(
-            options.ForCommand(CliCommand.ScoreAffinities, affinitiesPath));
-        Console.WriteLine($"[sync-postgres] [generation] Affinities produced: {affinities.AffinityCount} rows.");
-
         return new PostgresSyncResult
         {
             InsertedRowCount = insertedRows,
@@ -222,9 +275,6 @@ internal sealed class PostgresSyncRunner
             ArchetypeCount = clusters.ArchetypeCount,
             SynergyClusterCount = clusters.ClusterCount,
             AffinityCount = affinities.AffinityCount,
-            SynergyEdgeCount = 0,
-            SynergyEdgeCandidatePairCount = 0,
-            SynergyEdgeBatchCount = 0,
             ConnectionDisplay = DatabaseSettingsResolver.RedactConnectionString(connectionString),
             StagingDirectory = stagingDirectory
         };
@@ -319,13 +369,9 @@ DO UPDATE SET
         return count;
     }
 
-    private static void ClearExistingRows(NpgsqlConnection connection, NpgsqlTransaction transaction, bool clearSynergyEdges)
+    private static void ClearExistingRows(NpgsqlConnection connection, NpgsqlTransaction transaction)
     {
         List<string> statements = new List<string>();
-        if (clearSynergyEdges)
-        {
-            statements.Add("DELETE FROM entity_synergy_edges;");
-        }
 
         statements.AddRange(new[]
         {
@@ -846,39 +892,39 @@ INSERT INTO synergy_clusters (
         return count;
     }
 
-    private static int InsertSynergyEdges(NpgsqlConnection connection, NpgsqlTransaction transaction, string csvPath)
+    private static bool HasBaseData(string connectionString)
     {
-        List<Dictionary<string, string>> rows = CsvReader.ReadRows(csvPath);
-        int count = 0;
-        for (int i = 0; i < rows.Count; i++)
-        {
-            Dictionary<string, string> row = rows[i];
-            using NpgsqlCommand command = new NpgsqlCommand(@"
-INSERT INTO entity_synergy_edges (
-    entity_a_type, entity_a_id, entity_b_type, entity_b_id,
-    synergy_strength, is_anti_synergy, shared_tags, explanation
-) VALUES (
-    @entity_a_type, @entity_a_id, @entity_b_type, @entity_b_id,
-    @synergy_strength, @is_anti_synergy, @shared_tags, @explanation
-) ON CONFLICT (entity_a_type, entity_a_id, entity_b_type, entity_b_id, is_anti_synergy)
-DO UPDATE SET
-    synergy_strength = EXCLUDED.synergy_strength,
-    shared_tags = EXCLUDED.shared_tags,
-    explanation = EXCLUDED.explanation;", connection, transaction);
+        return TableHasRows(connectionString, "characters")
+            && TableHasRows(connectionString, "cards")
+            && TableHasRows(connectionString, "relics")
+            && TableHasRows(connectionString, "potions")
+            && TableHasRows(connectionString, "events")
+            && TableHasRows(connectionString, "powers");
+    }
 
-            command.Parameters.AddWithValue("entity_a_type", Read(row, "entity_a_type"));
-            command.Parameters.AddWithValue("entity_a_id", Read(row, "entity_a_id"));
-            command.Parameters.AddWithValue("entity_b_type", Read(row, "entity_b_type"));
-            command.Parameters.AddWithValue("entity_b_id", Read(row, "entity_b_id"));
-            command.Parameters.AddWithValue("synergy_strength", ParseInt(Read(row, "synergy_strength"), 1));
-            command.Parameters.AddWithValue("is_anti_synergy", ParseBool(Read(row, "is_anti_synergy")));
-            command.Parameters.Add("shared_tags", NpgsqlDbType.Array | NpgsqlDbType.Text).Value = ParseArray(Read(row, "shared_tags"));
-            command.Parameters.AddWithValue("explanation", DbValue(Read(row, "explanation")));
-            command.ExecuteNonQuery();
-            count++;
+    private static bool TableHasRows(string connectionString, string tableName)
+    {
+        return CountRows(connectionString, tableName) > 0;
+    }
+
+    private static int CountRows(string connectionString, string tableName)
+    {
+        using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+        connection.Open();
+        string sql = "SELECT COUNT(*) FROM " + tableName + ";";
+        using NpgsqlCommand command = new NpgsqlCommand(sql, connection);
+        object result = command.ExecuteScalar();
+        if (result is long longCount)
+        {
+            return (int)longCount;
         }
 
-        return count;
+        if (result is int intCount)
+        {
+            return intCount;
+        }
+
+        return 0;
     }
 
     private static void ExecuteNonQuery(NpgsqlConnection connection, NpgsqlTransaction transaction, string sql)

@@ -122,6 +122,8 @@ ORDER BY
     CASE WHEN @sort_by = 'flexibility' AND @sort_direction <> 'asc' THEN COALESCE(esr.flexibility_rating, 0) END DESC,
     CASE WHEN @sort_by = 'anti' AND @sort_direction = 'asc' THEN COALESCE(esr.anti_synergy_rating, 0) END ASC,
     CASE WHEN @sort_by = 'anti' AND @sort_direction <> 'asc' THEN COALESCE(esr.anti_synergy_rating, 0) END DESC,
+    CASE WHEN @sort_by = 'name' AND @sort_direction = 'asc' THEN e.title END ASC,
+    CASE WHEN @sort_by = 'name' AND @sort_direction <> 'asc' THEN e.title END DESC,
     e.entity_type,
     e.entity_id
 LIMIT @limit;", connection);
@@ -260,7 +262,6 @@ LIMIT @limit;", connection);
             using NpgsqlConnection connection = OpenConnection();
             using NpgsqlCommand command = new NpgsqlCommand(@"
 SELECT
-    (SELECT COUNT(*) FROM entity_synergy_edges) AS edge_count,
     (SELECT COUNT(*) FROM synergy_clusters) AS cluster_count,
     (SELECT COUNT(*) FROM entity_strength_ratings) AS rating_count,
     (SELECT COUNT(*) FROM entity_archetype_affinity) AS affinity_count;", connection);
@@ -268,10 +269,9 @@ SELECT
             using NpgsqlDataReader reader = command.ExecuteReader();
             if (reader.Read())
             {
-                diagnostics.SynergyEdgeCount = reader.GetInt32(0);
-                diagnostics.SynergyClusterCount = reader.GetInt32(1);
-                diagnostics.EntityStrengthRatingCount = reader.GetInt32(2);
-                diagnostics.EntityArchetypeAffinityCount = reader.GetInt32(3);
+                diagnostics.SynergyClusterCount = reader.GetInt32(0);
+                diagnostics.EntityStrengthRatingCount = reader.GetInt32(1);
+                diagnostics.EntityArchetypeAffinityCount = reader.GetInt32(2);
             }
         }
         catch (PostgresException ex) when (ex.SqlState == "42P01")
@@ -427,50 +427,6 @@ ORDER BY id;", connection);
         return rows;
     }
 
-    public IReadOnlyList<EntitySynergyEdgeRow> GetEntitySynergyEdges(string[] entityIds)
-    {
-        if (!HasConnectionString() || entityIds.Length == 0)
-        {
-            return new List<EntitySynergyEdgeRow>();
-        }
-
-        List<EntitySynergyEdgeRow> rows = new List<EntitySynergyEdgeRow>();
-
-        using NpgsqlConnection connection = OpenConnection();
-        using NpgsqlCommand command = new NpgsqlCommand(@"
-SELECT
-    entity_a_type::text,
-    entity_a_id,
-    entity_b_type::text,
-    entity_b_id,
-    synergy_strength,
-    is_anti_synergy,
-    COALESCE(shared_tags, ARRAY[]::text[]),
-    COALESCE(explanation, '')
-FROM entity_synergy_edges
-WHERE entity_a_id = ANY(@ids) OR entity_b_id = ANY(@ids);", connection);
-
-        command.Parameters.AddWithValue("ids", entityIds);
-
-        using NpgsqlDataReader reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            rows.Add(new EntitySynergyEdgeRow
-            {
-                EntityAType = reader.GetString(0),
-                EntityAId = reader.GetString(1),
-                EntityBType = reader.GetString(2),
-                EntityBId = reader.GetString(3),
-                SynergyStrength = reader.GetInt32(4),
-                IsAntiSynergy = reader.GetBoolean(5),
-                SharedTags = reader.GetFieldValue<string[]>(6),
-                Explanation = reader.GetString(7)
-            });
-        }
-
-        return rows;
-    }
-
     public IReadOnlyList<EntityArchetypeAffinityRow> GetEntityArchetypeAffinities(string entityType, string entityId)
     {
         if (!HasConnectionString())
@@ -577,12 +533,8 @@ ORDER BY sc.synergy_score DESC NULLS LAST, sc.id;", connection);
         }
 
         string[] allHeld = deckIds.Concat(relicIds).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        int heldSize = Math.Max(allHeld.Length, 1);
 
         Dictionary<string, string> optionTypes = ResolveEntityTypes(optionIds);
-        List<EntitySynergyEdgeRow> edges = allHeld.Length == 0
-            ? new List<EntitySynergyEdgeRow>()
-            : LoadEdges(optionIds, allHeld);
 
         Dictionary<string, double> archetypeAffinity = archetypeId > 0
             ? LoadOptionAffinity(new[] { archetypeId }, optionIds, optionTypes)
@@ -603,34 +555,17 @@ ORDER BY sc.synergy_score DESC NULLS LAST, sc.id;", connection);
         List<PickScoreRow> scores = new List<PickScoreRow>();
         foreach (string optionId in optionIds)
         {
-            List<EntitySynergyEdgeRow> optionEdges = edges
-                .Where(e => string.Equals(e.EntityAId, optionId, StringComparison.OrdinalIgnoreCase)
-                         || string.Equals(e.EntityBId, optionId, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
             double affinity = archetypeAffinity.TryGetValue(optionId, out double af) ? af : 0.0;
             double deckFit = deckAffinityFit.TryGetValue(optionId, out double df) ? df : 0.0;
 
-            double antiEdgeSum = optionEdges.Where(e => e.IsAntiSynergy).Sum(e => (double)e.SynergyStrength);
-            double antiPenalty = Math.Min(antiEdgeSum / (heldSize * 10.0), 1.0);
-
+            double antiPenalty = 0.0;
             string[] cardAntiTags = antiTags.TryGetValue(optionId, out string[] at) ? at : Array.Empty<string>();
             int tagOverlap = cardAntiTags.Count(t => heldEffectTags.Contains(t));
-            antiPenalty = Math.Min(antiPenalty + (tagOverlap * 0.1), 1.0);
+            antiPenalty = Math.Min(tagOverlap * 0.1, 1.0);
 
             double flexScore = flex.TryGetValue(optionId, out double fs) ? fs : 0.5;
             double composite = (WeightAffinity * affinity) + (WeightDeckFit * deckFit) - (WeightAnti * antiPenalty) + (WeightFlex * flexScore);
             composite = Math.Max(0.0, composite);
-
-            List<string> drivers = new List<string>();
-            foreach (EntitySynergyEdgeRow edge in optionEdges.Where(e => !e.IsAntiSynergy))
-            {
-                string driverId = string.Equals(edge.EntityAId, optionId, StringComparison.OrdinalIgnoreCase)
-                    ? edge.EntityBId
-                    : edge.EntityAId;
-                string explanation = string.IsNullOrWhiteSpace(edge.Explanation) ? string.Empty : $" ({edge.Explanation})";
-                drivers.Add(driverId + explanation);
-            }
 
             scores.Add(new PickScoreRow
             {
@@ -641,7 +576,7 @@ ORDER BY sc.synergy_score DESC NULLS LAST, sc.id;", connection);
                 AntiSynergyPenalty = antiPenalty,
                 FlexibilityScore = flexScore,
                 CompositeScore = composite,
-                SynergyDrivers = drivers
+                SynergyDrivers = new List<string>()
             });
         }
 
@@ -698,46 +633,6 @@ ORDER BY sc.synergy_score DESC NULLS LAST, sc.id;", connection);
                 result[id] = entityType;
             }
         }
-    }
-
-    private List<EntitySynergyEdgeRow> LoadEdges(string[] optionIds, string[] heldIds)
-    {
-        List<EntitySynergyEdgeRow> rows = new List<EntitySynergyEdgeRow>();
-        using NpgsqlConnection connection = OpenConnection();
-        using NpgsqlCommand command = new NpgsqlCommand(@"
-SELECT
-    entity_a_type::text,
-    entity_a_id,
-    entity_b_type::text,
-    entity_b_id,
-    synergy_strength,
-    is_anti_synergy,
-    COALESCE(shared_tags, ARRAY[]::text[]),
-    COALESCE(explanation, '')
-FROM entity_synergy_edges
-WHERE (entity_a_id = ANY(@options) AND entity_b_id = ANY(@held))
-   OR (entity_b_id = ANY(@options) AND entity_a_id = ANY(@held));", connection);
-
-        command.Parameters.AddWithValue("options", optionIds);
-        command.Parameters.AddWithValue("held", heldIds);
-
-        using NpgsqlDataReader reader = command.ExecuteReader();
-        while (reader.Read())
-        {
-            rows.Add(new EntitySynergyEdgeRow
-            {
-                EntityAType = reader.GetString(0),
-                EntityAId = reader.GetString(1),
-                EntityBType = reader.GetString(2),
-                EntityBId = reader.GetString(3),
-                SynergyStrength = reader.GetInt32(4),
-                IsAntiSynergy = reader.GetBoolean(5),
-                SharedTags = reader.GetFieldValue<string[]>(6),
-                Explanation = reader.GetString(7)
-            });
-        }
-
-        return rows;
     }
 
     private Dictionary<string, double> LoadOptionAffinity(int[] archetypeIds, string[] optionIds, Dictionary<string, string> optionTypes)
@@ -931,5 +826,209 @@ WHERE archetype_id = ANY(@archetype_ids)
         }
 
         return result;
+    }
+
+    public EntityArchetypeAffinityRow GetHighestSynergyArchetype(string entityType, string entityId)
+    {
+        if (!HasConnectionString())
+        {
+            return new EntityArchetypeAffinityRow();
+        }
+
+        try
+        {
+            using NpgsqlConnection connection = OpenConnection();
+            using NpgsqlCommand command = new NpgsqlCommand(@"
+SELECT
+    ea.archetype_id,
+    COALESCE(a.name, ''),
+    COALESCE(ea.affinity_score, 0),
+    COALESCE(a.character_id, '')
+FROM entity_archetype_affinity ea
+LEFT JOIN archetypes a ON a.id = ea.archetype_id
+WHERE LOWER(ea.entity_type) = LOWER(@entity_type)
+  AND ea.entity_id = @entity_id
+ORDER BY ea.affinity_score DESC NULLS LAST
+LIMIT 1;", connection);
+
+            command.Parameters.AddWithValue("entity_type", entityType);
+            command.Parameters.AddWithValue("entity_id", entityId);
+
+            using NpgsqlDataReader reader = command.ExecuteReader();
+            if (reader.Read())
+            {
+                return new EntityArchetypeAffinityRow
+                {
+                    ArchetypeId = reader.GetInt32(0),
+                    ArchetypeName = reader.GetString(1),
+                    AffinityScore = reader.GetInt32(2),
+                    CharacterId = reader.GetString(3)
+                };
+            }
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            return new EntityArchetypeAffinityRow();
+        }
+
+        return new EntityArchetypeAffinityRow();
+    }
+
+    public IReadOnlyList<EntityRow> GetEntitiesSynergizingWithArchetype(int archetypeId, int minAffinityScore, int limit)
+    {
+        if (!HasConnectionString())
+        {
+            return new List<EntityRow>();
+        }
+
+        List<EntityRow> rows = new List<EntityRow>();
+
+        try
+        {
+            using NpgsqlConnection connection = OpenConnection();
+            using NpgsqlCommand command = new NpgsqlCommand(@"
+WITH entities AS (
+    SELECT
+        'card'::text AS entity_type,
+        'card'::text AS rating_entity_type,
+        c.id AS entity_id,
+        COALESCE(c.character_id, 'colorless') AS character_id,
+        COALESCE(NULLIF(c.title, ''), c.id) AS title,
+        COALESCE(c.description, '') AS description,
+        COALESCE(c.effect_tags, ARRAY[]::text[]) AS tags
+    FROM cards c
+
+    UNION ALL
+
+    SELECT
+        'relic'::text,
+        'relic'::text,
+        r.id,
+        COALESCE(r.character_id, ''),
+        COALESCE(NULLIF(r.title, ''), r.id),
+        COALESCE(r.description, ''),
+        COALESCE(r.effect_tags, ARRAY[]::text[])
+    FROM relics r
+
+    UNION ALL
+
+    SELECT
+        'potion'::text,
+        'potion'::text,
+        p.id,
+        COALESCE(p.character_id, ''),
+        COALESCE(NULLIF(p.title, ''), p.id),
+        COALESCE(p.description, ''),
+        COALESCE(p.effect_tags, ARRAY[]::text[])
+    FROM potions p
+)
+SELECT
+    e.entity_type,
+    e.entity_id,
+    e.character_id,
+    e.title,
+    e.description,
+    e.tags,
+    COALESCE(esr.synergy_rating, 0),
+    COALESCE(esr.flexibility_rating, 0),
+    COALESCE(esr.anti_synergy_rating, 0)
+FROM entities e
+LEFT JOIN entity_strength_ratings esr
+    ON esr.entity_type = e.rating_entity_type
+   AND esr.entity_id = e.entity_id
+WHERE EXISTS (
+    SELECT 1
+    FROM entity_archetype_affinity ea
+    WHERE ea.archetype_id = @archetype_id
+      AND LOWER(ea.entity_type) = LOWER(e.entity_type)
+      AND ea.entity_id = e.entity_id
+      AND ea.affinity_score >= @min_affinity_score
+)
+ORDER BY
+    (SELECT COALESCE(ea.affinity_score, 0)
+     FROM entity_archetype_affinity ea
+     WHERE ea.archetype_id = @archetype_id
+       AND LOWER(ea.entity_type) = LOWER(e.entity_type)
+       AND ea.entity_id = e.entity_id) DESC,
+    e.entity_type,
+    e.entity_id
+LIMIT @limit;", connection);
+
+            command.Parameters.AddWithValue("archetype_id", archetypeId);
+            command.Parameters.AddWithValue("min_affinity_score", minAffinityScore);
+            command.Parameters.AddWithValue("limit", limit);
+
+            using NpgsqlDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                string[] tags = reader.IsDBNull(5) ? Array.Empty<string>() : reader.GetFieldValue<string[]>(5);
+                rows.Add(new EntityRow
+                {
+                    EntityType = reader.GetString(0),
+                    EntityId = reader.GetString(1),
+                    CharacterId = reader.GetString(2),
+                    Title = reader.GetString(3),
+                    Description = reader.GetString(4),
+                    Tags = tags,
+                    SynergyRating = reader.GetInt32(6),
+                    FlexibilityRating = reader.GetInt32(7),
+                    AntiSynergyRating = reader.GetInt32(8)
+                });
+            }
+        }
+        catch (PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            return new List<EntityRow>();
+        }
+
+        return rows;
+    }
+
+    public DeckDrawProfile LoadDeckDrawProfile(string[] deckIds, string[] relicIds)
+    {
+        DeckDrawProfile profile = new DeckDrawProfile { TotalCards = deckIds.Length };
+
+        if (!HasConnectionString())
+        {
+            return profile;
+        }
+
+        using NpgsqlConnection connection = OpenConnection();
+
+        if (deckIds.Length > 0)
+        {
+            using NpgsqlCommand command = new NpgsqlCommand(@"
+SELECT
+    COUNT(*) FILTER (WHERE LOWER(type::text) = 'power'),
+    COUNT(*) FILTER (WHERE keywords @> ARRAY['draw'] OR effect_tags @> ARRAY['draw'] OR effect_tags @> ARRAY['card_draw']),
+    COUNT(*) FILTER (WHERE keywords @> ARRAY['exhaust'] OR keywords @> ARRAY['ethereal'] OR effect_tags @> ARRAY['exhaust'] OR effect_tags @> ARRAY['self_exhaust'])
+FROM cards
+WHERE id = ANY(@ids);", connection);
+
+            command.Parameters.AddWithValue("ids", deckIds);
+
+            using NpgsqlDataReader reader = command.ExecuteReader();
+            if (reader.Read())
+            {
+                profile.PowerCards = reader.GetInt32(0);
+                profile.DrawCards = reader.GetInt32(1);
+                profile.ExhaustCards = reader.GetInt32(2);
+            }
+        }
+
+        if (relicIds.Length > 0)
+        {
+            using NpgsqlCommand relicCommand = new NpgsqlCommand(@"
+SELECT COUNT(*)
+FROM relics
+WHERE id = ANY(@ids)
+  AND (effect_tags @> ARRAY['draw'] OR effect_tags @> ARRAY['card_draw'] OR effect_tags @> ARRAY['extra_draw']);", connection);
+
+            relicCommand.Parameters.AddWithValue("ids", relicIds);
+            object result = relicCommand.ExecuteScalar();
+            profile.DrawRelics = result is long l ? (int)l : 0;
+        }
+
+        return profile;
     }
 }

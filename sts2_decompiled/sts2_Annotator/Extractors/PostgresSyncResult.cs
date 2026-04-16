@@ -14,12 +14,6 @@ internal sealed class PostgresSyncResult
 
     public int AffinityCount { get; set; }
 
-    public int SynergyEdgeCount { get; set; }
-
-    public int SynergyEdgeCandidatePairCount { get; set; }
-
-    public int SynergyEdgeBatchCount { get; set; }
-
     public string ConnectionDisplay { get; set; }
 
     public string StagingDirectory { get; set; }

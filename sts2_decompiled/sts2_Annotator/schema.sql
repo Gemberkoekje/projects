@@ -196,20 +196,6 @@ CREATE TABLE IF NOT EXISTS synergy_clusters (
     explanation TEXT
 );
 
--- Entity synergy edges table
-CREATE TABLE IF NOT EXISTS entity_synergy_edges (
-    id SERIAL PRIMARY KEY,
-    entity_a_type TEXT NOT NULL,
-    entity_a_id TEXT NOT NULL,
-    entity_b_type TEXT NOT NULL,
-    entity_b_id TEXT NOT NULL,
-    synergy_strength INTEGER NOT NULL,
-    is_anti_synergy BOOLEAN DEFAULT FALSE,
-    shared_tags TEXT[],
-    explanation TEXT,
-    UNIQUE (entity_a_type, entity_a_id, entity_b_type, entity_b_id, is_anti_synergy)
-);
-
 -- Entity strength ratings table
 CREATE TABLE IF NOT EXISTS entity_strength_ratings (
     entity_type TEXT NOT NULL,
@@ -264,8 +250,6 @@ CREATE INDEX IF NOT EXISTS idx_entity_archetype_affinity_entity ON entity_archet
 CREATE INDEX IF NOT EXISTS idx_entity_archetype_affinity_archetype ON entity_archetype_affinity(archetype_id);
 CREATE INDEX IF NOT EXISTS idx_synergy_clusters_archetype ON synergy_clusters(archetype_id);
 CREATE INDEX IF NOT EXISTS idx_synergy_clusters_entity ON synergy_clusters(entity_type, entity_id);
-CREATE INDEX IF NOT EXISTS idx_entity_edges_a ON entity_synergy_edges(entity_a_type, entity_a_id);
-CREATE INDEX IF NOT EXISTS idx_entity_edges_b ON entity_synergy_edges(entity_b_type, entity_b_id);
 CREATE INDEX IF NOT EXISTS idx_entity_ratings_type ON entity_strength_ratings(entity_type);
 CREATE INDEX IF NOT EXISTS idx_run_states_name ON run_states(name);
 CREATE INDEX IF NOT EXISTS idx_pick_advice_run_state ON pick_advice(run_state_id);

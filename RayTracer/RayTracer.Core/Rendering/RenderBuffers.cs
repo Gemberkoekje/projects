@@ -44,6 +44,7 @@ internal class RenderBuffers
     public float[] DiffUnfilteredVsFiltered { get; }
     public float[] DiffReprojectedVsCurrent { get; }
     public int[] LastUpdatedFrame { get; }
+    public byte[] DiffuseCacheState { get; }
 
     // TAA next-frame buffers
     public Vector3[] TaaNextXYZ { get; }
@@ -83,6 +84,7 @@ internal class RenderBuffers
         DiffUnfilteredVsFiltered = new float[pixelCount];
         DiffReprojectedVsCurrent = new float[pixelCount];
         LastUpdatedFrame = new int[pixelCount];
+        DiffuseCacheState = new byte[pixelCount];
 
         TaaNextXYZ = new Vector3[pixelCount];
         TaaNextHitPoint = new Vector3[pixelCount];

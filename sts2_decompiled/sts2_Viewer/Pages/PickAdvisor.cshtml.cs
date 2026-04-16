@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Sts2Viewer.Data;
-using Sts2Viewer.Llm;
 
 namespace Sts2Viewer.Pages;
 
@@ -15,7 +12,6 @@ public sealed class PickAdvisorModel : PageModel
 {
     private readonly PostgresReadService _readService;
     private readonly PostgresWriteService _writeService;
-    private readonly PickExplanationService _explanationService;
 
     [BindProperty(SupportsGet = true)]
     public string CharacterId { get; set; }
@@ -41,6 +37,9 @@ public sealed class PickAdvisorModel : PageModel
     [BindProperty(SupportsGet = true)]
     public bool IncludeColorless { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string SelectedArchetypesCsv { get; set; }
+
     [BindProperty]
     public string RunStateName { get; set; }
 
@@ -48,6 +47,10 @@ public sealed class PickAdvisorModel : PageModel
     public int SelectedRunStateId { get; set; }
 
     public bool HasConnectionString { get; private set; }
+
+    public double SkipScore { get; private set; }
+
+    public DeckDrawProfile DrawProfile { get; private set; }
 
     public IReadOnlyList<CharacterRow> Characters { get; private set; }
 
@@ -63,13 +66,10 @@ public sealed class PickAdvisorModel : PageModel
 
     public IReadOnlyList<PickAdviceRow> RecentAdvice { get; private set; }
 
-    public string LlmNarrative { get; private set; }
-
-    public PickAdvisorModel(PostgresReadService readService, PostgresWriteService writeService, PickExplanationService explanationService)
+    public PickAdvisorModel(PostgresReadService readService, PostgresWriteService writeService)
     {
         _readService = readService;
         _writeService = writeService;
-        _explanationService = explanationService;
 
         CharacterId = string.Empty;
         DeckCsv = string.Empty;
@@ -78,6 +78,7 @@ public sealed class PickAdvisorModel : PageModel
         Option2Id = string.Empty;
         Option3Id = string.Empty;
         IncludeColorless = true;
+        SelectedArchetypesCsv = string.Empty;
         RunStateName = string.Empty;
         Characters = new List<CharacterRow>();
         Archetypes = new List<ArchetypeRow>();
@@ -86,7 +87,7 @@ public sealed class PickAdvisorModel : PageModel
         RunStates = new List<RunStateRow>();
         Scores = new List<PickScoreRow>();
         RecentAdvice = new List<PickAdviceRow>();
-        LlmNarrative = string.Empty;
+        DrawProfile = new DeckDrawProfile();
     }
 
     public void OnGet()
@@ -109,6 +110,7 @@ public sealed class PickAdvisorModel : PageModel
         return new JsonResult(new
         {
             ok = true,
+            skipScore = SkipScore,
             scores = Scores.Select(s => new
             {
                 rank = s.Rank,
@@ -133,17 +135,6 @@ public sealed class PickAdvisorModel : PageModel
                 antiSynergyPenalty = r.AntiSynergyPenalty
             }).ToArray()
         });
-    }
-
-    public async Task OnPostExplainAsync()
-    {
-        Initialize();
-        TryScore();
-
-        if (Scores.Count > 0)
-        {
-            LlmNarrative = await _explanationService.ExplainAsync(Scores, CancellationToken.None);
-        }
     }
 
     public IActionResult OnPostSaveRunState()
@@ -259,12 +250,55 @@ public sealed class PickAdvisorModel : PageModel
         {
             Scores = new List<PickScoreRow>();
             RecentAdvice = new List<PickAdviceRow>();
+            SkipScore = 0;
             return;
         }
 
+        DeckDrawProfile drawProfile = _readService.LoadDeckDrawProfile(deckIds, relicIds);
+        DrawProfile = drawProfile;
+        SkipScore = CalculateSkipScore(drawProfile);
         Scores = _readService.ScorePickOptions(ArchetypeId, deckIds, relicIds, options.ToArray());
         _writeService.SavePickAdvice(SelectedRunStateId, Scores);
         RecentAdvice = _writeService.GetRecentPickAdvice(options.ToArray(), 20);
+    }
+
+    private static double CalculateSkipScore(DeckDrawProfile profile)
+    {
+        int totalCards = profile.TotalCards;
+        if (totalCards == 0)
+        {
+            return 0.05;
+        }
+
+        // Effective deck size: cards that actually clog draws.
+        // Powers are played once and leave the deck permanently, so they reduce future draw pressure.
+        // Exhaust/Ethereal cards remove themselves during combat, so they also reduce effective size.
+        int selfRemovingCards = profile.PowerCards + profile.ExhaustCards;
+        int effectiveDeckSize = Math.Max(0, totalCards - selfRemovingCards);
+
+        // Draw power offsets deck bloat.
+        // Each draw card seen per cycle roughly lets you see +1 extra card per turn.
+        // Draw relics provide a persistent draw bonus every turn.
+        int drawSources = profile.DrawCards + (profile.DrawRelics * 2);
+
+        // Net bloat: how many non-self-removing cards exceed what draw power can handle.
+        // A deck with 20 regular cards but 5 draw sources behaves like a ~15-card deck.
+        int netBloat = Math.Max(0, effectiveDeckSize - drawSources);
+
+        // Base skip value from net bloat (sigmoid-like curve, 0 to ~0.8)
+        double bloatFactor = netBloat / (netBloat + 15.0);
+
+        // Ratio of self-removing cards: high ratio means adding a non-removing card dilutes less.
+        double selfRemoveRatio = totalCards > 0 ? (double)selfRemovingCards / totalCards : 0.0;
+
+        // Draw density: fraction of deck that draws more cards.
+        double drawDensity = totalCards > 0 ? (double)profile.DrawCards / totalCards : 0.0;
+
+        // Adjustments: decks with lots of powers/exhaust or draw are more tolerant of extra cards.
+        double tolerance = (selfRemoveRatio * 0.15) + (drawDensity * 0.10);
+
+        double skipScore = Math.Max(0.05, bloatFactor - tolerance);
+        return Math.Min(skipScore, 0.85);
     }
 
     private object BuildRouteValues(string[] deckIds, string[] relicIds)

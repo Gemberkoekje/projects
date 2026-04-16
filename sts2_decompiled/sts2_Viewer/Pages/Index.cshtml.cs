@@ -49,7 +49,7 @@ public sealed class IndexModel : PageModel
 
     public IReadOnlyList<CharacterRow> AvailableCharacters { get; private set; }
 
-    public IReadOnlyList<EntityRow> Entities { get; private set; }
+    public IReadOnlyList<EntityWithArchetypeRow> Entities { get; private set; }
 
     public IReadOnlyList<SynergyClusterRow> SynergyClusters { get; private set; }
 
@@ -70,7 +70,7 @@ public sealed class IndexModel : PageModel
         EntityLimit = DefaultEntityLimit;
         AvailableTags = new List<string>();
         AvailableCharacters = new List<CharacterRow>();
-        Entities = new List<EntityRow>();
+        Entities = new List<EntityWithArchetypeRow>();
         SynergyClusters = new List<SynergyClusterRow>();
         PipelineDiagnostics = new PipelineDiagnosticsRow();
     }
@@ -107,7 +107,20 @@ public sealed class IndexModel : PageModel
         AvailableCharacters = _service.GetCharacters();
         int entityLimit = EntityLimit <= 0 ? DefaultEntityLimit : Math.Min(EntityLimit, MaxEntityLimit);
         EntityLimit = entityLimit;
-        Entities = _service.GetEntities(query, entityLimit);
+        IReadOnlyList<EntityRow> entityRows = _service.GetEntities(query, entityLimit);
+        
+        List<EntityWithArchetypeRow> entitiesWithArchetypes = new List<EntityWithArchetypeRow>();
+        foreach (var entity in entityRows)
+        {
+            var archetype = _service.GetHighestSynergyArchetype(entity.EntityType, entity.EntityId);
+            entitiesWithArchetypes.Add(new EntityWithArchetypeRow
+            {
+                Entity = entity,
+                HighestSynergyArchetype = archetype
+            });
+        }
+        Entities = entitiesWithArchetypes;
+        
         SynergyClusters = _service.GetSynergyClusters(100);
         PipelineDiagnostics = _service.GetPipelineDiagnostics();
     }
@@ -172,6 +185,7 @@ public sealed class IndexModel : PageModel
         {
             "flexibility" => "flexibility",
             "anti" => "anti",
+            "name" => "name",
             _ => "synergy"
         };
     }

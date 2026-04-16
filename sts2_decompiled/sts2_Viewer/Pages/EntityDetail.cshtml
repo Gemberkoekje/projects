@@ -39,6 +39,10 @@ else
                 <strong>@Model.Entity.Title</strong>
             </div>
             <div class="muted">@Model.Entity.EntityId</div>
+            @if (Model.CharacterDisplayName.Length > 0)
+            {
+                <div class="muted">Character: @Model.CharacterDisplayName</div>
+            }
             <p style="margin-top:8px;">@Model.Entity.Description</p>
         </section>
 
@@ -78,45 +82,6 @@ else
                         <span class="tag-chip">@tag</span>
                     }
                 </div>
-            }
-        </section>
-
-        <section>
-            <h2 style="font-size:1.1rem; margin-bottom:8px;">Synergy edges (@Model.SynergyEdges.Count)</h2>
-            @if (Model.SynergyEdges.Count == 0)
-            {
-                <p class="muted">No pairwise edges found for this entity.</p>
-            }
-            else
-            {
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Partner entity</th>
-                            <th>Strength</th>
-                            <th>Shared tags</th>
-                            <th>Anti-synergy</th>
-                            <th>Explanation</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @foreach (var edge in Model.SynergyEdges)
-                    {
-                        <tr>
-                            <td><a asp-page="/EntityDetail" asp-route-type="@edge.PartnerType" asp-route-id="@edge.PartnerId">@edge.PartnerType:@edge.PartnerId</a></td>
-                            <td>
-                                <div style="display:grid; grid-template-columns: 1fr 30px; align-items:center; gap:8px;">
-                                    <div class="meter"><div class="meter-fill @(edge.IsAntiSynergy ? "meter-anti" : "meter-good")" style="width:@(Math.Clamp(edge.Strength, 0, 10) * 10)%"></div></div>
-                                    <span>@edge.Strength</span>
-                                </div>
-                            </td>
-                            <td>@string.Join(", ", edge.SharedTags)</td>
-                            <td>@(edge.IsAntiSynergy ? "Yes" : "No")</td>
-                            <td>@edge.Explanation</td>
-                        </tr>
-                    }
-                    </tbody>
-                </table>
             }
         </section>
 

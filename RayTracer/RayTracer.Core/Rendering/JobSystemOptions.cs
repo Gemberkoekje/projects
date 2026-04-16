@@ -17,7 +17,10 @@ public sealed record DenoiseOptions(
     bool CheckerboardMotion = false,
     float TemporalBlendAlpha = 0f,
     bool EnableTaa = false,
-    float SampleClamp = 0f);
+    float SampleClamp = 0f,
+    bool EnableDiffuseCache = true,
+    float DiffuseCacheCellSize = 0.25f,
+    uint DiffuseCacheMinSamples = 4);
 
 public sealed record DebugOptions(
     bool EnableDiagnostics = true);

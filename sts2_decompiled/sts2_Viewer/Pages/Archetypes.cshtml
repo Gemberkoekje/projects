@@ -1,0 +1,106 @@
+@page
+@model Sts2Viewer.Pages.ArchetypesModel
+@{
+    ViewData["Title"] = "Archetypes";
+}
+
+<style>
+    .archetypes-shell { display:grid; gap:16px; }
+    .panel { padding:14px 16px; border:1px solid #d7dbe2; border-radius:12px; background:#fff; box-shadow:0 1px 2px rgba(15, 23, 42, 0.04); }
+    .panel-title { margin:0 0 10px 0; font-size:1.05rem; }
+    .filter-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; align-items:end; }
+    .filter-actions { display:flex; align-items:end; }
+    .filter-actions button { width:100%; }
+    .muted { color:#667085; }
+    .table-wrap { max-height:70vh; overflow:auto; border:1px solid #d7dbe2; border-radius:12px; }
+    .data-table { width:100%; border-collapse:separate; border-spacing:0; }
+    .data-table th,
+    .data-table td { border-bottom:1px solid #e5e7eb; border-right:0; border-left:0; font-size:12px; padding:10px 12px; }
+    .data-table thead th { position:sticky; top:0; z-index:1; background:#f8fafc; }
+    .data-table tbody tr:nth-child(even) { background:#fbfdff; }
+    .data-table tbody tr:hover { background:#eef6ff; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:4px; }
+    .tag-chip { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef3ff; color:#243b53; font-size:10px; line-height:1.5; }
+    .tags-cell { font-size:11px; min-width:220px; }
+    .title-cell { min-width:220px; }
+    .desc-cell { min-width:300px; max-width:500px; word-wrap:break-word; }
+</style>
+
+<h1>Archetypes</h1>
+
+@if (!Model.HasConnectionString)
+{
+    <p>Set <code>Database:ConnectionString</code> in <code>sts2_Viewer/appsettings.json</code> or set <code>STS2_POSTGRES_CONNECTION_STRING</code>.</p>
+}
+else
+{
+    <div class="archetypes-shell">
+        <section class="panel">
+            <h2 class="panel-title">Filter archetypes</h2>
+            <form method="get" class="filter-grid">
+                <label>
+                    Character<br />
+                    <select name="characterId">
+                        <option value="" selected="@(Model.CharacterId == "")">all</option>
+                        @foreach (var character in Model.AvailableCharacters)
+                        {
+                            <option value="@character.Id" selected="@(Model.CharacterId == character.Id)">@character.Title</option>
+                        }
+                    </select>
+                </label>
+
+                <div class="filter-actions">
+                    <button type="submit">Apply filter</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <h2 class="panel-title">Archetypes (@Model.Archetypes.Count)</h2>
+            @if (Model.Archetypes.Count == 0)
+            {
+                <p class="muted">No archetypes found.</p>
+            }
+            else
+            {
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Character</th>
+                                <th>Description</th>
+                                <th>Key Effect Tags</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var archetype in Model.Archetypes)
+                            {
+                                <tr>
+                                    <td class="title-cell"><a asp-page="/ArchetypeDetail" asp-route-id="@archetype.Id">@archetype.Name</a></td>
+                                    <td>@(string.IsNullOrEmpty(archetype.CharacterId) ? "—" : archetype.CharacterId)</td>
+                                    <td class="desc-cell">@archetype.Description</td>
+                                    <td class="tags-cell">
+                                        @if (archetype.KeyEffectTags.Count == 0)
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <div class="tag-list">
+                                                @foreach (string tag in archetype.KeyEffectTags)
+                                                {
+                                                    <span class="tag-chip">@tag</span>
+                                                }
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </div>
+}

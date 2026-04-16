@@ -8,7 +8,7 @@ internal static class ModelRouter
     {
         if (provider == LlmProviderKind.Anthropic)
         {
-            if (task == AnnotationTaskKind.Synergy || task == AnnotationTaskKind.ArchetypeDiscovery)
+            if (task == AnnotationTaskKind.ArchetypeDiscovery)
             {
                 return "claude-sonnet-4-6";
             }
@@ -18,7 +18,7 @@ internal static class ModelRouter
 
         if (provider == LlmProviderKind.OpenAI)
         {
-            if (task == AnnotationTaskKind.Synergy || task == AnnotationTaskKind.ArchetypeDiscovery)
+            if (task == AnnotationTaskKind.ArchetypeDiscovery)
             {
                 return "gpt-4o";
             }

@@ -60,7 +60,7 @@ public record RenderPreset(
     public static RenderPreset Medium => new(
         "Medium", 480, 360, 4, 300, 16, 32,
         SubPixelJitter: true, ResolutionScale: 1.0f,
-        FilterRadius: 1, EdgeAwareFilter: false,
+        FilterRadius: 1, EdgeAwareFilter: true,
         Lighting: LightingMode.Direct,
         CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 10f);
 

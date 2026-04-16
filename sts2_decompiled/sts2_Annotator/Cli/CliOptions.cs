@@ -7,7 +7,7 @@ namespace Sts2Extractor.Cli;
 
 internal sealed class CliOptions
 {
-    public static string Usage => "Usage: Sts2Extractor audit|extract-cards|extract-relics|extract-potions|extract-events|extract-powers|extract-characters|generate-ratings|seed-taxonomy|annotate|list-models|init-database|sync-postgres|build-synergy-edges|build-synergy-clusters|discover-archetypes|score-affinities|advise-pick [--root <path>] [--output <path>] [--character <id>] [--all-characters] [--cards <n>] [--relics <n>] [--powers <n>] [--threshold <0-1>] [--batch-size <n>] [--annotate] [--resume] [--provider anthropic|openai] [--task mechanical|synergy|archetype-discovery|affinity-scoring] [--prompt <text>] [--prompt-file <path>] [--system <text>] [--system-file <path>] [--model <id>] [--max-tokens <n>] [--connection-string <postgres-connection-string>] [advise-pick: --archetype <id|name>] [--deck <card_id,...>] [--relics <relic_id,...>] [--options <id1,id2[,id3]>] [--explain]";
+    public static string Usage => "Usage: Sts2Extractor audit|extract-cards|extract-relics|extract-potions|extract-events|extract-powers|extract-characters|generate-ratings|seed-taxonomy|annotate|list-models|init-database|sync-postgres|build-synergy-clusters|discover-archetypes|score-affinities|advise-pick [--root <path>] [--output <path>] [--character <id>] [--all-characters] [--cards <n>] [--relics <n>] [--powers <n>] [--threshold <0-1>] [--batch-size <n>] [--annotate] [--resume] [--resume-character <id>] [--resume-batch <n>] [--only-missing] [--provider anthropic|openai] [--task mechanical|archetype-discovery|affinity-scoring] [--prompt <text>] [--prompt-file <path>] [--system <text>] [--system-file <path>] [--model <id>] [--max-tokens <n>] [--rpm <n>] [--input-tpm <n>] [--output-tpm <n>] [--connection-string <postgres-connection-string>] [advise-pick: --archetype <id|name>] [--deck <card_id,...>] [--relics <relic_id,...>] [--options <id1,id2[,id3]>] [--explain]";
 
     public CliCommand Command { get; private set; }
 
@@ -39,6 +39,12 @@ internal sealed class CliOptions
 
     public int MaxTokens { get; private set; }
 
+    public int RequestsPerMinute { get; private set; }
+
+    public int InputTokensPerMinute { get; private set; }
+
+    public int OutputTokensPerMinute { get; private set; }
+
     public string ConnectionString { get; private set; }
 
     public string CharacterId { get; private set; }
@@ -57,6 +63,8 @@ internal sealed class CliOptions
 
     public bool Resume { get; private set; }
 
+    public bool OnlyMissingAffinities { get; private set; }
+
     public bool IsValid { get; private set; }
 
     public string ValidationMessage { get; private set; }
@@ -64,6 +72,10 @@ internal sealed class CliOptions
     public bool AllCharacters { get; private set; }
 
     public bool Annotate { get; private set; }
+
+    public string ResumeCharacterId { get; private set; }
+
+    public int ResumeBatchNumber { get; private set; }
 
     private CliOptions()
     {
@@ -82,6 +94,9 @@ internal sealed class CliOptions
         SystemPromptFilePath = string.Empty;
         ModelOverride = string.Empty;
         MaxTokens = 1200;
+        RequestsPerMinute = 0;
+        InputTokensPerMinute = 0;
+        OutputTokensPerMinute = 0;
         ConnectionString = string.Empty;
         CharacterId = string.Empty;
         BatchSize = 50;
@@ -91,10 +106,13 @@ internal sealed class CliOptions
         OptionIds = Array.Empty<string>();
         ExplainPick = false;
         Resume = false;
+        OnlyMissingAffinities = false;
         IsValid = true;
         ValidationMessage = string.Empty;
         AllCharacters = false;
         Annotate = false;
+        ResumeCharacterId = string.Empty;
+        ResumeBatchNumber = 0;
     }
 
     public CliOptions ForCommand(CliCommand command, string outputPath)
@@ -116,6 +134,9 @@ internal sealed class CliOptions
             SystemPromptFilePath = SystemPromptFilePath,
             ModelOverride = ModelOverride,
             MaxTokens = MaxTokens,
+            RequestsPerMinute = RequestsPerMinute,
+            InputTokensPerMinute = InputTokensPerMinute,
+            OutputTokensPerMinute = OutputTokensPerMinute,
             ConnectionString = ConnectionString,
             CharacterId = CharacterId,
             BatchSize = BatchSize,
@@ -125,10 +146,13 @@ internal sealed class CliOptions
             OptionIds = OptionIds,
             ExplainPick = ExplainPick,
             Resume = Resume,
+            OnlyMissingAffinities = OnlyMissingAffinities,
             IsValid = true,
             ValidationMessage = string.Empty,
             AllCharacters = AllCharacters,
-            Annotate = Annotate
+            Annotate = Annotate,
+            ResumeCharacterId = ResumeCharacterId,
+            ResumeBatchNumber = ResumeBatchNumber
         };
     }
 
@@ -151,6 +175,9 @@ internal sealed class CliOptions
             SystemPromptFilePath = SystemPromptFilePath,
             ModelOverride = ModelOverride,
             MaxTokens = MaxTokens,
+            RequestsPerMinute = RequestsPerMinute,
+            InputTokensPerMinute = InputTokensPerMinute,
+            OutputTokensPerMinute = OutputTokensPerMinute,
             ConnectionString = ConnectionString,
             CharacterId = characterId.ToLowerInvariant(),
             BatchSize = BatchSize,
@@ -160,10 +187,54 @@ internal sealed class CliOptions
             OptionIds = OptionIds,
             ExplainPick = ExplainPick,
             Resume = Resume,
+            OnlyMissingAffinities = OnlyMissingAffinities,
             IsValid = IsValid,
             ValidationMessage = ValidationMessage,
             AllCharacters = AllCharacters,
-            Annotate = Annotate
+            Annotate = Annotate,
+            ResumeCharacterId = ResumeCharacterId,
+            ResumeBatchNumber = ResumeBatchNumber
+        };
+    }
+
+    public CliOptions WithOnlyMissingAffinities()
+    {
+        return new CliOptions
+        {
+            Command = Command,
+            RootPath = RootPath,
+            OutputPath = OutputPath,
+            CardSampleSize = CardSampleSize,
+            RelicSampleSize = RelicSampleSize,
+            PowerSampleSize = PowerSampleSize,
+            ConfidenceThreshold = ConfidenceThreshold,
+            Provider = Provider,
+            AnnotationTask = AnnotationTask,
+            PromptText = PromptText,
+            PromptFilePath = PromptFilePath,
+            SystemPromptText = SystemPromptText,
+            SystemPromptFilePath = SystemPromptFilePath,
+            ModelOverride = ModelOverride,
+            MaxTokens = MaxTokens,
+            RequestsPerMinute = RequestsPerMinute,
+            InputTokensPerMinute = InputTokensPerMinute,
+            OutputTokensPerMinute = OutputTokensPerMinute,
+            ConnectionString = ConnectionString,
+            CharacterId = CharacterId,
+            BatchSize = BatchSize,
+            ArchetypeRef = ArchetypeRef,
+            DeckIds = DeckIds,
+            RelicIds = RelicIds,
+            OptionIds = OptionIds,
+            ExplainPick = ExplainPick,
+            Resume = Resume,
+            OnlyMissingAffinities = true,
+            IsValid = IsValid,
+            ValidationMessage = ValidationMessage,
+            AllCharacters = AllCharacters,
+            Annotate = Annotate,
+            ResumeCharacterId = ResumeCharacterId,
+            ResumeBatchNumber = ResumeBatchNumber
         };
     }
 
@@ -240,11 +311,6 @@ internal sealed class CliOptions
         {
             options.Command = CliCommand.InitDatabase;
         }
-        else if (string.Equals(command, "build-synergy-edges", StringComparison.OrdinalIgnoreCase))
-        {
-            options.Command = CliCommand.BuildSynergyEdges;
-            options.OutputPath = Path.Combine(options.RootPath, "synergy_edges_staging.csv");
-        }
         else if (string.Equals(command, "build-synergy-clusters", StringComparison.OrdinalIgnoreCase))
         {
             options.Command = CliCommand.BuildSynergyClusters;
@@ -303,6 +369,12 @@ internal sealed class CliOptions
             if (string.Equals(arg, "--resume", StringComparison.OrdinalIgnoreCase))
             {
                 options.Resume = true;
+                continue;
+            }
+
+            if (string.Equals(arg, "--only-missing", StringComparison.OrdinalIgnoreCase))
+            {
+                options.OnlyMissingAffinities = true;
                 continue;
             }
 
@@ -398,10 +470,6 @@ internal sealed class CliOptions
                 {
                     options.AnnotationTask = AnnotationTaskKind.Mechanical;
                 }
-                else if (string.Equals(value, "synergy", StringComparison.OrdinalIgnoreCase))
-                {
-                    options.AnnotationTask = AnnotationTaskKind.Synergy;
-                }
                 else if (string.Equals(value, "archetype-discovery", StringComparison.OrdinalIgnoreCase))
                 {
                     options.AnnotationTask = AnnotationTaskKind.ArchetypeDiscovery;
@@ -413,7 +481,7 @@ internal sealed class CliOptions
                 else
                 {
                     options.IsValid = false;
-                    options.ValidationMessage = "--task must be mechanical, synergy, archetype-discovery, or affinity-scoring.";
+                    options.ValidationMessage = "--task must be mechanical, archetype-discovery, or affinity-scoring.";
                     return options;
                 }
 
@@ -466,6 +534,48 @@ internal sealed class CliOptions
                 }
 
                 options.MaxTokens = parsed;
+                continue;
+            }
+
+            if (string.Equals(arg, "--rpm", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, out string value, options, "--rpm")) return options;
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
+                {
+                    options.IsValid = false;
+                    options.ValidationMessage = "--rpm must be a positive integer.";
+                    return options;
+                }
+
+                options.RequestsPerMinute = parsed;
+                continue;
+            }
+
+            if (string.Equals(arg, "--input-tpm", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, out string value, options, "--input-tpm")) return options;
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
+                {
+                    options.IsValid = false;
+                    options.ValidationMessage = "--input-tpm must be a positive integer.";
+                    return options;
+                }
+
+                options.InputTokensPerMinute = parsed;
+                continue;
+            }
+
+            if (string.Equals(arg, "--output-tpm", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, out string value, options, "--output-tpm")) return options;
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
+                {
+                    options.IsValid = false;
+                    options.ValidationMessage = "--output-tpm must be a positive integer.";
+                    return options;
+                }
+
+                options.OutputTokensPerMinute = parsed;
                 continue;
             }
 
@@ -524,6 +634,27 @@ internal sealed class CliOptions
                 continue;
             }
 
+            if (string.Equals(arg, "--resume-character", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, out string value, options, "--resume-character")) return options;
+                options.ResumeCharacterId = value.ToLowerInvariant();
+                continue;
+            }
+
+            if (string.Equals(arg, "--resume-batch", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryReadValue(args, ref i, out string value, options, "--resume-batch")) return options;
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) || parsed <= 0)
+                {
+                    options.IsValid = false;
+                    options.ValidationMessage = "--resume-batch must be a positive integer.";
+                    return options;
+                }
+
+                options.ResumeBatchNumber = parsed;
+                continue;
+            }
+
             options.IsValid = false;
             options.ValidationMessage = $"Unknown argument: {arg}";
             return options;
@@ -574,10 +705,6 @@ internal sealed class CliOptions
             else if (options.Command == CliCommand.SyncPostgres)
             {
                 options.OutputPath = Path.Combine(options.RootPath, "output", "postgres_sync");
-            }
-            else if (options.Command == CliCommand.BuildSynergyEdges)
-            {
-                options.OutputPath = Path.Combine(options.RootPath, "synergy_edges_staging.csv");
             }
             else if (options.Command == CliCommand.BuildSynergyClusters)
             {

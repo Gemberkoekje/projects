@@ -30,13 +30,8 @@ internal sealed class AdvisePickRunner
         int archetypeId = ResolveArchetypeId(connectionString, options.ArchetypeRef);
 
         string[] allHeld = options.DeckIds.Concat(options.RelicIds).ToArray();
-        int heldSize = Math.Max(allHeld.Length, 1);
 
         Dictionary<string, string> optionTypes = ResolveEntityTypes(connectionString, options.OptionIds);
-
-        List<SynergyEdgeRecord> edges = allHeld.Length > 0
-            ? LoadEdges(connectionString, options.OptionIds, allHeld)
-            : new List<SynergyEdgeRecord>();
 
         Dictionary<string, double> archetypeAffinity = archetypeId > 0
             ? LoadOptionAffinity(connectionString, new[] { archetypeId }, options.OptionIds, optionTypes)
@@ -61,37 +56,18 @@ internal sealed class AdvisePickRunner
         List<PickScoreRecord> scores = new List<PickScoreRecord>();
         foreach (string optionId in options.OptionIds)
         {
-            List<SynergyEdgeRecord> optionEdges = edges
-                .Where(e => string.Equals(e.EntityAId, optionId, StringComparison.OrdinalIgnoreCase)
-                         || string.Equals(e.EntityBId, optionId, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
             double affinity = archetypeAffinity.TryGetValue(optionId, out double af) ? af : 0.0;
             double deckFit = deckAffinityFit.TryGetValue(optionId, out double df) ? df : 0.0;
 
-            double antiEdgeSum = optionEdges
-                .Where(e => e.IsAntiSynergy)
-                .Sum(e => (double)e.SynergyStrength);
-            double antiPenalty = Math.Min(antiEdgeSum / (heldSize * 10.0), 1.0);
-
+            double antiPenalty = 0.0;
             string[] antiTags = optionAntiTags.TryGetValue(optionId, out string[] at) ? at : Array.Empty<string>();
             int tagOverlaps = antiTags.Count(t => heldEffectTags.Contains(t));
-            antiPenalty = Math.Min(antiPenalty + (tagOverlaps * 0.1), 1.0);
+            antiPenalty = Math.Min(tagOverlaps * 0.1, 1.0);
 
             double flex = flexScores.TryGetValue(optionId, out double fs) ? fs : 0.5;
 
             double composite = (WeightAffinity * affinity) + (WeightDeckFit * deckFit) - (WeightAnti * antiPenalty) + (WeightFlex * flex);
             composite = Math.Max(0.0, composite);
-
-            List<string> drivers = new List<string>();
-            foreach (SynergyEdgeRecord edge in optionEdges.Where(e => !e.IsAntiSynergy))
-            {
-                string driverId = string.Equals(edge.EntityAId, optionId, StringComparison.OrdinalIgnoreCase)
-                    ? edge.EntityBId
-                    : edge.EntityAId;
-                string explanation = string.IsNullOrWhiteSpace(edge.Explanation) ? string.Empty : $" ({edge.Explanation})";
-                drivers.Add($"{driverId}{explanation}");
-            }
 
             scores.Add(new PickScoreRecord
             {
@@ -102,7 +78,7 @@ internal sealed class AdvisePickRunner
                 AntiSynergyPenalty = antiPenalty,
                 FlexibilityScore = flex,
                 CompositeScore = composite,
-                SynergyDrivers = string.Join("; ", drivers),
+                SynergyDrivers = string.Empty,
                 Explanation = string.Empty
             });
         }
@@ -196,42 +172,6 @@ internal sealed class AdvisePickRunner
                 result[id] = entityType;
             }
         }
-    }
-
-    private static List<SynergyEdgeRecord> LoadEdges(string connectionString, string[] optionIds, string[] heldIds)
-    {
-        List<SynergyEdgeRecord> result = new List<SynergyEdgeRecord>();
-        using NpgsqlConnection conn = new NpgsqlConnection(connectionString);
-        conn.Open();
-
-        const string sql = @"
-            SELECT entity_a_type, entity_a_id, entity_b_type, entity_b_id,
-                   synergy_strength, is_anti_synergy, shared_tags, explanation
-            FROM entity_synergy_edges
-            WHERE (entity_a_id = ANY(@options) AND entity_b_id = ANY(@held))
-               OR (entity_b_id = ANY(@options) AND entity_a_id = ANY(@held))";
-
-        using NpgsqlCommand cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue("options", optionIds);
-        cmd.Parameters.AddWithValue("held", heldIds);
-
-        using NpgsqlDataReader reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            result.Add(new SynergyEdgeRecord
-            {
-                EntityAType = reader.GetString(0),
-                EntityAId = reader.GetString(1),
-                EntityBType = reader.GetString(2),
-                EntityBId = reader.GetString(3),
-                SynergyStrength = reader.GetInt32(4),
-                IsAntiSynergy = reader.GetBoolean(5),
-                SharedTags = reader.IsDBNull(6) ? string.Empty : string.Join(";", reader.GetFieldValue<string[]>(6)),
-                Explanation = reader.IsDBNull(7) ? string.Empty : reader.GetString(7)
-            });
-        }
-
-        return result;
     }
 
     private static Dictionary<string, double> LoadOptionAffinity(
@@ -456,10 +396,10 @@ WHERE archetype_id = ANY(@arch_ids)
     private static string GenerateNarrative(List<PickScoreRecord> scores, CliOptions options)
     {
         string model = string.IsNullOrWhiteSpace(options.ModelOverride)
-            ? ModelRouter.Resolve(options.Provider, AnnotationTaskKind.Synergy)
+            ? ModelRouter.Resolve(options.Provider, AnnotationTaskKind.ArchetypeDiscovery)
             : options.ModelOverride;
 
-        ILlmProvider provider = LlmProviderFactory.Create(options.Provider);
+        ILlmProvider provider = LlmProviderFactory.Create(options, model);
 
         StringBuilder sb = new StringBuilder();
         sb.AppendLine("You are an expert Slay the Spire 2 pick advisor. Explain in plain English why the top-ranked option is the best pick given the current deck state.");

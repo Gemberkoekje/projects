@@ -21,7 +21,7 @@ internal sealed class AnnotationRunner
             ? ModelRouter.Resolve(options.Provider, options.AnnotationTask)
             : options.ModelOverride;
 
-        ILlmProvider provider = LlmProviderFactory.Create(options.Provider);
+        ILlmProvider provider = LlmProviderFactory.Create(options, model);
 
         AnnotationRequest request = new AnnotationRequest
         {

@@ -15,10 +15,9 @@ internal enum CliCommand
     SyncPostgres = 10,
     ExtractPowers = 11,
     InitDatabase = 12,
-    BuildSynergyEdges = 13,
-    AdvisePick = 14,
-    BuildSynergyClusters = 15,
-    ExtractCharacters = 16,
-    DiscoverArchetypes = 17,
-    ScoreAffinities = 18
+    AdvisePick = 13,
+    BuildSynergyClusters = 14,
+    ExtractCharacters = 15,
+    DiscoverArchetypes = 16,
+    ScoreAffinities = 17
 }

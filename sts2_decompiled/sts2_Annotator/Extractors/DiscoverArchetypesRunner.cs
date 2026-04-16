@@ -28,7 +28,7 @@ internal sealed class DiscoverArchetypesRunner
             ? ModelRouter.Resolve(options.Provider, AnnotationTaskKind.ArchetypeDiscovery)
             : options.ModelOverride;
 
-        ILlmProvider provider = LlmProviderFactory.Create(options.Provider);
+        ILlmProvider provider = LlmProviderFactory.Create(options, model);
         List<string> characters = LoadCharacterIds(connectionString, options);
         List<ArchetypeOutputRow> outputRows = new List<ArchetypeOutputRow>();
 

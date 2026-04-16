@@ -21,13 +21,13 @@ public sealed class EntityDetailModel : PageModel
 
     public EntityRow Entity { get; private set; }
 
-    public IReadOnlyList<EntityDetailEdgeRow> SynergyEdges { get; private set; }
-
     public IReadOnlyList<EntityArchetypeAffinityRow> ArchetypeAffinities { get; private set; }
 
     public IReadOnlyList<SynergyClusterRow> SynergyClusters { get; private set; }
 
     public string QuickVerdict { get; private set; }
+
+    public string CharacterDisplayName { get; private set; }
 
     public bool IsFound => Entity.EntityId.Length > 0;
 
@@ -37,10 +37,10 @@ public sealed class EntityDetailModel : PageModel
         EntityType = string.Empty;
         EntityId = string.Empty;
         Entity = new EntityRow();
-        SynergyEdges = new List<EntityDetailEdgeRow>();
         ArchetypeAffinities = new List<EntityArchetypeAffinityRow>();
         SynergyClusters = new List<SynergyClusterRow>();
         QuickVerdict = string.Empty;
+        CharacterDisplayName = string.Empty;
     }
 
     public void OnGet()
@@ -81,36 +81,7 @@ public sealed class EntityDetailModel : PageModel
             return;
         }
 
-        List<EntityDetailEdgeRow> edges = new List<EntityDetailEdgeRow>();
-        foreach (EntitySynergyEdgeRow edge in _service.GetEntitySynergyEdges(new[] { normalizedId }))
-        {
-            bool matchesA = string.Equals(edge.EntityAId, normalizedId, StringComparison.OrdinalIgnoreCase)
-                         && string.Equals(edge.EntityAType, normalizedType, StringComparison.OrdinalIgnoreCase);
-            bool matchesB = string.Equals(edge.EntityBId, normalizedId, StringComparison.OrdinalIgnoreCase)
-                         && string.Equals(edge.EntityBType, normalizedType, StringComparison.OrdinalIgnoreCase);
-
-            if (!matchesA && !matchesB)
-            {
-                continue;
-            }
-
-            edges.Add(new EntityDetailEdgeRow
-            {
-                PartnerType = matchesA ? edge.EntityBType : edge.EntityAType,
-                PartnerId = matchesA ? edge.EntityBId : edge.EntityAId,
-                Strength = edge.SynergyStrength,
-                IsAntiSynergy = edge.IsAntiSynergy,
-                SharedTags = edge.SharedTags,
-                Explanation = edge.Explanation
-            });
-        }
-
-        SynergyEdges = edges
-            .OrderByDescending(e => e.Strength)
-            .ThenBy(e => e.PartnerType, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(e => e.PartnerId, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
+        CharacterDisplayName = ResolveCharacterDisplayName(Entity.CharacterId);
         ArchetypeAffinities = _service.GetEntityArchetypeAffinities(normalizedType, normalizedId);
         SynergyClusters = _service.GetSynergyClustersForEntity(normalizedType, normalizedId);
         QuickVerdict = BuildVerdict(Entity);
@@ -126,6 +97,24 @@ public sealed class EntityDetailModel : PageModel
             "event_option" => "badge badge-event",
             _ => "badge"
         };
+    }
+
+    private string ResolveCharacterDisplayName(string characterId)
+    {
+        if (string.IsNullOrWhiteSpace(characterId))
+        {
+            return string.Empty;
+        }
+
+        CharacterRow match = _service.GetCharacters()
+            .FirstOrDefault(c => string.Equals(c.Id, characterId, StringComparison.OrdinalIgnoreCase));
+
+        if (match is null)
+        {
+            return characterId;
+        }
+
+        return match.Title;
     }
 
     private static string BuildVerdict(EntityRow entity)
@@ -146,28 +135,5 @@ public sealed class EntityDetailModel : PageModel
         }
 
         return "Solid role-player.";
-    }
-}
-
-public sealed class EntityDetailEdgeRow
-{
-    public string PartnerType { get; set; }
-
-    public string PartnerId { get; set; }
-
-    public int Strength { get; set; }
-
-    public bool IsAntiSynergy { get; set; }
-
-    public IReadOnlyList<string> SharedTags { get; set; }
-
-    public string Explanation { get; set; }
-
-    public EntityDetailEdgeRow()
-    {
-        PartnerType = string.Empty;
-        PartnerId = string.Empty;
-        SharedTags = new List<string>();
-        Explanation = string.Empty;
     }
 }

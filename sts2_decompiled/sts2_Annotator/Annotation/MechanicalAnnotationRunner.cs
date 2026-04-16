@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Tasks;
 using Sts2Extractor.Annotation.Providers;
 using Sts2Extractor.Cli;
 using Sts2Extractor.Infrastructure;
@@ -54,24 +55,23 @@ internal sealed class MechanicalAnnotationRunner
         IReadOnlyList<string> potionIngestionPaths,
         string powerIngestionPath)
     {
-        ILlmProvider provider = LlmProviderFactory.Create(options.Provider);
         string model = string.IsNullOrWhiteSpace(options.ModelOverride)
             ? ModelRouter.Resolve(options.Provider, AnnotationTaskKind.Mechanical)
             : options.ModelOverride;
+
+        ILlmProvider provider = LlmProviderFactory.Create(options, model);
 
         _cardKeywordGlossary = LoadCardKeywordGlossary(options.RootPath);
 
         Console.WriteLine($"Mechanical annotation: provider={options.Provider}, model={model}, batch-size={options.BatchSize}");
 
-        int annotated = 0;
-        int skipped = 0;
-        int batches = 0;
-
+        // Gather all CSV files to process
+        List<(string path, AnnotationSchema schema)> csvFiles = new List<(string, AnnotationSchema)>();
         for (int i = 0; i < cardIngestionPaths.Count; i++)
         {
             if (File.Exists(cardIngestionPaths[i]))
             {
-                AnnotateCsvFile(cardIngestionPaths[i], CardSchema, provider, model, options.BatchSize, ref annotated, ref skipped, ref batches);
+                csvFiles.Add((cardIngestionPaths[i], CardSchema));
             }
         }
 
@@ -79,7 +79,7 @@ internal sealed class MechanicalAnnotationRunner
         {
             if (File.Exists(relicIngestionPaths[i]))
             {
-                AnnotateCsvFile(relicIngestionPaths[i], RelicSchema, provider, model, options.BatchSize, ref annotated, ref skipped, ref batches);
+                csvFiles.Add((relicIngestionPaths[i], RelicSchema));
             }
         }
 
@@ -87,13 +87,26 @@ internal sealed class MechanicalAnnotationRunner
         {
             if (File.Exists(potionIngestionPaths[i]))
             {
-                AnnotateCsvFile(potionIngestionPaths[i], PotionSchema, provider, model, options.BatchSize, ref annotated, ref skipped, ref batches);
+                csvFiles.Add((potionIngestionPaths[i], PotionSchema));
             }
         }
 
         if (!string.IsNullOrWhiteSpace(powerIngestionPath) && File.Exists(powerIngestionPath))
         {
-            AnnotateCsvFile(powerIngestionPath, PowerSchema, provider, model, options.BatchSize, ref annotated, ref skipped, ref batches);
+            csvFiles.Add((powerIngestionPath, PowerSchema));
+        }
+
+        int annotated = 0;
+        int skipped = 0;
+        int batches = 0;
+
+        if (provider is IBatchCapableLlmProvider batchProvider)
+        {
+            RunWithBatches(batchProvider, csvFiles, options.BatchSize, model, ref annotated, ref skipped, ref batches);
+        }
+        else
+        {
+            RunSequential(provider, model, csvFiles, options.BatchSize, ref annotated, ref skipped, ref batches);
         }
 
         return new MechanicalAnnotationResult
@@ -102,6 +115,120 @@ internal sealed class MechanicalAnnotationRunner
             SkippedCount = skipped,
             BatchCount = batches
         };
+    }
+
+    // ---- Batch path (Anthropic Message Batches API) ----
+
+    private void RunWithBatches(
+        IBatchCapableLlmProvider provider,
+        List<(string path, AnnotationSchema schema)> csvFiles,
+        int batchSize,
+        string model,
+        ref int annotated,
+        ref int skipped,
+        ref int batches)
+    {
+        // 1. Load all CSV data and build all batch requests
+        List<PendingBatch> pendingBatches = new List<PendingBatch>();
+        List<(string path, List<string> headers, List<Dictionary<string, string>> rows)> csvData =
+            new List<(string, List<string>, List<Dictionary<string, string>>)>(csvFiles.Count);
+
+        for (int fileIdx = 0; fileIdx < csvFiles.Count; fileIdx++)
+        {
+            (string csvPath, AnnotationSchema schema) = csvFiles[fileIdx];
+            List<string> headers = ReadCsvHeaders(csvPath);
+            List<Dictionary<string, string>> rows = CsvReader.ReadRows(csvPath);
+            csvData.Add((csvPath, headers, rows));
+
+            if (rows.Count == 0)
+            {
+                continue;
+            }
+
+            List<(int rowIndex, string id, string title, string source, string keywords, string energyCost, string cardType, string description)> targets =
+                CollectTargets(rows, schema, ref skipped);
+
+            for (int start = 0; start < targets.Count; start += batchSize)
+            {
+                int end = Math.Min(start + batchSize, targets.Count);
+                List<(int, string, string, string, string, string, string, string)> batchItems = targets.GetRange(start, end - start);
+
+                string customId = $"f{fileIdx}_b{pendingBatches.Count}";
+                string prompt = BuildBatchPrompt(batchItems, schema);
+                AnnotationRequest request = new AnnotationRequest
+                {
+                    Model = model,
+                    Prompt = prompt,
+                    SystemPrompt = MechanicalSystemPrompt,
+                    MaxTokens = BatchMaxTokens
+                };
+
+                pendingBatches.Add(new PendingBatch
+                {
+                    CustomId = customId,
+                    FileIndex = fileIdx,
+                    Schema = schema,
+                    Items = batchItems.Select(static t => (t.Item1, t.Item2)).ToList(),
+                    Request = request
+                });
+            }
+        }
+
+        if (pendingBatches.Count == 0)
+        {
+            return;
+        }
+
+        Console.WriteLine($"  Submitting {pendingBatches.Count} requests as a single Anthropic Message Batch...");
+
+        // 2. Submit all as one message batch
+        List<BatchAnnotationItem> batchItems2 = pendingBatches
+            .Select(static pb => new BatchAnnotationItem { CustomId = pb.CustomId, Request = pb.Request })
+            .ToList();
+
+        IReadOnlyDictionary<string, BatchAnnotationResult> results =
+            provider.BatchAnnotateAsync(batchItems2, CancellationToken.None).GetAwaiter().GetResult();
+
+        batches += pendingBatches.Count;
+
+        // 3. Apply results back to CSV rows
+        for (int p = 0; p < pendingBatches.Count; p++)
+        {
+            PendingBatch pending = pendingBatches[p];
+            if (!results.TryGetValue(pending.CustomId, out BatchAnnotationResult batchResult) || !batchResult.IsSuccess)
+            {
+                skipped += pending.Items.Count;
+                continue;
+            }
+
+            List<Dictionary<string, string>> rows = csvData[pending.FileIndex].rows;
+            Dictionary<string, Dictionary<string, string>> parsed = ParseAnnotationResponse(batchResult.Result.Content);
+            ApplyParsedAnnotations(pending.Items, parsed, rows, pending.Schema, ref annotated, ref skipped);
+        }
+
+        // 4. Rewrite all CSV files
+        for (int fileIdx = 0; fileIdx < csvData.Count; fileIdx++)
+        {
+            (string csvPath, List<string> headers, List<Dictionary<string, string>> rows) = csvData[fileIdx];
+            RewriteEnrichedCsv(csvPath, headers, rows);
+        }
+    }
+
+    // ---- Sequential path (non-batch providers) ----
+
+    private void RunSequential(
+        ILlmProvider provider,
+        string model,
+        List<(string path, AnnotationSchema schema)> csvFiles,
+        int batchSize,
+        ref int annotated,
+        ref int skipped,
+        ref int batches)
+    {
+        for (int i = 0; i < csvFiles.Count; i++)
+        {
+            AnnotateCsvFile(csvFiles[i].path, csvFiles[i].schema, provider, model, batchSize, ref annotated, ref skipped, ref batches);
+        }
     }
 
     private void AnnotateCsvFile(
@@ -122,6 +249,34 @@ internal sealed class MechanicalAnnotationRunner
         }
 
         List<(int rowIndex, string id, string title, string source, string keywords, string energyCost, string cardType, string description)> targets =
+            CollectTargets(rows, schema, ref skipped);
+
+        for (int start = 0; start < targets.Count; start += batchSize)
+        {
+            int end = Math.Min(start + batchSize, targets.Count);
+            List<(int rowIndex, string id, string title, string source, string keywords, string energyCost, string cardType, string description)> batch =
+                targets.GetRange(start, end - start);
+
+            Console.WriteLine($"  [{schema.IdColumn}] Batch {batches + 1}: items {start + 1}-{end}/{targets.Count} ({Path.GetFileName(csvPath)})");
+
+            Dictionary<string, Dictionary<string, string>> batchResults =
+                CallLlmForBatch(batch, schema, provider, model);
+
+            batches++;
+
+            List<(int rowIndex, string id)> batchMapping = batch.Select(static t => (t.rowIndex, t.id)).ToList();
+            ApplyParsedAnnotations(batchMapping, batchResults, rows, schema, ref annotated, ref skipped);
+        }
+
+        RewriteEnrichedCsv(csvPath, headers, rows);
+    }
+
+    private static List<(int rowIndex, string id, string title, string source, string keywords, string energyCost, string cardType, string description)> CollectTargets(
+        List<Dictionary<string, string>> rows,
+        AnnotationSchema schema,
+        ref int skipped)
+    {
+        List<(int, string, string, string, string, string, string, string)> targets =
             new List<(int, string, string, string, string, string, string, string)>();
 
         for (int i = 0; i < rows.Count; i++)
@@ -145,43 +300,72 @@ internal sealed class MechanicalAnnotationRunner
             }
         }
 
-        for (int start = 0; start < targets.Count; start += batchSize)
+        return targets;
+    }
+
+    private static void ApplyParsedAnnotations(
+        List<(int rowIndex, string id)> items,
+        Dictionary<string, Dictionary<string, string>> parsed,
+        List<Dictionary<string, string>> rows,
+        AnnotationSchema schema,
+        ref int annotated,
+        ref int skipped)
+    {
+        for (int j = 0; j < items.Count; j++)
         {
-            int end = Math.Min(start + batchSize, targets.Count);
-            List<(int rowIndex, string id, string title, string source, string keywords, string energyCost, string cardType, string description)> batch =
-                targets.GetRange(start, end - start);
-
-            Console.WriteLine($"  [{schema.IdColumn}] Batch {batches + 1}: items {start + 1}-{end}/{targets.Count} ({Path.GetFileName(csvPath)})");
-
-            Dictionary<string, Dictionary<string, string>> batchResults =
-                CallLlmForBatch(batch, schema, provider, model);
-
-            batches++;
-
-            for (int j = 0; j < batch.Count; j++)
+            (int rowIndex, string id) = items[j];
+            if (parsed.TryGetValue(id, out Dictionary<string, string> result))
             {
-                (int rowIndex, string id, _, _, _, _, _, _) = batch[j];
-                if (batchResults.TryGetValue(id, out Dictionary<string, string> result))
+                for (int k = 0; k < schema.AnnotationColumns.Length; k++)
                 {
-                    for (int k = 0; k < schema.AnnotationColumns.Length; k++)
+                    string column = schema.AnnotationColumns[k];
+                    if (result.TryGetValue(column, out string value))
                     {
-                        string column = schema.AnnotationColumns[k];
-                        if (result.TryGetValue(column, out string value))
+                        if (string.Equals(column, "effect_tags", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string existing = rows[rowIndex].TryGetValue(column, out string existingValue) ? existingValue : string.Empty;
+                            rows[rowIndex][column] = MergeSemicolonValues(existing, value);
+                        }
+                        else
                         {
                             rows[rowIndex][column] = value;
                         }
                     }
+                }
 
-                    annotated++;
-                }
-                else
-                {
-                    skipped++;
-                }
+                annotated++;
+            }
+            else
+            {
+                skipped++;
             }
         }
+    }
 
-        RewriteEnrichedCsv(csvPath, headers, rows);
+    private static string MergeSemicolonValues(string first, string second)
+    {
+        HashSet<string> values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddSemicolonValues(values, first);
+        AddSemicolonValues(values, second);
+        return string.Join(";", values.OrderBy(static v => v, StringComparer.Ordinal));
+    }
+
+    private static void AddSemicolonValues(HashSet<string> values, string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return;
+        }
+
+        string[] parts = raw.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string value = parts[i].Trim();
+            if (value.Length > 0)
+            {
+                values.Add(value);
+            }
+        }
     }
 
     private Dictionary<string, Dictionary<string, string>> CallLlmForBatch(
@@ -520,6 +704,23 @@ internal sealed class MechanicalAnnotationRunner
         public bool HasColumn(string column)
         {
             return _columnSet.Contains(column);
+        }
+    }
+
+    private sealed class PendingBatch
+    {
+        public string CustomId { get; set; }
+        public int FileIndex { get; set; }
+        public AnnotationSchema Schema { get; set; }
+        public List<(int rowIndex, string id)> Items { get; set; }
+        public AnnotationRequest Request { get; set; }
+
+        public PendingBatch()
+        {
+            CustomId = string.Empty;
+            Schema = null;
+            Items = new List<(int, string)>();
+            Request = new AnnotationRequest();
         }
     }
 }

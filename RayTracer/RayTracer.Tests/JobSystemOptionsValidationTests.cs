@@ -89,5 +89,31 @@ public class JobSystemOptionsValidationTests
                 samplingOptions: new SamplingOptions(),
                 denoiseOptions: new DenoiseOptions(TemporalBlendAlpha: 1.1f),
                 debugOptions: new DebugOptions()));
+
+        AssertThrows<ArgumentOutOfRangeException>(() =>
+            _ = new JobSystem(
+                16,
+                12,
+                scene,
+                camera,
+                16 * 4,
+                lights,
+                renderOptions: new RenderOptions(),
+                samplingOptions: new SamplingOptions(),
+                denoiseOptions: new DenoiseOptions(DiffuseCacheCellSize: 0f),
+                debugOptions: new DebugOptions()));
+
+        AssertThrows<ArgumentOutOfRangeException>(() =>
+            _ = new JobSystem(
+                16,
+                12,
+                scene,
+                camera,
+                16 * 4,
+                lights,
+                renderOptions: new RenderOptions(),
+                samplingOptions: new SamplingOptions(),
+                denoiseOptions: new DenoiseOptions(DiffuseCacheMinSamples: 0),
+                debugOptions: new DebugOptions()));
     }
 }

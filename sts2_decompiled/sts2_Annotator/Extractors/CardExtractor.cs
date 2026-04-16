@@ -78,7 +78,7 @@ internal sealed class CardExtractor
         }
 
         card.CompanionActions = DetectCompanionActions(card.CardId, source, card.OnPlaySource, card.OnUpgradeSource);
-        card.EffectTags = BuildEffectTags(card.CompanionActions);
+        card.EffectTags = BuildEffectTags(card.Keywords, card.CompanionActions);
         card.RoslynFallbackUsed = roslynFallbackUsed;
         card.ConfidenceScore = confidenceParts / 4m;
         return card;
@@ -107,21 +107,50 @@ internal sealed class CardExtractor
         return records;
     }
 
-    private static IReadOnlyList<string> BuildEffectTags(IReadOnlyList<CompanionActionRecord> companionActions)
+    private static IReadOnlyList<string> BuildEffectTags(IReadOnlyList<string> keywords, IReadOnlyList<CompanionActionRecord> companionActions)
     {
         HashSet<string> tags = new HashSet<string>(StringComparer.Ordinal);
-        if (companionActions.Count == 0)
+
+        for (int i = 0; i < keywords.Count; i++)
         {
-            return tags.ToList();
+            string mapped = MapKeywordToEffectTag(keywords[i]);
+            if (mapped.Length > 0)
+            {
+                tags.Add(mapped);
+            }
         }
 
-        tags.Add("companion_synergy");
-        foreach (CompanionActionRecord action in companionActions)
+        if (companionActions.Count > 0)
         {
-            tags.Add(action.ActionTag);
+            tags.Add("companion_synergy");
+            foreach (CompanionActionRecord action in companionActions)
+            {
+                tags.Add(action.ActionTag);
+            }
         }
 
         return tags.ToList();
+    }
+
+    private static string MapKeywordToEffectTag(string keyword)
+    {
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            return string.Empty;
+        }
+
+        return keyword.Trim().ToLowerInvariant() switch
+        {
+            "none" => string.Empty,
+            "sly" => "sly",
+            "retain" => "retain",
+            "innate" => "innate",
+            "exhaust" => "exhaust",
+            "ethereal" => "ethereal",
+            "unplayable" => "unplayable",
+            "eternal" => "eternal",
+            _ => string.Empty
+        };
     }
 
     private static string ResolveSourceMethod(string marker, string onPlaySource, string onUpgradeSource)

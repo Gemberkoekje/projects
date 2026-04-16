@@ -34,4 +34,10 @@ public readonly record struct FrameDiagnostics
 
     /// <summary>Total tile completions accumulated since the <see cref="JobSystem"/> was created.</summary>
     public long TotalTileCompletions { get; init; }
+
+    /// <summary>Current number of entries in the diffuse irradiance cache.</summary>
+    public int DiffuseCacheEntryCount { get; init; }
+
+    /// <summary>Cache hit rate in the range [0, 1].</summary>
+    public double DiffuseCacheHitRate { get; init; }
 }

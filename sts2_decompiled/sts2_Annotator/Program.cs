@@ -127,7 +127,6 @@ internal static class Program
                     Console.WriteLine($"  Annotated entities: {result.AnnotatedEntityCount}");
                 }
 
-                Console.WriteLine("  Regenerated synergy edges: skipped (run build-synergy-edges explicitly)");
                 Console.WriteLine($"  Regenerated ratings: {result.RatingsCount}");
                 Console.WriteLine($"  Regenerated archetypes/clusters: {result.ArchetypeCount}/{result.SynergyClusterCount}");
                 Console.WriteLine($"  Regenerated affinities: {result.AffinityCount}");
@@ -138,15 +137,6 @@ internal static class Program
             if (options.Command == CliCommand.InitDatabase)
             {
                 DatabaseInitializer.InitializeSchema(options);
-                return 0;
-            }
-
-            if (options.Command == CliCommand.BuildSynergyEdges)
-            {
-                BuildSynergyEdgesRunner runner = new BuildSynergyEdgesRunner();
-                BuildSynergyEdgesResult result = runner.Run(options);
-                Console.WriteLine($"Synergy edge build complete: {result.EdgeCount} edges from {result.CandidatePairCount} candidate pairs ({result.BatchCount} batches)");
-                Console.WriteLine($"  Output: {result.OutputPath}");
                 return 0;
             }
 

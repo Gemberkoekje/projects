@@ -44,7 +44,7 @@ public partial class JobSystem
                     float reprojectionDelta = 0f;
 
                     bool currentHit = _owner.LastHit[ix];
-                    Vector3 currentHitPoint = _owner.HitPointWorld[ix];
+                    Vector3 currentHitPoint = _owner._buffers.HitPointWorld[ix];
 
                     if (useTaa && currentHit && TryProjectToPrevPixel(currentHitPoint, invPrevRot, out float pxf, out float pyf))
                     {
@@ -80,11 +80,11 @@ public partial class JobSystem
                             bool accept = reprojErr < reprojThreshold;
 
                             var histNormal = Vector3.Zero;
-                            histNormal += _owner._normalWorld[i00] * w00;
-                            histNormal += _owner._normalWorld[i10] * w10;
-                            histNormal += _owner._normalWorld[i01] * w01;
-                            histNormal += _owner._normalWorld[i11] * w11;
-                            var currNormal = _owner._normalWorld[ix];
+                            histNormal += _owner._buffers.NormalWorld[i00] * w00;
+                            histNormal += _owner._buffers.NormalWorld[i10] * w10;
+                            histNormal += _owner._buffers.NormalWorld[i01] * w01;
+                            histNormal += _owner._buffers.NormalWorld[i11] * w11;
+                            var currNormal = _owner._buffers.NormalWorld[ix];
                             if (accept && histNormal != Vector3.Zero && currNormal != Vector3.Zero)
                             {
                                 float ndot = Math.Clamp(Vector3.Dot(Vector3.Normalize(histNormal), Vector3.Normalize(currNormal)), -1f, 1f);
@@ -115,25 +115,25 @@ public partial class JobSystem
                         rejectedThisPixel = true;
                     }
 
-                    _owner._taaNextXYZ[ix] = resolved;
-                    _owner._taaNextHitPoint[ix] = currentHitPoint;
-                    _owner._taaNextValid[ix] = currentHit;
-                    _owner._historyWeight[ix] = historyWeight;
-                    _owner._historyRejected[ix] = rejectedThisPixel ? (byte)1 : (byte)0;
-                    _owner._diffReprojectedVsCurrent[ix] = reprojectionDelta;
-                    _owner._diffCurrentVsAccum[ix] = Vector3.Distance(current, resolved);
-                    _owner._diffUnfilteredVsFiltered[ix] = Vector3.Distance(unfiltered, current);
+                    _owner._buffers.TaaNextXYZ[ix] = resolved;
+                    _owner._buffers.TaaNextHitPoint[ix] = currentHitPoint;
+                    _owner._buffers.TaaNextValid[ix] = currentHit;
+                    _owner._buffers.HistoryWeight[ix] = historyWeight;
+                    _owner._buffers.HistoryRejected[ix] = rejectedThisPixel ? (byte)1 : (byte)0;
+                    _owner._buffers.DiffReprojectedVsCurrent[ix] = reprojectionDelta;
+                    _owner._buffers.DiffCurrentVsAccum[ix] = Vector3.Distance(current, resolved);
+                    _owner._buffers.DiffUnfilteredVsFiltered[ix] = Vector3.Distance(unfiltered, current);
 
                     if (rejectedThisPixel)
                         rejected++;
 
                     histWeightSum += historyWeight;
-                    varianceSum += _owner._lumaVariance[ix];
+                    varianceSum += _owner._buffers.LumaVariance[ix];
                     uint spp = _owner.SampleCount[ix];
                     sppSum += spp;
                     if (spp > maxSpp)
                         maxSpp = spp;
-                    if (_owner._clampHitFrame[ix])
+                    if (_owner._buffers.ClampHitFrame[ix])
                         clampedPixelCount++;
 
                     WriteColorToBuffer(y, x, resolved);
@@ -142,17 +142,17 @@ public partial class JobSystem
 
             if (useTaa || !_owner._taaHasPrevCamera)
             {
-                Array.Copy(_owner._taaNextXYZ, _owner._taaHistoryXYZ, _owner._taaNextXYZ.Length);
-                Array.Copy(_owner._taaNextHitPoint, _owner._taaHistoryHitPoint, _owner._taaNextHitPoint.Length);
-                Array.Copy(_owner._taaNextValid, _owner._taaHistoryValid, _owner._taaNextValid.Length);
+                Array.Copy(_owner._buffers.TaaNextXYZ, _owner._taaHistoryXYZ, _owner._buffers.TaaNextXYZ.Length);
+                Array.Copy(_owner._buffers.TaaNextHitPoint, _owner._taaHistoryHitPoint, _owner._buffers.TaaNextHitPoint.Length);
+                Array.Copy(_owner._buffers.TaaNextValid, _owner._taaHistoryValid, _owner._buffers.TaaNextValid.Length);
             }
             else
             {
                 for (int i = 0; i < _owner._taaHistoryXYZ.Length; i++)
                 {
-                    _owner._taaHistoryXYZ[i] = _owner._taaNextXYZ[i];
-                    _owner._taaHistoryHitPoint[i] = _owner._taaNextHitPoint[i];
-                    _owner._taaHistoryValid[i] = _owner._taaNextValid[i];
+                    _owner._taaHistoryXYZ[i] = _owner._buffers.TaaNextXYZ[i];
+                    _owner._taaHistoryHitPoint[i] = _owner._buffers.TaaNextHitPoint[i];
+                    _owner._taaHistoryValid[i] = _owner._buffers.TaaNextValid[i];
                 }
             }
 
@@ -161,6 +161,8 @@ public partial class JobSystem
             _owner._taaHasPrevCamera = true;
             _owner.FrameIndex++;
 
+            _owner._irradianceCache.EvictStale(_owner.FrameIndex, DiffuseCacheMaxAgeFrames);
+
             int pixels = _owner.Width * _owner.Height;
             _owner.RejectedHistoryPercent = pixels > 0 ? (double)rejected / pixels * 100.0 : 0.0;
             _owner.ClampedPixelPercent = pixels > 0 ? (double)clampedPixelCount / pixels * 100.0 : 0.0;
@@ -168,7 +170,9 @@ public partial class JobSystem
             _owner.AverageHistoryWeight = pixels > 0 ? histWeightSum / pixels : 0.0;
             _owner.AverageEffectiveSpp = pixels > 0 ? sppSum / pixels : 0.0;
             _owner.MaxObservedSampleCount = maxSpp;
-            Array.Clear(_owner._clampHitFrame);
+            _owner.DiffuseCacheEntryCount = _owner.EnableDiffuseCache ? _owner._irradianceCache.EntryCount : 0;
+            _owner.DiffuseCacheHitRate = _owner.EnableDiffuseCache ? _owner._irradianceCache.HitRate : 0;
+            Array.Clear(_owner._buffers.ClampHitFrame);
 
             _resolveStopwatch.Stop();
             _owner.LastFrameDiagnostics = new FrameDiagnostics
@@ -181,7 +185,9 @@ public partial class JobSystem
                 AverageEffectiveSpp = _owner.AverageEffectiveSpp,
                 ClampedPixelPercent = _owner.ClampedPixelPercent,
                 TotalRays = _owner.TotalRays,
-                TotalTileCompletions = _owner.TotalTileCompletions
+                TotalTileCompletions = _owner.TotalTileCompletions,
+                DiffuseCacheEntryCount = _owner.DiffuseCacheEntryCount,
+                DiffuseCacheHitRate = _owner.DiffuseCacheHitRate
             };
         }
 

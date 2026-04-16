@@ -38,7 +38,7 @@ public partial class JobSystem
                         {
                             for (var x = job.X; x < job.X + job.Width; x++)
                             {
-                                if (_owner.CheckerboardMotion && _owner.IsMoving && ((x + y) & 1) != phase)
+                                if (_owner.CheckerboardMotion && _owner.IsMoving && !_owner.IsTurning && ((x + y) & 1) != phase)
                                 {
                                     _displayResolver.Render(_owner.Stride, _owner.DisplayBuffer, y, x);
                                     continue;

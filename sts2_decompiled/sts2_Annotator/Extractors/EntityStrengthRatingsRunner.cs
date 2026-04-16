@@ -53,15 +53,15 @@ internal sealed class EntityStrengthRatingsRunner
 
             List<DatabaseEntityRatingSource> entities = LoadDatabaseEntities(connection);
             List<DatabaseEventOptionRatingSource> eventOptions = LoadDatabaseEventOptions(connection);
-            Dictionary<string, EntityEdgeSummary> edgeSummaries = LoadEdgeSummaries(connection);
+            Dictionary<string, EntityAffinitySummary> affinitySummaries = LoadAffinitySummaries(connection);
 
             for (int i = 0; i < entities.Count; i++)
             {
                 DatabaseEntityRatingSource entity = entities[i];
                 string key = BuildEntityKey(entity.EntityType, entity.EntityId);
-                EntityEdgeSummary summary = edgeSummaries.TryGetValue(key, out EntityEdgeSummary value)
+                EntityAffinitySummary summary = affinitySummaries.TryGetValue(key, out EntityAffinitySummary value)
                     ? value
-                    : new EntityEdgeSummary();
+                    : new EntityAffinitySummary();
                 ratings.Add(RateDatabaseEntity(entity, summary));
             }
 
@@ -225,80 +225,30 @@ ORDER BY event_id, option_key;", connection);
         return rows;
     }
 
-    private static Dictionary<string, EntityEdgeSummary> LoadEdgeSummaries(NpgsqlConnection connection)
+    private static Dictionary<string, EntityAffinitySummary> LoadAffinitySummaries(NpgsqlConnection connection)
     {
-        Dictionary<string, EntityEdgeSummary> summaries = new Dictionary<string, EntityEdgeSummary>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, EntityAffinitySummary> summaries = new Dictionary<string, EntityAffinitySummary>(StringComparer.OrdinalIgnoreCase);
         using NpgsqlCommand command = new NpgsqlCommand(@"
-SELECT
-    entity_a_type,
-    entity_a_id,
-    entity_b_type,
-    entity_b_id,
-    synergy_strength,
-    is_anti_synergy,
-    COALESCE(shared_tags, ARRAY[]::text[])
-FROM entity_synergy_edges;", connection);
+SELECT entity_type, entity_id, affinity_score
+FROM entity_archetype_affinity;", connection);
 
         using NpgsqlDataReader reader = command.ExecuteReader();
         while (reader.Read())
         {
-            string entityAType = reader.GetString(0);
-            string entityAId = reader.GetString(1);
-            string entityBType = reader.GetString(2);
-            string entityBId = reader.GetString(3);
-            int strength = reader.GetInt32(4);
-            bool isAntiSynergy = reader.GetBoolean(5);
-            string[] sharedTags = ReadStringArray(reader, 6);
+            string entityType = reader.GetString(0);
+            string entityId = reader.GetString(1);
+            int affinityScore = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+            string key = BuildEntityKey(entityType, entityId);
+            if (!summaries.TryGetValue(key, out EntityAffinitySummary summary))
+            {
+                summary = new EntityAffinitySummary();
+                summaries[key] = summary;
+            }
 
-            AddEdgeSummary(summaries, entityAType, entityAId, strength, isAntiSynergy, sharedTags);
-            AddEdgeSummary(summaries, entityBType, entityBId, strength, isAntiSynergy, sharedTags);
+            summary.Add(affinityScore);
         }
 
         return summaries;
-    }
-
-    private static void AddEdgeSummary(
-        Dictionary<string, EntityEdgeSummary> summaries,
-        string entityType,
-        string entityId,
-        int strength,
-        bool isAntiSynergy,
-        IReadOnlyList<string> sharedTags)
-    {
-        string key = BuildEntityKey(entityType, entityId);
-        if (!summaries.TryGetValue(key, out EntityEdgeSummary summary))
-        {
-            summary = new EntityEdgeSummary();
-            summaries[key] = summary;
-        }
-
-        if (isAntiSynergy)
-        {
-            summary.NegativeEdgeCount++;
-            summary.NegativeStrengthTotal += strength;
-            if (strength > summary.MaxNegativeStrength)
-            {
-                summary.MaxNegativeStrength = strength;
-            }
-        }
-        else
-        {
-            summary.PositiveEdgeCount++;
-            summary.PositiveStrengthTotal += strength;
-            if (strength > summary.MaxPositiveStrength)
-            {
-                summary.MaxPositiveStrength = strength;
-            }
-        }
-
-        for (int i = 0; i < sharedTags.Count; i++)
-        {
-            string tag = sharedTags[i];
-            if (!string.IsNullOrWhiteSpace(tag))
-            {
-                summary.SharedTags.Add(tag);
-            }
-        }
     }
 
     private static string BuildEntityKey(string entityType, string entityId)
@@ -306,208 +256,32 @@ FROM entity_synergy_edges;", connection);
         return entityType + "::" + entityId;
     }
 
-    private static EntityStrengthRatingRecord RateDatabaseEntity(DatabaseEntityRatingSource entity, EntityEdgeSummary summary)
+    private static EntityStrengthRatingRecord RateDatabaseEntity(DatabaseEntityRatingSource entity, EntityAffinitySummary summary)
     {
-        if (string.Equals(entity.EntityType, "card", StringComparison.Ordinal))
+        if (summary.Count == 0)
         {
-            return RateDatabaseCard(entity, summary);
+            return CreateRating(entity.EntityType, entity.EntityId, 0, 0, 0, new[]
+            {
+                "no archetype affinity grades available"
+            }, entity.EntityType);
         }
 
-        if (string.Equals(entity.EntityType, "relic", StringComparison.Ordinal))
+        int synergy = summary.MaxAffinity;
+        int flexibility = (int)Math.Round(summary.TotalAffinity / (double)summary.Count, MidpointRounding.AwayFromZero);
+        int antiSynergy = summary.MinAffinity;
+
+        return CreateRating(entity.EntityType, entity.EntityId, synergy, flexibility, antiSynergy, new[]
         {
-            return RateDatabaseRelic(entity, summary);
-        }
-
-        return RateDatabasePotion(entity, summary);
-    }
-
-    private static EntityStrengthRatingRecord RateDatabaseCard(DatabaseEntityRatingSource entity, EntityEdgeSummary summary)
-    {
-        int synergy = 2;
-        int flexibility = 4;
-        int antiSynergy = 1;
-        List<string> rationale = new List<string>();
-
-        ApplyEdgeContributions(summary, ref synergy, ref flexibility, ref antiSynergy, rationale);
-
-        if (entity.DamageBase > 0 || entity.DamageUpgraded > 0)
-        {
-            synergy += 1;
-        }
-
-        if (entity.GainsBlock || entity.BlockBase > 0 || entity.BlockUpgraded > 0)
-        {
-            synergy += 1;
-            flexibility += 1;
-        }
-
-        int tagBonus = Math.Min(2, entity.EffectTags.Length / 2);
-        synergy += tagBonus;
-
-        if (entity.EnergyCost == 0)
-        {
-            flexibility += 2;
-            rationale.Add("zero-cost shell fit");
-        }
-        else if (entity.EnergyCost == 1)
-        {
-            flexibility += 2;
-        }
-        else if (entity.EnergyCost == 2)
-        {
-            flexibility += 1;
-        }
-        else if (entity.EnergyCost >= 3)
-        {
-            flexibility -= 1;
-            antiSynergy += 1;
-            rationale.Add("high energy cost");
-        }
-
-        if (ContainsAnyTag(entity.AntiSynergyTags, "self-damage", "self_damage", "exhaust", "ethereal", "lose_hp", "hp_loss")
-            || CountContains(entity.SourceText, "losehp", "lose hp", "selfdamage", "self damage", "discard", "exhaust", "damage self") > 0)
-        {
-            antiSynergy += 2;
-            flexibility -= 1;
-            rationale.Add("self-tax or exhaust drawback");
-        }
-
-        if (string.Equals(entity.Subtype, "Curse", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(entity.Subtype, "Status", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility -= 3;
-            antiSynergy += 3;
-            rationale.Add("curse/status type");
-        }
-
-        if (string.Equals(entity.TargetType, "AnyEnemy", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(entity.TargetType, "AllEnemies", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(entity.TargetType, "Self", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility += 1;
-        }
-
-        return CreateRating("card", entity.EntityId, synergy, flexibility, antiSynergy, rationale, "card");
-    }
-
-    private static EntityStrengthRatingRecord RateDatabaseRelic(DatabaseEntityRatingSource entity, EntityEdgeSummary summary)
-    {
-        int synergy = 3;
-        int flexibility = 4;
-        int antiSynergy = 1;
-        List<string> rationale = new List<string>();
-
-        ApplyEdgeContributions(summary, ref synergy, ref flexibility, ref antiSynergy, rationale);
-
-        if (entity.TriggersOn.Length > 0)
-        {
-            synergy += Math.Min(2, entity.TriggersOn.Length);
-        }
-
-        if (entity.AmountBase != int.MinValue || entity.CounterBase != int.MinValue)
-        {
-            synergy += 1;
-        }
-
-        if (string.Equals(entity.Rarity, "Common", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility += 2;
-        }
-        else if (string.Equals(entity.Rarity, "Uncommon", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(entity.Rarity, "Starter", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility += 1;
-        }
-        else if (string.Equals(entity.Rarity, "Shop", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(entity.Rarity, "Event", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility -= 1;
-        }
-
-        int penaltySignals = CountContains(entity.SourceText, "losehp", "lose hp", "selfdamage", "self damage", "discard", "exhaust", "curse");
-        if (penaltySignals > 0)
-        {
-            antiSynergy += Math.Min(3, penaltySignals);
-            rationale.Add("contains drawback behavior");
-        }
-
-        return CreateRating("relic", entity.EntityId, synergy, flexibility, antiSynergy, rationale, "relic");
-    }
-
-    private static EntityStrengthRatingRecord RateDatabasePotion(DatabaseEntityRatingSource entity, EntityEdgeSummary summary)
-    {
-        int synergy = 3;
-        int flexibility = 4;
-        int antiSynergy = 1;
-        List<string> rationale = new List<string>();
-
-        ApplyEdgeContributions(summary, ref synergy, ref flexibility, ref antiSynergy, rationale);
-
-        if (entity.AmountBase > 0)
-        {
-            synergy += 1;
-        }
-
-        if (string.Equals(entity.Rarity, "Common", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility += 2;
-        }
-        else if (string.Equals(entity.Rarity, "Uncommon", StringComparison.OrdinalIgnoreCase))
-        {
-            flexibility += 1;
-        }
-
-        int positiveSignals = CountContains(entity.SourceText, "draw", "energy", "block", "strength", "dexterity", "vulnerable", "weak", "damage");
-        if (positiveSignals > 0)
-        {
-            synergy += Math.Min(2, positiveSignals);
-        }
-
-        int penaltySignals = CountContains(entity.SourceText, "losehp", "lose hp", "selfdamage", "self damage", "discard", "exhaust", "curse");
-        if (penaltySignals > 0)
-        {
-            antiSynergy += Math.Min(3, penaltySignals);
-            rationale.Add("contains drawback behavior");
-        }
-
-        return CreateRating("potion", entity.EntityId, synergy, flexibility, antiSynergy, rationale, "potion");
-    }
-
-    private static void ApplyEdgeContributions(EntityEdgeSummary summary, ref int synergy, ref int flexibility, ref int antiSynergy, List<string> rationale)
-    {
-        if (summary.PositiveEdgeCount > 0)
-        {
-            int averagePositiveStrength = (int)Math.Round(summary.PositiveStrengthTotal / (double)summary.PositiveEdgeCount, MidpointRounding.AwayFromZero);
-            synergy += Math.Min(4, Math.Max(1, averagePositiveStrength - 3));
-            synergy += Math.Min(2, summary.PositiveEdgeCount / 3);
-            flexibility += Math.Min(3, summary.SharedTags.Count / 2);
-            rationale.Add(summary.PositiveEdgeCount.ToString(CultureInfo.InvariantCulture) + " positive pairings across " + summary.SharedTags.Count.ToString(CultureInfo.InvariantCulture) + " shared tags");
-        }
-        else
-        {
-            rationale.Add("no confirmed pairwise synergy edges yet");
-        }
-
-        if (summary.NegativeEdgeCount > 0)
-        {
-            antiSynergy += Math.Min(4, Math.Max(1, summary.MaxNegativeStrength - 3));
-            antiSynergy += Math.Min(2, summary.NegativeEdgeCount / 2);
-            flexibility -= Math.Min(2, summary.NegativeEdgeCount / 2);
-            rationale.Add(summary.NegativeEdgeCount.ToString(CultureInfo.InvariantCulture) + " anti-synergy pairings");
-        }
-    }
-
-    private static EntityStrengthRatingRecord CreateRating(string entityType, string entityId, int synergy, int flexibility, int antiSynergy, IReadOnlyList<string> rationale, string fallback)
-    {
-        return new EntityStrengthRatingRecord
-        {
-            EntityType = entityType,
-            EntityId = entityId,
-            SynergyRating = ClampRating(synergy),
-            FlexibilityRating = ClampRating(flexibility),
-            AntiSynergyRating = ClampRating(antiSynergy),
-            Rationale = JoinRationale(rationale, fallback)
-        };
+            "derived from "
+            + summary.Count.ToString(CultureInfo.InvariantCulture)
+            + " archetype affinity grades (max="
+            + summary.MaxAffinity.ToString(CultureInfo.InvariantCulture)
+            + ", mean="
+            + flexibility.ToString(CultureInfo.InvariantCulture)
+            + ", min="
+            + summary.MinAffinity.ToString(CultureInfo.InvariantCulture)
+            + ")"
+        }, entity.EntityType);
     }
 
     private static EntityStrengthRatingRecord RateDatabaseEventOption(DatabaseEventOptionRatingSource option)
@@ -963,11 +737,24 @@ FROM entity_synergy_edges;", connection);
         };
     }
 
+    private static EntityStrengthRatingRecord CreateRating(string entityType, string entityId, int synergy, int flexibility, int antiSynergy, IReadOnlyList<string> rationale, string fallback)
+    {
+        return new EntityStrengthRatingRecord
+        {
+            EntityType = entityType,
+            EntityId = entityId,
+            SynergyRating = ClampRating(synergy),
+            FlexibilityRating = ClampRating(flexibility),
+            AntiSynergyRating = ClampRating(antiSynergy),
+            Rationale = JoinRationale(rationale, fallback)
+        };
+    }
+
     private static int ClampRating(int value)
     {
-        if (value < 1)
+        if (value < 0)
         {
-            return 1;
+            return 0;
         }
 
         if (value > 10)
@@ -1118,6 +905,39 @@ FROM entity_synergy_edges;", connection);
             OptionKey = string.Empty;
             HandlerMethod = string.Empty;
             HandlerSource = string.Empty;
+        }
+    }
+
+    private sealed class EntityAffinitySummary
+    {
+        public int Count { get; private set; }
+
+        public int TotalAffinity { get; private set; }
+
+        public int MinAffinity { get; private set; }
+
+        public int MaxAffinity { get; private set; }
+
+        public EntityAffinitySummary()
+        {
+            MinAffinity = 10;
+            MaxAffinity = 0;
+        }
+
+        public void Add(int affinityScore)
+        {
+            int clamped = Math.Max(0, Math.Min(10, affinityScore));
+            Count++;
+            TotalAffinity += clamped;
+            if (clamped < MinAffinity)
+            {
+                MinAffinity = clamped;
+            }
+
+            if (clamped > MaxAffinity)
+            {
+                MaxAffinity = clamped;
+            }
         }
     }
 

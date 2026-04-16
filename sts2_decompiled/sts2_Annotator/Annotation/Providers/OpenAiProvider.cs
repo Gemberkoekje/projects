@@ -15,10 +15,12 @@ internal sealed class OpenAiProvider : ILlmProvider
     private const int MaxAttempts = 8;
 
     private readonly string _apiKey;
+    private readonly LlmRateLimiter _rateLimiter;
 
-    public OpenAiProvider(string apiKey)
+    public OpenAiProvider(string apiKey, LlmRateLimitSettings rateLimitSettings)
     {
         _apiKey = apiKey;
+        _rateLimiter = new LlmRateLimiter(rateLimitSettings);
     }
 
     public async Task<AnnotationResult> AnnotateAsync(AnnotationRequest request, CancellationToken cancellationToken)
@@ -26,6 +28,9 @@ internal sealed class OpenAiProvider : ILlmProvider
         using HttpClient client = new HttpClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        int estimatedInputTokens = EstimateInputTokens(request);
+        int estimatedOutputTokens = Math.Max(request.MaxTokens, 1);
 
         string body = JsonSerializer.Serialize(new
         {
@@ -48,6 +53,12 @@ internal sealed class OpenAiProvider : ILlmProvider
 
         for (int attempt = 1; attempt <= MaxAttempts; attempt++)
         {
+            TimeSpan throttledFor = await _rateLimiter.ReserveAsync(estimatedInputTokens, estimatedOutputTokens, cancellationToken);
+            if (throttledFor > TimeSpan.Zero)
+            {
+                Console.WriteLine($"Throttled {Math.Ceiling(throttledFor.TotalSeconds)}s to stay within configured limits (OpenAI).");
+            }
+
             using StringContent content = new StringContent(body, Encoding.UTF8, "application/json");
             using HttpResponseMessage response = await client.PostAsync(Endpoint, content, cancellationToken);
             string responseText = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -77,6 +88,23 @@ internal sealed class OpenAiProvider : ILlmProvider
         }
 
         throw new InvalidOperationException("OpenAI request failed after retries.");
+    }
+
+    private static int EstimateInputTokens(AnnotationRequest request)
+    {
+        return EstimateTokenCount(request.SystemPrompt) + EstimateTokenCount(request.Prompt);
+    }
+
+    private static int EstimateTokenCount(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return 1;
+        }
+
+        int chars = value.Length;
+        int tokens = (int)Math.Ceiling(chars / 4d);
+        return Math.Max(tokens, 1);
     }
 
     private static bool IsRateLimited(HttpStatusCode statusCode, string responseText)
