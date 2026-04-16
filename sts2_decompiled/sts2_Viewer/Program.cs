@@ -16,6 +16,8 @@ builder.Services.AddSingleton<PickExplanationService>();
 
 WebApplication app = builder.Build();
 
+app.MapGet("/healthz", () => Results.Ok());
+
 app.UsePathBase("/sts2viewer");
 
 if (!app.Environment.IsDevelopment())
