@@ -24,7 +24,9 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore
-        run: dotnet restore ./AiUsageMonitoring/src/AiUsageMonitor/AiUsageMonitor.csproj
+        run: |
+          dotnet restore ./AiUsageMonitoring/src/AiUsageMonitor/AiUsageMonitor.csproj
+          dotnet restore ./AiUsageMonitoring/tests/AiUsageMonitor.Tests/AiUsageMonitor.Tests.csproj
 
       - name: Build
         run: dotnet build ./AiUsageMonitoring/src/AiUsageMonitor/AiUsageMonitor.csproj --no-restore --configuration Release
