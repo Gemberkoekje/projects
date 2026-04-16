@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
 namespace RayTracer;
@@ -9,34 +10,68 @@ public partial class JobSystem
 {
     private WavelengthLookup WavelengthLookup { get; init; } = new();
 
-    public Vector3[] AccumXYZ { get; init; }
-    public uint[] SampleCount { get; init; }
-    public long[] WavelengthCounter { get; init; }
-    public bool[] LastHit { get; init; }
-    private Vector3[] HitPointWorld { get; init; }
-    private readonly float[] _lumaM2;
-    private readonly float[] _lumaVariance;
-    private readonly float[] _lumaDirectM2;
-    private readonly float[] _lumaIndirectM2;
-    private readonly float[] _lumaDirectVariance;
-    private readonly float[] _lumaIndirectVariance;
-    private readonly float[] _historyWeight;
-    private readonly byte[] _historyRejected;
-    private readonly float[] _clampAmount;
-    private readonly bool[] _clampHitFrame;
-    private readonly float[] _depthDistance;
-    private readonly float[] _albedoScalar;
-    private readonly Vector3[] _normalWorld;
-    private readonly Vector3[] _directLightingXYZ;
-    private readonly Vector3[] _indirectLightingXYZ;
-    private readonly Vector3[] _emissiveLightingXYZ;
-    private readonly Vector3[] _bounce0XYZ;
-    private readonly Vector3[] _bounce1XYZ;
-    private readonly Vector3[] _bounce2PlusXYZ;
-    private readonly float[] _diffCurrentVsAccum;
-    private readonly float[] _diffUnfilteredVsFiltered;
-    private readonly float[] _diffReprojectedVsCurrent;
-    private readonly int[] _lastUpdatedFrame;
+    private readonly RenderBuffers _buffers;
+
+    // Public buffer accessors for backward compatibility
+    public Vector3[] AccumXYZ => _buffers.AccumXYZ;
+    public uint[] SampleCount => _buffers.SampleCount;
+    public long[] WavelengthCounter => _buffers.WavelengthCounter;
+    public bool[] LastHit => _buffers.LastHit;
+    
+    // Internal buffer accessors for partial class files
+    internal Vector3[] _hitPointWorld => _buffers.HitPointWorld;
+    internal float[] _lumaM2 => _buffers.LumaM2;
+    internal float[] _lumaVariance => _buffers.LumaVariance;
+    internal float[] _lumaDirectM2 => _buffers.LumaDirectM2;
+    internal float[] _lumaIndirectM2 => _buffers.LumaIndirectM2;
+    internal float[] _lumaDirectVariance => _buffers.LumaDirectVariance;
+    internal float[] _lumaIndirectVariance => _buffers.LumaIndirectVariance;
+    internal float[] _historyWeight => _buffers.HistoryWeight;
+    internal byte[] _historyRejected => _buffers.HistoryRejected;
+    internal float[] _clampAmount => _buffers.ClampAmount;
+    internal bool[] _clampHitFrame => _buffers.ClampHitFrame;
+    internal float[] _depthDistance => _buffers.DepthDistance;
+    internal float[] _albedoScalar => _buffers.AlbedoScalar;
+    internal Vector3[] _normalWorld => _buffers.NormalWorld;
+    internal Vector3[] _directLightingXYZ => _buffers.DirectLightingXYZ;
+    internal Vector3[] _indirectLightingXYZ => _buffers.IndirectLightingXYZ;
+    internal Vector3[] _emissiveLightingXYZ => _buffers.EmissiveLightingXYZ;
+    internal Vector3[] _bounce0XYZ => _buffers.Bounce0XYZ;
+    internal Vector3[] _bounce1XYZ => _buffers.Bounce1XYZ;
+    internal Vector3[] _bounce2PlusXYZ => _buffers.Bounce2PlusXYZ;
+    internal float[] _diffCurrentVsAccum => _buffers.DiffCurrentVsAccum;
+    internal float[] _diffUnfilteredVsFiltered => _buffers.DiffUnfilteredVsFiltered;
+    internal float[] _diffReprojectedVsCurrent => _buffers.DiffReprojectedVsCurrent;
+    internal int[] _lastUpdatedFrame => _buffers.LastUpdatedFrame;
+    internal Vector3[] _taaNextXYZ => _buffers.TaaNextXYZ;
+    internal Vector3[] _taaNextHitPoint => _buffers.TaaNextHitPoint;
+    internal bool[] _taaNextValid => _buffers.TaaNextValid;
+
+    // Convenience aliases used by TraceCore and debug rendering within this partial class
+    private Vector3[] HitPointWorld => _buffers.HitPointWorld;
+    private float[] LumaM2 => _buffers.LumaM2;
+    private float[] LumaVariance => _buffers.LumaVariance;
+    private float[] LumaDirectM2 => _buffers.LumaDirectM2;
+    private float[] LumaIndirectM2 => _buffers.LumaIndirectM2;
+    private float[] LumaDirectVariance => _buffers.LumaDirectVariance;
+    private float[] LumaIndirectVariance => _buffers.LumaIndirectVariance;
+    private float[] HistoryWeight => _buffers.HistoryWeight;
+    private byte[] HistoryRejected => _buffers.HistoryRejected;
+    private float[] ClampAmount => _buffers.ClampAmount;
+    private bool[] ClampHitFrame => _buffers.ClampHitFrame;
+    private float[] DepthDistance => _buffers.DepthDistance;
+    private float[] AlbedoScalar => _buffers.AlbedoScalar;
+    private Vector3[] NormalWorld => _buffers.NormalWorld;
+    private Vector3[] DirectLightingXYZ => _buffers.DirectLightingXYZ;
+    private Vector3[] IndirectLightingXYZ => _buffers.IndirectLightingXYZ;
+    private Vector3[] EmissiveLightingXYZ => _buffers.EmissiveLightingXYZ;
+    private Vector3[] Bounce0XYZ => _buffers.Bounce0XYZ;
+    private Vector3[] Bounce1XYZ => _buffers.Bounce1XYZ;
+    private Vector3[] Bounce2PlusXYZ => _buffers.Bounce2PlusXYZ;
+    private float[] DiffCurrentVsAccum => _buffers.DiffCurrentVsAccum;
+    private float[] DiffUnfilteredVsFiltered => _buffers.DiffUnfilteredVsFiltered;
+    private float[] DiffReprojectedVsCurrent => _buffers.DiffReprojectedVsCurrent;
+    private int[] LastUpdatedFrame => _buffers.LastUpdatedFrame;
 
     private readonly Vector3 _sampleClampVec;
 
@@ -181,9 +216,6 @@ public partial class JobSystem
     private readonly Vector3[] _taaHistoryXYZ;
     private readonly Vector3[] _taaHistoryHitPoint;
     private readonly bool[] _taaHistoryValid;
-    private readonly Vector3[] _taaNextXYZ;
-    private readonly Vector3[] _taaNextHitPoint;
-    private readonly bool[] _taaNextValid;
     private Vector3 _taaPrevCamPos;
     private Quaternion _taaPrevCamRot;
     private bool _taaHasPrevCamera;
@@ -272,34 +304,9 @@ public partial class JobSystem
 
         DebugOptions = effectiveDebugOptions;
 
-        AccumXYZ = new Vector3[width * height];
-        SampleCount = new uint[width * height];
-        WavelengthCounter = new long[width * height];
-        LastHit = new bool[width * height];
-        HitPointWorld = new Vector3[width * height];
-        _lumaM2 = new float[width * height];
-        _lumaVariance = new float[width * height];
-        _lumaDirectM2 = new float[width * height];
-        _lumaIndirectM2 = new float[width * height];
-        _lumaDirectVariance = new float[width * height];
-        _lumaIndirectVariance = new float[width * height];
-        _historyWeight = new float[width * height];
-        _historyRejected = new byte[width * height];
-        _clampAmount = new float[width * height];
-        _clampHitFrame = new bool[width * height];
-        _depthDistance = new float[width * height];
-        _albedoScalar = new float[width * height];
-        _normalWorld = new Vector3[width * height];
-        _directLightingXYZ = new Vector3[width * height];
-        _indirectLightingXYZ = new Vector3[width * height];
-        _emissiveLightingXYZ = new Vector3[width * height];
-        _bounce0XYZ = new Vector3[width * height];
-        _bounce1XYZ = new Vector3[width * height];
-        _bounce2PlusXYZ = new Vector3[width * height];
-        _diffCurrentVsAccum = new float[width * height];
-        _diffUnfilteredVsFiltered = new float[width * height];
-        _diffReprojectedVsCurrent = new float[width * height];
-        _lastUpdatedFrame = new int[width * height];
+        // Allocate all per-pixel render buffers as a single unit
+        _buffers = RenderBuffers.Create(width, height);
+
         Width = width;
         Height = height;
         Scene = scene;
@@ -318,31 +325,28 @@ public partial class JobSystem
         _taaHistoryXYZ = new Vector3[width * height];
         _taaHistoryHitPoint = new Vector3[width * height];
         _taaHistoryValid = new bool[width * height];
-        _taaNextXYZ = new Vector3[width * height];
-        _taaNextHitPoint = new Vector3[width * height];
-        _taaNextValid = new bool[width * height];
 
         PerPixel = new PerPixelState(AccumXYZ, SampleCount, WavelengthCounter, LastHit, HitPointWorld);
         History = new HistoryState(_taaHistoryXYZ, _taaHistoryHitPoint, _taaHistoryValid, _taaNextXYZ, _taaNextHitPoint, _taaNextValid);
         Debug = new DebugState(
-            _lumaVariance,
-            _historyWeight,
-            _historyRejected,
-            _clampAmount,
-            _clampHitFrame,
-            _depthDistance,
-            _albedoScalar,
-            _normalWorld,
-            _directLightingXYZ,
-            _indirectLightingXYZ,
-            _emissiveLightingXYZ,
-            _bounce0XYZ,
-            _bounce1XYZ,
-            _bounce2PlusXYZ,
-            _diffCurrentVsAccum,
-            _diffUnfilteredVsFiltered,
-            _diffReprojectedVsCurrent,
-            _lastUpdatedFrame);
+            LumaVariance,
+            HistoryWeight,
+            HistoryRejected,
+            ClampAmount,
+            ClampHitFrame,
+            DepthDistance,
+            AlbedoScalar,
+            NormalWorld,
+            DirectLightingXYZ,
+            IndirectLightingXYZ,
+            EmissiveLightingXYZ,
+            Bounce0XYZ,
+            Bounce1XYZ,
+            Bounce2PlusXYZ,
+            DiffCurrentVsAccum,
+            DiffUnfilteredVsFiltered,
+            DiffReprojectedVsCurrent,
+            LastUpdatedFrame);
 
         _pathTracer = new PathTracer(this);
         _displayResolver = new DisplayResolver(this);
@@ -414,53 +418,10 @@ public partial class JobSystem
     /// </summary>
     public PixelDebugInfo GetPixelDebugInfo(int x, int y)
     {
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-            return new PixelDebugInfo(
-                Vector3.Zero,
-                Vector3.Zero,
-                0f,
-                0f,
-                false,
-                0u,
-                0f,
-                0,
-                0f,
-                0f,
-                0,
-                Vector3.Zero,
-                Vector3.Zero,
-                Vector3.Zero,
-                0f,
-                0f,
-                Vector3.Zero,
-                Vector3.Zero,
-                Vector3.Zero);
-
-        int ix = y * Width + x;
-        Vector3 filtered = ResolveFilteredXYZ(y, x);
-        return new PixelDebugInfo(
-            AccumXYZ[ix],
-            filtered,
-            _diffCurrentVsAccum[ix],
-            _clampAmount[ix],
-            _clampHitFrame[ix],
-            SampleCount[ix],
-            _historyWeight[ix],
-            _historyRejected[ix],
-            _depthDistance[ix],
-            _albedoScalar[ix],
-            _lastUpdatedFrame[ix],
-            _normalWorld[ix],
-            _directLightingXYZ[ix],
-            _indirectLightingXYZ[ix],
-            _diffUnfilteredVsFiltered[ix],
-            _diffReprojectedVsCurrent[ix],
-            _bounce0XYZ[ix],
-            _bounce1XYZ[ix],
-            _bounce2PlusXYZ[ix]
-        );
+        return _debugBufferRenderer.GetPixelDebugInfo(x, y);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Vector3 ResolveFilteredXYZ(int y, int x)
     {
         int radius = IsMoving ? FilterRadius : 0;
@@ -512,6 +473,7 @@ public partial class JobSystem
          0.0557f, -0.2040f, 1.0570f
          );
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 ToSRGB(Vector3 xyz)
     {
         return xyz * TosRGBMatrix;
@@ -533,28 +495,28 @@ public partial class JobSystem
         Array.Clear(LastHit);
         Array.Clear(WavelengthCounter);
         Array.Clear(HitPointWorld);
-        Array.Clear(_lumaM2);
-        Array.Clear(_lumaVariance);
-        Array.Clear(_historyWeight);
-        Array.Clear(_historyRejected);
-        Array.Clear(_clampAmount);
-        Array.Clear(_clampHitFrame);
-        Array.Clear(_depthDistance);
-        Array.Clear(_albedoScalar);
-        Array.Clear(_normalWorld);
-        Array.Clear(_directLightingXYZ);
-        Array.Clear(_indirectLightingXYZ);
-        Array.Clear(_emissiveLightingXYZ);
-        Array.Clear(_diffCurrentVsAccum);
-        Array.Clear(_diffUnfilteredVsFiltered);
-        Array.Clear(_diffReprojectedVsCurrent);
-        Array.Clear(_lastUpdatedFrame);
+        Array.Clear(LumaM2);
+        Array.Clear(LumaVariance);
+        Array.Clear(HistoryWeight);
+        Array.Clear(HistoryRejected);
+        Array.Clear(ClampAmount);
+        Array.Clear(ClampHitFrame);
+        Array.Clear(DepthDistance);
+        Array.Clear(AlbedoScalar);
+        Array.Clear(NormalWorld);
+        Array.Clear(DirectLightingXYZ);
+        Array.Clear(IndirectLightingXYZ);
+        Array.Clear(EmissiveLightingXYZ);
+        Array.Clear(DiffCurrentVsAccum);
+        Array.Clear(DiffUnfilteredVsFiltered);
+        Array.Clear(DiffReprojectedVsCurrent);
+        Array.Clear(LastUpdatedFrame);
         Array.Clear(_taaHistoryXYZ);
         Array.Clear(_taaHistoryHitPoint);
         Array.Clear(_taaHistoryValid);
-        Array.Clear(_taaNextXYZ);
-        Array.Clear(_taaNextHitPoint);
-        Array.Clear(_taaNextValid);
+        Array.Clear(_buffers.TaaNextXYZ);
+        Array.Clear(_buffers.TaaNextHitPoint);
+        Array.Clear(_buffers.TaaNextValid);
         _taaHasPrevCamera = false;
         _clampEventCount = 0;
         RejectedHistoryPercent = 0;
@@ -996,27 +958,27 @@ public partial class JobSystem
         {
             AccumXYZ[ix] = Vector3.Zero;
             SampleCount[ix] = 0;
-            _lumaM2[ix] = 0f;
-            _lumaVariance[ix] = 0f;
-            _lumaDirectM2[ix] = 0f;
-            _lumaIndirectM2[ix] = 0f;
-            _lumaDirectVariance[ix] = 0f;
-            _lumaIndirectVariance[ix] = 0f;
-            _clampAmount[ix] = 0f;
-            _depthDistance[ix] = 0f;
-            _albedoScalar[ix] = 0f;
-            _normalWorld[ix] = Vector3.Zero;
-            _directLightingXYZ[ix] = Vector3.Zero;
-            _indirectLightingXYZ[ix] = Vector3.Zero;
-            _emissiveLightingXYZ[ix] = Vector3.Zero;
+            LumaM2[ix] = 0f;
+            LumaVariance[ix] = 0f;
+            LumaDirectM2[ix] = 0f;
+            LumaIndirectM2[ix] = 0f;
+            LumaDirectVariance[ix] = 0f;
+            LumaIndirectVariance[ix] = 0f;
+            ClampAmount[ix] = 0f;
+            DepthDistance[ix] = 0f;
+            AlbedoScalar[ix] = 0f;
+            NormalWorld[ix] = Vector3.Zero;
+            DirectLightingXYZ[ix] = Vector3.Zero;
+            IndirectLightingXYZ[ix] = Vector3.Zero;
+            EmissiveLightingXYZ[ix] = Vector3.Zero;
             LastHit[ix] = hit;
         }
         if (hit)
         {
             HitPointWorld[ix] = hitPoint;
-            _depthDistance[ix] = Vector3.Distance(camera.Position, hitPoint);
-            _albedoScalar[ix] = Math.Clamp(reflectance, 0f, 1f);
-            _normalWorld[ix] = hitNormal;
+            DepthDistance[ix] = Vector3.Distance(camera.Position, hitPoint);
+            AlbedoScalar[ix] = Math.Clamp(reflectance, 0f, 1f);
+            NormalWorld[ix] = hitNormal;
         }
 
         var correctedXYZ = xyz * WavelengthLookup.DeterministicCorrection;
@@ -1035,8 +997,8 @@ public partial class JobSystem
                 MathF.Abs(unclamped.Z - correctedXYZ.Z);
             if (clampDelta > 0f)
             {
-                _clampAmount[ix] += clampDelta;
-                _clampHitFrame[ix] = true;
+                ClampAmount[ix] += clampDelta;
+                ClampHitFrame[ix] = true;
                 System.Threading.Interlocked.Increment(ref _clampEventCount);
             }
         }
@@ -1045,21 +1007,21 @@ public partial class JobSystem
             SampleCount[ix] += 1;
         uint count = SampleCount[ix];
         AccumXYZ[ix] += (correctedXYZ - AccumXYZ[ix]) / count;
-        _directLightingXYZ[ix] += (correctedDirect - _directLightingXYZ[ix]) / count;
-        _indirectLightingXYZ[ix] += (correctedIndirect - _indirectLightingXYZ[ix]) / count;
-        _emissiveLightingXYZ[ix] += (correctedEmissive - _emissiveLightingXYZ[ix]) / count;
+        DirectLightingXYZ[ix] += (correctedDirect - DirectLightingXYZ[ix]) / count;
+        IndirectLightingXYZ[ix] += (correctedIndirect - IndirectLightingXYZ[ix]) / count;
+        EmissiveLightingXYZ[ix] += (correctedEmissive - EmissiveLightingXYZ[ix]) / count;
         // Bounce breakdown approximations: assign direct to bounce0, one-bounce indirect to bounce1,
         // and any remaining indirect energy to bounce2+. Use correctedDirect/Indirect as proxies.
-        _bounce0XYZ[ix] += (correctedDirect - _bounce0XYZ[ix]) / count;
-        _bounce1XYZ[ix] += (correctedIndirect - _bounce1XYZ[ix]) / count;
-        _bounce2PlusXYZ[ix] += (correctedBounce2Plus - _bounce2PlusXYZ[ix]) / count;
+        Bounce0XYZ[ix] += (correctedDirect - Bounce0XYZ[ix]) / count;
+        Bounce1XYZ[ix] += (correctedIndirect - Bounce1XYZ[ix]) / count;
+        Bounce2PlusXYZ[ix] += (correctedBounce2Plus - Bounce2PlusXYZ[ix]) / count;
 
         // Welford-style running variance on luminance (Y channel).
         float ySample = correctedXYZ.Y;
         float yMean = AccumXYZ[ix].Y;
         float delta = ySample - yMean;
-        _lumaM2[ix] += delta * (ySample - yMean);
-        _lumaVariance[ix] = count > 1 ? _lumaM2[ix] / (count - 1) : 0f;
+        LumaM2[ix] += delta * (ySample - yMean);
+        LumaVariance[ix] = count > 1 ? LumaM2[ix] / (count - 1) : 0f;
 
         // Approximate variance split: attribute sample luminance to direct and indirect
         float directY = correctedDirect.Y;
@@ -1071,22 +1033,22 @@ public partial class JobSystem
 
         // Update direct variance accumulator
         float yDirectSample = ySample * dFrac;
-        float directMean = _directLightingXYZ[ix].Y; // use accumulated direct as mean proxy
+        float directMean = DirectLightingXYZ[ix].Y; // use accumulated direct as mean proxy
         float dDelta = yDirectSample - directMean;
-        _lumaDirectM2[ix] += dDelta * (yDirectSample - directMean);
-        _lumaDirectVariance[ix] = count > 1 ? _lumaDirectM2[ix] / (count - 1) : 0f;
+        LumaDirectM2[ix] += dDelta * (yDirectSample - directMean);
+        LumaDirectVariance[ix] = count > 1 ? LumaDirectM2[ix] / (count - 1) : 0f;
 
         // Update indirect variance accumulator
         float yIndirectSample = ySample * iFrac;
-        float indirectMean = _indirectLightingXYZ[ix].Y; // use accumulated indirect as mean proxy
+        float indirectMean = IndirectLightingXYZ[ix].Y; // use accumulated indirect as mean proxy
         float iDelta = yIndirectSample - indirectMean;
-        _lumaIndirectM2[ix] += iDelta * (yIndirectSample - indirectMean);
-        _lumaIndirectVariance[ix] = count > 1 ? _lumaIndirectM2[ix] / (count - 1) : 0f;
+        LumaIndirectM2[ix] += iDelta * (yIndirectSample - indirectMean);
+        LumaIndirectVariance[ix] = count > 1 ? LumaIndirectM2[ix] / (count - 1) : 0f;
 
         // Record the last frame this pixel received an update for the history-age debug view.
         // FrameIndex is incremented on the UI thread in ResolveDisplayBufferWithTaa();
         // writing it here is best-effort and races are acceptable for diagnostics.
-        _lastUpdatedFrame[ix] = FrameIndex;
+        LastUpdatedFrame[ix] = FrameIndex;
     }
 
     public string GetDebugLegend(DebugViewMode mode)
@@ -1094,246 +1056,9 @@ public partial class JobSystem
         return _debugBufferRenderer.GetDebugLegend(mode);
     }
 
-    internal string GetDebugLegendCore(DebugViewMode mode)
-    {
-        return mode switch
-        {
-            DebugViewMode.Beauty => "Debug: Beauty | Range: scene-referred color",
-            DebugViewMode.SampleCount => $"Debug: Effective Sample Count | Range: 0 - {Math.Max(1u, MaxObservedSampleCount)}",
-            DebugViewMode.Variance => $"Debug: Variance Heatmap | Range: 0.000 - {Math.Max(0.0001, AverageVariance * 8):0.000}",
-            DebugViewMode.HistoryWeight => "Debug: History Weight | 0 = current only, 1 = history dominated",
-            DebugViewMode.RejectionMask => "Debug: Rejection Mask | Green = reused, Red = rejected",
-            DebugViewMode.ClampHeatmap => $"Debug: Clamp Heatmap | Active: {ClampedPixelPercent:0.0}%",
-            DebugViewMode.Depth => "Debug: Depth | Dark = near, bright = far",
-            DebugViewMode.Albedo => "Debug: Albedo | Dark = low reflectance, bright = high reflectance",
-            DebugViewMode.Normal => "Debug: Normal | RGB = world normal",
-            DebugViewMode.DirectLighting => "Debug: Direct lighting only",
-            DebugViewMode.IndirectLighting => "Debug: Indirect lighting only (currently zero in this tracer)",
-            DebugViewMode.EmissiveLighting => "Debug: Emissive lighting only (currently zero in this tracer)",
-            DebugViewMode.CurrentVsAccumDiff => "Debug: abs(current - accumulated)",
-            DebugViewMode.UnfilteredVsFilteredDiff => "Debug: abs(unfiltered - filtered)",
-            DebugViewMode.ReprojectedVsCurrentDiff => "Debug: abs(reprojected_history - current)",
-            DebugViewMode.HistoryAge => "Debug: History Age | Blue=fresh, Red=stale",
-            _ => "Debug: Unknown"
-        };
-    }
-
     public void RenderDebugModeToBuffer(DebugViewMode mode, byte[] targetBuffer, int targetStride)
     {
         _debugBufferRenderer.RenderDebugModeToBuffer(mode, targetBuffer, targetStride);
-    }
-
-    internal void RenderDebugModeToBufferCore(DebugViewMode mode, byte[] targetBuffer, int targetStride)
-    {
-        for (int y = 0; y < Height; y++)
-        {
-            int row = y * Width;
-            for (int x = 0; x < Width; x++)
-            {
-                int ix = row + x;
-                // Precompute an edge disagreement scalar only when requested to keep
-                // the common path cheap. We'll still compute it on-demand below.
-                float edgeDisagreement = 0f;
-                if (mode == DebugViewMode.EdgeDisagreement)
-                {
-                    // Color disagreement: use existing diff metrics (current vs accum,
-                    // unfiltered vs filtered, reprojection vs current) and take the max.
-                    float colorDiff = MathF.Max(_diffCurrentVsAccum[ix], MathF.Max(_diffUnfilteredVsFiltered[ix], _diffReprojectedVsCurrent[ix]));
-
-                    // Depth disagreement: compare with 4-neighbors and take max absolute delta
-                    float depth = _depthDistance[ix];
-                    float maxDepthDelta = 0f;
-                    if (x > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _depthDistance[row + x - 1]));
-                    if (x + 1 < Width) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _depthDistance[row + x + 1]));
-                    if (y > 0) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _depthDistance[(y - 1) * Width + x]));
-                    if (y + 1 < Height) maxDepthDelta = MathF.Max(maxDepthDelta, MathF.Abs(depth - _depthDistance[(y + 1) * Width + x]));
-                    // Normalize depth delta by a soft scale to keep values reasonable.
-                    float depthDiff = maxDepthDelta * 0.05f; // tuned scale
-
-                    // Normal disagreement: measure angular deviation with neighbors using dot product.
-                    Vector3 n = _normalWorld[ix];
-                    float maxNormalDiff = 0f;
-                    if (n != Vector3.Zero)
-                    {
-                        if (x > 0)
-                        {
-                            var nn = _normalWorld[row + x - 1];
-                            if (nn != Vector3.Zero)
-                        maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
-                        }
-                        if (x + 1 < Width)
-                        {
-                            var nn = _normalWorld[row + x + 1];
-                            if (nn != Vector3.Zero)
-                                maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
-                        }
-                        if (y > 0)
-                        {
-                            var nn = _normalWorld[(y - 1) * Width + x];
-                            if (nn != Vector3.Zero)
-                                maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
-                        }
-                        if (y + 1 < Height)
-                        {
-                            var nn = _normalWorld[(y + 1) * Width + x];
-                            if (nn != Vector3.Zero)
-                                maxNormalDiff = MathF.Max(maxNormalDiff, 1f - Math.Clamp(Vector3.Dot(Vector3.Normalize(n), Vector3.Normalize(nn)), -1f, 1f));
-                        }
-                    }
-
-                    // Combine metrics with tuned weights. Color gets highest weight, normals second, depth last.
-                    edgeDisagreement = MathF.Max(colorDiff, MathF.Max(maxNormalDiff * 0.9f, depthDiff * 0.6f));
-                }
-                Vector3 rgb = mode switch
-                {
-                    DebugViewMode.Beauty => ColorFromXyz(ResolveFilteredXYZ(y, x)),
-                    DebugViewMode.SampleCount => PaletteSampleCount(SampleCount[ix], Math.Max(1u, MaxObservedSampleCount)),
-                    DebugViewMode.Variance => PaletteVariance(_lumaVariance[ix], (float)Math.Max(0.0001, AverageVariance * 8)),
-                    DebugViewMode.HistoryWeight => PaletteHistoryWeight(_historyWeight[ix]),
-                    DebugViewMode.RejectionMask => _historyRejected[ix] > 0 ? new Vector3(1f, 0.1f, 0.1f) : new Vector3(0.1f, 0.9f, 0.1f),
-                    DebugViewMode.ClampHeatmap => PaletteClamp(_clampAmount[ix]),
-                    DebugViewMode.Depth => PaletteDepth(_depthDistance[ix]),
-                    DebugViewMode.HistoryAge =>
-                        // Map last-updated frame to age in frames relative to current FrameIndex.
-                        PaletteDifference(MathF.Min(1f, (FrameIndex - _lastUpdatedFrame[ix]) / 120f)),
-                    DebugViewMode.Albedo => PaletteAlbedo(_albedoScalar[ix]),
-                    DebugViewMode.Normal => PaletteNormal(_normalWorld[ix]),
-                    DebugViewMode.DirectLighting => ColorFromXyz(_directLightingXYZ[ix]),
-                    DebugViewMode.IndirectLighting => ColorFromXyz(_indirectLightingXYZ[ix]),
-                    DebugViewMode.EmissiveLighting => ColorFromXyz(_emissiveLightingXYZ[ix]),
-                    DebugViewMode.CurrentVsAccumDiff => PaletteDifference(_diffCurrentVsAccum[ix]),
-                    DebugViewMode.DirectVariance => PaletteVariance(_lumaDirectVariance[ix], (float)Math.Max(0.0001, AverageVariance * 8)),
-                    DebugViewMode.IndirectVariance => PaletteVariance(_lumaIndirectVariance[ix], (float)Math.Max(0.0001, AverageVariance * 8)),
-                    DebugViewMode.VarianceSplit => new Vector3(
-                    Math.Clamp(_lumaIndirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                    Math.Clamp(_lumaDirectVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                    Math.Clamp(_lumaVariance[ix] / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f)),
-                    DebugViewMode.UnfilteredVsFilteredDiff => PaletteDifference(_diffUnfilteredVsFiltered[ix]),
-                    DebugViewMode.ReprojectedVsCurrentDiff => PaletteDifference(_diffReprojectedVsCurrent[ix]),
-                    DebugViewMode.Bounce0 => ColorFromXyz(_bounce0XYZ[ix]),
-                    DebugViewMode.Bounce1 => ColorFromXyz(_bounce1XYZ[ix]),
-                    DebugViewMode.Bounce2Plus => ColorFromXyz(_bounce2PlusXYZ[ix]),
-                    DebugViewMode.BounceRGB => new Vector3(
-                        Math.Clamp(_bounce2PlusXYZ[ix].Y / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                        Math.Clamp(_bounce1XYZ[ix].Y / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f),
-                        Math.Clamp(_bounce0XYZ[ix].Y / (float)Math.Max(1e-6, AverageVariance * 8), 0f, 1f)
-                    ),
-                    DebugViewMode.EdgeDisagreement => PaletteDifference(edgeDisagreement),
-                    _ => Vector3.Zero
-                };
-
-                int i = y * targetStride + x * 4;
-                targetBuffer[i + 0] = (byte)Math.Clamp(rgb.Z * 255f, 0, 255);
-                targetBuffer[i + 1] = (byte)Math.Clamp(rgb.Y * 255f, 0, 255);
-                targetBuffer[i + 2] = (byte)Math.Clamp(rgb.X * 255f, 0, 255);
-                targetBuffer[i + 3] = 255;
-            }
-        }
-    }
-
-    private static Vector3 ColorFromXyz(Vector3 xyz)
-    {
-        var linearColor = ToSRGB(xyz);
-        return new Vector3(
-            LinearToSRGBStatic(linearColor.X),
-            LinearToSRGBStatic(linearColor.Y),
-            LinearToSRGBStatic(linearColor.Z)
-        );
-    }
-
-    private static float LinearToSRGBStatic(float linear)
-    {
-        if (linear <= 0.0031308f)
-            return 12.92f * linear;
-        return 1.055f * MathF.Pow(linear, InvGamma) - 0.055f;
-    }
-
-    private static Vector3 PaletteSampleCount(uint sampleCount, uint maxSampleCount)
-    {
-        float t = maxSampleCount > 0 ? Math.Clamp(sampleCount / (float)maxSampleCount, 0f, 1f) : 0f;
-        return MultiStop(t,
-            new Vector3(0.20f, 0.00f, 0.35f),
-            new Vector3(0.00f, 0.70f, 1.00f),
-            new Vector3(0.10f, 0.90f, 0.20f),
-            new Vector3(1.00f, 0.95f, 0.20f),
-            new Vector3(1.00f, 1.00f, 1.00f));
-    }
-
-    private static Vector3 PaletteVariance(float variance, float maxVariance)
-    {
-        float t = maxVariance > 0f ? Math.Clamp(variance / maxVariance, 0f, 1f) : 0f;
-        return MultiStop(t,
-            new Vector3(0.00f, 0.00f, 0.20f),
-            new Vector3(0.00f, 0.20f, 0.90f),
-            new Vector3(0.00f, 0.80f, 0.30f),
-            new Vector3(1.00f, 0.90f, 0.10f),
-            new Vector3(1.00f, 0.20f, 0.10f));
-    }
-
-    private static Vector3 PaletteHistoryWeight(float weight)
-    {
-        float t = Math.Clamp(weight, 0f, 1f);
-        return MultiStop(t,
-            new Vector3(0.10f, 0.10f, 0.20f),
-            new Vector3(0.20f, 0.80f, 1.00f),
-            new Vector3(1.00f, 0.95f, 0.20f),
-            new Vector3(1.00f, 0.50f, 0.10f),
-            new Vector3(1.00f, 0.10f, 0.10f));
-    }
-
-    private static Vector3 PaletteClamp(float amount)
-    {
-        float t = 1f - MathF.Exp(-amount * 0.5f);
-        return MultiStop(t,
-            new Vector3(0.00f, 0.00f, 0.00f),
-            new Vector3(1.00f, 0.50f, 0.10f),
-            new Vector3(1.00f, 0.15f, 0.10f),
-            new Vector3(1.00f, 0.80f, 0.70f),
-            new Vector3(1.00f, 1.00f, 1.00f));
-    }
-
-    private static Vector3 PaletteDepth(float depth)
-    {
-        float t = 1f - MathF.Exp(-depth * 0.08f);
-        return MultiStop(t,
-            new Vector3(0.02f, 0.02f, 0.05f),
-            new Vector3(0.08f, 0.15f, 0.45f),
-            new Vector3(0.10f, 0.60f, 0.80f),
-            new Vector3(0.90f, 0.90f, 0.45f),
-            new Vector3(1.00f, 1.00f, 1.00f));
-    }
-
-    private static Vector3 PaletteDifference(float diff)
-    {
-        float t = 1f - MathF.Exp(-diff * 6f);
-        return MultiStop(t,
-            new Vector3(0.00f, 0.00f, 0.00f),
-            new Vector3(0.10f, 0.15f, 0.50f),
-            new Vector3(0.20f, 0.80f, 0.70f),
-            new Vector3(0.95f, 0.90f, 0.20f),
-            new Vector3(1.00f, 0.20f, 0.15f));
-    }
-
-    private static Vector3 PaletteAlbedo(float albedo)
-    {
-        float v = Math.Clamp(albedo, 0f, 1f);
-        return new Vector3(v, v, v);
-    }
-
-    private static Vector3 PaletteNormal(Vector3 normal)
-    {
-        if (normal == Vector3.Zero)
-            return Vector3.Zero;
-        Vector3 n = Vector3.Normalize(normal);
-        return n * 0.5f + new Vector3(0.5f, 0.5f, 0.5f);
-    }
-
-    private static Vector3 MultiStop(float t, Vector3 c0, Vector3 c1, Vector3 c2, Vector3 c3, Vector3 c4)
-    {
-        if (t <= 0.25f) return Vector3.Lerp(c0, c1, t / 0.25f);
-        if (t <= 0.5f) return Vector3.Lerp(c1, c2, (t - 0.25f) / 0.25f);
-        if (t <= 0.75f) return Vector3.Lerp(c2, c3, (t - 0.5f) / 0.25f);
-        return Vector3.Lerp(c3, c4, (t - 0.75f) / 0.25f);
     }
 }
 

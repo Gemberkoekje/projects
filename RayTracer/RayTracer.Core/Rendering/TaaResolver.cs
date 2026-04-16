@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace RayTracer;
 
@@ -224,26 +225,10 @@ public partial class JobSystem
             return px >= 0f && px < _owner.Width && py >= 0f && py < _owner.Height;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteColorToBuffer(int y, int x, Vector3 xyz)
         {
-            var linearColor = JobSystem.ToSRGB(xyz);
-            var color = new Vector3(
-                LinearToSRGB(linearColor.X),
-                LinearToSRGB(linearColor.Y),
-                LinearToSRGB(linearColor.Z));
-
-            int i = y * _owner.Stride + x * 4;
-            _owner.DisplayBuffer[i + 0] = (byte)Math.Clamp(color.Z * 255f, 0, 255);
-            _owner.DisplayBuffer[i + 1] = (byte)Math.Clamp(color.Y * 255f, 0, 255);
-            _owner.DisplayBuffer[i + 2] = (byte)Math.Clamp(color.X * 255f, 0, 255);
-            _owner.DisplayBuffer[i + 3] = 255;
-        }
-
-        private static float LinearToSRGB(float linear)
-        {
-            if (linear <= 0.0031308f)
-                return 12.92f * linear;
-            return 1.055f * MathF.Pow(linear, InvGamma) - 0.055f;
+            DisplayResolver.WritePixel(_owner.DisplayBuffer.AsSpan(y * _owner.Stride + x * 4, 4), xyz);
         }
     }
 }

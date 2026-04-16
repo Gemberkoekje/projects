@@ -113,6 +113,57 @@ public class CameraControllerTests
         Assert.IsTrue(dist > 0.1f, $"Camera should have moved from start; distance = {dist}.");
     }
 
+    [TestMethod]
+    public void Update_ZeroDeltaTime_DoesNotMoveCameraPosition()
+    {
+        var maze = new Maze(4, 4, seed: 11);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.South);
+        var ctrl = new CameraController(nav, 2f, 1f);
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = Quaternion.Identity,
+            Fov = MathF.PI / 3f,
+            Aspect = 4f / 3f,
+            ImgPlaneZ = 1f
+        };
+
+        var startPos = cam.Position;
+        ctrl.Update(0f, cam);
+
+        AssertVec3Near(startPos, cam.Position, 1e-6f);
+        Assert.IsTrue(ctrl.Dirty, "Controller should still mark camera as dirty during active interpolation.");
+    }
+
+    [TestMethod]
+    public void RapidAlternatingUpdates_KeepNavigatorWithinMazeBounds()
+    {
+        const int mazeSize = 8;
+        var maze = new Maze(mazeSize, mazeSize, seed: 123);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.South);
+        var ctrl = new CameraController(nav, 2f, 1f);
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = Quaternion.Identity,
+            Fov = MathF.PI / 3f,
+            Aspect = 16f / 9f,
+            ImgPlaneZ = 1f
+        };
+
+        for (int i = 0; i < 200; i++)
+        {
+            float dt = (i % 2 == 0) ? 0.001f : 2.5f;
+            ctrl.Update(dt, cam);
+
+            Assert.IsTrue(nav.CellX >= 0 && nav.CellX < mazeSize, $"CellX out of bounds: {nav.CellX}");
+            Assert.IsTrue(nav.CellY >= 0 && nav.CellY < mazeSize, $"CellY out of bounds: {nav.CellY}");
+            Assert.AreEqual(1f, cam.Position.Y, 0.001f, "Eye height should remain stable under rapid update cadence.");
+            Assert.IsTrue(float.IsFinite(cam.Position.X) && float.IsFinite(cam.Position.Y) && float.IsFinite(cam.Position.Z),
+                "Camera position should stay finite.");
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────
 
     static void AssertVec3Near(Vector3 expected, Vector3 actual, float eps)

@@ -98,4 +98,98 @@ public class BVHTests
         var invDir = new Vector3(1f / dir.X, 1f / dir.Y, 1f / dir.Z);
         Assert.IsFalse(box.Intersects(origin, invDir, float.MaxValue));
     }
+
+    [TestMethod]
+    public void BVH_MatchesLinearScan_ForAllCoplanarRectangles()
+    {
+        var material = new MaterialsLookup()["00115"];
+        var scene = new List<Tracable>();
+
+        const int size = 20;
+        for (int x = 0; x < size; x++)
+        {
+            for (int z = 0; z < size; z++)
+            {
+                scene.Add(new TracableRectangle(
+                    (new Vector3(x, 0f, z), new Vector3(x + 1f, 0f, z), new Vector3(x, 0f, z + 1f)),
+                    material));
+            }
+        }
+
+        var ray = new Ray
+        {
+            Origin = new Vector3(size * 0.5f + 0.25f, 3f, size * 0.5f + 0.25f),
+            Direction = Vector3.Normalize(new Vector3(0f, -1f, 0f)),
+            Wavelength = 550,
+            Intensity = 1f
+        };
+
+        var bvh = new BVH(scene.ToArray());
+        var (linearReflectance, linearT, linearHit) = FindClosestLinear(scene, ray);
+        var (bvhReflectance, bvhPoint, _, _, bvhHit, _) = bvh.FindClosest(ray);
+
+        Assert.AreEqual(linearHit, bvhHit);
+        if (linearHit)
+        {
+            Assert.AreEqual(linearReflectance, bvhReflectance, 1e-5f);
+            Assert.AreEqual(ray.Origin.Y + ray.Direction.Y * linearT, bvhPoint.Y, 1e-4f);
+        }
+    }
+
+    [TestMethod]
+    public void BVH_HandlesZeroVolumeAabbs_AndStillFindsValidHit()
+    {
+        var material = new MaterialsLookup()["00115"];
+        var scene = new List<Tracable>();
+
+        for (int i = 0; i < 200; i++)
+            scene.Add(new DegenerateBoundsTracable(new Vector3(i * 0.01f, 0.5f, i * 0.01f)));
+
+        scene.Add(new TracableRectangle(
+            (new Vector3(0f, 0f, 0f), new Vector3(1f, 0f, 0f), new Vector3(0f, 0f, 1f)),
+            material));
+
+        var bvh = new BVH(scene.ToArray());
+        var ray = new Ray
+        {
+            Origin = new Vector3(0.5f, 1f, 0.5f),
+            Direction = new Vector3(0f, -1f, 0f),
+            Wavelength = 550,
+            Intensity = 1f
+        };
+
+        var (_, hitPoint, _, _, hit, hitPrimitive) = bvh.FindClosest(ray);
+
+        Assert.IsTrue(hit, "BVH should still report a hit in the presence of many zero-volume bounds.");
+        Assert.IsInstanceOfType<TracableRectangle>(hitPrimitive);
+        Assert.AreEqual(0f, hitPoint.Y, 1e-4f);
+    }
+
+    private static (float reflectance, float t, bool hit) FindClosestLinear(IEnumerable<Tracable> scene, Ray ray)
+    {
+        float closestT = float.MaxValue;
+        float closestReflectance = 0f;
+        bool hit = false;
+
+        foreach (var t in scene)
+        {
+            var intersect = t.Intersect(ray);
+            if (intersect.HasValue && intersect.Value.t < closestT)
+            {
+                closestT = intersect.Value.t;
+                closestReflectance = intersect.Value.reflectance;
+                hit = true;
+            }
+        }
+
+        return (closestReflectance, closestT, hit);
+    }
+
+    private sealed class DegenerateBoundsTracable(Vector3 point) : Tracable
+    {
+        public AABB Bounds { get; } = new(point, point);
+
+        public (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+            => null;
+    }
 }

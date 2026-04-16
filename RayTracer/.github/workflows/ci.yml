@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      runBenchmarks:
+        description: Run benchmark project
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore .net.csproj
+
+      - name: Build
+        run: dotnet build .net.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test RayTracer.Tests/RayTracer.Tests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Analyzer checks
+        run: dotnet build .net.csproj --configuration Release --no-restore -p:RunAnalyzers=true
+
+      - name: Benchmark (optional)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.runBenchmarks == true }}
+        run: dotnet run --project Benchmark/Benchmarks.csproj --configuration Release --no-build

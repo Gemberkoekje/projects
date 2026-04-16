@@ -1,4 +1,4 @@
-﻿ID,Name,V(λ) Reflectance,M(λ) Reflectance,M/P Ratio,L*,a*,b*,R_reflectance,G_reflectance,B_reflectance,Specularity,Roughness
+ID,Name,V(λ) Reflectance,M(λ) Reflectance,M/P Ratio,L*,a*,b*,R_reflectance,G_reflectance,B_reflectance,Specularity,Roughness
 00001,"White Painted Room Walls","","","0.95","91.99","-0.28","5.53","83.16%","81.16%","72.26%","0.36%","0.20"
 00002,"Dark Grey Floor Tiles","","","0.95","51.76","0.82","2.97","20.15%","18.79%","17.16%","1.25%","0.20"
 00003,"White Painted Room Ceiling","","","0.94","92.42","-0.09","5.88","84.62%","82.06%","72.63%","0.44%","0.20"
