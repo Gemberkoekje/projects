@@ -16,6 +16,8 @@ builder.Services.AddSingleton<PickExplanationService>();
 
 WebApplication app = builder.Build();
 
+app.UsePathBase("/sts2viewer");
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
