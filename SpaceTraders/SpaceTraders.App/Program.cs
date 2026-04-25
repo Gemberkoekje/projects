@@ -1,7 +1,25 @@
+using Serilog;
+using Serilog.Formatting.Compact;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, cfg) =>
+{
+    if (ctx.HostingEnvironment.IsProduction())
+    {
+        cfg.WriteTo.Console(new CompactJsonFormatter());
+    }
+    else
+    {
+        cfg.WriteTo.Console();
+    }
+
+    cfg.ReadFrom.Configuration(ctx.Configuration);
+    cfg.Enrich.FromLogContext();
+    cfg.Enrich.WithProperty("Application", "SpaceTraders.App");
+});
 
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddRazorPages();

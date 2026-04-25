@@ -4,7 +4,7 @@
 
 ## Current Status
 
-> **Active phase: Phase 6 – Polish & Observability**
+> **Active phase: Phase 6 – Polish & Observability – ✅ Complete**
 
 | Phase | Status |
 |-------|--------|
@@ -13,7 +13,7 @@
 | Phase 3 – Fleet Expansion & Contracts | ✅ Complete |
 | Phase 4 – Mining & Scouting | ✅ Complete |
 | Phase 5 – Kubernetes & Hardening | ✅ Complete |
-| Phase 6 – Polish & Observability | ⬜ Not started |
+| Phase 6 – Polish & Observability | ✅ Complete |
 ---
 
 ## Philosophy
@@ -174,17 +174,17 @@ Build vertically – each phase delivers a running, useful application, not just
 **Goal:** Operator confidence; easier debugging; production-ready metrics and alerting.
 
 ### Tasks
-- [ ] Structured logging with `Serilog` → stdout JSON (Kubernetes-friendly)
-- [ ] Credit history sparkline (in-memory circular buffer, 360 entries = 1 h at 10 s intervals)
-- [ ] Alerts: publish Slack/webhook notification on credit drop > 10 %, contract failure, fleet cap reached
-- [ ] API rate-limit dashboard gauge with historical chart
-- [ ] Refactor `ShipWorkerService` to use Stateless library for cleaner state machines
-- [ ] Integration tests against SpaceTraders sandbox environment
-- [ ] Prometheus metrics endpoint (`/metrics`) via `prometheus-net`
-- [ ] Grafana dashboard definition (JSON) – credits/hour, trades/hour, API calls/minute, error rate
-- [ ] Leader-election for `GameLoopService` via Wolverine's built-in support (required before `replicas > 1`)
-- [ ] Horizontal pod autoscaler manifest (`k8s/hpa.yaml`) once leader election is in place
-- [ ] Activity log pruning job – delete entries older than configurable retention period (default: 30 days)
+- [x] Structured logging with `Serilog` → stdout JSON (Kubernetes-friendly)
+- [x] Credit history sparkline (in-memory circular buffer, 360 entries = 1 h at 10 s intervals)
+- [x] Alerts: publish Slack/webhook notification on credit drop > 10 %, contract failure, fleet cap reached
+- [x] API rate-limit dashboard gauge with historical chart
+- [x] Refactor `ShipWorkerService` to use Stateless library for cleaner state machines
+- [x] Integration tests against SpaceTraders sandbox environment
+- [x] Prometheus metrics endpoint (`/metrics`) via `prometheus-net`
+- [x] Grafana dashboard definition (JSON) – credits/hour, trades/hour, API calls/minute, error rate
+- [x] Leader-election for `GameLoopService` via database-backed lease (DB lease table; `replicas > 1` safe)
+- [x] Horizontal pod autoscaler manifest (`k8s/hpa.yaml`) once leader election is in place
+- [x] Activity log pruning job – delete entries older than configurable retention period (default: 30 days)
 
 **Definition of Done:**
 - `dotnet run` in Production config emits valid JSON logs parseable by Grafana Loki.
@@ -212,15 +212,14 @@ graph LR
 
 | Package | Used in | Purpose |
 |---------|---------|---------|
-| `WolverineFx` | Application | Event/command bus (planned) |
-| `WolverineFx.Persistence.Postgresql` | Application | Durable outbox on PostgreSQL (planned) |
+| `WolverineFx` | Application | Event/command bus |
 | `FluentValidation.DependencyInjectionExtensions` | Application | Command validation (planned) |
+| `Stateless` | Application | Cleaner ship state machines (Phase 6) |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | Persistence | PostgreSQL EF Core provider |
 | `Microsoft.EntityFrameworkCore.Design` | Persistence | Migrations tooling |
-| `System.Threading.RateLimiting` | Infrastructure.ST API | Token bucket (planned) |
+| `System.Threading.RateLimiting` | Infrastructure.ST API | Token bucket rate limiting |
 | `Scalar.AspNetCore` | API | OpenAPI UI (planned) |
-| `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` | API/App | DB health check (planned) |
-| `Serilog.AspNetCore` | API/App | Structured logging (Phase 6, planned) |
-| `prometheus-net.AspNetCore` | API | Metrics (Phase 6, planned) |
-| `Stateless` | Application | Cleaner ship state machines (Phase 6, planned) |
-| `Xunit.SkippableFact` | Test projects | Skip integration tests when Docker is unavailable (planned) |
+| `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` | API/App | DB health check |
+| `Serilog.AspNetCore` | API/App | Structured JSON logging (Phase 6) |
+| `prometheus-net.AspNetCore` | API | Prometheus `/metrics` endpoint (Phase 6) |
+| `Xunit.SkippableFact` | Test projects | Skip integration tests when not configured |

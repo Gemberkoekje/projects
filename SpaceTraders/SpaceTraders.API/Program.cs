@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Prometheus;
+using Serilog;
+using Serilog.Formatting.Compact;
 using SpaceTraders.API.Endpoints;
 using SpaceTraders.API.Middleware;
 using SpaceTraders.API.Services;
@@ -12,6 +15,22 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, cfg) =>
+{
+    if (ctx.HostingEnvironment.IsProduction())
+    {
+        cfg.WriteTo.Console(new CompactJsonFormatter());
+    }
+    else
+    {
+        cfg.WriteTo.Console();
+    }
+
+    cfg.ReadFrom.Configuration(ctx.Configuration);
+    cfg.Enrich.FromLogContext();
+    cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
+});
 
 builder.Services
     .AddApplication()
@@ -31,7 +50,12 @@ builder.Services
 builder.Services.Configure<HostOptions>(opts =>
     opts.ShutdownTimeout = TimeSpan.FromSeconds(60));
 
-// Order matters: bootstrap → sync → recovery → game loop → ship workers
+// LeaderElectionService doubles as ILeaderElection (singleton) and IHostedService.
+builder.Services.AddSingleton<LeaderElectionService>();
+builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ILeaderElection>(
+    sp => sp.GetRequiredService<LeaderElectionService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<LeaderElectionService>());
+
 builder.Services.AddHostedService<AgentBootstrapService>();
 builder.Services.AddHostedService<StartupSyncService>();
 builder.Services.AddHostedService<StartupRecoveryService>();
@@ -39,6 +63,8 @@ builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddHostedService<ShipWorkerService>();
 builder.Services.AddHostedService<ContractWatchService>();
 builder.Services.AddHostedService<ScoutService>();
+builder.Services.AddHostedService<ActivityLogPruningService>();
+builder.Services.AddHostedService<PrometheusMetricsService>();
 
 var app = builder.Build();
 
@@ -55,10 +81,13 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
+app.UseHttpMetrics();
+
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready");
 app.MapHealthChecks("/health/startup");
 
+app.MapMetrics();
 app.MapStatusEndpoints();
 app.MapSettingsEndpoints();
 app.MapControlEndpoints();

@@ -12,6 +12,7 @@ namespace SpaceTraders.Application.Automation;
 /// <summary>
 /// Dead-reckoning background service.
 /// Every 5 s:
+///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
 ///    updates their nav state in the DB, and publishes ShipArrivedAtWaypointEvent.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
@@ -20,6 +21,7 @@ namespace SpaceTraders.Application.Automation;
 public sealed class GameLoopService(
     IServiceScopeFactory serviceScopeFactory,
     IApiAvailabilityState apiAvailability,
+    ILeaderElection leaderElection,
     ILogger<GameLoopService> logger) : BackgroundService
 {
     private const double FuelLowThreshold = 0.20;
@@ -48,6 +50,12 @@ public sealed class GameLoopService(
 
     private async Task TickAsync(CancellationToken cancellationToken)
     {
+        if (!leaderElection.IsLeader)
+        {
+            logger.LogTrace("GameLoopService: not the leader; skipping tick.");
+            return;
+        }
+
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();

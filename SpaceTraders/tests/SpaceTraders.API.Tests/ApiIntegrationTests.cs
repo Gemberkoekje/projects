@@ -147,6 +147,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
     public ITradeOpportunityRepository TradeOpportunityRepository { get; } = Substitute.For<ITradeOpportunityRepository>();
     public IShipAssignmentRepository ShipAssignmentRepository { get; } = Substitute.For<IShipAssignmentRepository>();
     public IRateLimitStatus RateLimitStatus { get; } = Substitute.For<IRateLimitStatus>();
+    public ILeaderElection LeaderElection { get; } = Substitute.For<ILeaderElection>();
+    public ICreditHistoryService CreditHistory { get; } = Substitute.For<ICreditHistoryService>();
 
     public SpaceTradersApiFactory()
     {
@@ -158,6 +160,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
         SettingsRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<(string, string, string, string)>());
         TradeOpportunityRepository.GetBestRouteForCapacityAsync(default, default, default, default)
             .ReturnsForAnyArgs((TradeOpportunityDto?)null);
+        LeaderElection.IsLeader.Returns(true);
+        CreditHistory.GetHistory().Returns(Array.Empty<(DateTimeOffset, long)>());
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -193,6 +197,15 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IRateLimitStatus>();
             services.AddSingleton(RateLimitStatus);
+
+            services.RemoveAll<ILeaderElection>();
+            services.AddSingleton(LeaderElection);
+
+            services.RemoveAll<ICreditHistoryService>();
+            services.AddSingleton(CreditHistory);
+
+            services.RemoveAll<ILeaderLeaseRepository>();
+            services.AddScoped(_ => Substitute.For<ILeaderLeaseRepository>());
 
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();

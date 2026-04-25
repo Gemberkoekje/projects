@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ISettingsRepository, SettingsRepository>();
         services.AddScoped<ITradeOpportunityRepository, TradeOpportunityRepository>();
         services.AddScoped<IWaypointRepository, WaypointRepository>();
+        services.AddScoped<ILeaderLeaseRepository, LeaderLeaseRepository>();
 
         return services;
     }
