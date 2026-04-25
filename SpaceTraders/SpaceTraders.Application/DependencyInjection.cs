@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Services;
 using Wolverine;
 using Wolverine.ErrorHandling;
 
@@ -8,6 +10,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
+
         services.AddWolverine(opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);

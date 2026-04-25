@@ -24,7 +24,7 @@ public sealed class GetAllShipsQueryHandler(IShipRepository ships)
         var all = await ships.GetAllAsync(cancellationToken);
         return all.Select(s => new ShipDto(
             s.Symbol, s.SystemSymbol, s.WaypointSymbol, s.Status, s.FlightMode,
-            s.FuelCurrent, s.FuelCapacity, 0, 0,
+            s.FuelCurrent, s.FuelCapacity, s.CargoCurrent, s.CargoCapacity,
             s.ArrivesAt, s.ArrivesAt.HasValue && s.ArrivesAt > DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow)).ToList();
     }
@@ -47,3 +47,47 @@ public sealed class GetRateLimitStatusQueryHandler(IRateLimitStatus status)
             status.Remaining, status.Limit, status.BurstRemaining, status.BurstLimit,
             status.ResetAt, status.LimitType, status.TotalRequests, status.ThrottledCount));
 }
+
+public record GetSettingsQuery;
+
+public sealed class GetSettingsQueryHandler(ISettingsRepository settings)
+{
+    public async Task<IReadOnlyList<SettingDto>> Handle(GetSettingsQuery query, CancellationToken cancellationToken)
+    {
+        var all = await settings.GetAllAsync(cancellationToken);
+        return all.Select(s => new SettingDto(s.Key, s.Value, s.Type, s.Description)).ToList();
+    }
+}
+
+public record GetActivityLogQuery(int Page = 1, int PageSize = 50, string? ShipFilter = null);
+
+public sealed class GetActivityLogQueryHandler(IActivityLogRepository activityLog)
+{
+    public async Task<IReadOnlyList<ActivityLogDto>> Handle(GetActivityLogQuery query, CancellationToken cancellationToken)
+        => await activityLog.GetPagedAsync(query.Page, query.PageSize, query.ShipFilter, cancellationToken);
+}
+
+public record GetBestTradeRouteQuery(int CargoCapacity, int MinProfitPerUnit = 0, int MaxDistanceJumps = 5);
+
+public sealed class GetBestTradeRouteQueryHandler(
+    ITradeOpportunityRepository tradeOpportunities,
+    ISettingsRepository settings)
+{
+    private const int DefaultMinProfitPerUnit = 200;
+    private const int DefaultMaxHaulDistance = 5;
+
+    public async Task<TradeOpportunityDto?> Handle(GetBestTradeRouteQuery query, CancellationToken cancellationToken)
+    {
+        var minProfit = query.MinProfitPerUnit > 0
+            ? query.MinProfitPerUnit
+            : (await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken) is var m and > 0 ? m : DefaultMinProfitPerUnit);
+
+        var maxDistance = query.MaxDistanceJumps > 0
+            ? query.MaxDistanceJumps
+            : (await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken) is var d and > 0 ? d : DefaultMaxHaulDistance);
+
+        return await tradeOpportunities.GetBestRouteForCapacityAsync(
+            query.CargoCapacity, minProfit, maxDistance, cancellationToken);
+    }
+}
+

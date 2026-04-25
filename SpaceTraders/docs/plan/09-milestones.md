@@ -4,11 +4,11 @@
 
 ## Current Status
 
-> **Active phase: Phase 1 – Foundation (nearly complete) / Phase 2 – Automation Core (started)**
+> **Active phase: Phase 2 – Automation Core**
 
 | Phase | Status |
 |-------|--------|
-| Phase 1 – Foundation | 🔄 In progress |
+| Phase 1 – Foundation | ✅ Complete |
 | Phase 2 – Automation Core | 🔄 In progress |
 | Phase 3 – Fleet Expansion & Contracts | ⬜ Not started |
 | Phase 4 – Mining & Scouting | ⬜ Not started |
@@ -29,8 +29,8 @@ Build vertically – each phase delivers a running, useful application, not just
 **Related docs:** [01-domain.md](01-domain.md) · [02-rate-limiter.md](02-rate-limiter.md) · [03-persistence.md](03-persistence.md) · [12-local-dev.md](12-local-dev.md) · [11-testing.md](11-testing.md)
 
 ### Tasks
-- [ ] Domain entities & value objects (`01-domain.md`)
-- [ ] Rate-limiting `DelegatingHandler` chain with dual token bucket (`02-rate-limiter.md`)
+- [x] Domain entities & value objects (`01-domain.md`)
+- [x] Rate-limiting `DelegatingHandler` chain with dual token bucket (`02-rate-limiter.md`)
 - [x] `SpaceTradersApiClient` expanded: `SellCargo`, `BuyCargo`, `Navigate`, `Dock`, `Orbit`, `Extract`, `PurchaseShip`, `AcceptContract`, `DeliverContract`, `FulfillContract`, `GetMarket`, `GetShipyard`, `Refuel`
 - [x] **All POST/PATCH handlers apply response data directly to cache** – no follow-up GETs
 - [x] EF Core + PostgreSQL (Npgsql) setup
@@ -63,14 +63,14 @@ Build vertically – each phase delivers a running, useful application, not just
 
 ### Tasks
 - [x] Full domain events wired through Wolverine
-- [ ] `ShipWorkerService` with Trade assignment state machine
-- [ ] `AssignShipAfterSaleHandler` – assigns best trade route on cargo sold
-- [ ] `TradeAnalyser` – scores routes from MarketData cache
-- [ ] `TradeOpportunity` table computed and refreshed
-- [x] All persistence repositories implemented
+- [x] `ShipWorkerService` with Trade assignment state machine
+- [x] `AssignShipAfterSaleHandler` – assigns best trade route on cargo sold
+- [x] `TradeAnalyser` – scores routes from MarketData cache
+- [x] `TradeOpportunity` table computed and refreshed
+- [x] All persistence repositories implemented (`SettingsRepository`, `TradeOpportunityRepository`, etc.)
 - [x] Settings store with default seed values
-- [ ] `/settings` API endpoints + Razor Pages Settings page
-- [ ] Activity log persisted and shown in `/log` page
+- [x] `/settings` Razor Pages Settings page
+- [x] Activity log persisted and shown in `/log` page
 - [ ] Integration tests for persistence layer (Testcontainers) – see `11-testing.md §11.4`
 - [x] Handler unit tests covering no-GET-after-POST rule – see `11-testing.md §11.3`
 

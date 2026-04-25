@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 
@@ -17,5 +19,23 @@ public sealed class ActivityLogRepository(SpaceTradersDbContext db) : IActivityL
         });
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ActivityLogDto>> GetPagedAsync(int page = 1, int pageSize = 50, string? shipFilter = null, CancellationToken cancellationToken = default)
+    {
+        var query = db.ActivityLogs.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(shipFilter))
+            query = query.Where(l => l.ShipSymbol == shipFilter);
+
+        var items = await query
+            .OrderByDescending(l => l.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return items.Select(l => new ActivityLogDto(
+            l.Id, l.Timestamp, l.ShipSymbol, l.EventType, l.Message, l.JsonDetails))
+            .ToList();
     }
 }
