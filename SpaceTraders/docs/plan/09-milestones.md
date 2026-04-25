@@ -4,17 +4,16 @@
 
 ## Current Status
 
-> **Active phase: Phase 3 – Fleet Expansion & Contracts**
+> **Active phase: Phase 4 – Mining & Scouting**
 
 | Phase | Status |
 |-------|--------|
 | Phase 1 – Foundation | ✅ Complete |
 | Phase 2 – Automation Core | ✅ Complete |
-| Phase 3 – Fleet Expansion & Contracts | 🔄 In progress |
-| Phase 4 – Mining & Scouting | ⬜ Not started |
+| Phase 3 – Fleet Expansion & Contracts | ✅ Complete |
+| Phase 4 – Mining & Scouting | 🔄 In progress |
 | Phase 5 – Kubernetes & Hardening | ⬜ Not started |
 | Phase 6 – Polish & Observability | ⬜ Not started |
-
 ---
 
 ## Philosophy
@@ -93,14 +92,14 @@ Build vertically – each phase delivers a running, useful application, not just
 **Related docs:** [05-automation-engine.md](05-automation-engine.md) · [07-ui.md](07-ui.md)
 
 ### Tasks
-- [ ] `FleetExpansionDecisionHandler` – buy ship when credits allow
-- [ ] `PurchaseShipCommand` + handler
-- [ ] `InitialAssignmentHandler` – new ship gets Scout then Trade mission
-- [ ] `ContractWatchService` + deadline events
-- [ ] Contract fulfillment assignment type
-- [ ] `AcceptContractCommand`, `DeliverContractCommand`, `FulfillContractCommand` handlers
-- [ ] Contracts page in dashboard
-- [ ] Market explorer page
+- [x] `FleetExpansionDecisionHandler` – buy ship when credits allow
+- [x] `PurchaseShipCommand` + handler
+- [x] `InitialAssignmentHandler` – new ship gets Trade mission (Scout first is planned for Phase 4)
+- [x] `ContractWatchService` + deadline events
+- [x] Contract fulfillment assignment type
+- [x] `AcceptContractCommand`, `DeliverContractCommand`, `FulfillContractCommand` handlers
+- [x] Contracts page in dashboard
+- [x] Market explorer page
 
 **Definition of Done:**
 - All tasks above checked off.

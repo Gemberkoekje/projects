@@ -1,0 +1,98 @@
+@page
+@model SpaceTraders.App.Pages.Market.IndexModel
+@{
+    ViewData["Title"] = "Market Explorer";
+}
+
+<div class="mb-4">
+    <h1 class="display-5">Market Explorer</h1>
+    <p class="text-muted mb-0">Known markets and best trade routes from the local cache.</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Best Trade Routes</div>
+            <div class="card-body p-0">
+                @if (Model.TopRoutes.Count == 0)
+                {
+                    <div class="p-3 text-muted">No trade routes computed yet. Market data will be populated as ships visit markets.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Good</th>
+                                    <th>Buy At</th>
+                                    <th>Sell At</th>
+                                    <th>Buy Price</th>
+                                    <th>Sell Price</th>
+                                    <th>Profit/Unit</th>
+                                    <th>Distance</th>
+                                    <th>Profit/Jump</th>
+                                    <th>Computed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var route in Model.TopRoutes)
+                            {
+                                <tr>
+                                    <td><code>@route.TradeSymbol</code></td>
+                                    <td class="text-nowrap">@route.BuyWaypoint</td>
+                                    <td class="text-nowrap">@route.SellWaypoint</td>
+                                    <td class="text-end">@route.BuyPrice.ToString("N0")</td>
+                                    <td class="text-end">@route.SellPrice.ToString("N0")</td>
+                                    <td class="text-end fw-semibold @(route.ProfitPerUnit >= 500 ? "text-success" : route.ProfitPerUnit >= 200 ? "" : "text-danger")">
+                                        @route.ProfitPerUnit.ToString("N0")
+                                    </td>
+                                    <td class="text-center">@route.DistanceJumps</td>
+                                    <td class="text-end">@route.ProfitPerJump.ToString("N0")</td>
+                                    <td class="text-nowrap text-muted small">@route.ComputedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Known Markets</div>
+            <div class="card-body p-0">
+                @if (Model.Markets.Count == 0)
+                {
+                    <div class="p-3 text-muted">No market data available yet.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Waypoint</th>
+                                    <th>System</th>
+                                    <th>Last Observed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var market in Model.Markets)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@market.WaypointSymbol</td>
+                                    <td class="text-nowrap">@market.SystemSymbol</td>
+                                    <td class="text-nowrap text-muted small">@market.LastObservedAt.ToLocalTime().ToString("g")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
