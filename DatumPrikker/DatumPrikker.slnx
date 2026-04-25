@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path=".net.csproj" />
+  <Project Path="DatumPrikker.ApiService/DatumPrikker.ApiService.csproj" />
+  <Project Path="DatumPrikker.AppHost/DatumPrikker.AppHost.csproj" />
+  <Project Path="DatumPrikker.ServiceDefaults/DatumPrikker.ServiceDefaults.csproj" />
+  <Project Path="DatumPrikker.Tests/DatumPrikker.Tests.csproj" />
+  <Project Path="DatumPrikker.Web/DatumPrikker.Web.csproj" />
+</Solution>

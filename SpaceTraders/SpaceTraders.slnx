@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.csproj" />
+    <Project Path="tests/SpaceTraders.Domain.Tests/SpaceTraders.Domain.Tests.csproj" />
+  </Folder>
+  <Project Path="SpaceTraders.API/SpaceTraders.API.csproj" />
+  <Project Path="SpaceTraders.App/SpaceTraders.App.csproj" />
+  <Project Path="SpaceTraders.Application/SpaceTraders.Application.csproj" />
+  <Project Path="SpaceTraders.Domain/SpaceTraders.Domain.csproj" />
+  <Project Path="SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj" />
+  <Project Path="SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
+</Solution>

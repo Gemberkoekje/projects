@@ -1,0 +1,11 @@
+@inject NavigationManager Navigation
+
+@code {
+    protected override void OnInitialized()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var returnPath = string.IsNullOrWhiteSpace(relative) ? "/" : $"/{relative}";
+        var encoded = Uri.EscapeDataString(returnPath);
+        Navigation.NavigateTo($"/login?returnUrl={encoded}", true);
+    }
+}

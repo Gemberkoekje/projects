@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>SpaceTraders-API</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SpaceTraders.Application\SpaceTraders.Application.csproj" />
+    <ProjectReference Include="..\SpaceTraders.Infrastructure.Persistence\SpaceTraders.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="..\SpaceTraders.Infrastructure.SpaceTradersAPI\SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
+  </ItemGroup>
+
+</Project>

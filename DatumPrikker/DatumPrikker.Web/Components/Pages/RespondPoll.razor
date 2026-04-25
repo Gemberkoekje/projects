@@ -1,0 +1,195 @@
+@page "/poll/{ShareToken}"
+@inject PollsApiClient PollsApiClient
+
+<PageTitle>Respond to Poll</PageTitle>
+
+<h1>Respond to Poll</h1>
+
+@if (IsLoading)
+{
+    <p>Loading poll...</p>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else if (Poll is null)
+{
+    <p>Poll not found.</p>
+}
+else
+{
+    <h2 class="h4">@Poll.Title</h2>
+    <p>@Poll.Description</p>
+
+    @if (!Poll.IsOpen)
+    {
+        <div class="alert alert-warning" role="alert">This poll is closed.</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+    {
+        <div class="alert alert-success" role="alert">@SuccessMessage</div>
+    }
+
+    @if (!PollsApiClient.IsAuthenticated())
+    {
+        <div class="mb-3">
+            <label class="form-label" for="respondentName">Your name</label>
+            <input id="respondentName" class="form-control" @bind="RespondentName" />
+        </div>
+    }
+    else
+    {
+        <p><strong>Signed in as:</strong> @RespondentName</p>
+    }
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>From</th>
+                <th>Until</th>
+                <th>Availability</th>
+                <th>Reason (optional)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in ResponseRows)
+            {
+                <tr>
+                    <td>@row.Date</td>
+                    <td>@row.StartTime</td>
+                    <td>@row.EndTime</td>
+                    <td>
+                        <select class="form-select" @bind="row.Availability" disabled="@(!Poll.IsOpen || IsSubmitting)">
+                            <option value="@PollAvailability.None">No answer</option>
+                            <option value="@PollAvailability.Yes">Yes</option>
+                            <option value="@PollAvailability.Maybe">Maybe</option>
+                            <option value="@PollAvailability.No">No</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input class="form-control" @bind="row.Reason" disabled="@(!Poll.IsOpen || IsSubmitting)" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button class="btn btn-primary" @onclick="SubmitAsync" disabled="@(!Poll.IsOpen || IsSubmitting)">Submit response</button>
+}
+
+@code {
+    [Parameter]
+    public string ShareToken { get; set; } = string.Empty;
+
+    private bool IsLoading { get; set; } = true;
+    private bool IsSubmitting { get; set; }
+    private string ErrorMessage { get; set; } = string.Empty;
+    private string SuccessMessage { get; set; } = string.Empty;
+    private string RespondentName { get; set; } = string.Empty;
+
+    private PollDetailsDto Poll { get; set; } = null!;
+    private List<ResponseRow> ResponseRows { get; } = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        try
+        {
+            Poll = await PollsApiClient.GetPollAsync(ShareToken);
+            ResponseRows.Clear();
+            foreach (var option in Poll.Options)
+            {
+                ResponseRows.Add(new ResponseRow(
+                    option.PollOptionId,
+                    option.Date,
+                    option.StartTime,
+                    option.EndTime,
+                    PollAvailability.None,
+                    string.Empty));
+            }
+
+            RespondentName = PollsApiClient.GetAuthenticatedDisplayName();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Poll = null!;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (Poll is null)
+        {
+            return;
+        }
+
+        if (!PollsApiClient.IsAuthenticated() && string.IsNullOrWhiteSpace(RespondentName))
+        {
+            ErrorMessage = "Your name is required when you are not signed in.";
+            return;
+        }
+
+        if (ResponseRows.TrueForAll(row => row.Availability == PollAvailability.None))
+        {
+            ErrorMessage = "Select an availability for at least one option.";
+            return;
+        }
+
+        IsSubmitting = true;
+        ErrorMessage = string.Empty;
+        SuccessMessage = string.Empty;
+
+        try
+        {
+            var payload = new SubmitResponsesRequestDto(
+                RespondentName.Trim(),
+                ResponseRows.ConvertAll(row => new SubmitResponseInputDto(row.PollOptionId, row.Availability, row.Reason.Trim())));
+
+            await PollsApiClient.SubmitResponsesAsync(ShareToken, payload);
+            SuccessMessage = "Response saved.";
+        }
+        catch (PollClosedException)
+        {
+            ErrorMessage = "This poll is closed and no longer accepts responses.";
+        }
+        catch (RateLimitedException)
+        {
+            ErrorMessage = "Too many submissions. Please wait a few minutes before trying again.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private sealed class ResponseRow(
+        Guid pollOptionId,
+        DateOnly date,
+        TimeOnly startTime,
+        TimeOnly endTime,
+        PollAvailability availability,
+        string reason)
+    {
+        public Guid PollOptionId { get; set; } = pollOptionId;
+        public DateOnly Date { get; set; } = date;
+        public TimeOnly StartTime { get; set; } = startTime;
+        public TimeOnly EndTime { get; set; } = endTime;
+        public PollAvailability Availability { get; set; } = availability;
+        public string Reason { get; set; } = reason;
+    }
+}

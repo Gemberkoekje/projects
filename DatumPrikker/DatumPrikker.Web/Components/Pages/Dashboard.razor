@@ -1,0 +1,119 @@
+@page "/dashboard"
+@attribute [Authorize]
+@inject PollsApiClient PollsApiClient
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+<p>
+    <a class="btn btn-primary" href="/polls/create">Create poll</a>
+</p>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else if (IsLoading)
+{
+    <p>Loading polls...</p>
+}
+else if (Polls.Count == 0)
+{
+    <p>No polls yet.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Options</th>
+                <th>Responses</th>
+                <th>Share link</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var poll in Polls)
+            {
+                <tr>
+                    <td>@poll.Title</td>
+                    <td>@(poll.IsOpen ? "Open" : "Closed")</td>
+                    <td>@poll.OptionsCount</td>
+                    <td>@poll.ResponsesCount</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" @onclick="() => CopyShareLinkAsync(poll.ShareToken)">
+                            @(CopiedShareToken == poll.ShareToken ? "Copied!" : "Copy link")
+                        </button>
+                    </td>
+                    <td>
+                        <a class="btn btn-sm btn-outline-secondary" href="@($"/poll/{poll.ShareToken}")">Open</a>
+                        <a class="btn btn-sm btn-outline-primary ms-1" href="@($"/poll/{poll.ShareToken}/results")">Results</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool IsLoading { get; set; } = true;
+
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    private string CopiedShareToken { get; set; } = string.Empty;
+
+    private IReadOnlyList<PollSummaryDto> Polls { get; set; } = [];
+
+    private IJSObjectReference ClipboardModule { get; set; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Polls = await PollsApiClient.GetOwnerPollsAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            ClipboardModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/clipboard.js");
+        }
+    }
+
+    private async Task CopyShareLinkAsync(string shareToken)
+    {
+        try
+        {
+            var absoluteUrl = Navigation.ToAbsoluteUri($"/poll/{shareToken}").ToString();
+            await ClipboardModule.InvokeVoidAsync("copyToClipboard", absoluteUrl);
+            CopiedShareToken = shareToken;
+            StateHasChanged();
+
+            await Task.Delay(2000);
+            if (CopiedShareToken == shareToken)
+            {
+                CopiedShareToken = string.Empty;
+                StateHasChanged();
+            }
+        }
+        catch (Exception)
+        {
+            CopiedShareToken = string.Empty;
+        }
+    }
+}

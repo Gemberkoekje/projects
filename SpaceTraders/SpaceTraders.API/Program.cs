@@ -1,0 +1,33 @@
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using SpaceTraders.Application;
+using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.SpaceTradersAPI;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+using SpaceTraders.API.Services;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddApplication()
+    .AddPersistence(builder.Configuration)
+    .AddSpaceTradersApi(options =>
+    {
+        builder.Configuration.GetSection("SpaceTradersApi").Bind(options);
+        options.BaseUrl ??= SpaceTradersApiOptions.DefaultBaseUrl;
+        options.AccountToken ??= builder.Configuration["SpaceTraders:AccountToken"];
+        options.AgentToken ??= builder.Configuration["SpaceTraders:AgentToken"];
+    });
+
+builder.Services.AddHostedService<AgentBootstrapService>();
+builder.Services.AddHostedService<StartupSyncService>();
+
+var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+}
+
+app.Run();

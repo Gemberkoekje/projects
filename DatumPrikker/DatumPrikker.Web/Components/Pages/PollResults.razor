@@ -1,0 +1,101 @@
+@page "/poll/{ShareToken}/results"
+@attribute [Authorize]
+@inject PollsApiClient PollsApiClient
+
+<PageTitle>Poll Results</PageTitle>
+
+<h1>Poll Results</h1>
+
+@if (IsLoading)
+{
+    <p>Loading results...</p>
+}
+else if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+else
+{
+    <h2 class="h4">@Results.Title</h2>
+
+    @if (Results.Options.Count == 0)
+    {
+        <p>No options found.</p>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>From</th>
+                    <th>Until</th>
+                    <th>Yes</th>
+                    <th>Maybe</th>
+                    <th>No</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var option in Results.Options)
+                {
+                    <tr>
+                        <td>@option.Date</td>
+                        <td>@option.StartTime</td>
+                        <td>@option.EndTime</td>
+                        <td>@option.YesCount</td>
+                        <td>@option.MaybeCount</td>
+                        <td>@option.NoCount</td>
+                    </tr>
+                    @if (option.Respondents.Count > 0)
+                    {
+                        <tr>
+                            <td colspan="6">
+                                <ul class="mb-0">
+                                    @foreach (var respondent in option.Respondents)
+                                    {
+                                        <li><strong>@respondent.RespondentName</strong>: @respondent.Availability @FormatReason(respondent.Reason)</li>
+                                    }
+                                </ul>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter]
+    public string ShareToken { get; set; } = string.Empty;
+
+    private bool IsLoading { get; set; } = true;
+    private string ErrorMessage { get; set; } = string.Empty;
+
+    private PollResultsDto Results { get; set; } = new(Guid.Empty, string.Empty, string.Empty, []);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        IsLoading = true;
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            Results = await PollsApiClient.GetPollResultsAsync(ShareToken);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+            Results = new PollResultsDto(Guid.Empty, string.Empty, string.Empty, []);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string FormatReason(string reason)
+    {
+        return string.IsNullOrWhiteSpace(reason) ? string.Empty : $"({reason})";
+    }
+}

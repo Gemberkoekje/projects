@@ -1,0 +1,16 @@
+﻿@page "/"
+
+<PageTitle>DatumPrikker</PageTitle>
+
+<h1>DatumPrikker</h1>
+
+<p>Create and share scheduling polls.</p>
+
+<AuthorizeView>
+    <Authorized>
+        <a class="btn btn-primary" href="/dashboard">Open dashboard</a>
+    </Authorized>
+    <NotAuthorized>
+        <a class="btn btn-primary" href="/login">Login to start</a>
+    </NotAuthorized>
+</AuthorizeView>

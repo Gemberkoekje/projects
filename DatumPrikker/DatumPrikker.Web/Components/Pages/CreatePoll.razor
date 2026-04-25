@@ -1,0 +1,243 @@
+@page "/polls/create"
+@using System.ComponentModel.DataAnnotations
+@attribute [Authorize]
+@inject PollsApiClient PollsApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Create Poll</PageTitle>
+
+<h1>Create Poll</h1>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(CreatedShareToken))
+{
+    <div class="alert alert-success" role="alert">
+        Poll created: <a href="@($"/poll/{CreatedShareToken}")">@($"/poll/{CreatedShareToken}")</a>
+    </div>
+}
+
+<EditForm Model="FormModel" OnValidSubmit="CreatePollAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label" for="title">Title</label>
+        <InputText id="title" class="form-control" @bind-Value="FormModel.Title" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="description">Description</label>
+        <InputTextArea id="description" class="form-control" @bind-Value="FormModel.Description" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="closesAt">Close date and time (optional)</label>
+        <input id="closesAt" class="form-control" type="datetime-local" value="@FormModel.ClosesAtLocalText" @oninput="OnClosesAtChanged" />
+    </div>
+
+    <h2 class="h5">Options</h2>
+
+    @if (FormModel.Options.Count == 0)
+    {
+        <p>No options added yet.</p>
+    }
+    else
+    {
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>From</th>
+                    <th>Until</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var option in FormModel.Options)
+                {
+                    <tr>
+                        <td>@option.Date</td>
+                        <td>@option.StartTime</td>
+                        <td>@option.EndTime</td>
+                        <td>
+                            <button class="btn btn-outline-danger btn-sm" type="button" @onclick="() => RemoveOption(option.Id)">Remove</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-4">
+            <label class="form-label" for="newDate">Date</label>
+            <input id="newDate" class="form-control" type="date" value="@NewDateText" @oninput="OnNewDateChanged" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="newStart">From</label>
+            <input id="newStart" class="form-control" type="time" value="@NewStartTimeText" @oninput="OnNewStartTimeChanged" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="newEnd">Until</label>
+            <input id="newEnd" class="form-control" type="time" value="@NewEndTimeText" @oninput="OnNewEndTimeChanged" />
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-outline-secondary w-100" type="button" @onclick="AddOption">Add</button>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary" disabled="@IsSaving">Create poll</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="OpenDashboard">Back to dashboard</button>
+    </div>
+</EditForm>
+
+@code {
+    private readonly CreatePollFormModel FormModel = new();
+    private string ErrorMessage { get; set; } = string.Empty;
+    private string CreatedShareToken { get; set; } = string.Empty;
+    private bool IsSaving { get; set; }
+
+    private string NewDateText { get; set; } = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
+    private string NewStartTimeText { get; set; } = "09:00";
+    private string NewEndTimeText { get; set; } = "10:00";
+
+    private void AddOption()
+    {
+        if (!DateOnly.TryParse(NewDateText, out var date)
+            || !TimeOnly.TryParse(NewStartTimeText, out var startTime)
+            || !TimeOnly.TryParse(NewEndTimeText, out var endTime))
+        {
+            ErrorMessage = "Provide a valid date and time range.";
+            return;
+        }
+
+        if (startTime >= endTime)
+        {
+            ErrorMessage = "The start time must be earlier than the end time.";
+            return;
+        }
+
+        var duplicate = FormModel.Options.Exists(option =>
+            option.Date == date
+            && option.StartTime == startTime
+            && option.EndTime == endTime);
+
+        if (duplicate)
+        {
+            ErrorMessage = "This option already exists.";
+            return;
+        }
+
+        FormModel.Options.Add(new CreatePollOptionFormModel(Guid.NewGuid(), date, startTime, endTime));
+        ErrorMessage = string.Empty;
+    }
+
+    private void RemoveOption(Guid optionId)
+    {
+        FormModel.Options.RemoveAll(option => option.Id == optionId);
+    }
+
+    private async Task CreatePollAsync()
+    {
+        if (FormModel.Options.Count == 0)
+        {
+            ErrorMessage = "Add at least one option.";
+            return;
+        }
+
+        if (!TryParseOptionalCloseDateUtc(FormModel.ClosesAtLocalText, out var closesAtUtc))
+        {
+            ErrorMessage = "Close date is invalid.";
+            return;
+        }
+
+        IsSaving = true;
+        ErrorMessage = string.Empty;
+
+        try
+        {
+            var request = new CreatePollRequestDto(
+                FormModel.Title.Trim(),
+                FormModel.Description.Trim(),
+                closesAtUtc,
+                FormModel.Options.ConvertAll(option =>
+                    new CreatePollOptionRequestDto(option.Date, option.StartTime, option.EndTime)));
+
+            var response = await PollsApiClient.CreatePollAsync(request);
+            CreatedShareToken = response.ShareToken;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private static bool TryParseOptionalCloseDateUtc(string value, out DateTimeOffset? closesAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            closesAtUtc = null;
+            return true;
+        }
+
+        if (!DateTime.TryParse(value, out var parsedLocalDateTime))
+        {
+            closesAtUtc = null;
+            return false;
+        }
+
+        var localDateTime = DateTime.SpecifyKind(parsedLocalDateTime, DateTimeKind.Local);
+        closesAtUtc = localDateTime.ToUniversalTime();
+        return true;
+    }
+
+    private void OpenDashboard()
+    {
+        Navigation.NavigateTo("/dashboard");
+    }
+
+    private void OnClosesAtChanged(ChangeEventArgs args)
+    {
+        FormModel.ClosesAtLocalText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnNewDateChanged(ChangeEventArgs args)
+    {
+        NewDateText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnNewStartTimeChanged(ChangeEventArgs args)
+    {
+        NewStartTimeText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnNewEndTimeChanged(ChangeEventArgs args)
+    {
+        NewEndTimeText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private sealed class CreatePollFormModel
+    {
+        [Required]
+        [MaxLength(200)]
+        public string Title { get; set; } = string.Empty;
+
+        [MaxLength(2000)]
+        public string Description { get; set; } = string.Empty;
+
+        public string ClosesAtLocalText { get; set; } = string.Empty;
+
+        public List<CreatePollOptionFormModel> Options { get; } = [];
+    }
+
+    private sealed record CreatePollOptionFormModel(Guid Id, DateOnly Date, TimeOnly StartTime, TimeOnly EndTime);
+}

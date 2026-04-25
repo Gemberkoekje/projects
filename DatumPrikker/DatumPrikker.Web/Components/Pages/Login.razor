@@ -1,0 +1,47 @@
+@page "/login"
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+
+<PageTitle>Login</PageTitle>
+
+<h1>Login</h1>
+<p>Select a provider to continue.</p>
+
+@if (!HasAnyProvider)
+{
+    <p>No login providers are configured.</p>
+}
+else
+{
+    <div class="d-flex gap-2">
+        @if (HasGoogle)
+        {
+            <a class="btn btn-outline-dark" href='@BuildLoginLink("Google")'>Sign in with Google</a>
+        }
+        @if (HasMicrosoft)
+        {
+            <a class="btn btn-outline-primary" href='@BuildLoginLink("Microsoft")'>Sign in with Microsoft</a>
+        }
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery]
+    public string ReturnUrl { get; set; } = "/";
+
+    private bool HasGoogle =>
+        !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientId"])
+        && !string.IsNullOrWhiteSpace(Configuration["Authentication:Google:ClientSecret"]);
+
+    private bool HasMicrosoft =>
+        !string.IsNullOrWhiteSpace(Configuration["Authentication:Microsoft:ClientId"])
+        && !string.IsNullOrWhiteSpace(Configuration["Authentication:Microsoft:ClientSecret"]);
+
+    private bool HasAnyProvider => HasGoogle || HasMicrosoft;
+
+    private string BuildLoginLink(string provider)
+    {
+        var encodedReturnUrl = Uri.EscapeDataString(ReturnUrl);
+        return $"/auth/login/{provider}?returnUrl={encodedReturnUrl}";
+    }
+}
