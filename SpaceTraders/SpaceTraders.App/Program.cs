@@ -1,4 +1,5 @@
 using SpaceTraders.Infrastructure.Persistence;
+using SpaceTraders.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ await using (var scope = app.Services.CreateAsyncScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
     await dbContext.Database.EnsureCreatedAsync();
+    await DefaultSettingsSeed.SeedAsync(dbContext);
 }
 
 if (!app.Environment.IsDevelopment())
