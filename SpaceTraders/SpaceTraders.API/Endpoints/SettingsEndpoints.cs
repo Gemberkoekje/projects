@@ -29,9 +29,7 @@ public static class SettingsEndpoints
         group.MapPost("/reset", async (IServiceProvider sp, CancellationToken ct) =>
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
-            var all = await settings.GetAllAsync(ct);
-            foreach (var s in all)
-                await settings.SetAsync(s.Key, s.Value, ct);
+            await settings.ResetToDefaultsAsync(ct);
             return Results.Ok();
         });
 

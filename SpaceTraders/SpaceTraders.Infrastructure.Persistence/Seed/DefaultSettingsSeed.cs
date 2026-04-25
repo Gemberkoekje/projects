@@ -20,6 +20,9 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
     ];
 
+    /// <summary>
+    /// Seeds missing settings (does not overwrite existing values).
+    /// </summary>
     public static async Task SeedAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
     {
         var existingKeys = await db.Settings
@@ -31,6 +34,31 @@ public static class DefaultSettingsSeed
         {
             if (!existingKeys.Contains(setting.Key))
                 db.Settings.Add(setting);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Overwrites all settings with their original default values.
+    /// </summary>
+    public static async Task ResetAsync(SpaceTradersDbContext db, CancellationToken cancellationToken = default)
+    {
+        foreach (var defaultSetting in Defaults)
+        {
+            var existing = await db.Settings
+                .FirstOrDefaultAsync(s => s.Key == defaultSetting.Key, cancellationToken);
+
+            if (existing is null)
+                db.Settings.Add(new AgentSetting
+                {
+                    Key = defaultSetting.Key,
+                    Value = defaultSetting.Value,
+                    Type = defaultSetting.Type,
+                    Description = defaultSetting.Description
+                });
+            else
+                existing.Value = defaultSetting.Value;
         }
 
         await db.SaveChangesAsync(cancellationToken);

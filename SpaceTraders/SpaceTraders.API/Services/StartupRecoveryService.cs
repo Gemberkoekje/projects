@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.ValueObjects;
 using SpaceTraders.Infrastructure.Persistence;
@@ -16,13 +17,15 @@ namespace SpaceTraders.API.Services;
 ///  - Ship has no ArrivesAt         → resume at persisted StepIndex; no action needed here.
 ///
 /// Only issues a full API sync when the last sync is older than
-/// <see cref="RecoverySyncThresholdMinutes"/> (default: 60 min).
+/// <c>StartupRecovery:SyncThresholdMinutes</c> (default: 60).
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
+    IConfiguration configuration,
     ILogger<StartupRecoveryService> logger) : IHostedService
 {
-    private const int RecoverySyncThresholdMinutes = 60;
+    private int RecoverySyncThresholdMinutes =>
+        configuration.GetValue("StartupRecovery:SyncThresholdMinutes", 60);
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
