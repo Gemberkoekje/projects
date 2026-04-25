@@ -100,7 +100,7 @@ public sealed class ScoutService(
                     "Scout",
                     OriginWaypoint: waypoint.Symbol));
 
-                // Only assign one scout per ship per tick; re-evaluate next tick
+                // Only assign one scout per system per tick; re-evaluate next tick
                 break;
             }
         }

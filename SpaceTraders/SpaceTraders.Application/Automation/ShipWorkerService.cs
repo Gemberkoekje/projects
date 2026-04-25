@@ -248,14 +248,10 @@ public sealed class ShipWorkerService(
                     break;
 
                 case 5: // Sell all cargo
-                    if (ship.CargoCurrent > 0 && IsDocked(ship))
-                    {
-                        // Sell everything – iterate over all cargo items; for simplicity send a sell
-                        // with a placeholder symbol the SellCargo handler will use the actual ship cargo.
-                        // We reuse CargoSymbol if set, otherwise send a generic sell-all.
-                        var symbol = assignment.CargoSymbol ?? "ALL";
-                        await bus.SendAsync(new SellCargoCommand(ship.Symbol, symbol, ship.CargoCurrent));
-                    }
+                    if (assignment.CargoSymbol is not null && ship.CargoCurrent > 0 && IsDocked(ship))
+                        await bus.SendAsync(new SellCargoCommand(ship.Symbol, assignment.CargoSymbol, ship.CargoCurrent));
+                    else if (assignment.CargoSymbol is null && ship.CargoCurrent > 0)
+                        logger.LogWarning("Ship {Symbol} Mine step 5: no CargoSymbol set, skipping sell.", ship.Symbol);
                     await CompleteAssignmentAsync(assignment, assignments, cancellationToken);
                     logger.LogInformation("Ship {Symbol} completed Mine assignment.", ship.Symbol);
                     break;
