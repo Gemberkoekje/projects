@@ -14,6 +14,8 @@ public sealed class FleetExpansionDecisionHandler(
     IMessageBus bus,
     ILogger<FleetExpansionDecisionHandler> logger)
 {
+    private readonly IShipRepository _ships = ships;
+
     public async Task Handle(ShipCargoSoldEvent @event, CancellationToken cancellationToken)
         => await EvaluateExpansionAsync(cancellationToken);
 

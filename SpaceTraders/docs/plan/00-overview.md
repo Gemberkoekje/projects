@@ -1,7 +1,7 @@
 # SpaceTraders Autonomous Agent – Implementation Plan Overview
 
-> This document describes the **target architecture**.
-> Current implementation is a foundation subset (typed API client, persistence, bootstrap/sync services, basic Razor Pages dashboard).
+> This document describes the implemented architecture.
+> The current implementation covers the planned domain, API client, persistence, automation, API, Razor Pages dashboard, Kubernetes, hardening, and observability work.
 
 ## Solution Structure (current projects)
 
@@ -63,7 +63,7 @@ graph TD
     API -- "operator config changes" --> AL
 ```
 
-## Key Design Decisions (target)
+## Key Design Decisions
 
 1. **Wolverine** as the internal event/command bus.
 2. **PostgreSQL + EF Core** for the local cache.

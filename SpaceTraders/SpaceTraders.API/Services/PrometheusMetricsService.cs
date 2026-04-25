@@ -25,6 +25,8 @@ public sealed class PrometheusMetricsService(
     IRateLimitStatus rateLimitStatus,
     ILogger<PrometheusMetricsService> logger) : BackgroundService
 {
+    private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+
     private static readonly TimeSpan ScrapeInterval = TimeSpan.FromSeconds(10);
 
     private static readonly Gauge AgentCreditsGauge = Metrics

@@ -2,6 +2,7 @@ namespace SpaceTraders.Domain.Enums;
 
 public enum ShipRole
 {
+    None,
     Fabricator,
     Harvester,
     Hauler,
