@@ -16,6 +16,12 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"MountsJson\" text NULL;",
                 cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ShipType\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "UPDATE cached_ships SET \"ShipType\" = '' WHERE \"ShipType\" IS NULL;",
+                cancellationToken);
         }
 
         await DefaultSettingsSeed.SeedAsync(dbContext);

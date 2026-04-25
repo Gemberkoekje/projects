@@ -43,27 +43,34 @@ public sealed class MigrationTests : IntegrationTestBase
     }
 
     [SkippableFact]
-    public async Task InitializeAsync_AddsMountsJsonColumn_WhenDatabaseSchemaIsOutdated()
+    public async Task InitializeAsync_AddsMissingCachedShipColumns_WhenDatabaseSchemaIsOutdated()
     {
         await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"MountsJson\";");
+        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"ShipType\";");
 
         await SpaceTradersDatabaseInitializer.InitializeAsync(Db);
 
         await using var command = Db.Database.GetDbConnection().CreateCommand();
         command.CommandText = @"
-SELECT COUNT(*)
+SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = 'public'
   AND table_name = 'cached_ships'
-  AND column_name = 'MountsJson';";
+  AND column_name IN ('MountsJson', 'ShipType')
+ORDER BY column_name;";
 
         if (command.Connection is not null && command.Connection.State != ConnectionState.Open)
         {
             await command.Connection.OpenAsync();
         }
 
-        var result = await command.ExecuteScalarAsync();
+        var columns = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(0));
+        }
 
-        Convert.ToInt32(result).Should().Be(1);
+        columns.Should().BeEquivalentTo(["MountsJson", "ShipType"]);
     }
 }

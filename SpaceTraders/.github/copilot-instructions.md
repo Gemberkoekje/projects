@@ -170,3 +170,6 @@
 ## Project Guidelines
 - In Qowaiv.Validation.Abstractions, use non-generic `Result` (with `Result.OK` for success and `Result.WithMessages(...)` for failure) when no value needs to be returned, instead of `Result<bool>`.
 - When using Qowaiv Result, always check `IsValid` before accessing `Result.Value`. Accessing `Value` on an invalid result throws an exception.
+
+## Deployment Instructions
+- In this repository, deployment uses the root-level `dockerfile.api` and `dockerfile.app` files.
