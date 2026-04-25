@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/tests/">
     <Project Path="tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.csproj" />
+    <Project Path="tests/SpaceTraders.API.Tests/SpaceTraders.API.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Domain.Tests/SpaceTraders.Domain.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Infrastructure.Tests/SpaceTraders.Infrastructure.Tests.csproj" />
   </Folder>

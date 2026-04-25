@@ -4,7 +4,7 @@
 
 ## Current Status
 
-> **Active phase: Phase 5 – Kubernetes & Hardening**
+> **Active phase: Phase 6 – Polish & Observability**
 
 | Phase | Status |
 |-------|--------|
@@ -12,7 +12,7 @@
 | Phase 2 – Automation Core | ✅ Complete |
 | Phase 3 – Fleet Expansion & Contracts | ✅ Complete |
 | Phase 4 – Mining & Scouting | ✅ Complete |
-| Phase 5 – Kubernetes & Hardening | 🔄 In progress |
+| Phase 5 – Kubernetes & Hardening | ✅ Complete |
 | Phase 6 – Polish & Observability | ⬜ Not started |
 ---
 
@@ -143,16 +143,18 @@ Build vertically – each phase delivers a running, useful application, not just
 **Related docs:** [08-kubernetes.md](08-kubernetes.md) · [10-error-handling.md](10-error-handling.md) · [14-security.md](14-security.md) · [11-testing.md](11-testing.md)
 
 ### Tasks
-- [ ] All Kubernetes manifests (`08-kubernetes.md`) – PostgreSQL via CloudNativePG or managed service
-- [ ] Startup recovery – resume in-flight assignments from DB; detect arrived ships via `ArrivesAt` – see `10-error-handling.md §10.3`
-- [ ] `/health/*` endpoints fully implemented
-- [ ] `ContractPriorityHandler` – emergency reassign on deadline approaching
-- [ ] `RefuelHandler` – auto-refuel at Priority.Critical
-- [ ] `ApiUnavailabilityHandler` + auto-resume probe – see `10-error-handling.md §10.5`
-- [ ] Internal API key auth middleware
-- [ ] `.gitignore` entries for `k8s/secret.yaml`
-- [ ] `README.md` complete with deployment instructions + user-secrets setup – see `12-local-dev.md`
-- [ ] API integration tests via `WebApplicationFactory` – see `11-testing.md §11.5`
+- [x] All Kubernetes manifests (`08-kubernetes.md`) – `k8s/` directory with namespace, configmap, postgres, deployments, services, ingress; `Dockerfile.api` and `Dockerfile.app`
+- [x] Startup recovery – resume in-flight assignments from DB; detect arrived ships via `ArrivesAt` – see `10-error-handling.md §10.3`
+- [x] `/health/*` endpoints fully implemented (`/health/live`, `/health/ready`, `/health/startup`)
+- [x] `ContractPriorityHandler` – emergency reassign on deadline approaching (≤ 6h remaining)
+- [x] `ShipFuelLowHandler` – auto-refuel for docked ships below 20 % fuel; `GameLoopService` publishes `ShipFuelLowEvent`
+- [x] `ApiUnavailabilityHandler` + auto-resume probe (`ApiAvailabilityProbeCommand`) – see `10-error-handling.md §10.5`
+- [x] `IApiAvailabilityState` singleton tracks API reachability; `RetryHandler` marks unavailable/available
+- [x] Internal API key auth middleware (`X-Api-Key` header; `SPACETRADERS_INTERNAL_API_KEY` config key)
+- [x] Internal REST API endpoints: `/status/*`, `/settings/*`, `/control/*`
+- [x] `.gitignore` entries for `k8s/secret.yaml`
+- [x] `README.md` complete with deployment instructions + user-secrets setup
+- [x] API integration tests via `WebApplicationFactory` (`SpaceTraders.API.Tests`) – health probes, auth, status/settings/control endpoints
 
 **Definition of Done:**
 - All tasks above checked off.

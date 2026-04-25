@@ -404,3 +404,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# SpaceTraders – Kubernetes secrets (never commit)
+SpaceTraders/k8s/secret.yaml
