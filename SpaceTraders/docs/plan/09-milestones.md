@@ -4,13 +4,13 @@
 
 ## Current Status
 
-> **Active phase: Phase 2 – Automation Core**
+> **Active phase: Phase 3 – Fleet Expansion & Contracts**
 
 | Phase | Status |
 |-------|--------|
 | Phase 1 – Foundation | ✅ Complete |
-| Phase 2 – Automation Core | 🔄 In progress |
-| Phase 3 – Fleet Expansion & Contracts | ⬜ Not started |
+| Phase 2 – Automation Core | ✅ Complete |
+| Phase 3 – Fleet Expansion & Contracts | 🔄 In progress |
 | Phase 4 – Mining & Scouting | ⬜ Not started |
 | Phase 5 – Kubernetes & Hardening | ⬜ Not started |
 | Phase 6 – Polish & Observability | ⬜ Not started |
@@ -71,7 +71,7 @@ Build vertically – each phase delivers a running, useful application, not just
 - [x] Settings store with default seed values
 - [x] `/settings` Razor Pages Settings page
 - [x] Activity log persisted and shown in `/log` page
-- [ ] Integration tests for persistence layer (Testcontainers) – see `11-testing.md §11.4`
+- [x] Integration tests for persistence layer (Testcontainers) – see `11-testing.md §11.4`
 - [x] Handler unit tests covering no-GET-after-POST rule – see `11-testing.md §11.3`
 
 **Definition of Done:**
