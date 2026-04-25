@@ -2,6 +2,7 @@ namespace SpaceTraders.Domain.Enums;
 
 public enum ShipType
 {
+    None,
     ShipProbe,
     ShipMiningDrone,
     ShipSiphonDrone,
