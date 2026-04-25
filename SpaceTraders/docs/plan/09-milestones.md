@@ -4,12 +4,12 @@
 
 ## Current Status
 
-> **Active phase: Phase 1 – Foundation**
+> **Active phase: Phase 1 – Foundation (nearly complete) / Phase 2 – Automation Core (started)**
 
 | Phase | Status |
 |-------|--------|
 | Phase 1 – Foundation | 🔄 In progress |
-| Phase 2 – Automation Core | ⬜ Not started |
+| Phase 2 – Automation Core | 🔄 In progress |
 | Phase 3 – Fleet Expansion & Contracts | ⬜ Not started |
 | Phase 4 – Mining & Scouting | ⬜ Not started |
 | Phase 5 – Kubernetes & Hardening | ⬜ Not started |
@@ -31,18 +31,18 @@ Build vertically – each phase delivers a running, useful application, not just
 ### Tasks
 - [ ] Domain entities & value objects (`01-domain.md`)
 - [ ] Rate-limiting `DelegatingHandler` chain with dual token bucket (`02-rate-limiter.md`)
-- [ ] `SpaceTradersApiClient` expanded: `SellCargo`, `BuyCargo`, `Navigate`, `Dock`, `Orbit`, `Extract`, `PurchaseShip`, `AcceptContract`, `DeliverContract`, `FulfillContract`, `GetMarket`, `GetShipyard`, `Refuel`
-- [ ] **All POST/PATCH handlers apply response data directly to cache** – no follow-up GETs
+- [x] `SpaceTradersApiClient` expanded: `SellCargo`, `BuyCargo`, `Navigate`, `Dock`, `Orbit`, `Extract`, `PurchaseShip`, `AcceptContract`, `DeliverContract`, `FulfillContract`, `GetMarket`, `GetShipyard`, `Refuel`
+- [x] **All POST/PATCH handlers apply response data directly to cache** – no follow-up GETs
 - [x] EF Core + PostgreSQL (Npgsql) setup
 - [x] `AgentBootstrapService` – register agent from config if no token in DB
 - [x] `IAgentTokenProvider` singleton; `SpaceTradersApiClient` uses it for bearer auth
 - [x] `dotnet user-secrets` configured for local dev (AccountToken, connection string) – see `12-local-dev.md`
-- [ ] Wolverine registered; `SyncAllShipsCommand`, `SyncContractsCommand`, `SyncAgentCommand` handlers
-- [ ] Wolverine retry & dead-letter policy configured – see `10-error-handling.md §10.2`
-- [ ] `GameLoopService` skeleton – dead-reckoning tick + startup sync only
+- [x] Wolverine registered; `SyncAllShipsCommand`, `SyncContractsCommand`, `SyncAgentCommand` handlers
+- [x] Wolverine retry & dead-letter policy configured – see `10-error-handling.md §10.2`
+- [x] `GameLoopService` skeleton – dead-reckoning tick + startup sync only
 - [x] Razor Pages dashboard: Overview + Ships list (read-only)
 - [ ] Docker image builds locally
-- [ ] Test projects scaffolded (`SpaceTraders.Domain.Tests`, `SpaceTraders.Application.Tests`) – see `11-testing.md`
+- [x] Test projects scaffolded (`SpaceTraders.Domain.Tests`, `SpaceTraders.Application.Tests`) – see `11-testing.md`
 
 **Definition of Done:**
 - All tasks above checked off.
@@ -62,17 +62,17 @@ Build vertically – each phase delivers a running, useful application, not just
 **Related docs:** [04-application-events.md](04-application-events.md) · [05-automation-engine.md](05-automation-engine.md) · [06-api.md](06-api.md) · [07-ui.md](07-ui.md) · [11-testing.md](11-testing.md)
 
 ### Tasks
-- [ ] Full domain events wired through Wolverine
+- [x] Full domain events wired through Wolverine
 - [ ] `ShipWorkerService` with Trade assignment state machine
 - [ ] `AssignShipAfterSaleHandler` – assigns best trade route on cargo sold
 - [ ] `TradeAnalyser` – scores routes from MarketData cache
 - [ ] `TradeOpportunity` table computed and refreshed
-- [ ] All persistence repositories implemented
-- [ ] Settings store with default seed values
+- [x] All persistence repositories implemented
+- [x] Settings store with default seed values
 - [ ] `/settings` API endpoints + Razor Pages Settings page
 - [ ] Activity log persisted and shown in `/log` page
 - [ ] Integration tests for persistence layer (Testcontainers) – see `11-testing.md §11.4`
-- [ ] Handler unit tests covering no-GET-after-POST rule – see `11-testing.md §11.3`
+- [x] Handler unit tests covering no-GET-after-POST rule – see `11-testing.md §11.3`
 
 **Definition of Done:**
 - All tasks above checked off.
