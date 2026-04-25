@@ -1,0 +1,122 @@
+@page "{symbol}"
+@model SpaceTraders.App.Pages.Ships.DetailModel
+@{
+    ViewData["Title"] = Model.Ship is not null ? $"Ship {Model.Ship.Symbol}" : "Ship Detail";
+}
+
+@if (Model.Ship is null)
+{
+    <div class="alert alert-warning" role="alert">
+        Ship not found in local cache. It may not have been synced yet.
+    </div>
+    <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+}
+else
+{
+    <div class="mb-3 d-flex align-items-center gap-3">
+        <a href="/" class="btn btn-outline-secondary btn-sm">← Dashboard</a>
+        <h1 class="display-6 mb-0">@Model.Ship.Symbol</h1>
+        <span class="badge bg-@(Model.Ship.IsInTransit ? "warning text-dark" : Model.Ship.Status == "DOCKED" ? "success" : "info")">
+            @(Model.Ship.IsInTransit ? "IN_TRANSIT" : Model.Ship.Status)
+        </span>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Location</h6>
+                    <div><strong>System:</strong> @(Model.Ship.SystemSymbol ?? "—")</div>
+                    <div><strong>Waypoint:</strong> @(Model.Ship.WaypointSymbol ?? "—")</div>
+                    @if (Model.Ship.IsInTransit && Model.Ship.ArrivesAt.HasValue)
+                    {
+                        <div class="mt-1 text-warning small">
+                            Arrives: @Model.Ship.ArrivesAt.Value.ToLocalTime().ToString("g")
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Fuel</h6>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>@Model.Ship.FuelCurrent / @Model.Ship.FuelCapacity</span>
+                        <span class="text-muted small">@(Model.Ship.FuelCapacity > 0 ? $"{(double)Model.Ship.FuelCurrent / Model.Ship.FuelCapacity:P0}" : "—")</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar @(Model.FuelPercent < 20 ? "bg-danger" : Model.FuelPercent < 50 ? "bg-warning" : "bg-success")"
+                             role="progressbar"
+                             style="width: @Model.FuelPercent%"
+                             aria-valuenow="@Model.Ship.FuelCurrent"
+                             aria-valuemin="0"
+                             aria-valuemax="@Model.Ship.FuelCapacity">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title text-muted">Cargo</h6>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>@Model.Ship.CargoCurrent / @Model.Ship.CargoCapacity</span>
+                        <span class="text-muted small">@(Model.Ship.CargoCapacity > 0 ? $"{(double)Model.Ship.CargoCurrent / Model.Ship.CargoCapacity:P0}" : "—")</span>
+                    </div>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar @(Model.CargoPercent >= 90 ? "bg-danger" : Model.CargoPercent >= 50 ? "bg-warning" : "bg-primary")"
+                             role="progressbar"
+                             style="width: @Model.CargoPercent%"
+                             aria-valuenow="@Model.Ship.CargoCurrent"
+                             aria-valuemin="0"
+                             aria-valuemax="@Model.Ship.CargoCapacity">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.Assignment is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">Current Assignment</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Type</dt>
+                    <dd class="col-sm-9">@Model.Assignment.AssignmentType</dd>
+                    @if (Model.Assignment.OriginWaypoint is not null)
+                    {
+                        <dt class="col-sm-3">Origin</dt>
+                        <dd class="col-sm-9">@Model.Assignment.OriginWaypoint</dd>
+                    }
+                    @if (Model.Assignment.DestWaypoint is not null)
+                    {
+                        <dt class="col-sm-3">Destination</dt>
+                        <dd class="col-sm-9">@Model.Assignment.DestWaypoint</dd>
+                    }
+                    @if (Model.Assignment.CargoSymbol is not null)
+                    {
+                        <dt class="col-sm-3">Cargo</dt>
+                        <dd class="col-sm-9">@Model.Assignment.CargoSymbol</dd>
+                    }
+                    <dt class="col-sm-3">Step</dt>
+                    <dd class="col-sm-9">@Model.Assignment.StepIndex</dd>
+                    <dt class="col-sm-3">Assigned</dt>
+                    <dd class="col-sm-9">@Model.Assignment.AssignedAt.ToLocalTime().ToString("g")</dd>
+                    @if (Model.Assignment.CompletedAt.HasValue)
+                    {
+                        <dt class="col-sm-3">Completed</dt>
+                        <dd class="col-sm-9">@Model.Assignment.CompletedAt.Value.ToLocalTime().ToString("g")</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-secondary">No active assignment.</div>
+    }
+}

@@ -4,15 +4,15 @@
 
 ## Current Status
 
-> **Active phase: Phase 4 – Mining & Scouting**
+> **Active phase: Phase 5 – Kubernetes & Hardening**
 
 | Phase | Status |
 |-------|--------|
 | Phase 1 – Foundation | ✅ Complete |
 | Phase 2 – Automation Core | ✅ Complete |
 | Phase 3 – Fleet Expansion & Contracts | ✅ Complete |
-| Phase 4 – Mining & Scouting | 🔄 In progress |
-| Phase 5 – Kubernetes & Hardening | ⬜ Not started |
+| Phase 4 – Mining & Scouting | ✅ Complete |
+| Phase 5 – Kubernetes & Hardening | 🔄 In progress |
 | Phase 6 – Polish & Observability | ⬜ Not started |
 ---
 
@@ -119,11 +119,11 @@ Build vertically – each phase delivers a running, useful application, not just
 **Related docs:** [05-automation-engine.md](05-automation-engine.md) · [07-ui.md](07-ui.md)
 
 ### Tasks
-- [ ] `ExtractResourcesCommand` handler
-- [ ] Mine assignment state machine
-- [ ] `ScoutService` – assigns ships to unvisited waypoints
-- [ ] Shipyard data refresh and caching
-- [ ] Ship detail page with cargo and fuel sparklines
+- [x] `ExtractResourcesCommand` handler
+- [x] Mine assignment state machine
+- [x] `ScoutService` – assigns ships to unvisited waypoints
+- [x] Shipyard data refresh and caching
+- [x] Ship detail page with cargo and fuel progress bars
 
 **Definition of Done:**
 - All tasks above checked off.
