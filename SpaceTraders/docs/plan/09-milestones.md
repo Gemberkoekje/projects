@@ -1,6 +1,6 @@
 # 09 – Phased Delivery Milestones
 
-> This document tracks the **target roadmap**. Some foundational items are already implemented in the current solution.
+> This document tracks the implemented roadmap.
 
 ## Current Status
 
@@ -40,7 +40,7 @@ Build vertically – each phase delivers a running, useful application, not just
 - [x] Wolverine retry & dead-letter policy configured – see `10-error-handling.md §10.2`
 - [x] `GameLoopService` skeleton – dead-reckoning tick + startup sync only
 - [x] Razor Pages dashboard: Overview + Ships list (read-only)
-- [ ] Docker image builds locally
+- [x] Docker image builds locally
 - [x] Test projects scaffolded (`SpaceTraders.Domain.Tests`, `SpaceTraders.Application.Tests`) – see `11-testing.md`
 
 **Definition of Done:**
@@ -213,12 +213,12 @@ graph LR
 | Package | Used in | Purpose |
 |---------|---------|---------|
 | `WolverineFx` | Application | Event/command bus |
-| `FluentValidation.DependencyInjectionExtensions` | Application | Command validation (planned) |
+| `FluentValidation.DependencyInjectionExtensions` | Application | Command validation option, not currently required |
 | `Stateless` | Application | Cleaner ship state machines (Phase 6) |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | Persistence | PostgreSQL EF Core provider |
 | `Microsoft.EntityFrameworkCore.Design` | Persistence | Migrations tooling |
 | `System.Threading.RateLimiting` | Infrastructure.ST API | Token bucket rate limiting |
-| `Scalar.AspNetCore` | API | OpenAPI UI (planned) |
+| `Scalar.AspNetCore` | API | OpenAPI UI option, not currently required |
 | `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore` | API/App | DB health check |
 | `Serilog.AspNetCore` | API/App | Structured JSON logging (Phase 6) |
 | `prometheus-net.AspNetCore` | API | Prometheus `/metrics` endpoint (Phase 6) |

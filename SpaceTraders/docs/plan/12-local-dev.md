@@ -127,24 +127,31 @@ Subsequent runs load token from DB and skip registration.
 
 ## 8 – Verifying Connectivity
 
-Current implementation does not yet expose the planned `/status/*` and `/health/*` endpoint set.
+The implementation exposes `/status/*`, `/settings/*`, `/control/*`, and `/health/*` endpoints.
 Verification options:
 
 - Check API logs for successful bootstrap/sync messages.
 - Open the Razor Pages dashboard and confirm cached agent/ship data appears.
+- Call `/health/live`, `/health/ready`, and authenticated `/status/*` endpoints.
 - Query tables in PostgreSQL (`cached_agents`, `cached_ships`, `cached_contracts`, `stored_credentials`).
 
 ---
 
 ## 9 – Running Tests
 
-Test projects are planned but not yet present in the current solution.
+Run the automated tests from the `SpaceTraders` directory:
+
+```bash
+dotnet test SpaceTraders.slnx --filter "Category!=Integration"
+```
+
+Integration tests that require external services or SpaceTraders credentials are tagged or skipped when not configured.
 
 ---
 
 ## 10 – Offline / Mock Development
 
-A fake `ISpaceTradersApiClient` can be added later for offline development. This is not yet implemented.
+Offline development is supported through application ports and test doubles in the automated test projects.
 
 ---
 

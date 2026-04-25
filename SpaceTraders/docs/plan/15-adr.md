@@ -149,17 +149,17 @@ for real-time streaming.
 
 ---
 
-## ADR-006: Stateless library for ship state machines (planned)
+## ADR-006: Stateless library for ship state machines
 
-**Status:** Proposed (Phase 6)
+**Status:** Accepted and implemented (Phase 6)
 
 **Context:**  
-`ShipWorkerService` implements ship assignment state machines using manual `switch` statements.
-As the number of states and transitions grows this becomes hard to reason about and test.
+Ship assignment state machines grew beyond simple manual `switch` statements.
+Explicit state machines are easier to reason about and test.
 
 **Decision:**  
-Refactor `ShipWorkerService` to use the [Stateless](https://github.com/dotnet-state-machine/stateless)
-library for explicit, visualisable state machines.
+Use the [Stateless](https://github.com/dotnet-state-machine/stateless)
+library for explicit, visualisable trade, mining, and scouting state machines.
 
 **Rationale:**
 - Stateless generates Mermaid/DOT diagrams directly from the machine definition — useful for docs.
@@ -171,8 +171,8 @@ library for explicit, visualisable state machines.
 - **Workflow engine (e.g. Elsa)** – too heavyweight for in-process ship logic.
 
 **Consequences:**
-- Requires Phase 6 refactor task to be completed before the state machine grows further.
-- Stateless must be added as a NuGet dependency to `SpaceTraders.Application`.
+- Stateless is referenced by `SpaceTraders.Application`.
+- Trade, mining, and scouting assignment flows use dedicated state machine classes.
 
 ---
 
