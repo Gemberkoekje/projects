@@ -74,6 +74,7 @@ else
                             <th>Status</th>
                             <th>Flight Mode</th>
                             <th>Fuel</th>
+                            <th>Cargo</th>
                             <th>Last Sync</th>
                         </tr>
                     </thead>
@@ -81,12 +82,13 @@ else
                     @foreach (var ship in Model.Ships)
                     {
                         <tr>
-                            <td>@ship.Symbol</td>
+                            <td><a href="/Ships/@ship.Symbol">@ship.Symbol</a></td>
                             <td>@ship.SystemSymbol</td>
                             <td>@ship.WaypointSymbol</td>
                             <td>@ship.Status</td>
                             <td>@ship.FlightMode</td>
                             <td>@ship.FuelCurrent / @ship.FuelCapacity</td>
+                            <td>@ship.CargoCurrent / @ship.CargoCapacity</td>
                             <td>@ship.LastSyncedAt.ToLocalTime().ToString("g")</td>
                         </tr>
                     }
