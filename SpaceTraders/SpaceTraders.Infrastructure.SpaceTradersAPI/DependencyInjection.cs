@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Adapters;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Availability;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
@@ -37,6 +38,8 @@ public static class DependencyInjection
         services.AddSingleton<IAgentTokenProvider, AgentTokenProvider>();
         services.AddSingleton<RateLimitStatus>();
         services.AddSingleton<IRateLimitStatus>(sp => sp.GetRequiredService<RateLimitStatus>());
+        services.AddSingleton<ApiAvailabilityState>();
+        services.AddSingleton<IApiAvailabilityState>(sp => sp.GetRequiredService<ApiAvailabilityState>());
         services.AddTransient<RateLimitingHandler>();
         services.AddTransient<RateLimitResponseHandler>();
         services.AddTransient<RetryHandler>();

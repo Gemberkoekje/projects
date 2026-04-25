@@ -1,11 +1,19 @@
 using System.Net;
 using FluentAssertions;
+using NSubstitute;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
 namespace SpaceTraders.Application.Tests.RateLimiting;
 
 public sealed class RetryHandlerTests
 {
+    private static RetryHandler CreateHandler(IApiAvailabilityState? availabilityState = null)
+    {
+        availabilityState ??= Substitute.For<IApiAvailabilityState>();
+        return new RetryHandler(availabilityState);
+    }
+
     [Fact]
     public async Task Handle_502Once_RetriesAndSucceeds()
     {
@@ -18,7 +26,8 @@ public sealed class RetryHandlerTests
                 : new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var handler = new RetryHandler { InnerHandler = innerHandler };
+        var handler = CreateHandler();
+        handler.InnerHandler = innerHandler;
         var invoker = new HttpMessageInvoker(handler);
 
         var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
@@ -31,12 +40,27 @@ public sealed class RetryHandlerTests
     public async Task Handle_Persistent502_ReturnsLastBadGateway()
     {
         var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway));
-        var handler = new RetryHandler { InnerHandler = innerHandler };
+        var handler = CreateHandler();
+        handler.InnerHandler = innerHandler;
         var invoker = new HttpMessageInvoker(handler);
 
         var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
+    }
+
+    [Fact]
+    public async Task Handle_Persistent502_MarksApiUnavailable()
+    {
+        var availability = Substitute.For<IApiAvailabilityState>();
+        var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway));
+        var handler = CreateHandler(availability);
+        handler.InnerHandler = innerHandler;
+        var invoker = new HttpMessageInvoker(handler);
+
+        await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+
+        availability.Received().MarkUnavailable();
     }
 
     [Fact]
@@ -49,12 +73,27 @@ public sealed class RetryHandlerTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var handler = new RetryHandler { InnerHandler = innerHandler };
+        var handler = CreateHandler();
+        handler.InnerHandler = innerHandler;
         var invoker = new HttpMessageInvoker(handler);
 
         await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
 
         callCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Handle_SuccessfulRequest_MarksApiAvailable()
+    {
+        var availability = Substitute.For<IApiAvailabilityState>();
+        var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var handler = CreateHandler(availability);
+        handler.InnerHandler = innerHandler;
+        var invoker = new HttpMessageInvoker(handler);
+
+        await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+
+        availability.Received().MarkAvailable();
     }
 }
 

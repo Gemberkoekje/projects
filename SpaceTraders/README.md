@@ -6,7 +6,7 @@ This repository currently contains a **foundation implementation** for a SpaceTr
 
 - Typed SpaceTraders API client (`SpaceTraders.Infrastructure.SpaceTradersAPI`)
 - PostgreSQL persistence for cached agent/ship/contract/token data (`SpaceTraders.Infrastructure.Persistence`)
-- API host with bootstrap + startup sync background services (`SpaceTraders.API`)
+- API host with bootstrap + startup sync + game-loop + ship-worker automation (`SpaceTraders.API`)
 - Razor Pages dashboard showing cached agent + ships (`SpaceTraders.App`)
 
 > The detailed design docs in `docs/plan/` describe the **target architecture**. Large parts are planned, not yet implemented.
@@ -15,30 +15,36 @@ This repository currently contains a **foundation implementation** for a SpaceTr
 
 ## Implemented Features
 
-- Agent bootstrap flow:
-  - Reads stored agent token from DB, or
-  - Registers agent via account token and stores returned agent token
-- Startup sync flow:
-  - Syncs current agent, ships, and contracts from SpaceTraders API into local DB
-- Typed API client methods implemented for:
-  - Status, factions, agents, systems, waypoints
-  - Register, my-agent, my-ships, my-ship, my-contracts
-- Razor Pages dashboard (`/`) displaying:
-  - Cached agent summary
-  - Cached ship table
+- Agent bootstrap flow
+- Startup sync flow (agent, ships, contracts from SpaceTraders API)
+- Startup recovery service (resumes in-flight assignments after pod restart)
+- Typed API client for: status, factions, agents, systems, waypoints, fleet, contracts
+- Dead-reckoning game loop (detects ship arrivals, low fuel, API availability changes)
+- Ship worker service (executes per-ship assignment state machines)
+- Contract watch service, Scout service, Fleet expansion
+- Event handlers: `ContractPriorityHandler`, `ShipFuelLowHandler`, `ApiUnavailabilityHandler`
+- Internal REST API (`/status/*`, `/settings/*`, `/control/*`, `/health/*`)
+- API key authentication middleware (`X-Api-Key` header)
+- Kubernetes manifests + Dockerfiles (`k8s/`, `Dockerfile.api`, `Dockerfile.app`)
+- Razor Pages dashboard
 
 ---
 
 ## Solution Structure
 
 ```text
-SpaceTraders.sln
+SpaceTraders.slnx
 ├── SpaceTraders.Domain
 ├── SpaceTraders.Application
 ├── SpaceTraders.Infrastructure.SpaceTradersAPI
 ├── SpaceTraders.Infrastructure.Persistence
 ├── SpaceTraders.API
-└── SpaceTraders.App
+├── SpaceTraders.App
+└── tests/
+    ├── SpaceTraders.Domain.Tests
+    ├── SpaceTraders.Application.Tests
+    ├── SpaceTraders.Infrastructure.Tests
+    └── SpaceTraders.API.Tests          ← WebApplicationFactory integration tests
 ```
 
 ---
@@ -66,6 +72,8 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Da
 dotnet user-secrets set "SpaceTraders:AccountToken" "<your-account-token>"
 dotnet user-secrets set "SpaceTraders:AgentName" "<desired-callsign>"
 dotnet user-secrets set "SpaceTraders:AgentFaction" "COSMIC"
+# Optional: protect the internal REST API
+dotnet user-secrets set "SPACETRADERS_INTERNAL_API_KEY" "<random-secret>"
 
 cd ../SpaceTraders.App
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=spacetraders;Username=postgres;Password=changeme"
@@ -81,7 +89,59 @@ cd ../SpaceTraders.App
 dotnet run
 ```
 
-The API and App both create the DB schema with `EnsureCreated()` on startup.
+The API host creates the DB schema with `EnsureCreated()` on startup. The dashboard (App) uses the same database.
+
+### 4) Internal REST API
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /health/live` | None | Liveness probe |
+| `GET /health/ready` | None | Readiness probe (DB check) |
+| `GET /status/agent` | `X-Api-Key` | Current agent credits + ship count |
+| `GET /status/ships` | `X-Api-Key` | All ships with assignment + nav |
+| `GET /settings/` | `X-Api-Key` | All operator settings |
+| `PUT /settings/{key}` | `X-Api-Key` | Update a setting |
+| `POST /control/automation/enable` | `X-Api-Key` | Resume automation |
+| `POST /control/automation/disable` | `X-Api-Key` | Pause automation |
+| `POST /control/sync` | `X-Api-Key` | Force full sync |
+
+---
+
+## Kubernetes Deployment
+
+All manifests live in `k8s/`. Apply in this order:
+
+```powershell
+kubectl apply -f k8s/namespace.yaml
+# Copy k8s/secret.yaml.template → k8s/secret.yaml and fill in values, then:
+kubectl apply -f k8s/secret.yaml          # NEVER commit this file
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/postgres.yaml        # or use a managed service
+kubectl apply -f k8s/deployment-api.yaml
+kubectl apply -f k8s/deployment-app.yaml
+kubectl apply -f k8s/service-api.yaml
+kubectl apply -f k8s/service-app.yaml
+kubectl apply -f k8s/ingress.yaml         # optional, requires nginx ingress controller
+```
+
+Build and push container images:
+
+```powershell
+# From the repository root:
+docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
+docker build -f SpaceTraders/Dockerfile.app -t spacetraders-app:latest .
+```
+
+---
+
+## Tests
+
+```powershell
+cd SpaceTraders
+dotnet test SpaceTraders.slnx --filter "Category!=Integration"
+```
+
+Integration tests (require Docker / PostgreSQL) are tagged `Category=Integration` and skipped by the filter above.
 
 ---
 

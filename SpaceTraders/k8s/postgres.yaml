@@ -1,0 +1,17 @@
+# CloudNativePG cluster. Alternatively replace this file with a connection string
+# pointing at a managed service (Azure DB for PostgreSQL, etc.) in secret.yaml.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: spacetraders-pg
+  namespace: spacetraders
+spec:
+  instances: 1
+  storage:
+    size: 5Gi
+  bootstrap:
+    initdb:
+      database: spacetraders
+      owner: st
+      secret:
+        name: spacetraders-secrets

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Entities;
+using SpaceTraders.Infrastructure.Persistence.Seed;
 
 namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
@@ -70,5 +71,10 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
         return settings
             .Select(s => (s.Key, s.Value, s.Type, s.Description))
             .ToList();
+    }
+
+    public async Task ResetToDefaultsAsync(CancellationToken cancellationToken = default)
+    {
+        await DefaultSettingsSeed.ResetAsync(db, cancellationToken);
     }
 }

@@ -24,3 +24,7 @@ public sealed record MarketDataRefreshedEvent(WaypointSymbol Waypoint);
 public sealed record ShipyardDataRefreshedEvent(WaypointSymbol Waypoint);
 
 public sealed record NewShipPurchasedEvent(string ShipSymbol, ShipType Type, long CostPaid);
+
+public sealed record ApiUnavailableEvent(DateTimeOffset DetectedAt);
+
+public sealed record ApiAvailableEvent(DateTimeOffset RestoredAt);
