@@ -59,6 +59,7 @@ public sealed class SpaceTradersDbContext(DbContextOptions<SpaceTradersDbContext
             entity.Property(x => x.DestWaypointSymbol).HasMaxLength(100);
             entity.Property(x => x.Status).HasMaxLength(50);
             entity.Property(x => x.FlightMode).HasMaxLength(50);
+            entity.Property(x => x.ShipType).HasMaxLength(100).IsRequired();
         });
 
         modelBuilder.Entity<CachedContract>(entity =>
@@ -135,7 +136,7 @@ public sealed class SpaceTradersDbContext(DbContextOptions<SpaceTradersDbContext
             entity.Property(x => x.BuyWaypoint).HasMaxLength(100).IsRequired();
             entity.Property(x => x.SellWaypoint).HasMaxLength(100).IsRequired();
             entity.Property(x => x.ProfitPerJump).HasColumnType("numeric(18,4)");
-            entity.HasIndex(x => new { x.ProfitPerJump, x.ComputedAt });
+            entity.HasIndex(x => new { x.SupportsSupplyChain, x.SupplyChainDepth, x.ProfitPerJump, x.ComputedAt });
         });
 
         modelBuilder.Entity<ActivityLog>(entity =>

@@ -11,7 +11,9 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
     {
         var entities = await db.TradeOpportunities
             .AsNoTracking()
-            .OrderByDescending(t => t.ProfitPerJump)
+            .OrderByDescending(t => t.SupportsSupplyChain)
+            .ThenByDescending(t => t.SupplyChainDepth)
+            .ThenByDescending(t => t.ProfitPerJump)
             .Take(maxResults)
             .ToListAsync(cancellationToken);
 
@@ -23,7 +25,9 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
         var entity = await db.TradeOpportunities
             .AsNoTracking()
             .Where(t => t.ProfitPerUnit >= minProfitPerUnit && t.DistanceJumps <= maxDistanceJumps)
-            .OrderByDescending(t => t.ProfitPerJump)
+            .OrderByDescending(t => t.SupportsSupplyChain)
+            .ThenByDescending(t => t.SupplyChainDepth)
+            .ThenByDescending(t => t.ProfitPerJump)
             .FirstOrDefaultAsync(cancellationToken);
 
         return entity is null ? null : MapToDto(entity);
@@ -45,6 +49,8 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
                 ProfitPerUnit = dto.ProfitPerUnit,
                 DistanceJumps = dto.DistanceJumps,
                 ProfitPerJump = dto.ProfitPerJump,
+                SupportsSupplyChain = dto.SupportsSupplyChain,
+                SupplyChainDepth = dto.SupplyChainDepth,
                 ComputedAt = DateTimeOffset.UtcNow
             });
         }
@@ -55,5 +61,6 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
     private static TradeOpportunityDto MapToDto(TradeOpportunity entity) =>
         new(entity.Id, entity.TradeSymbol, entity.BuyWaypoint, entity.SellWaypoint,
             entity.BuyPrice, entity.SellPrice, entity.ProfitPerUnit,
-            entity.DistanceJumps, entity.ProfitPerJump, entity.ComputedAt);
+            entity.DistanceJumps, entity.ProfitPerJump, entity.SupportsSupplyChain,
+            entity.SupplyChainDepth, entity.ComputedAt);
 }

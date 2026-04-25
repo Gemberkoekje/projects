@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.Persistence.Entities;
+using System.Text.Json;
 
 namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
@@ -37,6 +38,8 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
     {
         var existing = await db.Ships.FindAsync([ship.Symbol], cancellationToken);
         var now = DateTimeOffset.UtcNow;
+        var mountsJson = JsonSerializer.Serialize(ship.MountSymbols ?? []);
+        var cargoJson = JsonSerializer.Serialize(ship.CargoInventory ?? []);
 
         if (existing is null)
         {
@@ -47,10 +50,13 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
                 WaypointSymbol = ship.WaypointSymbol,
                 Status = ship.Status,
                 FlightMode = ship.FlightMode,
+                ShipType = ship.ShipType,
+                MountsJson = mountsJson,
                 FuelCurrent = ship.FuelCurrent,
                 FuelCapacity = ship.FuelCapacity,
                 CargoCurrent = ship.CargoCurrent,
                 CargoCapacity = ship.CargoCapacity,
+                CargoJson = cargoJson,
                 ArrivesAt = ship.ArrivesAt,
                 DestWaypointSymbol = ship.DestWaypointSymbol,
                 LastSyncedAt = now
@@ -62,8 +68,13 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
             existing.WaypointSymbol = ship.WaypointSymbol;
             existing.Status = ship.Status;
             existing.FlightMode = ship.FlightMode;
+            existing.ShipType = ship.ShipType;
+            existing.MountsJson = mountsJson;
             existing.FuelCurrent = ship.FuelCurrent;
             existing.FuelCapacity = ship.FuelCapacity;
+            existing.CargoCurrent = ship.CargoCurrent;
+            existing.CargoCapacity = ship.CargoCapacity;
+            existing.CargoJson = cargoJson;
             existing.ArrivesAt = ship.ArrivesAt;
             existing.DestWaypointSymbol = ship.DestWaypointSymbol;
             existing.LastSyncedAt = now;
@@ -101,6 +112,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
         entity.CargoCurrent = cargo.Units;
         entity.CargoCapacity = cargo.Capacity;
+        entity.CargoJson = JsonSerializer.Serialize(cargo.Inventory ?? []);
         entity.LastSyncedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -118,8 +130,12 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static ShipModel MapToModel(CachedShip entity) =>
-        new(
+    private static ShipModel MapToModel(CachedShip entity)
+    {
+        var mounts = DeserializeMounts(entity.MountsJson);
+        var cargoInventory = DeserializeCargo(entity.CargoJson);
+
+        return new ShipModel(
             entity.Symbol,
             entity.SystemSymbol,
             entity.WaypointSymbol,
@@ -131,5 +147,43 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
             entity.DestWaypointSymbol,
             entity.CargoCurrent,
             entity.CargoCapacity,
-            entity.LastSyncedAt);
+            entity.LastSyncedAt,
+            entity.ShipType,
+            mounts,
+            cargoInventory);
+    }
+
+    private static IReadOnlyList<string> DeserializeMounts(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<CargoItemModel> DeserializeCargo(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<CargoItemModel>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
 }

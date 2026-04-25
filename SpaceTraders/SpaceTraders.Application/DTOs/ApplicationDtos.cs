@@ -40,6 +40,8 @@ public sealed record TradeOpportunityDto(
     int ProfitPerUnit,
     int DistanceJumps,
     decimal ProfitPerJump,
+    bool SupportsSupplyChain,
+    int SupplyChainDepth,
     DateTimeOffset ComputedAt);
 
 public sealed record SettingDto(

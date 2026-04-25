@@ -6,7 +6,9 @@ public record NavModel(string Status, string SystemSymbol, string WaypointSymbol
 
 public record FuelModel(int Current, int Capacity);
 
-public record CargoModel(int Units, int Capacity);
+public record CargoItemModel(string Symbol, int Units);
+
+public record CargoModel(int Units, int Capacity, IReadOnlyList<CargoItemModel>? Inventory = null);
 
 public record NavigateActionResult(NavModel Nav, FuelModel? Fuel);
 
@@ -28,13 +30,23 @@ public record ShipModel(
     string? FlightMode,
     int FuelCurrent,
     int FuelCapacity,
-    DateTimeOffset? ArrivesAt,
+    DateTimeOffset? ArrivesAt = null,
     string? DestWaypointSymbol = null,
     int CargoCurrent = 0,
     int CargoCapacity = 0,
-    DateTimeOffset LastSyncedAt = default)
+    DateTimeOffset LastSyncedAt = default,
+    string ShipType = "",
+    IReadOnlyList<string>? MountSymbols = null,
+    IReadOnlyList<CargoItemModel>? CargoInventory = null)
 {
     public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > DateTimeOffset.UtcNow;
+
+    public bool HasMiningEquipment =>
+        ShipType.Equals("SHIP_MINING_DRONE", StringComparison.OrdinalIgnoreCase) ||
+        ShipType.Equals("SHIP_ORE_HOUND", StringComparison.OrdinalIgnoreCase) ||
+        (MountSymbols ?? []).Any(m =>
+            m.Contains("MINING", StringComparison.OrdinalIgnoreCase) ||
+            m.Contains("SURVEYOR", StringComparison.OrdinalIgnoreCase));
 }
 
 public record ContractModel(string Id, string FactionSymbol, string Type, bool IsAccepted, bool IsFulfilled, DateTimeOffset? Expiration, DateTimeOffset? DeadlineToAccept);

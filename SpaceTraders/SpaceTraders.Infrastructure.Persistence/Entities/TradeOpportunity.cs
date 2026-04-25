@@ -20,5 +20,9 @@ public sealed class TradeOpportunity
 
     public decimal ProfitPerJump { get; set; }
 
+    public bool SupportsSupplyChain { get; set; }
+
+    public int SupplyChainDepth { get; set; }
+
     public DateTimeOffset ComputedAt { get; set; }
 }

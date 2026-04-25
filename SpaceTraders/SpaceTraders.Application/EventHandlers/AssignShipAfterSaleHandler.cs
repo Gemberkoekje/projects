@@ -1,45 +1,55 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.EventHandlers;
 
 public sealed class AssignShipAfterSaleHandler(
-    ITradeOpportunityRepository tradeOpportunities,
-    ISettingsRepository settings,
+    IShipRepository ships,
+    IShipAssignmentPlanner planner,
     IMessageBus bus,
     ILogger<AssignShipAfterSaleHandler> logger)
 {
     public async Task Handle(ShipCargoSoldEvent @event, CancellationToken cancellationToken)
     {
-        var minProfit = await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken);
-        var maxDistance = await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken);
-
-        var route = await tradeOpportunities.GetBestRouteForCapacityAsync(
-            cargoCapacity: int.MaxValue,
-            minProfitPerUnit: minProfit,
-            maxDistanceJumps: maxDistance,
-            cancellationToken: cancellationToken);
-
-        if (route is null)
+        var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
+        if (ship is null)
         {
-            logger.LogInformation("Ship {Symbol}: no trade route available; setting to Idle.", @event.ShipSymbol);
-            await bus.SendAsync(new AssignShipCommand(@event.ShipSymbol, "Idle"));
+            logger.LogWarning("Ship {Symbol}: ship data not found; setting to Idle.", @event.ShipSymbol);
+            await bus.SendAsync(new Commands.Ships.AssignShipCommand(@event.ShipSymbol, "Idle"));
             return;
         }
 
-        logger.LogInformation(
-            "Ship {Symbol}: assigning Trade route {Symbol} {Buy} → {Sell} (profit/unit: {Profit}).",
-            @event.ShipSymbol, route.TradeSymbol, route.BuyWaypoint, route.SellWaypoint, route.ProfitPerUnit);
+        var assignment = await planner.PlanAsync(ship, cancellationToken);
 
-        await bus.SendAsync(new AssignShipCommand(
+        logger.LogInformation(
+            "Ship {Symbol}: assigning {Type}{Details}.",
             @event.ShipSymbol,
-            "Trade",
-            OriginWaypoint: route.BuyWaypoint,
-            DestWaypoint: route.SellWaypoint,
-            CargoSymbol: route.TradeSymbol));
+            assignment.AssignmentType,
+            DescribeAssignment(assignment));
+
+        await bus.SendAsync(assignment);
+    }
+
+    private static string DescribeAssignment(Commands.Ships.AssignShipCommand assignment)
+    {
+        if (assignment.AssignmentType.Equals("Trade", StringComparison.OrdinalIgnoreCase))
+        {
+            return $" {assignment.CargoSymbol} {assignment.OriginWaypoint} → {assignment.DestWaypoint}";
+        }
+
+        if (assignment.AssignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase))
+        {
+            return $" {assignment.OriginWaypoint} → {assignment.DestWaypoint}";
+        }
+
+        if (assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase))
+        {
+            return $" {assignment.OriginWaypoint}";
+        }
+
+        return string.Empty;
     }
 }

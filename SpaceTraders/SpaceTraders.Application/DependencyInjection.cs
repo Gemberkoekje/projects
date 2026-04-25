@@ -12,6 +12,7 @@ public static class DependencyInjection
     {
         services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
+        services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
 
         services.AddWolverine(opts =>
         {

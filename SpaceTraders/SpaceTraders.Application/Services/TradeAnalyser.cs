@@ -9,15 +9,14 @@ public sealed class TradeAnalyser : ITradeAnalyser
         IReadOnlyList<MarketSnapshot> markets,
         int minProfitPerUnit = 0)
     {
-        // Index: tradeSymbol → list of (waypoint, systemSymbol, purchasePrice)
         var buyOptions = new Dictionary<string, List<(string Waypoint, string System, int Price)>>(StringComparer.OrdinalIgnoreCase);
         var sellOptions = new Dictionary<string, List<(string Waypoint, string System, int Price)>>(StringComparer.OrdinalIgnoreCase);
+        var supplyChainConsumers = BuildSupplyChainConsumers(markets);
 
         foreach (var market in markets)
         {
             foreach (var good in market.TradeGoods)
             {
-                // Only consider EXPORT and EXCHANGE types as buy sources
                 if (good.PurchasePrice > 0 &&
                     (good.Type.Equals("EXPORT", StringComparison.OrdinalIgnoreCase) ||
                      good.Type.Equals("EXCHANGE", StringComparison.OrdinalIgnoreCase)))
@@ -30,7 +29,6 @@ public sealed class TradeAnalyser : ITradeAnalyser
                     buys.Add((market.WaypointSymbol, market.SystemSymbol, good.PurchasePrice));
                 }
 
-                // Any market listing a good with a positive sell price is a valid sell destination
                 if (good.SellPrice > 0)
                 {
                     if (!sellOptions.TryGetValue(good.Symbol, out var sells))
@@ -49,16 +47,24 @@ public sealed class TradeAnalyser : ITradeAnalyser
         {
             if (!sellOptions.TryGetValue(symbol, out var sells)) continue;
 
+            supplyChainConsumers.TryGetValue(symbol, out var consumers);
+            var supplyChainDepth = consumers?.Count ?? 0;
+            var supportsSupplyChain = supplyChainDepth > 0;
+
             foreach (var buy in buys)
             {
                 foreach (var sell in sells)
                 {
-                    // Cannot buy and sell at the same waypoint
                     if (buy.Waypoint.Equals(sell.Waypoint, StringComparison.OrdinalIgnoreCase))
+                    {
                         continue;
+                    }
 
                     var profitPerUnit = sell.Price - buy.Price;
-                    if (profitPerUnit < minProfitPerUnit) continue;
+                    if (profitPerUnit < minProfitPerUnit)
+                    {
+                        continue;
+                    }
 
                     var distanceJumps = buy.System.Equals(sell.System, StringComparison.OrdinalIgnoreCase) ? 0 : 1;
                     var profitPerJump = distanceJumps == 0
@@ -75,13 +81,17 @@ public sealed class TradeAnalyser : ITradeAnalyser
                         ProfitPerUnit: profitPerUnit,
                         DistanceJumps: distanceJumps,
                         ProfitPerJump: profitPerJump,
+                        SupportsSupplyChain: supportsSupplyChain,
+                        SupplyChainDepth: supplyChainDepth,
                         ComputedAt: DateTimeOffset.UtcNow));
                 }
             }
         }
 
         return opportunities
-            .OrderByDescending(o => o.ProfitPerJump)
+            .OrderByDescending(o => o.SupportsSupplyChain)
+            .ThenByDescending(o => o.SupplyChainDepth)
+            .ThenByDescending(o => o.ProfitPerJump)
             .ToList();
     }
 
@@ -89,11 +99,68 @@ public sealed class TradeAnalyser : ITradeAnalyser
         IReadOnlyList<TradeOpportunityDto> routes,
         int cargoCapacity,
         int minProfitPerUnit,
-        int maxDistanceJumps)
+        int maxDistanceJumps,
+        bool prioritizeSupplyChain = true)
     {
-        return routes
-            .Where(r => r.ProfitPerUnit >= minProfitPerUnit && r.DistanceJumps <= maxDistanceJumps)
+        var candidates = routes
+            .Where(r => r.ProfitPerUnit >= minProfitPerUnit && r.DistanceJumps <= maxDistanceJumps);
+
+        if (prioritizeSupplyChain)
+        {
+            var supplyChainRoute = candidates
+                .Where(r => r.SupportsSupplyChain)
+                .OrderByDescending(r => r.SupplyChainDepth)
+                .ThenByDescending(r => r.ProfitPerJump)
+                .FirstOrDefault();
+
+            if (supplyChainRoute is not null)
+            {
+                return supplyChainRoute;
+            }
+        }
+
+        return candidates
             .OrderByDescending(r => r.ProfitPerJump)
             .FirstOrDefault();
+    }
+
+    private static Dictionary<string, HashSet<string>> BuildSupplyChainConsumers(IReadOnlyList<MarketSnapshot> markets)
+    {
+        var consumers = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var market in markets)
+        {
+            var imports = market.Imports
+                .Concat(market.TradeGoods
+                    .Where(g => g.Type.Equals("IMPORT", StringComparison.OrdinalIgnoreCase))
+                    .Select(g => g.Symbol))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var outputs = market.Exports
+                .Concat(market.Exchange)
+                .Concat(market.TradeGoods
+                    .Where(g => g.Type.Equals("EXPORT", StringComparison.OrdinalIgnoreCase) ||
+                                g.Type.Equals("EXCHANGE", StringComparison.OrdinalIgnoreCase))
+                    .Select(g => g.Symbol))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            foreach (var import in imports)
+            {
+                if (!consumers.TryGetValue(import, out var destinations))
+                {
+                    destinations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    consumers[import] = destinations;
+                }
+
+                foreach (var output in outputs)
+                {
+                    destinations.Add(output);
+                }
+            }
+        }
+
+        return consumers;
     }
 }

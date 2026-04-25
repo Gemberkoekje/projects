@@ -7,6 +7,9 @@ public sealed class Ship
     [JsonPropertyName("symbol")]
     public required string Symbol { get; init; }
 
+    [JsonPropertyName("registration")]
+    public ShipRegistration? Registration { get; init; }
+
     [JsonPropertyName("nav")]
     public ShipNav? Nav { get; init; }
 
@@ -15,6 +18,24 @@ public sealed class Ship
 
     [JsonPropertyName("fuel")]
     public ShipFuel? Fuel { get; init; }
+
+    [JsonPropertyName("cargo")]
+    public FleetShipCargo? Cargo { get; init; }
+
+    [JsonPropertyName("mounts")]
+    public IReadOnlyList<ShipMount>? Mounts { get; init; }
+}
+
+public sealed class ShipRegistration
+{
+    [JsonPropertyName("role")]
+    public required string Role { get; init; }
+}
+
+public sealed class ShipMount
+{
+    [JsonPropertyName("symbol")]
+    public required string Symbol { get; init; }
 }
 
 public sealed class ShipNav
@@ -75,4 +96,16 @@ public sealed class ShipFuel
 
     [JsonPropertyName("capacity")]
     public int Capacity { get; init; }
+}
+
+public sealed class FleetShipCargo
+{
+    [JsonPropertyName("units")]
+    public int Units { get; init; }
+
+    [JsonPropertyName("capacity")]
+    public int Capacity { get; init; }
+
+    [JsonPropertyName("inventory")]
+    public IReadOnlyList<CargoItem>? Inventory { get; init; }
 }

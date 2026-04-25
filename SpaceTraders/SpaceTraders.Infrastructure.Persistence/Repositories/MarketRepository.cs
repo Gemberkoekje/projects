@@ -70,7 +70,14 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
                         g.TradeVolume,
                         g.Supply ?? string.Empty))
                     .ToList();
-                snapshots.Add(new MarketSnapshot(m.WaypointSymbol, m.SystemSymbol, goodSnapshots));
+
+                snapshots.Add(new MarketSnapshot(
+                    m.WaypointSymbol,
+                    m.SystemSymbol,
+                    goodSnapshots,
+                    DeserializeSymbols(m.ImportsJson),
+                    DeserializeSymbols(m.ExportsJson),
+                    DeserializeSymbols(m.ExchangeJson)));
             }
             catch (JsonException)
             {
@@ -78,6 +85,28 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
             }
         }
         return snapshots;
+    }
+
+    private static IReadOnlyList<string> DeserializeSymbols(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<TradeGoodSymbolJson>>(json)
+                ?.Select(g => g.Symbol)
+                .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
+                .Cast<string>()
+                .ToList()
+                ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private sealed class TradeGoodJson
@@ -89,5 +118,10 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
         public string? Activity { get; init; }
         public int PurchasePrice { get; init; }
         public int SellPrice { get; init; }
+    }
+
+    private sealed class TradeGoodSymbolJson
+    {
+        public string? Symbol { get; init; }
     }
 }

@@ -5,6 +5,11 @@ using SpaceTraders.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true, reloadOnChange: true);
+}
+
 builder.Host.UseSerilog((ctx, cfg) =>
 {
     if (ctx.HostingEnvironment.IsProduction())

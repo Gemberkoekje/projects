@@ -16,6 +16,10 @@ public sealed class CachedShip
 
     public string? FlightMode { get; set; }
 
+    public string ShipType { get; set; } = string.Empty;
+
+    public string? MountsJson { get; set; }
+
     public int FuelCurrent { get; set; }
 
     public int FuelCapacity { get; set; }

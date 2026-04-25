@@ -15,6 +15,16 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
         return entity is null ? null : MapToDto(entity);
     }
 
+    public async Task<IReadOnlyList<ShipAssignmentDto>> GetAllActiveAsync(CancellationToken cancellationToken = default)
+    {
+        var entities = await db.ShipAssignments
+            .AsNoTracking()
+            .Where(x => x.CompletedAt == null)
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(MapToDto).ToList();
+    }
+
     public async Task UpsertAsync(ShipAssignmentDto assignment, CancellationToken cancellationToken = default)
     {
         var existing = await db.ShipAssignments

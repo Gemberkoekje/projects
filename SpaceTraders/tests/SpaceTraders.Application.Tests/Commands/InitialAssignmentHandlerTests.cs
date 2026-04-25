@@ -2,9 +2,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.EventHandlers;
-using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using Wolverine;
@@ -13,25 +13,19 @@ namespace SpaceTraders.Application.Tests.Commands;
 
 public sealed class InitialAssignmentHandlerTests
 {
-    private static ISettingsRepository MakeSettings(int minProfit = 200, int maxDistance = 5)
-    {
-        var settings = Substitute.For<ISettingsRepository>();
-        settings.GetAsync<int>("Trade.MinProfitPerUnit", Arg.Any<CancellationToken>()).Returns(minProfit);
-        settings.GetAsync<int>("Trade.MaxHaulDistance", Arg.Any<CancellationToken>()).Returns(maxDistance);
-        return settings;
-    }
-
     [Fact]
-    public async Task Handle_AssignsTradeRoute_WhenRouteAvailable()
+    public async Task Handle_AssignsPlannerResult_WhenShipExists()
     {
-        var routes = Substitute.For<ITradeOpportunityRepository>();
-        routes.GetBestRouteForCapacityAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns(new TradeOpportunityDto(1, "IRON_ORE", "X1-AB-001", "X1-AB-002", 100, 400, 300, 1, 300m, DateTimeOffset.UtcNow));
-
+        var ships = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipRepository>();
+        var planner = Substitute.For<IShipAssignmentPlanner>();
         var bus = Substitute.For<IMessageBus>();
+        var ship = new ShipModel("SHIP-2", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100, null);
+        var assignment = new AssignShipCommand("SHIP-2", "Trade", "X1-AB-001", "X1-AB-002", "IRON_ORE");
 
-        var handler = new InitialAssignmentHandler(routes, MakeSettings(), bus,
-            NullLogger<InitialAssignmentHandler>.Instance);
+        ships.FindAsync("SHIP-2", Arg.Any<CancellationToken>()).Returns(ship);
+        planner.PlanAsync(ship, Arg.Any<CancellationToken>()).Returns(assignment);
+
+        var handler = new InitialAssignmentHandler(ships, planner, bus, NullLogger<InitialAssignmentHandler>.Instance);
 
         await handler.Handle(
             new NewShipPurchasedEvent("SHIP-2", ShipType.ShipMiningDrone, 50_000),
@@ -46,16 +40,15 @@ public sealed class InitialAssignmentHandlerTests
     }
 
     [Fact]
-    public async Task Handle_AssignsIdle_WhenNoRouteAvailable()
+    public async Task Handle_AssignsIdle_WhenShipMissing()
     {
-        var routes = Substitute.For<ITradeOpportunityRepository>();
-        routes.GetBestRouteForCapacityAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
-            .Returns((TradeOpportunityDto?)null);
-
+        var ships = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipRepository>();
+        var planner = Substitute.For<IShipAssignmentPlanner>();
         var bus = Substitute.For<IMessageBus>();
 
-        var handler = new InitialAssignmentHandler(routes, MakeSettings(), bus,
-            NullLogger<InitialAssignmentHandler>.Instance);
+        ships.FindAsync("SHIP-2", Arg.Any<CancellationToken>()).Returns((ShipModel)null!);
+
+        var handler = new InitialAssignmentHandler(ships, planner, bus, NullLogger<InitialAssignmentHandler>.Instance);
 
         await handler.Handle(
             new NewShipPurchasedEvent("SHIP-2", ShipType.ShipMiningDrone, 50_000),

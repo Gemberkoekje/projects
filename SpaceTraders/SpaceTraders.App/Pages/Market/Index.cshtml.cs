@@ -22,7 +22,9 @@ public sealed class IndexModel : PageModel
     {
         TopRoutes = await _dbContext.TradeOpportunities
             .AsNoTracking()
-            .OrderByDescending(t => t.ProfitPerJump)
+            .OrderByDescending(t => t.SupportsSupplyChain)
+            .ThenByDescending(t => t.SupplyChainDepth)
+            .ThenByDescending(t => t.ProfitPerJump)
             .Take(20)
             .ToListAsync();
 

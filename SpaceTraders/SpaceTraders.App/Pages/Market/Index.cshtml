@@ -25,6 +25,7 @@
                             <thead>
                                 <tr>
                                     <th>Good</th>
+                                    <th>Priority</th>
                                     <th>Buy At</th>
                                     <th>Sell At</th>
                                     <th>Buy Price</th>
@@ -40,6 +41,16 @@
                             {
                                 <tr>
                                     <td><code>@route.TradeSymbol</code></td>
+                                    <td>
+                                        @if (route.SupportsSupplyChain)
+                                        {
+                                            <span class="badge text-bg-success">Chain @route.SupplyChainDepth</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-secondary">Direct</span>
+                                        }
+                                    </td>
                                     <td class="text-nowrap">@route.BuyWaypoint</td>
                                     <td class="text-nowrap">@route.SellWaypoint</td>
                                     <td class="text-end">@route.BuyPrice.ToString("N0")</td>

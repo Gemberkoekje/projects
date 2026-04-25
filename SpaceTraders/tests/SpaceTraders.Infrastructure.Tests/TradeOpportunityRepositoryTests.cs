@@ -7,8 +7,14 @@ namespace SpaceTraders.Infrastructure.Tests;
 [Trait("Category", "Integration")]
 public sealed class TradeOpportunityRepositoryTests : IntegrationTestBase
 {
-    private static TradeOpportunityDto MakeOpportunity(int id, string trade, decimal profitPerJump, int distance = 1) =>
-        new(id, trade, "WP-BUY", "WP-SELL", 100, 200, 100, distance, profitPerJump, DateTimeOffset.UtcNow);
+    private static TradeOpportunityDto MakeOpportunity(
+        int id,
+        string trade,
+        decimal profitPerJump,
+        int distance = 1,
+        bool supportsSupplyChain = false,
+        int supplyChainDepth = 0) =>
+        new(id, trade, "WP-BUY", "WP-SELL", 100, 200, 100, distance, profitPerJump, supportsSupplyChain, supplyChainDepth, DateTimeOffset.UtcNow);
 
     [SkippableFact]
     public async Task ReplaceAllAsync_ThenGetTopRoutes_ReturnsSortedByProfit()
@@ -51,18 +57,32 @@ public sealed class TradeOpportunityRepositoryTests : IntegrationTestBase
     {
         var repo = new TradeOpportunityRepository(Db);
         await repo.ReplaceAllAsync([
-            MakeOpportunity(0, "IRON_ORE", 50m, distance: 1),   // profit/unit = 100, dist = 1 ✓
-            MakeOpportunity(0, "GOLD", 200m, distance: 5),       // distance too high ✗
-            MakeOpportunity(0, "FUEL", 5m, distance: 1),         // profit/unit = 100 but low PpJ ✓
+            MakeOpportunity(0, "IRON_ORE", 50m, distance: 1),
+            MakeOpportunity(0, "GOLD", 200m, distance: 5),
+            MakeOpportunity(0, "FUEL", 5m, distance: 1),
         ]);
 
         await using var fresh = CreateFreshContext();
         var best = await new TradeOpportunityRepository(fresh)
             .GetBestRouteForCapacityAsync(cargoCapacity: 60, minProfitPerUnit: 50, maxDistanceJumps: 2);
 
-        // GOLD excluded by distance; both IRON and FUEL have profit/unit 100 >= 50 and dist 1 <= 2
         best.Should().NotBeNull();
-        best!.TradeSymbol.Should().Be("IRON_ORE"); // highest ProfitPerJump among eligible
+        best!.TradeSymbol.Should().Be("IRON_ORE");
+    }
+
+    [SkippableFact]
+    public async Task GetTopRoutesAsync_WithSupplyChainPriority_PrefersSupplyChainRoutes()
+    {
+        var repo = new TradeOpportunityRepository(Db);
+        await repo.ReplaceAllAsync([
+            MakeOpportunity(0, "GOLD", 200m),
+            MakeOpportunity(0, "IRON_ORE", 100m, supportsSupplyChain: true, supplyChainDepth: 2)
+        ]);
+
+        await using var fresh = CreateFreshContext();
+        var top = await new TradeOpportunityRepository(fresh).GetTopRoutesAsync(10);
+
+        top[0].TradeSymbol.Should().Be("IRON_ORE");
     }
 
     [SkippableFact]

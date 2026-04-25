@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
+using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Endpoints;
 using SpaceTraders.API.Middleware;
 using SpaceTraders.API.Services;
@@ -15,6 +16,13 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>(optional: true, reloadOnChange: true);
+}
+
+builder.Services.Configure<SpaceTradersBootstrapOptions>(builder.Configuration.GetSection("SpaceTraders"));
 
 builder.Host.UseSerilog((ctx, cfg) =>
 {

@@ -174,7 +174,10 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         new(fuel.Current, fuel.Capacity);
 
     private static CargoModel MapCargo(ShipCargo cargo) =>
-        new(cargo.Units, cargo.Capacity);
+        new(cargo.Units, cargo.Capacity, cargo.Inventory?.Select(MapCargoItem).ToList());
+
+    private static CargoItemModel MapCargoItem(CargoItem item) =>
+        new(item.Symbol, item.Units);
 
     private static ShipModel MapShip(Models.Fleet.Ship ship) =>
         new(
@@ -186,7 +189,13 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             ship.Fuel?.Current ?? 0,
             ship.Fuel?.Capacity ?? 0,
             ship.Nav?.Route?.Arrival,
-            ship.Nav?.Route?.Destination?.Symbol);
+            ship.Nav?.Route?.Destination?.Symbol,
+            ship.Cargo?.Units ?? 0,
+            ship.Cargo?.Capacity ?? 0,
+            default,
+            ship.Registration?.Role ?? string.Empty,
+            ship.Mounts?.Select(m => m.Symbol).ToList(),
+            ship.Cargo?.Inventory?.Select(MapCargoItem).ToList());
 
     private static ContractModel MapContract(Models.Contracts.Contract contract) =>
         new(contract.Id, contract.FactionSymbol, contract.Type, contract.Accepted, contract.Fulfilled, contract.Expiration, contract.DeadlineToAccept);

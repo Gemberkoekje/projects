@@ -19,7 +19,8 @@ public interface ITradeAnalyser
         IReadOnlyList<TradeOpportunityDto> routes,
         int cargoCapacity,
         int minProfitPerUnit,
-        int maxDistanceJumps);
+        int maxDistanceJumps,
+        bool prioritizeSupplyChain = true);
 }
 
 /// <summary>
@@ -28,7 +29,10 @@ public interface ITradeAnalyser
 public sealed record MarketSnapshot(
     string WaypointSymbol,
     string SystemSymbol,
-    IReadOnlyList<TradeGoodSnapshot> TradeGoods);
+    IReadOnlyList<TradeGoodSnapshot> TradeGoods,
+    IReadOnlyList<string> Imports,
+    IReadOnlyList<string> Exports,
+    IReadOnlyList<string> Exchange);
 
 public sealed record TradeGoodSnapshot(
     string Symbol,

@@ -61,43 +61,84 @@ public sealed class AgentBootstrapService(
             StoredAt = DateTimeOffset.UtcNow
         });
 
-        dbContext.Agents.Update(new CachedAgent
+        var agent = await dbContext.Agents.FindAsync(new object?[] { registration.Agent.Symbol }, cancellationToken);
+        if (agent is null)
         {
-            Symbol = registration.Agent.Symbol,
-            AccountId = registration.Agent.AccountId,
-            HeadquartersSymbol = registration.Agent.Headquarters,
-            StartingFaction = registration.Agent.StartingFaction,
-            Credits = registration.Agent.Credits,
-            ShipCount = registration.Agent.ShipCount,
-            LastSyncedAt = DateTimeOffset.UtcNow
-        });
-
-        foreach (var ship in registration.Ships)
-        {
-            dbContext.Ships.Update(new CachedShip
+            dbContext.Agents.Add(new CachedAgent
             {
-                Symbol = ship.Symbol,
-                SystemSymbol = ship.Nav?.SystemSymbol,
-                WaypointSymbol = ship.Nav?.WaypointSymbol,
-                Status = ship.Nav?.Status,
-                FlightMode = ship.Nav?.FlightMode,
-                FuelCurrent = ship.Fuel?.Current ?? 0,
-                FuelCapacity = ship.Fuel?.Capacity ?? 0,
+                Symbol = registration.Agent.Symbol,
+                AccountId = registration.Agent.AccountId,
+                HeadquartersSymbol = registration.Agent.Headquarters,
+                StartingFaction = registration.Agent.StartingFaction,
+                Credits = registration.Agent.Credits,
+                ShipCount = registration.Agent.ShipCount,
                 LastSyncedAt = DateTimeOffset.UtcNow
             });
         }
-
-        dbContext.Contracts.Update(new CachedContract
+        else
         {
-            Id = registration.Contract.Id,
-            FactionSymbol = registration.Contract.FactionSymbol,
-            Type = registration.Contract.Type,
-            IsAccepted = registration.Contract.Accepted,
-            IsFulfilled = registration.Contract.Fulfilled,
-            Expiration = registration.Contract.Expiration,
-            DeadlineToAccept = registration.Contract.DeadlineToAccept,
-            LastSyncedAt = DateTimeOffset.UtcNow
-        });
+            agent.AccountId = registration.Agent.AccountId;
+            agent.HeadquartersSymbol = registration.Agent.Headquarters;
+            agent.StartingFaction = registration.Agent.StartingFaction;
+            agent.Credits = registration.Agent.Credits;
+            agent.ShipCount = registration.Agent.ShipCount;
+            agent.LastSyncedAt = DateTimeOffset.UtcNow;
+        }
+
+        foreach (var ship in registration.Ships)
+        {
+            var cachedShip = await dbContext.Ships.FindAsync(new object?[] { ship.Symbol }, cancellationToken);
+            if (cachedShip is null)
+            {
+                dbContext.Ships.Add(new CachedShip
+                {
+                    Symbol = ship.Symbol,
+                    SystemSymbol = ship.Nav?.SystemSymbol,
+                    WaypointSymbol = ship.Nav?.WaypointSymbol,
+                    Status = ship.Nav?.Status,
+                    FlightMode = ship.Nav?.FlightMode,
+                    FuelCurrent = ship.Fuel?.Current ?? 0,
+                    FuelCapacity = ship.Fuel?.Capacity ?? 0,
+                    LastSyncedAt = DateTimeOffset.UtcNow
+                });
+            }
+            else
+            {
+                cachedShip.SystemSymbol = ship.Nav?.SystemSymbol;
+                cachedShip.WaypointSymbol = ship.Nav?.WaypointSymbol;
+                cachedShip.Status = ship.Nav?.Status;
+                cachedShip.FlightMode = ship.Nav?.FlightMode;
+                cachedShip.FuelCurrent = ship.Fuel?.Current ?? 0;
+                cachedShip.FuelCapacity = ship.Fuel?.Capacity ?? 0;
+                cachedShip.LastSyncedAt = DateTimeOffset.UtcNow;
+            }
+        }
+
+        var contract = await dbContext.Contracts.FindAsync(new object?[] { registration.Contract.Id }, cancellationToken);
+        if (contract is null)
+        {
+            dbContext.Contracts.Add(new CachedContract
+            {
+                Id = registration.Contract.Id,
+                FactionSymbol = registration.Contract.FactionSymbol,
+                Type = registration.Contract.Type,
+                IsAccepted = registration.Contract.Accepted,
+                IsFulfilled = registration.Contract.Fulfilled,
+                Expiration = registration.Contract.Expiration,
+                DeadlineToAccept = registration.Contract.DeadlineToAccept,
+                LastSyncedAt = DateTimeOffset.UtcNow
+            });
+        }
+        else
+        {
+            contract.FactionSymbol = registration.Contract.FactionSymbol;
+            contract.Type = registration.Contract.Type;
+            contract.IsAccepted = registration.Contract.Accepted;
+            contract.IsFulfilled = registration.Contract.Fulfilled;
+            contract.Expiration = registration.Contract.Expiration;
+            contract.DeadlineToAccept = registration.Contract.DeadlineToAccept;
+            contract.LastSyncedAt = DateTimeOffset.UtcNow;
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _agentTokenProvider.Set(registration.Token);
