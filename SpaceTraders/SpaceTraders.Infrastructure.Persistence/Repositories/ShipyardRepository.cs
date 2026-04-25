@@ -14,6 +14,17 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
         return entity?.LastObservedAt;
     }
 
+    public async Task<string?> FindShipyardForTypeAsync(string shipType, CancellationToken cancellationToken = default)
+    {
+        var shipyards = await db.Shipyards
+            .AsNoTracking()
+            .Where(s => s.ShipTypesJson != null && s.ShipTypesJson.Contains(shipType))
+            .OrderByDescending(s => s.LastObservedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return shipyards?.WaypointSymbol;
+    }
+
     public async Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default)
     {
         var existing = await db.Shipyards.FindAsync([shipyard.WaypointSymbol], cancellationToken);
