@@ -1,5 +1,7 @@
+using System.Data;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Infrastructure.Persistence;
 
 namespace SpaceTraders.Infrastructure.Tests;
 
@@ -38,5 +40,30 @@ public sealed class MigrationTests : IntegrationTestBase
         assignmentCount.Should().Be(0);
         tradeCount.Should().Be(0);
         logCount.Should().Be(0);
+    }
+
+    [SkippableFact]
+    public async Task InitializeAsync_AddsMountsJsonColumn_WhenDatabaseSchemaIsOutdated()
+    {
+        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"MountsJson\";");
+
+        await SpaceTradersDatabaseInitializer.InitializeAsync(Db);
+
+        await using var command = Db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = @"
+SELECT COUNT(*)
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'cached_ships'
+  AND column_name = 'MountsJson';";
+
+        if (command.Connection is not null && command.Connection.State != ConnectionState.Open)
+        {
+            await command.Connection.OpenAsync();
+        }
+
+        var result = await command.ExecuteScalarAsync();
+
+        Convert.ToInt32(result).Should().Be(1);
     }
 }

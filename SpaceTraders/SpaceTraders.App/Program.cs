@@ -34,8 +34,7 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
-    await DefaultSettingsSeed.SeedAsync(dbContext);
+    await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext);
 }
 
 if (!app.Environment.IsDevelopment())

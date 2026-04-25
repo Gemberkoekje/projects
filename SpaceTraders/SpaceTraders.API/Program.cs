@@ -79,12 +79,9 @@ var app = builder.Build();
 // Skip database initialization in Testing environment to avoid requiring a real DB connection.
 if (!app.Environment.IsEnvironment("Testing"))
 {
-    await using (var scope = app.Services.CreateAsyncScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-        await dbContext.Database.EnsureCreatedAsync();
-        await DefaultSettingsSeed.SeedAsync(dbContext);
-    }
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+    await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext);
 }
 
 app.UseMiddleware<ApiKeyMiddleware>();
