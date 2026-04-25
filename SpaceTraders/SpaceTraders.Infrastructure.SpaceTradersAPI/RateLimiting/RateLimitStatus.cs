@@ -1,6 +1,8 @@
+using SpaceTraders.Application.Interfaces;
+
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
-public sealed class RateLimitStatus
+public sealed class RateLimitStatus : IRateLimitStatus
 {
     public int Remaining { get; set; }
     public int Limit { get; set; }

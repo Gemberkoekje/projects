@@ -1,0 +1,41 @@
+using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
+using SpaceTraders.Infrastructure.Persistence.Entities;
+
+namespace SpaceTraders.Infrastructure.Persistence.Repositories;
+
+public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepository
+{
+    public async Task<DateTimeOffset?> GetLastObservedAtAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+    {
+        var entity = await db.Shipyards.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.WaypointSymbol == waypointSymbol, cancellationToken);
+        return entity?.LastObservedAt;
+    }
+
+    public async Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default)
+    {
+        var existing = await db.Shipyards.FindAsync([shipyard.WaypointSymbol], cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+
+        if (existing is null)
+        {
+            db.Shipyards.Add(new CachedShipyard
+            {
+                WaypointSymbol = shipyard.WaypointSymbol,
+                SystemSymbol = shipyard.SystemSymbol,
+                ShipTypesJson = shipyard.ShipTypesJson,
+                LastObservedAt = now
+            });
+        }
+        else
+        {
+            existing.SystemSymbol = shipyard.SystemSymbol;
+            existing.ShipTypesJson = shipyard.ShipTypesJson;
+            existing.LastObservedAt = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+}
