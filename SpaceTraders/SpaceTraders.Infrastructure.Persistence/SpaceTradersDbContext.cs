@@ -29,6 +29,8 @@ public sealed class SpaceTradersDbContext(DbContextOptions<SpaceTradersDbContext
 
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
+    public DbSet<LeaderLease> LeaderLeases => Set<LeaderLease>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -144,6 +146,14 @@ public sealed class SpaceTradersDbContext(DbContextOptions<SpaceTradersDbContext
             entity.Property(x => x.EventType).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Message).IsRequired();
             entity.HasIndex(x => new { x.Timestamp, x.ShipSymbol });
+        });
+
+        modelBuilder.Entity<LeaderLease>(entity =>
+        {
+            entity.ToTable("leader_leases");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(100);
+            entity.Property(x => x.HolderId).HasMaxLength(200).IsRequired();
         });
     }
 }

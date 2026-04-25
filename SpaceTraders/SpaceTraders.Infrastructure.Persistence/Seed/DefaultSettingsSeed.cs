@@ -18,6 +18,7 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Scout.ShipyardRefreshIntervalMinutes",  Value = "30",                  Type = "int",     Description = "How often to re-poll shipyards with a ship present" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
+        new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
     ];
 
     /// <summary>

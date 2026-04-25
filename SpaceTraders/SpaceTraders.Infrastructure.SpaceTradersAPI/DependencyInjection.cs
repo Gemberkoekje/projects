@@ -7,6 +7,7 @@ using SpaceTraders.Infrastructure.SpaceTradersAPI.Adapters;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Availability;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+using SpaceTraders.Infrastructure.SpaceTradersAPI.Notifications;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI;
@@ -56,6 +57,9 @@ public static class DependencyInjection
         .AddHttpMessageHandler<RateLimitingHandler>();
 
         services.AddScoped<ISpaceTradersPort, SpaceTradersPortAdapter>();
+
+        services.AddHttpClient("webhook");
+        services.AddScoped<IAlertNotifier, WebhookAlertNotifier>();
 
         return services;
     }
