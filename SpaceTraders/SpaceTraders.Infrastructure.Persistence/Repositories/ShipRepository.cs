@@ -49,6 +49,8 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
                 FlightMode = ship.FlightMode,
                 FuelCurrent = ship.FuelCurrent,
                 FuelCapacity = ship.FuelCapacity,
+                CargoCurrent = ship.CargoCurrent,
+                CargoCapacity = ship.CargoCapacity,
                 ArrivesAt = ship.ArrivesAt,
                 DestWaypointSymbol = ship.DestWaypointSymbol,
                 LastSyncedAt = now
