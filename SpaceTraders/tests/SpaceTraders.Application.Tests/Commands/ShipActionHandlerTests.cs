@@ -17,7 +17,7 @@ public sealed class ShipActionHandlerTests
     private static Agent MakeAgent(string symbol = "AGENT-1", long credits = 80_000) =>
         new() { Symbol = symbol, Credits = credits, StartingFaction = "COSMIC", ShipCount = 2 };
 
-    private static CachedShip AddShip(SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db, string symbol, string waypoint = "X1-AB-001")
+    private static CachedShip AddShip(SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext dbContext, string symbol, string waypoint = "X1-AB-001")
     {
         var ship = new CachedShip
         {
@@ -30,12 +30,12 @@ public sealed class ShipActionHandlerTests
             FuelCapacity = 100,
             LastSyncedAt = DateTimeOffset.UtcNow
         };
-        db.Ships.Add(ship);
-        db.SaveChanges();
+        dbContext.Ships.Add(ship);
+        dbContext.SaveChanges();
         return ship;
     }
 
-    private static CachedAgent AddAgent(SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db, string symbol = "AGENT-1", long credits = 50_000)
+    private static CachedAgent AddAgent(SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext dbContext, string symbol = "AGENT-1", long credits = 50_000)
     {
         var agent = new CachedAgent
         {
@@ -45,8 +45,8 @@ public sealed class ShipActionHandlerTests
             ShipCount = 1,
             LastSyncedAt = DateTimeOffset.UtcNow
         };
-        db.Agents.Add(agent);
-        db.SaveChanges();
+        dbContext.Agents.Add(agent);
+        dbContext.SaveChanges();
         return agent;
     }
 
