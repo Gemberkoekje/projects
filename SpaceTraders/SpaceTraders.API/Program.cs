@@ -21,10 +21,11 @@ builder.Services
         options.AgentToken ??= builder.Configuration["SpaceTraders:AgentToken"];
     });
 
-// Order matters: AgentBootstrapService → StartupSyncService → GameLoopService
+// Order matters: AgentBootstrapService → StartupSyncService → GameLoopService → ShipWorkerService
 builder.Services.AddHostedService<AgentBootstrapService>();
 builder.Services.AddHostedService<StartupSyncService>();
 builder.Services.AddHostedService<GameLoopService>();
+builder.Services.AddHostedService<ShipWorkerService>();
 
 var app = builder.Build();
 

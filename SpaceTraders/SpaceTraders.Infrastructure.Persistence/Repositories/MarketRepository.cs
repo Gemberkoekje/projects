@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.Persistence.Entities;
@@ -43,5 +45,49 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<MarketSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
+    {
+        var markets = await db.Markets.AsNoTracking()
+            .Where(m => m.TradeGoodsJson != null)
+            .ToListAsync(cancellationToken);
+
+        var snapshots = new List<MarketSnapshot>();
+        foreach (var m in markets)
+        {
+            if (m.TradeGoodsJson is null) continue;
+            try
+            {
+                var goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(m.TradeGoodsJson);
+                if (goods is null || goods.Count == 0) continue;
+                var goodSnapshots = goods
+                    .Select(g => new TradeGoodSnapshot(
+                        g.Symbol ?? string.Empty,
+                        g.Type ?? string.Empty,
+                        g.PurchasePrice,
+                        g.SellPrice,
+                        g.TradeVolume,
+                        g.Supply ?? string.Empty))
+                    .ToList();
+                snapshots.Add(new MarketSnapshot(m.WaypointSymbol, m.SystemSymbol, goodSnapshots));
+            }
+            catch (JsonException)
+            {
+                // skip malformed entries
+            }
+        }
+        return snapshots;
+    }
+
+    private sealed class TradeGoodJson
+    {
+        public string? Symbol { get; init; }
+        public string? Type { get; init; }
+        public int TradeVolume { get; init; }
+        public string? Supply { get; init; }
+        public string? Activity { get; init; }
+        public int PurchasePrice { get; init; }
+        public int SellPrice { get; init; }
     }
 }

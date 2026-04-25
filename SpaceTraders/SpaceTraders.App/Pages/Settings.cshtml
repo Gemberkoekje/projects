@@ -1,0 +1,63 @@
+@page
+@model SettingsModel
+@{
+    ViewData["Title"] = "Settings";
+}
+
+<div class="mb-4">
+    <h1 class="display-5">Settings</h1>
+    <p class="text-muted mb-0">Automation configuration. Changes take effect immediately.</p>
+</div>
+
+@if (Model.StatusMessage is not null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (Model.Settings.Count == 0)
+{
+    <div class="alert alert-info">No settings available yet.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Key</th>
+                        <th>Value</th>
+                        <th>Type</th>
+                        <th>Description</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var setting in Model.Settings)
+                {
+                    <tr>
+                        <td class="align-middle"><code>@setting.Key</code></td>
+                        <td>
+                            <form method="post" class="d-flex gap-2">
+                                <input type="hidden" name="key" value="@setting.Key" />
+                                <input class="form-control form-control-sm"
+                                       type="text"
+                                       name="value"
+                                       value="@setting.Value"
+                                       style="max-width:200px" />
+                                <button class="btn btn-sm btn-primary" type="submit">Save</button>
+                            </form>
+                        </td>
+                        <td class="align-middle"><span class="badge bg-secondary">@setting.Type</span></td>
+                        <td class="align-middle text-muted small">@setting.Description</td>
+                        <td></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

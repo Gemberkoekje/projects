@@ -26,6 +26,8 @@ public static class DependencyInjection
         services.AddScoped<IShipyardRepository, ShipyardRepository>();
         services.AddScoped<IShipAssignmentRepository, ShipAssignmentRepository>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
+        services.AddScoped<ITradeOpportunityRepository, TradeOpportunityRepository>();
 
         return services;
     }
