@@ -48,7 +48,8 @@ public sealed class ContractWatchService(
         => CheckContractsAsync(cancellationToken);
 
     private async Task CheckContractsAsync(CancellationToken cancellationToken)
-    {        await using var scope = serviceScopeFactory.CreateAsyncScope();
+    {
+        await using var scope = serviceScopeFactory.CreateAsyncScope();
         var contracts = scope.ServiceProvider.GetRequiredService<IContractRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
