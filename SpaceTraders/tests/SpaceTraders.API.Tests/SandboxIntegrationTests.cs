@@ -82,7 +82,7 @@ public sealed class SandboxIntegrationTests
         Skip.If(string.IsNullOrWhiteSpace(_agentToken),
             $"Sandbox tests require {AgentTokenEnvVar} to be set.");
 
-        var client = new HttpClient { BaseAddress = new Uri(SandboxBaseUrl) };
+        using var client = new HttpClient { BaseAddress = new Uri(SandboxBaseUrl) };
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         var response = await client.GetAsync("/");
 

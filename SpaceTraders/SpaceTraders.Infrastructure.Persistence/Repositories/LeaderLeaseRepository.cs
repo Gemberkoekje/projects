@@ -52,11 +52,27 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
 
         if (lease.ExpiresAt <= now)
         {
-            // Expired lease – take it over.
-            lease.HolderId = holderId;
-            lease.ExpiresAt = now + leaseDuration;
-            await db.SaveChangesAsync(cancellationToken);
-            return true;
+            // Lease has expired – take it over using the known expiry time as
+            // an optimistic concurrency guard to prevent two pods simultaneously
+            // taking an expired lease.
+            var expectedExpiry = lease.ExpiresAt;
+
+            try
+            {
+                var updated = await db.LeaderLeases
+                    .Where(l => l.Key == leaseKey && l.ExpiresAt == expectedExpiry)
+                    .ExecuteUpdateAsync(
+                        s => s
+                            .SetProperty(l => l.HolderId, holderId)
+                            .SetProperty(l => l.ExpiresAt, now + leaseDuration),
+                        cancellationToken);
+
+                return updated > 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         // Another instance holds a valid lease.

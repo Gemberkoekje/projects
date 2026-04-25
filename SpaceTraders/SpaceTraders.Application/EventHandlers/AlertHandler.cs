@@ -22,7 +22,7 @@ public sealed class AlertHandler(
     {
         if (_previousCredits != long.MinValue && _previousCredits > 0)
         {
-            var dropFraction = (double)(@event.OldCredits - @event.NewCredits) / _previousCredits;
+            var dropFraction = (double)(_previousCredits - @event.NewCredits) / _previousCredits;
             if (dropFraction > 0.10)
             {
                 var message =

@@ -1,3 +1,4 @@
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -62,19 +63,17 @@ public sealed class PrometheusMetricsService(
         if (history.Count > 0)
             AgentCreditsGauge.Set(history[history.Count - 1].Credits);
 
-        // API call counters – delta-encode the running totals from RateLimitStatus
-        var totalDelta = rateLimitStatus.TotalRequests - _lastTotalRequests;
+        // API call counters – atomically snapshot and delta-encode the running totals.
+        var currentTotal = rateLimitStatus.TotalRequests;
+        var prevTotal = Interlocked.Exchange(ref _lastTotalRequests, currentTotal);
+        var totalDelta = currentTotal - prevTotal;
         if (totalDelta > 0)
-        {
             ApiCallsCounter.Inc(totalDelta);
-            _lastTotalRequests = rateLimitStatus.TotalRequests;
-        }
 
-        var throttledDelta = rateLimitStatus.ThrottledCount - _lastThrottledCount;
+        var currentThrottled = rateLimitStatus.ThrottledCount;
+        var prevThrottled = Interlocked.Exchange(ref _lastThrottledCount, currentThrottled);
+        var throttledDelta = currentThrottled - prevThrottled;
         if (throttledDelta > 0)
-        {
             ApiThrottledCounter.Inc(throttledDelta);
-            _lastThrottledCount = rateLimitStatus.ThrottledCount;
-        }
     }
 }
