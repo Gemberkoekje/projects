@@ -16,8 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpaceTraders.Domain\SpaceTraders.Domain.csproj" />
-    <ProjectReference Include="..\SpaceTraders.Infrastructure.Persistence\SpaceTraders.Infrastructure.Persistence.csproj" />
-    <ProjectReference Include="..\SpaceTraders.Infrastructure.SpaceTradersAPI\SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
   </ItemGroup>
 
 </Project>

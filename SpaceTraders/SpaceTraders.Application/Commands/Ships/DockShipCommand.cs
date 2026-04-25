@@ -1,32 +1,20 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
 public record DockShipCommand(string ShipSymbol);
 
 public sealed class DockShipHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IShipRepository ships,
     ILogger<DockShipHandler> logger)
 {
     public async Task Handle(DockShipCommand command, CancellationToken cancellationToken)
     {
-        var result = await apiClient.DockShipAsync(command.ShipSymbol, cancellationToken);
-
-        var cached = await db.Ships.FindAsync([command.ShipSymbol], cancellationToken);
-        if (cached is not null)
-        {
-            cached.Status = result.Nav.Status;
-            cached.WaypointSymbol = result.Nav.WaypointSymbol;
-            cached.SystemSymbol = result.Nav.SystemSymbol;
-            cached.ArrivesAt = null;
-            cached.DestWaypointSymbol = null;
-            cached.LastSyncedAt = DateTimeOffset.UtcNow;
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        logger.LogInformation("Ship {Symbol} docked at {Waypoint}.", command.ShipSymbol, result.Nav.WaypointSymbol);
+        var nav = await port.DockShipAsync(command.ShipSymbol, cancellationToken);
+        await ships.UpdateNavAsync(command.ShipSymbol, nav, null, cancellationToken);
+        logger.LogInformation("Ship {Symbol} docked at {Waypoint}.", command.ShipSymbol, nav.WaypointSymbol);
     }
 }

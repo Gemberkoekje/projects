@@ -1,9 +1,8 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Domain.Events;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.Persistence.Entities;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Fleet;
@@ -11,45 +10,37 @@ namespace SpaceTraders.Application.Commands.Fleet;
 public record PurchaseShipCommand(string ShipType, string ShipyardWaypoint);
 
 public sealed class PurchaseShipHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IAgentRepository agents,
+    IShipRepository ships,
     IMessageBus bus,
     ILogger<PurchaseShipHandler> logger)
 {
     public async Task Handle(PurchaseShipCommand command, CancellationToken cancellationToken)
     {
-        var result = await apiClient.PurchaseShipAsync(command.ShipType, command.ShipyardWaypoint, cancellationToken);
+        var result = await port.PurchaseShipAsync(command.ShipType, command.ShipyardWaypoint, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        await agents.UpsertAsync(result.Agent, cancellationToken);
 
-        var cachedAgent = await db.Agents.FindAsync([result.Agent.Symbol], cancellationToken);
-        if (cachedAgent is not null)
-        {
-            cachedAgent.Credits = result.Agent.Credits;
-            cachedAgent.ShipCount = result.Agent.ShipCount;
-            cachedAgent.LastSyncedAt = now;
-        }
+        var newShip = new ShipModel(
+            result.ShipSymbol,
+            result.ShipNav.SystemSymbol,
+            result.ShipNav.WaypointSymbol,
+            result.ShipNav.Status,
+            result.ShipNav.FlightMode,
+            result.ShipFuel.Current,
+            result.ShipFuel.Capacity,
+            result.ShipNav.ArrivesAt,
+            result.ShipNav.DestWaypointSymbol);
 
-        db.Ships.Add(new CachedShip
-        {
-            Symbol = result.Ship.Symbol,
-            SystemSymbol = result.Ship.Nav?.SystemSymbol,
-            WaypointSymbol = result.Ship.Nav?.WaypointSymbol,
-            Status = result.Ship.Nav?.Status,
-            FlightMode = result.Ship.Nav?.FlightMode,
-            FuelCurrent = result.Ship.Fuel?.Current ?? 0,
-            FuelCapacity = result.Ship.Fuel?.Capacity ?? 0,
-            LastSyncedAt = now
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
+        await ships.UpsertAsync(newShip, cancellationToken);
 
         if (Enum.TryParse<ShipType>(command.ShipType, true, out var shipTypeEnum))
         {
-            await bus.PublishAsync(new NewShipPurchasedEvent(result.Ship.Symbol, shipTypeEnum, result.Transaction.Price));
+            await bus.PublishAsync(new NewShipPurchasedEvent(result.ShipSymbol, shipTypeEnum, result.Cost));
         }
 
         logger.LogInformation("Purchased ship {Symbol} of type {Type} for {Cost} credits.",
-            result.Ship.Symbol, command.ShipType, result.Transaction.Price);
+            result.ShipSymbol, command.ShipType, result.Cost);
     }
 }

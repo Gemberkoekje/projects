@@ -65,3 +65,14 @@ public sealed record RateLimitStatusDto(
     string? LimitType,
     int TotalRequests,
     int ThrottledCount);
+
+public record ShipAssignmentDto(
+    string ShipSymbol,
+    string AssignmentType,
+    string? OriginWaypoint,
+    string? DestWaypoint,
+    string? CargoSymbol,
+    string? ContractId,
+    int StepIndex,
+    DateTimeOffset AssignedAt,
+    DateTimeOffset? CompletedAt);

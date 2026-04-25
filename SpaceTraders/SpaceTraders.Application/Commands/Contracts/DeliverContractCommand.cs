@@ -1,45 +1,26 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Contracts;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Contracts;
 
 public record DeliverContractCommand(string ContractId, string ShipSymbol, string TradeSymbol, int Units);
 
 public sealed class DeliverContractHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IContractRepository contracts,
+    IShipRepository ships,
     ILogger<DeliverContractHandler> logger)
 {
     public async Task Handle(DeliverContractCommand command, CancellationToken cancellationToken)
     {
-        var result = await apiClient.DeliverContractAsync(command.ContractId, new DeliverContractRequest
-        {
-            ShipSymbol = command.ShipSymbol,
-            TradeSymbol = command.TradeSymbol,
-            Units = command.Units
-        }, cancellationToken);
+        var result = await port.DeliverContractAsync(command.ContractId, command.ShipSymbol, command.TradeSymbol, command.Units, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        await contracts.UpdateStatusAsync(result.ContractId, result.IsAccepted, result.IsFulfilled, cancellationToken);
 
-        var cachedContract = await db.Contracts.FindAsync([command.ContractId], cancellationToken);
-        if (cachedContract is not null)
-        {
-            cachedContract.IsAccepted = result.Contract.Accepted;
-            cachedContract.IsFulfilled = result.Contract.Fulfilled;
-            cachedContract.LastSyncedAt = now;
-        }
+        if (result.ShipCargo is not null)
+            await ships.UpdateCargoAsync(command.ShipSymbol, result.ShipCargo, cancellationToken);
 
-        var cachedShip = await db.Ships.FindAsync([command.ShipSymbol], cancellationToken);
-        if (cachedShip is not null)
-        {
-            cachedShip.CargoCurrent = result.Cargo.Units;
-            cachedShip.CargoCapacity = result.Cargo.Capacity;
-            cachedShip.LastSyncedAt = now;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Ship {Symbol} delivered {Units}x {Good} for contract {ContractId}.",
             command.ShipSymbol, command.Units, command.TradeSymbol, command.ContractId);
     }

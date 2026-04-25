@@ -1,10 +1,10 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.ValueObjects;
-using SpaceTraders.Infrastructure.Persistence;
 
 namespace SpaceTraders.Application.Automation;
 
@@ -43,20 +43,26 @@ public sealed class GameLoopService(
     private async Task ApplyDeadReckoningAsync(CancellationToken cancellationToken)
     {
         await using var scope = serviceScopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+        var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
 
-        var transitShips = await db.Ships
-            .Where(s => s.ArrivesAt.HasValue)
-            .ToListAsync(cancellationToken);
+        var transitShips = await ships.GetInTransitAsync(cancellationToken);
 
         foreach (var ship in transitShips)
         {
             if (ship.IsInTransit) continue;
 
             var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol;
-            ship.ApplyArrivalIfDue();
-            await db.SaveChangesAsync(cancellationToken);
+
+            var arrivedNav = new NavModel(
+                Status: "IN_ORBIT",
+                SystemSymbol: ship.SystemSymbol ?? string.Empty,
+                WaypointSymbol: arrivedWaypoint ?? ship.WaypointSymbol ?? string.Empty,
+                FlightMode: ship.FlightMode ?? "CRUISE",
+                DestWaypointSymbol: null,
+                ArrivesAt: null);
+
+            await ships.UpdateNavAsync(ship.Symbol, arrivedNav, null, cancellationToken);
 
             if (arrivedWaypoint is not null)
             {

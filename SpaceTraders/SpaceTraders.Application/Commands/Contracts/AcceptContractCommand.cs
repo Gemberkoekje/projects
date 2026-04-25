@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Contracts;
@@ -9,34 +9,25 @@ namespace SpaceTraders.Application.Commands.Contracts;
 public record AcceptContractCommand(string ContractId);
 
 public sealed class AcceptContractHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IContractRepository contracts,
+    IAgentRepository agents,
     IMessageBus bus,
     ILogger<AcceptContractHandler> logger)
 {
     public async Task Handle(AcceptContractCommand command, CancellationToken cancellationToken)
     {
-        var result = await apiClient.AcceptContractAsync(command.ContractId, cancellationToken);
+        var result = await port.AcceptContractAsync(command.ContractId, cancellationToken);
 
-        var cached = await db.Contracts.FindAsync([command.ContractId], cancellationToken);
-        if (cached is not null)
+        await contracts.UpdateStatusAsync(result.ContractId, result.IsAccepted, result.IsFulfilled, cancellationToken);
+
+        if (result.AgentSymbol is not null && result.AgentCredits.HasValue)
         {
-            cached.IsAccepted = result.Contract.Accepted;
-            cached.IsFulfilled = result.Contract.Fulfilled;
-            cached.LastSyncedAt = DateTimeOffset.UtcNow;
+            var agent = await agents.GetAsync(cancellationToken);
+            if (agent is not null)
+                await agents.UpsertAsync(agent with { Credits = result.AgentCredits.Value }, cancellationToken);
         }
 
-        if (result.Agent is not null)
-        {
-            var cachedAgent = await db.Agents.FindAsync([result.Agent.Symbol], cancellationToken);
-            if (cachedAgent is not null)
-            {
-                cachedAgent.Credits = result.Agent.Credits;
-                cachedAgent.LastSyncedAt = DateTimeOffset.UtcNow;
-            }
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
         await bus.PublishAsync(new ContractAcceptedEvent(command.ContractId));
         logger.LogInformation("Contract {ContractId} accepted.", command.ContractId);
     }

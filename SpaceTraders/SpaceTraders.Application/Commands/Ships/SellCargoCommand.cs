@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -10,44 +10,30 @@ namespace SpaceTraders.Application.Commands.Ships;
 public record SellCargoCommand(string ShipSymbol, string TradeSymbol, int Units);
 
 public sealed class SellCargoHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IShipRepository ships,
+    IAgentRepository agents,
     IMessageBus bus,
     ILogger<SellCargoHandler> logger)
 {
     public async Task Handle(SellCargoCommand command, CancellationToken cancellationToken)
     {
-        var result = await apiClient.SellCargoAsync(command.ShipSymbol, command.TradeSymbol, command.Units, cancellationToken);
+        var result = await port.SellCargoAsync(command.ShipSymbol, command.TradeSymbol, command.Units, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        await ships.UpdateCargoAsync(command.ShipSymbol, result.Cargo, cancellationToken);
 
-        var cachedAgent = await db.Agents.FindAsync([result.Agent.Symbol], cancellationToken);
-        if (cachedAgent is not null)
-        {
-            cachedAgent.Credits = result.Agent.Credits;
-            cachedAgent.LastSyncedAt = now;
-        }
+        var agent = await agents.GetAsync(cancellationToken);
+        if (agent is not null)
+            await agents.UpsertAsync(agent with { Credits = result.AgentCredits }, cancellationToken);
 
-        var cachedShip = await db.Ships.FindAsync([command.ShipSymbol], cancellationToken);
-        if (cachedShip is not null)
-        {
-            cachedShip.CargoCurrent = result.Cargo.Units;
-            cachedShip.CargoCapacity = result.Cargo.Capacity;
-            cachedShip.LastSyncedAt = now;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-
-        var soldEvent = new ShipCargoSoldEvent(
+        await bus.PublishAsync(new ShipCargoSoldEvent(
             command.ShipSymbol,
-            new Domain.ValueObjects.TradeSymbol(command.TradeSymbol),
+            new TradeSymbol(command.TradeSymbol),
             command.Units,
-            result.Transaction.TotalPrice,
-            result.Agent.Credits);
-
-        await bus.PublishAsync(soldEvent);
+            result.Revenue,
+            result.AgentCredits));
 
         logger.LogInformation("Ship {Symbol} sold {Units}x {Good} for {Revenue} credits.",
-            command.ShipSymbol, command.Units, command.TradeSymbol, result.Transaction.TotalPrice);
+            command.ShipSymbol, command.Units, command.TradeSymbol, result.Revenue);
     }
 }

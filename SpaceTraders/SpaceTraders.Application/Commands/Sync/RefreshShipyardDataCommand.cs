@@ -1,11 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.ValueObjects;
-using SpaceTraders.Infrastructure.Persistence;
-using SpaceTraders.Infrastructure.Persistence.Entities;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
-using System.Text.Json;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Sync;
@@ -13,8 +10,9 @@ namespace SpaceTraders.Application.Commands.Sync;
 public record RefreshShipyardDataCommand(string SystemSymbol, string WaypointSymbol);
 
 public sealed class RefreshShipyardDataHandler(
-    ISpaceTradersApiClient apiClient,
-    SpaceTradersDbContext db,
+    ISpaceTradersPort port,
+    IShipRepository ships,
+    IShipyardRepository shipyards,
     IMessageBus bus,
     ILogger<RefreshShipyardDataHandler> logger)
 {
@@ -22,47 +20,21 @@ public sealed class RefreshShipyardDataHandler(
 
     public async Task Handle(RefreshShipyardDataCommand command, CancellationToken cancellationToken)
     {
-        // Only refresh if a ship is present at this waypoint
-        var shipPresent = await db.Ships
-            .AsNoTracking()
-            .AnyAsync(s => s.WaypointSymbol == command.WaypointSymbol && s.Status != "IN_TRANSIT", cancellationToken);
-
-        if (!shipPresent)
+        if (!await ships.IsShipAtWaypointAsync(command.WaypointSymbol, cancellationToken))
         {
             logger.LogDebug("Skipping shipyard refresh for {Waypoint}: no ship present.", command.WaypointSymbol);
             return;
         }
 
-        // Check TTL
-        var existing = await db.Shipyards.FindAsync([command.WaypointSymbol], cancellationToken);
-        if (existing is not null && existing.LastObservedAt + DefaultTtl > DateTimeOffset.UtcNow)
+        var lastObserved = await shipyards.GetLastObservedAtAsync(command.WaypointSymbol, cancellationToken);
+        if (lastObserved.HasValue && lastObserved.Value + DefaultTtl > DateTimeOffset.UtcNow)
         {
             logger.LogDebug("Skipping shipyard refresh for {Waypoint}: data is fresh.", command.WaypointSymbol);
             return;
         }
 
-        var shipyard = await apiClient.GetShipyardAsync(command.SystemSymbol, command.WaypointSymbol, cancellationToken);
-
-        var now = DateTimeOffset.UtcNow;
-        var shipTypesJson = shipyard.Ships is not null ? JsonSerializer.Serialize(shipyard.Ships) : null;
-
-        if (existing is null)
-        {
-            db.Shipyards.Add(new CachedShipyard
-            {
-                WaypointSymbol = command.WaypointSymbol,
-                SystemSymbol = command.SystemSymbol,
-                ShipTypesJson = shipTypesJson,
-                LastObservedAt = now
-            });
-        }
-        else
-        {
-            existing.ShipTypesJson = shipTypesJson;
-            existing.LastObservedAt = now;
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
+        var shipyard = await port.GetShipyardAsync(command.SystemSymbol, command.WaypointSymbol, cancellationToken);
+        await shipyards.UpsertAsync(shipyard, cancellationToken);
         await bus.PublishAsync(new ShipyardDataRefreshedEvent(new WaypointSymbol(command.WaypointSymbol)));
         logger.LogInformation("Shipyard data refreshed for {Waypoint}.", command.WaypointSymbol);
     }

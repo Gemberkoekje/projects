@@ -1,8 +1,7 @@
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 
-namespace SpaceTraders.Application.Repositories;
+namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
 public sealed class ActivityLogRepository(SpaceTradersDbContext db) : IActivityLogRepository
 {

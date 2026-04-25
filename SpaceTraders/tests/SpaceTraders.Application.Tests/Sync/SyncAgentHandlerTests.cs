@@ -1,76 +1,69 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Sync;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Agents;
-using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Common;
+using SpaceTraders.Infrastructure.Persistence.Repositories;
 
 namespace SpaceTraders.Application.Tests.Sync;
 
 public sealed class SyncAgentHandlerTests
 {
-    private static Agent MakeAgent(string symbol = "AGENT-1", long credits = 50_000) =>
-        new() { Symbol = symbol, Credits = credits, StartingFaction = "COSMIC", ShipCount = 1 };
-
     [Fact]
-    public async Task Handle_NewAgent_PersistsToDatabase()
+    public async Task Handle_PersistsAgent()
     {
-        var apiClient = Substitute.For<ISpaceTradersApiClient>();
-        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
-                 .Returns(MakeAgent(credits: 50_000));
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT-1", null, "X1-AB-HQ", 50_000, "COSMIC", 2));
 
         await using var db = TestDbContextFactory.Create();
-        var handler = new SyncAgentHandler(apiClient, db, NullLogger<SyncAgentHandler>.Instance);
+        var repo = new AgentRepository(db);
+        await new SyncAgentHandler(port, repo, NullLogger<SyncAgentHandler>.Instance)
+            .Handle(new SyncAgentCommand(), CancellationToken.None);
 
-        await handler.Handle(new SyncAgentCommand(), CancellationToken.None);
-
-        var cached = await db.Agents.FindAsync("AGENT-1");
-        cached.Should().NotBeNull();
-        cached!.Credits.Should().Be(50_000);
+        var agent = await db.Agents.FindAsync("AGENT-1");
+        agent.Should().NotBeNull();
+        agent!.Credits.Should().Be(50_000);
     }
 
     [Fact]
-    public async Task Handle_ExistingAgent_UpdatesCredits()
+    public async Task Handle_UpdatesExistingAgent()
     {
-        var apiClient = Substitute.For<ISpaceTradersApiClient>();
-        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
-                 .Returns(MakeAgent(credits: 75_000));
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT-1", null, null, 99_000, "COSMIC", 3));
 
         await using var db = TestDbContextFactory.Create();
-        db.Agents.Add(new Infrastructure.Persistence.Entities.CachedAgent
-        {
-            Symbol = "AGENT-1",
-            StartingFaction = "COSMIC",
-            Credits = 50_000,
-            ShipCount = 1,
-            LastSyncedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
-        });
-        await db.SaveChangesAsync();
+        var repo = new AgentRepository(db);
 
-        var handler = new SyncAgentHandler(apiClient, db, NullLogger<SyncAgentHandler>.Instance);
+        // First sync
+        await new SyncAgentHandler(port, repo, NullLogger<SyncAgentHandler>.Instance)
+            .Handle(new SyncAgentCommand(), CancellationToken.None);
 
-        await handler.Handle(new SyncAgentCommand(), CancellationToken.None);
+        // Second sync with new credits
+        port.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT-1", null, null, 120_000, "COSMIC", 3));
+        await new SyncAgentHandler(port, repo, NullLogger<SyncAgentHandler>.Instance)
+            .Handle(new SyncAgentCommand(), CancellationToken.None);
 
-        var cached = await db.Agents.FindAsync("AGENT-1");
-        cached!.Credits.Should().Be(75_000);
+        db.Agents.Should().HaveCount(1);
+        var agent = await db.Agents.FindAsync("AGENT-1");
+        agent!.Credits.Should().Be(120_000);
     }
 
     [Fact]
-    public async Task Handle_DoesNotIssueFollowUpGetCalls()
+    public async Task Handle_DoesNotIssueNonAgentCalls()
     {
-        var apiClient = Substitute.For<ISpaceTradersApiClient>();
-        apiClient.GetMyAgentAsync(Arg.Any<CancellationToken>())
-                 .Returns(MakeAgent());
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.GetMyAgentAsync(Arg.Any<CancellationToken>())
+            .Returns(new AgentModel("AGENT-1", null, null, 50_000, "COSMIC", 1));
 
         await using var db = TestDbContextFactory.Create();
-        var handler = new SyncAgentHandler(apiClient, db, NullLogger<SyncAgentHandler>.Instance);
+        var repo = new AgentRepository(db);
+        await new SyncAgentHandler(port, repo, NullLogger<SyncAgentHandler>.Instance)
+            .Handle(new SyncAgentCommand(), CancellationToken.None);
 
-        await handler.Handle(new SyncAgentCommand(), CancellationToken.None);
-
-        // Only one GET call total – GetMyAgentAsync
-        await apiClient.Received(1).GetMyAgentAsync(Arg.Any<CancellationToken>());
-        await apiClient.DidNotReceive().GetMyShipsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await apiClient.DidNotReceive().GetMyContractsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await port.DidNotReceive().GetMyShipsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await port.DidNotReceive().GetMyContractsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 }
