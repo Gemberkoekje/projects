@@ -9,8 +9,8 @@ public sealed class TradeAnalyser : ITradeAnalyser
         IReadOnlyList<MarketSnapshot> markets,
         int minProfitPerUnit = 0)
     {
-        // Index: tradeSymbol → list of (waypoint, systemSymbol, purchasePrice, sellPrice)
-        var buyOptions = new Dictionary<string, List<(string Waypoint, string System, int Price, int Volume)>>(StringComparer.OrdinalIgnoreCase);
+        // Index: tradeSymbol → list of (waypoint, systemSymbol, purchasePrice)
+        var buyOptions = new Dictionary<string, List<(string Waypoint, string System, int Price)>>(StringComparer.OrdinalIgnoreCase);
         var sellOptions = new Dictionary<string, List<(string Waypoint, string System, int Price)>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var market in markets)
@@ -27,7 +27,7 @@ public sealed class TradeAnalyser : ITradeAnalyser
                         buys = [];
                         buyOptions[good.Symbol] = buys;
                     }
-                    buys.Add((market.WaypointSymbol, market.SystemSymbol, good.PurchasePrice, good.TradeVolume));
+                    buys.Add((market.WaypointSymbol, market.SystemSymbol, good.PurchasePrice));
                 }
 
                 // Any market listing a good with a positive sell price is a valid sell destination

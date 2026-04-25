@@ -73,15 +73,18 @@ public sealed class GetBestTradeRouteQueryHandler(
     ITradeOpportunityRepository tradeOpportunities,
     ISettingsRepository settings)
 {
+    private const int DefaultMinProfitPerUnit = 200;
+    private const int DefaultMaxHaulDistance = 5;
+
     public async Task<TradeOpportunityDto?> Handle(GetBestTradeRouteQuery query, CancellationToken cancellationToken)
     {
         var minProfit = query.MinProfitPerUnit > 0
             ? query.MinProfitPerUnit
-            : await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken);
+            : (await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken) is var m and > 0 ? m : DefaultMinProfitPerUnit);
 
         var maxDistance = query.MaxDistanceJumps > 0
             ? query.MaxDistanceJumps
-            : await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken);
+            : (await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken) is var d and > 0 ? d : DefaultMaxHaulDistance);
 
         return await tradeOpportunities.GetBestRouteForCapacityAsync(
             query.CargoCapacity, minProfit, maxDistance, cancellationToken);

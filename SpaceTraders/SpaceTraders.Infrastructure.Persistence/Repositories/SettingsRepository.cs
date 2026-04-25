@@ -1,24 +1,28 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 
 namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
-public sealed class SettingsRepository(SpaceTradersDbContext db) : ISettingsRepository
+public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<SettingsRepository> logger) : ISettingsRepository
 {
     public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
     {
         var raw = await GetRawAsync(key, cancellationToken);
         if (raw is null) return default;
 
+        // String passthrough: no deserialization needed
+        if (typeof(T) == typeof(string)) return (T)(object)raw;
+
         try
         {
             return JsonSerializer.Deserialize<T>(raw);
         }
-        catch
+        catch (JsonException ex)
         {
-            if (typeof(T) == typeof(string)) return (T)(object)raw;
+            logger.LogWarning(ex, "Failed to deserialize setting '{Key}' as {Type}. Raw value: {Value}", key, typeof(T).Name, raw);
             return default;
         }
     }

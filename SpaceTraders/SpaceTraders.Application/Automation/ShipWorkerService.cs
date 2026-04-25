@@ -111,8 +111,9 @@ public sealed class ShipWorkerService(
                 case 2: // Buy cargo
                     if (assignment.CargoSymbol is not null && IsDocked(ship))
                     {
-                        var units = Math.Max(1, ship.CargoCapacity - ship.CargoCurrent);
-                        await bus.SendAsync(new BuyCargoCommand(ship.Symbol, assignment.CargoSymbol, units));
+                        var units = ship.CargoCapacity - ship.CargoCurrent;
+                        if (units > 0)
+                            await bus.SendAsync(new BuyCargoCommand(ship.Symbol, assignment.CargoSymbol, units));
                     }
                     await AdvanceStepAsync(assignment, assignments, cancellationToken);
                     break;

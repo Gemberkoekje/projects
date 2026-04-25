@@ -31,8 +31,7 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
 
     public async Task ReplaceAllAsync(IReadOnlyList<TradeOpportunityDto> opportunities, CancellationToken cancellationToken = default)
     {
-        var existing = await db.TradeOpportunities.ToListAsync(cancellationToken);
-        db.TradeOpportunities.RemoveRange(existing);
+        await db.TradeOpportunities.ExecuteDeleteAsync(cancellationToken);
 
         foreach (var dto in opportunities)
         {
