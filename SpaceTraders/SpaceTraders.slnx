@@ -5,6 +5,7 @@
     <Project Path="tests/SpaceTraders.Domain.Tests/SpaceTraders.Domain.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Infrastructure.Tests/SpaceTraders.Infrastructure.Tests.csproj" />
   </Folder>
+  <Project Path=".net.csproj" />
   <Project Path="SpaceTraders.API/SpaceTraders.API.csproj" />
   <Project Path="SpaceTraders.App/SpaceTraders.App.csproj" />
   <Project Path="SpaceTraders.Application/SpaceTraders.Application.csproj" />

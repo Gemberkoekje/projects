@@ -10,7 +10,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 {
     public async Task<ShipModel?> FindAsync(string symbol, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
         return entity is null ? null : MapToModel(entity);
     }
 
@@ -36,8 +36,8 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpsertAsync(ShipModel ship, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Ships.FindAsync([ship.Symbol], cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var existing = await db.Ships.FindAsync([db.AgentToken, ship.Symbol], cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
         var mountsJson = JsonSerializer.Serialize(ship.MountSymbols ?? []);
         var cargoJson = JsonSerializer.Serialize(ship.CargoInventory ?? []);
 
@@ -45,6 +45,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         {
             db.Ships.Add(new CachedShip
             {
+                AgentToken = db.AgentToken,
                 Symbol = ship.Symbol,
                 SystemSymbol = ship.SystemSymbol,
                 WaypointSymbol = ship.WaypointSymbol,
@@ -85,7 +86,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateNavAsync(string symbol, NavModel nav, FuelModel? fuel, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.Status = nav.Status;
@@ -94,7 +95,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         entity.FlightMode = nav.FlightMode;
         entity.DestWaypointSymbol = nav.DestWaypointSymbol;
         entity.ArrivesAt = nav.ArrivesAt;
-        entity.LastSyncedAt = DateTimeOffset.UtcNow;
+        entity.LastSyncedAt = TimeProvider.System.GetUtcNow();
 
         if (fuel is not null)
         {
@@ -107,25 +108,25 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task UpdateCargoAsync(string symbol, CargoModel cargo, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.CargoCurrent = cargo.Units;
         entity.CargoCapacity = cargo.Capacity;
         entity.CargoJson = JsonSerializer.Serialize(cargo.Inventory ?? []);
-        entity.LastSyncedAt = DateTimeOffset.UtcNow;
+        entity.LastSyncedAt = TimeProvider.System.GetUtcNow();
 
         await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task UpdateFuelAsync(string symbol, FuelModel fuel, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Ships.FindAsync([symbol], cancellationToken);
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
         if (entity is null) return;
 
         entity.FuelCurrent = fuel.Current;
         entity.FuelCapacity = fuel.Capacity;
-        entity.LastSyncedAt = DateTimeOffset.UtcNow;
+        entity.LastSyncedAt = TimeProvider.System.GetUtcNow();
 
         await db.SaveChangesAsync(cancellationToken);
     }

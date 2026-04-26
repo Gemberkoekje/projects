@@ -14,7 +14,7 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and publishes ShipArrivedAtWaypointEvent.
+///    updates their nav state in the DB, and publishes ShipEnteredOrbitEvent and ShipArrivedAtWaypointEvent.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
@@ -90,8 +90,10 @@ public sealed class GameLoopService(
 
             if (arrivedWaypoint is not null)
             {
-                await bus.PublishAsync(new ShipArrivedAtWaypointEvent(ship.Symbol, new WaypointSymbol(arrivedWaypoint)));
-                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning).", ship.Symbol, arrivedWaypoint);
+                var waypoint = new WaypointSymbol(arrivedWaypoint);
+                await bus.PublishAsync(new ShipEnteredOrbitEvent(ship.Symbol, waypoint));
+                await bus.PublishAsync(new ShipArrivedAtWaypointEvent(ship.Symbol, waypoint));
+                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} and entered orbit (dead-reckoning).", ship.Symbol, arrivedWaypoint);
             }
         }
     }
@@ -127,13 +129,13 @@ public sealed class GameLoopService(
         if (apiAvailability.ConsumeUnavailableTransition())
         {
             logger.LogWarning("SpaceTraders API became unavailable; publishing ApiUnavailableEvent.");
-            await bus.PublishAsync(new ApiUnavailableEvent(DateTimeOffset.UtcNow));
+            await bus.PublishAsync(new ApiUnavailableEvent(TimeProvider.System.GetUtcNow()));
         }
 
         if (apiAvailability.ConsumeAvailableTransition())
         {
             logger.LogInformation("SpaceTraders API became available again; publishing ApiAvailableEvent.");
-            await bus.PublishAsync(new ApiAvailableEvent(DateTimeOffset.UtcNow));
+            await bus.PublishAsync(new ApiAvailableEvent(TimeProvider.System.GetUtcNow()));
         }
     }
 }

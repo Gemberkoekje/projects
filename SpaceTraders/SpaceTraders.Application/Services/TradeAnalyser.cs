@@ -83,7 +83,7 @@ public sealed class TradeAnalyser : ITradeAnalyser
                         ProfitPerJump: profitPerJump,
                         SupportsSupplyChain: supportsSupplyChain,
                         SupplyChainDepth: supplyChainDepth,
-                        ComputedAt: DateTimeOffset.UtcNow));
+                        ComputedAt: TimeProvider.System.GetUtcNow()));
                 }
             }
         }

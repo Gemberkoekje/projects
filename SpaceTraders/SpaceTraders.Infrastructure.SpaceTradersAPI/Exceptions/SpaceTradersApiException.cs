@@ -37,37 +37,7 @@ public sealed class SpaceTradersApiException : Exception
             ? null
             : await response.Content.ReadAsStringAsync(cancellationToken);
 
-        int? errorCode = null;
-        string? apiMessage = null;
-
-        if (!string.IsNullOrWhiteSpace(responseBody))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(responseBody);
-                var root = document.RootElement;
-
-                if (root.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.Object)
-                {
-                    if (errorElement.TryGetProperty("code", out var codeElement) && codeElement.TryGetInt32(out var parsedCode))
-                    {
-                        errorCode = parsedCode;
-                    }
-
-                    if (errorElement.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String)
-                    {
-                        apiMessage = messageElement.GetString();
-                    }
-                }
-                else if (root.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String)
-                {
-                    apiMessage = messageElement.GetString();
-                }
-            }
-            catch (JsonException)
-            {
-            }
-        }
+        var (errorCode, apiMessage) = TryReadApiError(responseBody);
 
         var message = apiMessage is null
             ? $"SpaceTraders API request to '{endpoint}' failed with status code {(int)response.StatusCode}."
@@ -75,4 +45,43 @@ public sealed class SpaceTradersApiException : Exception
 
         return new SpaceTradersApiException(message, response.StatusCode, endpoint, responseBody, errorCode);
     }
+
+    private static (int? ErrorCode, string? ApiMessage) TryReadApiError(string? responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+
+            if (root.TryGetProperty("error", out var errorElement) && errorElement.ValueKind == JsonValueKind.Object)
+            {
+                return ReadErrorObject(errorElement);
+            }
+
+            return (null, ReadMessage(root));
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
+
+    private static (int? ErrorCode, string? ApiMessage) ReadErrorObject(JsonElement errorElement)
+    {
+        var errorCode = errorElement.TryGetProperty("code", out var codeElement) && codeElement.TryGetInt32(out var parsedCode)
+            ? parsedCode
+            : (int?)null;
+
+        return (errorCode, ReadMessage(errorElement));
+    }
+
+    private static string? ReadMessage(JsonElement element)
+        => element.TryGetProperty("message", out var messageElement) && messageElement.ValueKind == JsonValueKind.String
+            ? messageElement.GetString()
+            : null;
 }

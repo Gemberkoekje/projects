@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SpaceTraders.Application\SpaceTraders.Application.csproj" />
+    <ProjectReference Include="../SpaceTraders.Application/SpaceTraders.Application.csproj" />
   </ItemGroup>
 
 </Project>

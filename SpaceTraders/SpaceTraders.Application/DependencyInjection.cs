@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
 using Wolverine;
@@ -13,6 +14,7 @@ public static class DependencyInjection
         services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
+        services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
         services.AddWolverine(opts =>
         {

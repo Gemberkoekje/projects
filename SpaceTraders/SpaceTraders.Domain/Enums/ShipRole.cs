@@ -16,5 +16,5 @@ public enum ShipRole
     Patrol,
     Satellite,
     Explorer,
-    Refinery
+    Refinery,
 }

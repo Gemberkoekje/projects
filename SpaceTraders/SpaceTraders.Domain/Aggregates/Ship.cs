@@ -5,6 +5,7 @@ using SpaceTraders.Domain.ValueObjects;
 
 namespace SpaceTraders.Domain.Aggregates;
 
+[Mutable]
 public sealed class Ship : AggregateRoot
 {
     private const double FuelLowThreshold = 0.20;
@@ -58,9 +59,10 @@ public sealed class Ship : AggregateRoot
         Cargo cargo,
         ShipAssignment? assignment = null,
         DateTimeOffset? arrivesAt = null,
-        DateTimeOffset? lastSyncedAt = null)
+        DateTimeOffset? lastSyncedAt = null,
+        TimeProvider? timeProvider = null)
         => new(symbol, role, status, flightMode, currentWaypoint, currentSystem, fuel, cargo,
-               assignment, arrivesAt, lastSyncedAt ?? DateTimeOffset.UtcNow);
+               assignment, arrivesAt, lastSyncedAt ?? (timeProvider ?? TimeProvider.System).GetUtcNow());
 
     public void UpdateFuel(Fuel fuel)
     {

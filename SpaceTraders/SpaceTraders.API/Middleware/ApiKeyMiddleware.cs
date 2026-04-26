@@ -10,6 +10,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, IConfiguration config
     private const string ApiKeyHeader = "X-Api-Key";
     private const string ApiKeyConfigKey = "SPACETRADERS_INTERNAL_API_KEY";
 
+    /// <inheritdoc />
     public async Task InvokeAsync(HttpContext context)
     {
         // Health probes must never require auth

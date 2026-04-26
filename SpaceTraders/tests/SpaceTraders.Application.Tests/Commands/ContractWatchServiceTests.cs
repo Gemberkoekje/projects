@@ -32,10 +32,10 @@ public sealed class ContractWatchServiceTests
         contractRepo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([contract]);
 
         var bus = Substitute.For<IMessageBus>();
-        var provider = BuildProvider(contractRepo, bus);
+        using var provider = BuildProvider(contractRepo, bus);
 
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
+        using var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
 
         await service.InvokeCheckContractsForTestAsync(CancellationToken.None);
 
@@ -53,10 +53,10 @@ public sealed class ContractWatchServiceTests
         contractRepo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([contract]);
 
         var bus = Substitute.For<IMessageBus>();
-        var provider = BuildProvider(contractRepo, bus);
+        using var provider = BuildProvider(contractRepo, bus);
 
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
+        using var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
 
         await service.InvokeCheckContractsForTestAsync(CancellationToken.None);
 
@@ -72,10 +72,10 @@ public sealed class ContractWatchServiceTests
         contractRepo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([contract]);
 
         var bus = Substitute.For<IMessageBus>();
-        var provider = BuildProvider(contractRepo, bus);
+        using var provider = BuildProvider(contractRepo, bus);
 
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
+        using var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
 
         await service.InvokeCheckContractsForTestAsync(CancellationToken.None);
         await service.InvokeCheckContractsForTestAsync(CancellationToken.None);
@@ -87,8 +87,11 @@ public sealed class ContractWatchServiceTests
     public async Task CheckContracts_SkipsUnacceptedContracts()
     {
         var contract = new ContractDto(
-            "CONTRACT-1", "COSMIC", "PROCUREMENT",
-            IsAccepted: false, IsFulfilled: false,
+            "CONTRACT-1",
+            "COSMIC",
+            "PROCUREMENT",
+            IsAccepted: false,
+            IsFulfilled: false,
             Expiration: DateTimeOffset.UtcNow.AddHours(12),
             DeadlineToAccept: null);
 
@@ -96,10 +99,10 @@ public sealed class ContractWatchServiceTests
         contractRepo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([contract]);
 
         var bus = Substitute.For<IMessageBus>();
-        var provider = BuildProvider(contractRepo, bus);
+        using var provider = BuildProvider(contractRepo, bus);
 
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
+        using var service = new ContractWatchService(scopeFactory, NullLogger<ContractWatchService>.Instance);
 
         await service.InvokeCheckContractsForTestAsync(CancellationToken.None);
 

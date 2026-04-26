@@ -5,5 +5,5 @@ public enum ContractType
     None,
     Procurement,
     Transport,
-    Shuttle
+    Shuttle,
 }

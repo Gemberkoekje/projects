@@ -2,17 +2,19 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedAgent
 {
-    public required string Symbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public string? AccountId { get; set; }
+    required public string Symbol { get; init; }
 
-    public string? HeadquartersSymbol { get; set; }
+    public string? AccountId { get; init; }
 
-    public required string StartingFaction { get; set; }
+    public string? HeadquartersSymbol { get; init; }
 
-    public long Credits { get; set; }
+    required public string StartingFaction { get; init; }
 
-    public int ShipCount { get; set; }
+    public long Credits { get; init; }
 
-    public DateTimeOffset LastSyncedAt { get; set; }
+    public int ShipCount { get; init; }
+
+    public DateTimeOffset LastSyncedAt { get; init; }
 }

@@ -2,19 +2,21 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedWaypoint
 {
-    public required string Symbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string SystemSymbol { get; set; }
+    required public string Symbol { get; init; }
 
-    public required string Type { get; set; }
+    required public string SystemSymbol { get; init; }
 
-    public int X { get; set; }
+    required public string Type { get; init; }
 
-    public int Y { get; set; }
+    public int X { get; init; }
 
-    public bool HasMarket { get; set; }
+    public int Y { get; init; }
 
-    public bool HasShipyard { get; set; }
+    public bool HasMarket { get; init; }
 
-    public DateTimeOffset LastObservedAt { get; set; }
+    public bool HasShipyard { get; init; }
+
+    public DateTimeOffset LastObservedAt { get; init; }
 }

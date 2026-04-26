@@ -2,9 +2,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
+[Mutable]
 public sealed class CachedShip
 {
-    public required string Symbol { get; set; }
+    public string AgentToken { get; set; } = string.Empty;
+
+    required public string Symbol { get; set; }
 
     public string? SystemSymbol { get; set; }
 
@@ -35,7 +38,7 @@ public sealed class CachedShip
     public DateTimeOffset LastSyncedAt { get; set; }
 
     [NotMapped]
-    public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > DateTimeOffset.UtcNow;
+    public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
 
     public void ApplyArrivalIfDue()
     {

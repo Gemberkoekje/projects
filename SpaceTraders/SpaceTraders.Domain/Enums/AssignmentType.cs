@@ -10,5 +10,5 @@ public enum AssignmentType
     FulfillContract,
     Refuel,
     Scout,
-    SellAll
+    SellAll,
 }

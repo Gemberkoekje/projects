@@ -2,19 +2,21 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedContract
 {
-    public required string Id { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string FactionSymbol { get; set; }
+    required public string Id { get; init; }
 
-    public required string Type { get; set; }
+    required public string FactionSymbol { get; init; }
 
-    public bool IsAccepted { get; set; }
+    required public string Type { get; init; }
 
-    public bool IsFulfilled { get; set; }
+    public bool IsAccepted { get; init; }
 
-    public DateTimeOffset? Expiration { get; set; }
+    public bool IsFulfilled { get; init; }
 
-    public DateTimeOffset? DeadlineToAccept { get; set; }
+    public DateTimeOffset? Expiration { get; init; }
 
-    public DateTimeOffset LastSyncedAt { get; set; }
+    public DateTimeOffset? DeadlineToAccept { get; init; }
+
+    public DateTimeOffset LastSyncedAt { get; init; }
 }

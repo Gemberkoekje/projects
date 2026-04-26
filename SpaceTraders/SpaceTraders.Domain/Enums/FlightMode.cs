@@ -6,5 +6,5 @@ public enum FlightMode
     Drift,
     Stealth,
     Cruise,
-    Burn
+    Burn,
 }

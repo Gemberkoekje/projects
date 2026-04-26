@@ -4,7 +4,16 @@ using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
-public record DockShipCommand(string ShipSymbol);
+public sealed record DockShipCommand
+{
+    public required string ShipSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public DockShipCommand(string ShipSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+    }
+}
 
 public sealed class DockShipHandler(
     ISpaceTradersPort port,

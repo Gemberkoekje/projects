@@ -1,7 +1,7 @@
 namespace SpaceTraders.Application.Sync;
 
-public record SyncAgentCommand;
+public sealed record SyncAgentCommand;
 
-public record SyncAllShipsCommand;
+public sealed record SyncAllShipsCommand;
 
-public record SyncContractsCommand;
+public sealed record SyncContractsCommand;

@@ -20,6 +20,7 @@ public sealed class ExtractResourcesHandlerTests
     {
         db.Ships.Add(new CachedShip
         {
+            AgentToken = TestDbContextFactory.AgentToken,
             Symbol = symbol,
             SystemSymbol = "X1-AB",
             WaypointSymbol = waypoint,
@@ -29,7 +30,7 @@ public sealed class ExtractResourcesHandlerTests
             FuelCapacity = 100,
             CargoCurrent = cargoCurrent,
             CargoCapacity = cargoCapacity,
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -48,7 +49,7 @@ public sealed class ExtractResourcesHandlerTests
         await new ExtractResourcesHandler(port, ships, NullLogger<ExtractResourcesHandler>.Instance)
             .Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
-        var cached = await db.Ships.FindAsync("SHIP-1");
+        var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         cached!.CargoCurrent.Should().Be(10);
         cached.CargoCapacity.Should().Be(60);
     }
@@ -89,7 +90,7 @@ public sealed class ExtractResourcesHandlerTests
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
-        var cached = await db.Ships.FindAsync("SHIP-1");
+        var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         cached!.CargoCurrent.Should().Be(25);
     }
 }

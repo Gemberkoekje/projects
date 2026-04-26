@@ -21,7 +21,7 @@ public sealed class SyncAgentHandlerTests
         await new SyncAgentHandler(port, repo, NullLogger<SyncAgentHandler>.Instance)
             .Handle(new SyncAgentCommand(), CancellationToken.None);
 
-        var agent = await db.Agents.FindAsync("AGENT-1");
+        var agent = await db.Agents.FindAsync(TestDbContextFactory.AgentToken, "AGENT-1");
         agent.Should().NotBeNull();
         agent!.Credits.Should().Be(50_000);
     }
@@ -47,7 +47,7 @@ public sealed class SyncAgentHandlerTests
             .Handle(new SyncAgentCommand(), CancellationToken.None);
 
         db.Agents.Should().HaveCount(1);
-        var agent = await db.Agents.FindAsync("AGENT-1");
+        var agent = await db.Agents.FindAsync(TestDbContextFactory.AgentToken, "AGENT-1");
         agent!.Credits.Should().Be(120_000);
     }
 

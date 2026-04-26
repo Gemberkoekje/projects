@@ -4,7 +4,25 @@ using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Contracts;
 
-public record DeliverContractCommand(string ContractId, string ShipSymbol, string TradeSymbol, int Units);
+public sealed record DeliverContractCommand
+{
+    public required string ContractId { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required int Units { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public DeliverContractCommand(string ContractId, string ShipSymbol, string TradeSymbol, int Units)
+    {
+        this.ContractId = ContractId;
+        this.ShipSymbol = ShipSymbol;
+        this.TradeSymbol = TradeSymbol;
+        this.Units = Units;
+    }
+}
 
 public sealed class DeliverContractHandler(
     ISpaceTradersPort port,

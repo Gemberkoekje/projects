@@ -2,27 +2,29 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class TradeOpportunity
 {
-    public int Id { get; set; }
+    public int Id { get; init; }
 
-    public required string TradeSymbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string BuyWaypoint { get; set; }
+    required public string TradeSymbol { get; init; }
 
-    public required string SellWaypoint { get; set; }
+    required public string BuyWaypoint { get; init; }
 
-    public int BuyPrice { get; set; }
+    required public string SellWaypoint { get; init; }
 
-    public int SellPrice { get; set; }
+    public int BuyPrice { get; init; }
 
-    public int ProfitPerUnit { get; set; }
+    public int SellPrice { get; init; }
 
-    public int DistanceJumps { get; set; }
+    public int ProfitPerUnit { get; init; }
 
-    public decimal ProfitPerJump { get; set; }
+    public int DistanceJumps { get; init; }
 
-    public bool SupportsSupplyChain { get; set; }
+    public decimal ProfitPerJump { get; init; }
 
-    public int SupplyChainDepth { get; set; }
+    public bool SupportsSupplyChain { get; init; }
 
-    public DateTimeOffset ComputedAt { get; set; }
+    public int SupplyChainDepth { get; init; }
+
+    public DateTimeOffset ComputedAt { get; init; }
 }

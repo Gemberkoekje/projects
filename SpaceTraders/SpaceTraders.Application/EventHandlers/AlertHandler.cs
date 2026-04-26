@@ -30,7 +30,7 @@ public sealed class AlertHandler(
                     $"({dropFraction:P0} decrease).";
 
                 logger.LogWarning("Credit drop alert: {Message}", message);
-                await alertNotifier.NotifyAsync("⚠️ Credit Drop Detected", message, cancellationToken);
+                await alertNotifier.NotifyAsync("Credit Drop Detected", message, cancellationToken);
             }
         }
 
@@ -46,7 +46,7 @@ public sealed class AlertHandler(
                 $"{@event.Remaining.Minutes}m.";
 
             logger.LogWarning("Contract deadline alert: {Message}", message);
-            await alertNotifier.NotifyAsync("🚨 Contract Deadline Approaching", message, cancellationToken);
+            await alertNotifier.NotifyAsync("Contract Deadline Approaching", message, cancellationToken);
         }
     }
 }

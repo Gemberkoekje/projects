@@ -8,6 +8,10 @@ public interface ISpaceTradersPort
 
     Task<PagedResult<ContractModel>> GetMyContractsAsync(int page = 1, int limit = 20, CancellationToken cancellationToken = default);
 
+    Task<SystemDataModel> GetSystemAsync(string systemSymbol, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<WaypointDataModel>> GetWaypointsAsync(string systemSymbol, int page = 1, int limit = 20, CancellationToken cancellationToken = default);
+
     Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<NavModel> DockShipAsync(string shipSymbol, CancellationToken cancellationToken = default);

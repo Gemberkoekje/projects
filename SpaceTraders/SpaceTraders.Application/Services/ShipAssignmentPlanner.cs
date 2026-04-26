@@ -87,7 +87,12 @@ public sealed class ShipAssignmentPlanner(
             return false;
         }
 
-        var targetMiningShips = (int)Math.Ceiling(miningCapableShips.Count * miningShipPercentage);
+        var exactTarget = miningCapableShips.Count * miningShipPercentage;
+        var targetMiningShips = (int)exactTarget;
+        if (targetMiningShips < exactTarget)
+        {
+            targetMiningShips++;
+        }
         if (targetMiningShips <= 0)
         {
             return false;

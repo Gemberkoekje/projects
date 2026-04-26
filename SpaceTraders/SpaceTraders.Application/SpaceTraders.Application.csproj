@@ -15,12 +15,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stateless" Version="5.20.1" />
-    <PackageReference Include="WolverineFx" Version="5.32.0" />
+    <PackageReference Include="Stateless" />
+    <PackageReference Include="WolverineFx" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SpaceTraders.Domain\SpaceTraders.Domain.csproj" />
+    <ProjectReference Include="../SpaceTraders.Domain/SpaceTraders.Domain.csproj" />
   </ItemGroup>
 
 </Project>

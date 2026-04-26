@@ -17,7 +17,9 @@ public sealed class ShipFuelLowHandler(
     {
         logger.LogInformation(
             "Ship {ShipSymbol} fuel low ({Current}/{Capacity}); dispatching refuel command.",
-            @event.ShipSymbol, @event.CurrentFuel, @event.Capacity);
+            @event.ShipSymbol,
+            @event.CurrentFuel,
+            @event.Capacity);
 
         await bus.SendAsync(new RefuelShipCommand(@event.ShipSymbol));
     }

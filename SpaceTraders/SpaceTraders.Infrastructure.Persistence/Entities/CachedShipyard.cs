@@ -2,11 +2,13 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedShipyard
 {
-    public required string WaypointSymbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string SystemSymbol { get; set; }
+    required public string WaypointSymbol { get; init; }
 
-    public string? ShipTypesJson { get; set; }
+    required public string SystemSymbol { get; init; }
 
-    public DateTimeOffset LastObservedAt { get; set; }
+    public string? ShipTypesJson { get; init; }
+
+    public DateTimeOffset LastObservedAt { get; init; }
 }

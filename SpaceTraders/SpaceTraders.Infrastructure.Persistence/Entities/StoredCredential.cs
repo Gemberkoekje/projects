@@ -2,9 +2,11 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class StoredCredential
 {
-    public required string Key { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string Value { get; set; }
+    required public string Key { get; init; }
 
-    public DateTimeOffset StoredAt { get; set; }
+    required public string Value { get; init; }
+
+    public DateTimeOffset StoredAt { get; init; }
 }

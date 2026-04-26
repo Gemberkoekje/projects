@@ -1,4 +1,5 @@
 using SpaceTraders.Application.Queries;
+using SpaceTraders.API.Services;
 using Wolverine;
 
 namespace SpaceTraders.API.Endpoints;
@@ -22,14 +23,18 @@ public static class SettingsEndpoints
             CancellationToken ct) =>
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.SetAsync(key, body.Value, ct);
+            await snapshotLogger.LogAsync($"settings updated: {key}", ct);
             return Results.Ok();
         });
 
         group.MapPost("/reset", async (IServiceProvider sp, CancellationToken ct) =>
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.ResetToDefaultsAsync(ct);
+            await snapshotLogger.LogAsync("settings reset", ct);
             return Results.Ok();
         });
 
@@ -37,4 +42,7 @@ public static class SettingsEndpoints
     }
 }
 
-public record UpdateSettingRequest(string Value);
+public sealed record UpdateSettingRequest
+{
+    public required string Value { get; init; }
+}

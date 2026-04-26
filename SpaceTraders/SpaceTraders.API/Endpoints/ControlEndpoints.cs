@@ -1,3 +1,4 @@
+using SpaceTraders.API.Services;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Sync;
 using Wolverine;
@@ -13,28 +14,31 @@ public static class ControlEndpoints
         group.MapPost("/automation/enable", async (IServiceProvider sp, CancellationToken ct) =>
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.SetAsync("Automation.Enabled", "true", ct);
+            await snapshotLogger.LogAsync("control automation enabled", ct);
             return Results.Ok(new { enabled = true });
         });
 
         group.MapPost("/automation/disable", async (IServiceProvider sp, CancellationToken ct) =>
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
+            var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
             await settings.SetAsync("Automation.Enabled", "false", ct);
+            await snapshotLogger.LogAsync("control automation disabled", ct);
             return Results.Ok(new { enabled = false });
         });
 
         group.MapPost("/ships/{symbol}/reassign", async (
             string symbol,
             ReassignRequest body,
-            IMessageBus bus,
-            CancellationToken ct) =>
+            IMessageBus bus) =>
         {
             await bus.SendAsync(new AssignShipCommand(symbol, body.AssignmentType));
             return Results.Accepted();
         });
 
-        group.MapPost("/sync", async (IMessageBus bus, CancellationToken ct) =>
+        group.MapPost("/sync", async (IMessageBus bus) =>
         {
             await bus.SendAsync(new SyncAllShipsCommand());
             await bus.SendAsync(new SyncAgentCommand());
@@ -46,4 +50,7 @@ public static class ControlEndpoints
     }
 }
 
-public record ReassignRequest(string AssignmentType);
+public sealed record ReassignRequest
+{
+    public required string AssignmentType { get; init; }
+}

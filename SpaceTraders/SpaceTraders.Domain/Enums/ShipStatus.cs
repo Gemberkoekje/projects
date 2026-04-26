@@ -5,5 +5,5 @@ public enum ShipStatus
     None,
     Docked,
     InTransit,
-    InOrbit
+    InOrbit,
 }

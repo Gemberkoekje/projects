@@ -3,8 +3,12 @@ using Wolverine;
 
 namespace SpaceTraders.API.Endpoints;
 
+/// <summary>Maps status API endpoints.</summary>
 public static class StatusEndpoints
 {
+    /// <summary>Registers the status route group on the given <paramref name="app"/>.</summary>
+    /// <param name="app">The endpoint route builder to register the status routes on.</param>
+    /// <returns>The updated endpoint route builder.</returns>
     public static IEndpointRouteBuilder MapStatusEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/status");

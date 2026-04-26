@@ -6,7 +6,16 @@ using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Contracts;
 
-public record AcceptContractCommand(string ContractId);
+public sealed record AcceptContractCommand
+{
+    public required string ContractId { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public AcceptContractCommand(string ContractId)
+    {
+        this.ContractId = ContractId;
+    }
+}
 
 public sealed class AcceptContractHandler(
     ISpaceTradersPort port,

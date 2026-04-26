@@ -5,7 +5,7 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
 public sealed class ShipNavResult
 {
     [JsonPropertyName("nav")]
-    public required ShipNav Nav { get; init; }
+    required public ShipNav Nav { get; init; }
 
     [JsonPropertyName("fuel")]
     public ShipFuel? Fuel { get; init; }
@@ -14,7 +14,7 @@ public sealed class ShipNavResult
 public sealed class NavigateResult
 {
     [JsonPropertyName("nav")]
-    public required ShipNav Nav { get; init; }
+    required public ShipNav Nav { get; init; }
 
     [JsonPropertyName("fuel")]
     public ShipFuel? Fuel { get; init; }
@@ -38,7 +38,7 @@ public sealed class ShipCargo
 public sealed class CargoItem
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("units")]
     public int Units { get; init; }
@@ -47,28 +47,28 @@ public sealed class CargoItem
 public sealed class SellCargoResult
 {
     [JsonPropertyName("agent")]
-    public required Models.Agents.Agent Agent { get; init; }
+    required public Models.Agents.Agent Agent { get; init; }
 
     [JsonPropertyName("cargo")]
-    public required ShipCargo Cargo { get; init; }
+    required public ShipCargo Cargo { get; init; }
 
     [JsonPropertyName("transaction")]
-    public required MarketTransaction Transaction { get; init; }
+    required public MarketTransaction Transaction { get; init; }
 }
 
 public sealed class MarketTransaction
 {
     [JsonPropertyName("waypointSymbol")]
-    public required string WaypointSymbol { get; init; }
+    required public string WaypointSymbol { get; init; }
 
     [JsonPropertyName("shipSymbol")]
-    public required string ShipSymbol { get; init; }
+    required public string ShipSymbol { get; init; }
 
     [JsonPropertyName("tradeSymbol")]
-    public required string TradeSymbol { get; init; }
+    required public string TradeSymbol { get; init; }
 
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("units")]
     public int Units { get; init; }
@@ -86,52 +86,52 @@ public sealed class MarketTransaction
 public sealed class BuyCargoResult
 {
     [JsonPropertyName("agent")]
-    public required Models.Agents.Agent Agent { get; init; }
+    required public Models.Agents.Agent Agent { get; init; }
 
     [JsonPropertyName("cargo")]
-    public required ShipCargo Cargo { get; init; }
+    required public ShipCargo Cargo { get; init; }
 
     [JsonPropertyName("transaction")]
-    public required MarketTransaction Transaction { get; init; }
+    required public MarketTransaction Transaction { get; init; }
 }
 
 public sealed class RefuelResult
 {
     [JsonPropertyName("agent")]
-    public required Models.Agents.Agent Agent { get; init; }
+    required public Models.Agents.Agent Agent { get; init; }
 
     [JsonPropertyName("fuel")]
-    public required ShipFuel Fuel { get; init; }
+    required public ShipFuel Fuel { get; init; }
 
     [JsonPropertyName("transaction")]
-    public required MarketTransaction Transaction { get; init; }
+    required public MarketTransaction Transaction { get; init; }
 }
 
 public sealed class ExtractResult
 {
     [JsonPropertyName("extraction")]
-    public required Extraction Extraction { get; init; }
+    required public Extraction Extraction { get; init; }
 
     [JsonPropertyName("cargo")]
-    public required ShipCargo Cargo { get; init; }
+    required public ShipCargo Cargo { get; init; }
 
     [JsonPropertyName("cooldown")]
-    public required Cooldown Cooldown { get; init; }
+    required public Cooldown Cooldown { get; init; }
 }
 
 public sealed class Extraction
 {
     [JsonPropertyName("shipSymbol")]
-    public required string ShipSymbol { get; init; }
+    required public string ShipSymbol { get; init; }
 
     [JsonPropertyName("yield")]
-    public required ExtractionYield Yield { get; init; }
+    required public ExtractionYield Yield { get; init; }
 }
 
 public sealed class ExtractionYield
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("units")]
     public int Units { get; init; }
@@ -140,7 +140,7 @@ public sealed class ExtractionYield
 public sealed class Cooldown
 {
     [JsonPropertyName("shipSymbol")]
-    public required string ShipSymbol { get; init; }
+    required public string ShipSymbol { get; init; }
 
     [JsonPropertyName("totalSeconds")]
     public int TotalSeconds { get; init; }
@@ -155,31 +155,31 @@ public sealed class Cooldown
 public sealed class PurchaseShipResult
 {
     [JsonPropertyName("agent")]
-    public required Models.Agents.Agent Agent { get; init; }
+    required public Models.Agents.Agent Agent { get; init; }
 
     [JsonPropertyName("ship")]
-    public required Ship Ship { get; init; }
+    required public Ship Ship { get; init; }
 
     [JsonPropertyName("transaction")]
-    public required ShipyardTransaction Transaction { get; init; }
+    required public ShipyardTransaction Transaction { get; init; }
 }
 
 public sealed class ShipyardTransaction
 {
     [JsonPropertyName("waypointSymbol")]
-    public required string WaypointSymbol { get; init; }
+    required public string WaypointSymbol { get; init; }
 
     [JsonPropertyName("shipSymbol")]
-    public required string ShipSymbol { get; init; }
+    required public string ShipSymbol { get; init; }
 
     [JsonPropertyName("shipType")]
-    public required string ShipType { get; init; }
+    required public string ShipType { get; init; }
 
     [JsonPropertyName("price")]
     public long Price { get; init; }
 
     [JsonPropertyName("agentSymbol")]
-    public required string AgentSymbol { get; init; }
+    required public string AgentSymbol { get; init; }
 
     [JsonPropertyName("timestamp")]
     public DateTimeOffset Timestamp { get; init; }

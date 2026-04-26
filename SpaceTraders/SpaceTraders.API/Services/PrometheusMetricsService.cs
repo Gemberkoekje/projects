@@ -41,6 +41,7 @@ public sealed class PrometheusMetricsService(
     private int _lastTotalRequests;
     private int _lastThrottledCount;
 
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)

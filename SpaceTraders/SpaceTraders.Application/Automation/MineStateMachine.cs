@@ -4,7 +4,10 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
+using System;
 
 namespace SpaceTraders.Application.Automation;
 
@@ -33,7 +36,7 @@ internal sealed class MineStateMachine
         NavigateToSell = 3,
         DockAtSell = 4,
         SellCargo = 5,
-        Completed = 6
+        Completed = 6,
     }
 
     private enum Trigger { Advance, Complete }
@@ -66,7 +69,6 @@ internal sealed class MineStateMachine
 
         _machine.Configure(MineStep.NavigateToAsteroid).Permit(Trigger.Advance, MineStep.OrbitAtAsteroid);
         _machine.Configure(MineStep.OrbitAtAsteroid).Permit(Trigger.Advance, MineStep.ExtractResources);
-        // ExtractResources loops on itself until cargo is full, then advances
         _machine.Configure(MineStep.ExtractResources)
             .PermitReentry(Trigger.Advance)
             .Permit(Trigger.Complete, MineStep.NavigateToSell);
@@ -107,7 +109,6 @@ internal sealed class MineStateMachine
                 else if (IsInOrbit() && IsAtWaypoint(_assignment.OriginWaypoint))
                 {
                     await _bus.SendAsync(new ExtractResourcesCommand(_ship.Symbol));
-                    // Stay at step 2 – do NOT advance; loop will re-check next tick.
                 }
                 break;
 
@@ -136,10 +137,19 @@ internal sealed class MineStateMachine
 
             case MineStep.SellCargo:
                 if (_assignment.CargoSymbol is not null && _ship.CargoCurrent > 0 && IsDocked())
+                {
                     await _bus.SendAsync(new SellCargoCommand(_ship.Symbol, _assignment.CargoSymbol, _ship.CargoCurrent));
+                    await MarkCompleteOnlyAsync(cancellationToken);
+                }
                 else if (_assignment.CargoSymbol is null && _ship.CargoCurrent > 0)
+                {
                     _logger.LogWarning("Ship {Symbol} Mine step SellCargo: no CargoSymbol set, skipping sell.", _ship.Symbol);
-                await MarkCompleteAsync(cancellationToken);
+                    await MarkCompleteAsync(cancellationToken);
+                }
+                else
+                {
+                    await MarkCompleteAsync(cancellationToken);
+                }
                 _logger.LogInformation("Ship {Symbol} completed Mine assignment.", _ship.Symbol);
                 break;
 
@@ -175,7 +185,19 @@ internal sealed class MineStateMachine
 
     private async Task MarkCompleteAsync(CancellationToken cancellationToken)
     {
-        var completed = _assignment with { CompletedAt = DateTimeOffset.UtcNow };
+        await MarkCompleteAsync(AssignmentType.Mine, cancellationToken);
+    }
+
+    private async Task MarkCompleteOnlyAsync(CancellationToken cancellationToken)
+    {
+        var completed = _assignment with { CompletedAt = TimeProvider.System.GetUtcNow() };
         await _assignments.UpsertAsync(completed, cancellationToken);
+    }
+
+    private async Task MarkCompleteAsync(AssignmentType completedType, CancellationToken cancellationToken)
+    {
+        var completed = _assignment with { CompletedAt = TimeProvider.System.GetUtcNow() };
+        await _assignments.UpsertAsync(completed, cancellationToken);
+        await _bus.PublishAsync(new ShipAssignmentCompletedEvent(_ship.Symbol, completedType));
     }
 }

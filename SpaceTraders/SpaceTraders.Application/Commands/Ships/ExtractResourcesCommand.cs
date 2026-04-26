@@ -4,7 +4,16 @@ using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
-public record ExtractResourcesCommand(string ShipSymbol);
+public sealed record ExtractResourcesCommand
+{
+    public required string ShipSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ExtractResourcesCommand(string ShipSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+    }
+}
 
 public sealed class ExtractResourcesHandler(
     ISpaceTradersPort port,

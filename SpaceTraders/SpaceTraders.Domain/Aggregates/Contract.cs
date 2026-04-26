@@ -5,6 +5,7 @@ using SpaceTraders.Domain.ValueObjects;
 
 namespace SpaceTraders.Domain.Aggregates;
 
+[Mutable]
 public sealed class Contract : AggregateRoot
 {
     public string Id { get; private set; }
@@ -15,8 +16,14 @@ public sealed class Contract : AggregateRoot
     public bool IsFulfilled { get; private set; }
     public DateTimeOffset Expiration { get; private set; }
 
-    private Contract(string id, string factionSymbol, ContractType type, ContractTerms terms,
-        bool isAccepted, bool isFulfilled, DateTimeOffset expiration)
+    private Contract(
+        string id,
+        string factionSymbol,
+        ContractType type,
+        ContractTerms terms,
+        bool isAccepted,
+        bool isFulfilled,
+        DateTimeOffset expiration)
     {
         Id = id;
         FactionSymbol = factionSymbol;
@@ -27,8 +34,14 @@ public sealed class Contract : AggregateRoot
         Expiration = expiration;
     }
 
-    public static Contract Reconstitute(string id, string factionSymbol, ContractType type, ContractTerms terms,
-        bool isAccepted, bool isFulfilled, DateTimeOffset expiration)
+    public static Contract Reconstitute(
+        string id,
+        string factionSymbol,
+        ContractType type,
+        ContractTerms terms,
+        bool isAccepted,
+        bool isFulfilled,
+        DateTimeOffset expiration)
         => new(id, factionSymbol, type, terms, isAccepted, isFulfilled, expiration);
 
     public void Accept()

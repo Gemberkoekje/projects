@@ -14,5 +14,5 @@ public enum ShipType
     ShipLightShuttle,
     ShipOreHound,
     ShipRefiningFreighter,
-    ShipSurveyor
+    ShipSurveyor,
 }

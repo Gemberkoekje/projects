@@ -9,17 +9,17 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
 public sealed class RegisterResponseData
 {
     [JsonPropertyName("token")]
-    public required string Token { get; init; }
+    required public string Token { get; init; }
 
     [JsonPropertyName("agent")]
-    public required Agent Agent { get; init; }
+    required public Agent Agent { get; init; }
 
     [JsonPropertyName("faction")]
-    public required Faction Faction { get; init; }
+    required public Faction Faction { get; init; }
 
     [JsonPropertyName("contract")]
-    public required Contract Contract { get; init; }
+    required public Contract Contract { get; init; }
 
     [JsonPropertyName("ships")]
-    public required IReadOnlyList<Ship> Ships { get; init; }
+    required public IReadOnlyList<Ship> Ships { get; init; }
 }

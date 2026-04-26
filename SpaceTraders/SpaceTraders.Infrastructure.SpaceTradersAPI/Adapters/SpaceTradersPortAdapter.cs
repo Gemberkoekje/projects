@@ -35,6 +35,22 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             response.Meta.Limit);
     }
 
+    public async Task<SystemDataModel> GetSystemAsync(string systemSymbol, CancellationToken cancellationToken = default)
+    {
+        var system = await client.GetSystemAsync(systemSymbol, cancellationToken);
+        return new SystemDataModel(system.Symbol, system.SectorSymbol, system.Type, system.X, system.Y);
+    }
+
+    public async Task<PagedResult<WaypointDataModel>> GetWaypointsAsync(string systemSymbol, int page = 1, int limit = 20, CancellationToken cancellationToken = default)
+    {
+        var response = await client.GetWaypointsAsync(systemSymbol, page, limit, cancellationToken);
+        return new PagedResult<WaypointDataModel>(
+            response.Data.Select(MapWaypoint).ToList(),
+            response.Meta.Total,
+            response.Meta.Page,
+            response.Meta.Limit);
+    }
+
     public async Task<NavigateActionResult> NavigateShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
         var result = await client.NavigateShipAsync(shipSymbol, waypointSymbol, cancellationToken);
@@ -106,12 +122,15 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     public async Task<ContractActionResult> DeliverContractAsync(string contractId, string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
     {
-        var result = await client.DeliverContractAsync(contractId, new DeliverContractRequest
-        {
-            ShipSymbol = shipSymbol,
-            TradeSymbol = tradeSymbol,
-            Units = units
-        }, cancellationToken);
+        var result = await client.DeliverContractAsync(
+            contractId,
+            new DeliverContractRequest
+            {
+                ShipSymbol = shipSymbol,
+                TradeSymbol = tradeSymbol,
+                Units = units,
+            },
+            cancellationToken);
         return new ContractActionResult(
             result.Contract.Id,
             result.Contract.Accepted,
@@ -156,11 +175,13 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     public async Task<RegisterResult> RegisterAsync(string agentSymbol, string faction, string? email, CancellationToken cancellationToken = default)
     {
-        var result = await client.RegisterAsync(new RegisterRequest
-        {
-            Symbol = agentSymbol,
-            Faction = faction
-        }, cancellationToken);
+        var result = await client.RegisterAsync(
+            new RegisterRequest
+            {
+                Symbol = agentSymbol,
+                Faction = faction,
+            },
+            cancellationToken);
         return new RegisterResult(result.Token, result.Agent.Symbol);
     }
 
@@ -199,4 +220,17 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     private static ContractModel MapContract(Models.Contracts.Contract contract) =>
         new(contract.Id, contract.FactionSymbol, contract.Type, contract.Accepted, contract.Fulfilled, contract.Expiration, contract.DeadlineToAccept);
+
+    private static WaypointDataModel MapWaypoint(Models.Systems.Waypoint waypoint)
+    {
+        var traits = waypoint.Traits ?? [];
+        return new WaypointDataModel(
+            waypoint.Symbol,
+            waypoint.SystemSymbol,
+            waypoint.Type,
+            waypoint.X,
+            waypoint.Y,
+            traits.Any(t => t.Symbol.Equals("MARKETPLACE", StringComparison.OrdinalIgnoreCase)),
+            traits.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)));
+    }
 }

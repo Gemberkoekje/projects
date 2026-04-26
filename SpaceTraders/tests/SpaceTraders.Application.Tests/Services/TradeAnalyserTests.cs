@@ -26,7 +26,7 @@ public sealed class TradeAnalyserTests
         var markets = new[]
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 80, 10)]),
-            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 200, 150, 10)])
+            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 200, 150, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -45,7 +45,7 @@ public sealed class TradeAnalyserTests
     {
         var markets = new[]
         {
-            BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 150, 10)])
+            BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 150, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -60,7 +60,7 @@ public sealed class TradeAnalyserTests
         var markets = new[]
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 200, 80, 10)]),
-            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 80, 100, 10)])
+            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 80, 100, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -75,7 +75,7 @@ public sealed class TradeAnalyserTests
         var markets = new[]
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 0, 10), ("GOLD", "EXPORT", 100, 0, 10)]),
-            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 150, 10), ("GOLD", "IMPORT", 0, 300, 10)])
+            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 150, 10), ("GOLD", "IMPORT", 0, 300, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -91,7 +91,7 @@ public sealed class TradeAnalyserTests
         var markets = new[]
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 0, 10)]),
-            BuildMarket("SYS-B-WP-1", "SYS-B", [("IRON_ORE", "IMPORT", 0, 200, 10)])
+            BuildMarket("SYS-B-WP-1", "SYS-B", [("IRON_ORE", "IMPORT", 0, 200, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -108,7 +108,7 @@ public sealed class TradeAnalyserTests
         var markets = new[]
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 0, 10)]),
-            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 200, 10)])
+            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 200, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -126,7 +126,7 @@ public sealed class TradeAnalyserTests
         {
             BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 0, 10), ("COPPER", "EXPORT", 100, 0, 10)]),
             BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 250, 10)], exports: ["STEEL"]),
-            BuildMarket("SYS-A-WP-3", "SYS-A", [("COPPER", "IMPORT", 0, 300, 10)])
+            BuildMarket("SYS-A-WP-3", "SYS-A", [("COPPER", "IMPORT", 0, 300, 10)]),
         };
 
         var analyser = new TradeAnalyser();
@@ -143,7 +143,7 @@ public sealed class TradeAnalyserTests
         var routes = new[]
         {
             new SpaceTraders.Application.DTOs.TradeOpportunityDto(1, "GOLD", "WP-1", "WP-2", 100, 300, 200, 0, 200m, false, 0, DateTimeOffset.UtcNow),
-            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow)
+            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow),
         };
 
         var analyser = new TradeAnalyser();
@@ -159,7 +159,7 @@ public sealed class TradeAnalyserTests
         var routes = new[]
         {
             new SpaceTraders.Application.DTOs.TradeOpportunityDto(1, "GOLD", "WP-1", "WP-2", 100, 400, 300, 0, 300m, false, 0, DateTimeOffset.UtcNow),
-            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 250, 150, 0, 150m, true, 2, DateTimeOffset.UtcNow)
+            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 250, 150, 0, 150m, true, 2, DateTimeOffset.UtcNow),
         };
 
         var analyser = new TradeAnalyser();
@@ -174,7 +174,7 @@ public sealed class TradeAnalyserTests
     {
         var routes = new[]
         {
-            new SpaceTraders.Application.DTOs.TradeOpportunityDto(1, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow)
+            new SpaceTraders.Application.DTOs.TradeOpportunityDto(1, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow),
         };
 
         var analyser = new TradeAnalyser();
@@ -189,7 +189,7 @@ public sealed class TradeAnalyserTests
         var routes = new[]
         {
             new SpaceTraders.Application.DTOs.TradeOpportunityDto(1, "GOLD", "WP-1", "WP-2", 100, 300, 200, 3, 67m, false, 0, DateTimeOffset.UtcNow),
-            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow)
+            new SpaceTraders.Application.DTOs.TradeOpportunityDto(2, "IRON", "WP-1", "WP-3", 100, 150, 50, 0, 50m, false, 0, DateTimeOffset.UtcNow),
         };
 
         var analyser = new TradeAnalyser();

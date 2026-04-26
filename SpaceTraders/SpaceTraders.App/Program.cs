@@ -3,6 +3,8 @@ using Serilog.Formatting.Compact;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 
+const string PathBase = "/spacetraders";
+
 var builder = WebApplication.CreateBuilder(args);
 
 if (builder.Environment.IsDevelopment())
@@ -43,9 +45,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UsePathBase(PathBase);
 app.UseHttpsRedirection();
 app.UseRouting();
 app.UseAuthorization();
 app.MapStaticAssets();
 app.MapRazorPages().WithStaticAssets();
-app.Run();
+await app.RunAsync();

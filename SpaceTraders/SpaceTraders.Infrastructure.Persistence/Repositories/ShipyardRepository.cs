@@ -27,24 +27,25 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
 
     public async Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Shipyards.FindAsync([shipyard.WaypointSymbol], cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var existing = await db.Shipyards.FindAsync([db.AgentToken, shipyard.WaypointSymbol], cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+
+        var values = new CachedShipyard
+        {
+            AgentToken = db.AgentToken,
+            WaypointSymbol = shipyard.WaypointSymbol,
+            SystemSymbol = shipyard.SystemSymbol,
+            ShipTypesJson = shipyard.ShipTypesJson,
+            LastObservedAt = now
+        };
 
         if (existing is null)
         {
-            db.Shipyards.Add(new CachedShipyard
-            {
-                WaypointSymbol = shipyard.WaypointSymbol,
-                SystemSymbol = shipyard.SystemSymbol,
-                ShipTypesJson = shipyard.ShipTypesJson,
-                LastObservedAt = now
-            });
+            db.Shipyards.Add(values);
         }
         else
         {
-            existing.SystemSymbol = shipyard.SystemSymbol;
-            existing.ShipTypesJson = shipyard.ShipTypesJson;
-            existing.LastObservedAt = now;
+            db.Entry(existing).CurrentValues.SetValues(values);
         }
 
         await db.SaveChangesAsync(cancellationToken);

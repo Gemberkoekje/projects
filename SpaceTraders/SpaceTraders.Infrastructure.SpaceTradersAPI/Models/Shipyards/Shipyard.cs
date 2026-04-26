@@ -5,7 +5,7 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Shipyards;
 public sealed class Shipyard
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("shipTypes")]
     public IReadOnlyList<ShipyardShipType>? ShipTypes { get; init; }
@@ -17,13 +17,13 @@ public sealed class Shipyard
 public sealed class ShipyardShipType
 {
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 }
 
 public sealed class ShipyardShip
 {
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("purchasePrice")]
     public long PurchasePrice { get; init; }

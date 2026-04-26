@@ -8,7 +8,7 @@ public sealed class Agent
     public string? AccountId { get; init; }
 
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("headquarters")]
     public string? Headquarters { get; init; }
@@ -17,7 +17,7 @@ public sealed class Agent
     public long Credits { get; init; }
 
     [JsonPropertyName("startingFaction")]
-    public required string StartingFaction { get; init; }
+    required public string StartingFaction { get; init; }
 
     [JsonPropertyName("shipCount")]
     public int ShipCount { get; init; }

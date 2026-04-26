@@ -161,11 +161,15 @@
 - Avoid hardcoding sensitive information
 - Use secure communication protocols (HTTPS, TLS)
 - Implement proper error handling without exposing sensitive information
+- Mask agent tokens in logs (e.g., abbreviated form) and do not log in full
 
 ## General Guidelines
 - Under almost any circumstances, do not use nullables (?) - they are generally not needed. Only use them in very specific circumstances where there's no other way to differentiate between an entity and no entity, or consider using `Result<T>`. Do NOT add `#nullable enable` as a workaround for CS8632 warnings — remove the `?` annotations instead.
 - All enums should have an empty value.
 - Implicit usings are disabled in this workspace (via project build props). This is intentional. All System.* and SDK usings must be explicitly declared in `GlobalUsings.cs` or as local usings.
+- Solve warnings. Do not suppress them unless there is no other way to address the underlying issue. If a warning cannot be resolved, add a comment explaining why it is safe to ignore.
+- If warnings need to be suppressed, use .globalconfig
+- You are not done until all warnings are resolved or properly suppressed with explanations. This includes warnings from generated code.
 
 ## Project Guidelines
 - In Qowaiv.Validation.Abstractions, use non-generic `Result` (with `Result.OK` for success and `Result.WithMessages(...)` for failure) when no value needs to be returned, instead of `Result<bool>`.

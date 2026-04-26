@@ -1,45 +1,342 @@
 namespace SpaceTraders.Application.Ports;
 
-public record AgentModel(string Symbol, string? AccountId, string? HeadquartersSymbol, long Credits, string StartingFaction, int ShipCount);
-
-public record NavModel(string Status, string SystemSymbol, string WaypointSymbol, string FlightMode, string? DestWaypointSymbol, DateTimeOffset? ArrivesAt);
-
-public record FuelModel(int Current, int Capacity);
-
-public record CargoItemModel(string Symbol, int Units);
-
-public record CargoModel(int Units, int Capacity, IReadOnlyList<CargoItemModel>? Inventory = null);
-
-public record NavigateActionResult(NavModel Nav, FuelModel? Fuel);
-
-public record TradeActionResult(string AgentSymbol, long AgentCredits, CargoModel Cargo, long Revenue);
-
-public record RefuelActionResult(long AgentCredits, FuelModel Fuel, long Cost);
-
-public record ExtractionActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds);
-
-public record PurchaseShipActionResult(AgentModel Agent, string ShipSymbol, NavModel ShipNav, FuelModel ShipFuel, long Cost);
-
-public record ContractActionResult(string ContractId, bool IsAccepted, bool IsFulfilled, string? AgentSymbol, long? AgentCredits, CargoModel? ShipCargo);
-
-public record ShipModel(
-    string Symbol,
-    string? SystemSymbol,
-    string? WaypointSymbol,
-    string? Status,
-    string? FlightMode,
-    int FuelCurrent,
-    int FuelCapacity,
-    DateTimeOffset? ArrivesAt = null,
-    string? DestWaypointSymbol = null,
-    int CargoCurrent = 0,
-    int CargoCapacity = 0,
-    DateTimeOffset LastSyncedAt = default,
-    string ShipType = "",
-    IReadOnlyList<string>? MountSymbols = null,
-    IReadOnlyList<CargoItemModel>? CargoInventory = null)
+public sealed record AgentModel
 {
-    public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > DateTimeOffset.UtcNow;
+    public required string Symbol { get; init; }
+
+    public string? AccountId { get; init; }
+
+    public string? HeadquartersSymbol { get; init; }
+
+    public required long Credits { get; init; }
+
+    public required string StartingFaction { get; init; }
+
+    public required int ShipCount { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public AgentModel(string Symbol, string? AccountId, string? HeadquartersSymbol, long Credits, string StartingFaction, int ShipCount)
+    {
+        this.Symbol = Symbol;
+        this.AccountId = AccountId;
+        this.HeadquartersSymbol = HeadquartersSymbol;
+        this.Credits = Credits;
+        this.StartingFaction = StartingFaction;
+        this.ShipCount = ShipCount;
+    }
+}
+
+public sealed record NavModel
+{
+    public required string Status { get; init; }
+
+    public required string SystemSymbol { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    public required string FlightMode { get; init; }
+
+    public string? DestWaypointSymbol { get; init; }
+
+    public DateTimeOffset? ArrivesAt { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public NavModel(string Status, string SystemSymbol, string WaypointSymbol, string FlightMode, string? DestWaypointSymbol, DateTimeOffset? ArrivesAt)
+    {
+        this.Status = Status;
+        this.SystemSymbol = SystemSymbol;
+        this.WaypointSymbol = WaypointSymbol;
+        this.FlightMode = FlightMode;
+        this.DestWaypointSymbol = DestWaypointSymbol;
+        this.ArrivesAt = ArrivesAt;
+    }
+}
+
+public sealed record FuelModel
+{
+    public required int Current { get; init; }
+
+    public required int Capacity { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public FuelModel(int Current, int Capacity)
+    {
+        this.Current = Current;
+        this.Capacity = Capacity;
+    }
+}
+
+public sealed record CargoItemModel
+{
+    public required string Symbol { get; init; }
+
+    public required int Units { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CargoItemModel(string Symbol, int Units)
+    {
+        this.Symbol = Symbol;
+        this.Units = Units;
+    }
+}
+
+public sealed record CargoModel
+{
+    public required int Units { get; init; }
+
+    public required int Capacity { get; init; }
+
+    public IReadOnlyList<CargoItemModel>? Inventory { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CargoModel(int Units, int Capacity, IReadOnlyList<CargoItemModel>? Inventory = null)
+    {
+        this.Units = Units;
+        this.Capacity = Capacity;
+        this.Inventory = Inventory;
+    }
+}
+
+public sealed record NavigateActionResult
+{
+    public required NavModel Nav { get; init; }
+
+    public FuelModel? Fuel { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public NavigateActionResult(NavModel Nav, FuelModel? Fuel)
+    {
+        this.Nav = Nav;
+        this.Fuel = Fuel;
+    }
+}
+
+public sealed record TradeActionResult
+{
+    public required string AgentSymbol { get; init; }
+
+    public required long AgentCredits { get; init; }
+
+    public required CargoModel Cargo { get; init; }
+
+    public required long Revenue { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public TradeActionResult(string AgentSymbol, long AgentCredits, CargoModel Cargo, long Revenue)
+    {
+        this.AgentSymbol = AgentSymbol;
+        this.AgentCredits = AgentCredits;
+        this.Cargo = Cargo;
+        this.Revenue = Revenue;
+    }
+}
+
+public sealed record RefuelActionResult
+{
+    public required long AgentCredits { get; init; }
+
+    public required FuelModel Fuel { get; init; }
+
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RefuelActionResult(long AgentCredits, FuelModel Fuel, long Cost)
+    {
+        this.AgentCredits = AgentCredits;
+        this.Fuel = Fuel;
+        this.Cost = Cost;
+    }
+}
+
+public sealed record ExtractionActionResult
+{
+    public required string YieldSymbol { get; init; }
+
+    public required int YieldUnits { get; init; }
+
+    public required CargoModel Cargo { get; init; }
+
+    public required int CooldownSeconds { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ExtractionActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds)
+    {
+        this.YieldSymbol = YieldSymbol;
+        this.YieldUnits = YieldUnits;
+        this.Cargo = Cargo;
+        this.CooldownSeconds = CooldownSeconds;
+    }
+}
+
+public sealed record PurchaseShipActionResult
+{
+    public required AgentModel Agent { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    public required NavModel ShipNav { get; init; }
+
+    public required FuelModel ShipFuel { get; init; }
+
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public PurchaseShipActionResult(AgentModel Agent, string ShipSymbol, NavModel ShipNav, FuelModel ShipFuel, long Cost)
+    {
+        this.Agent = Agent;
+        this.ShipSymbol = ShipSymbol;
+        this.ShipNav = ShipNav;
+        this.ShipFuel = ShipFuel;
+        this.Cost = Cost;
+    }
+}
+
+public sealed record ContractActionResult
+{
+    public required string ContractId { get; init; }
+
+    public required bool IsAccepted { get; init; }
+
+    public required bool IsFulfilled { get; init; }
+
+    public string? AgentSymbol { get; init; }
+
+    public long? AgentCredits { get; init; }
+
+    public CargoModel? ShipCargo { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractActionResult(string ContractId, bool IsAccepted, bool IsFulfilled, string? AgentSymbol, long? AgentCredits, CargoModel? ShipCargo)
+    {
+        this.ContractId = ContractId;
+        this.IsAccepted = IsAccepted;
+        this.IsFulfilled = IsFulfilled;
+        this.AgentSymbol = AgentSymbol;
+        this.AgentCredits = AgentCredits;
+        this.ShipCargo = ShipCargo;
+    }
+}
+
+public sealed record SystemDataModel
+{
+    public required string Symbol { get; init; }
+
+    public required string SectorSymbol { get; init; }
+
+    public required string Type { get; init; }
+
+    public required int X { get; init; }
+
+    public required int Y { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SystemDataModel(string Symbol, string SectorSymbol, string Type, int X, int Y)
+    {
+        this.Symbol = Symbol;
+        this.SectorSymbol = SectorSymbol;
+        this.Type = Type;
+        this.X = X;
+        this.Y = Y;
+    }
+}
+
+public sealed record WaypointDataModel
+{
+    public required string Symbol { get; init; }
+
+    public required string SystemSymbol { get; init; }
+
+    public required string Type { get; init; }
+
+    public required int X { get; init; }
+
+    public required int Y { get; init; }
+
+    public required bool HasMarket { get; init; }
+
+    public required bool HasShipyard { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public WaypointDataModel(string Symbol, string SystemSymbol, string Type, int X, int Y, bool HasMarket, bool HasShipyard)
+    {
+        this.Symbol = Symbol;
+        this.SystemSymbol = SystemSymbol;
+        this.Type = Type;
+        this.X = X;
+        this.Y = Y;
+        this.HasMarket = HasMarket;
+        this.HasShipyard = HasShipyard;
+    }
+}
+
+public sealed record ShipModel
+{
+    public required string Symbol { get; init; }
+
+    public string? SystemSymbol { get; init; }
+
+    public string? WaypointSymbol { get; init; }
+
+    public string? Status { get; init; }
+
+    public string? FlightMode { get; init; }
+
+    public required int FuelCurrent { get; init; }
+
+    public required int FuelCapacity { get; init; }
+
+    public DateTimeOffset? ArrivesAt { get; init; } = null;
+
+    public string? DestWaypointSymbol { get; init; } = null;
+
+    public int CargoCurrent { get; init; } = 0;
+
+    public int CargoCapacity { get; init; } = 0;
+
+    public DateTimeOffset LastSyncedAt { get; init; } = default;
+
+    public string ShipType { get; init; } = "";
+
+    public IReadOnlyList<string>? MountSymbols { get; init; } = null;
+
+    public IReadOnlyList<CargoItemModel>? CargoInventory { get; init; } = null;
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipModel(
+        string Symbol,
+        string? SystemSymbol,
+        string? WaypointSymbol,
+        string? Status,
+        string? FlightMode,
+        int FuelCurrent,
+        int FuelCapacity,
+        DateTimeOffset? ArrivesAt = null,
+        string? DestWaypointSymbol = null,
+        int CargoCurrent = 0,
+        int CargoCapacity = 0,
+        DateTimeOffset LastSyncedAt = default,
+        string ShipType = "",
+        IReadOnlyList<string>? MountSymbols = null,
+        IReadOnlyList<CargoItemModel>? CargoInventory = null)
+    {
+        this.Symbol = Symbol;
+        this.SystemSymbol = SystemSymbol;
+        this.WaypointSymbol = WaypointSymbol;
+        this.Status = Status;
+        this.FlightMode = FlightMode;
+        this.FuelCurrent = FuelCurrent;
+        this.FuelCapacity = FuelCapacity;
+        this.ArrivesAt = ArrivesAt;
+        this.DestWaypointSymbol = DestWaypointSymbol;
+        this.CargoCurrent = CargoCurrent;
+        this.CargoCapacity = CargoCapacity;
+        this.LastSyncedAt = LastSyncedAt;
+        this.ShipType = ShipType;
+        this.MountSymbols = MountSymbols;
+        this.CargoInventory = CargoInventory;
+    }
+
+    public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
 
     public bool HasMiningEquipment =>
         ShipType.Equals("SHIP_MINING_DRONE", StringComparison.OrdinalIgnoreCase) ||
@@ -49,12 +346,121 @@ public record ShipModel(
             m.Contains("SURVEYOR", StringComparison.OrdinalIgnoreCase));
 }
 
-public record ContractModel(string Id, string FactionSymbol, string Type, bool IsAccepted, bool IsFulfilled, DateTimeOffset? Expiration, DateTimeOffset? DeadlineToAccept);
+public sealed record ContractModel
+{
+    public required string Id { get; init; }
 
-public record MarketDataModel(string WaypointSymbol, string SystemSymbol, string? TradeGoodsJson, string? ImportsJson, string? ExportsJson, string? ExchangeJson);
+    public required string FactionSymbol { get; init; }
 
-public record ShipyardDataModel(string WaypointSymbol, string SystemSymbol, string? ShipTypesJson);
+    public required string Type { get; init; }
 
-public record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int Limit);
+    public required bool IsAccepted { get; init; }
 
-public record RegisterResult(string AgentToken, string AgentSymbol);
+    public required bool IsFulfilled { get; init; }
+
+    public DateTimeOffset? Expiration { get; init; }
+
+    public DateTimeOffset? DeadlineToAccept { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractModel(
+        string Id,
+        string FactionSymbol,
+        string Type,
+        bool IsAccepted,
+        bool IsFulfilled,
+        DateTimeOffset? Expiration,
+        DateTimeOffset? DeadlineToAccept)
+    {
+        this.Id = Id;
+        this.FactionSymbol = FactionSymbol;
+        this.Type = Type;
+        this.IsAccepted = IsAccepted;
+        this.IsFulfilled = IsFulfilled;
+        this.Expiration = Expiration;
+        this.DeadlineToAccept = DeadlineToAccept;
+    }
+}
+
+public sealed record MarketDataModel
+{
+    public required string WaypointSymbol { get; init; }
+
+    public required string SystemSymbol { get; init; }
+
+    public string? TradeGoodsJson { get; init; }
+
+    public string? ImportsJson { get; init; }
+
+    public string? ExportsJson { get; init; }
+
+    public string? ExchangeJson { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MarketDataModel(
+        string WaypointSymbol,
+        string SystemSymbol,
+        string? TradeGoodsJson,
+        string? ImportsJson,
+        string? ExportsJson,
+        string? ExchangeJson)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.SystemSymbol = SystemSymbol;
+        this.TradeGoodsJson = TradeGoodsJson;
+        this.ImportsJson = ImportsJson;
+        this.ExportsJson = ExportsJson;
+        this.ExchangeJson = ExchangeJson;
+    }
+}
+
+public sealed record ShipyardDataModel
+{
+    public required string WaypointSymbol { get; init; }
+
+    public required string SystemSymbol { get; init; }
+
+    public string? ShipTypesJson { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipyardDataModel(string WaypointSymbol, string SystemSymbol, string? ShipTypesJson)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.SystemSymbol = SystemSymbol;
+        this.ShipTypesJson = ShipTypesJson;
+    }
+}
+
+public sealed record PagedResult<T>
+{
+    public required IReadOnlyList<T> Items { get; init; }
+
+    public required int Total { get; init; }
+
+    public required int Page { get; init; }
+
+    public required int Limit { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public PagedResult(IReadOnlyList<T> Items, int Total, int Page, int Limit)
+    {
+        this.Items = Items;
+        this.Total = Total;
+        this.Page = Page;
+        this.Limit = Limit;
+    }
+}
+
+public sealed record RegisterResult
+{
+    public required string AgentToken { get; init; }
+
+    public required string AgentSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RegisterResult(string AgentToken, string AgentSymbol)
+    {
+        this.AgentToken = AgentToken;
+        this.AgentSymbol = AgentSymbol;
+    }
+}

@@ -15,7 +15,7 @@ public sealed class RateLimitResponseHandler(RateLimitStatus status) : Delegatin
         {
             _status.ThrottledCount++;
             var resetAt = ParseResetHeader(response);
-            var delay = resetAt - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(50);
+            var delay = resetAt - TimeProvider.System.GetUtcNow() + TimeSpan.FromMilliseconds(50);
             if (delay > TimeSpan.Zero)
                 await Task.Delay(delay, cancellationToken);
 
@@ -35,7 +35,7 @@ public sealed class RateLimitResponseHandler(RateLimitStatus status) : Delegatin
             if (val is not null && DateTimeOffset.TryParse(val, out var reset))
                 return reset;
         }
-        return DateTimeOffset.UtcNow.AddSeconds(1);
+        return TimeProvider.System.GetUtcNow().AddSeconds(1);
     }
 
     private void UpdateStatus(HttpResponseMessage response)

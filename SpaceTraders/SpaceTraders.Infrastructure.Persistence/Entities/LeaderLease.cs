@@ -6,12 +6,14 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 /// </summary>
 public sealed class LeaderLease
 {
+    public string AgentToken { get; init; } = string.Empty;
+
     /// <summary>Logical name of the lease (e.g. <c>"game-loop"</c>).</summary>
-    public required string Key { get; set; }
+    required public string Key { get; init; }
 
     /// <summary>Opaque identifier of the holder (e.g. a GUID generated at startup).</summary>
-    public required string HolderId { get; set; }
+    required public string HolderId { get; init; }
 
     /// <summary>UTC timestamp after which the lease may be taken over by another instance.</summary>
-    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; init; }
 }

@@ -54,7 +54,7 @@ public sealed class ContractWatchService(
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
 
         var activeContracts = await contracts.GetActiveAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.System.GetUtcNow();
 
         foreach (var contract in activeContracts)
         {

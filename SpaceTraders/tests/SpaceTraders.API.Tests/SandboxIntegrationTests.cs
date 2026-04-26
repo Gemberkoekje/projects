@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 
 namespace SpaceTraders.API.Tests;
 
@@ -16,7 +15,7 @@ namespace SpaceTraders.API.Tests;
 /// </code>
 /// </summary>
 [Trait("Category", "Sandbox")]
-public sealed class SandboxIntegrationTests
+public sealed class SandboxIntegrationTests : IDisposable
 {
     private const string SandboxBaseUrl = "https://api.spacetraders.io/v2";
     private const string AgentTokenEnvVar = "SPACETRADERS_AGENT_TOKEN";
@@ -31,7 +30,7 @@ public sealed class SandboxIntegrationTests
 
         _client = new HttpClient
         {
-            BaseAddress = new Uri(SandboxBaseUrl)
+            BaseAddress = new Uri(SandboxBaseUrl),
         };
         _client.DefaultRequestHeaders.Accept.Clear();
         _client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
@@ -43,13 +42,19 @@ public sealed class SandboxIntegrationTests
         }
     }
 
+    public void Dispose()
+    {
+        _client.Dispose();
+    }
+
     [SkippableFact]
     public async Task GetMyAgent_WithValidToken_ReturnsOk()
     {
-        Skip.If(string.IsNullOrWhiteSpace(_agentToken),
+        Skip.If(
+            string.IsNullOrWhiteSpace(_agentToken),
             $"Sandbox tests require {AgentTokenEnvVar} to be set.");
 
-        var response = await _client.GetAsync("/my/agent");
+        using var response = await _client.GetAsync("/my/agent");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -57,10 +62,11 @@ public sealed class SandboxIntegrationTests
     [SkippableFact]
     public async Task GetMyShips_WithValidToken_ReturnsOk()
     {
-        Skip.If(string.IsNullOrWhiteSpace(_agentToken),
+        Skip.If(
+            string.IsNullOrWhiteSpace(_agentToken),
             $"Sandbox tests require {AgentTokenEnvVar} to be set.");
 
-        var response = await _client.GetAsync("/my/ships");
+        using var response = await _client.GetAsync("/my/ships");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -68,10 +74,11 @@ public sealed class SandboxIntegrationTests
     [SkippableFact]
     public async Task GetMyContracts_WithValidToken_ReturnsOk()
     {
-        Skip.If(string.IsNullOrWhiteSpace(_agentToken),
+        Skip.If(
+            string.IsNullOrWhiteSpace(_agentToken),
             $"Sandbox tests require {AgentTokenEnvVar} to be set.");
 
-        var response = await _client.GetAsync("/my/contracts");
+        using var response = await _client.GetAsync("/my/contracts");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -79,12 +86,13 @@ public sealed class SandboxIntegrationTests
     [SkippableFact]
     public async Task GetServerStatus_NoAuth_ReturnsOk()
     {
-        Skip.If(string.IsNullOrWhiteSpace(_agentToken),
+        Skip.If(
+            string.IsNullOrWhiteSpace(_agentToken),
             $"Sandbox tests require {AgentTokenEnvVar} to be set.");
 
         using var client = new HttpClient { BaseAddress = new Uri(SandboxBaseUrl) };
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-        var response = await client.GetAsync("/");
+        using var response = await client.GetAsync("/");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }

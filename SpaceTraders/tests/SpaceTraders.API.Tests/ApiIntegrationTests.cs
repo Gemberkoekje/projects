@@ -21,7 +21,7 @@ namespace SpaceTraders.API.Tests;
 /// Uses the "Testing" environment so that <see cref="Program"/> skips database init.
 /// All external dependencies (DB repositories, SpaceTraders API) are replaced with fakes.
 /// </summary>
-public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
+public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>, IDisposable
 {
     private readonly HttpClient _client;
     private readonly HttpClient _clientWithKey;
@@ -33,12 +33,18 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
         _clientWithKey.DefaultRequestHeaders.Add("X-Api-Key", SpaceTradersApiFactory.TestApiKey);
     }
 
+    public void Dispose()
+    {
+        _client.Dispose();
+        _clientWithKey.Dispose();
+    }
+
     // ── Health checks – no auth required ────────────────────────────────────
 
     [Fact]
     public async Task HealthLive_ReturnsOkWithoutApiKey()
     {
-        var response = await _client.GetAsync("/health/live");
+        using var response = await _client.GetAsync("/health/live");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -47,14 +53,14 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
     {
         // Health probes must never return 401 – whether they return 200 or 503
         // depends on DB connectivity which is not available in tests.
-        var response = await _client.GetAsync("/health/ready");
+        using var response = await _client.GetAsync("/health/ready");
         response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task HealthStartup_DoesNotRequireApiKey()
     {
-        var response = await _client.GetAsync("/health/startup");
+        using var response = await _client.GetAsync("/health/startup");
         response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
     }
 
@@ -63,7 +69,7 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
     [Fact]
     public async Task StatusAgent_WithoutApiKey_Returns401()
     {
-        var response = await _client.GetAsync("/status/agent");
+        using var response = await _client.GetAsync("/status/agent");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
@@ -72,21 +78,21 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
     [Fact]
     public async Task StatusAgent_WithValidApiKey_Returns200OrNotFound()
     {
-        var response = await _clientWithKey.GetAsync("/status/agent");
+        using var response = await _clientWithKey.GetAsync("/status/agent");
         response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task StatusShips_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.GetAsync("/status/ships");
+        using var response = await _clientWithKey.GetAsync("/status/ships");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task StatusContracts_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.GetAsync("/status/contracts");
+        using var response = await _clientWithKey.GetAsync("/status/contracts");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -95,14 +101,14 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
     [Fact]
     public async Task Settings_Get_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.GetAsync("/settings/");
+        using var response = await _clientWithKey.GetAsync("/settings/");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task Settings_Put_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.PutAsJsonAsync("/settings/Automation.Enabled", new { Value = "false" });
+        using var response = await _clientWithKey.PutAsJsonAsync("/settings/Automation.Enabled", new { Value = "false" });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -111,14 +117,14 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>
     [Fact]
     public async Task Control_AutomationEnable_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.PostAsync("/control/automation/enable", null);
+        using var response = await _clientWithKey.PostAsync("/control/automation/enable", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
     public async Task Control_AutomationDisable_WithValidApiKey_Returns200()
     {
-        var response = await _clientWithKey.PostAsync("/control/automation/disable", null);
+        using var response = await _clientWithKey.PostAsync("/control/automation/disable", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }
@@ -140,14 +146,23 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     // Shared mocks – configure return values in tests as needed
     public ISettingsRepository SettingsRepository { get; } = Substitute.For<ISettingsRepository>();
+
     public IAgentRepository AgentRepository { get; } = Substitute.For<IAgentRepository>();
+
     public IShipRepository ShipRepository { get; } = Substitute.For<IShipRepository>();
+
     public IContractRepository ContractRepository { get; } = Substitute.For<IContractRepository>();
+
     public IActivityLogRepository ActivityLogRepository { get; } = Substitute.For<IActivityLogRepository>();
+
     public ITradeOpportunityRepository TradeOpportunityRepository { get; } = Substitute.For<ITradeOpportunityRepository>();
+
     public IShipAssignmentRepository ShipAssignmentRepository { get; } = Substitute.For<IShipAssignmentRepository>();
+
     public IRateLimitStatus RateLimitStatus { get; } = Substitute.For<IRateLimitStatus>();
+
     public ILeaderElection LeaderElection { get; } = Substitute.For<ILeaderElection>();
+
     public ICreditHistoryService CreditHistory { get; } = Substitute.For<ICreditHistoryService>();
 
     public SpaceTradersApiFactory()

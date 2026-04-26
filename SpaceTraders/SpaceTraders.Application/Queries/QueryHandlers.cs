@@ -4,7 +4,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 
 namespace SpaceTraders.Application.Queries;
 
-public record GetAgentQuery;
+public sealed record GetAgentQuery;
 
 public sealed class GetAgentQueryHandler(IAgentRepository agents)
 {
@@ -15,22 +15,23 @@ public sealed class GetAgentQueryHandler(IAgentRepository agents)
     }
 }
 
-public record GetAllShipsQuery;
+public sealed record GetAllShipsQuery;
 
 public sealed class GetAllShipsQueryHandler(IShipRepository ships)
 {
     public async Task<IReadOnlyList<ShipDto>> Handle(GetAllShipsQuery query, CancellationToken cancellationToken)
     {
         var all = await ships.GetAllAsync(cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
         return all.Select(s => new ShipDto(
             s.Symbol, s.SystemSymbol, s.WaypointSymbol, s.Status, s.FlightMode,
             s.FuelCurrent, s.FuelCapacity, s.CargoCurrent, s.CargoCapacity,
-            s.ArrivesAt, s.ArrivesAt.HasValue && s.ArrivesAt > DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow)).ToList();
+            s.ArrivesAt, s.ArrivesAt.HasValue && s.ArrivesAt > now,
+            now)).ToList();
     }
 }
 
-public record GetActiveContractsQuery;
+public sealed record GetActiveContractsQuery;
 
 public sealed class GetActiveContractsQueryHandler(IContractRepository contracts)
 {
@@ -38,7 +39,7 @@ public sealed class GetActiveContractsQueryHandler(IContractRepository contracts
         => await contracts.GetActiveAsync(cancellationToken);
 }
 
-public record GetRateLimitStatusQuery;
+public sealed record GetRateLimitStatusQuery;
 
 public sealed class GetRateLimitStatusQueryHandler(IRateLimitStatus status)
 {
@@ -48,7 +49,7 @@ public sealed class GetRateLimitStatusQueryHandler(IRateLimitStatus status)
             status.ResetAt, status.LimitType, status.TotalRequests, status.ThrottledCount));
 }
 
-public record GetSettingsQuery;
+public sealed record GetSettingsQuery;
 
 public sealed class GetSettingsQueryHandler(ISettingsRepository settings)
 {
@@ -59,15 +60,39 @@ public sealed class GetSettingsQueryHandler(ISettingsRepository settings)
     }
 }
 
-public record GetActivityLogQuery(int Page = 1, int PageSize = 50, string? ShipFilter = null);
-
-public sealed class GetActivityLogQueryHandler(IActivityLogRepository activityLog)
+public sealed record GetActivityLogQuery
 {
-    public async Task<IReadOnlyList<ActivityLogDto>> Handle(GetActivityLogQuery query, CancellationToken cancellationToken)
-        => await activityLog.GetPagedAsync(query.Page, query.PageSize, query.ShipFilter, cancellationToken);
+    public int Page { get; init; } = 1;
+
+    public int PageSize { get; init; } = 50;
+
+    public string? ShipFilter { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public GetActivityLogQuery(int Page = 1, int PageSize = 50, string? ShipFilter = null)
+    {
+        this.Page = Page;
+        this.PageSize = PageSize;
+        this.ShipFilter = ShipFilter;
+    }
 }
 
-public record GetBestTradeRouteQuery(int CargoCapacity, int MinProfitPerUnit = 0, int MaxDistanceJumps = 5);
+public sealed record GetBestTradeRouteQuery
+{
+    public required int CargoCapacity { get; init; }
+
+    public int MinProfitPerUnit { get; init; } = 0;
+
+    public int MaxDistanceJumps { get; init; } = 5;
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public GetBestTradeRouteQuery(int CargoCapacity, int MinProfitPerUnit = 0, int MaxDistanceJumps = 5)
+    {
+        this.CargoCapacity = CargoCapacity;
+        this.MinProfitPerUnit = MinProfitPerUnit;
+        this.MaxDistanceJumps = MaxDistanceJumps;
+    }
+}
 
 public sealed class GetBestTradeRouteQueryHandler(
     ITradeOpportunityRepository tradeOpportunities,

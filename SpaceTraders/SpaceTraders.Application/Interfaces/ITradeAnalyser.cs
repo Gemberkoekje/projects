@@ -26,18 +26,66 @@ public interface ITradeAnalyser
 /// <summary>
 /// Lightweight market snapshot used by the TradeAnalyser (no EF Core dependency).
 /// </summary>
-public sealed record MarketSnapshot(
-    string WaypointSymbol,
-    string SystemSymbol,
-    IReadOnlyList<TradeGoodSnapshot> TradeGoods,
-    IReadOnlyList<string> Imports,
-    IReadOnlyList<string> Exports,
-    IReadOnlyList<string> Exchange);
+public sealed record MarketSnapshot
+{
+    public required string WaypointSymbol { get; init; }
 
-public sealed record TradeGoodSnapshot(
-    string Symbol,
-    string Type,
-    int PurchasePrice,
-    int SellPrice,
-    int TradeVolume,
-    string Supply);
+    public required string SystemSymbol { get; init; }
+
+    public required IReadOnlyList<TradeGoodSnapshot> TradeGoods { get; init; }
+
+    public required IReadOnlyList<string> Imports { get; init; }
+
+    public required IReadOnlyList<string> Exports { get; init; }
+
+    public required IReadOnlyList<string> Exchange { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MarketSnapshot(
+        string waypointSymbol,
+        string systemSymbol,
+        IReadOnlyList<TradeGoodSnapshot> tradeGoods,
+        IReadOnlyList<string> imports,
+        IReadOnlyList<string> exports,
+        IReadOnlyList<string> exchange)
+    {
+        this.WaypointSymbol = waypointSymbol;
+        this.SystemSymbol = systemSymbol;
+        this.TradeGoods = tradeGoods;
+        this.Imports = imports;
+        this.Exports = exports;
+        this.Exchange = exchange;
+    }
+}
+
+public sealed record TradeGoodSnapshot
+{
+    public required string Symbol { get; init; }
+
+    public required string Type { get; init; }
+
+    public required int PurchasePrice { get; init; }
+
+    public required int SellPrice { get; init; }
+
+    public required int TradeVolume { get; init; }
+
+    public required string Supply { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public TradeGoodSnapshot(
+        string symbol,
+        string type,
+        int purchasePrice,
+        int sellPrice,
+        int tradeVolume,
+        string supply)
+    {
+        this.Symbol = symbol;
+        this.Type = type;
+        this.PurchasePrice = purchasePrice;
+        this.SellPrice = sellPrice;
+        this.TradeVolume = tradeVolume;
+        this.Supply = supply;
+    }
+}

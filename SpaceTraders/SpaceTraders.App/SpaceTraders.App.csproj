@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SpaceTraders.Infrastructure.Persistence\SpaceTraders.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="../SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" />
   </ItemGroup>
 
 </Project>

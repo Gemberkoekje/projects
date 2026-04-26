@@ -5,13 +5,13 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Contracts;
 public sealed class Contract
 {
     [JsonPropertyName("id")]
-    public required string Id { get; init; }
+    required public string Id { get; init; }
 
     [JsonPropertyName("factionSymbol")]
-    public required string FactionSymbol { get; init; }
+    required public string FactionSymbol { get; init; }
 
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("accepted")]
     public bool Accepted { get; init; }

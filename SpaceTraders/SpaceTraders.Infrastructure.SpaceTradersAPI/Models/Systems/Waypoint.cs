@@ -5,13 +5,13 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Systems;
 public sealed class Waypoint
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("systemSymbol")]
-    public required string SystemSymbol { get; init; }
+    required public string SystemSymbol { get; init; }
 
     [JsonPropertyName("x")]
     public int X { get; init; }
@@ -21,10 +21,19 @@ public sealed class Waypoint
 
     [JsonPropertyName("orbitals")]
     public IReadOnlyList<WaypointOrbital>? Orbitals { get; init; }
+
+    [JsonPropertyName("traits")]
+    public IReadOnlyList<WaypointTrait>? Traits { get; init; }
 }
 
 public sealed class WaypointOrbital
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
+}
+
+public sealed class WaypointTrait
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
 }

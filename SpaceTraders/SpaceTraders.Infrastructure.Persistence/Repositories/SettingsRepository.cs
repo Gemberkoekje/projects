@@ -41,21 +41,24 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
         var raw = value is string s ? s : JsonSerializer.Serialize(value);
 
         var existing = await db.Settings
-            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
+            .FindAsync([db.AgentToken, key], cancellationToken);
+
+        var values = new AgentSetting
+        {
+            AgentToken = db.AgentToken,
+            Key = key,
+            Value = raw,
+            Type = typeof(T).Name.ToLowerInvariant(),
+            Description = existing?.Description ?? string.Empty
+        };
 
         if (existing is null)
         {
-            db.Settings.Add(new AgentSetting
-            {
-                Key = key,
-                Value = raw,
-                Type = typeof(T).Name.ToLowerInvariant(),
-                Description = string.Empty
-            });
+            db.Settings.Add(values);
         }
         else
         {
-            existing.Value = raw;
+            db.Entry(existing).CurrentValues.SetValues(values);
         }
 
         await db.SaveChangesAsync(cancellationToken);

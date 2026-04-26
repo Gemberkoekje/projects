@@ -28,18 +28,19 @@ public sealed class WebhookAlertNotifier(
 
             var payload = JsonSerializer.Serialize(new
             {
-                text = $"*{title}*\n{message}"
+                text = $"*{title}*\n{message}",
             });
 
             using var client = httpClientFactory.CreateClient("webhook");
             using var content = new StringContent(payload, Encoding.UTF8, "application/json");
-            var response = await client.PostAsync(webhookUrl, content, cancellationToken);
+            using var response = await client.PostAsync(webhookUrl, content, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning(
                     "Webhook alert POST to {Url} returned {StatusCode}.",
-                    webhookUrl, (int)response.StatusCode);
+                    webhookUrl,
+                    (int)response.StatusCode);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

@@ -1,5 +1,6 @@
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
 
+[Mutable]
 public sealed class SpaceTradersApiOptions
 {
     public const string DefaultBaseUrl = "https://api.spacetraders.io/v2/";

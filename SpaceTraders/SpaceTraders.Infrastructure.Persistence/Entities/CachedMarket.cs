@@ -2,17 +2,19 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedMarket
 {
-    public required string WaypointSymbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string SystemSymbol { get; set; }
+    required public string WaypointSymbol { get; init; }
 
-    public string? ImportsJson { get; set; }
+    required public string SystemSymbol { get; init; }
 
-    public string? ExportsJson { get; set; }
+    public string? ImportsJson { get; init; }
 
-    public string? ExchangeJson { get; set; }
+    public string? ExportsJson { get; init; }
 
-    public string? TradeGoodsJson { get; set; }
+    public string? ExchangeJson { get; init; }
 
-    public DateTimeOffset LastObservedAt { get; set; }
+    public string? TradeGoodsJson { get; init; }
+
+    public DateTimeOffset LastObservedAt { get; init; }
 }

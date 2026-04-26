@@ -21,7 +21,7 @@ public sealed class CreditHistoryService : ICreditHistoryService
     {
         lock (_lock)
         {
-            _buffer[_head] = (DateTimeOffset.UtcNow, credits);
+            _buffer[_head] = (TimeProvider.System.GetUtcNow(), credits);
             _head = (_head + 1) % Capacity;
             if (_count < Capacity) _count++;
         }

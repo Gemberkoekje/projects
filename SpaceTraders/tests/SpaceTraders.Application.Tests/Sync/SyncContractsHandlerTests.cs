@@ -46,7 +46,7 @@ public sealed class SyncContractsHandlerTests
         await new SyncContractsHandler(port, contracts, NullLogger<SyncContractsHandler>.Instance)
             .Handle(new SyncContractsCommand(), CancellationToken.None);
 
-        var contract = await db.Contracts.FindAsync("CONTRACT-1");
+        var contract = await db.Contracts.FindAsync(TestDbContextFactory.AgentToken, "CONTRACT-1");
         contract!.IsAccepted.Should().BeTrue();
     }
 

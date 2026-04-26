@@ -5,6 +5,7 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
+using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
@@ -17,6 +18,7 @@ public sealed class ShipActionHandlerTests
     {
         db.Ships.Add(new CachedShip
         {
+            AgentToken = TestDbContextFactory.AgentToken,
             Symbol = symbol,
             SystemSymbol = "X1-AB",
             WaypointSymbol = waypoint,
@@ -24,7 +26,7 @@ public sealed class ShipActionHandlerTests
             FlightMode = "CRUISE",
             FuelCurrent = 80,
             FuelCapacity = 100,
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -33,11 +35,12 @@ public sealed class ShipActionHandlerTests
     {
         db.Agents.Add(new CachedAgent
         {
+            AgentToken = TestDbContextFactory.AgentToken,
             Symbol = symbol,
             StartingFaction = "COSMIC",
             Credits = credits,
             ShipCount = 1,
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -58,7 +61,7 @@ public sealed class ShipActionHandlerTests
         await new DockShipHandler(port, ships, NullLogger<DockShipHandler>.Instance)
             .Handle(new DockShipCommand("SHIP-1"), CancellationToken.None);
 
-        var cached = await db.Ships.FindAsync("SHIP-1");
+        var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         cached!.Status.Should().Be("DOCKED");
     }
 
@@ -90,15 +93,36 @@ public sealed class ShipActionHandlerTests
         port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(MakeNav(status: "IN_ORBIT"));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         var ships = new ShipRepository(db);
 
-        await new OrbitShipHandler(port, ships, NullLogger<OrbitShipHandler>.Instance)
+        await new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance)
             .Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
 
-        var cached = await db.Ships.FindAsync("SHIP-1");
+        var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         cached!.Status.Should().Be("IN_ORBIT");
+    }
+
+    [Fact]
+    public async Task OrbitShip_PublishesShipEnteredOrbitEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(MakeNav(status: "IN_ORBIT"));
+
+        var bus = Substitute.For<IMessageBus>();
+
+        await using var db = TestDbContextFactory.Create();
+        AddShip(db, "SHIP-1");
+        var ships = new ShipRepository(db);
+
+        await new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance)
+            .Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
     }
 
     // ─── RefuelShipHandler ────────────────────────────────────────────────────
@@ -119,10 +143,10 @@ public sealed class ShipActionHandlerTests
         await new RefuelShipHandler(port, ships, agents, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
-        var ship = await db.Ships.FindAsync("SHIP-1");
+        var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         ship!.FuelCurrent.Should().Be(100);
 
-        var agent = await db.Agents.FindAsync("AGENT-1");
+        var agent = await db.Agents.FindAsync(TestDbContextFactory.AgentToken, "AGENT-1");
         agent!.Credits.Should().Be(48_000);
     }
 
@@ -156,20 +180,22 @@ public sealed class ShipActionHandlerTests
         port.BuyCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
             .Returns(new TradeActionResult("AGENT-1", 45_000, new CargoModel(10, 60), 5_000));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         AddAgent(db, credits: 50_000);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
 
-        await new BuyCargoHandler(port, ships, agents, NullLogger<BuyCargoHandler>.Instance)
+        await new BuyCargoHandler(port, ships, agents, bus, NullLogger<BuyCargoHandler>.Instance)
             .Handle(new BuyCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
-        var ship = await db.Ships.FindAsync("SHIP-1");
+        var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         ship!.CargoCurrent.Should().Be(10);
         ship.CargoCapacity.Should().Be(60);
 
-        var agent = await db.Agents.FindAsync("AGENT-1");
+        var agent = await db.Agents.FindAsync(TestDbContextFactory.AgentToken, "AGENT-1");
         agent!.Credits.Should().Be(45_000);
     }
 
@@ -180,16 +206,18 @@ public sealed class ShipActionHandlerTests
     {
         await using var db = TestDbContextFactory.Create();
         var assignments = new ShipAssignmentRepository(db);
+        var bus = Substitute.For<Wolverine.IMessageBus>();
 
-        await new AssignShipHandler(assignments, NullLogger<AssignShipHandler>.Instance)
+        await new AssignShipHandler(assignments, bus, NullLogger<AssignShipHandler>.Instance)
             .Handle(new AssignShipCommand("SHIP-1", "TRADE", "X1-AB-001", "X1-AB-002", "IRON_ORE"), CancellationToken.None);
 
-        var record = await db.ShipAssignments.FindAsync("SHIP-1");
+        var record = await db.ShipAssignments.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         record.Should().NotBeNull();
         record!.Type.Should().Be("TRADE");
         record.CargoSymbol.Should().Be("IRON_ORE");
         record.StepIndex.Should().Be(0);
         record.CompletedAt.Should().BeNull();
+        await bus.Received(1).PublishAsync(Arg.Any<object>(), Arg.Any<Wolverine.DeliveryOptions>());
     }
 
     [Fact]
@@ -198,20 +226,23 @@ public sealed class ShipActionHandlerTests
         await using var db = TestDbContextFactory.Create();
         db.ShipAssignments.Add(new ShipAssignmentRecord
         {
+            AgentToken = TestDbContextFactory.AgentToken,
             ShipSymbol = "SHIP-1",
             Type = "IDLE",
             StepIndex = 3,
-            AssignedAt = DateTimeOffset.UtcNow.AddHours(-1)
+            AssignedAt = DateTimeOffset.UtcNow.AddHours(-1),
         });
         await db.SaveChangesAsync();
 
         var assignments = new ShipAssignmentRepository(db);
+        var bus = Substitute.For<Wolverine.IMessageBus>();
 
-        await new AssignShipHandler(assignments, NullLogger<AssignShipHandler>.Instance)
+        await new AssignShipHandler(assignments, bus, NullLogger<AssignShipHandler>.Instance)
             .Handle(new AssignShipCommand("SHIP-1", "MINE"), CancellationToken.None);
 
-        var record = await db.ShipAssignments.FindAsync("SHIP-1");
+        var record = await db.ShipAssignments.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         record!.Type.Should().Be("MINE");
         record.StepIndex.Should().Be(0);
+        await bus.Received(1).PublishAsync(Arg.Any<object>(), Arg.Any<Wolverine.DeliveryOptions>());
     }
 }

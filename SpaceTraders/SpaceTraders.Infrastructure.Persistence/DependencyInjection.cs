@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
+using SpaceTraders.Infrastructure.Persistence.Scoping;
 
 namespace SpaceTraders.Infrastructure.Persistence;
 
@@ -17,7 +19,25 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
         }
 
-        services.AddDbContext<SpaceTradersDbContext>(options => options.UseNpgsql(connectionString));
+        var initialToken = configuration["SpaceTraders:AgentToken"]
+            ?? configuration["SpaceTradersApi:AgentToken"]
+            ?? configuration["SPACETRADERS_AGENT_TOKEN"]
+            ?? string.Empty;
+
+        services.AddSingleton<IAgentDataScope>(_ =>
+        {
+            var scope = new AgentDataScope();
+            if (!string.IsNullOrWhiteSpace(initialToken))
+            {
+                scope.Set(initialToken);
+            }
+            return scope;
+        });
+
+        services.AddDbContext<SpaceTradersDbContext>((_, options) =>
+        {
+            options.UseNpgsql(connectionString);
+        });
 
         services.AddScoped<IAgentRepository, AgentRepository>();
         services.AddScoped<IShipRepository, ShipRepository>();
@@ -29,7 +49,9 @@ public static class DependencyInjection
         services.AddScoped<ISettingsRepository, SettingsRepository>();
         services.AddScoped<ITradeOpportunityRepository, TradeOpportunityRepository>();
         services.AddScoped<IWaypointRepository, WaypointRepository>();
+        services.AddScoped<ISystemRepository, SystemRepository>();
         services.AddScoped<ILeaderLeaseRepository, LeaderLeaseRepository>();
+        services.AddScoped<IApiEndpointUsageRecorder, ApiEndpointUsageRecorder>();
 
         return services;
     }

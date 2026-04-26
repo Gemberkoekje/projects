@@ -5,7 +5,7 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Fleet;
 public sealed class Ship
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("registration")]
     public ShipRegistration? Registration { get; init; }
@@ -29,28 +29,28 @@ public sealed class Ship
 public sealed class ShipRegistration
 {
     [JsonPropertyName("role")]
-    public required string Role { get; init; }
+    required public string Role { get; init; }
 }
 
 public sealed class ShipMount
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 }
 
 public sealed class ShipNav
 {
     [JsonPropertyName("systemSymbol")]
-    public required string SystemSymbol { get; init; }
+    required public string SystemSymbol { get; init; }
 
     [JsonPropertyName("waypointSymbol")]
-    public required string WaypointSymbol { get; init; }
+    required public string WaypointSymbol { get; init; }
 
     [JsonPropertyName("status")]
-    public required string Status { get; init; }
+    required public string Status { get; init; }
 
     [JsonPropertyName("flightMode")]
-    public required string FlightMode { get; init; }
+    required public string FlightMode { get; init; }
 
     [JsonPropertyName("route")]
     public ShipNavRoute? Route { get; init; }
@@ -74,10 +74,10 @@ public sealed class ShipNavRoute
 public sealed class ShipNavRouteWaypoint
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("systemSymbol")]
-    public required string SystemSymbol { get; init; }
+    required public string SystemSymbol { get; init; }
 }
 
 public sealed class ShipCrew

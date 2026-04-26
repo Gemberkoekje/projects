@@ -13,7 +13,7 @@ public sealed class RateLimitingHandler : DelegatingHandler
         QueueLimit = int.MaxValue,
         ReplenishmentPeriod = TimeSpan.FromSeconds(1),
         TokensPerPeriod = 2,
-        AutoReplenishment = true
+        AutoReplenishment = true,
     });
 
     // Burst: 30 tokens over 60 s (0.5/s)
@@ -24,7 +24,7 @@ public sealed class RateLimitingHandler : DelegatingHandler
         QueueLimit = int.MaxValue,
         ReplenishmentPeriod = TimeSpan.FromSeconds(60),
         TokensPerPeriod = 30,
-        AutoReplenishment = true
+        AutoReplenishment = true,
     });
 
     private readonly RateLimitStatus _status;

@@ -3,6 +3,7 @@
     "SpaceTraders.API": {
       "commandName": "Project",
       "launchBrowser": true,
+      "launchUrl": "spacetraders/api/swagger",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

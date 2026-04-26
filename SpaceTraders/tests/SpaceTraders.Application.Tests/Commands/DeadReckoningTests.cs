@@ -15,7 +15,7 @@ public sealed class DeadReckoningTests
             DestWaypointSymbol = "X1-AB-002",
             Status = "IN_TRANSIT",
             ArrivesAt = DateTimeOffset.UtcNow.AddSeconds(-1),
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         };
 
         ship.ApplyArrivalIfDue();
@@ -37,7 +37,7 @@ public sealed class DeadReckoningTests
             DestWaypointSymbol = "X1-AB-002",
             Status = "IN_TRANSIT",
             ArrivesAt = arrival,
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         };
 
         ship.ApplyArrivalIfDue();
@@ -62,7 +62,7 @@ public sealed class DeadReckoningTests
         {
             Symbol = "SHIP-1",
             ArrivesAt = DateTimeOffset.UtcNow.AddSeconds(-10),
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         };
         ship.IsInTransit.Should().BeFalse();
     }
@@ -74,7 +74,7 @@ public sealed class DeadReckoningTests
         {
             Symbol = "SHIP-1",
             ArrivesAt = DateTimeOffset.UtcNow.AddMinutes(2),
-            LastSyncedAt = DateTimeOffset.UtcNow
+            LastSyncedAt = DateTimeOffset.UtcNow,
         };
         ship.IsInTransit.Should().BeTrue();
     }

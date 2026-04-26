@@ -42,6 +42,33 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
+    public async Task Handle(ShipEnteredOrbitEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipEnteredOrbitEvent),
+            $"Ship {@event.ShipSymbol} entered orbit at {@event.Waypoint.Value}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipBecameIdleEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipBecameIdleEvent),
+            $"Ship {@event.ShipSymbol} became idle. Reason: {@event.Reason}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipAssignedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipAssignedEvent),
+            $"Ship {@event.ShipSymbol} assigned to {@event.AssignmentType}.",
+            cancellationToken: cancellationToken);
+    }
+
     public async Task Handle(ShipFuelLowEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(

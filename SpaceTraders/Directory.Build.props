@@ -1,0 +1,42 @@
+<Project>
+
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <NoWarn>$(NoWarn);CS1591;Proj0039;SA0001;SA1011;SA1116;SA1117;SA1122;SA1136;SA1210;SA1413;SA1516;SA1518</NoWarn>
+    <NuGetAudit>true</NuGetAudit>
+    <OutputType>library</OutputType>
+    <LangVersion>14</LangVersion>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RuntimeIdentifiers>linux-x64;win-x64</RuntimeIdentifiers>
+    <NuGetAuditMode>All</NuGetAuditMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <RestoreLockedMode>true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Package">
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup Label="Analyzers">
+    <PackageReference Include="AsyncFixer" PrivateAssets="all" />
+    <PackageReference Include="DotNetProjectFile.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="IDisposableAnalyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" PrivateAssets="all" />
+    <PackageReference Include="Qowaiv.Analyzers.CSharp" PrivateAssets="all" />
+    <PackageReference Include="SerilogAnalyzer" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AdditionalFiles Include="*.csproj" Visible="false" />
+  </ItemGroup>
+
+</Project>

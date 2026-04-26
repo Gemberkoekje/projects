@@ -5,7 +5,7 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Markets;
 public sealed class Market
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("exports")]
     public IReadOnlyList<TradeGoodSymbol>? Exports { get; init; }
@@ -23,22 +23,22 @@ public sealed class Market
 public sealed class TradeGoodSymbol
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 }
 
 public sealed class TradeGood
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("tradeVolume")]
     public int TradeVolume { get; init; }
 
     [JsonPropertyName("supply")]
-    public required string Supply { get; init; }
+    required public string Supply { get; init; }
 
     [JsonPropertyName("activity")]
     public string? Activity { get; init; }

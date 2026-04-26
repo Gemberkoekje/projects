@@ -9,7 +9,7 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
 {
     public async Task<ContractDto?> FindAsync(string id, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Contracts.FindAsync([id], cancellationToken);
+        var entity = await db.Contracts.FindAsync([db.AgentToken, id], cancellationToken);
         return entity is null ? null : MapToDto(entity);
     }
 
@@ -26,32 +26,29 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
 
     public async Task UpsertAsync(ContractDto contract, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Contracts.FindAsync([contract.Id], cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var existing = await db.Contracts.FindAsync([db.AgentToken, contract.Id], cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+
+        var values = new CachedContract
+        {
+            AgentToken = db.AgentToken,
+            Id = contract.Id,
+            FactionSymbol = contract.FactionSymbol,
+            Type = contract.Type,
+            IsAccepted = contract.IsAccepted,
+            IsFulfilled = contract.IsFulfilled,
+            Expiration = contract.Expiration,
+            DeadlineToAccept = contract.DeadlineToAccept,
+            LastSyncedAt = now
+        };
 
         if (existing is null)
         {
-            db.Contracts.Add(new CachedContract
-            {
-                Id = contract.Id,
-                FactionSymbol = contract.FactionSymbol,
-                Type = contract.Type,
-                IsAccepted = contract.IsAccepted,
-                IsFulfilled = contract.IsFulfilled,
-                Expiration = contract.Expiration,
-                DeadlineToAccept = contract.DeadlineToAccept,
-                LastSyncedAt = now
-            });
+            db.Contracts.Add(values);
         }
         else
         {
-            existing.FactionSymbol = contract.FactionSymbol;
-            existing.Type = contract.Type;
-            existing.IsAccepted = contract.IsAccepted;
-            existing.IsFulfilled = contract.IsFulfilled;
-            existing.Expiration = contract.Expiration;
-            existing.DeadlineToAccept = contract.DeadlineToAccept;
-            existing.LastSyncedAt = now;
+            db.Entry(existing).CurrentValues.SetValues(values);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -59,14 +56,14 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
 
     public async Task UpdateStatusAsync(string id, bool isAccepted, bool isFulfilled, CancellationToken cancellationToken = default)
     {
-        var entity = await db.Contracts.FindAsync([id], cancellationToken);
-        if (entity is null) return;
-
-        entity.IsAccepted = isAccepted;
-        entity.IsFulfilled = isFulfilled;
-        entity.LastSyncedAt = DateTimeOffset.UtcNow;
-
-        await db.SaveChangesAsync(cancellationToken);
+        await db.Contracts
+            .Where(c => c.AgentToken == db.AgentToken && c.Id == id)
+            .ExecuteUpdateAsync(
+                updates => updates
+                    .SetProperty(c => c.IsAccepted, isAccepted)
+                    .SetProperty(c => c.IsFulfilled, isFulfilled)
+                    .SetProperty(c => c.LastSyncedAt, TimeProvider.System.GetUtcNow()),
+                cancellationToken);
     }
 
     private static ContractDto MapToDto(CachedContract entity) =>

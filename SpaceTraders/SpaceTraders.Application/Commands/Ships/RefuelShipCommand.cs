@@ -4,7 +4,16 @@ using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
-public record RefuelShipCommand(string ShipSymbol);
+public sealed record RefuelShipCommand
+{
+    public required string ShipSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RefuelShipCommand(string ShipSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+    }
+}
 
 public sealed class RefuelShipHandler(
     ISpaceTradersPort port,

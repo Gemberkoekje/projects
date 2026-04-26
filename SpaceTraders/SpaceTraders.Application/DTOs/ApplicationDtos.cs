@@ -1,80 +1,306 @@
 namespace SpaceTraders.Application.DTOs;
 
-public sealed record AgentDto(
-    string Symbol,
-    long Credits,
-    string StartingFaction,
-    int ShipCount,
-    string? HeadquartersSymbol);
+public sealed record AgentDto
+{
+    public required string Symbol { get; init; }
 
-public sealed record ShipDto(
-    string Symbol,
-    string? SystemSymbol,
-    string? WaypointSymbol,
-    string? Status,
-    string? FlightMode,
-    int FuelCurrent,
-    int FuelCapacity,
-    int CargoCurrent,
-    int CargoCapacity,
-    DateTimeOffset? ArrivesAt,
-    bool IsInTransit,
-    DateTimeOffset LastSyncedAt);
+    public required long Credits { get; init; }
 
-public sealed record ContractDto(
-    string Id,
-    string FactionSymbol,
-    string Type,
-    bool IsAccepted,
-    bool IsFulfilled,
-    DateTimeOffset? Expiration,
-    DateTimeOffset? DeadlineToAccept);
+    public required string StartingFaction { get; init; }
 
-public sealed record TradeOpportunityDto(
-    int Id,
-    string TradeSymbol,
-    string BuyWaypoint,
-    string SellWaypoint,
-    int BuyPrice,
-    int SellPrice,
-    int ProfitPerUnit,
-    int DistanceJumps,
-    decimal ProfitPerJump,
-    bool SupportsSupplyChain,
-    int SupplyChainDepth,
-    DateTimeOffset ComputedAt);
+    public required int ShipCount { get; init; }
 
-public sealed record SettingDto(
-    string Key,
-    string Value,
-    string Type,
-    string Description);
+    public string? HeadquartersSymbol { get; init; }
 
-public sealed record ActivityLogDto(
-    long Id,
-    DateTimeOffset Timestamp,
-    string ShipSymbol,
-    string EventType,
-    string Message,
-    string? JsonDetails);
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public AgentDto(string Symbol, long Credits, string StartingFaction, int ShipCount, string? HeadquartersSymbol)
+    {
+        this.Symbol = Symbol;
+        this.Credits = Credits;
+        this.StartingFaction = StartingFaction;
+        this.ShipCount = ShipCount;
+        this.HeadquartersSymbol = HeadquartersSymbol;
+    }
+}
 
-public sealed record RateLimitStatusDto(
-    int Remaining,
-    int Limit,
-    int BurstRemaining,
-    int BurstLimit,
-    DateTimeOffset ResetAt,
-    string? LimitType,
-    int TotalRequests,
-    int ThrottledCount);
+public sealed record ShipDto
+{
+    public required string Symbol { get; init; }
 
-public record ShipAssignmentDto(
-    string ShipSymbol,
-    string AssignmentType,
-    string? OriginWaypoint,
-    string? DestWaypoint,
-    string? CargoSymbol,
-    string? ContractId,
-    int StepIndex,
-    DateTimeOffset AssignedAt,
-    DateTimeOffset? CompletedAt);
+    public string? SystemSymbol { get; init; }
+
+    public string? WaypointSymbol { get; init; }
+
+    public string? Status { get; init; }
+
+    public string? FlightMode { get; init; }
+
+    public required int FuelCurrent { get; init; }
+
+    public required int FuelCapacity { get; init; }
+
+    public required int CargoCurrent { get; init; }
+
+    public required int CargoCapacity { get; init; }
+
+    public DateTimeOffset? ArrivesAt { get; init; }
+
+    public required bool IsInTransit { get; init; }
+
+    public required DateTimeOffset LastSyncedAt { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipDto(
+        string Symbol,
+        string? SystemSymbol,
+        string? WaypointSymbol,
+        string? Status,
+        string? FlightMode,
+        int FuelCurrent,
+        int FuelCapacity,
+        int CargoCurrent,
+        int CargoCapacity,
+        DateTimeOffset? ArrivesAt,
+        bool IsInTransit,
+        DateTimeOffset LastSyncedAt)
+    {
+        this.Symbol = Symbol;
+        this.SystemSymbol = SystemSymbol;
+        this.WaypointSymbol = WaypointSymbol;
+        this.Status = Status;
+        this.FlightMode = FlightMode;
+        this.FuelCurrent = FuelCurrent;
+        this.FuelCapacity = FuelCapacity;
+        this.CargoCurrent = CargoCurrent;
+        this.CargoCapacity = CargoCapacity;
+        this.ArrivesAt = ArrivesAt;
+        this.IsInTransit = IsInTransit;
+        this.LastSyncedAt = LastSyncedAt;
+    }
+}
+
+public sealed record ContractDto
+{
+    public required string Id { get; init; }
+
+    public required string FactionSymbol { get; init; }
+
+    public required string Type { get; init; }
+
+    public required bool IsAccepted { get; init; }
+
+    public required bool IsFulfilled { get; init; }
+
+    public DateTimeOffset? Expiration { get; init; }
+
+    public DateTimeOffset? DeadlineToAccept { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractDto(
+        string Id,
+        string FactionSymbol,
+        string Type,
+        bool IsAccepted,
+        bool IsFulfilled,
+        DateTimeOffset? Expiration,
+        DateTimeOffset? DeadlineToAccept)
+    {
+        this.Id = Id;
+        this.FactionSymbol = FactionSymbol;
+        this.Type = Type;
+        this.IsAccepted = IsAccepted;
+        this.IsFulfilled = IsFulfilled;
+        this.Expiration = Expiration;
+        this.DeadlineToAccept = DeadlineToAccept;
+    }
+}
+
+public sealed record TradeOpportunityDto
+{
+    public required int Id { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required string BuyWaypoint { get; init; }
+
+    public required string SellWaypoint { get; init; }
+
+    public required int BuyPrice { get; init; }
+
+    public required int SellPrice { get; init; }
+
+    public required int ProfitPerUnit { get; init; }
+
+    public required int DistanceJumps { get; init; }
+
+    public required decimal ProfitPerJump { get; init; }
+
+    public required bool SupportsSupplyChain { get; init; }
+
+    public required int SupplyChainDepth { get; init; }
+
+    public required DateTimeOffset ComputedAt { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public TradeOpportunityDto(
+        int Id,
+        string TradeSymbol,
+        string BuyWaypoint,
+        string SellWaypoint,
+        int BuyPrice,
+        int SellPrice,
+        int ProfitPerUnit,
+        int DistanceJumps,
+        decimal ProfitPerJump,
+        bool SupportsSupplyChain,
+        int SupplyChainDepth,
+        DateTimeOffset ComputedAt)
+    {
+        this.Id = Id;
+        this.TradeSymbol = TradeSymbol;
+        this.BuyWaypoint = BuyWaypoint;
+        this.SellWaypoint = SellWaypoint;
+        this.BuyPrice = BuyPrice;
+        this.SellPrice = SellPrice;
+        this.ProfitPerUnit = ProfitPerUnit;
+        this.DistanceJumps = DistanceJumps;
+        this.ProfitPerJump = ProfitPerJump;
+        this.SupportsSupplyChain = SupportsSupplyChain;
+        this.SupplyChainDepth = SupplyChainDepth;
+        this.ComputedAt = ComputedAt;
+    }
+}
+
+public sealed record SettingDto
+{
+    public required string Key { get; init; }
+
+    public required string Value { get; init; }
+
+    public required string Type { get; init; }
+
+    public required string Description { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SettingDto(string Key, string Value, string Type, string Description)
+    {
+        this.Key = Key;
+        this.Value = Value;
+        this.Type = Type;
+        this.Description = Description;
+    }
+}
+
+public sealed record ActivityLogDto
+{
+    public required long Id { get; init; }
+
+    public required DateTimeOffset Timestamp { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    public required string EventType { get; init; }
+
+    public required string Message { get; init; }
+
+    public string? JsonDetails { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ActivityLogDto(long Id, DateTimeOffset Timestamp, string ShipSymbol, string EventType, string Message, string? JsonDetails)
+    {
+        this.Id = Id;
+        this.Timestamp = Timestamp;
+        this.ShipSymbol = ShipSymbol;
+        this.EventType = EventType;
+        this.Message = Message;
+        this.JsonDetails = JsonDetails;
+    }
+}
+
+public sealed record RateLimitStatusDto
+{
+    public required int Remaining { get; init; }
+
+    public required int Limit { get; init; }
+
+    public required int BurstRemaining { get; init; }
+
+    public required int BurstLimit { get; init; }
+
+    public required DateTimeOffset ResetAt { get; init; }
+
+    public string? LimitType { get; init; }
+
+    public required int TotalRequests { get; init; }
+
+    public required int ThrottledCount { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public RateLimitStatusDto(
+        int Remaining,
+        int Limit,
+        int BurstRemaining,
+        int BurstLimit,
+        DateTimeOffset ResetAt,
+        string? LimitType,
+        int TotalRequests,
+        int ThrottledCount)
+    {
+        this.Remaining = Remaining;
+        this.Limit = Limit;
+        this.BurstRemaining = BurstRemaining;
+        this.BurstLimit = BurstLimit;
+        this.ResetAt = ResetAt;
+        this.LimitType = LimitType;
+        this.TotalRequests = TotalRequests;
+        this.ThrottledCount = ThrottledCount;
+    }
+}
+
+public sealed record ShipAssignmentDto
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string AssignmentType { get; init; }
+
+    public string? OriginWaypoint { get; init; }
+
+    public string? DestWaypoint { get; init; }
+
+    public string? CargoSymbol { get; init; }
+
+    public string? ContractId { get; init; }
+
+    public required int StepIndex { get; init; }
+
+    public required DateTimeOffset AssignedAt { get; init; }
+
+    public DateTimeOffset? CompletedAt { get; init; }
+
+    public int PurchaseUnitPrice { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipAssignmentDto(
+        string ShipSymbol,
+        string AssignmentType,
+        string? OriginWaypoint,
+        string? DestWaypoint,
+        string? CargoSymbol,
+        string? ContractId,
+        int StepIndex,
+        DateTimeOffset AssignedAt,
+        DateTimeOffset? CompletedAt,
+        int PurchaseUnitPrice = 0)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.AssignmentType = AssignmentType;
+        this.OriginWaypoint = OriginWaypoint;
+        this.DestWaypoint = DestWaypoint;
+        this.CargoSymbol = CargoSymbol;
+        this.ContractId = ContractId;
+        this.StepIndex = StepIndex;
+        this.AssignedAt = AssignedAt;
+        this.CompletedAt = CompletedAt;
+        this.PurchaseUnitPrice = PurchaseUnitPrice;
+    }
+}

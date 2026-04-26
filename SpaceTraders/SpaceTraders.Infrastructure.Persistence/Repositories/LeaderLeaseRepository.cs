@@ -16,7 +16,7 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
         TimeSpan leaseDuration,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = TimeProvider.System.GetUtcNow();
         var lease = await db.LeaderLeases
             .FirstOrDefaultAsync(l => l.Key == leaseKey, cancellationToken);
 
@@ -24,6 +24,7 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
         {
             db.LeaderLeases.Add(new LeaderLease
             {
+                AgentToken = db.AgentToken,
                 Key = leaseKey,
                 HolderId = holderId,
                 ExpiresAt = now + leaseDuration
@@ -45,8 +46,11 @@ public sealed class LeaderLeaseRepository(SpaceTradersDbContext db) : ILeaderLea
         if (lease.HolderId == holderId)
         {
             // We already hold the lease – renew it.
-            lease.ExpiresAt = now + leaseDuration;
-            await db.SaveChangesAsync(cancellationToken);
+            await db.LeaderLeases
+                .Where(l => l.AgentToken == db.AgentToken && l.Key == leaseKey && l.HolderId == holderId)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(l => l.ExpiresAt, now + leaseDuration),
+                    cancellationToken);
             return true;
         }
 

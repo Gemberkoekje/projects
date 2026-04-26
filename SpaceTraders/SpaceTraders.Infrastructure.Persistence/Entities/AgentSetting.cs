@@ -2,11 +2,13 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class AgentSetting
 {
-    public required string Key { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string Value { get; set; }
+    required public string Key { get; init; }
 
-    public required string Type { get; set; }
+    required public string Value { get; init; }
 
-    public required string Description { get; set; }
+    required public string Type { get; init; }
+
+    required public string Description { get; init; }
 }

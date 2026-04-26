@@ -55,7 +55,7 @@
                                     <td class="text-nowrap">@route.SellWaypoint</td>
                                     <td class="text-end">@route.BuyPrice.ToString("N0")</td>
                                     <td class="text-end">@route.SellPrice.ToString("N0")</td>
-                                    <td class="text-end fw-semibold @(route.ProfitPerUnit >= 500 ? "text-success" : route.ProfitPerUnit >= 200 ? "" : "text-danger")">
+                                    <td class="text-end fw-semibold @IndexModel.GetProfitPerUnitClass(route)">
                                         @route.ProfitPerUnit.ToString("N0")
                                     </td>
                                     <td class="text-center">@route.DistanceJumps</td>

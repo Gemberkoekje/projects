@@ -18,33 +18,39 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
 
     public async Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Markets.FindAsync([market.WaypointSymbol], cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var existing = await db.Markets.FindAsync([db.AgentToken, market.WaypointSymbol], cancellationToken);
+        var now = TimeProvider.System.GetUtcNow();
+
+        var values = new CachedMarket
+        {
+            AgentToken = db.AgentToken,
+            WaypointSymbol = market.WaypointSymbol,
+            SystemSymbol = market.SystemSymbol,
+            TradeGoodsJson = market.TradeGoodsJson,
+            ImportsJson = market.ImportsJson,
+            ExportsJson = market.ExportsJson,
+            ExchangeJson = market.ExchangeJson,
+            LastObservedAt = now
+        };
 
         if (existing is null)
         {
-            db.Markets.Add(new CachedMarket
-            {
-                WaypointSymbol = market.WaypointSymbol,
-                SystemSymbol = market.SystemSymbol,
-                TradeGoodsJson = market.TradeGoodsJson,
-                ImportsJson = market.ImportsJson,
-                ExportsJson = market.ExportsJson,
-                ExchangeJson = market.ExchangeJson,
-                LastObservedAt = now
-            });
+            db.Markets.Add(values);
         }
         else
         {
-            existing.SystemSymbol = market.SystemSymbol;
-            existing.TradeGoodsJson = market.TradeGoodsJson;
-            existing.ImportsJson = market.ImportsJson;
-            existing.ExportsJson = market.ExportsJson;
-            existing.ExchangeJson = market.ExchangeJson;
-            existing.LastObservedAt = now;
+            db.Entry(existing).CurrentValues.SetValues(values);
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<MarketSnapshot?> FindSnapshotByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+    {
+        var market = await db.Markets.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.WaypointSymbol == waypointSymbol && m.TradeGoodsJson != null, cancellationToken);
+
+        return market is null ? null : TryCreateSnapshot(market);
     }
 
     public async Task<IReadOnlyList<MarketSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
@@ -54,37 +60,55 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
             .ToListAsync(cancellationToken);
 
         var snapshots = new List<MarketSnapshot>();
-        foreach (var m in markets)
+        foreach (var market in markets)
         {
-            if (m.TradeGoodsJson is null) continue;
-            try
+            var snapshot = TryCreateSnapshot(market);
+            if (snapshot is not null)
             {
-                var goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(m.TradeGoodsJson);
-                if (goods is null || goods.Count == 0) continue;
-                var goodSnapshots = goods
-                    .Select(g => new TradeGoodSnapshot(
-                        g.Symbol ?? string.Empty,
-                        g.Type ?? string.Empty,
-                        g.PurchasePrice,
-                        g.SellPrice,
-                        g.TradeVolume,
-                        g.Supply ?? string.Empty))
-                    .ToList();
-
-                snapshots.Add(new MarketSnapshot(
-                    m.WaypointSymbol,
-                    m.SystemSymbol,
-                    goodSnapshots,
-                    DeserializeSymbols(m.ImportsJson),
-                    DeserializeSymbols(m.ExportsJson),
-                    DeserializeSymbols(m.ExchangeJson)));
-            }
-            catch (JsonException)
-            {
-                // skip malformed entries
+                snapshots.Add(snapshot);
             }
         }
+
         return snapshots;
+    }
+
+    private static MarketSnapshot? TryCreateSnapshot(CachedMarket market)
+    {
+        if (market.TradeGoodsJson is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(market.TradeGoodsJson);
+            if (goods is null || goods.Count == 0)
+            {
+                return null;
+            }
+
+            var goodSnapshots = goods
+                .Select(g => new TradeGoodSnapshot(
+                    g.Symbol ?? string.Empty,
+                    g.Type ?? string.Empty,
+                    g.PurchasePrice,
+                    g.SellPrice,
+                    g.TradeVolume,
+                    g.Supply ?? string.Empty))
+                .ToList();
+
+            return new MarketSnapshot(
+                market.WaypointSymbol,
+                market.SystemSymbol,
+                goodSnapshots,
+                DeserializeSymbols(market.ImportsJson),
+                DeserializeSymbols(market.ExportsJson),
+                DeserializeSymbols(market.ExchangeJson));
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static IReadOnlyList<string> DeserializeSymbols(string? json)

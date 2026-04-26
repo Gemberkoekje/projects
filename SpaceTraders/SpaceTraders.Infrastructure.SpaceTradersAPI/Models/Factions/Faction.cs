@@ -5,13 +5,13 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Factions;
 public sealed class Faction
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("name")]
-    public required string Name { get; init; }
+    required public string Name { get; init; }
 
     [JsonPropertyName("description")]
-    public required string Description { get; init; }
+    required public string Description { get; init; }
 
     [JsonPropertyName("headquarters")]
     public string? Headquarters { get; init; }

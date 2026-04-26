@@ -5,13 +5,13 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Systems;
 public sealed class SystemInfo
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("sectorSymbol")]
-    public required string SectorSymbol { get; init; }
+    required public string SectorSymbol { get; init; }
 
     [JsonPropertyName("type")]
-    public required string Type { get; init; }
+    required public string Type { get; init; }
 
     [JsonPropertyName("x")]
     public int X { get; init; }

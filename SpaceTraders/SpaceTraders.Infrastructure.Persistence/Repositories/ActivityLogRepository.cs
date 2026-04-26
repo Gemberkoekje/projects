@@ -11,7 +11,8 @@ public sealed class ActivityLogRepository(SpaceTradersDbContext db) : IActivityL
     {
         db.ActivityLogs.Add(new ActivityLog
         {
-            Timestamp = DateTimeOffset.UtcNow,
+            AgentToken = db.AgentToken,
+            Timestamp = TimeProvider.System.GetUtcNow(),
             ShipSymbol = shipSymbol,
             EventType = eventType,
             Message = message,

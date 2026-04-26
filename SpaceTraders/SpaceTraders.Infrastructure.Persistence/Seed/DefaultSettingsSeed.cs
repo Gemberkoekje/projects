@@ -16,6 +16,7 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Contract.AutoAccept",                   Value = "true",                Type = "bool",    Description = "Auto-accept contracts when profitable" },
         new AgentSetting { Key = "Scout.MarketRefreshIntervalMinutes",    Value = "10",                  Type = "int",     Description = "How often to re-poll markets with a ship present" },
         new AgentSetting { Key = "Scout.ShipyardRefreshIntervalMinutes",  Value = "30",                  Type = "int",     Description = "How often to re-poll shipyards with a ship present" },
+        new AgentSetting { Key = "Automation.Trade.MaxLossPerUnitBeforeReroute", Value = "50",            Type = "int",     Description = "Max accepted per-unit loss before trying an alternate sell market" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
@@ -34,7 +35,16 @@ public static class DefaultSettingsSeed
         foreach (var setting in Defaults)
         {
             if (!existingKeys.Contains(setting.Key))
-                db.Settings.Add(setting);
+            {
+                db.Settings.Add(new AgentSetting
+                {
+                    AgentToken = db.AgentToken,
+                    Key = setting.Key,
+                    Value = setting.Value,
+                    Type = setting.Type,
+                    Description = setting.Description,
+                });
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -51,15 +61,27 @@ public static class DefaultSettingsSeed
                 .FirstOrDefaultAsync(s => s.Key == defaultSetting.Key, cancellationToken);
 
             if (existing is null)
+            {
                 db.Settings.Add(new AgentSetting
                 {
+                    AgentToken = db.AgentToken,
                     Key = defaultSetting.Key,
                     Value = defaultSetting.Value,
                     Type = defaultSetting.Type,
-                    Description = defaultSetting.Description
+                    Description = defaultSetting.Description,
                 });
+            }
             else
-                existing.Value = defaultSetting.Value;
+            {
+                db.Entry(existing).CurrentValues.SetValues(new AgentSetting
+                {
+                    AgentToken = db.AgentToken,
+                    Key = existing.Key,
+                    Value = defaultSetting.Value,
+                    Type = existing.Type,
+                    Description = existing.Description,
+                });
+            }
         }
 
         await db.SaveChangesAsync(cancellationToken);

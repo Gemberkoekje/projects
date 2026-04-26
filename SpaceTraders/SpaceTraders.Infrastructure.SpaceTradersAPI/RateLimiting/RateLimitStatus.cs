@@ -2,6 +2,7 @@ using SpaceTraders.Application.Interfaces;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
+[Mutable]
 public sealed class RateLimitStatus : IRateLimitStatus
 {
     public int Remaining { get; set; }

@@ -2,15 +2,17 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class CachedSystem
 {
-    public required string Symbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string SectorSymbol { get; set; }
+    required public string Symbol { get; init; }
 
-    public required string Type { get; set; }
+    required public string SectorSymbol { get; init; }
 
-    public int X { get; set; }
+    required public string Type { get; init; }
 
-    public int Y { get; set; }
+    public int X { get; init; }
 
-    public DateTimeOffset LastObservedAt { get; set; }
+    public int Y { get; init; }
+
+    public DateTimeOffset LastObservedAt { get; init; }
 }

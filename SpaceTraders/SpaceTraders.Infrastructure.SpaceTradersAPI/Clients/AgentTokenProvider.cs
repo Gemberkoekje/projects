@@ -1,5 +1,6 @@
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 
+[Mutable]
 public sealed class AgentTokenProvider : IAgentTokenProvider
 {
     public string? Token { get; private set; }

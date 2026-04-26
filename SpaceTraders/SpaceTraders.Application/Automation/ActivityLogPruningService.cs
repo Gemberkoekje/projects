@@ -51,7 +51,7 @@ public sealed class ActivityLogPruningService(
         var retentionDays = await settings.GetAsync<int>(RetentionSettingKey, cancellationToken);
         if (retentionDays <= 0) retentionDays = DefaultRetentionDays;
 
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-retentionDays);
+        var cutoff = TimeProvider.System.GetUtcNow().AddDays(-retentionDays);
         var deleted = await activityLog.PruneAsync(cutoff, cancellationToken);
 
         if (deleted > 0)

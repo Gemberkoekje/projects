@@ -26,11 +26,12 @@ public sealed class RetryHandlerTests
                 : new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var handler = CreateHandler();
+        using var handler = CreateHandler();
         handler.InnerHandler = innerHandler;
-        var invoker = new HttpMessageInvoker(handler);
+        using var invoker = new HttpMessageInvoker(handler);
 
-        var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         callCount.Should().Be(2);
@@ -40,11 +41,12 @@ public sealed class RetryHandlerTests
     public async Task Handle_Persistent502_ReturnsLastBadGateway()
     {
         var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway));
-        var handler = CreateHandler();
+        using var handler = CreateHandler();
         handler.InnerHandler = innerHandler;
-        var invoker = new HttpMessageInvoker(handler);
+        using var invoker = new HttpMessageInvoker(handler);
 
-        var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadGateway);
     }
@@ -54,11 +56,12 @@ public sealed class RetryHandlerTests
     {
         var availability = Substitute.For<IApiAvailabilityState>();
         var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway));
-        var handler = CreateHandler(availability);
+        using var handler = CreateHandler(availability);
         handler.InnerHandler = innerHandler;
-        var invoker = new HttpMessageInvoker(handler);
+        using var invoker = new HttpMessageInvoker(handler);
 
-        await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         availability.Received().MarkUnavailable();
     }
@@ -73,11 +76,12 @@ public sealed class RetryHandlerTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var handler = CreateHandler();
+        using var handler = CreateHandler();
         handler.InnerHandler = innerHandler;
-        var invoker = new HttpMessageInvoker(handler);
+        using var invoker = new HttpMessageInvoker(handler);
 
-        await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         callCount.Should().Be(1);
     }
@@ -87,11 +91,12 @@ public sealed class RetryHandlerTests
     {
         var availability = Substitute.For<IApiAvailabilityState>();
         var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
-        var handler = CreateHandler(availability);
+        using var handler = CreateHandler(availability);
         handler.InnerHandler = innerHandler;
-        var invoker = new HttpMessageInvoker(handler);
+        using var invoker = new HttpMessageInvoker(handler);
 
-        await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         availability.Received().MarkAvailable();
     }
@@ -104,10 +109,11 @@ public sealed class RateLimitResponseHandlerTests
     {
         var status = new RateLimitStatus();
         var innerHandler = new CallbackMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
-        var handler = new RateLimitResponseHandler(status) { InnerHandler = innerHandler };
-        var invoker = new HttpMessageInvoker(handler);
+        using var handler = new RateLimitResponseHandler(status) { InnerHandler = innerHandler };
+        using var invoker = new HttpMessageInvoker(handler);
 
-        var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         status.ThrottledCount.Should().Be(0);
@@ -127,10 +133,11 @@ public sealed class RateLimitResponseHandlerTests
                 : new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        var handler = new RateLimitResponseHandler(status) { InnerHandler = innerHandler };
-        var invoker = new HttpMessageInvoker(handler);
+        using var handler = new RateLimitResponseHandler(status) { InnerHandler = innerHandler };
+        using var invoker = new HttpMessageInvoker(handler);
 
-        var response = await invoker.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://test/"), CancellationToken.None);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://test/");
+        using var response = await invoker.SendAsync(request, CancellationToken.None);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         status.ThrottledCount.Should().Be(1);

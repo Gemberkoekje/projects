@@ -41,6 +41,7 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
         {
             db.TradeOpportunities.Add(new TradeOpportunity
             {
+                AgentToken = db.AgentToken,
                 TradeSymbol = dto.TradeSymbol,
                 BuyWaypoint = dto.BuyWaypoint,
                 SellWaypoint = dto.SellWaypoint,
@@ -51,7 +52,7 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
                 ProfitPerJump = dto.ProfitPerJump,
                 SupportsSupplyChain = dto.SupportsSupplyChain,
                 SupplyChainDepth = dto.SupplyChainDepth,
-                ComputedAt = DateTimeOffset.UtcNow
+                ComputedAt = TimeProvider.System.GetUtcNow()
             });
         }
 

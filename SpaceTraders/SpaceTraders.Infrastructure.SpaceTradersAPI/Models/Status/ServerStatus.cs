@@ -5,16 +5,16 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Status;
 public sealed class ServerStatus
 {
     [JsonPropertyName("status")]
-    public required string Status { get; init; }
+    required public string Status { get; init; }
 
     [JsonPropertyName("version")]
-    public required string Version { get; init; }
+    required public string Version { get; init; }
 
     [JsonPropertyName("resetDate")]
-    public required string ResetDate { get; init; }
+    required public string ResetDate { get; init; }
 
     [JsonPropertyName("description")]
-    public required string Description { get; init; }
+    required public string Description { get; init; }
 
     [JsonPropertyName("stats")]
     public StatusStats? Stats { get; init; }
@@ -53,7 +53,7 @@ public sealed class StatusStats
 public sealed class StatusHealth
 {
     [JsonPropertyName("status")]
-    public required string Status { get; init; }
+    required public string Status { get; init; }
 
     [JsonPropertyName("lastUpdated")]
     public string? LastUpdated { get; init; }
@@ -62,26 +62,26 @@ public sealed class StatusHealth
 public sealed class ServerResetInfo
 {
     [JsonPropertyName("next")]
-    public required string Next { get; init; }
+    required public string Next { get; init; }
 
     [JsonPropertyName("frequency")]
-    public required string Frequency { get; init; }
+    required public string Frequency { get; init; }
 }
 
 public sealed class Announcement
 {
     [JsonPropertyName("title")]
-    public required string Title { get; init; }
+    required public string Title { get; init; }
 
     [JsonPropertyName("body")]
-    public required string Body { get; init; }
+    required public string Body { get; init; }
 }
 
 public sealed class StatusLink
 {
     [JsonPropertyName("name")]
-    public required string Name { get; init; }
+    required public string Name { get; init; }
 
     [JsonPropertyName("url")]
-    public required string Url { get; init; }
+    required public string Url { get; init; }
 }

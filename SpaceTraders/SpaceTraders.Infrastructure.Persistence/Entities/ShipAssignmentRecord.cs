@@ -2,21 +2,25 @@ namespace SpaceTraders.Infrastructure.Persistence.Entities;
 
 public sealed class ShipAssignmentRecord
 {
-    public required string ShipSymbol { get; set; }
+    public string AgentToken { get; init; } = string.Empty;
 
-    public required string Type { get; set; }
+    required public string ShipSymbol { get; init; }
 
-    public string? OriginWaypoint { get; set; }
+    required public string Type { get; init; }
 
-    public string? DestWaypoint { get; set; }
+    public string? OriginWaypoint { get; init; }
 
-    public string? CargoSymbol { get; set; }
+    public string? DestWaypoint { get; init; }
 
-    public string? ContractId { get; set; }
+    public string? CargoSymbol { get; init; }
 
-    public int StepIndex { get; set; }
+    public string? ContractId { get; init; }
 
-    public DateTimeOffset AssignedAt { get; set; }
+    public int StepIndex { get; init; }
 
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset AssignedAt { get; init; }
+
+    public DateTimeOffset? CompletedAt { get; init; }
+
+    public int PurchaseUnitPrice { get; init; }
 }

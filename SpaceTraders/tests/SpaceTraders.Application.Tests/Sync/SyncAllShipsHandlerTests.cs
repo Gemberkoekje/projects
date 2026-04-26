@@ -45,7 +45,7 @@ public sealed class SyncAllShipsHandlerTests
         await new SyncAllShipsHandler(port, ships, NullLogger<SyncAllShipsHandler>.Instance)
             .Handle(new SyncAllShipsCommand(), CancellationToken.None);
 
-        var ship = await db.Ships.FindAsync("SHIP-1");
+        var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
         ship!.ArrivesAt.Should().BeCloseTo(arrival, TimeSpan.FromSeconds(1));
     }
 

@@ -5,6 +5,8 @@ using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Automation;
@@ -24,7 +26,7 @@ internal sealed class ScoutStateMachine
         None = -1,
         NavigateToTarget = 0,
         RefreshData = 1,
-        Completed = 2
+        Completed = 2,
     }
 
     private enum Trigger { Advance, Complete }
@@ -114,7 +116,13 @@ internal sealed class ScoutStateMachine
 
     private async Task MarkCompleteAsync(CancellationToken cancellationToken)
     {
-        var completed = _assignment with { CompletedAt = DateTimeOffset.UtcNow };
+        await MarkCompleteAsync(AssignmentType.Scout, cancellationToken);
+    }
+
+    private async Task MarkCompleteAsync(AssignmentType completedType, CancellationToken cancellationToken)
+    {
+        var completed = _assignment with { CompletedAt = TimeProvider.System.GetUtcNow() };
         await _assignments.UpsertAsync(completed, cancellationToken);
+        await _bus.PublishAsync(new ShipAssignmentCompletedEvent(_ship.Symbol, completedType));
     }
 }

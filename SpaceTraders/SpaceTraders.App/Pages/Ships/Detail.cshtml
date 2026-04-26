@@ -9,14 +9,14 @@
     <div class="alert alert-warning" role="alert">
         Ship not found in local cache. It may not have been synced yet.
     </div>
-    <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+    <a asp-page="/Index" class="btn btn-secondary">← Back to Dashboard</a>
 }
 else
 {
     <div class="mb-3 d-flex align-items-center gap-3">
-        <a href="/" class="btn btn-outline-secondary btn-sm">← Dashboard</a>
+        <a asp-page="/Index" class="btn btn-outline-secondary btn-sm">← Dashboard</a>
         <h1 class="display-6 mb-0">@Model.Ship.Symbol</h1>
-        <span class="badge bg-@(Model.Ship.IsInTransit ? "warning text-dark" : Model.Ship.Status == "DOCKED" ? "success" : "info")">
+        <span class="badge bg-@Model.ShipStatusClass">
             @(Model.Ship.IsInTransit ? "IN_TRANSIT" : Model.Ship.Status)
         </span>
     </div>
@@ -46,7 +46,7 @@ else
                         <span class="text-muted small">@(Model.Ship.FuelCapacity > 0 ? $"{(double)Model.Ship.FuelCurrent / Model.Ship.FuelCapacity:P0}" : "—")</span>
                     </div>
                     <div class="progress" style="height: 20px;">
-                        <div class="progress-bar @(Model.FuelPercent < 20 ? "bg-danger" : Model.FuelPercent < 50 ? "bg-warning" : "bg-success")"
+                        <div class="progress-bar @Model.FuelProgressClass"
                              role="progressbar"
                              style="width: @Model.FuelPercent%"
                              aria-valuenow="@Model.Ship.FuelCurrent"
@@ -66,7 +66,7 @@ else
                         <span class="text-muted small">@(Model.Ship.CargoCapacity > 0 ? $"{(double)Model.Ship.CargoCurrent / Model.Ship.CargoCapacity:P0}" : "—")</span>
                     </div>
                     <div class="progress" style="height: 20px;">
-                        <div class="progress-bar @(Model.CargoPercent >= 90 ? "bg-danger" : Model.CargoPercent >= 50 ? "bg-warning" : "bg-primary")"
+                        <div class="progress-bar @Model.CargoProgressClass"
                              role="progressbar"
                              style="width: @Model.CargoPercent%"
                              aria-valuenow="@Model.Ship.CargoCurrent"

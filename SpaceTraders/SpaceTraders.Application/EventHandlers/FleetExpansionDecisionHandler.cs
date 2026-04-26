@@ -37,8 +37,10 @@ public sealed class FleetExpansionDecisionHandler(
         var minCreditReserve = await settings.GetAsync<long>("FleetExpansion.MinCreditReserve", cancellationToken);
         if (agent.Credits <= minCreditReserve)
         {
-            logger.LogDebug("Credits {Credits} at or below reserve {Reserve}; skipping expansion check.",
-                agent.Credits, minCreditReserve);
+            logger.LogDebug(
+                "Credits {Credits} at or below reserve {Reserve}; skipping expansion check.",
+                agent.Credits,
+                minCreditReserve);
             return;
         }
 
@@ -54,7 +56,11 @@ public sealed class FleetExpansionDecisionHandler(
 
         logger.LogInformation(
             "Fleet expansion: purchasing {ShipType} at {Waypoint} (credits: {Credits}, ships: {ShipCount}/{MaxShips}).",
-            preferredType, shipyardWaypoint, agent.Credits, agent.ShipCount, maxShips);
+            preferredType,
+            shipyardWaypoint,
+            agent.Credits,
+            agent.ShipCount,
+            maxShips);
 
         await bus.SendAsync(new PurchaseShipCommand(preferredType, shipyardWaypoint));
     }

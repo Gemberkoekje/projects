@@ -3,6 +3,7 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Aggregates;
 
+[Mutable]
 public sealed class Agent : AggregateRoot
 {
     private const long CreditsChangedThreshold = 10_000;

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Prometheus;
@@ -14,6 +14,8 @@ using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+
+const string PathBase = "/spacetraders/api";
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,6 +53,11 @@ builder.Services
         options.AgentToken ??= builder.Configuration["SpaceTraders:AgentToken"];
     });
 
+builder.Services.AddSingleton<SettingsSnapshotLogger>();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 builder.Services
     .AddHealthChecks()
     .AddDbContextCheck<SpaceTradersDbContext>("postgresql");
@@ -67,6 +74,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<LeaderElectionServ
 builder.Services.AddHostedService<AgentBootstrapService>();
 builder.Services.AddHostedService<StartupSyncService>();
 builder.Services.AddHostedService<StartupRecoveryService>();
+builder.Services.AddHostedService<SettingsStartupLoggingService>();
 builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddHostedService<ShipWorkerService>();
 builder.Services.AddHostedService<ContractWatchService>();
@@ -75,6 +83,14 @@ builder.Services.AddHostedService<ActivityLogPruningService>();
 builder.Services.AddHostedService<PrometheusMetricsService>();
 
 var app = builder.Build();
+
+app.UsePathBase(PathBase);
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 // Skip database initialization in Testing environment to avoid requiring a real DB connection.
 if (!app.Environment.IsEnvironment("Testing"))
@@ -97,7 +113,9 @@ app.MapStatusEndpoints();
 app.MapSettingsEndpoints();
 app.MapControlEndpoints();
 
-app.Run();
+await app.RunAsync();
 
-// Required for WebApplicationFactory in integration tests
-public partial class Program { }
+/// <summary>Entry point marker for the SpaceTraders API; used by WebApplicationFactory in integration tests.</summary>
+public sealed partial class Program
+{
+}

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.ValueObjects;
 using SpaceTraders.Infrastructure.Persistence;
@@ -12,7 +13,7 @@ namespace SpaceTraders.API.Services;
 /// in-flight ship assignments that were interrupted by a pod restart.
 ///
 /// For each active (incomplete) assignment:
-///  - Ship.ArrivesAt has elapsed  → ship has already arrived; publish ShipArrivedAtWaypointEvent.
+///  - Ship.ArrivesAt has elapsed  → ship has already arrived; publish ShipEnteredOrbitEvent and ShipArrivedAtWaypointEvent.
 ///  - Ship.ArrivesAt is in the future → ship is still in transit; GameLoopService will handle arrival.
 ///  - Ship has no ArrivesAt         → resume at persisted StepIndex; no action needed here.
 ///
@@ -27,12 +28,17 @@ public sealed class StartupRecoveryService(
     private int RecoverySyncThresholdMinutes =>
         configuration.GetValue("StartupRecovery:SyncThresholdMinutes", 60);
 
+    /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        var now = DateTimeOffset.UtcNow;
+        var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
+        var assignments = scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        var now = TimeProvider.System.GetUtcNow();
+        var recoveredArrivals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var incompleteAssignments = await db.ShipAssignments
             .AsNoTracking()
@@ -42,40 +48,58 @@ public sealed class StartupRecoveryService(
         if (incompleteAssignments.Count == 0)
         {
             logger.LogInformation("StartupRecovery: no in-flight assignments found.");
-            return;
         }
-
-        logger.LogInformation("StartupRecovery: found {Count} in-flight assignment(s). Checking for arrived ships.", incompleteAssignments.Count);
-
-        foreach (var assignment in incompleteAssignments)
+        else
         {
-            var ship = await db.Ships.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Symbol == assignment.ShipSymbol, cancellationToken);
+            logger.LogInformation("StartupRecovery: found {Count} in-flight assignment(s). Checking for arrived ships.", incompleteAssignments.Count);
 
-            if (ship is null) continue;
-
-            if (ship.ArrivesAt.HasValue && ship.ArrivesAt.Value <= now)
+            foreach (var assignment in incompleteAssignments)
             {
-                var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol;
-                if (arrivedWaypoint is null) continue;
+                var ship = await db.Ships.AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.Symbol == assignment.ShipSymbol, cancellationToken);
 
-                logger.LogInformation(
-                    "StartupRecovery: Ship {Symbol} was in transit and has now arrived at {Waypoint}. Publishing ShipArrivedAtWaypointEvent.",
-                    assignment.ShipSymbol, arrivedWaypoint);
+                if (ship is null) continue;
 
-                await bus.PublishAsync(new ShipArrivedAtWaypointEvent(assignment.ShipSymbol, new WaypointSymbol(arrivedWaypoint)));
-            }
-            else if (ship.ArrivesAt.HasValue)
-            {
-                logger.LogInformation(
-                    "StartupRecovery: Ship {Symbol} is still in transit (arrives at {ArrivesAt}); GameLoopService will handle arrival.",
-                    assignment.ShipSymbol, ship.ArrivesAt);
-            }
-            else
-            {
-                logger.LogInformation(
-                    "StartupRecovery: Ship {Symbol} resuming at step {Step} of {Type} assignment.",
-                    assignment.ShipSymbol, assignment.StepIndex, assignment.Type);
+                if (ship.ArrivesAt.HasValue && ship.ArrivesAt.Value <= now)
+                {
+                    var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol;
+                    if (arrivedWaypoint is null) continue;
+
+                    var arrivedNav = new SpaceTraders.Application.Ports.NavModel(
+                        Status: "IN_ORBIT",
+                        SystemSymbol: ship.SystemSymbol ?? string.Empty,
+                        WaypointSymbol: arrivedWaypoint,
+                        FlightMode: ship.FlightMode ?? "CRUISE",
+                        DestWaypointSymbol: null,
+                        ArrivesAt: null);
+
+                    await ships.UpdateNavAsync(assignment.ShipSymbol, arrivedNav, null, cancellationToken);
+                    recoveredArrivals.Add(assignment.ShipSymbol);
+
+                    logger.LogInformation(
+                        "StartupRecovery: Ship {Symbol} was in transit and has now arrived at {Waypoint}. Publishing ShipEnteredOrbitEvent and ShipArrivedAtWaypointEvent.",
+                        assignment.ShipSymbol,
+                        arrivedWaypoint);
+
+                    var waypoint = new WaypointSymbol(arrivedWaypoint);
+                    await bus.PublishAsync(new ShipEnteredOrbitEvent(assignment.ShipSymbol, waypoint));
+                    await bus.PublishAsync(new ShipArrivedAtWaypointEvent(assignment.ShipSymbol, waypoint));
+                }
+                else if (ship.ArrivesAt.HasValue)
+                {
+                    logger.LogInformation(
+                        "StartupRecovery: Ship {Symbol} is still in transit (arrives at {ArrivesAt}); GameLoopService will handle arrival.",
+                        assignment.ShipSymbol,
+                        ship.ArrivesAt);
+                }
+                else
+                {
+                    logger.LogInformation(
+                        "StartupRecovery: Ship {Symbol} resuming at step {Step} of {Type} assignment.",
+                        assignment.ShipSymbol,
+                        assignment.StepIndex,
+                        assignment.Type);
+                }
             }
         }
 
@@ -88,7 +112,48 @@ public sealed class StartupRecoveryService(
             logger.LogInformation("StartupRecovery: ship data is stale; dispatching SyncAllShipsCommand.");
             await bus.SendAsync(new Application.Sync.SyncAllShipsCommand());
         }
+
+        await EnsureIdleShipsArePublishedAsync(ships, assignments, settings, recoveredArrivals, bus, cancellationToken);
     }
 
+    /// <inheritdoc />
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private async Task EnsureIdleShipsArePublishedAsync(
+        IShipRepository ships,
+        IShipAssignmentRepository assignments,
+        ISettingsRepository settings,
+        ISet<string> recoveredArrivals,
+        IMessageBus bus,
+        CancellationToken cancellationToken)
+    {
+        var automationEnabled = await settings.GetAsync<bool>("Automation.Enabled", cancellationToken);
+        if (!automationEnabled)
+        {
+            logger.LogInformation("StartupRecovery: automation disabled; skipping idle ship recovery.");
+            return;
+        }
+
+        var fleet = await ships.GetAllAsync(cancellationToken);
+
+        foreach (var ship in fleet)
+        {
+            if (ship.IsInTransit) continue;
+            if (recoveredArrivals.Contains(ship.Symbol)) continue;
+
+            var currentAssignment = await assignments.FindAsync(ship.Symbol, cancellationToken);
+            var hasActiveNonIdleAssignment =
+                currentAssignment is not null &&
+                !currentAssignment.CompletedAt.HasValue &&
+                !currentAssignment.AssignmentType.Equals("Idle", StringComparison.OrdinalIgnoreCase);
+
+            if (hasActiveNonIdleAssignment) continue;
+
+            logger.LogInformation(
+                "StartupRecovery: ship {Symbol} is idle/stalled. Publishing ShipBecameIdleEvent.",
+                ship.Symbol);
+
+            await bus.PublishAsync(new ShipBecameIdleEvent(ship.Symbol, "Startup recovery detected idle or stalled ship"));
+        }
+    }
 }

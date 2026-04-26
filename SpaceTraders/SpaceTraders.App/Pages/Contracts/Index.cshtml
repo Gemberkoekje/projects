@@ -39,7 +39,7 @@ else
                             <td class="text-nowrap">
                                 @if (contract.Expiration.HasValue)
                                 {
-                                    <span class="@(contract.Expiration.Value < DateTimeOffset.UtcNow.AddHours(24) ? "text-danger" : "")">
+                                    <span class="@(contract.Expiration.Value < TimeProvider.System.GetUtcNow().AddHours(24) ? "text-danger" : "")">
                                         @contract.Expiration.Value.ToLocalTime().ToString("g")
                                     </span>
                                 }

@@ -8,15 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SpaceTraders.Application\SpaceTraders.Application.csproj" />
-    <ProjectReference Include="..\SpaceTraders.Infrastructure.Persistence\SpaceTraders.Infrastructure.Persistence.csproj" />
-    <ProjectReference Include="..\SpaceTraders.Infrastructure.SpaceTradersAPI\SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
+    <ProjectReference Include="../SpaceTraders.Application/SpaceTraders.Application.csproj" />
+    <ProjectReference Include="../SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj" />
+    <ProjectReference Include="../SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
-    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+    <PackageReference Include="prometheus-net.AspNetCore" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
 </Project>

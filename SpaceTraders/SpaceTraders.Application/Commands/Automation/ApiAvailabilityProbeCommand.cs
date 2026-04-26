@@ -5,7 +5,7 @@ using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Automation;
 
-public record ApiAvailabilityProbeCommand;
+public sealed record ApiAvailabilityProbeCommand;
 
 /// <summary>
 /// Scheduled probe command dispatched when the SpaceTraders API becomes unavailable.
@@ -28,7 +28,7 @@ public sealed class ApiAvailabilityProbeHandler(
             await port.GetMyAgentAsync(cancellationToken);
 
             logger.LogInformation("SpaceTraders API probe succeeded; restoring availability.");
-            await bus.PublishAsync(new ApiAvailableEvent(DateTimeOffset.UtcNow));
+            await bus.PublishAsync(new ApiAvailableEvent(TimeProvider.System.GetUtcNow()));
         }
         catch (Exception ex)
         {

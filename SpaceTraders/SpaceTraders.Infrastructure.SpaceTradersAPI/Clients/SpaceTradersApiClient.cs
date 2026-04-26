@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
@@ -21,7 +22,8 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 public sealed class SpaceTradersApiClient(
     HttpClient httpClient,
     IOptions<SpaceTradersApiOptions> options,
-    IAgentTokenProvider agentTokenProvider) : ISpaceTradersApiClient
+    IAgentTokenProvider agentTokenProvider,
+    IApiEndpointUsageRecorder endpointUsageRecorder) : ISpaceTradersApiClient
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -32,6 +34,7 @@ public sealed class SpaceTradersApiClient(
     private readonly HttpClient _httpClient = httpClient;
     private readonly SpaceTradersApiOptions _options = options.Value;
     private readonly IAgentTokenProvider _agentTokenProvider = agentTokenProvider;
+    private readonly IApiEndpointUsageRecorder _endpointUsageRecorder = endpointUsageRecorder;
 
     public Task<ServerStatus> GetStatusAsync(CancellationToken cancellationToken = default)
         => GetAsync<ServerStatus>(string.Empty, AuthMode.None, cancellationToken);
@@ -188,6 +191,12 @@ public sealed class SpaceTradersApiClient(
         if (!string.IsNullOrWhiteSpace(token))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
+        var currentAgentToken = _agentTokenProvider.Token ?? _options.AgentToken;
+        if (!string.IsNullOrWhiteSpace(currentAgentToken))
+        {
+            await _endpointUsageRecorder.RecordAsync(method.Method, endpoint, currentAgentToken, cancellationToken);
         }
 
         if (body is not null)

@@ -5,8 +5,8 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
 public sealed class RegisterRequest
 {
     [JsonPropertyName("symbol")]
-    public required string Symbol { get; init; }
+    required public string Symbol { get; init; }
 
     [JsonPropertyName("faction")]
-    public required string Faction { get; init; }
+    required public string Faction { get; init; }
 }

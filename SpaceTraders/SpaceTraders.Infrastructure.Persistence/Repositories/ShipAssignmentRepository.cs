@@ -30,31 +30,28 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
         var existing = await db.ShipAssignments
             .FirstOrDefaultAsync(x => x.ShipSymbol == assignment.ShipSymbol, cancellationToken);
 
+        var values = new ShipAssignmentRecord
+        {
+            AgentToken = db.AgentToken,
+            ShipSymbol = assignment.ShipSymbol,
+            Type = assignment.AssignmentType,
+            OriginWaypoint = assignment.OriginWaypoint,
+            DestWaypoint = assignment.DestWaypoint,
+            CargoSymbol = assignment.CargoSymbol,
+            ContractId = assignment.ContractId,
+            StepIndex = assignment.StepIndex,
+            AssignedAt = assignment.AssignedAt,
+            CompletedAt = assignment.CompletedAt,
+            PurchaseUnitPrice = assignment.PurchaseUnitPrice,
+        };
+
         if (existing is null)
         {
-            db.ShipAssignments.Add(new ShipAssignmentRecord
-            {
-                ShipSymbol = assignment.ShipSymbol,
-                Type = assignment.AssignmentType,
-                OriginWaypoint = assignment.OriginWaypoint,
-                DestWaypoint = assignment.DestWaypoint,
-                CargoSymbol = assignment.CargoSymbol,
-                ContractId = assignment.ContractId,
-                StepIndex = assignment.StepIndex,
-                AssignedAt = assignment.AssignedAt,
-                CompletedAt = assignment.CompletedAt
-            });
+            db.ShipAssignments.Add(values);
         }
         else
         {
-            existing.Type = assignment.AssignmentType;
-            existing.OriginWaypoint = assignment.OriginWaypoint;
-            existing.DestWaypoint = assignment.DestWaypoint;
-            existing.CargoSymbol = assignment.CargoSymbol;
-            existing.ContractId = assignment.ContractId;
-            existing.StepIndex = assignment.StepIndex;
-            existing.AssignedAt = assignment.AssignedAt;
-            existing.CompletedAt = assignment.CompletedAt;
+            db.Entry(existing).CurrentValues.SetValues(values);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -70,5 +67,6 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
             entity.ContractId,
             entity.StepIndex,
             entity.AssignedAt,
-            entity.CompletedAt);
+            entity.CompletedAt,
+            entity.PurchaseUnitPrice);
 }

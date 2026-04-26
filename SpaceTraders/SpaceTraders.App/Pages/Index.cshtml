@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model IndexModel
 @{
     ViewData["Title"] = "Dashboard";
@@ -82,7 +82,7 @@ else
                     @foreach (var ship in Model.Ships)
                     {
                         <tr>
-                            <td><a href="/Ships/@ship.Symbol">@ship.Symbol</a></td>
+                            <td><a asp-page="/Ships/Detail" asp-route-symbol="@ship.Symbol">@ship.Symbol</a></td>
                             <td>@ship.SystemSymbol</td>
                             <td>@ship.WaypointSymbol</td>
                             <td>@ship.Status</td>

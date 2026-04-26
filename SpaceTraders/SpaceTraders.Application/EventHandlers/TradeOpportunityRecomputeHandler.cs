@@ -33,7 +33,9 @@ public sealed class TradeOpportunityRecomputeHandler(
         var opportunities = analyser.ComputeOpportunities(snapshots, minProfit);
         await repository.ReplaceAllAsync(opportunities, cancellationToken);
 
-        logger.LogInformation("Recomputed {Count} trade opportunities from {Markets} market(s).",
-            opportunities.Count, snapshots.Count);
+        logger.LogInformation(
+            "Recomputed {Count} trade opportunities from {Markets} market(s).",
+            opportunities.Count,
+            snapshots.Count);
     }
 }

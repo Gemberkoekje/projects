@@ -1,15 +1,33 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
-public record BuyCargoCommand(string ShipSymbol, string TradeSymbol, int Units);
+public sealed record BuyCargoCommand
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required int Units { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public BuyCargoCommand(string ShipSymbol, string TradeSymbol, int Units)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.TradeSymbol = TradeSymbol;
+        this.Units = Units;
+    }
+}
 
 public sealed class BuyCargoHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IAgentRepository agents,
+    IMessageBus bus,
     ILogger<BuyCargoHandler> logger)
 {
     public async Task Handle(BuyCargoCommand command, CancellationToken cancellationToken)
@@ -20,7 +38,15 @@ public sealed class BuyCargoHandler(
 
         var agent = await agents.GetAsync(cancellationToken);
         if (agent is not null)
+        {
             await agents.UpsertAsync(agent with { Credits = result.AgentCredits }, cancellationToken);
+        }
+
+        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
+        if (ship?.SystemSymbol is not null && ship.WaypointSymbol is not null)
+        {
+            await bus.SendAsync(new RefreshMarketDataCommand(ship.SystemSymbol, ship.WaypointSymbol, ForceRefresh: true));
+        }
 
         logger.LogInformation("Ship {Symbol} bought {Units}x {Good} for {Cost} credits.",
             command.ShipSymbol, command.Units, command.TradeSymbol, result.Revenue);
