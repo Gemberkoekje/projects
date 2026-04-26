@@ -82,10 +82,10 @@ await dbContext.SaveChangesAsync();   // commits both mutation + outbox entry at
 ```
 
 **Implementation:**
-- Use Wolverine's PostgreSQL outbox integration (`WolverineFx.Persistence.Postgresql`)
-- Configure outbox table in migrations
+- Use Wolverine's PostgreSQL-backed message storage (`WolverineFx.Postgresql`) and EF Core transaction middleware (`WolverineFx.EntityFrameworkCore`)
+- Wolverine auto-creates the `wolverine` envelope storage tables on startup through its message storage resource setup
 - All command handlers must publish events **before** calling `SaveChangesAsync()`
-- The outbox is flushed as part of the transaction commit
+- The durable local queue/outbox is flushed as part of the EF Core transaction commit
 
 ---
 
@@ -231,30 +231,35 @@ private async Task RecoverShipAsync(
 
 ```csharp
 // In Program.cs
-services.AddWolverine(options =>
+services.AddApplication(options =>
 {
-    options.UsePostgresqlPersistence(Configuration.GetConnectionString("GameDb"));
-    options.Policies.AutoApplyTransactions();  // Wraps handlers in transactions
+    options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
+    options.PersistMessagesWithPostgresql(connectionString, "wolverine")
+        .Enroll<SpaceTradersDbContext>()
+        .EnableCommandQueues(false);
+    options.Policies.UseDurableLocalQueues();
 });
 ```
 
-### 4.2 Outbox Table Schema
+### 4.2 Package and Host Setup
 
-The Wolverine PostgreSQL integration creates this table:
+Implemented in:
+- `Directory.Packages.props` with `WolverineFx.Postgresql` and `WolverineFx.EntityFrameworkCore` version `5.32.1`
+- `SpaceTraders.API/SpaceTraders.API.csproj` as API composition-root dependencies
+- `SpaceTraders.Application/DependencyInjection.cs` with an optional Wolverine configuration callback
+- `SpaceTraders.API/Program.cs` with production PostgreSQL durability and test-environment durability disabled
+
+The application layer still owns handler discovery and error policies. The API host owns infrastructure-specific persistence wiring so Razor Pages and tests can keep using the default non-durable registration.
+
+### 4.3 Outbox Table Schema
+
+Wolverine creates and manages its envelope storage tables in the `wolverine` schema. Do not hand-code an approximate outbox table; use Wolverine-managed resources so the table shape matches the installed Wolverine version.
+
+Conceptually, the durable storage contains:
 
 ```sql
-CREATE TABLE IF NOT EXISTS wolverine.outbox
-(
-    id              BIGSERIAL PRIMARY KEY,
-    owner_id        INT NOT NULL,
-    message_type    VARCHAR(250) NOT NULL,
-    message_body    TEXT NOT NULL,
-    timestamp       TIMESTAMP NOT NULL,
-    attempts        INT NOT NULL DEFAULT 0,
-    processed_at    TIMESTAMP NULL
-);
-
-CREATE INDEX idx_outbox_owner ON wolverine.outbox (owner_id, processed_at);
+-- Managed by Wolverine in schema: wolverine
+-- Stores outgoing, incoming, scheduled, and durable local envelopes.
 ```
 
 ---
@@ -551,22 +556,25 @@ private async Task RecoverShipAsync(
 }
 ```
 
-### 9.2 ⏳ PENDING: Wolverine PostgreSQL Outbox Configuration
+### 9.2 ✅ COMPLETED: Wolverine PostgreSQL Durable Outbox Configuration
 
-**Target:** `SpaceTraders.Infrastructure.Persistence/DependencyInjection.cs`
+**Target:** `SpaceTraders.API/Program.cs`, `SpaceTraders.API/SpaceTraders.API.csproj`, `SpaceTraders.Application/DependencyInjection.cs`, `Directory.Packages.props`
 
-**Status:** Blocked - `WolverineFx.Persistence.Postgresql` package not available in current NuGet repositories (as of Wolverine 5.32.1).
+**Status:** Implemented with the available Wolverine packages:
+- `WolverineFx.Postgresql` `5.32.1`
+- `WolverineFx.EntityFrameworkCore` `5.32.1`
 
-**Alternative Approach (Recommended for Phase 2):**
-1. Use Wolverine's built-in in-process outbox until persistence extension becomes available
-2. Ensure command handlers follow the template: **Publish event → SaveChangesAsync()**
-3. This maintains atomic ordering without external outbox persistence
-4. Future migration to durable outbox is backward-compatible once package becomes available
+**Changes:**
+- ✅ Fixed malformed `Directory.Packages.props` so NuGet restore can load central package versions
+- ✅ Added Wolverine PostgreSQL and EF Core integration packages
+- ✅ Configured `UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager)`
+- ✅ Configured `PersistMessagesWithPostgresql(connectionString, "wolverine")`
+- ✅ Enrolled `SpaceTradersDbContext` in Wolverine envelope storage
+- ✅ Enabled durable local queues for local domain event handling
+- ✅ Disabled Wolverine durability in the `Testing` environment so API integration tests do not require a real PostgreSQL database
 
-**Next Steps:**
-- Verify with Wolverine team if PostgreSQL persistence is available in later versions
-- Consider implementing custom durable outbox using Postgres if needed
-- Document outbox replay behavior for testing
+**Rationale:**
+The originally documented `WolverineFx.Persistence.Postgresql` package name does not exist. The correct package for Wolverine `5.32.1` is `WolverineFx.Postgresql`. EF Core transaction middleware comes from `WolverineFx.EntityFrameworkCore`.
 
 ### 9.3 ⏳ PENDING: Command Handler Audit Trail
 
@@ -622,8 +630,8 @@ For every command handler:
 
 For the application:
 
-- [ ] Wolverine is configured with PostgreSQL outbox (blocked - package unavailable)
-- [ ] Migrations create the outbox table
+- [x] Wolverine is configured with PostgreSQL durable message storage
+- [x] Wolverine manages the envelope storage schema at startup
 - [x] `StartupRecoveryService` runs **before** any handlers process events
 - [x] `SyncAllShipsCommand` is called first in recovery
 - [ ] Pod restart / outbox replay tests pass
@@ -638,15 +646,14 @@ For the application:
 **What's been implemented:**
 1. ✅ **StartupRecoveryService refactored** - no longer performs redundant database updates; only emits recovery events based on synced state
 2. ✅ **Recovery ordering preserved** - Sync → Read → Emit events pattern ensures consistency
+3. ✅ **Wolverine PostgreSQL durability configured** - API host uses PostgreSQL-backed envelope storage plus EF Core transaction middleware
 
 **What's pending:**
-1. ⏳ **Wolverine PostgreSQL Outbox** - requires external package availability
-2. ⏳ **Command handler refactor** - event publishing before SaveChangesAsync
-3. ⏳ **Audit trail** - ActivityLog recording for all state mutations
-4. ⏳ **Integration tests** - transactionality and idempotency validation
+1. ⏳ **Command handler refactor** - event publishing before SaveChangesAsync
+2. ⏳ **Audit trail** - ActivityLog recording for all state mutations
+3. ⏳ **Integration tests** - transactionality and idempotency validation
 
 **Next Phase:**
-- Implement durable outbox (custom or via later Wolverine version)
 - Add audit trail to all command handlers
 - Comprehensive test coverage for transactional guarantees
 - Divergence detection health checks

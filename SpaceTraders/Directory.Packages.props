@@ -1,11 +1,9 @@
 <Project>
-
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageVersion Include="AsyncFixer" Version="2.1.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.0" />
@@ -36,10 +34,11 @@
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.7" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.11.0" />
     <PackageVersion Include="WolverineFx" Version="5.32.1" />
+    <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="5.32.1" />
+    <PackageVersion Include="WolverineFx.Postgresql" Version="5.32.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.analyzers" Version="1.27.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
   </ItemGroup>
-
-</Project></Project>
+</Project>

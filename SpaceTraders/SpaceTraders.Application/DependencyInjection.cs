@@ -13,8 +13,12 @@ namespace SpaceTraders.Application;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddApplication(this IServiceCollection services)
+    public static IServiceCollection AddApplication(
+        this IServiceCollection services,
+        Action<WolverineOptions> configureWolverine)
     {
+        ArgumentNullException.ThrowIfNull(configureWolverine);
+
         services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
@@ -51,6 +55,7 @@ public static class DependencyInjection
         services.AddWolverine(opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
+            configureWolverine(opts);
 
             opts.OnException<Exception>()
                 .RetryWithCooldown(
@@ -62,4 +67,7 @@ public static class DependencyInjection
 
         return services;
     }
+
+    public static IServiceCollection AddApplication(this IServiceCollection services) =>
+        services.AddApplication(_ => { });
 }

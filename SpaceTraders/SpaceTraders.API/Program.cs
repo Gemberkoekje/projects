@@ -4,6 +4,10 @@ using Microsoft.Extensions.Hosting;
 using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.Persistence;
+using Wolverine.Postgresql;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Endpoints;
 using SpaceTraders.API.Middleware;
@@ -43,7 +47,7 @@ builder.Host.UseSerilog((ctx, cfg) =>
 });
 
 builder.Services
-    .AddApplication()
+    .AddApplication(options => ConfigureWolverine(options, builder.Configuration, builder.Environment))
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {
@@ -113,6 +117,31 @@ app.MapSettingsEndpoints();
 app.MapControlEndpoints();
 
 await app.RunAsync();
+
+static void ConfigureWolverine(
+    WolverineOptions options,
+    IConfiguration configuration,
+    IHostEnvironment environment)
+{
+    var connectionString = configuration.GetConnectionString("DefaultConnection");
+
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+    }
+
+    if (environment.IsEnvironment("Testing"))
+    {
+        options.Durability.DurabilityAgentEnabled = false;
+        return;
+    }
+
+    options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
+    options.PersistMessagesWithPostgresql(connectionString, "wolverine")
+        .Enroll<SpaceTradersDbContext>()
+        .EnableCommandQueues(false);
+    options.Policies.UseDurableLocalQueues();
+}
 
 /// <summary>Entry point marker for the SpaceTraders API; used by WebApplicationFactory in integration tests.</summary>
 public sealed partial class Program
