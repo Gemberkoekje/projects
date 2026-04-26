@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
-using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -52,7 +50,6 @@ public sealed class OrbitShipHandler(
 
         if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
         {
-            await bus.PublishAsync(new ShipEnteredOrbitEvent(command.ShipSymbol, new WaypointSymbol(nav.WaypointSymbol)));
             await bus.PublishAsync(new ShipUndockedEvent(
                 command.ShipSymbol,
                 nav.SystemSymbol,

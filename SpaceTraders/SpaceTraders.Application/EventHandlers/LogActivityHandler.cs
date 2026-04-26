@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.EventHandlers;
 
@@ -42,15 +43,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
-    public async Task Handle(ShipEnteredOrbitEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipEnteredOrbitEvent),
-            $"Ship {@event.ShipSymbol} entered orbit at {@event.Waypoint.Value}.",
-            cancellationToken: cancellationToken);
-    }
-
     public async Task Handle(ShipBecameIdleEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(
@@ -75,6 +67,69 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             @event.ShipSymbol,
             nameof(ShipFuelLowEvent),
             $"Ship {@event.ShipSymbol} fuel low: {@event.CurrentFuel}/{@event.Capacity}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipDockedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipDockedEvent),
+            $"Ship {@event.ShipSymbol} docked at {@event.WaypointSymbol}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipIdleDockedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipIdleDockedEvent),
+            $"Ship {@event.ShipSymbol} is idle and docked at {@event.WaypointSymbol}; awaiting role assignment.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipUndockedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipUndockedEvent),
+            $"Ship {@event.ShipSymbol} undocked and is in orbit at {@event.WaypointSymbol}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipInTransitEvent),
+            $"Ship {@event.ShipSymbol} in transit to {@event.DestinationWaypointSymbol}, arriving at {@event.ArrivalTime:u}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipStateMismatchEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipStateMismatchEvent),
+            $"Ship {@event.ShipSymbol} state mismatch in {@event.CommandName}: expected {@event.RequiredState}, was {@event.ActualState}. {@event.Reason}",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipInOrbitEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipInOrbitEvent),
+            $"Ship {@event.ShipSymbol} entered orbit at {@event.WaypointSymbol}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ShipIdleEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ShipIdleEvent),
+            $"Ship {@event.ShipSymbol} became idle. Reason: {@event.Reason}.",
             cancellationToken: cancellationToken);
     }
 }

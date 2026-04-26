@@ -4,6 +4,7 @@ using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Sync;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipIdleDockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipRefueledEvent>, ShipRefueledEventHandler>();
+        services.AddScoped<SyncAllShipsHandler>();
 
         services.AddWolverine(opts =>
         {

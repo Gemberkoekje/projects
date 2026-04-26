@@ -5,6 +5,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.ValueObjects;
 
 namespace SpaceTraders.Application.Automation;
@@ -14,7 +15,8 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and publishes ShipEnteredOrbitEvent and ShipArrivedAtWaypointEvent.
+///    updates their nav state in the DB, and publishes <see cref="ShipInTransitEvent"/> so the
+///    chain-of-command routes to <see cref="ShipInTransitEventHandler"/> → in-orbit → undocked.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
@@ -90,10 +92,18 @@ public sealed class GameLoopService(
 
             if (arrivedWaypoint is not null)
             {
-                var waypoint = new WaypointSymbol(arrivedWaypoint);
-                await bus.PublishAsync(new ShipEnteredOrbitEvent(ship.Symbol, waypoint));
-                await bus.PublishAsync(new ShipArrivedAtWaypointEvent(ship.Symbol, waypoint));
-                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} and entered orbit (dead-reckoning).", ship.Symbol, arrivedWaypoint);
+                var now = TimeProvider.System.GetUtcNow();
+                var transitEvent = new ShipInTransitEvent(
+                    ship.Symbol,
+                    ship.WaypointSymbol ?? arrivedWaypoint,
+                    arrivedWaypoint,
+                    now,
+                    Guid.NewGuid(),
+                    Guid.Empty,
+                    now);
+
+                await bus.PublishAsync(transitEvent);
+                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipInTransitEvent.", ship.Symbol, arrivedWaypoint);
             }
         }
     }

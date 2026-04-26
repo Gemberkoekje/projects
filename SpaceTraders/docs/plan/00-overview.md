@@ -1,7 +1,20 @@
-# SpaceTraders Autonomous Agent – Implementation Plan Overview
+# SpaceTraders Planning Overview
 
-> This document describes the implemented architecture.
-> The current implementation covers the planned domain, API client, persistence, automation, API, Razor Pages dashboard, Kubernetes, hardening, and observability work.
+This directory is the canonical home for architecture and roadmap plans.
+
+## Current target plan
+
+- [Ship Event Command Plan](ship-event-command-plan.md) - target automation architecture based on ship-state events, role-specific chain-of-command handlers, persisted ship plans, and no ship state machines.
+
+## Implemented or historical plans
+
+- The numbered documents describe the broader implemented foundation and older roadmap details.
+- [Chain of Command Event Plan](chain-of-command-plan.md) records the implemented chain-of-command work, but is superseded as the target automation direction by the ship event command plan.
+- Root-level `plan.md` is archived historical context for the initial API client integration.
+
+## Documentation rule
+
+New roadmap or architecture work should be added under `docs/plan/` and linked from this overview. Root-level documents should point here instead of duplicating plan details.
 
 ## Solution Structure (current projects)
 
@@ -35,6 +48,8 @@ SpaceTraders.sln
 | 14 | [14-security.md](14-security.md) | Security – secrets, RBAC, network policies, token safety |
 | 15 | [15-adr.md](15-adr.md) | Architecture Decision Records |
 | 16 | [16-sequence-flows.md](16-sequence-flows.md) | Sequence diagrams – agent bootstrap & trade cycle |
+| Target | [ship-event-command-plan.md](ship-event-command-plan.md) | Target ship automation architecture – event command handlers, role plans, no state machines |
+| Archive | [chain-of-command-plan.md](chain-of-command-plan.md) | Implemented chain-of-command event work; superseded target direction |
 
 ## High-Level Architecture
 
@@ -72,9 +87,10 @@ graph TD
 5. Polling focused on Market/Shipyard data where needed.
 6. Agent bootstrap flow for first-run token registration.
 7. Rate limiter as `DelegatingHandler`.
-8. Automation engine hosted services.
+8. Automation through state-gated event handlers and persisted ship plans.
 9. Runtime settings in DB and exposed via internal API.
 10. No secrets in code.
+11. Ship automation should not use state machines as the target architecture.
 
 ---
 
@@ -84,3 +100,4 @@ graph TD
 - [15-adr.md](15-adr.md)
 - [16-sequence-flows.md](16-sequence-flows.md)
 - [09-milestones.md](09-milestones.md)
+- [ship-event-command-plan.md](ship-event-command-plan.md)

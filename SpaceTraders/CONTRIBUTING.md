@@ -16,6 +16,7 @@ Implemented today:
 - Razor Pages dashboard (overview with cached agent + ships)
 
 Planned architecture and future phases are documented in `docs/plan/`.
+Start with `docs/plan/00-overview.md`; the current target ship automation direction is `docs/plan/ship-event-command-plan.md`.
 
 ---
 

@@ -15,7 +15,8 @@ Apply these indexes in EF Core entity configuration or as explicit migration SQL
 |-------|-------|-----------|
 | `CachedShip` | `(NavStatus, ArrivesAt)` | `GameLoopService` filters by `IN_TRANSIT` + `ArrivesAt <= now` every 5 s |
 | `CachedShip` | `(Symbol)` PK (already indexed) | – |
-| `ShipAssignmentRecord` | `(ShipSymbol, CompletedAt)` | Startup recovery loads all incomplete assignments |
+| `ShipPlanRecord` | `(ShipSymbol, Status)` | Startup recovery loads all active ship plans |
+| `ShipPlanRecord` | `(Role, CargoSymbol, PlannedWaypoint)` | Price-change re-planning finds affected ships quickly |
 | `CachedMarket` | `(WaypointSymbol, LastObservedAt)` | TTL check before dispatching `RefreshMarketDataCommand` |
 | `TradeOpportunity` | `(ProfitPerJump DESC, ComputedAt)` | `GetBestTradeRouteQuery` sorts descending |
 | `ActivityLog` | `(Timestamp DESC, ShipSymbol)` | Dashboard paging and ship-filter queries |
@@ -71,7 +72,7 @@ Expected execution time: < 5 ms for fleets up to 50 ships.
 
 ---
 
-## 13.4 TradeOpportunity Recomputation
+## 13.4 TradeOpportunity Recomputation and Re-planning
 
 `TradeOpportunityRecomputeHandler` runs after every `MarketDataRefreshedEvent`. At scale this can
 be triggered frequently. Guard against redundant recomputes:
@@ -80,6 +81,9 @@ be triggered frequently. Guard against redundant recomputes:
   30 s from now instead.
 - Recompute is pure in-memory (reads from cache, writes to `TradeOpportunity` table) – no external
   HTTP calls, so the compute itself is cheap.
+- Emit `MarketPricesChangedEvent` only for actionable price, supply, activity, or trade-volume changes.
+- Query affected `ShipPlanRecord` rows by role, planned waypoint, and cargo symbol before inspecting JSON details.
+- Re-plan in memory first, then persist only plans that materially change.
 
 ---
 
@@ -105,7 +109,7 @@ This avoids writing 6 rows/minute to the database for purely presentational data
 
 ## 13.6 Fleet Size Scaling Expectations
 
-| Fleet size | DB rows (Ships + Assignments + ActivityLog/day) | Expected game loop tick time |
+| Fleet size | DB rows (Ships + ShipPlans + ActivityLog/day) | Expected game loop tick time |
 |-----------|--------------------------------------------------|------------------------------|
 | 5 ships   | ~5 + ~5 + ~720 | < 2 ms |
 | 20 ships  | ~20 + ~20 + ~2 880 | < 5 ms |

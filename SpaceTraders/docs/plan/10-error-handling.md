@@ -24,7 +24,7 @@
 | Database | Connection failure at startup | Startup probe fails → K8s will not route traffic; pod restarts |
 | Database | Connection failure at runtime | EF Core throws; handler fails; Wolverine retries with back-off |
 | Database | Migration failure | Startup throws, pod does not start – investigate migration scripts |
-| Ship state machine | Unexpected ship status | Log warning, reset ship assignment to `IDLE`, re-queue `AssignShipCommand` |
+| Ship event handler | Unexpected ship status | Log warning, emit `ShipNeedsDockingEvent` for non-docked roleless ships or `ShipIdleDockedEvent` for docked ships |
 | Contract | Deadline passed before fulfillment | `ContractWatchService` marks contract failed, frees assigned ship (see `05-automation-engine.md §5.5`) |
 
 ---
@@ -61,11 +61,12 @@ On restart, `StartupRecoveryService` runs before any automation:
 1. Run EF Core migrations (idempotent).
 2. AgentBootstrapService: load token from DB (or register if absent).
 3. Replay any Wolverine outbox messages that were not yet acknowledged.
-4. Load all ShipAssignmentRecords with CompletedAt == null.
-5. For each in-flight assignment:
+4. Load all active `ShipPlanRecord` rows.
+5. For each planned ship:
    - Ship.ArrivesAt > UtcNow  → mark IN_TRANSIT; GameLoopService will handle arrival.
-   - Ship.ArrivesAt <= UtcNow → treat as arrived; publish ShipArrivedAtWaypointEvent.
-   - Ship has no ArrivesAt    → resume assignment at last persisted StepIndex.
+   - Ship.ArrivesAt <= UtcNow → treat as arrived; publish `ShipArrivedEvent` / `ShipInOrbitEvent`.
+   - Ship is docked           → publish the matching docked role event or `ShipIdleDockedEvent`.
+   - Ship is in orbit         → publish the matching in-orbit role event or `ShipNeedsDockingEvent`.
 6. Start all BackgroundServices.
 ```
 
@@ -124,11 +125,11 @@ _logger.LogError(ex,
 ### Stranded Ship (No Fuel, No Credits)
 ```
 1. Ship arrives at a waypoint with no fuel and agent credits < refuel cost.
-2. `RefuelHandler` dispatches `RefuelShipCommand` at Priority.Critical – fails with 4xx (insufficient credits).
+2. A docked-state refuel handler dispatches `RefuelShipCommand` at Priority.Critical – fails with 4xx (insufficient credits).
 3. After retry exhaustion → move ship to Idle, publish `ShipStrandedEvent`.
 4. `ShipStrandedHandler`:
    - Logs a structured warning with ship symbol, waypoint, credits, fuel level.
-   - Pauses the ship's assignment (sets to Idle) so other ships are not blocked.
+    - Suspends the ship plan or sets it to idle docked so other ships are not blocked.
    - If other ships have credits income → re-attempts refuel after configurable cooldown (default: 5 min).
 5. Dashboard shows a yellow alert: "Ship {symbol} stranded at {waypoint} – insufficient credits".
 ```
@@ -153,9 +154,9 @@ If `TradeAnalyser.ScoreRoutes` returns the same origin/destination pair on conse
 ### All Markets Unavailable / No Trade Routes
 ```
 1. TradeAnalyser returns an empty list.
-2. AssignShipAfterSaleHandler falls through to Scout assignment.
-3. If no unvisited waypoints remain → ship assigned to Idle.
-4. GameLoopService detects all ships Idle → publishes AllShipsIdleEvent.
+2. Role planner falls through to a scout plan.
+3. If no unvisited waypoints remain → ship remains idle docked.
+4. GameLoopService detects all ships idle docked → publishes AllShipsIdleEvent.
 5. AllShipsIdleHandler:
    - Waits 5 min then dispatches SyncAllShipsCommand + RefreshMarketDataCommand for all known markets.
    - Logs a warning: "All ships idle – no viable routes found; forcing market refresh."
@@ -176,9 +177,9 @@ If the API returns `403 Forbidden` on any authenticated endpoint:
 When the Kubernetes pod receives `SIGTERM`:
 1. ASP.NET Core `IHostApplicationLifetime.ApplicationStopping` fires.
 2. `GameLoopService` stops dispatching new assignments.
-3. `ShipWorkerService` instances finish their **current atomic step** (e.g. finish a sell call) then stop.
+3. In-flight Wolverine handlers finish their **current atomic step** (e.g. finish a sell call) then stop.
 4. Wolverine drains its in-process queue within `HostOptions.ShutdownTimeout` (default: 30 s; increase to 60 s in `Program.cs`).
-5. EF Core saves any pending `ShipAssignmentRecord.StepIndex` updates.
+5. EF Core saves any pending ship cache and `ShipPlanRecord` updates.
 6. Process exits cleanly – Kubernetes replaces the pod.
 
 ```csharp

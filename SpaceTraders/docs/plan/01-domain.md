@@ -34,13 +34,13 @@ Ship
 ├── CurrentSystem       : SystemSymbol (value object)
 ├── Fuel                : Fuel { Current, Capacity }
 ├── Cargo               : Cargo { Units, Capacity, Items: CargoItem[] }
-├── Assignment          : ShipAssignment? (see §1.3)
+├── Plan                : ShipPlan? (see §1.3)
 └── LastSyncedAt        : DateTimeOffset
 ```
 **Raises:**
-- `ShipAssignmentCompletedEvent` – when a ship finishes its current assignment.
+- `ShipPlanCompletedEvent` – when a ship finishes its current plan.
 - `ShipCargoSoldEvent` – when cargo is sold (carries TradeSymbol, units, totalRevenue).
-- `ShipArrivedAtWaypointEvent` – when nav status transitions to DOCKED/IN_ORBIT.
+- `ShipArrivedEvent` / `ShipInOrbitEvent` – when navigation completes and the ship is in orbit.
 - `ShipFuelLowEvent` – when fuel falls below 20 % of capacity.
 
 ---
@@ -101,33 +101,34 @@ Shipyard
 
 ---
 
-## 1.3 Ship Assignment (value object / owned entity)
+## 1.3 Ship Plan (value object / owned entity)
 
-Represents the current autonomous task of a ship.
+Represents the current autonomous intent of a ship. Target automation persists plan intent and derives the next action from the ship's physical state. It does not persist procedural state-machine steps.
 
 ```csharp
-public enum AssignmentType
+public enum ShipPlanRole
 {
+    None,
     Idle,
-    Mine,           // extract resources at an asteroid
-    Haul,           // move cargo from A to B
-    Trade,          // buy at origin, sell at destination
-    FulfillContract,
-    Refuel,
-    Scout,          // visit waypoints to populate Market/Shipyard cache
-    SellAll,        // sell everything in cargo at best available market
+    Miner,
+    Trader,
+    Scout,
+    Contract,
+    Recovery,
 }
 
-public sealed class ShipAssignment
+public sealed class ShipPlan
 {
-    public AssignmentType Type        { get; init; }
-    public WaypointSymbol? Origin     { get; init; }
-    public WaypointSymbol? Destination{ get; init; }
-    public TradeSymbol?    Cargo      { get; init; }
-    public string?         ContractId { get; init; }
-    public DateTimeOffset  AssignedAt { get; init; }
+    public ShipPlanRole Role          { get; init; }
+    public WaypointSymbol Objective   { get; init; }
+    public TradeSymbol Cargo          { get; init; }
+    public int CargoUnits             { get; init; }
+    public string DetailsJson         { get; init; }
+    public DateTimeOffset PlannedAt   { get; init; }
 }
 ```
+
+See [ship-event-command-plan.md](ship-event-command-plan.md) for persisted `ShipPlanRecord` columns and role-specific JSON details.
 
 ---
 
@@ -135,14 +136,20 @@ public sealed class ShipAssignment
 
 ```
 AgentCreditsChangedEvent       { long OldCredits, long NewCredits }
-ShipAssignmentCompletedEvent   { string ShipSymbol, AssignmentType CompletedType }
+ShipPlanCompletedEvent         { string ShipSymbol, ShipPlanRole CompletedRole }
 ShipCargoSoldEvent             { string ShipSymbol, TradeSymbol Good, int Units, long Revenue, long NewAgentCredits }
-ShipArrivedAtWaypointEvent     { string ShipSymbol, WaypointSymbol Waypoint }
+ShipDockedEvent                { string ShipSymbol, WaypointSymbol Waypoint }
+ShipInOrbitEvent               { string ShipSymbol, WaypointSymbol Waypoint }
+ShipInTransitEvent             { string ShipSymbol, WaypointSymbol Origin, WaypointSymbol Destination, DateTimeOffset ArrivesAt }
+ShipArrivedEvent               { string ShipSymbol, WaypointSymbol Waypoint }
+ShipIdleDockedEvent            { string ShipSymbol, WaypointSymbol Waypoint }
+ShipNeedsDockingEvent          { string ShipSymbol, WaypointSymbol Waypoint }
 ShipFuelLowEvent               { string ShipSymbol, int CurrentFuel, int Capacity }
 ContractAcceptedEvent          { string ContractId }
 ContractDeadlineApproachingEvent { string ContractId, TimeSpan Remaining }
 ContractFulfilledEvent         { string ContractId, long Payment }
 MarketDataRefreshedEvent       { WaypointSymbol Waypoint }
+MarketPricesChangedEvent       { WaypointSymbol Waypoint, TradeSymbol[] ChangedGoods }
 ShipyardDataRefreshedEvent     { WaypointSymbol Waypoint }
 NewShipPurchasedEvent          { string ShipSymbol, ShipType Type, long CostPaid }
 ```
@@ -160,11 +167,13 @@ SpaceTraders.Domain/
 │   │       └── AgentCreditsChangedEvent.cs
 │   ├── ShipAggregate/
 │   │   ├── Ship.cs
-│   │   ├── ShipAssignment.cs
+│   │   ├── ShipPlan.cs
 │   │   └── Events/
-│   │       ├── ShipAssignmentCompletedEvent.cs
+│   │       ├── ShipPlanCompletedEvent.cs
 │   │       ├── ShipCargoSoldEvent.cs
-│   │       ├── ShipArrivedAtWaypointEvent.cs
+│   │       ├── ShipDockedEvent.cs
+│   │       ├── ShipInOrbitEvent.cs
+│   │       ├── ShipArrivedEvent.cs
 │   │       └── ShipFuelLowEvent.cs
 │   ├── ContractAggregate/
 │   │   ├── Contract.cs

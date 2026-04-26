@@ -828,7 +828,8 @@
           "Microsoft.EntityFrameworkCore": "[10.0.7, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.7, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.1, )",
-          "SpaceTraders.Application": "[1.0.0, )"
+          "SpaceTraders.Application": "[1.0.0, )",
+          "WolverineFx.Persistence.Postgresql": "[5.32.1, )"
         }
       },
       "Microsoft.EntityFrameworkCore": {

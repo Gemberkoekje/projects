@@ -18,6 +18,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Docs – Added
 - `docs/plan/` documentation suite (architecture and phased roadmap)
+- `docs/plan/ship-event-command-plan.md` target automation plan for state-gated ship events and persisted ship plans
 - `docs/GLOSSARY.md`
 - `CONTRIBUTING.md`
 - `CHANGELOG.md`
@@ -25,6 +26,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Docs – Changed
 - `README.md` aligned with currently implemented foundation scope
 - `CONTRIBUTING.md` aligned with current repository state
+- Centralized plan navigation in `docs/plan/00-overview.md`
 
 ---
 

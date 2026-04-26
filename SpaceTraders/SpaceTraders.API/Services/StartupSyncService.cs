@@ -271,20 +271,25 @@ public sealed class StartupSyncService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var locatedShips = ships
+        var locatedWaypoints = ships
             .Where(s => s.Nav is not null
                 && !string.Equals(s.Nav.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(s.Nav.SystemSymbol)
                 && !string.IsNullOrWhiteSpace(s.Nav.WaypointSymbol))
+            .Select(s => new
+            {
+                SystemSymbol = s.Nav!.SystemSymbol,
+                WaypointSymbol = s.Nav.WaypointSymbol,
+            })
+            .DistinctBy(x => x.WaypointSymbol)
             .ToList();
 
-        foreach (var ship in locatedShips)
+        foreach (var location in locatedWaypoints)
         {
-            var systemSymbol = ship.Nav!.SystemSymbol;
-            var waypointSymbol = ship.Nav.WaypointSymbol;
+            var systemSymbol = location.SystemSymbol;
+            var waypointSymbol = location.WaypointSymbol;
 
-            var waypoint = await dbContext.Waypoints
-                .FirstOrDefaultAsync(w => w.Symbol == waypointSymbol, cancellationToken);
+            var waypoint = await dbContext.Waypoints.FindAsync([dbContext.AgentToken, waypointSymbol], cancellationToken);
 
             if (waypoint is null)
             {

@@ -1,5 +1,8 @@
 # 05 – Automation Engine
 
+> Target automation update: use [Ship Event Command Plan](ship-event-command-plan.md) for new ship automation work.
+> The older assignment/state-machine sections below describe historical implementation context and should be migrated to state-gated event handlers with persisted ship plans.
+
 ## Goals
 - Run continuously without human intervention.
 - Orchestrate the full game loop: sync state → decide → act → repeat.
@@ -12,7 +15,7 @@
 | Service | Role |
 |---------|------|
 | `GameLoopService` | Master orchestrator – periodic sync + event publication |
-| `ShipWorkerService` | One logical worker per ship – runs its current assignment |
+| `ShipStateEventService` | Publishes current-state ship events and recovery events for active ship plans |
 | `ScoutService` | Periodically scouts unknown or stale waypoints/markets |
 | `ContractWatchService` | Monitors contract deadlines and fires warning events |
 | `ApiDispatcher` | Drains the priority request queue (see §02) |
@@ -26,7 +29,7 @@ All are `BackgroundService` implementations registered in DI.
 ```
 Every 5 s (tight loop, cheap because no API calls):
   1. For each CachedShip with IsInTransit == false AND ArrivesAt was set:
-     → call ApplyArrivalIfDue(), save to DB, publish ShipArrivedAtWaypointEvent
+     → call ApplyArrivalIfDue(), save to DB, publish ShipArrivedEvent
   2. Check Automation.Enabled setting → if false, skip steps below
 
 Every 30 s:
@@ -40,26 +43,22 @@ No periodic API polling for agent credits, ship state, or contracts – those ar
 
 ---
 
-## 5.3 ShipWorkerService
+## 5.3 Ship Event Automation
 
-Each ship runs through a **state machine**:
+Each ship advances through state-gated events instead of a state machine:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> IDLE
-    IDLE --> NAVIGATING : AssignShipCommand received
-    NAVIGATING --> AT_WAYPOINT : ShipArrivedAtWaypointEvent
-    NAVIGATING --> IDLE : error / cancel
-    AT_WAYPOINT --> EXTRACTING : mine assignment
-    AT_WAYPOINT --> TRADING : trade / haul / contract assignment
-    AT_WAYPOINT --> IDLE : scout complete
-    EXTRACTING --> NAVIGATING : cargo ≥ 90% full
-    EXTRACTING --> IDLE : error / cancel
-    TRADING --> IDLE : ShipCargoSoldEvent / ShipAssignmentCompletedEvent
-    TRADING --> IDLE : error / cancel
+    [*] --> Docked
+    Docked --> InOrbit : Docked handler issues OrbitShipCommand
+    InOrbit --> InTransit : In-orbit handler issues NavigateShipCommand
+    InTransit --> InOrbit : dead-reckoning emits ShipArrivedEvent
+    InOrbit --> Docked : In-orbit handler issues DockShipCommand
+    Docked --> IdleDocked : no active role/plan
+    IdleDocked --> Docked : role planner persists ShipPlanRecord
 ```
 
-The state machine is stored as `ShipAssignmentRecord` in PostgreSQL so it survives restart.
+`ShipPlanRecord` is stored in PostgreSQL so role intent survives restart. It stores the chosen role, immediate objective, waypoints, goods, units, and role-specific JSON details. It does not store a procedural `StepIndex`.
 
 ### Assignment Execution Steps
 
@@ -173,10 +172,12 @@ On pod start:
 3. SyncAllShipsCommand → GET /my/ships (only startup GET for ships)
 4. SyncContractsCommand → GET /my/contracts
 5. SyncAgentCommand → GET /my/agent
-6. Load all ShipAssignmentRecords from DB
-7. For each record with CompletedAt == null:
-   - If ship IsInTransit (ArrivesAt in future) → wait, no action needed (GameLoopService will detect arrival)
-   - Else → resume assignment at StepIndex
+6. Load all active `ShipPlanRecord` rows from DB.
+7. For each planned ship:
+   - If ship is in transit (`ArrivesAt` in future) → wait; `GameLoopService` will emit arrival when due.
+   - If ship arrived while offline → emit `ShipArrivedEvent` / `ShipInOrbitEvent`.
+   - If ship is docked → emit the matching docked role event or `ShipIdleDockedEvent`.
+   - If ship is in orbit → emit the matching in-orbit role event or `ShipNeedsDockingEvent`.
 8. Start all hosted services
 ```
 
@@ -189,8 +190,8 @@ After startup, no periodic GETs for ships/agent/contracts. State is maintained e
 When `IHostApplicationLifetime.ApplicationStopping` fires (e.g. SIGTERM from Kubernetes):
 
 1. `GameLoopService` stops the dead-reckoning loop and does **not** start any new assignment cycles.
-2. `ShipWorkerService` instances finish their current **atomic step** (e.g. a single API call), then exit their loops.
-3. In-progress `ShipAssignmentRecord.StepIndex` is saved before exiting so recovery resumes at the correct step.
+2. In-flight Wolverine handlers finish their current **atomic step** (e.g. a single API call), then exit.
+3. Updated ship cache and `ShipPlanRecord` data is saved before exiting so recovery resumes from current state and intent.
 4. `ApiDispatcher` stops accepting new requests; drains any already-dequeued request.
 5. Wolverine flushes the durable outbox to PostgreSQL.
 6. Total expected shutdown time: < 30 s (extend `HostOptions.ShutdownTimeout` if needed).
@@ -205,17 +206,12 @@ See also `10-error-handling.md §10.8`.
 SpaceTraders.Application/
 └── Automation/
     ├── GameLoopService.cs
-    ├── ShipWorkerService.cs
+    ├── ShipStateEventService.cs
     ├── ScoutService.cs
     ├── ContractWatchService.cs
-    └── StateMachine/
-        ├── ShipStateMachine.cs
-        ├── States/
-        │   ├── IdleState.cs
-        │   ├── NavigatingState.cs
-        │   ├── AtWaypointState.cs
-        │   ├── ExtractingState.cs
-        │   └── TradingState.cs
-        └── Transitions/
-            └── ShipTransitionRules.cs
+    └── ShipPlanning/
+        ├── ShipRolePlanner.cs
+        ├── TradeRouteService.cs
+        ├── MinerPlanService.cs
+        └── ScoutPlanService.cs
 ```

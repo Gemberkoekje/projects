@@ -2,6 +2,8 @@
 
 Key runtime interaction sequences illustrated as Mermaid diagrams.
 
+> Automation update: the trade-cycle sequence below is historical. New automation flows should follow [Ship Event Command Plan](ship-event-command-plan.md).
+
 _See [`../GLOSSARY.md`](../GLOSSARY.md) for term definitions._
 
 ---
@@ -49,65 +51,65 @@ A single ship completing one full buy-navigate-sell loop and receiving its next 
 ```mermaid
 sequenceDiagram
     participant GLS as GameLoopService
-    participant SWS as ShipWorkerService
+    participant SEH as Ship Event Handlers
     participant MB as Wolverine IMessageBus
     participant AL as Application Layer
     participant RC as Rate-Limited ST API Client
     participant DB as PostgreSQL
     participant ST as SpaceTraders.io API
 
-    GLS->>MB: Publish AssignShipCommand(shipId)
-    MB->>AL: AssignShipHandler
+    GLS->>MB: Publish ShipIdleDockedEvent(shipId)
+    MB->>AL: ShipIdleDockedEventHandler
     AL->>DB: SELECT best TradeOpportunity for ship
     DB-->>AL: opportunity (buyWaypoint, sellWaypoint, tradeGood)
-    AL->>DB: INSERT ShipAssignmentRecord (Trade, step=0)
-    AL->>MB: Publish ShipAssignedEvent
+    AL->>DB: UPSERT ShipPlanRecord (Trader, buyWaypoint, sellWaypoint, tradeGood)
+    AL->>MB: Publish ShipBecameTraderEvent
 
-    MB->>SWS: ShipAssignedHandler → begin Trade state machine
+    MB->>SEH: ShipTraderDockedEventHandler
 
-    Note over SWS: Step 1 – Navigate to buy waypoint
-    SWS->>RC: POST /my/ships/{id}/navigate { waypointSymbol: buyWaypoint }
+    Note over SEH: Docked handler may undock; in-orbit handler may navigate
+    SEH->>RC: POST /my/ships/{id}/orbit
+    RC->>ST: POST /orbit
+    ST-->>RC: 200 { nav: { status: IN_ORBIT } }
+    SEH->>RC: POST /my/ships/{id}/navigate { waypointSymbol: buyWaypoint }
     RC->>ST: POST /navigate
     ST-->>RC: 200 { nav: { arrival, status: IN_TRANSIT } }
-    RC-->>SWS: response
-    SWS->>DB: UPDATE ship (status=IN_TRANSIT, arrivesAt=arrival)
-    SWS->>DB: UPDATE ShipAssignmentRecord (step=1)
+    RC-->>SEH: response
+    SEH->>DB: UPDATE ship (status=IN_TRANSIT, arrivesAt=arrival)
 
     Note over GLS: Dead-reckoning tick detects arrival
-    GLS->>MB: Publish ShipArrivedAtWaypointEvent(shipId)
-    MB->>SWS: resume Trade state machine at step 1
+    GLS->>MB: Publish ShipArrivedEvent(shipId)
+    MB->>SEH: ShipTraderUndockedEventHandler / ShipTraderDockedEventHandler
 
-    Note over SWS: Step 2 – Dock & buy cargo
-    SWS->>RC: POST /my/ships/{id}/dock
+    Note over SEH: Buy while docked
+    SEH->>RC: POST /my/ships/{id}/dock
     RC->>ST: POST /dock
     ST-->>RC: 200 { nav: { status: DOCKED } }
-    SWS->>RC: POST /my/ships/{id}/purchase { symbol, units }
+    SEH->>RC: POST /my/ships/{id}/purchase { symbol, units }
     RC->>ST: POST /purchase
     ST-->>RC: 200 { agent, cargo, transaction }
-    SWS->>DB: UPDATE agent (credits), UPDATE ship cargo
-    SWS->>DB: UPDATE ShipAssignmentRecord (step=2)
+    SEH->>DB: UPDATE agent (credits), UPDATE ship cargo
 
-    Note over SWS: Step 3 – Navigate to sell waypoint (same pattern as step 1)
+    Note over SEH: Navigate to sell waypoint using the same docked → orbit → navigate pattern
 
-    Note over SWS: Step 4 – Dock & sell cargo
-    SWS->>RC: POST /my/ships/{id}/sell { symbol, units }
+    Note over SEH: Dock & sell cargo
+    SEH->>RC: POST /my/ships/{id}/sell { symbol, units }
     RC->>ST: POST /sell
     ST-->>RC: 200 { agent, cargo, transaction }
-    SWS->>DB: UPDATE agent (credits), UPDATE ship cargo
-    SWS->>MB: Publish CargoPurchasedEvent / CargoSoldEvent
+    SEH->>DB: UPDATE agent (credits), UPDATE ship cargo
+    SEH->>MB: Publish CargoPurchasedEvent / CargoSoldEvent
 
-    MB->>AL: AssignShipAfterSaleHandler
+    MB->>AL: ShipTraderDockedEventHandler / role planner
     AL->>DB: SELECT next best TradeOpportunity
-    AL->>MB: Publish AssignShipCommand(shipId)
+    AL->>DB: UPDATE ShipPlanRecord when needed
 
-    Note over SWS,GLS: Loop restarts from top
+    Note over SEH,GLS: Loop restarts from top
 ```
 
 **Notes:**
 - Every `POST` response is applied directly to the cache — no follow-up GET is ever issued
   (see [ADR-003](15-adr.md#adr-003-no-get-after-post-caching-rule)).
-- `ShipAssignmentRecord.StepIndex` is updated after each step so a pod restart can resume
-  from the exact correct point (see [`10-error-handling.md §10.3`](10-error-handling.md)).
+- Target automation persists `ShipPlanRecord` intent and resumes from current ship state instead of `ShipAssignmentRecord.StepIndex`.
 - The rate-limited client transparently queues requests so all ships share the 2 req/s budget.
 
 ---
@@ -128,15 +130,15 @@ sequenceDiagram
     ABS->>DB: LOAD IAgentTokenProvider from stored_credentials
 
     App->>GLS: StartAsync()
-    GLS->>DB: SELECT all ShipAssignmentRecords WHERE active = true
+    GLS->>DB: SELECT all ShipPlanRecords WHERE status = Active
     GLS->>DB: SELECT all ships WHERE status = IN_TRANSIT AND arrivesAt <= NOW()
 
     loop each arrived ship
-        GLS->>MB: Publish ShipArrivedAtWaypointEvent(shipId)
+        GLS->>MB: Publish ShipArrivedEvent(shipId)
     end
 
-    loop each active assignment
-        GLS->>MB: Publish ResumeAssignmentCommand(shipId, stepIndex)
+    loop each active ship plan
+        GLS->>MB: Publish current-state role event
     end
 
     Note over GLS: Normal operation resumes.<br/>No extra GETs needed — arrival<br/>was persisted before the crash.
@@ -154,5 +156,6 @@ sequenceDiagram
 
 - [`00-overview.md`](00-overview.md) – High-level architecture overview
 - [`15-adr.md`](15-adr.md) – Rationale behind the design choices shown above
-- [`05-automation-engine.md`](05-automation-engine.md) – Automation engine state machine detail
+- [`ship-event-command-plan.md`](ship-event-command-plan.md) – Target ship event automation detail
+- [`05-automation-engine.md`](05-automation-engine.md) – Automation engine historical context and target updates
 - [`10-error-handling.md`](10-error-handling.md) – Error and recovery scenarios

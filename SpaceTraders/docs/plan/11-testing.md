@@ -1,5 +1,7 @@
 # 11 – Testing Strategy
 
+> Ship automation testing should follow [Ship Event Command Plan](ship-event-command-plan.md): command state guards, state-gated event handlers, persisted ship plans, and price-change re-planning.
+
 ## Goals
 - Ensure correctness of domain logic, handler behaviour and API contracts without requiring a live
   SpaceTraders account or a running database.
@@ -42,7 +44,7 @@ Test pure domain logic with no dependencies on EF Core, HTTP, or Wolverine.
 - Domain event generation (e.g. `Ship.UpdateFuel()` raises `ShipFuelLowEvent` when below 20%)
 - `TradeAnalyser.ScoreRoutes()` returns routes in correct priority order
 - `TradeAnalyser.ShouldAcceptContract()` returns expected decisions given credit levels
-- State machine transition guards (e.g. cannot navigate from `DOCKED` without orbiting first)
+- Ship state command guards (e.g. cannot navigate from `DOCKED` without orbiting first)
 
 ### Example
 ```csharp
@@ -75,7 +77,7 @@ For anything touching migrations, constraints, or JSON columns → use `SpaceTra
 ### What to test
 - Each command handler applies the correct fields from the API response to the DB entity.
 - No follow-up GET is ever issued after a successful POST (assert `apiClient` received no GET calls).
-- `GameLoopService` publishes `ShipArrivedAtWaypointEvent` when `ArrivesAt` has elapsed.
+- `GameLoopService` publishes `ShipArrivedEvent` when `ArrivesAt` has elapsed.
 - `ContractWatchService` publishes `ContractDeadlineApproachingEvent` at the right thresholds.
 - Dead-reckoning: ship is marked arrived without any API call.
 
@@ -130,7 +132,8 @@ public class ShipRepositoryTests : IAsyncLifetime
 - EF Core entity configurations (owned types, JSON columns, value converters) round-trip correctly.
 - `AgentBootstrapService` inserts `StoredCredential` on first run and reads it back on second run.
 - Optimistic concurrency conflicts are handled gracefully.
-- `ShipAssignmentRecord` persists and resumes `StepIndex` correctly.
+- `ShipPlanRecord` persists role intent, waypoint/goods details, and JSON role details correctly.
+- Optimistic concurrency protects ship plans during price-change re-planning.
 
 ---
 
@@ -200,5 +203,6 @@ available (add `[SkippableFact]` from the `Xunit.SkippableFact` package where ne
 ## 11.8 Related Documents
 
 - `04-application-events.md` – Wolverine handler shapes that need to be tested
-- `05-automation-engine.md` – State machine transitions that need unit coverage
+- `ship-event-command-plan.md` – Command guards, handler ordering, ship plans, and price-change re-planning tests
+- `05-automation-engine.md` – Automation engine context
 - `09-milestones.md` – Testing tasks are spread across all phases

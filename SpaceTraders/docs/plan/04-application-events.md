@@ -1,5 +1,8 @@
 # 04 – Application Layer: Wolverine Event Bus
 
+> Automation update: ship automation should move toward [Ship Event Command Plan](ship-event-command-plan.md).
+> Commands and events in this document remain useful, but target ship flows are state-gated event handlers with persisted ship plans, not assignment state machines.
+
 ## Goals
 - Decouple automation decisions from API calls and persistence via Wolverine.
 - Every significant game event produces a domain notification → one or more handlers react.
@@ -128,7 +131,7 @@ ShipCargoSoldEvent           { ShipSymbol, TradeSymbol, Units, Revenue, NewAgent
   └── LogActivityHandler
 
 ShipAssignmentCompletedEvent
-  └── ReassignShipHandler           → dispatches AssignShipCommand
+  └── LegacyReassignShipHandler     → compatibility path while migrating to ShipPlanRecord
 
 AgentCreditsChangedEvent           { OldCredits, NewCredits }
   └── FleetExpansionDecisionHandler → uses NewCredits directly (§4.5)
@@ -142,12 +145,16 @@ ContractFulfilledEvent             { Agent, Contract }
 ShipFuelLowEvent
   └── RefuelHandler                 → schedules RefuelShipCommand at Priority.Critical
 
-ShipArrivedAtWaypointEvent
-  ├── ArrivalActionHandler          → triggers next step of current assignment
+ShipArrivedEvent
+  ├── ShipArrivedHandler            → emits ShipInOrbitEvent for state-gated handling
   └── MarketPollHandler             → dispatches RefreshMarketDataCommand if TTL expired
 
 MarketDataRefreshedEvent
-  └── TradeOpportunityRecomputeHandler → recalculates TradeOpportunity table (no API call)
+  ├── TradeOpportunityRecomputeHandler → recalculates TradeOpportunity table (no API call)
+  └── MarketPriceChangeDetector        → emits MarketPricesChangedEvent when actionable prices changed
+
+MarketPricesChangedEvent
+  └── AffectedShipReplanHandler        → updates affected ShipPlanRecord rows and redirects ships where legal
 
 ShipyardDataRefreshedEvent
   └── TradeOpportunityRecomputeHandler → same handler, separate overload
@@ -158,17 +165,17 @@ NewShipPurchasedEvent
 
 ---
 
-## 4.4 Ship Reassignment Logic (`AssignShipAfterSaleHandler`)
+## 4.4 Ship Role Planning Logic
 
 ```
-1. Load ship from cache (call ApplyArrivalIfDue())
-2. Load active contracts → undelivered good we can fulfil? → FulfillContract assignment
-3. Load top TradeOpportunity for ship's cargo capacity → Trade assignment
-4. If no route → Scout (waypoints with no/stale market data in current system)
-5. If mining drone + asteroid in system → Mine
-6. Else → Idle
-7. Dispatch AssignShipCommand (local only)
-8. Log to ActivityLog
+1. Load ship from cache and confirm it is docked before it can become idle.
+2. Load active contracts → urgent good we can fulfil? → create contract/trade ship plan.
+3. If mining-capable and a viable asteroid plus sell market exists → create miner ship plan.
+4. Load top TradeOpportunity for ship's cargo capacity → create trader ship plan.
+5. If no route → create scout ship plan for unknown/stale waypoint data.
+6. Else → persist idle docked plan.
+7. Emit the matching ship-becomes-role event.
+8. Log to ActivityLog.
 ```
 
 ---

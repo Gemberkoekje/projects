@@ -11,11 +11,11 @@ _See [`../GLOSSARY.md`](../GLOSSARY.md) for definitions of terms used below._
 
 **Status:** Accepted
 
-**Context:**  
+**Context:**
 The application needs an in-process bus for commands, queries, and domain events. MediatR is the
 most widely-used option but lacks built-in durable messaging.
 
-**Decision:**  
+**Decision:**
 Use [WolverineFx](https://wolverinefx.net/) in place of MediatR.
 
 **Rationale:**
@@ -41,11 +41,11 @@ Use [WolverineFx](https://wolverinefx.net/) in place of MediatR.
 
 **Status:** Accepted
 
-**Context:**  
+**Context:**
 The application needs to cache game state locally and store settings. SQLite is the simplest
 embedded option; PostgreSQL is the production-grade alternative.
 
-**Decision:**  
+**Decision:**
 Use PostgreSQL (via Npgsql + EF Core) for all persistence — including local development.
 
 **Rationale:**
@@ -69,18 +69,18 @@ Use PostgreSQL (via Npgsql + EF Core) for all persistence — including local de
 
 **Status:** Accepted
 
-**Context:**  
+**Context:**
 The SpaceTraders API rate-limits callers to 2 req/s sustained / 30 req/60 s burst. Issuing a
 follow-up GET to refresh state after every mutating call would consume half the available budget.
 
-**Decision:**  
+**Decision:**
 Every mutating POST/PATCH call returns the updated resource in its response body. Apply that
 response directly to the local cache — never issue a follow-up GET for the same entity.
 
 **Rationale:**
 - Halves API call volume for every trade/navigation action.
 - The SpaceTraders API guarantees the response body is the canonical updated state.
-- Simplifies the state machine: one network round-trip per action, not two.
+- Simplifies command handling: one network round-trip per action, not two.
 
 **Alternatives considered:**
 - **Always GET after POST** – simpler cache-invalidation logic, but doubles API call cost.
@@ -96,11 +96,11 @@ response directly to the local cache — never issue a follow-up GET for the sam
 
 **Status:** Accepted
 
-**Context:**  
+**Context:**
 Ships take real time to travel between waypoints. Polling `GET /my/ships/{id}` until status
 changes to `IN_ORBIT` would consume rate-limit budget on every in-flight ship every few seconds.
 
-**Decision:**  
+**Decision:**
 Store the `arrival` timestamp returned by `POST /my/ships/{id}/navigate`. Mark the ship
 `IN_TRANSIT` until that timestamp is reached; then transition automatically via the
 `GameLoopService` dead-reckoning tick — no API call needed.
@@ -108,7 +108,7 @@ Store the `arrival` timestamp returned by `POST /my/ships/{id}/navigate`. Mark t
 **Rationale:**
 - Zero API calls during transit regardless of fleet size.
 - `arrival` is authoritative (set by the server); no drift or jitter.
-- Survives pod restarts: `arrival` is persisted in the `ShipAssignmentRecord`.
+- Survives pod restarts: `arrival` is persisted with cached ship navigation state and the active `ShipPlanRecord`.
 
 **Alternatives considered:**
 - **Poll GET /my/ships/{id}** – simple, but O(fleet size) calls per tick.
@@ -124,11 +124,11 @@ Store the `arrival` timestamp returned by `POST /my/ships/{id}/navigate`. Mark t
 
 **Status:** Accepted
 
-**Context:**  
+**Context:**
 The dashboard needs real-time updates (fleet status, credits, rate-limit gauge) and operator
 controls (pause, override assignment, change settings).
 
-**Decision:**  
+**Decision:**
 Use ASP.NET Core Razor Pages with htmx for partial page updates and Server-Sent Events (SSE)
 for real-time streaming.
 
@@ -149,30 +149,32 @@ for real-time streaming.
 
 ---
 
-## ADR-006: Stateless library for ship state machines
+## ADR-006: Do not use state machines for ship automation
 
-**Status:** Accepted and implemented (Phase 6)
+**Status:** Accepted as target direction; supersedes the earlier Stateless state-machine decision.
 
-**Context:**  
-Ship assignment state machines grew beyond simple manual `switch` statements.
-Explicit state machines are easier to reason about and test.
+**Context:**
+Ship assignment state machines made automation harder to reason about because most SpaceTraders commands are already gated by physical ship state. A docked ship can buy, sell, refuel, or undock. An in-orbit ship can dock, navigate, or extract. Persisting procedural workflow steps duplicates that state and creates recovery edge cases.
 
-**Decision:**  
-Use the [Stateless](https://github.com/dotnet-state-machine/stateless)
-library for explicit, visualisable trade, mining, and scouting state machines.
+**Decision:**
+Use state-gated event handlers and persisted ship plans instead of ship automation state machines. See [Ship Event Command Plan](ship-event-command-plan.md).
 
 **Rationale:**
-- Stateless generates Mermaid/DOT diagrams directly from the machine definition — useful for docs.
-- Transition guards and entry/exit actions are declared explicitly, reducing hidden state bugs.
-- No additional infrastructure required; purely in-process.
+- The SpaceTraders API already defines legal actions by ship state.
+- Role-specific event handlers can be ordered before generic fallback handlers.
+- Persisted ship plans capture intent without procedural `StepIndex` recovery.
+- Command handlers can guard invalid states before calling the API.
+- Market price changes can update plans directly and trigger the correct current-state event.
 
 **Alternatives considered:**
-- **Keep manual switch** – works today but scales poorly beyond ~5 states.
+- **Keep manual switch/state machine logic** – works but duplicates physical ship state.
+- **Use Stateless** – explicit, but still preserves workflow state that should be derived from ship state plus plan intent.
 - **Workflow engine (e.g. Elsa)** – too heavyweight for in-process ship logic.
 
 **Consequences:**
-- Stateless is referenced by `SpaceTraders.Application`.
-- Trade, mining, and scouting assignment flows use dedicated state machine classes.
+- New automation work should not add state machines.
+- Existing state machines should be migrated behind role-specific event handlers and then removed.
+- `Stateless` should be removed when no longer used.
 
 ---
 

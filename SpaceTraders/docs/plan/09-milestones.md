@@ -4,7 +4,7 @@
 
 ## Current Status
 
-> **Active phase: Phase 6 – Polish & Observability – ✅ Complete**
+> **Active phase: Phase 7 – Ship Event Command Architecture – planned**
 
 | Phase | Status |
 |-------|--------|
@@ -14,6 +14,32 @@
 | Phase 4 – Mining & Scouting | ✅ Complete |
 | Phase 5 – Kubernetes & Hardening | ✅ Complete |
 | Phase 6 – Polish & Observability | ✅ Complete |
+| Phase 7 – Ship Event Command Architecture | Planned |
+---
+
+## Phase 7 – Ship Event Command Architecture (Planned)
+
+**Goal:** Replace assignment state machines with state-gated event handlers and persisted ship plans.
+
+**Related docs:** [ship-event-command-plan.md](ship-event-command-plan.md)
+
+### Tasks
+- [ ] Add base ship-state events: docked, in orbit, in transit, arrived, idle docked, needs docking.
+- [ ] Add role-specific miner, trader, scout, and contract events.
+- [ ] Add command guards so invalid ship-state commands do not call SpaceTraders.
+- [ ] Add `ShipPlanRecord` persistence for role, objective, waypoints, goods, units, and role-specific JSON details.
+- [ ] Implement docked and in-orbit role handler chains.
+- [ ] Implement role planners that persist exact ship plans.
+- [ ] Emit `MarketPricesChangedEvent` on actionable market changes.
+- [ ] Re-plan affected ships and redirect navigation when legal.
+- [ ] Remove ship assignment state machines and remove `Stateless` if unused.
+
+**Definition of Done:**
+- No active ship automation depends on `StepIndex`.
+- Only docked handlers issue docked-state commands such as buy, sell, refuel, and orbit.
+- Only in-orbit handlers issue orbit-state commands such as dock, navigate, extract, and survey.
+- Ships without a role are idle only when docked; non-docked roleless ships follow the recovery path to dock.
+
 ---
 
 ## Philosophy
@@ -62,7 +88,7 @@ Build vertically – each phase delivers a running, useful application, not just
 
 ### Tasks
 - [x] Full domain events wired through Wolverine
-- [x] `ShipWorkerService` with Trade assignment state machine
+- [x] Legacy `ShipWorkerService` with Trade assignment state machine
 - [x] `AssignShipAfterSaleHandler` – assigns best trade route on cargo sold
 - [x] `TradeAnalyser` – scores routes from MarketData cache
 - [x] `TradeOpportunity` table computed and refreshed
@@ -178,7 +204,7 @@ Build vertically – each phase delivers a running, useful application, not just
 - [x] Credit history sparkline (in-memory circular buffer, 360 entries = 1 h at 10 s intervals)
 - [x] Alerts: publish Slack/webhook notification on credit drop > 10 %, contract failure, fleet cap reached
 - [x] API rate-limit dashboard gauge with historical chart
-- [x] Refactor `ShipWorkerService` to use Stateless library for cleaner state machines
+- [x] Legacy refactor of `ShipWorkerService` to use Stateless library for cleaner state machines
 - [x] Integration tests against SpaceTraders sandbox environment
 - [x] Prometheus metrics endpoint (`/metrics`) via `prometheus-net`
 - [x] Grafana dashboard definition (JSON) – credits/hour, trades/hour, API calls/minute, error rate
@@ -214,7 +240,7 @@ graph LR
 |---------|---------|---------|
 | `WolverineFx` | Application | Event/command bus |
 | `FluentValidation.DependencyInjectionExtensions` | Application | Command validation option, not currently required |
-| `Stateless` | Application | Cleaner ship state machines (Phase 6) |
+| `Stateless` | Application | Legacy ship state machines; remove during Phase 7 if no other code uses it |
 | `Npgsql.EntityFrameworkCore.PostgreSQL` | Persistence | PostgreSQL EF Core provider |
 | `Microsoft.EntityFrameworkCore.Design` | Persistence | Migrations tooling |
 | `System.Threading.RateLimiting` | Infrastructure.ST API | Token bucket rate limiting |

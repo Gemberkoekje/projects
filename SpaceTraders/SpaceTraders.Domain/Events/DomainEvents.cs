@@ -68,20 +68,6 @@ public sealed record ShipArrivedAtWaypointEvent
     }
 }
 
-public sealed record ShipEnteredOrbitEvent
-{
-    public required string ShipSymbol { get; init; }
-
-    public required WaypointSymbol Waypoint { get; init; }
-
-    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ShipEnteredOrbitEvent(string ShipSymbol, WaypointSymbol Waypoint)
-    {
-        this.ShipSymbol = ShipSymbol;
-        this.Waypoint = Waypoint;
-    }
-}
-
 public sealed record ShipBecameIdleEvent
 {
     public required string ShipSymbol { get; init; }

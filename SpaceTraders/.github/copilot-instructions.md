@@ -177,3 +177,9 @@
 
 ## Deployment Instructions
 - In this repository, deployment uses the root-level `dockerfile.api` and `dockerfile.app` files.
+
+## SpaceTraders Project Guidelines
+- For ship automation, avoid state machines. Instead, use state-gated event handlers, role-specific chain-of-command handlers, and persisted ship plan intent.
+- Use separate state-scoped command acceptors (Docked, InOrbit, InTransit) so handlers cannot issue commands invalid for the ship's current state without explicitly switching interfaces.
+- Use one generic undocked event with chain-of-command role-specific handlers; do not define role-specific undocked event types like miner/trader/scout undocked events.
+- Only handlers for the ship's current physical state should issue commands valid for that state.

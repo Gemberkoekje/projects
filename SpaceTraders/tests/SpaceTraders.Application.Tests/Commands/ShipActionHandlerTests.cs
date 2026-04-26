@@ -161,27 +161,6 @@ public sealed class ShipActionHandlerTests
     }
 
     [Fact]
-    public async Task OrbitShip_PublishesShipEnteredOrbitEvent()
-    {
-        var port = Substitute.For<ISpaceTradersPort>();
-        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(MakeNav(status: "IN_ORBIT"));
-
-        var bus = Substitute.For<IMessageBus>();
-
-        await using var db = TestDbContextFactory.Create();
-        AddShip(db, "SHIP-1");
-        var ships = new ShipRepository(db);
-
-        await new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance)
-            .Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<object>(message => message is SpaceTraders.Domain.Events.ShipEnteredOrbitEvent),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
     public async Task OrbitShip_PublishesShipUndockedEvent()
     {
         var port = Substitute.For<ISpaceTradersPort>();

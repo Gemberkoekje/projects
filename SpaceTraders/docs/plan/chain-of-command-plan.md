@@ -1,5 +1,8 @@
 # Chain of Command Event Plan
 
+> Superseded target direction: use [Ship Event Command Plan](ship-event-command-plan.md) for new ship automation work.
+> This document remains as an implementation record for the chain-of-command event work already done in this workspace.
+
 ## Status
 
 ### Phase 1: Event Foundation (Implemented)

@@ -53,15 +53,13 @@ public sealed class ShipIdleDockedEventHandler(
 
         await bus.SendAsync(new OrbitShipCommand(@event.ShipSymbol));
 
-        var now = TimeProvider.System.GetUtcNow();
-        var undockedEvent = new ShipUndockedEvent(
+        var idleEvent = new ShipIdleEvent(
             @event.ShipSymbol,
-            ship.SystemSymbol ?? @event.SystemSymbol,
-            ship.WaypointSymbol ?? @event.WaypointSymbol,
+            "Idle docked handler requested orbit; awaiting undocked continuation.",
             @event.CorrelationId,
             @event.EventId,
-            now);
+            TimeProvider.System.GetUtcNow());
 
-        return ChainOfCommandHandlerResult.Handled(undockedEvent);
+        return ChainOfCommandHandlerResult.Handled(idleEvent);
     }
 }

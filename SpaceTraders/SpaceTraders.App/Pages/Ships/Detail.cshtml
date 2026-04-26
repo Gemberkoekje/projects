@@ -102,8 +102,6 @@ else
                         <dt class="col-sm-3">Cargo</dt>
                         <dd class="col-sm-9">@Model.Assignment.CargoSymbol</dd>
                     }
-                    <dt class="col-sm-3">Step</dt>
-                    <dd class="col-sm-9">@Model.Assignment.StepIndex</dd>
                     <dt class="col-sm-3">Assigned</dt>
                     <dd class="col-sm-9">@Model.Assignment.AssignedAt.ToLocalTime().ToString("g")</dd>
                     @if (Model.Assignment.CompletedAt.HasValue)

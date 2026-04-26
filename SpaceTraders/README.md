@@ -17,10 +17,10 @@ This repository currently contains a **foundation implementation** for a SpaceTr
 
 - Agent bootstrap flow
 - Startup sync flow (agent, ships, contracts from SpaceTraders API)
-- Startup recovery service (resumes in-flight assignments after pod restart)
+- Startup recovery service (resumes in-flight ship automation after pod restart)
 - Typed API client for: status, factions, agents, systems, waypoints, fleet, contracts
 - Dead-reckoning game loop (detects ship arrivals, low fuel, API availability changes)
-- Ship worker service (executes per-ship assignment state machines)
+- Ship automation services and event handlers
 - Contract watch service, Scout service, Fleet expansion
 - Event handlers: `ContractPriorityHandler`, `ShipFuelLowHandler`, `ApiUnavailabilityHandler`
 - Internal REST API (`/status/*`, `/settings/*`, `/control/*`, `/health/*`)
@@ -147,7 +147,9 @@ Integration tests (require Docker / PostgreSQL) are tagged `Category=Integration
 
 ## Documentation
 
-- `docs/plan/` = target/roadmap architecture documents
+- `docs/plan/00-overview.md` = planning index
+- `docs/plan/ship-event-command-plan.md` = current target ship automation plan
+- `docs/plan/` = broader target/roadmap architecture documents
 - `plan.md` = archived integration plan for initial API client work
 - `CHANGELOG.md` = notable changes
 - `CONTRIBUTING.md` = contribution conventions
