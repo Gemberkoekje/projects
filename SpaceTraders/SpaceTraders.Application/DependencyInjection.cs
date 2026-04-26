@@ -1,7 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.Events.Dispatching;
+using SpaceTraders.Application.Events.Handlers;
+using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 using Wolverine.ErrorHandling;
 
@@ -15,6 +18,10 @@ public static class DependencyInjection
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
+
+        services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
 
         services.AddWolverine(opts =>
         {

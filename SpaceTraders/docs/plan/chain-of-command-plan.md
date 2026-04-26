@@ -36,6 +36,27 @@ Validation added:
 - Domain tests for event metadata/correlation behavior.
 - Application tests for dispatcher ordering, scheduled events, and missing-handler failure.
 
+### Phase 2: Ship Moving Chain (Implemented)
+
+Implemented in this workspace:
+
+- Ship-moving chain handler:
+  - `SpaceTraders.Application/Events/Handlers/Ships/ShipMovingEventHandler.cs`
+  - Handles `ShipMovingEvent` with priority 100.
+  - Creates `ShipArrivedEvent` with propagated correlation/causation metadata.
+  - Schedules arrival for future timestamps.
+  - Publishes arrival immediately when the due time is already reached.
+- Handler registrations in application DI:
+  - `IChainOfCommandEventHandler<ShipUndockedEvent>` → `ShipUndockedScoutEventHandler`
+  - `IChainOfCommandEventHandler<ShipUndockedEvent>` → `ShipUndockedEventHandler`
+  - `IChainOfCommandEventHandler<ShipMovingEvent>` → `ShipMovingEventHandler`
+
+Validation added:
+
+- Dispatcher-backed tests for ship-moving chain behavior:
+  - `tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipMovingEventHandlerTests.cs`
+  - Verifies future arrivals are scheduled and due arrivals are published immediately.
+
 ## Goal
 
 Introduce an event-driven chain of command where every SpaceTraders `POST` action produces a domain event, every event has one or more handlers, and every event chain continues by producing either:
