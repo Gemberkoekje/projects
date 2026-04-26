@@ -31,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipInTransitEvent>, ShipInTransitEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipStateMismatchEvent>, ShipStateMismatchEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();

@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 1 is now implemented in code for event taxonomy, runtime command guards, and initial state-scoped command acceptor wiring.
+Phase 2 is now implemented in code for state-event chain bridge coverage and state-gated chain handlers for transit, in-orbit, and mismatch recovery events.
 
 Target architecture plan. This supersedes assignment state machines and any plan that treats ship automation as a persisted `StepIndex` workflow.
 
@@ -31,6 +31,33 @@ Remaining follow-up inside this phase:
 
 - expand interface-gated usage across all docked and transit chains (beyond the undocked chain and current command guard surface);
 - add explicit compile-time-only safety tests for acceptor boundary enforcement where practical.
+
+## Phase 2 implementation status
+
+Implemented:
+
+- chain bridge routing expanded to include:
+  - `ShipInTransitEvent`
+  - `ShipInOrbitEvent`
+  - `ShipStateMismatchEvent`
+- state-chain handlers added:
+  - `ShipInTransitEventHandler` (priority 100)
+    - emits `ShipInOrbitEvent` when arrival is due;
+    - schedules `ShipInOrbitEvent` when arrival is in the future.
+  - `ShipInOrbitEventHandler` (priority 100)
+    - emits `ShipUndockedEvent` as in-orbit chain entry.
+  - `ShipStateMismatchEventHandler` (priority 1000)
+    - attempts safe recovery docking when ship is currently in orbit;
+    - emits `ShipDockedEvent` after recovery dock path;
+    - emits `ShipIdleEvent` when recovery is not actionable.
+- DI registration updated for all new handlers.
+
+Validation added:
+
+- dispatcher-backed tests for state-chain behavior:
+  - `ShipInTransitEventHandlerTests`
+  - `ShipInOrbitEventHandlerTests`
+  - `ShipStateMismatchEventHandlerTests`
 
 ## Goals
 
@@ -184,6 +211,15 @@ Invalid state should produce a recoverable domain event, not a blind API call. E
 - Update handlers to depend on acceptor interfaces instead of a generic command sender.
 - Add state validation to ship command handlers.
 - Add tests proving invalid state does not call the SpaceTraders API.
+
+### Phase 2 - State-event chain wiring
+
+- Add chain bridge coverage for `ShipInTransitEvent`, `ShipInOrbitEvent`, and `ShipStateMismatchEvent`.
+- Add transit chain handler to schedule or emit `ShipInOrbitEvent` based on arrival time.
+- Add in-orbit chain handler to emit `ShipUndockedEvent` as role-chain entry.
+- Add state mismatch recovery handler for safe docking-or-idle behavior.
+- Register all phase-2 handlers in DI.
+- Add dispatcher-backed tests for new state-chain handlers.
 
 ### Phase 3 - Docked and in-orbit handler chains
 
