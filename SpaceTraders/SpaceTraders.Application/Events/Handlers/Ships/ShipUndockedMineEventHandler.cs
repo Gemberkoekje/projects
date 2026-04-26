@@ -4,17 +4,17 @@ using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
-public sealed class ShipUndockedScoutEventHandler(
+public sealed class ShipUndockedMineEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
     ISpaceTradersPort port) : IChainOfCommandEventHandler<ShipUndockedEvent>
 {
-    public int Priority => 100;
+    public int Priority => 200;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
     {
         var assignment = await assignments.FindAsync(@event.ShipSymbol, cancellationToken);
-        if (assignment is null || !assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase))
+        if (assignment is null || !assignment.AssignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase))
         {
             return ChainOfCommandHandlerResult.Skipped();
         }
@@ -23,7 +23,7 @@ public sealed class ShipUndockedScoutEventHandler(
         {
             var noTargetIdle = new ShipIdleEvent(
                 @event.ShipSymbol,
-                "Scout assignment has no target waypoint.",
+                "Mine assignment has no target waypoint.",
                 @event.CorrelationId,
                 @event.EventId,
                 TimeProvider.System.GetUtcNow());
@@ -36,7 +36,7 @@ public sealed class ShipUndockedScoutEventHandler(
         {
             var alreadyThereIdle = new ShipIdleEvent(
                 @event.ShipSymbol,
-                "Scout ship is already at target waypoint.",
+                "Mine ship is already at target waypoint.",
                 @event.CorrelationId,
                 @event.EventId,
                 TimeProvider.System.GetUtcNow());
@@ -53,16 +53,17 @@ public sealed class ShipUndockedScoutEventHandler(
         var result = await port.NavigateShipAsync(@event.ShipSymbol, assignment.OriginWaypoint, cancellationToken);
         await ships.UpdateNavAsync(@event.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
+        var now = TimeProvider.System.GetUtcNow();
         var movingEvent = new ShipMovingEvent(
             @event.ShipSymbol,
             @event.WaypointSymbol,
             assignment.OriginWaypoint,
-            TimeProvider.System.GetUtcNow(),
-            result.Nav.ArrivesAt ?? TimeProvider.System.GetUtcNow(),
+            now,
+            result.Nav.ArrivesAt ?? now,
             result.Fuel?.Current ?? 0,
             @event.CorrelationId,
             @event.EventId,
-            TimeProvider.System.GetUtcNow());
+            now);
 
         return ChainOfCommandHandlerResult.Handled(movingEvent);
     }

@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
 
