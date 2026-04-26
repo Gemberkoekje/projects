@@ -30,14 +30,28 @@ public sealed class NavigateShipHandler(
     public async Task Handle(NavigateShipCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (ship?.Status?.Equals("DOCKED", StringComparison.OrdinalIgnoreCase) == true)
+        if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
-            var orbitNav = await port.OrbitShipAsync(command.ShipSymbol, cancellationToken);
-            await ships.UpdateNavAsync(command.ShipSymbol, orbitNav, null, cancellationToken);
-            logger.LogInformation("Ship {Symbol} was docked and moved to orbit before navigation.", command.ShipSymbol);
+            var now = TimeProvider.System.GetUtcNow();
+            await bus.PublishAsync(new ShipStateMismatchEvent(
+                command.ShipSymbol,
+                nameof(NavigateShipCommand),
+                "IN_ORBIT",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be in orbit before navigation.",
+                Guid.Empty,
+                Guid.Empty,
+                now));
+
+            logger.LogWarning(
+                "Skipping navigation for ship {Symbol} to {Waypoint}: expected IN_ORBIT but was {Status}.",
+                command.ShipSymbol,
+                command.DestinationWaypoint,
+                ship?.Status ?? "UNKNOWN");
+            return;
         }
 
-        var now = TimeProvider.System.GetUtcNow();
+        var nowNavigate = TimeProvider.System.GetUtcNow();
         var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
@@ -45,12 +59,12 @@ public sealed class NavigateShipHandler(
             command.ShipSymbol,
             ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
             command.DestinationWaypoint,
-            now,
-            result.Nav.ArrivesAt ?? now,
+            nowNavigate,
+            result.Nav.ArrivesAt ?? nowNavigate,
             ship is not null && result.Fuel is not null ? Math.Max(0, ship.FuelCurrent - result.Fuel.Current) : 0,
             Guid.Empty,
             Guid.Empty,
-            now);
+            nowNavigate);
 
         await bus.PublishAsync(movingEvent);
 

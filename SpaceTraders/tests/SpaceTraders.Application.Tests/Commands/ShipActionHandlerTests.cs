@@ -15,7 +15,11 @@ public sealed class ShipActionHandlerTests
     private static NavModel MakeNav(string waypoint = "X1-AB-001", string status = "DOCKED") =>
         new(status, "X1-AB", waypoint, "CRUISE", null, null);
 
-    private static void AddShip(SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db, string symbol, string waypoint = "X1-AB-001")
+    private static void AddShip(
+        SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db,
+        string symbol,
+        string waypoint = "X1-AB-001",
+        string status = "DOCKED")
     {
         db.Ships.Add(new CachedShip
         {
@@ -23,11 +27,32 @@ public sealed class ShipActionHandlerTests
             Symbol = symbol,
             SystemSymbol = "X1-AB",
             WaypointSymbol = waypoint,
-            Status = "DOCKED",
+            Status = status,
             FlightMode = "CRUISE",
             FuelCurrent = 80,
             FuelCapacity = 100,
             LastSyncedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+    }
+
+    private static void AddWaypoint(
+        SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db,
+        string symbol = "X1-AB-001",
+        string type = "ORBITAL_STATION",
+        bool hasMarket = true)
+    {
+        db.Waypoints.Add(new CachedWaypoint
+        {
+            AgentToken = TestDbContextFactory.AgentToken,
+            Symbol = symbol,
+            SystemSymbol = "X1-AB",
+            Type = type,
+            X = 0,
+            Y = 0,
+            HasMarket = hasMarket,
+            HasShipyard = false,
+            LastObservedAt = DateTimeOffset.UtcNow,
         });
         db.SaveChanges();
     }
@@ -58,7 +83,7 @@ public sealed class ShipActionHandlerTests
         var bus = Substitute.For<IMessageBus>();
 
         await using var db = TestDbContextFactory.Create();
-        AddShip(db, "SHIP-1");
+        AddShip(db, "SHIP-1", status: "IN_ORBIT");
         var ships = new ShipRepository(db);
 
         await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
@@ -78,7 +103,7 @@ public sealed class ShipActionHandlerTests
         var bus = Substitute.For<IMessageBus>();
 
         await using var db = TestDbContextFactory.Create();
-        AddShip(db, "SHIP-1");
+        AddShip(db, "SHIP-1", status: "IN_ORBIT");
         var ships = new ShipRepository(db);
 
         await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
@@ -99,7 +124,7 @@ public sealed class ShipActionHandlerTests
         var bus = Substitute.For<IMessageBus>();
 
         await using var db = TestDbContextFactory.Create();
-        AddShip(db, "SHIP-1");
+        AddShip(db, "SHIP-1", status: "IN_ORBIT");
         var ships = new ShipRepository(db);
 
         await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
@@ -193,11 +218,13 @@ public sealed class ShipActionHandlerTests
 
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
+        AddWaypoint(db);
         AddAgent(db, credits: 50_000);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
+        await new RefuelShipHandler(port, ships, agents, waypoints, bus, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
         var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
@@ -218,11 +245,13 @@ public sealed class ShipActionHandlerTests
 
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
+        AddWaypoint(db);
         AddAgent(db);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
+        await new RefuelShipHandler(port, ships, agents, waypoints, bus, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).RefuelShipAsync("SHIP-1", Arg.Any<CancellationToken>());
@@ -241,11 +270,13 @@ public sealed class ShipActionHandlerTests
 
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
+        AddWaypoint(db);
         AddAgent(db, credits: 50_000);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
+        await new RefuelShipHandler(port, ships, agents, waypoints, bus, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(
@@ -270,11 +301,13 @@ public sealed class ShipActionHandlerTests
 
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
+        AddWaypoint(db);
         AddAgent(db, credits: 50_000);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new BuyCargoHandler(port, ships, agents, bus, NullLogger<BuyCargoHandler>.Instance)
+        await new BuyCargoHandler(port, ships, agents, waypoints, bus, NullLogger<BuyCargoHandler>.Instance)
             .Handle(new BuyCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
         var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");

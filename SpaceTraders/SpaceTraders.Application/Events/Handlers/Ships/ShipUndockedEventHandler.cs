@@ -1,15 +1,11 @@
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Services;
-using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 public sealed class ShipUndockedEventHandler(
     IShipRepository ships,
-    IShipAssignmentRepository assignments,
-    IShipAssignmentPlanner planner) : IChainOfCommandEventHandler<ShipUndockedEvent>
+    IInOrbitCommandAcceptor inOrbitCommands) : IChainOfCommandEventHandler<ShipUndockedEvent>
 {
     public int Priority => 1000;
 
@@ -18,73 +14,45 @@ public sealed class ShipUndockedEventHandler(
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
         if (ship is null)
         {
-            var missingShipIdle = new ShipIdleEvent(
+            var missingShipMismatch = new ShipStateMismatchEvent(
                 @event.ShipSymbol,
-                "Ship not found for fallback undocked handling.",
+                nameof(ShipUndockedEventHandler),
+                "IN_ORBIT",
+                "UNKNOWN",
+                "Fallback undocked handling could not load ship state.",
                 @event.CorrelationId,
                 @event.EventId,
                 TimeProvider.System.GetUtcNow());
 
-            return ChainOfCommandHandlerResult.Handled(missingShipIdle);
+            return ChainOfCommandHandlerResult.Handled(missingShipMismatch);
         }
 
-        var assignment = await planner.PlanAsync(ship, cancellationToken);
-        var role = MapRole(assignment.AssignmentType);
-
-        if (role == ShipRole.None)
+        if (string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
-            var nextEvent = new ShipIdleEvent(
+            await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
+            var now = TimeProvider.System.GetUtcNow();
+
+            var idleDockedEvent = new ShipDockedEvent(
                 @event.ShipSymbol,
-                "No specialized undocked handler matched.",
+                ship.SystemSymbol ?? @event.SystemSymbol,
+                ship.WaypointSymbol ?? @event.WaypointSymbol,
                 @event.CorrelationId,
                 @event.EventId,
-                TimeProvider.System.GetUtcNow());
+                now);
 
-            return ChainOfCommandHandlerResult.Handled(nextEvent);
+            return ChainOfCommandHandlerResult.Handled(idleDockedEvent);
         }
 
-        var now = TimeProvider.System.GetUtcNow();
-        var assignmentDto = new ShipAssignmentDto(
+        var mismatchEvent = new ShipStateMismatchEvent(
             @event.ShipSymbol,
-            assignment.AssignmentType,
-            assignment.OriginWaypoint,
-            assignment.DestWaypoint,
-            assignment.CargoSymbol,
-            assignment.ContractId,
-            0,
-            now,
-            null,
-            0);
-
-        await assignments.UpsertAsync(assignmentDto, cancellationToken);
-
-        var roleSetEvent = new ShipRoleSetEvent(
-            @event.ShipSymbol,
-            role,
+            nameof(ShipUndockedEventHandler),
+            "IN_ORBIT",
+            ship.Status ?? "UNKNOWN",
+            "Fallback undocked handler received a ship outside orbit state.",
             @event.CorrelationId,
             @event.EventId,
-            now);
+            TimeProvider.System.GetUtcNow());
 
-        return ChainOfCommandHandlerResult.Handled(roleSetEvent);
-    }
-
-    private static ShipRole MapRole(string assignmentType)
-    {
-        if (assignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase))
-        {
-            return ShipRole.Explorer;
-        }
-
-        if (assignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase))
-        {
-            return ShipRole.Excavator;
-        }
-
-        if (assignmentType.Equals("Trade", StringComparison.OrdinalIgnoreCase))
-        {
-            return ShipRole.Hauler;
-        }
-
-        return ShipRole.None;
+        return ChainOfCommandHandlerResult.Handled(mismatchEvent);
     }
 }

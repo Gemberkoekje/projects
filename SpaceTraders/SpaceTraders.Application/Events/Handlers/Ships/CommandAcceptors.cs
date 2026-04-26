@@ -1,0 +1,86 @@
+using SpaceTraders.Application.Commands.Contracts;
+using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Domain.Events.Ships;
+using Wolverine;
+
+namespace SpaceTraders.Application.Events.Handlers.Ships;
+
+public interface IDockedCommandAcceptor
+{
+    Task OrbitAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken);
+
+    Task SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken);
+
+    Task RefuelAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task DeliverContractAsync(
+        string contractId,
+        string shipSymbol,
+        string tradeSymbol,
+        int units,
+        string destinationWaypoint,
+        CancellationToken cancellationToken);
+}
+
+public interface IInOrbitCommandAcceptor
+{
+    Task DockAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task NavigateAsync(string shipSymbol, string destinationWaypoint, CancellationToken cancellationToken);
+
+    Task ExtractAsync(string shipSymbol, CancellationToken cancellationToken);
+}
+
+public interface IInTransitCommandAcceptor
+{
+    Task ScheduleArrivalAsync(ShipArrivedEvent arrivedEvent, DateTimeOffset dueAt, CancellationToken cancellationToken);
+
+    Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken);
+}
+
+public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAcceptor
+{
+    public Task OrbitAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new OrbitShipCommand(shipSymbol)).AsTask();
+
+    public Task BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken)
+        => bus.SendAsync(new BuyCargoCommand(shipSymbol, tradeSymbol, units)).AsTask();
+
+    public Task SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken)
+        => bus.SendAsync(new SellCargoCommand(shipSymbol, tradeSymbol, units)).AsTask();
+
+    public Task RefuelAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new RefuelShipCommand(shipSymbol)).AsTask();
+
+    public Task DeliverContractAsync(
+        string contractId,
+        string shipSymbol,
+        string tradeSymbol,
+        int units,
+        string destinationWaypoint,
+        CancellationToken cancellationToken)
+        => bus.SendAsync(new DeliverContractCommand(contractId, shipSymbol, tradeSymbol, units, destinationWaypoint)).AsTask();
+}
+
+public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcceptor
+{
+    public Task DockAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new DockShipCommand(shipSymbol)).AsTask();
+
+    public Task NavigateAsync(string shipSymbol, string destinationWaypoint, CancellationToken cancellationToken)
+        => bus.SendAsync(new NavigateShipCommand(shipSymbol, destinationWaypoint)).AsTask();
+
+    public Task ExtractAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new ExtractResourcesCommand(shipSymbol)).AsTask();
+}
+
+public sealed class InTransitCommandAcceptor(IMessageBus bus) : IInTransitCommandAcceptor
+{
+    public Task ScheduleArrivalAsync(ShipArrivedEvent arrivedEvent, DateTimeOffset dueAt, CancellationToken cancellationToken)
+        => bus.ScheduleAsync(arrivedEvent, dueAt).AsTask();
+
+    public Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken)
+        => bus.PublishAsync(inOrbitEvent).AsTask();
+}

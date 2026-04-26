@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers;
+using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -51,7 +52,9 @@ public sealed class ChainOfCommandDispatcherTests
     {
         var bus = Substitute.For<IMessageBus>();
         var services = new ServiceCollection();
+        var inTransit = Substitute.For<IInTransitCommandAcceptor>();
 
+        services.AddSingleton(inTransit);
         services.AddSingleton<IChainOfCommandEventHandler<ShipMovingEvent>, ScheduleArrivalHandler>();
 
         await using var provider = services.BuildServiceProvider();
@@ -138,11 +141,11 @@ public sealed class ChainOfCommandDispatcherTests
         }
     }
 
-    private sealed class ScheduleArrivalHandler : IChainOfCommandEventHandler<ShipMovingEvent>
+    private sealed class ScheduleArrivalHandler(IInTransitCommandAcceptor inTransit) : IChainOfCommandEventHandler<ShipMovingEvent>
     {
         public int Priority => 100;
 
-        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipMovingEvent @event, CancellationToken cancellationToken)
+        public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipMovingEvent @event, CancellationToken cancellationToken)
         {
             var arrivalEvent = new ShipArrivedEvent(
                 @event.ShipSymbol,
@@ -153,7 +156,8 @@ public sealed class ChainOfCommandDispatcherTests
                 @event.EventId,
                 DateTimeOffset.UtcNow);
 
-            return Task.FromResult(ChainOfCommandHandlerResult.Scheduled(arrivalEvent, @event.ArrivalTime));
+            await inTransit.ScheduleArrivalAsync(arrivalEvent, @event.ArrivalTime, cancellationToken);
+            return ChainOfCommandHandlerResult.Scheduled(arrivalEvent, @event.ArrivalTime);
         }
     }
 }

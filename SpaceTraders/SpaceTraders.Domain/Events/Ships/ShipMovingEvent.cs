@@ -2,17 +2,9 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Events.Ships;
 
-public sealed record ShipMovingEvent : ChainOfCommandEvent
+public sealed record ShipMovingEvent : ShipInTransitEvent
 {
-    public string ShipSymbol { get; init; }
-
-    public string OriginWaypointSymbol { get; init; }
-
-    public string DestinationWaypointSymbol { get; init; }
-
     public DateTimeOffset DepartureTime { get; init; }
-
-    public DateTimeOffset ArrivalTime { get; init; }
 
     public int FuelConsumed { get; init; }
 
@@ -26,13 +18,9 @@ public sealed record ShipMovingEvent : ChainOfCommandEvent
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
-        : base(correlationId, causationId, occurredAt)
+        : base(shipSymbol, originWaypointSymbol, destinationWaypointSymbol, arrivalTime, correlationId, causationId, occurredAt)
     {
-        ShipSymbol = shipSymbol;
-        OriginWaypointSymbol = originWaypointSymbol;
-        DestinationWaypointSymbol = destinationWaypointSymbol;
         DepartureTime = departureTime;
-        ArrivalTime = arrivalTime;
         FuelConsumed = fuelConsumed;
     }
 }

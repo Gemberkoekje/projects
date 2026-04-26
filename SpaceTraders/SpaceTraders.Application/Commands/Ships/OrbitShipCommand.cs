@@ -27,10 +27,28 @@ public sealed class OrbitShipHandler(
 {
     public async Task Handle(OrbitShipCommand command, CancellationToken cancellationToken)
     {
+        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
+        if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
+        {
+            var now = TimeProvider.System.GetUtcNow();
+            await bus.PublishAsync(new ShipStateMismatchEvent(
+                command.ShipSymbol,
+                nameof(OrbitShipCommand),
+                "DOCKED",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be docked before orbiting.",
+                Guid.Empty,
+                Guid.Empty,
+                now));
+
+            logger.LogWarning("Skipping orbit for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
+            return;
+        }
+
         var nav = await port.OrbitShipAsync(command.ShipSymbol, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, nav, null, cancellationToken);
 
-        var now = TimeProvider.System.GetUtcNow();
+        var publishedAt = TimeProvider.System.GetUtcNow();
 
         if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
         {
@@ -41,7 +59,7 @@ public sealed class OrbitShipHandler(
                 nav.WaypointSymbol,
                 Guid.Empty,
                 Guid.Empty,
-                now));
+                publishedAt));
         }
 
         logger.LogInformation("Ship {Symbol} in orbit at {Waypoint}.", command.ShipSymbol, nav.WaypointSymbol);

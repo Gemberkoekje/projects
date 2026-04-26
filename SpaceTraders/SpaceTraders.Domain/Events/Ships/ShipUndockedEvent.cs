@@ -2,14 +2,8 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Events.Ships;
 
-public sealed record ShipUndockedEvent : ChainOfCommandEvent
+public sealed record ShipUndockedEvent : ShipInOrbitEvent
 {
-    public string ShipSymbol { get; init; }
-
-    public string SystemSymbol { get; init; }
-
-    public string WaypointSymbol { get; init; }
-
     public ShipUndockedEvent(
         string shipSymbol,
         string systemSymbol,
@@ -17,10 +11,7 @@ public sealed record ShipUndockedEvent : ChainOfCommandEvent
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
-        : base(correlationId, causationId, occurredAt)
+        : base(shipSymbol, systemSymbol, waypointSymbol, correlationId, causationId, occurredAt)
     {
-        ShipSymbol = shipSymbol;
-        SystemSymbol = systemSymbol;
-        WaypointSymbol = waypointSymbol;
     }
 }

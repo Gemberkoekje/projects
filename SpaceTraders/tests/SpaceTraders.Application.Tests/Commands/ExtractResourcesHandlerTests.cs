@@ -35,6 +35,26 @@ public sealed class ExtractResourcesHandlerTests
         db.SaveChanges();
     }
 
+    private static void AddWaypoint(
+        SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db,
+        string symbol = "X1-AB-001",
+        string type = "ASTEROID")
+    {
+        db.Waypoints.Add(new CachedWaypoint
+        {
+            AgentToken = TestDbContextFactory.AgentToken,
+            Symbol = symbol,
+            SystemSymbol = "X1-AB",
+            Type = type,
+            X = 0,
+            Y = 0,
+            HasMarket = false,
+            HasShipyard = false,
+            LastObservedAt = DateTimeOffset.UtcNow,
+        });
+        db.SaveChanges();
+    }
+
     [Fact]
     public async Task ExtractResources_UpdatesCargoFromResponse()
     {
@@ -42,11 +62,15 @@ public sealed class ExtractResourcesHandlerTests
         port.ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 60), 60));
 
+        var bus = Substitute.For<Wolverine.IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1", cargoCurrent: 0, cargoCapacity: 60);
+        AddWaypoint(db);
         var ships = new ShipRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new ExtractResourcesHandler(port, ships, NullLogger<ExtractResourcesHandler>.Instance)
+        await new ExtractResourcesHandler(port, ships, waypoints, bus, NullLogger<ExtractResourcesHandler>.Instance)
             .Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
@@ -61,11 +85,15 @@ public sealed class ExtractResourcesHandlerTests
         port.ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ExtractionActionResult("IRON_ORE", 5, new CargoModel(5, 60), 60));
 
+        var bus = Substitute.For<Wolverine.IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
+        AddWaypoint(db);
         var ships = new ShipRepository(db);
+        var waypoints = new WaypointRepository(db);
 
-        await new ExtractResourcesHandler(port, ships, NullLogger<ExtractResourcesHandler>.Instance)
+        await new ExtractResourcesHandler(port, ships, waypoints, bus, NullLogger<ExtractResourcesHandler>.Instance)
             .Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>());
@@ -82,10 +110,14 @@ public sealed class ExtractResourcesHandlerTests
                 new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 60), 60),
                 new ExtractionActionResult("IRON_ORE", 15, new CargoModel(25, 60), 60));
 
+        var bus = Substitute.For<Wolverine.IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1", cargoCurrent: 0, cargoCapacity: 60);
+        AddWaypoint(db);
         var ships = new ShipRepository(db);
-        var handler = new ExtractResourcesHandler(port, ships, NullLogger<ExtractResourcesHandler>.Instance);
+        var waypoints = new WaypointRepository(db);
+        var handler = new ExtractResourcesHandler(port, ships, waypoints, bus, NullLogger<ExtractResourcesHandler>.Instance);
 
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);

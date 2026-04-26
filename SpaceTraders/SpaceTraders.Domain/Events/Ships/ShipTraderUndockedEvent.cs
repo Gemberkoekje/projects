@@ -1,21 +1,15 @@
-using SpaceTraders.Domain.Events;
-
 namespace SpaceTraders.Domain.Events.Ships;
 
-public sealed record ShipArrivedEvent : ShipInOrbitEvent
+public sealed record ShipTraderUndockedEvent : ShipInOrbitEvent
 {
-    public DateTimeOffset ArrivedAt { get; init; }
-
-    public ShipArrivedEvent(
+    public ShipTraderUndockedEvent(
         string shipSymbol,
         string systemSymbol,
         string waypointSymbol,
-        DateTimeOffset arrivedAt,
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
         : base(shipSymbol, systemSymbol, waypointSymbol, correlationId, causationId, occurredAt)
     {
-        ArrivedAt = arrivedAt;
     }
 }

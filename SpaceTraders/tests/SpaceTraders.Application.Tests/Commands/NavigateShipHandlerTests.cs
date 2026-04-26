@@ -13,12 +13,10 @@ namespace SpaceTraders.Application.Tests.Commands;
 public sealed class NavigateShipHandlerTests
 {
     [Fact]
-    public async Task NavigateShip_WhenDocked_OrbitsBeforeNavigation()
+    public async Task NavigateShip_WhenDocked_DoesNotNavigateAndPublishesMismatch()
     {
         var arrival = DateTimeOffset.UtcNow.AddMinutes(3);
         var port = Substitute.For<ISpaceTradersPort>();
-        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new NavModel("IN_ORBIT", "X1-AB", "X1-AB-001", "CRUISE", null, null));
         port.NavigateShipAsync("SHIP-1", "X1-AB-002", Arg.Any<CancellationToken>())
             .Returns(new NavigateActionResult(
                 new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-001", "CRUISE", "X1-AB-002", arrival),
@@ -46,11 +44,14 @@ public sealed class NavigateShipHandlerTests
         await new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance)
             .Handle(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
 
-        Received.InOrder(async () =>
-        {
-            await port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>());
-            await port.NavigateShipAsync("SHIP-1", "X1-AB-002", Arg.Any<CancellationToken>());
-        });
+        await port.DidNotReceive().NavigateShipAsync("SHIP-1", "X1-AB-002", Arg.Any<CancellationToken>());
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipStateMismatchEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.CommandName == nameof(NavigateShipCommand) &&
+                e.RequiredState == "IN_ORBIT" &&
+                e.ActualState == "DOCKED"),
+            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -104,7 +105,14 @@ public sealed class NavigateShipHandlerTests
         var bus = Substitute.For<IMessageBus>();
 
         await using var db = TestDbContextFactory.Create();
-        db.Ships.Add(new CachedShip { AgentToken = TestDbContextFactory.AgentToken, Symbol = "SHIP-1", LastSyncedAt = DateTimeOffset.UtcNow });
+        db.Ships.Add(new CachedShip
+        {
+            AgentToken = TestDbContextFactory.AgentToken,
+            Symbol = "SHIP-1",
+            Status = "IN_ORBIT",
+            WaypointSymbol = "X1-AB-001",
+            LastSyncedAt = DateTimeOffset.UtcNow,
+        });
         await db.SaveChangesAsync();
 
         var ships = new ShipRepository(db);
@@ -157,6 +165,42 @@ public sealed class NavigateShipHandlerTests
                 e.DestinationWaypointSymbol == "X1-AB-002" &&
                 e.ArrivalTime == arrival &&
                 e.FuelConsumed == 30),
+            Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task NavigateShip_WhenNotInOrbit_DoesNotNavigateAndPublishesMismatch()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        var bus = Substitute.For<IMessageBus>();
+
+        await using var db = TestDbContextFactory.Create();
+        db.Ships.Add(new CachedShip
+        {
+            AgentToken = TestDbContextFactory.AgentToken,
+            Symbol = "SHIP-1",
+            SystemSymbol = "X1-AB",
+            WaypointSymbol = "X1-AB-001",
+            Status = "IN_TRANSIT",
+            FlightMode = "CRUISE",
+            FuelCurrent = 100,
+            FuelCapacity = 100,
+            LastSyncedAt = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var ships = new ShipRepository(db);
+
+        await new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance)
+            .Handle(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
+
+        await port.DidNotReceive().NavigateShipAsync("SHIP-1", "X1-AB-002", Arg.Any<CancellationToken>());
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipStateMismatchEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.CommandName == nameof(NavigateShipCommand) &&
+                e.RequiredState == "IN_ORBIT" &&
+                e.ActualState == "IN_TRANSIT"),
             Arg.Any<DeliveryOptions>());
     }
 }

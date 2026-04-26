@@ -2,7 +2,7 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Events.Ships;
 
-public record ShipDockedEvent : ChainOfCommandEvent
+public record ShipInOrbitEvent : ChainOfCommandEvent
 {
     public string ShipSymbol { get; init; }
 
@@ -10,7 +10,7 @@ public record ShipDockedEvent : ChainOfCommandEvent
 
     public string WaypointSymbol { get; init; }
 
-    public ShipDockedEvent(
+    public ShipInOrbitEvent(
         string shipSymbol,
         string systemSymbol,
         string waypointSymbol,

@@ -2,14 +2,11 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -23,11 +20,10 @@ public sealed class ShipUndockedEventHandlerTests
         var bus = Substitute.For<IMessageBus>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
-        var planner = Substitute.For<IShipAssignmentPlanner>();
-        var port = Substitute.For<ISpaceTradersPort>();
+        var inOrbitCommands = Substitute.For<IInOrbitCommandAcceptor>();
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
+            .Returns(new SpaceTraders.Application.DTOs.ShipAssignmentDto(
                 "SHIP-1",
                 "Scout",
                 "X1-AB-009",
@@ -42,16 +38,10 @@ public sealed class ShipUndockedEventHandlerTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
 
-        port.NavigateShipAsync("SHIP-1", "X1-AB-009", Arg.Any<CancellationToken>())
-            .Returns(new NavigateActionResult(
-                new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-001", "CRUISE", "X1-AB-009", DateTimeOffset.UtcNow.AddMinutes(2)),
-                new FuelModel(90, 100)));
-
         var services = new ServiceCollection();
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
-        services.AddSingleton(planner);
-        services.AddSingleton(port);
+        services.AddSingleton(inOrbitCommands);
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
@@ -73,14 +63,14 @@ public sealed class ShipUndockedEventHandlerTests
         result.Outcome.Should().Be("Handled");
         result.NextEventType.Should().Be(nameof(ShipMovingEvent));
 
+        await inOrbitCommands.Received(1).NavigateAsync("SHIP-1", "X1-AB-009", Arg.Any<CancellationToken>());
+
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipMovingEvent>(e =>
                 e.ShipSymbol == "SHIP-1" &&
                 e.OriginWaypointSymbol == "X1-AB-001" &&
                 e.DestinationWaypointSymbol == "X1-AB-009"),
             Arg.Any<DeliveryOptions>());
-
-        await planner.DidNotReceive().PlanAsync(Arg.Any<ShipModel>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -89,11 +79,10 @@ public sealed class ShipUndockedEventHandlerTests
         var bus = Substitute.For<IMessageBus>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
-        var planner = Substitute.For<IShipAssignmentPlanner>();
-        var port = Substitute.For<ISpaceTradersPort>();
+        var inOrbitCommands = Substitute.For<IInOrbitCommandAcceptor>();
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
+            .Returns(new SpaceTraders.Application.DTOs.ShipAssignmentDto(
                 "SHIP-1",
                 "Mine",
                 "X1-AB-077",
@@ -108,16 +97,10 @@ public sealed class ShipUndockedEventHandlerTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
 
-        port.NavigateShipAsync("SHIP-1", "X1-AB-077", Arg.Any<CancellationToken>())
-            .Returns(new NavigateActionResult(
-                new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-001", "CRUISE", "X1-AB-077", DateTimeOffset.UtcNow.AddMinutes(3)),
-                new FuelModel(85, 100)));
-
         var services = new ServiceCollection();
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
-        services.AddSingleton(planner);
-        services.AddSingleton(port);
+        services.AddSingleton(inOrbitCommands);
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
@@ -139,14 +122,14 @@ public sealed class ShipUndockedEventHandlerTests
         result.Outcome.Should().Be("Handled");
         result.NextEventType.Should().Be(nameof(ShipMovingEvent));
 
+        await inOrbitCommands.Received(1).NavigateAsync("SHIP-1", "X1-AB-077", Arg.Any<CancellationToken>());
+
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipMovingEvent>(e =>
                 e.ShipSymbol == "SHIP-1" &&
                 e.OriginWaypointSymbol == "X1-AB-001" &&
                 e.DestinationWaypointSymbol == "X1-AB-077"),
             Arg.Any<DeliveryOptions>());
-
-        await planner.DidNotReceive().PlanAsync(Arg.Any<ShipModel>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -155,22 +138,18 @@ public sealed class ShipUndockedEventHandlerTests
         var bus = Substitute.For<IMessageBus>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
-        var planner = Substitute.For<IShipAssignmentPlanner>();
-        var port = Substitute.For<ISpaceTradersPort>();
+        var inOrbitCommands = Substitute.For<IInOrbitCommandAcceptor>();
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns((ShipAssignmentDto?)null);
+            .Returns((SpaceTraders.Application.DTOs.ShipAssignmentDto?)null);
 
-        var ship = new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
-        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(ship);
-        planner.PlanAsync(ship, Arg.Any<CancellationToken>())
-            .Returns(new AssignShipCommand("SHIP-1", "Scout", OriginWaypoint: "X1-AB-123"));
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
 
         var services = new ServiceCollection();
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
-        services.AddSingleton(planner);
-        services.AddSingleton(port);
+        services.AddSingleton(inOrbitCommands);
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
@@ -190,21 +169,15 @@ public sealed class ShipUndockedEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipUndockedEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipRoleSetEvent));
+        result.NextEventType.Should().Be(nameof(ShipDockedEvent));
 
-        await assignments.Received(1).UpsertAsync(
-            Arg.Is<ShipAssignmentDto>(dto =>
-                dto.ShipSymbol == "SHIP-1" &&
-                dto.AssignmentType == "Scout" &&
-                dto.OriginWaypoint == "X1-AB-123"),
-            Arg.Any<CancellationToken>());
+        await inOrbitCommands.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
 
         await bus.Received(1).PublishAsync(
-            Arg.Is<ShipRoleSetEvent>(e =>
+            Arg.Is<ShipDockedEvent>(e =>
                 e.ShipSymbol == "SHIP-1" &&
-                e.Role == SpaceTraders.Domain.Enums.ShipRole.Explorer),
+                e.SystemSymbol == "X1-AB" &&
+                e.WaypointSymbol == "X1-AB-001"),
             Arg.Any<DeliveryOptions>());
-
-        await port.DidNotReceive().NavigateShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

@@ -16,7 +16,9 @@ public sealed class ShipMovingEventHandlerTests
     public async Task DispatchAsync_SchedulesArrival_WhenArrivalIsInFuture()
     {
         var bus = Substitute.For<IMessageBus>();
+        var inTransit = Substitute.For<IInTransitCommandAcceptor>();
         var services = new ServiceCollection();
+        services.AddSingleton(inTransit);
         services.AddSingleton<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
 
         await using var provider = services.BuildServiceProvider();
@@ -46,7 +48,9 @@ public sealed class ShipMovingEventHandlerTests
     public async Task DispatchAsync_PublishesArrivalImmediately_WhenArrivalIsDue()
     {
         var bus = Substitute.For<IMessageBus>();
+        var inTransit = Substitute.For<IInTransitCommandAcceptor>();
         var services = new ServiceCollection();
+        services.AddSingleton(inTransit);
         services.AddSingleton<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
 
         await using var provider = services.BuildServiceProvider();

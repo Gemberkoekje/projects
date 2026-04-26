@@ -19,6 +19,10 @@ public static class DependencyInjection
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
+        services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
+        services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
+        services.AddScoped<IInTransitCommandAcceptor, InTransitCommandAcceptor>();
+
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();

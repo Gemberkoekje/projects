@@ -1,5 +1,4 @@
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -7,7 +6,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipUndockedScoutEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
-    ISpaceTradersPort port) : IChainOfCommandEventHandler<ShipUndockedEvent>
+    IInOrbitCommandAcceptor inOrbitCommands) : IChainOfCommandEventHandler<ShipUndockedEvent>
 {
     public int Priority => 100;
 
@@ -44,25 +43,19 @@ public sealed class ShipUndockedScoutEventHandler(
             return ChainOfCommandHandlerResult.Handled(alreadyThereIdle);
         }
 
-        if (ship?.Status?.Equals("DOCKED", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            var orbitNav = await port.OrbitShipAsync(@event.ShipSymbol, cancellationToken);
-            await ships.UpdateNavAsync(@event.ShipSymbol, orbitNav, null, cancellationToken);
-        }
+        await inOrbitCommands.NavigateAsync(@event.ShipSymbol, assignment.OriginWaypoint, cancellationToken);
 
-        var result = await port.NavigateShipAsync(@event.ShipSymbol, assignment.OriginWaypoint, cancellationToken);
-        await ships.UpdateNavAsync(@event.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
-
+        var now = TimeProvider.System.GetUtcNow();
         var movingEvent = new ShipMovingEvent(
             @event.ShipSymbol,
             @event.WaypointSymbol,
             assignment.OriginWaypoint,
-            TimeProvider.System.GetUtcNow(),
-            result.Nav.ArrivesAt ?? TimeProvider.System.GetUtcNow(),
-            result.Fuel?.Current ?? 0,
+            now,
+            now.AddSeconds(1),
+            0,
             @event.CorrelationId,
             @event.EventId,
-            TimeProvider.System.GetUtcNow());
+            now);
 
         return ChainOfCommandHandlerResult.Handled(movingEvent);
     }
