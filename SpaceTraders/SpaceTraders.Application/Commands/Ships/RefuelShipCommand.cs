@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events.Ships;
+using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
@@ -19,6 +21,7 @@ public sealed class RefuelShipHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IAgentRepository agents,
+    IMessageBus bus,
     ILogger<RefuelShipHandler> logger)
 {
     public async Task Handle(RefuelShipCommand command, CancellationToken cancellationToken)
@@ -30,6 +33,16 @@ public sealed class RefuelShipHandler(
         var agent = await agents.GetAsync(cancellationToken);
         if (agent is not null)
             await agents.UpsertAsync(agent with { Credits = result.AgentCredits }, cancellationToken);
+
+        var now = TimeProvider.System.GetUtcNow();
+        await bus.PublishAsync(new ShipRefueledEvent(
+            command.ShipSymbol,
+            result.Fuel.Current,
+            result.Fuel.Capacity,
+            result.Cost,
+            Guid.Empty,
+            Guid.Empty,
+            now));
 
         logger.LogInformation("Ship {Symbol} refuelled. Fuel: {Current}/{Capacity}. Cost: {Cost} credits.",
             command.ShipSymbol, result.Fuel.Current, result.Fuel.Capacity, result.Cost);

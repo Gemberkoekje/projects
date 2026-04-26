@@ -55,11 +55,13 @@ public sealed class ShipActionHandlerTests
         port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(MakeNav(status: "DOCKED"));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         var ships = new ShipRepository(db);
 
-        await new DockShipHandler(port, ships, NullLogger<DockShipHandler>.Instance)
+        await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
             .Handle(new DockShipCommand("SHIP-1"), CancellationToken.None);
 
         var cached = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
@@ -73,16 +75,42 @@ public sealed class ShipActionHandlerTests
         port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(MakeNav(status: "DOCKED"));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         var ships = new ShipRepository(db);
 
-        await new DockShipHandler(port, ships, NullLogger<DockShipHandler>.Instance)
+        await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
             .Handle(new DockShipCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).DockShipAsync("SHIP-1", Arg.Any<CancellationToken>());
         await port.DidNotReceive().GetMyAgentAsync(Arg.Any<CancellationToken>());
         await port.DidNotReceive().GetMyShipsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DockShip_PublishesShipDockedEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(MakeNav(status: "DOCKED"));
+
+        var bus = Substitute.For<IMessageBus>();
+
+        await using var db = TestDbContextFactory.Create();
+        AddShip(db, "SHIP-1");
+        var ships = new ShipRepository(db);
+
+        await new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance)
+            .Handle(new DockShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipDockedEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.SystemSymbol == "X1-AB" &&
+                e.WaypointSymbol == "X1-AB-001"),
+            Arg.Any<DeliveryOptions>());
     }
 
     // ─── OrbitShipHandler ─────────────────────────────────────────────────────
@@ -161,13 +189,15 @@ public sealed class ShipActionHandlerTests
         port.RefuelShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new RefuelActionResult(48_000, new FuelModel(100, 100), 2_000));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         AddAgent(db, credits: 50_000);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
 
-        await new RefuelShipHandler(port, ships, agents, NullLogger<RefuelShipHandler>.Instance)
+        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
         var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
@@ -184,18 +214,47 @@ public sealed class ShipActionHandlerTests
         port.RefuelShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new RefuelActionResult(48_000, new FuelModel(100, 100), 2_000));
 
+        var bus = Substitute.For<IMessageBus>();
+
         await using var db = TestDbContextFactory.Create();
         AddShip(db, "SHIP-1");
         AddAgent(db);
         var ships = new ShipRepository(db);
         var agents = new AgentRepository(db);
 
-        await new RefuelShipHandler(port, ships, agents, NullLogger<RefuelShipHandler>.Instance)
+        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
             .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).RefuelShipAsync("SHIP-1", Arg.Any<CancellationToken>());
         await port.DidNotReceive().GetMyAgentAsync(Arg.Any<CancellationToken>());
         await port.DidNotReceive().GetMyShipsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RefuelShip_PublishesShipRefueledEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.RefuelShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new RefuelActionResult(48_000, new FuelModel(100, 100), 2_000));
+
+        var bus = Substitute.For<IMessageBus>();
+
+        await using var db = TestDbContextFactory.Create();
+        AddShip(db, "SHIP-1");
+        AddAgent(db, credits: 50_000);
+        var ships = new ShipRepository(db);
+        var agents = new AgentRepository(db);
+
+        await new RefuelShipHandler(port, ships, agents, bus, NullLogger<RefuelShipHandler>.Instance)
+            .Handle(new RefuelShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipRefueledEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.FuelCurrent == 100 &&
+                e.FuelCapacity == 100 &&
+                e.CostPaid == 2_000),
+            Arg.Any<DeliveryOptions>());
     }
 
     // ─── BuyCargoHandler ──────────────────────────────────────────────────────

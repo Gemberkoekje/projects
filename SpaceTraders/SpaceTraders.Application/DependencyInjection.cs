@@ -30,6 +30,9 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipRoleSetEvent>, ShipRoleSetEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipRefueledEvent>, ShipRefueledEventHandler>();
 
         services.AddWolverine(opts =>
         {

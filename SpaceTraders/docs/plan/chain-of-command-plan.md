@@ -162,6 +162,17 @@ Validation added:
   - Verifies refresh is skipped entirely when this instance is not the leader.
   - Verifies no error is thrown when there are no ships.
 
+### Phase 7: Complete Event Coverage (Implemented)
+
+Implemented in this workspace:
+
+- Added `ShipDockedEvent` and `ShipRefueledEvent` chain domain events.
+- `DockShipCommand` publishes `ShipDockedEvent`; `RefuelShipCommand` publishes `ShipRefueledEvent`.
+- Added `ShipDockedEventHandler`, `ShipRefueledEventHandler`, and `ShipRoleSetEventHandler`.
+- Added `ChainOfCommandBridgeHandler` to wire all chain events from Wolverine to `IChainOfCommandDispatcher`
+  and to translate terminal `ShipIdleEvent` into `ShipBecameIdleEvent` for existing handlers.
+- Ensure every event chain ends in a new immediate event or a scheduled future event.
+
 ## Goal
 
 Introduce an event-driven chain of command where every SpaceTraders `POST` action produces a domain event, every event has one or more handlers, and every event chain continues by producing either:
@@ -225,8 +236,11 @@ The system should allow role-specific handlers to react first, then fall back to
 - Request cache-aware marketplace and shipyard refreshes.
 - Add tests for stale-cache and fresh-cache behavior.
 
-### Phase 7: Complete Event Coverage
+### Phase 7: Complete Event Coverage (Implemented)
 
-- Add event mappings for remaining POST endpoints.
-- Add role-specific handlers as new ship roles are introduced.
-- Ensure every event chain ends in a new immediate event or scheduled future event.
+- Added `ShipDockedEvent` and `ShipRefueledEvent` chain domain events.
+- `DockShipCommand` publishes `ShipDockedEvent`; `RefuelShipCommand` publishes `ShipRefueledEvent`.
+- Added `ShipDockedEventHandler`, `ShipRefueledEventHandler`, and `ShipRoleSetEventHandler`.
+- Added `ChainOfCommandBridgeHandler` to wire all chain events from Wolverine to `IChainOfCommandDispatcher`
+  and to translate terminal `ShipIdleEvent` into `ShipBecameIdleEvent` for existing handlers.
+- Ensure every event chain ends in a new immediate event or a scheduled future event.
