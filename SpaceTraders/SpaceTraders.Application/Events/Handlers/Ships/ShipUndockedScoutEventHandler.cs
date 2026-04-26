@@ -8,7 +8,7 @@ public sealed class ShipUndockedScoutEventHandler(
     IShipRepository ships,
     IInOrbitCommandAcceptor inOrbitCommands) : IChainOfCommandEventHandler<ShipUndockedEvent>
 {
-    public int Priority => 100;
+    public int Priority => 300;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
     {

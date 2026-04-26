@@ -3,8 +3,8 @@ using SpaceTraders.Domain.Events.Ships;
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
-/// Handles <see cref="ShipDockedEvent"/> by emitting a <see cref="ShipIdleEvent"/>.
-/// Docking itself ends a movement segment; the ship is idle until the next action.
+/// Handles <see cref="ShipDockedEvent"/> by emitting a <see cref="ShipIdleDockedEvent"/>.
+/// Docked fallback transitions into the idle-docked decision chain.
 /// </summary>
 public sealed class ShipDockedEventHandler : IChainOfCommandEventHandler<ShipDockedEvent>
 {
@@ -12,13 +12,15 @@ public sealed class ShipDockedEventHandler : IChainOfCommandEventHandler<ShipDoc
 
     public Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {
-        var idleEvent = new ShipIdleEvent(
+        var idleDockedEvent = new ShipIdleDockedEvent(
             @event.ShipSymbol,
-            "Ship docked; awaiting next action.",
+            @event.SystemSymbol,
+            @event.WaypointSymbol,
+            "Ship docked; entering idle docked role selection.",
             @event.CorrelationId,
             @event.EventId,
             TimeProvider.System.GetUtcNow());
 
-        return Task.FromResult(ChainOfCommandHandlerResult.Handled(idleEvent));
+        return Task.FromResult(ChainOfCommandHandlerResult.Handled(idleDockedEvent));
     }
 }

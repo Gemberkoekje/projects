@@ -169,12 +169,12 @@ public sealed class ShipUndockedEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipUndockedEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipDockedEvent));
+        result.NextEventType.Should().Be(nameof(ShipIdleDockedEvent));
 
         await inOrbitCommands.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
 
         await bus.Received(1).PublishAsync(
-            Arg.Is<ShipDockedEvent>(e =>
+            Arg.Is<ShipIdleDockedEvent>(e =>
                 e.ShipSymbol == "SHIP-1" &&
                 e.SystemSymbol == "X1-AB" &&
                 e.WaypointSymbol == "X1-AB-001"),

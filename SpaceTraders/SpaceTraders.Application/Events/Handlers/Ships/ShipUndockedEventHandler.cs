@@ -32,10 +32,11 @@ public sealed class ShipUndockedEventHandler(
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
             var now = TimeProvider.System.GetUtcNow();
 
-            var idleDockedEvent = new ShipDockedEvent(
+            var idleDockedEvent = new ShipIdleDockedEvent(
                 @event.ShipSymbol,
                 ship.SystemSymbol ?? @event.SystemSymbol,
                 ship.WaypointSymbol ?? @event.WaypointSymbol,
+                "Fallback undocked recovery docked ship due to missing or invalid role plan.",
                 @event.CorrelationId,
                 @event.EventId,
                 now);

@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 2 is now implemented in code for state-event chain bridge coverage and state-gated chain handlers for transit, in-orbit, and mismatch recovery events.
+Phase 3 is now implemented in code for docked and in-orbit role-chain handling with state-scoped command acceptors and fallback recovery routing.
 
 Target architecture plan. This supersedes assignment state machines and any plan that treats ship automation as a persisted `StepIndex` workflow.
 
@@ -29,7 +29,6 @@ Implemented:
 
 Remaining follow-up inside this phase:
 
-- expand interface-gated usage across all docked and transit chains (beyond the undocked chain and current command guard surface);
 - add explicit compile-time-only safety tests for acceptor boundary enforcement where practical.
 
 ## Phase 2 implementation status
@@ -58,6 +57,35 @@ Validation added:
   - `ShipInTransitEventHandlerTests`
   - `ShipInOrbitEventHandlerTests`
   - `ShipStateMismatchEventHandlerTests`
+
+## Phase 3 implementation status
+
+Implemented:
+
+- `ShipIdleDockedEvent` introduced as a dedicated docked-idle chain event;
+- chain bridge routing expanded to include `ShipIdleDockedEvent`;
+- undocked/in-orbit role chain expanded with trader-specific handler:
+  - `ShipUndockedMineEventHandler` (priority 100)
+  - `ShipUndockedTraderEventHandler` (priority 150)
+  - `ShipUndockedScoutEventHandler` (priority 300)
+  - fallback `ShipUndockedEventHandler` (priority 1000)
+- fallback undocked recovery now emits `ShipIdleDockedEvent` after successful recovery docking;
+- docked role chain handlers added and wired to `IDockedCommandAcceptor`:
+  - `ShipMinerDockedEventHandler` (priority 100)
+  - `ShipTraderDockedEventHandler` (priority 200)
+  - `ShipScoutDockedEventHandler` (priority 300)
+  - `ShipDockedEventHandler` fallback now emits `ShipIdleDockedEvent`
+  - `ShipIdleDockedEventHandler` (priority 400) for docked role-selection/plan bootstrap;
+- DI registration updated for all phase-3 handlers.
+
+Validation added:
+
+- undocked fallback test updated to assert `ShipIdleDockedEvent` behavior;
+- docked fallback tests updated to assert `ShipIdleDockedEvent` behavior;
+- new trader undocked handler tests:
+  - `ShipUndockedTraderEventHandlerTests`
+- new docked role-chain handler tests:
+  - `ShipDockedRoleHandlersTests`.
 
 ## Goals
 
@@ -175,7 +203,7 @@ For a docked event:
    - Emits a ship-becomes-role event.
 5. `ShipDockedEventHandler`
    - Generic fallback.
-   - If no role/plan is valid, keep the ship idle and emit/log a repair decision.
+   - If no role/plan is valid, emit `ShipIdleDockedEvent` for docked role-selection/recovery.
 
 Only handlers in this docked chain may issue `OrbitShipCommand`, `BuyCargoCommand`, `SellCargoCommand`, `RefuelShipCommand`, and contract hand-in commands, and only via `IDockedCommandAcceptor`.
 

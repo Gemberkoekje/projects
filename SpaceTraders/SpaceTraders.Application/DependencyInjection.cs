@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
 
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
@@ -38,7 +39,11 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipRoleSetEvent>, ShipRoleSetEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipMinerDockedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipTraderDockedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipScoutDockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipIdleDockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipRefueledEvent>, ShipRefueledEventHandler>();
 
         services.AddWolverine(opts =>

@@ -5,7 +5,6 @@ using NSubstitute;
 using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
-using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -14,7 +13,7 @@ namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 public sealed class ShipDockedEventHandlerTests
 {
     [Fact]
-    public async Task DispatchAsync_EmitsShipIdleEvent()
+    public async Task DispatchAsync_EmitsShipIdleDockedEvent()
     {
         var bus = Substitute.For<IMessageBus>();
 
@@ -37,12 +36,12 @@ public sealed class ShipDockedEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipDockedEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
+        result.NextEventType.Should().Be(nameof(ShipIdleDockedEvent));
         result.IsScheduled.Should().BeFalse();
     }
 
     [Fact]
-    public async Task DispatchAsync_PublishesShipIdleEvent_WithDockedReason()
+    public async Task DispatchAsync_PublishesShipIdleDockedEvent_WithDockedReason()
     {
         var bus = Substitute.For<IMessageBus>();
 
@@ -64,7 +63,7 @@ public sealed class ShipDockedEventHandlerTests
         await dispatcher.DispatchAsync(@event, CancellationToken.None);
 
         await bus.Received(1).PublishAsync(
-            Arg.Is<ShipIdleEvent>(e =>
+            Arg.Is<ShipIdleDockedEvent>(e =>
                 e.ShipSymbol == "SHIP-1" &&
                 e.Reason.Contains("docked", StringComparison.OrdinalIgnoreCase)),
             Arg.Any<Wolverine.DeliveryOptions>());
