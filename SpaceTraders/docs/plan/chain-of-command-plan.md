@@ -139,6 +139,29 @@ Validation added:
   - `tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipArrivedEventHandlerTests.cs`
   - Verifies scout-first handling with refresh dispatching, mine handling at asteroid arrival, and fallback arrival handling.
 
+### Phase 6: Ship Refresh Worker (Implemented)
+
+Implemented in this workspace:
+
+- 10-minute hosted background worker:
+  - `SpaceTraders.Application/Automation/ShipRefreshWorkerService.cs`
+  - Only executes when this instance holds the leader lease.
+  - Fetches all owned ships from the repository.
+  - Collects unique waypoint symbols across all ships.
+  - Invokes `IMarketRefreshService.RefreshIfApplicableAsync` for each waypoint.
+  - Invokes `IShipyardRefreshService.RefreshIfApplicableAsync` for each waypoint.
+  - Cache-aware services skip the refresh when the waypoint lacks the relevant facility.
+- Hosted service registration:
+  - `ShipRefreshWorkerService` registered in `SpaceTraders.API/Program.cs`.
+
+Validation added:
+
+- Tests for worker behavior:
+  - `tests/SpaceTraders.Application.Tests/Automation/ShipRefreshWorkerServiceTests.cs`
+  - Verifies market and shipyard refresh are called once per unique waypoint.
+  - Verifies refresh is skipped entirely when this instance is not the leader.
+  - Verifies no error is thrown when there are no ships.
+
 ## Goal
 
 Introduce an event-driven chain of command where every SpaceTraders `POST` action produces a domain event, every event has one or more handlers, and every event chain continues by producing either:
@@ -195,7 +218,7 @@ The system should allow role-specific handlers to react first, then fall back to
 - Add mining arrival behavior.
 - Add fallback arrival handler.
 
-### Phase 6: Ship Refresh Worker
+### Phase 6: Ship Refresh Worker (Implemented)
 
 - Add 10-minute hosted worker.
 - Iterate all owned ships.

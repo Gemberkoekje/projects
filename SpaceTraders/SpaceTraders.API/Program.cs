@@ -80,6 +80,7 @@ builder.Services.AddHostedService<ShipWorkerService>();
 builder.Services.AddHostedService<ContractWatchService>();
 builder.Services.AddHostedService<ScoutService>();
 builder.Services.AddHostedService<ActivityLogPruningService>();
+builder.Services.AddHostedService<ShipRefreshWorkerService>();
 builder.Services.AddHostedService<PrometheusMetricsService>();
 
 var app = builder.Build();
