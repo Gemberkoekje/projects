@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -36,8 +37,22 @@ public sealed class NavigateShipHandler(
             logger.LogInformation("Ship {Symbol} was docked and moved to orbit before navigation.", command.ShipSymbol);
         }
 
+        var now = TimeProvider.System.GetUtcNow();
         var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
+
+        var movingEvent = new ShipMovingEvent(
+            command.ShipSymbol,
+            ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
+            command.DestinationWaypoint,
+            now,
+            result.Nav.ArrivesAt ?? now,
+            ship is not null && result.Fuel is not null ? Math.Max(0, ship.FuelCurrent - result.Fuel.Current) : 0,
+            Guid.Empty,
+            Guid.Empty,
+            now);
+
+        await bus.PublishAsync(movingEvent);
 
         var destinationSystem = ExtractSystemSymbol(command.DestinationWaypoint);
         await bus.SendAsync(new RefreshSystemDataCommand(destinationSystem));

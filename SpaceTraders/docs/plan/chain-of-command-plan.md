@@ -84,6 +84,27 @@ Validation added:
   - `tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipUndockedEventHandlerTests.cs`
   - Verifies scout-first handling, miner fallback after scout skip, and generic fallback role assignment.
 
+### Phase 4: POST Event Publishing (Implemented)
+
+Implemented in this workspace:
+
+- Successful ship POST command handlers now publish chain-of-command events:
+  - `SpaceTraders.Application/Commands/Ships/OrbitShipCommand.cs`
+    - Publishes `ShipUndockedEvent` after a successful orbit response is applied locally.
+    - Keeps publishing `ShipEnteredOrbitEvent` for the existing non-chain activity flow.
+  - `SpaceTraders.Application/Commands/Ships/NavigateShipCommand.cs`
+    - Publishes `ShipMovingEvent` after a successful navigate response is applied locally.
+    - Captures origin waypoint, destination waypoint, departure time, arrival time, and fuel consumed from local state plus the POST response.
+- Phase 4 continues to use POST response data directly for local state updates, without follow-up GET requests.
+
+Validation added:
+
+- POST-to-event mapping tests:
+  - `tests/SpaceTraders.Application.Tests/Commands/NavigateShipHandlerTests.cs`
+    - Verifies `NavigateShipCommand` publishes `ShipMovingEvent` with the expected route and fuel metadata.
+  - `tests/SpaceTraders.Application.Tests/Commands/ShipActionHandlerTests.cs`
+    - Verifies `OrbitShipCommand` publishes `ShipUndockedEvent` with the expected ship and location metadata.
+
 ## Goal
 
 Introduce an event-driven chain of command where every SpaceTraders `POST` action produces a domain event, every event has one or more handlers, and every event chain continues by producing either:
@@ -127,7 +148,7 @@ The system should allow role-specific handlers to react first, then fall back to
 - Add role lookup and assignment services.
 - Add tests for handler ordering and fallback behavior.
 
-### Phase 4: POST Event Publishing
+### Phase 4: POST Event Publishing (Implemented)
 
 - Wrap SpaceTraders mutation calls so successful POST responses publish events.
 - Start with undock and navigate.

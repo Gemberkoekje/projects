@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
 using Wolverine;
@@ -122,7 +123,33 @@ public sealed class ShipActionHandlerTests
         await new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance)
             .Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
 
-        await bus.Received(1).PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await bus.Received(1).PublishAsync(
+            Arg.Is<object>(message => message is SpaceTraders.Domain.Events.ShipEnteredOrbitEvent),
+            Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task OrbitShip_PublishesShipUndockedEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(MakeNav(status: "IN_ORBIT"));
+
+        var bus = Substitute.For<IMessageBus>();
+
+        await using var db = TestDbContextFactory.Create();
+        AddShip(db, "SHIP-1");
+        var ships = new ShipRepository(db);
+
+        await new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance)
+            .Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipUndockedEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.SystemSymbol == "X1-AB" &&
+                e.WaypointSymbol == "X1-AB-001"),
+            Arg.Any<DeliveryOptions>());
     }
 
     // ─── RefuelShipHandler ────────────────────────────────────────────────────
