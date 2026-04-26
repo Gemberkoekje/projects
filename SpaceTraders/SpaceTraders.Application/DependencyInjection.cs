@@ -19,10 +19,17 @@ public static class DependencyInjection
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
+        services.AddScoped<IWaypointVisitService, WaypointVisitService>();
+        services.AddScoped<IMarketRefreshService, MarketRefreshService>();
+        services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
+
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipMovingEvent>, ShipMovingEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
 
         services.AddWolverine(opts =>
         {

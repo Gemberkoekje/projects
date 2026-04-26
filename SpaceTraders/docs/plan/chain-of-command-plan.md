@@ -105,6 +105,40 @@ Validation added:
   - `tests/SpaceTraders.Application.Tests/Commands/ShipActionHandlerTests.cs`
     - Verifies `OrbitShipCommand` publishes `ShipUndockedEvent` with the expected ship and location metadata.
 
+### Phase 5: Ship Arrived Chain (Implemented)
+
+Implemented in this workspace:
+
+- Role-specific arrival handlers:
+  - `ShipArrivedScoutEventHandler` (priority 100)
+    - Resolves scout assignment for the ship.
+    - Marks the arrived waypoint as visited.
+    - Invokes cache-aware market and shipyard refresh commands only when the waypoint supports those facilities.
+    - Emits `ShipIdleEvent` after handling scout arrival.
+  - `ShipArrivedMineEventHandler` (priority 200)
+    - Resolves mine assignment for the ship.
+    - At mining origin: ensures orbit and executes extraction, then updates cached cargo.
+    - At sell destination: ensures dock, sells available cargo, updates cached ship cargo and agent credits.
+    - Emits `ShipIdleEvent` for handled mining arrival outcomes.
+- Fallback arrival handler:
+  - `ShipArrivedEventHandler` (priority 1000)
+    - Handles unmatched arrival events.
+    - Emits `ShipIdleEvent` when no specialized arrival flow applies.
+- Cache-aware waypoint refresh services:
+  - `IWaypointVisitService` / `WaypointVisitService`
+  - `IMarketRefreshService` / `MarketRefreshService`
+  - `IShipyardRefreshService` / `ShipyardRefreshService`
+- Handler registrations in application DI:
+  - `IChainOfCommandEventHandler<ShipArrivedEvent>` → `ShipArrivedScoutEventHandler`
+  - `IChainOfCommandEventHandler<ShipArrivedEvent>` → `ShipArrivedMineEventHandler`
+  - `IChainOfCommandEventHandler<ShipArrivedEvent>` → `ShipArrivedEventHandler`
+
+Validation added:
+
+- Dispatcher-backed tests for arrived chain behavior:
+  - `tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipArrivedEventHandlerTests.cs`
+  - Verifies scout-first handling with refresh dispatching, mine handling at asteroid arrival, and fallback arrival handling.
+
 ## Goal
 
 Introduce an event-driven chain of command where every SpaceTraders `POST` action produces a domain event, every event has one or more handlers, and every event chain continues by producing either:
@@ -154,7 +188,7 @@ The system should allow role-specific handlers to react first, then fall back to
 - Start with undock and navigate.
 - Add tests proving each POST maps to the expected event.
 
-### Phase 5: Ship Arrived Chain
+### Phase 5: Ship Arrived Chain (Implemented)
 
 - Add scout arrival handler.
 - Add cache-aware waypoint, marketplace, and shipyard refresh services.
