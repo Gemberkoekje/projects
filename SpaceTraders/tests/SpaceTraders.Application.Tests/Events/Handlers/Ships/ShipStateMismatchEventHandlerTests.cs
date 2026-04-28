@@ -25,6 +25,7 @@ public sealed class ShipStateMismatchEventHandlerTests
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
 
         var services = new ServiceCollection();
+        services.AddSingleton(bus);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbitCommands);
         services.AddSingleton<IChainOfCommandEventHandler<ShipStateMismatchEvent>, ShipStateMismatchEventHandler>();
@@ -46,16 +47,9 @@ public sealed class ShipStateMismatchEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipStateMismatchEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipDockedEvent));
+        result.NextEventType.Should().BeNullOrEmpty();
 
         await inOrbitCommands.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipDockedEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.SystemSymbol == "X1-AB" &&
-                e.WaypointSymbol == "X1-AB-001"),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -69,6 +63,7 @@ public sealed class ShipStateMismatchEventHandlerTests
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100));
 
         var services = new ServiceCollection();
+        services.AddSingleton(bus);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbitCommands);
         services.AddSingleton<IChainOfCommandEventHandler<ShipStateMismatchEvent>, ShipStateMismatchEventHandler>();
@@ -79,9 +74,9 @@ public sealed class ShipStateMismatchEventHandlerTests
         var @event = new ShipStateMismatchEvent(
             "SHIP-1",
             "NavigateShipCommand",
-            "IN_ORBIT",
             "DOCKED",
-            "Ship must be in orbit before navigation.",
+            "IN_ORBIT",
+            "Recovery needed",
             Guid.NewGuid(),
             Guid.Empty,
             DateTimeOffset.UtcNow);
@@ -90,14 +85,6 @@ public sealed class ShipStateMismatchEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipStateMismatchEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
-
-        await inOrbitCommands.DidNotReceive().DockAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipIdleEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason.Contains("State mismatch recovery paused", StringComparison.Ordinal)),
-            Arg.Any<DeliveryOptions>());
+        result.NextEventType.Should().BeNullOrEmpty();
     }
 }

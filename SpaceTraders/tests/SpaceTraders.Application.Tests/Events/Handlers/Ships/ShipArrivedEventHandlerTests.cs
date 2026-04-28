@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.DTOs;
@@ -16,208 +17,111 @@ namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 
 public sealed class ShipArrivedEventHandlerTests
 {
-    [Fact]
-    public async Task DispatchAsync_UsesScoutArrivalHandler_WhenScoutAssignmentExists()
+    private static ShipArrivedEvent MakeEvent(string waypoint = "X1-AB-009") =>
+        new("SHIP-1", "X1-AB", waypoint, DateTimeOffset.UtcNow, Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow);
+
+    private static ServiceCollection BaseServices()
     {
-        var bus = Substitute.For<IMessageBus>();
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var waypoints = Substitute.For<IWaypointRepository>();
-        var markets = Substitute.For<IMarketRepository>();
-        var shipyards = Substitute.For<IShipyardRepository>();
-        var ships = Substitute.For<IShipRepository>();
-        var agents = Substitute.For<IAgentRepository>();
-        var port = Substitute.For<ISpaceTradersPort>();
-
-        assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
-                "SHIP-1",
-                "Scout",
-                "X1-AB-009",
-                null,
-                null,
-                null,
-                0,
-                DateTimeOffset.UtcNow,
-                null,
-                0));
-
-        waypoints.FindAsync("X1-AB-009", Arg.Any<CancellationToken>())
-            .Returns(new WaypointCacheModel("X1-AB-009", "X1-AB", "PLANET", 0, 0, true, true, DateTimeOffset.UtcNow));
-
         var services = new ServiceCollection();
-        services.AddSingleton(bus);
-        services.AddSingleton(assignments);
-        services.AddSingleton(waypoints);
-        services.AddSingleton(markets);
-        services.AddSingleton(shipyards);
-        services.AddSingleton(ships);
-        services.AddSingleton(agents);
-        services.AddSingleton(port);
+        services.AddLogging();
+        services.AddSingleton(Substitute.For<IMessageBus>());
+        services.AddSingleton(Substitute.For<IShipAssignmentRepository>());
+        services.AddSingleton(Substitute.For<IShipRepository>());
+        services.AddSingleton(Substitute.For<IAgentRepository>());
+        services.AddSingleton(Substitute.For<ISpaceTradersPort>());
+        services.AddSingleton(Substitute.For<IWaypointRepository>());
+        services.AddSingleton(Substitute.For<IMarketRepository>());
+        services.AddSingleton(Substitute.For<IShipyardRepository>());
         services.AddSingleton<IWaypointVisitService, WaypointVisitService>();
         services.AddSingleton<IMarketRefreshService, MarketRefreshService>();
         services.AddSingleton<IShipyardRefreshService, ShipyardRefreshService>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
-
-        await using var provider = services.BuildServiceProvider();
-        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
-
-        var @event = new ShipArrivedEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-009",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            Guid.Empty,
-            DateTimeOffset.UtcNow);
-
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
-
-        result.HandlerName.Should().Be(nameof(ShipArrivedScoutEventHandler));
-        result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
-
-        await waypoints.Received(1).MarkVisitedAsync("X1-AB-009", Arg.Any<CancellationToken>());
-        await bus.Received(1).SendAsync(Arg.Is<SpaceTraders.Application.Commands.Sync.RefreshMarketDataCommand>(c => c.WaypointSymbol == "X1-AB-009"));
-        await bus.Received(1).SendAsync(Arg.Is<SpaceTraders.Application.Commands.Sync.RefreshShipyardDataCommand>(c => c.WaypointSymbol == "X1-AB-009"));
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipIdleEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason == "Scout arrival handled; cache refresh requested."),
-            Arg.Any<DeliveryOptions>());
+        services.AddSingleton<IInOrbitCommandAcceptor>(Substitute.For<IInOrbitCommandAcceptor>());
+        return services;
     }
 
     [Fact]
-    public async Task DispatchAsync_UsesMineArrivalHandler_WhenMineAssignmentExists()
+    public async Task DispatchAsync_WithShipArrivedEvent_RoutesViaInOrbitHandlers()
     {
-        var bus = Substitute.For<IMessageBus>();
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var waypoints = Substitute.For<IWaypointRepository>();
-        var markets = Substitute.For<IMarketRepository>();
-        var shipyards = Substitute.For<IShipyardRepository>();
-        var ships = Substitute.For<IShipRepository>();
-        var agents = Substitute.For<IAgentRepository>();
-        var port = Substitute.For<ISpaceTradersPort>();
+        var services = BaseServices();
+        var assignments = services.First(d => d.ServiceType == typeof(IShipAssignmentRepository)).ImplementationInstance as IShipAssignmentRepository;
+        var bus = services.First(d => d.ServiceType == typeof(IMessageBus)).ImplementationInstance as IMessageBus;
 
-        assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
-                "SHIP-1",
-                "Mine",
-                "X1-AB-AST",
-                "X1-AB-MKT",
-                null,
-                null,
-                0,
-                DateTimeOffset.UtcNow,
-                null,
-                0));
-
-        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-AST", "DOCKED", "CRUISE", 80, 100));
-
-        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new NavModel("IN_ORBIT", "X1-AB", "X1-AB-AST", "CRUISE", null, null));
-
-        port.ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 100), 60));
-
-        var services = new ServiceCollection();
-        services.AddSingleton(bus);
-        services.AddSingleton(assignments);
-        services.AddSingleton(waypoints);
-        services.AddSingleton(markets);
-        services.AddSingleton(shipyards);
-        services.AddSingleton(ships);
-        services.AddSingleton(agents);
-        services.AddSingleton(port);
-        services.AddSingleton<IWaypointVisitService, WaypointVisitService>();
-        services.AddSingleton<IMarketRefreshService, MarketRefreshService>();
-        services.AddSingleton<IShipyardRefreshService, ShipyardRefreshService>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
-
-        await using var provider = services.BuildServiceProvider();
-        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
-
-        var @event = new ShipArrivedEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-AST",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            Guid.Empty,
-            DateTimeOffset.UtcNow);
-
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
-
-        result.HandlerName.Should().Be(nameof(ShipArrivedMineEventHandler));
-        result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
-
-        await port.Received(1).OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>());
-        await port.Received(1).ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipIdleEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason == "Mine arrival extracted resources."),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task DispatchAsync_UsesFallbackArrivalHandler_WhenNoRoleSpecificAssignmentMatches()
-    {
-        var bus = Substitute.For<IMessageBus>();
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var waypoints = Substitute.For<IWaypointRepository>();
-        var markets = Substitute.For<IMarketRepository>();
-        var shipyards = Substitute.For<IShipyardRepository>();
-        var ships = Substitute.For<IShipRepository>();
-        var agents = Substitute.For<IAgentRepository>();
-        var port = Substitute.For<ISpaceTradersPort>();
-
-        assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+        assignments!.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns((ShipAssignmentDto?)null);
 
-        var services = new ServiceCollection();
-        services.AddSingleton(bus);
-        services.AddSingleton(assignments);
-        services.AddSingleton(waypoints);
-        services.AddSingleton(markets);
-        services.AddSingleton(shipyards);
-        services.AddSingleton(ships);
-        services.AddSingleton(agents);
-        services.AddSingleton(port);
-        services.AddSingleton<IWaypointVisitService, WaypointVisitService>();
-        services.AddSingleton<IMarketRefreshService, MarketRefreshService>();
-        services.AddSingleton<IShipyardRefreshService, ShipyardRefreshService>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedScoutEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedMineEventHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipArrivedEvent>, ShipArrivedEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitEventHandler>();
 
         await using var provider = services.BuildServiceProvider();
-        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
+        var dispatcher = new ChainOfCommandDispatcher(provider, bus!, NullLogger<ChainOfCommandDispatcher>.Instance);
 
-        var @event = new ShipArrivedEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-777",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            Guid.Empty,
-            DateTimeOffset.UtcNow);
+        var result = await dispatcher.DispatchAsync<ShipInOrbitEvent>(MakeEvent(), CancellationToken.None);
 
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
-
-        result.HandlerName.Should().Be(nameof(ShipArrivedEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
+        result.HandlerName.Should().Be(nameof(ShipInOrbitEventHandler));
+    }
 
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipIdleEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason == "No specialized arrival handler matched."),
-            Arg.Any<DeliveryOptions>());
+    [Fact]
+    public async Task DispatchAsync_WithScoutAssignment_UsesScoutInOrbitHandler()
+    {
+        var services = BaseServices();
+        var assignments = services.First(d => d.ServiceType == typeof(IShipAssignmentRepository)).ImplementationInstance as IShipAssignmentRepository;
+        var bus = services.First(d => d.ServiceType == typeof(IMessageBus)).ImplementationInstance as IMessageBus;
+        var ships = services.First(d => d.ServiceType == typeof(IShipRepository)).ImplementationInstance as IShipRepository;
+
+        assignments!.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipAssignmentDto(
+                "SHIP-1", "Scout", "X1-AB-009", null, null, null, 0, DateTimeOffset.UtcNow, null, 0));
+
+        ships!.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-009", "IN_ORBIT", "CRUISE", 80, 100));
+
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitEventHandler>();
+
+        await using var provider = services.BuildServiceProvider();
+        var dispatcher = new ChainOfCommandDispatcher(provider, bus!, NullLogger<ChainOfCommandDispatcher>.Instance);
+
+        var result = await dispatcher.DispatchAsync<ShipInOrbitEvent>(MakeEvent("X1-AB-009"), CancellationToken.None);
+
+        result.Outcome.Should().Be("Handled");
+        result.HandlerName.Should().Be(nameof(ShipInOrbitScoutEventHandler));
+    }
+
+    [Fact]
+    public async Task DispatchAsync_WithMineAssignmentAtOrigin_UsesMineInOrbitHandler()
+    {
+        var services = BaseServices();
+        var assignments = services.First(d => d.ServiceType == typeof(IShipAssignmentRepository)).ImplementationInstance as IShipAssignmentRepository;
+        var bus = services.First(d => d.ServiceType == typeof(IMessageBus)).ImplementationInstance as IMessageBus;
+        var ships = services.First(d => d.ServiceType == typeof(IShipRepository)).ImplementationInstance as IShipRepository;
+        var inOrbitCommands = services.First(d => d.ServiceType == typeof(IInOrbitCommandAcceptor)).ImplementationInstance as IInOrbitCommandAcceptor;
+
+        assignments!.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipAssignmentDto(
+                "SHIP-1", "Mine", "X1-AB-AST", "X1-AB-MKT", null, null, 0, DateTimeOffset.UtcNow, null, 0));
+
+        ships!.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-AST", "IN_ORBIT", "CRUISE", 80, 100,
+                CargoCurrent: 0, CargoCapacity: 40));
+
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitEventHandler>();
+
+        await using var provider = services.BuildServiceProvider();
+        var dispatcher = new ChainOfCommandDispatcher(provider, bus!, NullLogger<ChainOfCommandDispatcher>.Instance);
+
+        var result = await dispatcher.DispatchAsync<ShipInOrbitEvent>(MakeEvent("X1-AB-AST"), CancellationToken.None);
+
+        result.Outcome.Should().Be("Handled");
+        result.HandlerName.Should().Be(nameof(ShipInOrbitMineEventHandler));
+
+        await inOrbitCommands!.Received(1).ExtractAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 }

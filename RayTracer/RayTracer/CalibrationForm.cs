@@ -13,8 +13,8 @@ public class CalibrationForm : Form
 {
     // ── Layout constants ───────────────────────────────────────────
     private const int FormWidth = 540;
-    private const int CollapsedHeight = 375;
-    private const int ExpandedHeight = 640;
+    private const int CollapsedHeight = 430;
+    private const int ExpandedHeight = 730;
 
     // ── Top-level controls ─────────────────────────────────────────
     private readonly ProgressBar _progressBar;
@@ -40,6 +40,8 @@ public class CalibrationForm : Form
     private CheckBox _chkEma;
     private CheckBox _chkClamp;
     private ComboBox _cboLighting;
+    private ComboBox _cboSmokeMode;
+    private ComboBox _cboVolumetricQuality;
     private Label _lblThrottle;
     private ComboBox _cboThrottle;
     private Label _lblEffective;
@@ -65,6 +67,12 @@ public class CalibrationForm : Form
 
     private static readonly (string label, LightingMode mode)[] LightingOptions =
         [("None", LightingMode.None), ("Direct", LightingMode.Direct), ("NEE", LightingMode.NEE)];
+
+    private static readonly (string label, SmokeMode mode)[] SmokeModeOptions =
+        [("Off", SmokeMode.None), ("Biome", SmokeMode.Biome), ("Always fog", SmokeMode.AlwaysFog), ("Always ground smoke", SmokeMode.AlwaysGroundSmoke)];
+
+    private static readonly (string label, VolumetricQuality quality)[] VolumetricQualityOptions =
+        [("Off", VolumetricQuality.Off), ("Low", VolumetricQuality.Low), ("Medium", VolumetricQuality.Medium), ("High", VolumetricQuality.High), ("Ultra", VolumetricQuality.Ultra)];
 
     private static readonly (string label, CpuThrottle value)[] ThrottleOptions =
     [
@@ -129,6 +137,8 @@ public class CalibrationForm : Form
         };
 
         var presets = RenderPreset.All;
+        int presetPanelHeight = 8 + (presets.Length + 1) * 30 + 6;
+        _presetPanel.Size = new Size(500, presetPanelHeight);
         _presetRadios = new RadioButton[presets.Length];
         for (int i = 0; i < presets.Length; i++)
         {
@@ -163,11 +173,11 @@ public class CalibrationForm : Form
         _lblThrottle = new Label
         {
             Text = "CPU usage:",
-            Location = new Point(20, 304),
+            Location = new Point(20, _presetPanel.Bottom + 10),
             AutoSize = true,
             Visible = false
         };
-        _cboThrottle = Cbo(120, 300, 230, ThrottleOptions.Select(t => t.label));
+        _cboThrottle = Cbo(120, _presetPanel.Bottom + 6, 230, ThrottleOptions.Select(t => t.label));
         _cboThrottle.Visible = false;
 
         // ── Start button ───────────────────────────────────────────
@@ -175,7 +185,7 @@ public class CalibrationForm : Form
         {
             Text = "Start Maze",
             Size = new Size(120, 35),
-            Location = new Point(210, 330),
+            Location = new Point(210, _presetPanel.Bottom + 36),
             Enabled = false
         };
         _startButton.Click += (_, _) =>
@@ -200,8 +210,8 @@ public class CalibrationForm : Form
         var grp = new GroupBox
         {
             Text = "Advanced Settings",
-            Location = new Point(20, 330),
-            Size = new Size(500, 255),
+            Location = new Point(20, 420),
+            Size = new Size(500, 270),
             Visible = false
         };
 
@@ -237,54 +247,62 @@ public class CalibrationForm : Form
         _cboLighting = Cbo(315, 112, 90, LightingOptions.Select(l => l.label));
         grp.Controls.Add(_cboLighting);
 
-        // Row 4: Checkboxes
+        // Row 4: Smoke mode & volumetric quality
+        grp.Controls.Add(Lbl("Smoke", 15, 145));
+        _cboSmokeMode = Cbo(115, 142, 130, SmokeModeOptions.Select(s => s.label));
+        grp.Controls.Add(_cboSmokeMode);
+        grp.Controls.Add(Lbl("Volume", 270, 145));
+        _cboVolumetricQuality = Cbo(335, 142, 90, VolumetricQualityOptions.Select(v => v.label));
+        grp.Controls.Add(_cboVolumetricQuality);
+
+        // Row 5: Checkboxes
         _chkJitter = new CheckBox
         {
             Text = "Sub-pixel jitter",
-            Location = new Point(15, 145),
+            Location = new Point(15, 170),
             Size = new Size(200, 22)
         };
         _chkEdgeAware = new CheckBox
         {
             Text = "Edge-aware filter",
-            Location = new Point(250, 145),
+            Location = new Point(250, 170),
             Size = new Size(200, 22)
         };
         grp.Controls.Add(_chkJitter);
         grp.Controls.Add(_chkEdgeAware);
 
-        // Row 5: Noise-reduction checkboxes
+        // Row 6: Noise-reduction checkboxes
         _chkChecker = new CheckBox
         {
             Text = "Checker motion",
-            Location = new Point(15, 170),
+            Location = new Point(15, 195),
             Size = new Size(150, 22)
         };
         _chkEma = new CheckBox
         {
             Text = "Temporal EMA",
-            Location = new Point(170, 170),
+            Location = new Point(170, 195),
             Size = new Size(150, 22)
         };
         _chkClamp = new CheckBox
         {
             Text = "Sample clamp",
-            Location = new Point(330, 170),
+            Location = new Point(330, 195),
             Size = new Size(150, 22)
         };
         grp.Controls.Add(_chkChecker);
         grp.Controls.Add(_chkEma);
         grp.Controls.Add(_chkClamp);
 
-        // Row 6: Live info
+        // Row 7: Live info
         _lblEffective = new Label
         {
-            Location = new Point(15, 200),
+            Location = new Point(15, 220),
             Size = new Size(460, 18)
         };
         _lblAdvancedFps = new Label
         {
-            Location = new Point(15, 221),
+            Location = new Point(15, 238),
             Size = new Size(460, 20),
             Font = new Font(Font.FontFamily, 9, FontStyle.Bold)
         };
@@ -301,6 +319,8 @@ public class CalibrationForm : Form
         _cboFilter.SelectedIndexChanged += refresh;
         _cboTileSize.SelectedIndexChanged += refresh;
         _cboLighting.SelectedIndexChanged += refresh;
+        _cboSmokeMode.SelectedIndexChanged += refresh;
+        _cboVolumetricQuality.SelectedIndexChanged += refresh;
         _chkJitter.CheckedChanged += refresh;
         _chkEdgeAware.CheckedChanged += refresh;
         _chkChecker.CheckedChanged += refresh;
@@ -344,6 +364,9 @@ public class CalibrationForm : Form
         RenderPreset recommended = RenderPreset.Low;
         foreach (var p in presets)
         {
+            if (p.IsDebugSmokePreset)
+                continue;
+
             double fps = p.PredictFps(perPresetRps[p.Name]);
             if (fps >= 10)
             {
@@ -394,14 +417,14 @@ public class CalibrationForm : Form
     private void CollapseAdvanced()
     {
         _advancedGroup.Visible = false;
-        _startButton.Location = new Point(210, 330);
+        _startButton.Location = new Point(210, _presetPanel.Bottom + 36);
         ClientSize = new Size(FormWidth, CollapsedHeight);
     }
 
     private void ExpandAdvanced()
     {
         _advancedGroup.Visible = true;
-        _startButton.Location = new Point(210, 595);
+        _startButton.Location = new Point(210, 690);
         ClientSize = new Size(FormWidth, ExpandedHeight);
     }
 
@@ -428,6 +451,12 @@ public class CalibrationForm : Form
         _cboLighting.SelectedIndex = SafeFind(
             Array.FindIndex(LightingOptions, l => l.mode == p.Lighting),
             LightingOptions.Length);
+        _cboSmokeMode.SelectedIndex = SafeFind(
+            Array.FindIndex(SmokeModeOptions, s => s.mode == p.SmokeMode),
+            SmokeModeOptions.Length, 1);
+        _cboVolumetricQuality.SelectedIndex = SafeFind(
+            Array.FindIndex(VolumetricQualityOptions, v => v.quality == p.Volumetrics.Quality),
+            VolumetricQualityOptions.Length, 2);
         _chkJitter.Checked = p.SubPixelJitter;
         _chkEdgeAware.Checked = p.EdgeAwareFilter;
         _chkChecker.Checked = p.CheckerboardMotion;
@@ -445,6 +474,9 @@ public class CalibrationForm : Form
         int filterRadius = FilterOptions[Safe(_cboFilter)].radius;
         int tileSize = TileSizeOptions[Safe(_cboTileSize)];
         var lighting = LightingOptions[Safe(_cboLighting)].mode;
+        var smokeMode = SmokeModeOptions[Safe(_cboSmokeMode)].mode;
+        var volumetricQuality = VolumetricQualityOptions[Safe(_cboVolumetricQuality)].quality;
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(volumetricQuality, smokeMode);
 
         return new RenderPreset("Custom", rw, rh, spp, maxSamples, motionCap,
             tileSize, _chkJitter.Checked, scale, filterRadius, _chkEdgeAware.Checked,
@@ -452,7 +484,9 @@ public class CalibrationForm : Form
             CheckerboardMotion: _chkChecker.Checked,
             TemporalBlendAlpha: _chkEma.Checked ? 0.05f : 0f,
             SampleClamp: _chkClamp.Checked ? 10f : 0f,
-            ThrottleCpu: ThrottleOptions[Safe(_cboThrottle)].value);
+            ThrottleCpu: ThrottleOptions[Safe(_cboThrottle)].value,
+            SmokeMode: smokeMode,
+            Volumetrics: volumetrics);
     }
 
     private void UpdateAdvancedFps()

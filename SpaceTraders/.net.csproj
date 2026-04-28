@@ -11,13 +11,14 @@
   
   <ItemGroup>
     <AdditionalFiles Remove="NuGet.config" />
+    <AdditionalFiles Remove="SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj" />
   </ItemGroup>
   
   <ItemGroup>
-    <None Include="docs\implementation\RACE_CONDITION_PREVENTION_IMPLEMENTATION.md" />
-    <None Include="docs\plan\chain-of-command-plan.md" />
-    <None Include="docs\plan\race-condition-prevention.md" />
-    <None Include="docs\plan\ship-event-command-plan.md" />
+    <None Include="docs/implementation/CURRENT_IMPLEMENTATION_OVERVIEW.md" />
+    <None Include="docs/implementation/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md" />
+    <None Include="docs/operations/LOCAL_DEVELOPMENT.md" />
+    <None Include="docs/SPACE_TRADERS_IMPLEMENTATION_PLAN.md" />
   </ItemGroup>
   
   <ItemGroup>

@@ -138,31 +138,125 @@ public static class MazeGeometryBuilder
     }
 
     /// <summary>
-    /// Creates a point light at the ceiling centre of every maze cell.
-    /// Lights are placed slightly below the ceiling to avoid
-    /// self-intersection with the ceiling plane.
+    /// Creates point lights and wall torches for the maze based on cell
+    /// properties. Some blocks have ceiling lights, others are unlit, and
+    /// designated biome regions have wall-mounted torches instead.
     /// </summary>
+    /// <param name="maze">The maze to create lights for.</param>
+    /// <param name="cellSize">World-space size of each cell.</param>
+    /// <param name="wallHeight">Wall height.</param>
+    /// <param name="lightSpawnChance">Probability (0-1) that a cell gets a ceiling light.</param>
+    /// <param name="biomeSize">Size of torch biome regions (0 to disable biomes).</param>
+    /// <param name="seed">Seed for random light placement.</param>
     public static Light[] BuildLights(
         Maze maze,
         float cellSize = CellSize,
-        float wallHeight = WallHeight)
+        float wallHeight = WallHeight,
+        float lightSpawnChance = 0.4f,
+        int biomeSize = 4,
+        int seed = 0)
     {
         var lights = new List<Light>();
+        var rng = new Random(seed);
+
         for (int gy = 0; gy < maze.Height; gy++)
         {
             for (int gx = 0; gx < maze.Width; gx++)
             {
-                lights.Add(new Light
+                // Determine which biome this cell belongs to
+                int biomeX = biomeSize > 0 ? gx / biomeSize : -1;
+                int biomeY = biomeSize > 0 ? gy / biomeSize : -1;
+                bool isTorchBiome = (biomeX + biomeY) % 2 == 0;
+
+                if (biomeSize > 0 && isTorchBiome)
                 {
-                    Position = new Vector3(
-                        (gx + 0.5f) * cellSize,
-                        wallHeight - 0.05f,
-                        (gy + 0.5f) * cellSize),
-                    Color = new Vector3(1f, 1f, 1f),
-                    Ambient = 0.05f
-                });
+                    // Place wall torches in this biome region
+                    AddWallTorches(lights, maze, gx, gy, cellSize, wallHeight, rng);
+                }
+                else if (rng.NextSingle() < lightSpawnChance)
+                {
+                    // Place a ceiling light in this cell
+                    lights.Add(new Light
+                    {
+                        Position = new Vector3(
+                            (gx + 0.5f) * cellSize,
+                            wallHeight - 0.05f,
+                            (gy + 0.5f) * cellSize),
+                        Color = new Vector3(1f, 1f, 1f),
+                        Ambient = 0f
+                    });
+                }
             }
         }
         return lights.ToArray();
+    }
+
+    /// <summary>
+    /// Adds wall-mounted torches to the perimeter walls of a cell
+    /// that faces adjacent unlit regions. Torches are dimmer than ceiling
+    /// lights and their color varies slightly to simulate flickering flames.
+    /// </summary>
+    private static void AddWallTorches(
+        List<Light> lights,
+        Maze maze,
+        int cellX,
+        int cellY,
+        float cellSize,
+        float wallHeight,
+        Random rng)
+    {
+        float torchHeight = wallHeight * 0.75f;
+
+        // Consistent warm torch color (no per-frame variation)
+        var torchColor = new Vector3(1f, 0.75f, 0.5f);
+
+        // Check each wall direction
+        // North wall
+        if (cellY > 0 && !maze.HasWall(cellX, cellY - 1, Wall.South))
+        {
+            float z = cellY * cellSize;
+            lights.Add(new Light
+            {
+                Position = new Vector3((cellX + 0.5f) * cellSize, torchHeight, z + 0.1f),
+                Color = torchColor,
+                Ambient = 0f
+            });
+        }
+
+        // South wall
+        if (cellY < maze.Height - 1 && !maze.HasWall(cellX, cellY + 1, Wall.North))
+        {
+            float z = (cellY + 1) * cellSize;
+            lights.Add(new Light
+            {
+                Position = new Vector3((cellX + 0.5f) * cellSize, torchHeight, z - 0.1f),
+                Color = torchColor,
+                Ambient = 0f
+            });
+        }
+
+        // West wall
+        if (cellX > 0 && !maze.HasWall(cellX - 1, cellY, Wall.East))
+        {
+            float x = cellX * cellSize;
+            lights.Add(new Light
+            {
+                Position = new Vector3(x + 0.1f, torchHeight, (cellY + 0.5f) * cellSize),
+                Color = torchColor,
+                Ambient = 0f
+            });
+        }
+
+        // East wall
+        if (cellX < maze.Width - 1 && !maze.HasWall(cellX + 1, cellY, Wall.West))
+        {
+            float x = (cellX + 1) * cellSize;
+            lights.Add(new Light
+            {
+                Position = new Vector3(x - 0.1f, torchHeight, (cellY + 0.5f) * cellSize),
+                Color = torchColor,
+                Ambient = 0f
+            });
+        }
     }
 }

@@ -91,8 +91,11 @@ public sealed class RefuelShipHandler(
         }
 
         var nowRefueled = TimeProvider.System.GetUtcNow();
+        var refueledShip = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         await bus.PublishAsync(new ShipRefueledEvent(
             command.ShipSymbol,
+            refueledShip?.SystemSymbol ?? string.Empty,
+            refueledShip?.WaypointSymbol ?? string.Empty,
             result.Fuel.Current,
             result.Fuel.Capacity,
             result.Cost,

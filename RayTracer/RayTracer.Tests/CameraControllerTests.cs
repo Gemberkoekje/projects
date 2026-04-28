@@ -37,9 +37,9 @@ public class CameraControllerTests
     // ── Update integration ─────────────────────────────────────────
 
     [TestMethod]
-    public void Update_SetsDirtyFlag_OnActionTransition()
+    public void Update_DoesNotSetDirty_DuringStill()
     {
-        var maze = new Maze(4, 4, seed: 0);
+        var maze = new Maze(1, 2, seed: 0);
         var nav = new MazeNavigator(maze, 0, 0, Direction.South);
         var ctrl = new CameraController(nav, 2f, 1f);
         var cam = new Camera
@@ -51,17 +51,61 @@ public class CameraControllerTests
             ImgPlaneZ = 1f
         };
 
-        // Dirty is set at the start of each action (constructor calls BeginNextAction).
-        Assert.IsTrue(ctrl.Dirty, "Dirty should be true after construction.");
-        ctrl.Dirty = false;
-
-        // A small tick during interpolation SHOULD set Dirty (camera is moving).
+        Assert.IsFalse(ctrl.Dirty, "Dirty should be false after construction while still.");
         ctrl.Update(0.01f, cam);
-        Assert.IsTrue(ctrl.Dirty, "Mid-interpolation should set Dirty.");
+        Assert.IsFalse(ctrl.Dirty, "Still phase should not set Dirty.");
+    }
 
-        // Advancing past the action duration triggers BeginNextAction → Dirty.
-        ctrl.Update(100f, cam);
-        Assert.IsTrue(ctrl.Dirty, "Action transition should set Dirty.");
+    [TestMethod]
+    public void Update_StartsTurnImmediately_WhenStillAndFacingWall()
+    {
+        var maze = new Maze(1, 2, seed: 0);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.North);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 10f,
+            TurnTime = 1f
+        };
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = CameraController.HeadingToQuaternion(Direction.North),
+            Fov = MathF.PI / 3f,
+            Aspect = 4f / 3f,
+            ImgPlaneZ = 1f
+        };
+
+        ctrl.Update(0.001f, cam);
+
+        Assert.IsTrue(ctrl.IsTurning, "Controller should begin turning immediately instead of waiting out still time.");
+        Assert.IsTrue(ctrl.Dirty, "Starting a turn should mark camera as dirty.");
+    }
+
+    [TestMethod]
+    public void Update_TurnCompletes_AndHeadingUpdates()
+    {
+        var maze = new Maze(1, 2, seed: 0);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.North);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 10f,
+            TurnTime = 1f
+        };
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = CameraController.HeadingToQuaternion(Direction.North),
+            Fov = MathF.PI / 3f,
+            Aspect = 4f / 3f,
+            ImgPlaneZ = 1f
+        };
+
+        ctrl.Update(0.001f, cam);
+        ctrl.Dirty = false;
+        ctrl.Update(1f, cam);
+
+        Assert.AreEqual(Direction.South, nav.Heading);
+        Assert.IsFalse(ctrl.IsTurning, "After full turn duration, controller should leave turning state.");
     }
 
     [TestMethod]
@@ -69,7 +113,11 @@ public class CameraControllerTests
     {
         var maze = new Maze(4, 4, seed: 0);
         var nav = new MazeNavigator(maze, 0, 0, Direction.South);
-        var ctrl = new CameraController(nav, 2f, 1f);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 0f,
+            MoveTime = 1f
+        };
         var cam = new Camera
         {
             Position = new Vector3(1, 1, 1),
@@ -93,7 +141,10 @@ public class CameraControllerTests
         var nav = new MazeNavigator(maze, 0, 0, Direction.South);
         float cs = 2f;
         float eyeHeight = 1f;
-        var ctrl = new CameraController(nav, cs, eyeHeight);
+        var ctrl = new CameraController(nav, cs, eyeHeight)
+        {
+            StillTime = 0.01f
+        };
         var cam = new Camera
         {
             Position = new Vector3(cs * 0.5f, eyeHeight, cs * 0.5f),
@@ -132,7 +183,7 @@ public class CameraControllerTests
         ctrl.Update(0f, cam);
 
         AssertVec3Near(startPos, cam.Position, 1e-6f);
-        Assert.IsTrue(ctrl.Dirty, "Controller should still mark camera as dirty during active interpolation.");
+        Assert.IsFalse(ctrl.Dirty, "Controller should not mark the camera dirty during a still phase.");
     }
 
     [TestMethod]
@@ -141,7 +192,10 @@ public class CameraControllerTests
         const int mazeSize = 8;
         var maze = new Maze(mazeSize, mazeSize, seed: 123);
         var nav = new MazeNavigator(maze, 0, 0, Direction.South);
-        var ctrl = new CameraController(nav, 2f, 1f);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 0.01f
+        };
         var cam = new Camera
         {
             Position = new Vector3(1, 1, 1),
@@ -162,6 +216,30 @@ public class CameraControllerTests
             Assert.IsTrue(float.IsFinite(cam.Position.X) && float.IsFinite(cam.Position.Y) && float.IsFinite(cam.Position.Z),
                 "Camera position should stay finite.");
         }
+    }
+
+    [TestMethod]
+    public void Update_DuringStill_WhenFacingWall_TurnsImmediatelyWithoutWaiting()
+    {
+        var maze = new Maze(1, 2, seed: 0);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.North);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 10f
+        };
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = CameraController.HeadingToQuaternion(Direction.North),
+            Fov = MathF.PI / 3f,
+            Aspect = 4f / 3f,
+            ImgPlaneZ = 1f
+        };
+
+        ctrl.Update(0.001f, cam);
+
+        Assert.IsTrue(ctrl.IsTurning, "Controller should start turning immediately instead of waiting out still time.");
+        Assert.IsTrue(ctrl.Dirty, "Turn start should mark camera as dirty.");
     }
 
     // ── Helpers ────────────────────────────────────────────────────

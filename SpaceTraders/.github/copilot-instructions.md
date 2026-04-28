@@ -179,7 +179,9 @@
 - In this repository, deployment uses the root-level `dockerfile.api` and `dockerfile.app` files.
 
 ## SpaceTraders Project Guidelines
-- For ship automation, avoid state machines. Instead, use state-gated event handlers, role-specific chain-of-command handlers, and persisted ship plan intent.
+- For ship automation, each ship should have exactly one active role, and only one in-orbit role handler should decide navigation once per decision point; avoid duplicate chain dispatches that allow multiple simultaneous navigate commands for the same ship.
 - Use separate state-scoped command acceptors (Docked, InOrbit, InTransit) so handlers cannot issue commands invalid for the ship's current state without explicitly switching interfaces.
 - Use one generic undocked event with chain-of-command role-specific handlers; do not define role-specific undocked event types like miner/trader/scout undocked events.
 - Only handlers for the ship's current physical state should issue commands valid for that state.
+- Avoid a separate `ShipIdleDockedEvent` handler; keep docked-idle planning logic inside `ShipDockedEventHandler`.
+- Refueled should be part of the docked state and not treated as a separate exception handler/event path.

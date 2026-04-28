@@ -4,8 +4,8 @@ namespace RayTracer;
 
 /// <summary>
 /// Drives a first-person <see cref="Camera"/> through a maze using a
-/// <see cref="MazeNavigator"/>. Handles smooth cell-to-cell movement
-/// and smooth 90° turns via quaternion slerp.
+/// <see cref="MazeNavigator"/>. Holds still between moves and handles
+/// smooth cell-to-cell movement and smooth turns.
 /// </summary>
 public class CameraController
 {
@@ -14,10 +14,13 @@ public class CameraController
     private readonly float _eyeHeight;
 
     /// <summary>Seconds to move from one cell center to the next.</summary>
-    public float MoveTime { get; set; } = 4.0f;
+    public float MoveTime { get; set; } = 1.0f;
+
+    /// <summary>Seconds to hold the camera still between actions.</summary>
+    public float StillTime { get; set; } = 6.0f;
 
     /// <summary>Seconds to perform a 90° turn.</summary>
-    public float TurnTime { get; set; } = 1.5f;
+    public float TurnTime { get; set; } = 1.0f;
 
     /// <summary>
     /// Set to true by the controller whenever the camera moves or
@@ -29,7 +32,7 @@ public class CameraController
     // Expose whether the controller is currently performing a turn.
     public bool IsTurning => _state == State.Turning;
 
-    private enum State { Moving, Turning }
+    private enum State { Still, Moving, Turning }
     private State _state;
 
     // Interpolation progress [0..1].
@@ -51,8 +54,7 @@ public class CameraController
         _cellSize = cellSize;
         _eyeHeight = eyeHeight;
 
-        // Begin by evaluating the first move from the starting cell.
-        BeginNextAction();
+        BeginStill();
     }
 
     /// <summary>
@@ -61,32 +63,73 @@ public class CameraController
     /// </summary>
     public void Update(float deltaTime, Camera camera)
     {
+        if (_state == State.Still)
+        {
+            if (TryBeginImmediateTurn())
+                return;
+
+            if (StillTime <= 0f)
+            {
+                BeginNextAction();
+                return;
+            }
+
+            _t += deltaTime / StillTime;
+            if (_t >= 1f)
+                BeginNextAction();
+
+            return;
+        }
+
         float duration = _state == State.Moving ? MoveTime : TurnTime;
+        if (duration <= 0f)
+        {
+            Dirty = true;
+            camera.Position = _endPos;
+            camera.Rotation = _endRot;
+            if (_state == State.Turning && _pendingMove is { } instantTurnTarget)
+                _nav.Heading = instantTurnTarget.heading;
+            BeginStill();
+            return;
+        }
+
         _t += deltaTime / duration;
 
         if (_t >= 1f)
         {
-            // Snap to the target.
+            Dirty = true;
             _t = 1f;
             camera.Position = _endPos;
             camera.Rotation = _endRot;
-
-            // Prepare the next action (sets Dirty).
-            BeginNextAction();
+            if (_state == State.Turning && _pendingMove is { } turnTarget)
+                _nav.Heading = turnTarget.heading;
+            BeginStill();
+            return;
         }
-        else
-        {
-            Dirty = true;
-            float smooth = SmoothStep(_t);
 
-            if (_state == State.Moving)
-                camera.Position = Vector3.Lerp(_startPos, _endPos, smooth);
+        Dirty = true;
+        float smooth = SmoothStep(_t);
 
-            camera.Rotation = Quaternion.Slerp(_startRot, _endRot, smooth);
-        }
+        if (_state == State.Moving)
+            camera.Position = Vector3.Lerp(_startPos, _endPos, smooth);
+
+        camera.Rotation = Quaternion.Slerp(_startRot, _endRot, smooth);
     }
 
     // ── Private helpers ────────────────────────────────────────────
+
+    private bool TryBeginImmediateTurn()
+    {
+        if (_pendingMove is not null)
+            return false;
+
+        var (nextX, nextY, nextHeading) = _nav.PeekNext();
+        if (nextHeading == _nav.Heading)
+            return false;
+
+        BeginTurn(nextX, nextY, nextHeading);
+        return true;
+    }
 
     private void BeginNextAction()
     {
@@ -115,12 +158,8 @@ public class CameraController
 
         if (nextHeading != _nav.Heading)
         {
-            // Turn in place first; save the move for after the turn.
-            Dirty = true;
-            _state = State.Turning;
-            _endPos = _startPos;
-            _endRot = HeadingToQuaternion(nextHeading);
-            _pendingMove = (nextX, nextY, nextHeading);
+            // Turn immediately when needed; don't wait out still time.
+            BeginTurn(nextX, nextY, nextHeading);
         }
         else
         {
@@ -130,8 +169,25 @@ public class CameraController
             _endPos = CellCenter(nextX, nextY);
             _endRot = _startRot;
             _nav.Advance();
+            _t = 0f;
         }
+    }
 
+    private void BeginTurn(int nextX, int nextY, Direction nextHeading)
+    {
+        Dirty = true;
+        _state = State.Turning;
+        _startPos = CellCenter(_nav.CellX, _nav.CellY);
+        _endPos = _startPos;
+        _startRot = HeadingToQuaternion(_nav.Heading);
+        _endRot = HeadingToQuaternion(nextHeading);
+        _pendingMove = (nextX, nextY, nextHeading);
+        _t = 0f;
+    }
+
+    private void BeginStill()
+    {
+        _state = State.Still;
         _t = 0f;
     }
 

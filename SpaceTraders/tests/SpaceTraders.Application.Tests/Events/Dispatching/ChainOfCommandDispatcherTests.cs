@@ -40,11 +40,40 @@ public sealed class ChainOfCommandDispatcherTests
 
         result.HandlerName.Should().Be(nameof(HandleUndockedHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipIdleEvent));
+        result.NextEventType.Should().Be(nameof(ShipAssignmentTypeSetEvent));
         result.IsScheduled.Should().BeFalse();
         tracker.Calls.Should().ContainInOrder(nameof(SkipUndockedHandler), nameof(HandleUndockedHandler));
         tracker.Calls.Should().NotContain(nameof(LateUndockedHandler));
-        await bus.Received(1).PublishAsync(Arg.Any<ShipIdleEvent>(), Arg.Any<DeliveryOptions>());
+        await bus.Received(1).PublishAsync(Arg.Any<ShipAssignmentTypeSetEvent>(), Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task DispatchAsync_DoesNotPublish_WhenHandlerReturnsHandledWithoutNextEvent()
+    {
+        var bus = Substitute.For<IMessageBus>();
+        var services = new ServiceCollection();
+
+        services.AddSingleton(bus);
+        services.AddSingleton<IChainOfCommandEventHandler<ShipDockedEvent>, HandleWithoutNextDockedHandler>();
+
+        await using var provider = services.BuildServiceProvider();
+        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
+
+        var @event = new ShipDockedEvent(
+            "SHIP-1",
+            "X1-AB",
+            "X1-AB-001",
+            Guid.NewGuid(),
+            Guid.Empty,
+            DateTimeOffset.UtcNow);
+
+        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
+
+        result.HandlerName.Should().Be(nameof(HandleWithoutNextDockedHandler));
+        result.Outcome.Should().Be("Handled");
+        result.NextEventType.Should().BeEmpty();
+        result.IsScheduled.Should().BeFalse();
+        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -55,19 +84,17 @@ public sealed class ChainOfCommandDispatcherTests
         var inTransit = Substitute.For<IInTransitCommandAcceptor>();
 
         services.AddSingleton(inTransit);
-        services.AddSingleton<IChainOfCommandEventHandler<ShipMovingEvent>, ScheduleArrivalHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>, ScheduleArrivalHandler>();
 
         await using var provider = services.BuildServiceProvider();
         var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
 
         var now = DateTimeOffset.UtcNow;
-        var @event = new ShipMovingEvent(
+        var @event = new ShipInTransitEvent(
             "SHIP-1",
             "X1-AB-001",
             "X1-AB-002",
-            now,
             now.AddMinutes(3),
-            10,
             Guid.NewGuid(),
             Guid.Empty,
             now);
@@ -125,7 +152,7 @@ public sealed class ChainOfCommandDispatcherTests
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
         {
             tracker.Calls.Add(nameof(HandleUndockedHandler));
-            var nextEvent = new ShipIdleEvent(@event.ShipSymbol, "handled", @event.CorrelationId, @event.EventId, DateTimeOffset.UtcNow);
+            var nextEvent = new ShipAssignmentTypeSetEvent(@event.ShipSymbol, @event.SystemSymbol, @event.WaypointSymbol, "Idle", @event.CorrelationId, @event.EventId, DateTimeOffset.UtcNow);
             return Task.FromResult(ChainOfCommandHandlerResult.Handled(nextEvent));
         }
     }
@@ -141,11 +168,19 @@ public sealed class ChainOfCommandDispatcherTests
         }
     }
 
-    private sealed class ScheduleArrivalHandler(IInTransitCommandAcceptor inTransit) : IChainOfCommandEventHandler<ShipMovingEvent>
+    private sealed class HandleWithoutNextDockedHandler : IChainOfCommandEventHandler<ShipDockedEvent>
     {
         public int Priority => 100;
 
-        public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipMovingEvent @event, CancellationToken cancellationToken)
+        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
+            => Task.FromResult(ChainOfCommandHandlerResult.Handled());
+    }
+
+    private sealed class ScheduleArrivalHandler(IInTransitCommandAcceptor inTransit) : IChainOfCommandEventHandler<ShipInTransitEvent>
+    {
+        public int Priority => 100;
+
+        public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInTransitEvent @event, CancellationToken cancellationToken)
         {
             var arrivalEvent = new ShipArrivedEvent(
                 @event.ShipSymbol,

@@ -55,18 +55,16 @@ public sealed class NavigateShipHandler(
         var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
-        var movingEvent = new ShipMovingEvent(
+        var inTransitEvent = new ShipInTransitEvent(
             command.ShipSymbol,
             ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
             command.DestinationWaypoint,
-            nowNavigate,
             result.Nav.ArrivesAt ?? nowNavigate,
-            ship is not null && result.Fuel is not null ? Math.Max(0, ship.FuelCurrent - result.Fuel.Current) : 0,
             Guid.Empty,
             Guid.Empty,
             nowNavigate);
 
-        await bus.PublishAsync(movingEvent);
+        await bus.PublishAsync(inTransitEvent);
 
         var destinationSystem = ExtractSystemSymbol(command.DestinationWaypoint);
         await bus.SendAsync(new RefreshSystemDataCommand(destinationSystem));

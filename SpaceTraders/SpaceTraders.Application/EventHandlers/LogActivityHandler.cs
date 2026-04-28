@@ -124,12 +124,12 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
-    public async Task Handle(ShipIdleEvent @event, CancellationToken cancellationToken)
+    public async Task Handle(ShipAssignmentTypeSetEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(
             @event.ShipSymbol,
-            nameof(ShipIdleEvent),
-            $"Ship {@event.ShipSymbol} became idle. Reason: {@event.Reason}.",
+            nameof(ShipAssignmentTypeSetEvent),
+            $"Ship {@event.ShipSymbol} assignment type set to {@event.AssignmentType}.",
             cancellationToken: cancellationToken);
     }
 }

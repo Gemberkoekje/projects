@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace RayTracer;
 
@@ -10,6 +11,117 @@ public partial class JobSystem
         h = (h ^ (h >> 13)) * 1274126177u;
         return h ^ (h >> 16);
     }
+
+    private static uint HashCell(int x, int y)
+    {
+        uint h = (uint)(x * 374761393 + y * 668265263);
+        h ^= h >> 16;
+        h *= 2246822519u;
+        h ^= h >> 13;
+        h *= 3266489917u;
+        return h ^ (h >> 16);
+    }
+
+    private static bool IsSmokeBiome(int biomeX, int biomeY)
+        => (biomeX + biomeY) % 3 == 1;
+
+    private static bool IsFogBiome(int biomeX, int biomeY)
+    {
+        uint biomeHash = HashCell(biomeX, biomeY);
+        return (biomeHash & 1u) == 0u;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float SmokeCoverage(float x, float z)
+    {
+        float bands = 0.5f + 0.5f * MathF.Sin(x * 0.37f + z * 0.53f);
+        float swirl = 0.5f + 0.5f * MathF.Sin(x * 0.19f - z * 0.29f + bands * 3.1f);
+        return 0.35f + 0.65f * (0.6f * bands + 0.4f * swirl);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float GetBiomeCellDensity(int biomeX, int biomeY, Vector3 p, float coverage)
+    {
+        if (!IsSmokeBiome(biomeX, biomeY))
+            return 0f;
+
+        if (IsFogBiome(biomeX, biomeY))
+        {
+            float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
+            return 0.022f * coverage * (0.35f + 0.65f * midHeight);
+        }
+
+        float groundLayer = MathF.Exp(-MathF.Max(p.Y, 0f) * 2.6f);
+        return 0.045f * coverage * groundLayer;
+    }
+
+    private static float SmoothStep01(float t)
+    {
+        t = Math.Clamp(t, 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
+
+    private static float GetDensityBiome(Vector3 p)
+    {
+        const int biomeSizeCells = 4;
+        float biomeWorldSize = MazeGeometryBuilder.CellSize * biomeSizeCells;
+
+        float biomeFx = p.X / biomeWorldSize;
+        float biomeFy = p.Z / biomeWorldSize;
+
+        int bx0 = (int)MathF.Floor(biomeFx);
+        int by0 = (int)MathF.Floor(biomeFy);
+        int bx1 = bx0 + 1;
+        int by1 = by0 + 1;
+
+        float tx = SmoothStep01(biomeFx - bx0);
+        float ty = SmoothStep01(biomeFy - by0);
+
+        float coverage = SmokeCoverage(p.X, p.Z);
+        float d00 = GetBiomeCellDensity(bx0, by0, p, coverage);
+        float d10 = GetBiomeCellDensity(bx1, by0, p, coverage);
+        float d01 = GetBiomeCellDensity(bx0, by1, p, coverage);
+        float d11 = GetBiomeCellDensity(bx1, by1, p, coverage);
+
+        float dx0 = d00 + (d10 - d00) * tx;
+        float dx1 = d01 + (d11 - d01) * tx;
+        return dx0 + (dx1 - dx0) * ty;
+    }
+
+    private static float GetDensityFog(Vector3 p)
+    {
+        float coverage = SmokeCoverage(p.X, p.Z);
+        float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
+
+        // Match the perceived thickness of ground smoke, but distributed
+        // through the full corridor volume with a mild center-height bias.
+        float thickCoverage = 0.72f + 0.28f * coverage;
+        float heightWeight = 0.70f + 0.30f * midHeight;
+        return 0.50f * thickCoverage * heightWeight;
+    }
+
+    private static float GetDensityGround(Vector3 p)
+    {
+        float coverage = SmokeCoverage(p.X, p.Z);
+
+        // Keep the floor layer thick, but make it fall off quickly with height
+        // so smoke does not fill the full corridor volume.
+        float thickCoverage = 0.72f + 0.28f * coverage;
+        float height = MathF.Max(p.Y, 0f);
+        float groundLayer = MathF.Exp(-height * 2.35f);
+        return 0.50f * thickCoverage * groundLayer;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float GetDensity(Vector3 p, SmokeMode smokeMode)
+        => smokeMode switch
+        {
+            SmokeMode.None => 0f,
+            SmokeMode.Biome => GetDensityBiome(p),
+            SmokeMode.AlwaysFog => GetDensityFog(p),
+            SmokeMode.AlwaysGroundSmoke => GetDensityGround(p),
+            _ => GetDensityBiome(p)
+        };
 
     /// <summary>
     /// Number of evenly-spaced companion wavelengths (including the hero)
@@ -413,6 +525,14 @@ public partial class JobSystem
             depthDistance[ix] = Vector3.Distance(camera.Position, hitPoint);
             albedoScalar[ix] = Math.Clamp(reflectance, 0f, 1f);
             normalWorld[ix] = hitNormal;
+
+            VolumetricSample volume = IntegrateVolumetricSegment(camera.Position, hitPoint, dir);
+            xyz = volume.Apply(xyz);
+            directLighting *= volume.Transmittance;
+            indirectLighting *= volume.Transmittance;
+            bounce0 *= volume.Transmittance;
+            bounce1 *= volume.Transmittance;
+            bounce2plus *= volume.Transmittance;
         }
 
         var correctedXYZ = xyz * WavelengthLookup.DeterministicCorrection;

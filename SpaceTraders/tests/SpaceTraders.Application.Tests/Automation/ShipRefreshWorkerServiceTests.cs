@@ -48,7 +48,7 @@ public sealed class ShipRefreshWorkerServiceTests
         await using var provider = services.BuildServiceProvider();
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
 
-        var worker = new ShipRefreshWorkerService(
+        using var worker = new ShipRefreshWorkerService(
             scopeFactory,
             leaderElection,
             NullLogger<ShipRefreshWorkerService>.Instance);
@@ -82,7 +82,7 @@ public sealed class ShipRefreshWorkerServiceTests
         await using var provider = services.BuildServiceProvider();
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
 
-        var worker = new ShipRefreshWorkerService(
+        using var worker = new ShipRefreshWorkerService(
             scopeFactory,
             leaderElection,
             NullLogger<ShipRefreshWorkerService>.Instance);
@@ -115,7 +115,7 @@ public sealed class ShipRefreshWorkerServiceTests
         await using var provider = services.BuildServiceProvider();
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
 
-        var worker = new ShipRefreshWorkerService(
+        using var worker = new ShipRefreshWorkerService(
             scopeFactory,
             leaderElection,
             NullLogger<ShipRefreshWorkerService>.Instance);

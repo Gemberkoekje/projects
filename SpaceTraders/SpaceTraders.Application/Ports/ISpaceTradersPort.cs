@@ -39,4 +39,25 @@ public interface ISpaceTradersPort
     Task<ShipyardDataModel> GetShipyardAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<RegisterResult> RegisterAsync(string agentSymbol, string faction, string? email, CancellationToken cancellationToken = default);
+
+    // Phase 1 additions
+    Task<CargoModel> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<JettisonActionResult> JettisonCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
+
+    Task<NegotiateContractActionResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<NavModel> PatchShipNavAsync(string shipSymbol, string flightMode, CancellationToken cancellationToken = default);
+
+    Task<SurveyActionResult> SurveyAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ExtractionActionResult> ExtractWithSurveyAsync(string shipSymbol, SurveyModel survey, CancellationToken cancellationToken = default);
+
+    Task<SiphonActionResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    Task<JumpActionResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
+
+    Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 }

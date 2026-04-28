@@ -67,4 +67,25 @@ public interface ISpaceTradersApiClient
     Task<Market> GetMarketAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 
     Task<Shipyard> GetShipyardAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    // Phase 1 additions
+    Task<ShipCargo> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<JettisonResult> JettisonCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
+
+    Task<NegotiateContractResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<PatchShipNavResult> PatchShipNavAsync(string shipSymbol, string flightMode, CancellationToken cancellationToken = default);
+
+    Task<SurveyResult> SurveyAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ExtractResult> ExtractWithSurveyAsync(string shipSymbol, Survey survey, CancellationToken cancellationToken = default);
+
+    Task<SiphonResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<WarpResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    Task<JumpResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
+
+    Task<ChartResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 }

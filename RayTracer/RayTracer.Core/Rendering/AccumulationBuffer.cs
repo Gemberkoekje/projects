@@ -4,6 +4,8 @@ namespace RayTracer;
 
 public partial class JobSystem
 {
+    private const uint StopAccumulationSampleCount = 8;
+
     /// <summary>
     /// Clears the accumulation buffers so the image reconverges quickly
     /// after a camera movement or rotation.
@@ -97,6 +99,36 @@ public partial class JobSystem
                 _buffers.SampleCount[i] = MotionSampleCap;
     }
 
+    /// <summary>
+    /// Reduces accumulation to a small effective sample count per pixel while
+    /// preserving the current mean color. This allows new samples to take over
+    /// quickly without a full blackout reset.
+    /// </summary>
+    public void CollapseAccumulationForStoppedMotion()
+    {
+        _accumulationBuffer.CollapseAccumulationForStoppedMotion();
+    }
+
+    internal void CollapseAccumulationForStoppedMotionCore()
+    {
+        _checkerPhase ^= 1;
+
+        for (int i = 0; i < _buffers.SampleCount.Length; i++)
+        {
+            uint count = _buffers.SampleCount[i];
+            if (count <= StopAccumulationSampleCount)
+                continue;
+
+            float scale = StopAccumulationSampleCount / (float)count;
+            _buffers.LumaM2[i] *= scale;
+            _buffers.LumaDirectM2[i] *= scale;
+            _buffers.LumaIndirectM2[i] *= scale;
+            _buffers.ClampAmount[i] *= scale;
+            _buffers.SampleCount[i] = StopAccumulationSampleCount;
+            _buffers.WavelengthCounter[i] = Math.Min(_buffers.WavelengthCounter[i], StopAccumulationSampleCount);
+        }
+    }
+
     private sealed class AccumulationBuffer(JobSystem owner)
     {
         private readonly JobSystem _owner = owner;
@@ -109,6 +141,11 @@ public partial class JobSystem
         public void SoftResetAccumulation()
         {
             _owner.SoftResetAccumulationCore();
+        }
+
+        public void CollapseAccumulationForStoppedMotion()
+        {
+            _owner.CollapseAccumulationForStoppedMotionCore();
         }
     }
 }

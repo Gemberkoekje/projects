@@ -56,7 +56,9 @@ public static class PerformanceCalibrator
                 SubPixelJitter: preset.SubPixelJitter),
             denoiseOptions: new DenoiseOptions(
                 FilterRadius: preset.FilterRadius,
-                EdgeAwareFilter: preset.EdgeAwareFilter),
+                EdgeAwareFilter: preset.EdgeAwareFilter,
+                SmokeMode: preset.SmokeMode,
+                Volumetrics: preset.Volumetrics),
             debugOptions: new DebugOptions());
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

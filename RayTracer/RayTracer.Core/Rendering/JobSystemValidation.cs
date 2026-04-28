@@ -42,5 +42,31 @@ public partial class JobSystem
 
         if (denoiseOptions.DiffuseCacheMinSamples == 0)
             throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.DiffuseCacheMinSamples, "DiffuseCacheMinSamples must be greater than zero.");
+
+        ValidateVolumetricOptions(denoiseOptions.Volumetrics);
+    }
+
+    private static void ValidateVolumetricOptions(VolumetricOptions volumetrics)
+    {
+        if (volumetrics.MarchSteps < 0)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.MarchSteps, "MarchSteps cannot be negative.");
+
+        if (volumetrics.MaxMarchDistance < 0f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.MaxMarchDistance, "MaxMarchDistance cannot be negative.");
+
+        if (volumetrics.SigmaScaleFog < 0f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.SigmaScaleFog, "SigmaScaleFog cannot be negative.");
+
+        if (volumetrics.SigmaScaleGround < 0f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.SigmaScaleGround, "SigmaScaleGround cannot be negative.");
+
+        if (volumetrics.AnisotropyG is < -0.95f or > 0.95f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.AnisotropyG, "AnisotropyG must be in [-0.95, 0.95].");
+
+        if (volumetrics.InscatterStrength < 0f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.InscatterStrength, "InscatterStrength cannot be negative.");
+
+        if (volumetrics.EarlyOutTransmittance is < 0f or > 1f)
+            throw new ArgumentOutOfRangeException(nameof(volumetrics), volumetrics.EarlyOutTransmittance, "EarlyOutTransmittance must be in [0, 1].");
     }
 }

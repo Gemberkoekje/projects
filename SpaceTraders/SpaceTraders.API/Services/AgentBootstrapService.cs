@@ -38,7 +38,8 @@ public sealed class AgentBootstrapService(
             return;
         }
 
-        if (await TryBootstrapWithTokenAsync(_options.AgentToken, "configured", cancellationToken))
+        var configuredToken = _options.AgentToken ?? string.Empty;
+        if (await TryBootstrapWithTokenAsync(configuredToken, "configured", cancellationToken))
         {
             return;
         }

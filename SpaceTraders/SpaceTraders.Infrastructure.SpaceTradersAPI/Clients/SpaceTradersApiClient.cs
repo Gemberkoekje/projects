@@ -167,6 +167,82 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    public Task<ShipCargo> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => GetWrappedAsync<ShipCargo>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/cargo",
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<JettisonResult> JettisonCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, JettisonResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/jettison",
+            new { symbol = tradeSymbol, units },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<NegotiateContractResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, NegotiateContractResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/negotiate/contract",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<PatchShipNavResult> PatchShipNavAsync(string shipSymbol, string flightMode, CancellationToken cancellationToken = default)
+        => PatchWrappedAsync<object, PatchShipNavResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/nav",
+            new { flightMode },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<SurveyResult> SurveyAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, SurveyResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/survey",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<ExtractResult> ExtractWithSurveyAsync(string shipSymbol, Survey survey, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<ExtractWithSurveyRequest, ExtractResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/extract/survey",
+            new ExtractWithSurveyRequest
+            {
+                Signature = survey.Signature,
+                Symbol = survey.Symbol,
+                Deposits = survey.Deposits,
+                Expiration = survey.Expiration,
+                Size = survey.Size,
+            },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<SiphonResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, SiphonResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/siphon",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<WarpResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, WarpResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/warp",
+            new { waypointSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<JumpResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, JumpResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/jump",
+            new { systemSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<ChartResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, ChartResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/chart",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
     private async Task<T> GetWrappedAsync<T>(string endpoint, AuthMode authMode, CancellationToken cancellationToken)
     {
         var response = await GetAsync<ApiResponse<T>>(endpoint, authMode, cancellationToken);
@@ -179,6 +255,12 @@ public sealed class SpaceTradersApiClient(
     private async Task<TResponse> PostWrappedAsync<TRequest, TResponse>(string endpoint, TRequest request, AuthMode authMode, CancellationToken cancellationToken)
     {
         var response = await SendAsync<ApiResponse<TResponse>>(HttpMethod.Post, endpoint, authMode, request, cancellationToken);
+        return response.Data;
+    }
+
+    private async Task<TResponse> PatchWrappedAsync<TRequest, TResponse>(string endpoint, TRequest request, AuthMode authMode, CancellationToken cancellationToken)
+    {
+        var response = await SendAsync<ApiResponse<TResponse>>(HttpMethod.Patch, endpoint, authMode, request, cancellationToken);
         return response.Data;
     }
 

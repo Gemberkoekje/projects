@@ -47,7 +47,10 @@ public record RenderPreset(
     bool CheckerboardMotion = false,
     float TemporalBlendAlpha = 0f,
     float SampleClamp = 0f,
-    CpuThrottle ThrottleCpu = CpuThrottle.Normal)
+    CpuThrottle ThrottleCpu = CpuThrottle.Normal,
+    SmokeMode SmokeMode = SmokeMode.Biome,
+    VolumetricOptions Volumetrics = default,
+    bool IsDebugSmokePreset = false)
 {
     // ── Presets ─────────────────────────────────────────────────────
     public static RenderPreset Low => new(
@@ -55,30 +58,70 @@ public record RenderPreset(
         SubPixelJitter: false, ResolutionScale: 1.0f,
         FilterRadius: 1, EdgeAwareFilter: false,
         Lighting: LightingMode.None,
-        SampleClamp: 10f);
+        SampleClamp: 10f,
+        SmokeMode: SmokeMode.None,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Off, SmokeMode.None));
+
+    public static RenderPreset Playable => new(
+        "Playable", 320, 240, 1, 150, 8, 32,
+        SubPixelJitter: true, ResolutionScale: 1.0f,
+        FilterRadius: 1, EdgeAwareFilter: true,
+        Lighting: LightingMode.Direct,
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.08f, SampleClamp: 8f,
+        SmokeMode: SmokeMode.Biome,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Low, SmokeMode.Biome)
+            with { MarchSteps = 3, MaxMarchDistance = 10f, InscatterStrength = 0.22f });
 
     public static RenderPreset Medium => new(
         "Medium", 480, 360, 4, 300, 16, 32,
         SubPixelJitter: true, ResolutionScale: 1.0f,
         FilterRadius: 1, EdgeAwareFilter: true,
         Lighting: LightingMode.Direct,
-        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 10f);
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.Biome,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.Biome));
 
     public static RenderPreset High => new(
         "High", 640, 480, 4, 500, 24, 32,
         SubPixelJitter: true, ResolutionScale: 1.0f,
         FilterRadius: 1, EdgeAwareFilter: true,
         Lighting: LightingMode.NEE,
-        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 10f);
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.Biome,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.Biome));
 
     public static RenderPreset Ultra => new(
         "Ultra", 800, 600, 8, 800, 32, 32,
         SubPixelJitter: true, ResolutionScale: 1.25f,
         FilterRadius: 2, EdgeAwareFilter: true,
         Lighting: LightingMode.NEE,
-        CheckerboardMotion: true, TemporalBlendAlpha: 0.04f, SampleClamp: 10f);
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.04f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.Biome,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Ultra, SmokeMode.Biome));
 
-    public static RenderPreset[] All => [Low, Medium, High, Ultra];
+    public static RenderPreset FogDebug => new(
+        "Fog Debug", 480, 360, 2, 250, 12, 32,
+        SubPixelJitter: true, ResolutionScale: 1.0f,
+        FilterRadius: 1, EdgeAwareFilter: true,
+        Lighting: LightingMode.Direct,
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.AlwaysFog,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog) with { SigmaScaleFog = 1.35f },
+        IsDebugSmokePreset: true);
+
+    public static RenderPreset GroundSmokeDebug => new(
+        "Ground Smoke Debug", 480, 360, 2, 250, 12, 32,
+        SubPixelJitter: true, ResolutionScale: 1.0f,
+        FilterRadius: 1, EdgeAwareFilter: true,
+        Lighting: LightingMode.Direct,
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.AlwaysGroundSmoke,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysGroundSmoke) with { SigmaScaleGround = 1.45f, MaxMarchDistance = 12f },
+        IsDebugSmokePreset: true);
+
+    public static RenderPreset[] All => [Low, Playable, Medium, High, Ultra, FogDebug, GroundSmokeDebug];
+
+    public static RenderPreset[] QualityPresets => [Low, Playable, Medium, High, Ultra];
 
     // ── Derived metrics ────────────────────────────────────────────
     /// <summary>Effective width after applying <see cref="ResolutionScale"/>.</summary>
@@ -117,6 +160,16 @@ public record RenderPreset(
             if (CheckerboardMotion) parts.Add("checker");
             if (TemporalBlendAlpha > 0f) parts.Add("EMA");
             if (SampleClamp > 0f) parts.Add("clamp");
+            if (SmokeMode != SmokeMode.None)
+            {
+                parts.Add(SmokeMode switch
+                {
+                    SmokeMode.Biome => "biome smoke",
+                    SmokeMode.AlwaysFog => "always fog",
+                    SmokeMode.AlwaysGroundSmoke => "ground smoke",
+                    _ => "smoke"
+                });
+            }
             return parts.Count > 0 ? string.Join(", ", parts) : "baseline";
         }
     }
@@ -129,10 +182,10 @@ public record RenderPreset(
     /// </summary>
     public static RenderPreset Recommend(double raysPerSecond)
     {
-        // Walk from highest to lowest; pick the first that hits ≥10 FPS.
-        var presets = new[] { Ultra, High, Medium, Low };
+        // Walk from highest to lowest quality preset; pick the first that hits ≥10 FPS.
+        var presets = new[] { Ultra, High, Medium, Playable, Low };
         foreach (var p in presets)
-            if (p.PredictFps(raysPerSecond) >= 10)
+            if (!p.IsDebugSmokePreset && p.PredictFps(raysPerSecond) >= 10)
                 return p;
         return Low;
     }

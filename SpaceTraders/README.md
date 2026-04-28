@@ -1,15 +1,15 @@
-# SpaceTraders (Current Foundation)
+# SpaceTraders
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 
-This repository currently contains a **foundation implementation** for a SpaceTraders-based system:
+This repository contains a .NET automation and dashboard system for the [SpaceTraders API](https://spacetraders.io/):
 
 - Typed SpaceTraders API client (`SpaceTraders.Infrastructure.SpaceTradersAPI`)
 - PostgreSQL persistence for cached agent/ship/contract/token data (`SpaceTraders.Infrastructure.Persistence`)
 - API host with bootstrap + startup sync + game-loop + ship-worker automation (`SpaceTraders.API`)
-- Razor Pages dashboard showing cached agent + ships (`SpaceTraders.App`)
+- Razor Pages dashboard for operational views (`SpaceTraders.App`)
 
-> The detailed design docs in `docs/plan/` describe the **target architecture**. Large parts are planned, not yet implemented.
+SpaceTraders is a headless, open-universe space game exposed through HTTP endpoints. Players write their own clients to control agents, ships, contracts, mining, trading, navigation, and exploration. This project uses that API as the backend for automated fleet operations and a local Razor Pages dashboard.
 
 ---
 
@@ -21,7 +21,7 @@ This repository currently contains a **foundation implementation** for a SpaceTr
 - Typed API client for: status, factions, agents, systems, waypoints, fleet, contracts
 - Dead-reckoning game loop (detects ship arrivals, low fuel, API availability changes)
 - Ship automation services and event handlers
-- Contract watch service, Scout service, Fleet expansion
+- Contract watch service and fleet expansion decisions
 - Event handlers: `ContractPriorityHandler`, `ShipFuelLowHandler`, `ApiUnavailabilityHandler`
 - Internal REST API (`/status/*`, `/settings/*`, `/control/*`, `/health/*`)
 - API key authentication middleware (`X-Api-Key` header)
@@ -93,16 +93,25 @@ The API host creates the DB schema with `EnsureCreated()` on startup. The dashbo
 
 ### 4) Internal REST API
 
+The API host applies the path base `/spacetraders/api`. The endpoints below are relative to that path base.
+
 | Endpoint | Auth | Description |
 |----------|------|-------------|
 | `GET /health/live` | None | Liveness probe |
 | `GET /health/ready` | None | Readiness probe (DB check) |
+| `GET /health/startup` | None | Startup probe |
 | `GET /status/agent` | `X-Api-Key` | Current agent credits + ship count |
 | `GET /status/ships` | `X-Api-Key` | All ships with assignment + nav |
+| `GET /status/contracts` | `X-Api-Key` | Active cached contracts |
+| `GET /status/rate-limit` | `X-Api-Key` | Current rate limit status |
+| `GET /status/activity` | `X-Api-Key` | Paged activity log |
+| `GET /status/trade-opportunities` | `X-Api-Key` | Best cached trade opportunity |
 | `GET /settings/` | `X-Api-Key` | All operator settings |
 | `PUT /settings/{key}` | `X-Api-Key` | Update a setting |
+| `POST /settings/reset` | `X-Api-Key` | Reset settings to defaults |
 | `POST /control/automation/enable` | `X-Api-Key` | Resume automation |
 | `POST /control/automation/disable` | `X-Api-Key` | Pause automation |
+| `POST /control/ships/{symbol}/reassign` | `X-Api-Key` | Reassign a ship |
 | `POST /control/sync` | `X-Api-Key` | Force full sync |
 
 ---
@@ -127,7 +136,7 @@ kubectl apply -f k8s/ingress.yaml         # optional, requires nginx ingress con
 Build and push container images:
 
 ```powershell
-# From the repository root:
+# From C:\git\projects, the parent directory that contains SpaceTraders:
 docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
 docker build -f SpaceTraders/Dockerfile.app -t spacetraders-app:latest .
 ```
@@ -147,9 +156,11 @@ Integration tests (require Docker / PostgreSQL) are tagged `Category=Integration
 
 ## Documentation
 
-- `docs/plan/00-overview.md` = planning index
-- `docs/plan/ship-event-command-plan.md` = current target ship automation plan
-- `docs/plan/` = broader target/roadmap architecture documents
-- `plan.md` = archived integration plan for initial API client work
+- `docs/implementation/CURRENT_IMPLEMENTATION_OVERVIEW.md` = how the solution works today (implemented behavior)
+- `docs/implementation/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md` = implemented consistency and recovery safeguards
+- `docs/operations/LOCAL_DEVELOPMENT.md` = local development, internal endpoints, and deployment notes
+- `docs/SPACE_TRADERS_IMPLEMENTATION_PLAN.md` = implementation plan based on `spacetraders.md` and current code
+- `docs/GLOSSARY.md` = project terminology
+- `spacetraders.md` = cleaned SpaceTraders.io reference content and gameplay/API explanation
 - `CHANGELOG.md` = notable changes
 - `CONTRIBUTING.md` = contribution conventions

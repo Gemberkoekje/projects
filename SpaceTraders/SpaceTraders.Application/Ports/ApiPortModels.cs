@@ -464,3 +464,135 @@ public sealed record RegisterResult
         this.AgentSymbol = AgentSymbol;
     }
 }
+
+public sealed record JettisonActionResult
+{
+    public required CargoModel Cargo { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public JettisonActionResult(CargoModel Cargo)
+    {
+        this.Cargo = Cargo;
+    }
+}
+
+public sealed record SurveyDepositModel
+{
+    public required string Symbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SurveyDepositModel(string Symbol)
+    {
+        this.Symbol = Symbol;
+    }
+}
+
+public sealed record SurveyModel
+{
+    public required string Signature { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    public required IReadOnlyList<SurveyDepositModel> Deposits { get; init; }
+
+    public required DateTimeOffset Expiration { get; init; }
+
+    public required string Size { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SurveyModel(string Signature, string WaypointSymbol, IReadOnlyList<SurveyDepositModel> Deposits, DateTimeOffset Expiration, string Size)
+    {
+        this.Signature = Signature;
+        this.WaypointSymbol = WaypointSymbol;
+        this.Deposits = Deposits;
+        this.Expiration = Expiration;
+        this.Size = Size;
+    }
+}
+
+public sealed record SurveyActionResult
+{
+    public required IReadOnlyList<SurveyModel> Surveys { get; init; }
+
+    public required int CooldownSeconds { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SurveyActionResult(IReadOnlyList<SurveyModel> Surveys, int CooldownSeconds)
+    {
+        this.Surveys = Surveys;
+        this.CooldownSeconds = CooldownSeconds;
+    }
+}
+
+public sealed record SiphonActionResult
+{
+    public required string YieldSymbol { get; init; }
+
+    public required int YieldUnits { get; init; }
+
+    public required CargoModel Cargo { get; init; }
+
+    public required int CooldownSeconds { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SiphonActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds)
+    {
+        this.YieldSymbol = YieldSymbol;
+        this.YieldUnits = YieldUnits;
+        this.Cargo = Cargo;
+        this.CooldownSeconds = CooldownSeconds;
+    }
+}
+
+public sealed record WarpActionResult
+{
+    public required NavModel Nav { get; init; }
+
+    public required FuelModel Fuel { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public WarpActionResult(NavModel Nav, FuelModel Fuel)
+    {
+        this.Nav = Nav;
+        this.Fuel = Fuel;
+    }
+}
+
+public sealed record JumpActionResult
+{
+    public required NavModel Nav { get; init; }
+
+    public required int CooldownSeconds { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public JumpActionResult(NavModel Nav, int CooldownSeconds)
+    {
+        this.Nav = Nav;
+        this.CooldownSeconds = CooldownSeconds;
+    }
+}
+
+public sealed record ChartActionResult
+{
+    public required string WaypointSymbol { get; init; }
+
+    public required string WaypointType { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ChartActionResult(string WaypointSymbol, string WaypointType)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.WaypointType = WaypointType;
+    }
+}
+
+public sealed record NegotiateContractActionResult
+{
+    public required ContractModel Contract { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public NegotiateContractActionResult(ContractModel Contract)
+    {
+        this.Contract = Contract;
+    }
+}

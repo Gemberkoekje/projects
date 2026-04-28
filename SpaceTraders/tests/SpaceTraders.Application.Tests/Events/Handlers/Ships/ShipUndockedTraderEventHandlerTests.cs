@@ -39,21 +39,22 @@ public sealed class ShipUndockedTraderEventHandlerTests
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100, CargoCurrent: 0, CargoCapacity: 20));
 
         var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(bus);
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbit);
-        services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedTraderEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
 
         await using var provider = services.BuildServiceProvider();
         var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
 
         var @event = new ShipUndockedEvent("SHIP-1", "X1-AB", "X1-AB-001", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow);
 
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
+        var result = await dispatcher.DispatchAsync<ShipInOrbitEvent>(@event, CancellationToken.None);
 
-        result.HandlerName.Should().Be(nameof(ShipUndockedTraderEventHandler));
+        result.HandlerName.Should().Be(nameof(ShipInOrbitTraderEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipMovingEvent));
 
         await inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-010", Arg.Any<CancellationToken>());
     }
@@ -83,21 +84,22 @@ public sealed class ShipUndockedTraderEventHandlerTests
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-099", "IN_ORBIT", "CRUISE", 100, 100, CargoCurrent: 10, CargoCapacity: 20));
 
         var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(bus);
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbit);
-        services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, ShipUndockedTraderEventHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
 
         await using var provider = services.BuildServiceProvider();
         var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
 
         var @event = new ShipUndockedEvent("SHIP-1", "X1-AB", "X1-AB-099", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow);
 
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
+        var result = await dispatcher.DispatchAsync<ShipInOrbitEvent>(@event, CancellationToken.None);
 
-        result.HandlerName.Should().Be(nameof(ShipUndockedTraderEventHandler));
+        result.HandlerName.Should().Be(nameof(ShipInOrbitTraderEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipDockedEvent));
 
         await inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
     }

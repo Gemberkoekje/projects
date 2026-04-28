@@ -20,7 +20,9 @@ public sealed record DenoiseOptions(
     float SampleClamp = 0f,
     bool EnableDiffuseCache = true,
     float DiffuseCacheCellSize = 0.25f,
-    uint DiffuseCacheMinSamples = 4);
+    uint DiffuseCacheMinSamples = 4,
+    SmokeMode SmokeMode = SmokeMode.Biome,
+    VolumetricOptions Volumetrics = default);
 
 public sealed record DebugOptions(
     bool EnableDiagnostics = true);

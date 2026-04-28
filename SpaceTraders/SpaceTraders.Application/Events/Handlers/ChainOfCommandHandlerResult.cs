@@ -9,6 +9,9 @@ public abstract record ChainOfCommandHandlerResult
     public static ChainOfCommandHandlerResult Handled(ChainOfCommandEvent nextEvent)
         => new HandledChainOfCommandHandlerResult(nextEvent, false, DateTimeOffset.MinValue);
 
+    public static ChainOfCommandHandlerResult Handled()
+        => HandledWithoutNextEventChainOfCommandHandlerResult.Instance;
+
     public static ChainOfCommandHandlerResult Scheduled(ChainOfCommandEvent nextEvent, DateTimeOffset dueAt)
         => new HandledChainOfCommandHandlerResult(nextEvent, true, dueAt);
 
@@ -23,6 +26,15 @@ internal sealed record SkippedChainOfCommandHandlerResult : ChainOfCommandHandle
     }
 
     public static SkippedChainOfCommandHandlerResult Instance { get; } = new();
+}
+
+internal sealed record HandledWithoutNextEventChainOfCommandHandlerResult : ChainOfCommandHandlerResult
+{
+    private HandledWithoutNextEventChainOfCommandHandlerResult()
+    {
+    }
+
+    public static HandledWithoutNextEventChainOfCommandHandlerResult Instance { get; } = new();
 }
 
 internal sealed record HandledChainOfCommandHandlerResult(

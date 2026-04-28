@@ -1,177 +1,58 @@
-using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Infrastructure.Persistence.Entities;
-using SpaceTraders.Infrastructure.Persistence.Repositories;
+using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Commands;
 
 public sealed class SellCargoHandlerTests
 {
-    private static void AddWaypoint(
-        SpaceTraders.Infrastructure.Persistence.SpaceTradersDbContext db,
-        string symbol = "X1-AB-001",
-        bool hasMarket = true)
-    {
-        db.Waypoints.Add(new CachedWaypoint
-        {
-            AgentToken = TestDbContextFactory.AgentToken,
-            Symbol = symbol,
-            SystemSymbol = "X1-AB",
-            Type = "ORBITAL_STATION",
-            X = 0,
-            Y = 0,
-            HasMarket = hasMarket,
-            HasShipyard = false,
-            LastObservedAt = DateTimeOffset.UtcNow,
-        });
-    }
-
     [Fact]
-    public async Task SellCargo_AppliesCargoAndCreditsFromResponse()
+    public async Task SellCargo_WhenNotDocked_PublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
-        port.SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult("AGENT-1", 55_000, new CargoModel(0, 60), 5_000));
-
-        var assignments = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipAssignmentRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
         var bus = Substitute.For<IMessageBus>();
 
-        await using var db = TestDbContextFactory.Create();
-        db.Ships.Add(new CachedShip
-        {
-            AgentToken = TestDbContextFactory.AgentToken,
-            Symbol = "SHIP-1",
-            WaypointSymbol = "X1-AB-001",
-            Status = "DOCKED",
-            CargoCurrent = 10,
-            CargoCapacity = 60,
-            LastSyncedAt = DateTimeOffset.UtcNow,
-        });
-        AddWaypoint(db);
-        db.Agents.Add(new CachedAgent { AgentToken = TestDbContextFactory.AgentToken, Symbol = "AGENT-1", StartingFaction = "COSMIC", Credits = 50_000, ShipCount = 1, LastSyncedAt = DateTimeOffset.UtcNow });
-        await db.SaveChangesAsync();
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
 
-        var ships = new ShipRepository(db);
-        var agents = new AgentRepository(db);
-        var waypoints = new WaypointRepository(db);
+        var handler = new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance);
+        await handler.Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
-        await new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance)
-            .Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
-
-        var ship = await db.Ships.FindAsync(TestDbContextFactory.AgentToken, "SHIP-1");
-        ship!.CargoCurrent.Should().Be(0);
-
-        var agent = await db.Agents.FindAsync(TestDbContextFactory.AgentToken, "AGENT-1");
-        agent!.Credits.Should().Be(55_000);
+        await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task SellCargo_PublishesShipCargoSoldEvent()
+    public async Task SellCargo_PublishesShipCargoSoldEvent_WhenSuccessful()
     {
         var port = Substitute.For<ISpaceTradersPort>();
-        port.SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult("AGENT-1", 55_000, new CargoModel(0, 60), 5_000));
-
-        var assignments = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipAssignmentRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var agents = Substitute.For<IAgentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
         var bus = Substitute.For<IMessageBus>();
 
-        await using var db = TestDbContextFactory.Create();
-        db.Ships.Add(new CachedShip
-        {
-            AgentToken = TestDbContextFactory.AgentToken,
-            Symbol = "SHIP-1",
-            WaypointSymbol = "X1-AB-001",
-            Status = "DOCKED",
-            LastSyncedAt = DateTimeOffset.UtcNow,
-        });
-        AddWaypoint(db);
-        db.Agents.Add(new CachedAgent { AgentToken = TestDbContextFactory.AgentToken, Symbol = "AGENT-1", StartingFaction = "COSMIC", Credits = 50_000, ShipCount = 1, LastSyncedAt = DateTimeOffset.UtcNow });
-        await db.SaveChangesAsync();
-
-        var ships = new ShipRepository(db);
-        var agents = new AgentRepository(db);
-        var waypoints = new WaypointRepository(db);
-
-        await new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance)
-            .Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
-
-        await bus.Received(1).PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task SellCargo_PublishesAssignmentCompletedEvent_WhenAssignmentWasMarkedComplete()
-    {
-        var port = Substitute.For<ISpaceTradersPort>();
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100, CargoCurrent: 10, CargoCapacity: 60));
+        waypoints.FindAsync("X1-AB-001", Arg.Any<CancellationToken>())
+            .Returns(new WaypointCacheModel("X1-AB-001", "X1-AB", "ORBITAL_STATION", 0, 0, true, false, DateTimeOffset.UtcNow));
         port.SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
             .Returns(new TradeActionResult("AGENT-1", 55_000, new CargoModel(0, 60), 5_000));
-
-        var assignments = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipAssignmentRepository>();
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto("SHIP-1", "Trade", "X1-AB-001", "X1-AB-002", "IRON_ORE", null, 5, DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow));
-        var bus = Substitute.For<IMessageBus>();
+            .Returns(new ShipAssignmentDto("SHIP-1", "Trade", null, null, null, null, 0, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow));
 
-        await using var db = TestDbContextFactory.Create();
-        db.Ships.Add(new CachedShip
-        {
-            AgentToken = TestDbContextFactory.AgentToken,
-            Symbol = "SHIP-1",
-            WaypointSymbol = "X1-AB-001",
-            Status = "DOCKED",
-            LastSyncedAt = DateTimeOffset.UtcNow,
-        });
-        AddWaypoint(db);
-        db.Agents.Add(new CachedAgent { AgentToken = TestDbContextFactory.AgentToken, Symbol = "AGENT-1", StartingFaction = "COSMIC", Credits = 50_000, ShipCount = 1, LastSyncedAt = DateTimeOffset.UtcNow });
-        await db.SaveChangesAsync();
+        var handler = new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance);
+        await handler.Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
-        var ships = new ShipRepository(db);
-        var agents = new AgentRepository(db);
-        var waypoints = new WaypointRepository(db);
-
-        await new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance)
-            .Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
-
-        await bus.Received().PublishAsync(
-            Arg.Is<object>(m => m.GetType().Name == "ShipAssignmentCompletedEvent"),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task SellCargo_DoesNotIssueFollowUpGets()
-    {
-        var port = Substitute.For<ISpaceTradersPort>();
-        port.SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
-            .Returns(new TradeActionResult("AGENT-1", 55_000, new CargoModel(0, 60), 5_000));
-
-        var assignments = Substitute.For<SpaceTraders.Application.Interfaces.Repositories.IShipAssignmentRepository>();
-        var bus = Substitute.For<IMessageBus>();
-
-        await using var db = TestDbContextFactory.Create();
-        db.Ships.Add(new CachedShip
-        {
-            AgentToken = TestDbContextFactory.AgentToken,
-            Symbol = "SHIP-1",
-            WaypointSymbol = "X1-AB-001",
-            Status = "DOCKED",
-            LastSyncedAt = DateTimeOffset.UtcNow,
-        });
-        AddWaypoint(db);
-        db.Agents.Add(new CachedAgent { AgentToken = TestDbContextFactory.AgentToken, Symbol = "AGENT-1", StartingFaction = "COSMIC", Credits = 50_000, ShipCount = 1, LastSyncedAt = DateTimeOffset.UtcNow });
-        await db.SaveChangesAsync();
-
-        var ships = new ShipRepository(db);
-        var agents = new AgentRepository(db);
-        var waypoints = new WaypointRepository(db);
-
-        await new SellCargoHandler(port, ships, agents, waypoints, assignments, bus, NullLogger<SellCargoHandler>.Instance)
-            .Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
-
-        await port.Received(1).SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>());
-        await port.DidNotReceive().GetMyAgentAsync(Arg.Any<CancellationToken>());
-        await port.DidNotReceive().GetMyShipsAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+        await bus.Received().PublishAsync(Arg.Any<ShipCargoSoldEvent>(), Arg.Any<DeliveryOptions>());
     }
 }

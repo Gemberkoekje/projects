@@ -12,11 +12,12 @@ Please keep changes small, focused, and aligned with the current implementation.
 Implemented today:
 - SpaceTraders typed HTTP client
 - PostgreSQL persistence with EF Core
-- API host with bootstrap + startup sync hosted services
-- Razor Pages dashboard (overview with cached agent + ships)
+- API host with bootstrap, startup sync, startup recovery, game loop, contract watch, activity pruning, ship refresh, metrics, and leader election hosted services
+- Internal Minimal API endpoints for status, settings, control, metrics, and health
+- Razor Pages dashboard for agent, fleet, contracts, market, API usage, activity log, and settings views
+- Kubernetes manifests and root-level Dockerfiles for API and app deployment
 
-Planned architecture and future phases are documented in `docs/plan/`.
-Start with `docs/plan/00-overview.md`; the current target ship automation direction is `docs/plan/ship-event-command-plan.md`.
+Current architecture and operational behavior are documented in `docs/implementation/` and `docs/operations/`.
 
 ---
 
@@ -41,6 +42,7 @@ Use PostgreSQL in development and production paths.
 - Keep nullable reference types enabled.
 - Use `CancellationToken` on async APIs.
 - Prefer small, testable units where possible.
+- Do not log full SpaceTraders account or agent tokens. Mask tokens in diagnostics.
 
 ---
 

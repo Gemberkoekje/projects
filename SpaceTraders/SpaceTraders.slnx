@@ -1,11 +1,16 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="spacetraders.md" />
+  </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.csproj" />
     <Project Path="tests/SpaceTraders.API.Tests/SpaceTraders.API.Tests.csproj" />
+    <Project Path="tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Domain.Tests/SpaceTraders.Domain.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Infrastructure.Tests/SpaceTraders.Infrastructure.Tests.csproj" />
   </Folder>
-  <Project Path=".net.csproj" />
+  <Project Path="SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj" />
   <Project Path="SpaceTraders.API/SpaceTraders.API.csproj" />
   <Project Path="SpaceTraders.App/SpaceTraders.App.csproj" />
   <Project Path="SpaceTraders.Application/SpaceTraders.Application.csproj" />

@@ -13,10 +13,9 @@ namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 public sealed class ShipInTransitEventHandlerTests
 {
     [Fact]
-    public async Task DispatchAsync_SchedulesShipInOrbitEvent_WhenArrivalIsInFuture()
+    public async Task DispatchAsync_SchedulesArrival_WhenArrivalIsInFuture()
     {
         var bus = Substitute.For<IMessageBus>();
-
         var services = new ServiceCollection();
         services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>, ShipInTransitEventHandler>();
 
@@ -37,15 +36,14 @@ public sealed class ShipInTransitEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipInOrbitEvent));
+        result.NextEventType.Should().Be(nameof(ShipArrivedEvent));
         result.IsScheduled.Should().BeTrue();
     }
 
     [Fact]
-    public async Task DispatchAsync_PublishesShipInOrbitEvent_WhenArrivalIsDue()
+    public async Task DispatchAsync_PublishesArrivalImmediately_WhenArrivalIsDue()
     {
         var bus = Substitute.For<IMessageBus>();
-
         var services = new ServiceCollection();
         services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>, ShipInTransitEventHandler>();
 
@@ -60,20 +58,22 @@ public sealed class ShipInTransitEventHandlerTests
             now.AddSeconds(-1),
             Guid.NewGuid(),
             Guid.Empty,
-            now.AddMinutes(-1));
+            now.AddMinutes(-2));
 
         var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
 
         result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipInOrbitEvent));
+        result.NextEventType.Should().Be(nameof(ShipArrivedEvent));
         result.IsScheduled.Should().BeFalse();
 
         await bus.Received(1).PublishAsync(
-            Arg.Is<ShipInOrbitEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
+            Arg.Is<ShipArrivedEvent>(e =>
+                e.ShipSymbol == @event.ShipSymbol &&
+                e.WaypointSymbol == @event.DestinationWaypointSymbol &&
                 e.SystemSymbol == "X1-AB" &&
-                e.WaypointSymbol == "X1-AB-002"),
+                e.CorrelationId == @event.CorrelationId &&
+                e.CausationId == @event.EventId),
             Arg.Any<DeliveryOptions>());
     }
 }

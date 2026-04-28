@@ -23,6 +23,8 @@ namespace SpaceTraders.API.Tests;
 /// </summary>
 public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>, IDisposable
 {
+    private const string ApiPathBase = "/spacetraders/api";
+
     private readonly HttpClient _client;
     private readonly HttpClient _clientWithKey;
 
@@ -126,6 +128,57 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     {
         using var response = await _clientWithKey.PostAsync("/control/automation/disable", null);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // ── Smoke tests for path-based routing assumptions ────────────────────────
+
+    [Fact]
+    public async Task HealthLive_WithPathBase_ReturnsOkWithoutApiKey()
+    {
+        using var response = await _client.GetAsync($"{ApiPathBase}/health/live");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task HealthReady_WithPathBase_DoesNotRequireApiKey()
+    {
+        using var response = await _client.GetAsync($"{ApiPathBase}/health/ready");
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task HealthStartup_WithPathBase_DoesNotRequireApiKey()
+    {
+        using var response = await _client.GetAsync($"{ApiPathBase}/health/startup");
+        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task StatusAgent_WithPathBaseAndValidApiKey_Returns200OrNotFound()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/agent");
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task StatusShips_WithPathBaseAndValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/ships");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task StatusContracts_WithPathBaseAndValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/contracts");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Metrics_WithoutApiKeyWithPathBase_ReturnsUnauthorizedWhenApiKeyConfigured()
+    {
+        using var response = await _client.GetAsync($"{ApiPathBase}/metrics");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 }
 

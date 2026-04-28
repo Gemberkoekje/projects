@@ -40,6 +40,15 @@ public sealed class ChainOfCommandDispatcher(
                 continue;
             }
 
+            if (result is HandledWithoutNextEventChainOfCommandHandlerResult)
+            {
+                return new ChainOfCommandDispatchResult(
+                    handler.GetType().Name,
+                    "Handled",
+                    string.Empty,
+                    false);
+            }
+
             if (result is HandledChainOfCommandHandlerResult handled)
             {
                 if (handled.IsScheduled)

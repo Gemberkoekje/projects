@@ -1,11 +1,14 @@
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
+using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 public sealed class ShipStateMismatchEventHandler(
     IShipRepository ships,
-    IInOrbitCommandAcceptor inOrbitCommands) : IChainOfCommandEventHandler<ShipStateMismatchEvent>
+    IInOrbitCommandAcceptor inOrbitCommands,
+    IMessageBus bus) : IChainOfCommandEventHandler<ShipStateMismatchEvent>
 {
     public int Priority => 1000;
 
@@ -15,26 +18,17 @@ public sealed class ShipStateMismatchEventHandler(
         if (ship is not null && string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
-
-            var now = TimeProvider.System.GetUtcNow();
-            var dockedEvent = new ShipDockedEvent(
-                @event.ShipSymbol,
-                ship.SystemSymbol ?? string.Empty,
-                ship.WaypointSymbol ?? string.Empty,
-                @event.CorrelationId,
-                @event.EventId,
-                now);
-
-            return ChainOfCommandHandlerResult.Handled(dockedEvent);
+            return ChainOfCommandHandlerResult.Handled();
         }
 
-        var idleEvent = new ShipIdleEvent(
+        await bus.InvokeAsync(new AssignShipCommand(
             @event.ShipSymbol,
-            $"State mismatch recovery paused: {@event.Reason}",
-            @event.CorrelationId,
-            @event.EventId,
-            TimeProvider.System.GetUtcNow());
+            "Idle",
+            SystemSymbol: ship?.SystemSymbol ?? string.Empty,
+            WaypointSymbol: ship?.WaypointSymbol ?? string.Empty,
+            CorrelationId: @event.CorrelationId,
+            CausationId: @event.EventId), cancellationToken);
 
-        return ChainOfCommandHandlerResult.Handled(idleEvent);
+        return ChainOfCommandHandlerResult.Handled();
     }
 }

@@ -94,13 +94,13 @@ public partial class JobSystem
     private readonly Light[] _lights;
 
     /// <summary>Base ambient illumination applied to every hit point.</summary>
-    private const float AmbientLevel = 0.05f;
+    private const float AmbientLevel = 0.01f;
 
     /// <summary>
     /// Intensity of each point light. Scaled so that the floor
     /// directly below a ceiling light receives roughly unit illumination.
     /// </summary>
-    private const float LightIntensity = 4.0f;
+    private const float LightIntensity = 1.5f;
 
     public Camera Camera { get; set; }
 
@@ -188,6 +188,10 @@ public partial class JobSystem
     /// 0 = disabled.
     /// </summary>
     public float SampleClamp { get; }
+
+    public SmokeMode SmokeMode { get; }
+
+    public VolumetricOptions Volumetrics { get; }
 
     /// <summary>
     /// Controls how surfaces are shaded: <see cref="LightingMode.None"/>
@@ -303,6 +307,11 @@ public partial class JobSystem
         EnableDiffuseCache = effectiveDenoiseOptions.EnableDiffuseCache;
         DiffuseCacheCellSize = effectiveDenoiseOptions.DiffuseCacheCellSize;
         DiffuseCacheMinSamples = effectiveDenoiseOptions.DiffuseCacheMinSamples;
+        SmokeMode = effectiveDenoiseOptions.SmokeMode;
+        VolumetricOptions effectiveVolumetrics = effectiveDenoiseOptions.Volumetrics == default
+            ? VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode)
+            : effectiveDenoiseOptions.Volumetrics;
+        Volumetrics = effectiveVolumetrics.ForSmokeMode(SmokeMode);
 
         _sampleClampVec = new Vector3(SampleClamp);
         _irradianceCache = new DiffuseIrradianceCache(DiffuseCacheCellSize, DiffuseCacheMinSamples);

@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../SpaceTraders.Domain/SpaceTraders.Domain.csproj" />
   </ItemGroup>
 

@@ -185,6 +185,88 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return new RegisterResult(result.Token, result.Agent.Symbol);
     }
 
+    public async Task<CargoModel> GetShipCargoAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var cargo = await client.GetShipCargoAsync(shipSymbol, cancellationToken);
+        return MapCargo(cargo);
+    }
+
+    public async Task<JettisonActionResult> JettisonCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+    {
+        var result = await client.JettisonCargoAsync(shipSymbol, tradeSymbol, units, cancellationToken);
+        return new JettisonActionResult(MapCargo(result.Cargo));
+    }
+
+    public async Task<NegotiateContractActionResult> NegotiateContractAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.NegotiateContractAsync(shipSymbol, cancellationToken);
+        return new NegotiateContractActionResult(MapContract(result.Contract));
+    }
+
+    public async Task<NavModel> PatchShipNavAsync(string shipSymbol, string flightMode, CancellationToken cancellationToken = default)
+    {
+        var result = await client.PatchShipNavAsync(shipSymbol, flightMode, cancellationToken);
+        return MapNav(result.Nav);
+    }
+
+    public async Task<SurveyActionResult> SurveyAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.SurveyAsync(shipSymbol, cancellationToken);
+        var surveys = result.Surveys.Select(s => new SurveyModel(
+            s.Signature,
+            s.Symbol,
+            s.Deposits.Select(d => new SurveyDepositModel(d.Symbol)).ToList(),
+            s.Expiration,
+            s.Size)).ToList();
+        return new SurveyActionResult(surveys, result.Cooldown.TotalSeconds);
+    }
+
+    public async Task<ExtractionActionResult> ExtractWithSurveyAsync(string shipSymbol, SurveyModel survey, CancellationToken cancellationToken = default)
+    {
+        var apiSurvey = new Survey
+        {
+            Signature = survey.Signature,
+            Symbol = survey.WaypointSymbol,
+            Deposits = survey.Deposits.Select(d => new SurveyDeposit { Symbol = d.Symbol }).ToList(),
+            Expiration = survey.Expiration,
+            Size = survey.Size,
+        };
+        var result = await client.ExtractWithSurveyAsync(shipSymbol, apiSurvey, cancellationToken);
+        return new ExtractionActionResult(
+            result.Extraction.Yield.Symbol,
+            result.Extraction.Yield.Units,
+            MapCargo(result.Cargo),
+            result.Cooldown.TotalSeconds);
+    }
+
+    public async Task<SiphonActionResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.SiphonResourcesAsync(shipSymbol, cancellationToken);
+        return new SiphonActionResult(
+            result.Siphon.Yield.Symbol,
+            result.Siphon.Yield.Units,
+            MapCargo(result.Cargo),
+            result.Cooldown.TotalSeconds);
+    }
+
+    public async Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.WarpShipAsync(shipSymbol, waypointSymbol, cancellationToken);
+        return new WarpActionResult(MapNav(result.Nav), MapFuel(result.Fuel));
+    }
+
+    public async Task<JumpActionResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.JumpShipAsync(shipSymbol, systemSymbol, cancellationToken);
+        return new JumpActionResult(MapNav(result.Nav), result.Cooldown.TotalSeconds);
+    }
+
+    public async Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.CreateChartAsync(shipSymbol, cancellationToken);
+        return new ChartActionResult(result.Waypoint.Symbol, result.Waypoint.Type);
+    }
+
     private static AgentModel MapAgent(Models.Agents.Agent agent) =>
         new(agent.Symbol, agent.AccountId, agent.Headquarters, agent.Credits, agent.StartingFaction, agent.ShipCount);
 

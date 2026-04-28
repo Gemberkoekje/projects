@@ -10,6 +10,10 @@
   </ItemGroup>
   
   <ItemGroup>
+    <Compile Remove="Benchmark\SmokeBenchmarks.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
     <None Include=".env.example" />
   </ItemGroup>
   

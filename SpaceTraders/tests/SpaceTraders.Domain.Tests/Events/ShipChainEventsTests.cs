@@ -25,20 +25,18 @@ public sealed class ShipChainEventsTests
     }
 
     [Fact]
-    public void ShipMovingEvent_PreservesProvidedCorrelationAndPayload()
+    public void ShipInTransitEvent_PreservesProvidedCorrelationAndPayload()
     {
         var correlationId = Guid.NewGuid();
         var causationId = Guid.NewGuid();
         var departure = DateTimeOffset.UtcNow;
         var arrival = departure.AddMinutes(2);
 
-        var @event = new ShipMovingEvent(
+        var @event = new ShipInTransitEvent(
             "SHIP-1",
             "X1-AB-001",
             "X1-AB-002",
-            departure,
             arrival,
-            12,
             correlationId,
             causationId,
             departure);
@@ -49,6 +47,5 @@ public sealed class ShipChainEventsTests
         @event.OriginWaypointSymbol.Should().Be("X1-AB-001");
         @event.DestinationWaypointSymbol.Should().Be("X1-AB-002");
         @event.ArrivalTime.Should().Be(arrival);
-        @event.FuelConsumed.Should().Be(12);
     }
 }

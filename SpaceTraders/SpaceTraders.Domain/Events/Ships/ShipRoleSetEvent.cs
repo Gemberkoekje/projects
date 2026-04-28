@@ -3,21 +3,20 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Events.Ships;
 
-public sealed record ShipRoleSetEvent : ChainOfCommandEvent
+public sealed record ShipRoleSetEvent : ShipDockedEvent
 {
-    public string ShipSymbol { get; init; }
-
     public ShipRole Role { get; init; }
 
     public ShipRoleSetEvent(
         string shipSymbol,
+        string systemSymbol,
+        string waypointSymbol,
         ShipRole role,
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
-        : base(correlationId, causationId, occurredAt)
+        : base(shipSymbol, systemSymbol, waypointSymbol, correlationId, causationId, occurredAt)
     {
-        ShipSymbol = shipSymbol;
         Role = role;
     }
 }

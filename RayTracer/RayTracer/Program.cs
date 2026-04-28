@@ -35,7 +35,11 @@ static class Program
             ceilingGridMaterial: ceilingGridMat,
             goalMaterial: goalMaterial);
 
-        var lights = MazeGeometryBuilder.BuildLights(maze);
+        var lights = MazeGeometryBuilder.BuildLights(
+            maze,
+            lightSpawnChance: 0.4f,  // 40% of cells get ceiling lights (reduced from 70%)
+            biomeSize: 4,             // 4×4 cell torch biomes
+            seed: Environment.TickCount);
 
         // Camera starting point (used for both calibration and gameplay).
         float cs = MazeGeometryBuilder.CellSize;
@@ -112,16 +116,16 @@ public class RayForm : Form
         [DebugViewMode.Beauty, DebugViewMode.ReprojectedVsCurrentDiff, DebugViewMode.Depth, DebugViewMode.Normal]
     ];
     int _activeDebugPage = 0;
-    bool _showDebugPage = true;
+    bool _showDebugPage = false;
     bool _beautyOnly = false;
-    bool _showHud = true;
+    bool _showHud = false;
     bool _overlayEnabled = true;
     Font _hudFontLarge;
     Bitmap _presentBmp;
     byte[] _debugScratchBuffer;
     int _pickedX = -1;
     int _pickedY = -1;
-    bool _wasTurningLastFrame;
+    bool _wasMovingLastFrame;
 
     public RayForm(RenderPreset preset, Tracable[] scene, Maze maze, Light[] lights)
     {
@@ -193,7 +197,9 @@ public class RayForm : Form
                 CheckerboardMotion: preset.CheckerboardMotion,
                 TemporalBlendAlpha: preset.TemporalBlendAlpha,
                 EnableTaa: preset.TemporalBlendAlpha > 0f,
-                SampleClamp: preset.SampleClamp),
+                SampleClamp: preset.SampleClamp,
+                SmokeMode: preset.SmokeMode,
+                Volumetrics: preset.Volumetrics),
             debugOptions: new DebugOptions());
 
         jobSystem.SetupJobs(CancellationToken.None);
@@ -248,8 +254,8 @@ public class RayForm : Form
         // Create HUD fonts sized relative to the chosen render resolution
         // baseSize scales roughly with the smaller dimension of the render target
         float baseSize = MathF.Max(6f, MathF.Min(14f, MathF.Min(jobSystem.Width, jobSystem.Height) / 40f));
-        _hudFont = new Font("Consolas", baseSize, FontStyle.Regular, GraphicsUnit.Point);
-        _hudFontLarge = new Font("Consolas", MathF.Max(12f, baseSize * 1.8f), FontStyle.Regular, GraphicsUnit.Point);
+        _hudFont = new Font("Consolas", baseSize * 0.8f, FontStyle.Regular, GraphicsUnit.Point);
+        _hudFontLarge = new Font("Consolas", baseSize * 1.2f, FontStyle.Regular, GraphicsUnit.Point);
 
         KeyPreview = true;
         KeyDown += (_, e) =>
@@ -291,8 +297,7 @@ public class RayForm : Form
         if (dt > 0f)
             camController.Update(dt, jobSystem.Camera);
 
-        bool isTurning = camController.IsTurning;
-        jobSystem.IsTurning = isTurning;
+        jobSystem.IsTurning = camController.IsTurning;
 
         // If the camera moved, cap sample counts and enable spatial
         // denoising so the image stays smooth during motion.
@@ -302,10 +307,6 @@ public class RayForm : Form
             // Always apply a soft reset so sample counts are capped while moving.
             jobSystem.SoftResetAccumulation();
 
-            // For in-place turns, invalidate TAA history once when entering a turn.
-            if (isTurning && !_wasTurningLastFrame)
-                jobSystem.InvalidateTaaHistory();
-
             camController.Dirty = false;
         }
         else
@@ -313,7 +314,12 @@ public class RayForm : Form
             jobSystem.IsMoving = false;
         }
 
-        _wasTurningLastFrame = isTurning;
+        // When motion just stopped, reduce the effective sample count so
+        // new still-frame samples take over quickly without a harsh reset.
+        if (_wasMovingLastFrame && !jobSystem.IsMoving)
+            jobSystem.CollapseAccumulationForStoppedMotion();
+
+        _wasMovingLastFrame = jobSystem.IsMoving;
 
         jobSystem.ResolveDisplayBufferWithTaa();
 

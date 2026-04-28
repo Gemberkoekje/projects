@@ -87,5 +87,8 @@ internal static class JobSystemFactory
 
         if (denoiseOptions.SampleClamp < 0f)
             throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.SampleClamp, "SampleClamp cannot be negative.");
+
+        if (denoiseOptions.Volumetrics.MarchSteps < 0)
+            throw new ArgumentOutOfRangeException(nameof(denoiseOptions), denoiseOptions.Volumetrics.MarchSteps, "MarchSteps cannot be negative.");
     }
 }

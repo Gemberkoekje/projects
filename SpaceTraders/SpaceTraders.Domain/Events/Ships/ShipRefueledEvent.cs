@@ -2,10 +2,8 @@ using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Domain.Events.Ships;
 
-public sealed record ShipRefueledEvent : ChainOfCommandEvent
+public sealed record ShipRefueledEvent : ShipDockedEvent
 {
-    public string ShipSymbol { get; init; }
-
     public int FuelCurrent { get; init; }
 
     public int FuelCapacity { get; init; }
@@ -14,15 +12,16 @@ public sealed record ShipRefueledEvent : ChainOfCommandEvent
 
     public ShipRefueledEvent(
         string shipSymbol,
+        string systemSymbol,
+        string waypointSymbol,
         int fuelCurrent,
         int fuelCapacity,
         long costPaid,
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
-        : base(correlationId, causationId, occurredAt)
+        : base(shipSymbol, systemSymbol, waypointSymbol, correlationId, causationId, occurredAt)
     {
-        ShipSymbol = shipSymbol;
         FuelCurrent = fuelCurrent;
         FuelCapacity = fuelCapacity;
         CostPaid = costPaid;

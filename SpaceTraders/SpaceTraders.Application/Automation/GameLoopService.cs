@@ -15,8 +15,7 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and publishes <see cref="ShipInTransitEvent"/> so the
-///    chain-of-command routes to <see cref="ShipInTransitEventHandler"/> → in-orbit → undocked.
+///    updates their nav state in the DB, and publishes <see cref="ShipArrivedEvent"/> for arrival processing.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
@@ -93,19 +92,26 @@ public sealed class GameLoopService(
             if (arrivedWaypoint is not null)
             {
                 var now = TimeProvider.System.GetUtcNow();
-                var transitEvent = new ShipInTransitEvent(
+                var systemSymbol = ExtractSystemSymbol(arrivedWaypoint);
+                var arrivedEvent = new ShipArrivedEvent(
                     ship.Symbol,
-                    ship.WaypointSymbol ?? arrivedWaypoint,
+                    systemSymbol,
                     arrivedWaypoint,
                     now,
                     Guid.NewGuid(),
                     Guid.Empty,
                     now);
 
-                await bus.PublishAsync(transitEvent);
-                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipInTransitEvent.", ship.Symbol, arrivedWaypoint);
+                await bus.PublishAsync(arrivedEvent);
+                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipArrivedEvent.", ship.Symbol, arrivedWaypoint);
             }
         }
+    }
+
+    private static string ExtractSystemSymbol(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
     private async Task CheckFuelAsync(
