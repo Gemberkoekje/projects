@@ -7,6 +7,7 @@ using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -22,8 +23,12 @@ public sealed class ShipDockedMineEventHandlerTests
         var contracts = Substitute.For<IContractRepository>();
         var markets = Substitute.For<IMarketRepository>();
         var settings = Substitute.For<ISettingsRepository>();
+        var maintenance = Substitute.For<IFleetMaintenancePlanner>();
         var docked = Substitute.For<IDockedCommandAcceptor>();
         var bus = Substitute.For<IMessageBus>();
+
+        maintenance.DecideAsync(Arg.Any<ShipModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new FleetMaintenanceDecision(false, false, false));
 
         settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", Arg.Any<CancellationToken>()).Returns(10);
         settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", Arg.Any<CancellationToken>()).Returns(25);
@@ -56,7 +61,7 @@ public sealed class ShipDockedMineEventHandlerTests
                     new TradeGoodSnapshot("HYDROCARBON", "EXPORT", 10, 40, 10, "HIGH")
                 ], [], [], []));
 
-        var handler = new ShipDockedMineEventHandler(assignments, ships, contracts, markets, settings, docked, bus);
+        var handler = new ShipDockedMineEventHandler(assignments, ships, contracts, markets, settings, maintenance, docked, bus);
         var result = await handler.HandleAsync(new ShipDockedEvent("SHIP-1", "X1-AB", "X1-AB-MKT", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow), CancellationToken.None);
 
         result.Should().BeSameAs(ChainOfCommandHandlerResult.Handled());
@@ -75,8 +80,12 @@ public sealed class ShipDockedMineEventHandlerTests
         var contracts = Substitute.For<IContractRepository>();
         var markets = Substitute.For<IMarketRepository>();
         var settings = Substitute.For<ISettingsRepository>();
+        var maintenance = Substitute.For<IFleetMaintenancePlanner>();
         var docked = Substitute.For<IDockedCommandAcceptor>();
         var bus = Substitute.For<IMessageBus>();
+
+        maintenance.DecideAsync(Arg.Any<ShipModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new FleetMaintenanceDecision(false, false, false));
 
         settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", Arg.Any<CancellationToken>()).Returns(10);
         settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", Arg.Any<CancellationToken>()).Returns(25);
@@ -102,7 +111,7 @@ public sealed class ShipDockedMineEventHandlerTests
         markets.FindSnapshotByWaypointAsync("X1-AB-MKT", Arg.Any<CancellationToken>())
             .Returns(new MarketSnapshot("X1-AB-MKT", "X1-AB", [], [], [], []));
 
-        var handler = new ShipDockedMineEventHandler(assignments, ships, contracts, markets, settings, docked, bus);
+        var handler = new ShipDockedMineEventHandler(assignments, ships, contracts, markets, settings, maintenance, docked, bus);
         var result = await handler.HandleAsync(new ShipDockedEvent("SHIP-1", "X1-AB", "X1-AB-MKT", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow), CancellationToken.None);
 
         result.Should().BeSameAs(ChainOfCommandHandlerResult.Handled());

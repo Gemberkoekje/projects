@@ -62,4 +62,21 @@ public interface ISpaceTradersPort
     Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     Task<JumpGateConnectionModel> GetJumpGateConnectionsAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    // Phase 7 additions
+    Task<ShipRepairQuoteModel> GetRepairQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipRepairActionResult> RepairShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipScrapQuoteModel> GetScrapQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipScrapActionResult> ScrapShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipOutfitActionResult> InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipOutfitActionResult> RemoveMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipOutfitActionResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
+
+    Task<ShipOutfitActionResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
 }

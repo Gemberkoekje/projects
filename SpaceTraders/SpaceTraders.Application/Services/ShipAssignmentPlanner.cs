@@ -146,8 +146,8 @@ public sealed class ShipAssignmentPlanner(
         public Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
 
-        public Task<MarketSnapshot> FindSnapshotByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
-            => Task.FromResult<MarketSnapshot>(null!);
+        public Task<MarketSnapshot?> FindSnapshotByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+            => Task.FromResult<MarketSnapshot?>(null);
 
         public Task<IReadOnlyList<MarketSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<MarketSnapshot>>([]);

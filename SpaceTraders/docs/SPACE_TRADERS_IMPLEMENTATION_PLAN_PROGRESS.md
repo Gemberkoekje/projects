@@ -20,7 +20,7 @@ Legend:
 | 4 | Market and supply-chain automation | [x] | Trade scoring upgraded with volume/supply/activity/fuel-time penalties, probe-first market scouting, and Market UI expanded with detail, route comparison, and production-chain views. |
 | 5 | Navigation, fuel, jump, and exploration planning | [x] | Added navigation planning service with coordinate-based distance/fuel/time estimates and flight-mode selection, cargo-based refuel support, jump-gate connection retrieval/caching, and chart-driven scout exploration targeting. |
 | 6 | Extraction, survey, siphon, and resource logistics | [x] | Added survey persistence and survey-aware extraction, gas-giant/gas-processor siphon validation, mining/siphon assignment targeting, deposit-aware and modifier-aware asteroid prioritization, and docked cargo policies with role-loop coverage tests. |
-| 7 | Fleet outfitting, maintenance, repair, and scrapping | [ ] | Not started. |
+| 7 | Fleet outfitting, maintenance, repair, and scrapping | [x] | Added repair/scrap and mount/module install/remove API support, maintenance/outfitting policy integration in docked role handlers, maintenance planner thresholds, and role-handler command coverage updates. |
 | 8 | Reset awareness and operational reliability | [ ] | Not started. |
 | 9 | Razor Pages dashboard expansion | [ ] | Not started. |
 | 10 | Advanced gameplay backlog | [-] | Backlog by design. |
@@ -78,6 +78,16 @@ Legend:
   - Expanded `ShipAssignmentPlanner` to create `Siphon` assignments for gas-capable ships and to bias mining toward contract/trade-targeted resources, deposit-aware waypoint signals, better sell markets, and lower-risk asteroid modifiers.
   - Updated docked mining cargo policy to keep active contract cargo, preserve a hydrocarbon reserve for cargo refueling, sell profitable surplus, and jettison low-value cargo only when full.
   - Added phase-6 role-loop coverage for in-orbit survey-vs-extract decisions, siphon decisions, and docked cargo policy behavior.
+
+### Phase 7 deliverables
+
+- [x] Fleet roles account for ship capability and maintenance state.
+  - Added phase-7 API client support in `ISpaceTradersApiClient`/`SpaceTradersApiClient` for ship repair/scrap estimates and actions plus mount/module install/remove actions, with supporting response models in `Models/Fleet/Phase7ActionModels.cs`.
+  - Extended application port contracts (`ISpaceTradersPort` and `ApiPortModels.cs`) and adapter mappings (`SpaceTradersPortAdapter`) with phase-7 maintenance and outfitting results.
+  - Added docked command support and command handlers for `RepairShipCommand`, `ScrapShipCommand`, `InstallMountCommand`, `RemoveMountCommand`, `InstallModuleCommand`, and `RemoveModuleCommand`.
+  - Added `FleetMaintenancePlanner` with configurable thresholds (`Maintenance.*`) and integrated maintenance/outfitting policy checks into docked mine/trade/scout/contract handlers.
+  - Added phase-7 default settings for repair/scrap thresholds and preferred outfitting symbols in `DefaultSettingsSeed`.
+  - Updated phase-focused role-handler tests for the new maintenance planner dependencies and behavior paths.
 
 ## Phase 3 checklist
 
@@ -145,3 +155,7 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
   - Result: build successful.
 - `run_tests` for `ShipAssignmentPlannerTests`, `ShipInOrbitMineEventHandlerTests`, and `ShipDockedMineEventHandlerTests` during Phase 6 completion
   - Result: 9 passed, 0 failed.
+- `dotnet build SpaceTraders.slnx` after Phase 7 changes
+  - Result: build successful.
+- `run_tests` for `ShipDockedMineEventHandlerTests`, `ShipDockedRoleHandlersTests`, and `Phase1CommandHandlerTests` during Phase 7
+  - Result: 16 passed, 0 failed.

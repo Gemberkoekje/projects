@@ -459,6 +459,168 @@ public sealed record ShipModel
 
     public bool HasGasProcessor =>
         !string.IsNullOrWhiteSpace(ModulesJson) && ModulesJson.Contains("MODULE_GAS_PROCESSOR", StringComparison.OrdinalIgnoreCase);
+
+    public bool HasMineralProcessor =>
+        !string.IsNullOrWhiteSpace(ModulesJson) && ModulesJson.Contains("MODULE_MINERAL_PROCESSOR", StringComparison.OrdinalIgnoreCase);
+
+    public bool HasSensorArray =>
+        (MountSymbols ?? []).Any(m => m.Contains("SENSOR_ARRAY", StringComparison.OrdinalIgnoreCase));
+
+    public decimal AverageIntegrity
+    {
+        get
+        {
+            var integrities = new List<decimal>();
+            AddIntegrity(FrameJson, integrities);
+            AddIntegrity(ReactorJson, integrities);
+            AddIntegrity(EngineJson, integrities);
+            return integrities.Count == 0 ? 1m : integrities.Average();
+        }
+    }
+
+    public decimal AverageCondition
+    {
+        get
+        {
+            var conditions = new List<decimal>();
+            AddCondition(FrameJson, conditions);
+            AddCondition(ReactorJson, conditions);
+            AddCondition(EngineJson, conditions);
+            return conditions.Count == 0 ? 1m : conditions.Average();
+        }
+    }
+
+    private static void AddIntegrity(string? json, List<decimal> values)
+    {
+        if (TryReadComponentMetric(json, "integrity", out var value))
+        {
+            values.Add(value);
+        }
+    }
+
+    private static void AddCondition(string? json, List<decimal> values)
+    {
+        if (TryReadComponentMetric(json, "condition", out var value))
+        {
+            values.Add(value);
+        }
+    }
+
+    private static bool TryReadComponentMetric(string? json, string property, out decimal value)
+    {
+        value = 0m;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (!document.RootElement.TryGetProperty(property, out var metricElement))
+            {
+                return false;
+            }
+
+            return metricElement.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Number when metricElement.TryGetDecimal(out var numeric) => SetMetric(numeric, out value),
+                System.Text.Json.JsonValueKind.String when decimal.TryParse(metricElement.GetString(), out var parsed) => SetMetric(parsed, out value),
+                _ => false,
+            };
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool SetMetric(decimal parsed, out decimal value)
+    {
+        value = parsed;
+        return true;
+    }
+}
+
+public sealed record ShipRepairQuoteModel
+{
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipRepairQuoteModel(long Cost)
+    {
+        this.Cost = Cost;
+    }
+}
+
+public sealed record ShipScrapQuoteModel
+{
+    public required long Value { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipScrapQuoteModel(long Value)
+    {
+        this.Value = Value;
+    }
+}
+
+public sealed record ShipRepairActionResult
+{
+    public required AgentModel Agent { get; init; }
+
+    public required ShipModel Ship { get; init; }
+
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipRepairActionResult(AgentModel Agent, ShipModel Ship, long Cost)
+    {
+        this.Agent = Agent;
+        this.Ship = Ship;
+        this.Cost = Cost;
+    }
+}
+
+public sealed record ShipScrapActionResult
+{
+    public required AgentModel Agent { get; init; }
+
+    public required long Value { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipScrapActionResult(AgentModel Agent, long Value)
+    {
+        this.Agent = Agent;
+        this.Value = Value;
+    }
+}
+
+public sealed record ShipOutfitActionResult
+{
+    public required AgentModel Agent { get; init; }
+
+    public required CargoModel Cargo { get; init; }
+
+    public IReadOnlyList<string>? MountSymbols { get; init; }
+
+    public string? ModulesJson { get; init; }
+
+    public required long Cost { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipOutfitActionResult(AgentModel Agent, CargoModel Cargo, IReadOnlyList<string>? MountSymbols, string? ModulesJson, long Cost)
+    {
+        this.Agent = Agent;
+        this.Cargo = Cargo;
+        this.MountSymbols = MountSymbols;
+        this.ModulesJson = ModulesJson;
+        this.Cost = Cost;
+    }
 }
 
 public sealed record ContractDeliverableModel

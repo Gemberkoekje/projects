@@ -90,4 +90,21 @@ public interface ISpaceTradersApiClient
     Task<ChartResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
     Task<JumpGate> GetJumpGateAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    // Phase 7 additions
+    Task<RepairQuoteResult> GetRepairQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<RepairResult> RepairShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ScrapQuoteResult> GetScrapQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<ScrapResult> ScrapShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<InstallMountResult> InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default);
+
+    Task<RemoveMountResult> RemoveMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default);
+
+    Task<InstallModuleResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
+
+    Task<RemoveModuleResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
 }

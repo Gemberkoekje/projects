@@ -1,5 +1,6 @@
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -14,6 +15,7 @@ public sealed class ShipDockedMineEventHandler(
     IContractRepository contracts,
     IMarketRepository markets,
     ISettingsRepository settings,
+    IFleetMaintenancePlanner maintenance,
     IDockedCommandAcceptor dockedCommands,
     IMessageBus bus) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
@@ -92,6 +94,34 @@ public sealed class ShipDockedMineEventHandler(
                 c.Units > reserveHydrocarbonUnits && c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)) == true;
 
             await dockedCommands.RefuelAsync(@event.ShipSymbol, hasHydrocarbonCargo, cancellationToken);
+        }
+
+        var maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
+        if (maintenanceDecision.ShouldScrap)
+        {
+            await dockedCommands.ScrapAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        if (maintenanceDecision.ShouldRepair)
+        {
+            await dockedCommands.RepairAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        var preferredMiningMount = await settings.GetAsync<string>("Outfitting.PreferredMiningMount", cancellationToken);
+        if (!string.IsNullOrWhiteSpace(preferredMiningMount) &&
+            (ship.MountSymbols ?? []).All(m => !m.Equals(preferredMiningMount, StringComparison.OrdinalIgnoreCase)))
+        {
+            await dockedCommands.InstallMountAsync(@event.ShipSymbol, preferredMiningMount, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        var preferredMineralProcessor = await settings.GetAsync<string>("Outfitting.PreferredMineralProcessor", cancellationToken);
+        if (!string.IsNullOrWhiteSpace(preferredMineralProcessor) && !ship.HasMineralProcessor)
+        {
+            await dockedCommands.InstallModuleAsync(@event.ShipSymbol, preferredMineralProcessor, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
         }
 
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);

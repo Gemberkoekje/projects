@@ -11,6 +11,8 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipDockedScoutEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
+    ISettingsRepository settings,
+    IFleetMaintenancePlanner maintenance,
     IWaypointVisitService waypointVisit,
     IMarketRefreshService markets,
     IShipyardRefreshService shipyards,
@@ -30,6 +32,26 @@ public sealed class ShipDockedScoutEventHandler(
         if (ship is null)
         {
             return ChainOfCommandHandlerResult.Skipped();
+        }
+
+        var maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
+        if (maintenanceDecision.ShouldScrap)
+        {
+            await dockedCommands.ScrapAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        if (maintenanceDecision.ShouldRepair)
+        {
+            await dockedCommands.RepairAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        var preferredSensorMount = await settings.GetAsync<string>("Outfitting.PreferredScoutSensorMount", cancellationToken);
+        if (!string.IsNullOrWhiteSpace(preferredSensorMount) && !ship.HasSensorArray)
+        {
+            await dockedCommands.InstallMountAsync(@event.ShipSymbol, preferredSensorMount, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
         }
 
         var waypoint = ship.WaypointSymbol ?? @event.WaypointSymbol;

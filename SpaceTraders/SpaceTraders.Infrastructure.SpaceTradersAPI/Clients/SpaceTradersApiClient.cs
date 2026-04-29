@@ -249,6 +249,60 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    public Task<RepairQuoteResult> GetRepairQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => GetWrappedAsync<RepairQuoteResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/repair",
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<RepairResult> RepairShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, RepairResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/repair",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<ScrapQuoteResult> GetScrapQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => GetWrappedAsync<ScrapQuoteResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/scrap",
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<ScrapResult> ScrapShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object?, ScrapResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/scrap",
+            null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<InstallMountResult> InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, InstallMountResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/mounts/install",
+            new { symbol = mountSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<RemoveMountResult> RemoveMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, RemoveMountResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/mounts/remove",
+            new { symbol = mountSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<InstallModuleResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, InstallModuleResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/modules/install",
+            new { symbol = moduleSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<RemoveModuleResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<object, RemoveModuleResult>(
+            $"my/ships/{Uri.EscapeDataString(shipSymbol)}/modules/remove",
+            new { symbol = moduleSymbol },
+            AuthMode.AgentToken,
+            cancellationToken);
+
     private async Task<T> GetWrappedAsync<T>(string endpoint, AuthMode authMode, CancellationToken cancellationToken)
     {
         var response = await GetAsync<ApiResponse<T>>(endpoint, authMode, cancellationToken);

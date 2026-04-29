@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<INavigationPlanningService, NavigationPlanningService>();
         services.AddScoped<IJumpGateCacheService, JumpGateCacheService>();
         services.AddScoped<IContractObjectivePlanner, ContractObjectivePlanner>();
+        services.AddScoped<IFleetMaintenancePlanner, FleetMaintenancePlanner>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 

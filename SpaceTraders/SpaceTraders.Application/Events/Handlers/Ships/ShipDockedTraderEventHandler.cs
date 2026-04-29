@@ -1,4 +1,5 @@
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -10,6 +11,8 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipDockedTraderEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
+    ISettingsRepository settings,
+    IFleetMaintenancePlanner maintenance,
     IDockedCommandAcceptor dockedCommands) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
     public int Priority => 200;
@@ -45,6 +48,27 @@ public sealed class ShipDockedTraderEventHandler(
         else if (atSellWaypoint && !string.IsNullOrWhiteSpace(assignment.CargoSymbol) && ship.CargoCurrent > 0)
         {
             await dockedCommands.SellCargoAsync(@event.ShipSymbol, assignment.CargoSymbol, ship.CargoCurrent, cancellationToken);
+        }
+
+        var maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
+        if (maintenanceDecision.ShouldScrap)
+        {
+            await dockedCommands.ScrapAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        if (maintenanceDecision.ShouldRepair)
+        {
+            await dockedCommands.RepairAsync(@event.ShipSymbol, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
+        var preferredCargoModule = await settings.GetAsync<string>("Outfitting.TraderCargoModule", cancellationToken);
+        if (!string.IsNullOrWhiteSpace(preferredCargoModule) &&
+            (ship.ModulesJson?.Contains(preferredCargoModule, StringComparison.OrdinalIgnoreCase) != true))
+        {
+            await dockedCommands.InstallModuleAsync(@event.ShipSymbol, preferredCargoModule, cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
         }
 
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);

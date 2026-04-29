@@ -22,6 +22,14 @@ public interface IDockedCommandAcceptor
         int units,
         string destinationWaypoint,
         CancellationToken cancellationToken);
+
+    Task RepairAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task ScrapAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken);
+
+    Task InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken);
 }
 
 public interface IInOrbitCommandAcceptor
@@ -66,6 +74,18 @@ public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAccep
         string destinationWaypoint,
         CancellationToken cancellationToken)
         => bus.SendAsync(new DeliverContractCommand(contractId, shipSymbol, tradeSymbol, units, destinationWaypoint)).AsTask();
+
+    public Task RepairAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new RepairShipCommand(shipSymbol)).AsTask();
+
+    public Task ScrapAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new ScrapShipCommand(shipSymbol)).AsTask();
+
+    public Task InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new InstallMountCommand(shipSymbol, mountSymbol)).AsTask();
+
+    public Task InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new InstallModuleCommand(shipSymbol, moduleSymbol)).AsTask();
 }
 
 public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcceptor

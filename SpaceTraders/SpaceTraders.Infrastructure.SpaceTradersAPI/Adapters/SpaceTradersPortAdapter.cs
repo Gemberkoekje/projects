@@ -294,6 +294,79 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             jumpGate.Connections?.Select(ExtractSystemSymbol).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? []);
     }
 
+    public async Task<ShipRepairQuoteModel> GetRepairQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var quote = await client.GetRepairQuoteAsync(shipSymbol, cancellationToken);
+        return new ShipRepairQuoteModel(quote.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipRepairActionResult> RepairShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.RepairShipAsync(shipSymbol, cancellationToken);
+        return new ShipRepairActionResult(
+            MapAgent(result.Agent),
+            MapShip(result.Ship),
+            result.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipScrapQuoteModel> GetScrapQuoteAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var quote = await client.GetScrapQuoteAsync(shipSymbol, cancellationToken);
+        return new ShipScrapQuoteModel(quote.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipScrapActionResult> ScrapShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.ScrapShipAsync(shipSymbol, cancellationToken);
+        return new ShipScrapActionResult(
+            MapAgent(result.Agent),
+            result.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipOutfitActionResult> InstallMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.InstallMountAsync(shipSymbol, mountSymbol, cancellationToken);
+        return new ShipOutfitActionResult(
+            MapAgent(result.Agent),
+            MapCargo(result.Cargo),
+            result.Mounts.Select(m => m.Symbol).ToList(),
+            null,
+            result.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipOutfitActionResult> RemoveMountAsync(string shipSymbol, string mountSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.RemoveMountAsync(shipSymbol, mountSymbol, cancellationToken);
+        return new ShipOutfitActionResult(
+            MapAgent(result.Agent),
+            MapCargo(result.Cargo),
+            result.Mounts.Select(m => m.Symbol).ToList(),
+            null,
+            result.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipOutfitActionResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.InstallModuleAsync(shipSymbol, moduleSymbol, cancellationToken);
+        return new ShipOutfitActionResult(
+            MapAgent(result.Agent),
+            MapCargo(result.Cargo),
+            null,
+            JsonSerializer.Serialize(result.Modules),
+            result.Transaction.TotalPrice);
+    }
+
+    public async Task<ShipOutfitActionResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default)
+    {
+        var result = await client.RemoveModuleAsync(shipSymbol, moduleSymbol, cancellationToken);
+        return new ShipOutfitActionResult(
+            MapAgent(result.Agent),
+            MapCargo(result.Cargo),
+            null,
+            JsonSerializer.Serialize(result.Modules),
+            result.Transaction.TotalPrice);
+    }
+
     private static string ExtractSystemSymbol(string waypointSymbol)
     {
         var lastDash = waypointSymbol.LastIndexOf('-');

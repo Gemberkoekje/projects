@@ -141,6 +141,18 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task RemoveAsync(string symbol, CancellationToken cancellationToken = default)
+    {
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        if (entity is null)
+        {
+            return;
+        }
+
+        db.Ships.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private static ShipModel MapToModel(CachedShip entity)
     {
         var mounts = DeserializeMounts(entity.MountsJson);
