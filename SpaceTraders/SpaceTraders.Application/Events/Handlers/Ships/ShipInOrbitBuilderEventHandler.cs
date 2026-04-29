@@ -117,8 +117,15 @@ public sealed class ShipInOrbitBuilderEventHandler(
         // No cargo — dock at origin so the docked handler can buy
         if (atOrigin)
         {
-            logger.LogInformation("{Handler}: ship {Ship} at origin {Origin} with no cargo; docking to buy {Symbol}.", nameof(ShipInOrbitBuilderEventHandler), @event.ShipSymbol, currentWaypoint, assignment.CargoSymbol);
+            logger.LogInformation("{Handler}: ship {Ship} completed supply run; docking at origin {Origin} and returning to Idle.", nameof(ShipInOrbitBuilderEventHandler), @event.ShipSymbol, currentWaypoint);
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
+            await bus.InvokeAsync(new AssignShipCommand(
+                @event.ShipSymbol,
+                "Idle",
+                SystemSymbol: @event.SystemSymbol,
+                WaypointSymbol: currentWaypoint,
+                CorrelationId: @event.CorrelationId,
+                CausationId: @event.EventId), cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
 
