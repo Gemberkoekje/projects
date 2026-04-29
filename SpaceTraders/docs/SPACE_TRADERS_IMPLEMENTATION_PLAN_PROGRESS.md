@@ -22,7 +22,7 @@ Legend:
 | 6 | Extraction, survey, siphon, and resource logistics | [x] | Added survey persistence and survey-aware extraction, gas-giant/gas-processor siphon validation, mining/siphon assignment targeting, deposit-aware and modifier-aware asteroid prioritization, and docked cargo policies with role-loop coverage tests. |
 | 7 | Fleet outfitting, maintenance, repair, and scrapping | [x] | Added repair/scrap and mount/module install/remove API support, maintenance/outfitting policy integration in docked role handlers, maintenance planner thresholds, and role-handler command coverage updates. |
 | 8 | Reset awareness and operational reliability | [x] | Added reset/reliability monitor service, API/cache divergence sampling, reset-aware pause/resume with alerts, token reset mismatch signaling, status endpoint alerts, dashboard alert banner, and runbook documentation. |
-| 9 | Razor Pages dashboard expansion | [ ] | Not started. |
+| 9 | Razor Pages dashboard expansion | [x] | Added fleet filters, ship command page with safe manual actions, contract detail + deliverables progress, systems/waypoints pages, production-chain and maintenance/outfitting pages, and expanded API control endpoints for manual command queueing. |
 | 10 | Advanced gameplay backlog | [-] | Backlog by design. |
 
 ## Phase deliverables status
@@ -100,6 +100,17 @@ Legend:
   - Added `/status/system-alerts` API endpoint and dashboard home-page alert banner for API unavailable, token mismatch, cache divergence, automation disabled, contract deadlines, and reset-approaching state.
   - Added phase-8 runbook documentation in `docs/implementation/PHASE8_RESET_RECOVERY_RUNBOOK.md`.
 
+### Phase 9 deliverables
+
+- [x] Dashboard supports operator decisions without requiring direct database/API inspection.
+  - Added `Fleet/Index` with role, state, cargo, fuel, cooldown, and assignment filters.
+  - Added `Ships/Command` manual command page and API command endpoints for safe queueing (`dock`, `orbit`, `refuel`, `navigate`, flight-mode update, and maintenance/outfitting actions).
+  - Added `Contracts/Detail` for contract deliverable progress and assigned-ship visibility.
+  - Added `Systems/Map` and `Waypoints/Detail` pages using cached systems/waypoints plus market/shipyard/chart/traits/modifiers snapshots.
+  - Added `Production/Index` reference view sourced from normalized trade opportunities and supply-chain scoring fields.
+  - Added `Maintenance/Index` for repair/scrap and module/mount install/remove queueing.
+  - Expanded app navigation and dashboard quick links for phase-9 pages.
+
 ## Phase 3 checklist
 
 Goal: reliably complete the early SpaceTraders loop described in the quickstart.
@@ -176,3 +187,7 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
   - Result: passed including `/status/system-alerts` coverage.
 - `dotnet build SpaceTraders.slnx` after Phase 8 changes
   - Result: build successful.
+- `dotnet build SpaceTraders.slnx` after Phase 9 changes
+  - Result: build successful.
+- `run_tests` for `SpaceTraders.API.Tests` after Phase 9 changes
+  - Result: 24 passed, 0 failed, 4 skipped (sandbox token-dependent).

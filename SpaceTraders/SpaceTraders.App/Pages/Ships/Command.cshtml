@@ -1,0 +1,82 @@
+@page
+@model SpaceTraders.App.Pages.Ships.CommandModel
+@{
+    ViewData["Title"] = "Ship Commands";
+}
+
+<div class="mb-4 d-flex align-items-center gap-2">
+    <a asp-page="/Fleet/Index" class="btn btn-outline-secondary btn-sm">← Fleet</a>
+    <h1 class="display-6 mb-0">Ship Commands: @Model.Symbol</h1>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-info">@Model.StatusMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div><strong>Status:</strong> @Model.Ship.Status</div>
+        <div><strong>Waypoint:</strong> @Model.Ship.WaypointSymbol</div>
+        <div><strong>Flight mode:</strong> @Model.Ship.FlightMode</div>
+        <div><strong>Fuel:</strong> @Model.Ship.FuelCurrent / @Model.Ship.FuelCapacity</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Dock / Orbit / Refuel</div>
+            <div class="card-body d-grid gap-2">
+                <form method="post" asp-page-handler="Dock">
+                    <input type="hidden" asp-for="Symbol" />
+                    <button type="submit" class="btn btn-sm btn-primary w-100">Queue Dock</button>
+                </form>
+                <form method="post" asp-page-handler="Orbit">
+                    <input type="hidden" asp-for="Symbol" />
+                    <button type="submit" class="btn btn-sm btn-primary w-100">Queue Orbit</button>
+                </form>
+                <form method="post" asp-page-handler="Refuel" class="d-grid gap-2">
+                    <input type="hidden" asp-for="Symbol" />
+                    <div class="form-check">
+                        <input class="form-check-input" asp-for="RefuelFromCargo" />
+                        <label class="form-check-label" asp-for="RefuelFromCargo">Refuel from cargo</label>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Queue Refuel</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Navigation</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="Navigate" class="d-grid gap-2">
+                    <input type="hidden" asp-for="Symbol" />
+                    <label asp-for="DestinationWaypoint" class="form-label">Destination waypoint</label>
+                    <input asp-for="DestinationWaypoint" class="form-control form-control-sm" />
+                    <button type="submit" class="btn btn-sm btn-primary">Queue Navigate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">Flight Mode</div>
+            <div class="card-body">
+                <form method="post" asp-page-handler="FlightMode" class="d-grid gap-2">
+                    <input type="hidden" asp-for="Symbol" />
+                    <label asp-for="FlightMode" class="form-label">Flight mode</label>
+                    <select asp-for="FlightMode" class="form-select form-select-sm">
+                        <option value="DRIFT">DRIFT</option>
+                        <option value="CRUISE">CRUISE</option>
+                        <option value="BURN">BURN</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-primary">Queue Flight-Mode Update</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

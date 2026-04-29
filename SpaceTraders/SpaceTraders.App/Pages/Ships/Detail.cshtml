@@ -14,7 +14,8 @@
 else
 {
     <div class="mb-3 d-flex align-items-center gap-3">
-        <a asp-page="/Index" class="btn btn-outline-secondary btn-sm">← Dashboard</a>
+        <a asp-page="/Fleet/Index" class="btn btn-outline-secondary btn-sm">← Fleet</a>
+        <a asp-page="/Ships/Command" asp-route-symbol="@Model.Ship.Symbol" class="btn btn-outline-primary btn-sm">Manual Commands</a>
         <h1 class="display-6 mb-0">@Model.Ship.Symbol</h1>
         <span class="badge bg-@Model.ShipStatusClass">
             @(Model.Ship.IsInTransit ? "IN_TRANSIT" : Model.Ship.Status)
@@ -27,7 +28,17 @@ else
                 <div class="card-body">
                     <h6 class="card-title text-muted">Location</h6>
                     <div><strong>System:</strong> @(Model.Ship.SystemSymbol ?? "—")</div>
-                    <div><strong>Waypoint:</strong> @(Model.Ship.WaypointSymbol ?? "—")</div>
+                    <div>
+                        <strong>Waypoint:</strong>
+                        @if (string.IsNullOrWhiteSpace(Model.Ship.WaypointSymbol))
+                        {
+                            <span>—</span>
+                        }
+                        else
+                        {
+                            <a asp-page="/Waypoints/Detail" asp-route-symbol="@Model.Ship.WaypointSymbol">@Model.Ship.WaypointSymbol</a>
+                        }
+                    </div>
                     @if (Model.Ship.IsInTransit && Model.Ship.ArrivesAt.HasValue)
                     {
                         <div class="mt-1 text-warning small">

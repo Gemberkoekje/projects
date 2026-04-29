@@ -1,5 +1,6 @@
 using Serilog;
 using Serilog.Formatting.Compact;
+using SpaceTraders.App.Services;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 
@@ -29,6 +30,12 @@ builder.Host.UseSerilog((ctx, cfg) =>
 });
 
 builder.Services.AddPersistence(builder.Configuration);
+builder.Services.Configure<InternalApiOptions>(builder.Configuration.GetSection(InternalApiOptions.SectionName));
+builder.Services.AddHttpClient<IShipCommandClient, ShipCommandClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<InternalApiOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+});
 builder.Services.AddRazorPages();
 
 var app = builder.Build();

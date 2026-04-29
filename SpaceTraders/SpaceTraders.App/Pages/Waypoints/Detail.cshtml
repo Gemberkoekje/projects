@@ -1,0 +1,87 @@
+@page "{symbol}"
+@model SpaceTraders.App.Pages.Waypoints.DetailModel
+@{
+    ViewData["Title"] = "Waypoint Detail";
+}
+
+<div class="mb-4 d-flex align-items-center gap-2">
+    <a asp-page="/Systems/Map" class="btn btn-outline-secondary btn-sm">← System Map</a>
+    <h1 class="display-6 mb-0">Waypoint @Model.Waypoint.Symbol</h1>
+</div>
+
+@if (Model.NotFound)
+{
+    <div class="alert alert-warning">Waypoint not found in cache.</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Core</div>
+                <div class="card-body">
+                    <div><strong>System:</strong> @Model.Waypoint.SystemSymbol</div>
+                    <div><strong>Type:</strong> @Model.Waypoint.Type</div>
+                    <div><strong>Coordinates:</strong> (@Model.Waypoint.X, @Model.Waypoint.Y)</div>
+                    <div><strong>Market:</strong> @(Model.Waypoint.HasMarket ? "Yes" : "No")</div>
+                    <div><strong>Shipyard:</strong> @(Model.Waypoint.HasShipyard ? "Yes" : "No")</div>
+                    <div><strong>Under construction:</strong> @(Model.Waypoint.IsUnderConstruction ? "Yes" : "No")</div>
+                    <div><strong>Parent:</strong> @(string.IsNullOrWhiteSpace(Model.Waypoint.ParentSymbol) ? "—" : Model.Waypoint.ParentSymbol)</div>
+                    <div><strong>Observed:</strong> @Model.Waypoint.LastObservedAt.ToLocalTime().ToString("g")</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Chart / Traits / Modifiers</div>
+                <div class="card-body">
+                    <div class="mb-2"><strong>Chart JSON</strong></div>
+                    <pre class="small bg-light p-2 border rounded">@(string.IsNullOrWhiteSpace(Model.Waypoint.ChartJson) ? "(none)" : Model.Waypoint.ChartJson)</pre>
+                    <div class="mb-2"><strong>Traits JSON</strong></div>
+                    <pre class="small bg-light p-2 border rounded">@(string.IsNullOrWhiteSpace(Model.Waypoint.TraitsJson) ? "(none)" : Model.Waypoint.TraitsJson)</pre>
+                    <div class="mb-2"><strong>Modifiers JSON</strong></div>
+                    <pre class="small bg-light p-2 border rounded">@(string.IsNullOrWhiteSpace(Model.Waypoint.ModifiersJson) ? "(none)" : Model.Waypoint.ModifiersJson)</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Market Snapshot</div>
+                <div class="card-body">
+                    @if (string.IsNullOrWhiteSpace(Model.Market.WaypointSymbol))
+                    {
+                        <span class="text-muted">No market snapshot cached.</span>
+                    }
+                    else
+                    {
+                        <div><strong>System:</strong> @Model.Market.SystemSymbol</div>
+                        <div><strong>Observed:</strong> @Model.Market.LastObservedAt.ToLocalTime().ToString("g")</div>
+                        <div class="mt-2"><strong>Trade Goods JSON</strong></div>
+                        <pre class="small bg-light p-2 border rounded">@(string.IsNullOrWhiteSpace(Model.Market.TradeGoodsJson) ? "(none)" : Model.Market.TradeGoodsJson)</pre>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-header">Shipyard Snapshot</div>
+                <div class="card-body">
+                    @if (string.IsNullOrWhiteSpace(Model.Shipyard.WaypointSymbol))
+                    {
+                        <span class="text-muted">No shipyard snapshot cached.</span>
+                    }
+                    else
+                    {
+                        <div><strong>System:</strong> @Model.Shipyard.SystemSymbol</div>
+                        <div><strong>Observed:</strong> @Model.Shipyard.LastObservedAt.ToLocalTime().ToString("g")</div>
+                        <div class="mt-2"><strong>Ship Types JSON</strong></div>
+                        <pre class="small bg-light p-2 border rounded">@(string.IsNullOrWhiteSpace(Model.Shipyard.ShipTypesJson) ? "(none)" : Model.Shipyard.ShipTypesJson)</pre>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}

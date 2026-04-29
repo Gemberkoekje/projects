@@ -33,7 +33,7 @@ else
                     @foreach (var contract in Model.Contracts)
                     {
                         <tr>
-                            <td class="text-nowrap"><code>@contract.Id</code></td>
+                            <td class="text-nowrap"><a asp-page="/Contracts/Detail" asp-route-id="@contract.Id"><code>@contract.Id</code></a></td>
                             <td>@contract.Type</td>
                             <td>@contract.FactionSymbol</td>
                             <td class="text-nowrap">

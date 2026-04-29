@@ -1,0 +1,105 @@
+@page
+@model SpaceTraders.App.Pages.Systems.MapModel
+@{
+    ViewData["Title"] = "System Map";
+}
+
+<div class="mb-4">
+    <h1 class="display-5">System Map</h1>
+    <p class="text-muted mb-0">Cached systems and waypoints with coordinates and market/shipyard markers.</p>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-xl-5">
+        <div class="card h-100">
+            <div class="card-header">Systems</div>
+            <div class="card-body p-0">
+                @if (Model.Systems.Count == 0)
+                {
+                    <div class="p-3 text-muted">No systems cached yet.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>System</th>
+                                    <th>Sector</th>
+                                    <th>Type</th>
+                                    <th>Coord</th>
+                                    <th>Waypoints</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var s in Model.Systems)
+                            {
+                                <tr>
+                                    <td><code>@s.Symbol</code></td>
+                                    <td>@s.SectorSymbol</td>
+                                    <td>@s.Type</td>
+                                    <td class="text-nowrap">(@s.X, @s.Y)</td>
+                                    <td class="text-end">@s.WaypointCount</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-7">
+        <div class="card h-100">
+            <div class="card-header">Waypoints</div>
+            <div class="card-body p-0">
+                @if (Model.Waypoints.Count == 0)
+                {
+                    <div class="p-3 text-muted">No waypoints cached yet.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Waypoint</th>
+                                    <th>System</th>
+                                    <th>Type</th>
+                                    <th>Coord</th>
+                                    <th>Flags</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var waypoint in Model.Waypoints)
+                            {
+                                <tr>
+                                    <td class="text-nowrap"><a asp-page="/Waypoints/Detail" asp-route-symbol="@waypoint.Symbol">@waypoint.Symbol</a></td>
+                                    <td><code>@waypoint.SystemSymbol</code></td>
+                                    <td>@waypoint.Type</td>
+                                    <td class="text-nowrap">(@waypoint.X, @waypoint.Y)</td>
+                                    <td class="text-nowrap">
+                                        @if (waypoint.HasMarket)
+                                        {
+                                            <span class="badge bg-primary">Market</span>
+                                        }
+                                        @if (waypoint.HasShipyard)
+                                        {
+                                            <span class="badge bg-success">Shipyard</span>
+                                        }
+                                        @if (waypoint.IsUnderConstruction)
+                                        {
+                                            <span class="badge bg-warning text-dark">Construction</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

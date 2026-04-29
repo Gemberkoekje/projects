@@ -1,0 +1,97 @@
+@page
+@model SpaceTraders.App.Pages.Maintenance.IndexModel
+@{
+    ViewData["Title"] = "Maintenance & Outfitting";
+}
+
+<div class="mb-4">
+    <h1 class="display-5">Maintenance & Outfitting</h1>
+    <p class="text-muted mb-0">Queue repair/scrap and mount/module install/remove commands.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-info">@Model.StatusMessage</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header">Manual Command</div>
+    <div class="card-body">
+        <form method="post" class="row g-2 align-items-end">
+            <div class="col-12 col-md-3">
+                <label class="form-label" asp-for="ShipSymbol">Ship</label>
+                <input class="form-control form-control-sm" asp-for="ShipSymbol" placeholder="SHIP_SYMBOL" />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" asp-for="EquipmentSymbol">Module/Mount symbol</label>
+                <input class="form-control form-control-sm" asp-for="EquipmentSymbol" placeholder="MOUNT_ or MODULE_..." />
+            </div>
+            <div class="col-12 col-md-6 d-flex gap-2 flex-wrap">
+                <button class="btn btn-sm btn-primary" asp-page-handler="Repair" type="submit">Repair</button>
+                <button class="btn btn-sm btn-danger" asp-page-handler="Scrap" type="submit">Scrap</button>
+                <button class="btn btn-sm btn-outline-primary" asp-page-handler="InstallMount" type="submit">Install Mount</button>
+                <button class="btn btn-sm btn-outline-secondary" asp-page-handler="RemoveMount" type="submit">Remove Mount</button>
+                <button class="btn btn-sm btn-outline-primary" asp-page-handler="InstallModule" type="submit">Install Module</button>
+                <button class="btn btn-sm btn-outline-secondary" asp-page-handler="RemoveModule" type="submit">Remove Module</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Fleet Equipment Snapshot</div>
+    <div class="card-body p-0">
+        @if (Model.Ships.Count == 0)
+        {
+            <div class="p-3 text-muted">No ships cached yet.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Ship</th>
+                            <th>Status</th>
+                            <th>Location</th>
+                            <th>Mounts</th>
+                            <th>Modules</th>
+                            <th>Last Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var ship in Model.Ships)
+                    {
+                        <tr>
+                            <td>@ship.Symbol</td>
+                            <td>@ship.Status</td>
+                            <td>@ship.SystemSymbol / @ship.WaypointSymbol</td>
+                            <td>
+                                @if (ship.Mounts.Count == 0)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    <span>@string.Join(", ", ship.Mounts)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (ship.Modules.Count == 0)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    <span>@string.Join(", ", ship.Modules)</span>
+                                }
+                            </td>
+                            <td class="text-nowrap text-muted">@ship.LastSyncedAt.ToLocalTime().ToString("g")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

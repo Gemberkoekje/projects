@@ -9,6 +9,13 @@
     <p class="text-muted mb-0">Foundation phase read-only overview from the local cache.</p>
 </div>
 
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <a class="btn btn-sm btn-outline-primary" asp-page="/Fleet/Index">Fleet</a>
+    <a class="btn btn-sm btn-outline-primary" asp-page="/Systems/Map">System Map</a>
+    <a class="btn btn-sm btn-outline-primary" asp-page="/Production/Index">Production Chains</a>
+    <a class="btn btn-sm btn-outline-primary" asp-page="/Maintenance/Index">Maintenance</a>
+</div>
+
 @if (Model.AlertApiUnavailable || Model.AlertTokenResetMismatch || Model.AlertCacheDivergence || Model.AlertAutomationDisabled || Model.AlertContractDeadlinesApproaching || Model.AlertResetUpcoming)
 {
     <div class="alert alert-warning" role="alert">
@@ -117,7 +124,16 @@ else
                         <tr>
                             <td><a asp-page="/Ships/Detail" asp-route-symbol="@ship.Symbol">@ship.Symbol</a></td>
                             <td>@ship.SystemSymbol</td>
-                            <td>@ship.WaypointSymbol</td>
+                            <td>
+                                @if (string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    <a asp-page="/Waypoints/Detail" asp-route-symbol="@ship.WaypointSymbol">@ship.WaypointSymbol</a>
+                                }
+                            </td>
                             <td>@ship.Status</td>
                             <td>@ship.FlightMode</td>
                             <td>@ship.FuelCurrent / @ship.FuelCapacity</td>
