@@ -448,22 +448,47 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             contract.Terms?.Deadline,
             MapDeliverables(contract));
 
-    private static WaypointDataModel MapWaypoint(Models.Systems.Waypoint waypoint)
+    // Phase 10 additions
+    public async Task<ConstructionSiteModel> GetConstructionSiteAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
     {
-        var traits = waypoint.Traits ?? [];
-        return new WaypointDataModel(
+        var site = await client.GetConstructionSiteAsync(systemSymbol, waypointSymbol, cancellationToken);
+        return MapConstructionSite(site);
+    }
+
+    public async Task<SupplyConstructionActionResult> SupplyConstructionAsync(string systemSymbol, string waypointSymbol, string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default)
+    {
+        var result = await client.SupplyConstructionAsync(
+            systemSymbol,
+            waypointSymbol,
+            new Models.Systems.SupplyConstructionRequest
+            {
+                ShipSymbol = shipSymbol,
+                TradeSymbol = tradeSymbol,
+                Units = units,
+            },
+            cancellationToken);
+        return new SupplyConstructionActionResult(
+            MapConstructionSite(result.Construction),
+            MapCargo(result.Cargo));
+    }
+
+    private static ConstructionSiteModel MapConstructionSite(Models.Systems.ConstructionSite site) =>
+        new(
+            site.Symbol,
+            site.IsComplete,
+            site.Materials?.Select(m => new ConstructionMaterialModel(m.TradeSymbol, m.Required, m.Fulfilled)).ToList() ?? []);
+
+    private static WaypointDataModel MapWaypoint(Models.Systems.Waypoint waypoint) =>
+        new(
             waypoint.Symbol,
             waypoint.SystemSymbol,
             waypoint.Type,
             waypoint.X,
             waypoint.Y,
-            traits.Any(t => t.Symbol.Equals("MARKETPLACE", StringComparison.OrdinalIgnoreCase)),
-            traits.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)),
-            traits.Count > 0 ? JsonSerializer.Serialize(traits) : null,
-            waypoint.Modifiers is not null && waypoint.Modifiers.Count > 0 ? JsonSerializer.Serialize(waypoint.Modifiers) : null,
-            waypoint.Orbitals is not null && waypoint.Orbitals.Count > 0 ? JsonSerializer.Serialize(waypoint.Orbitals) : null,
-            waypoint.Orbits,
-            waypoint.IsUnderConstruction,
-            waypoint.Chart is not null ? JsonSerializer.Serialize(waypoint.Chart) : null);
-    }
+            HasMarket: waypoint.Traits?.Any(t => t.Symbol.Equals("MARKETPLACE", StringComparison.OrdinalIgnoreCase)) ?? false,
+            HasShipyard: waypoint.Traits?.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)) ?? false,
+            TraitsJson: waypoint.Traits is not null ? System.Text.Json.JsonSerializer.Serialize(waypoint.Traits) : null,
+            OrbitalsJson: waypoint.Orbitals is not null ? System.Text.Json.JsonSerializer.Serialize(waypoint.Orbitals) : null,
+            ParentSymbol: waypoint.Orbits,
+            IsUnderConstruction: waypoint.IsUnderConstruction);
 }

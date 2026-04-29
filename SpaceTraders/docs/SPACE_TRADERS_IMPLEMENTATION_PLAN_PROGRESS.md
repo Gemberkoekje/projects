@@ -23,7 +23,7 @@ Legend:
 | 7 | Fleet outfitting, maintenance, repair, and scrapping | [x] | Added repair/scrap and mount/module install/remove API support, maintenance/outfitting policy integration in docked role handlers, maintenance planner thresholds, and role-handler command coverage updates. |
 | 8 | Reset awareness and operational reliability | [x] | Added reset/reliability monitor service, API/cache divergence sampling, reset-aware pause/resume with alerts, token reset mismatch signaling, status endpoint alerts, dashboard alert banner, and runbook documentation. |
 | 9 | Razor Pages dashboard expansion | [x] | Added fleet filters, ship command page with safe manual actions, contract detail + deliverables progress, systems/waypoints pages, production-chain and maintenance/outfitting pages, and expanded API control endpoints for manual command queueing. |
-| 10 | Advanced gameplay backlog | [-] | Backlog by design. |
+| 10 | Advanced gameplay backlog | [x] | Jump-gate construction automation implemented: Builder assignment role, construction-site persistence, buy→orbit→supply→return loop via ShipDockedBuilderEventHandler and ShipInOrbitBuilderEventHandler, SupplyConstructionCommand/ConstructionSuppliedEvent, and API client/port/adapter plumbing. |
 
 ## Phase deliverables status
 
@@ -111,6 +111,18 @@ Legend:
   - Added `Maintenance/Index` for repair/scrap and module/mount install/remove queueing.
   - Expanded app navigation and dashboard quick links for phase-9 pages.
 
+### Phase 10 deliverables
+
+- [x] `Builder` assignment type added to `AssignmentType` enum.
+- [x] `CachedConstruction` persistence entity, `IConstructionRepository`, and `ConstructionRepository` (EF Core) added with `cached_construction_sites` table migration.
+- [x] `GetConstructionSiteAsync` and `SupplyConstructionAsync` added to typed API client, `ISpaceTradersApiClient`, `ISpaceTradersPort`, and `SpaceTradersPortAdapter`.
+- [x] `SupplyConstructionCommand` / `SupplyConstructionHandler` validate in-orbit state, call the port, update construction and cargo caches, and publish `ConstructionSuppliedEvent`.
+- [x] `ConstructionSuppliedEvent` derives from `ShipInOrbitEvent` so the in-orbit chain continues automatically after a supply run.
+- [x] `ShipDockedBuilderEventHandler` (Priority 90) handles the origin docked phase: buys required cargo, refuels if needed, then orbits.
+- [x] `ShipInOrbitBuilderEventHandler` (Priority 55) handles the in-orbit phase: navigates to the construction site, calls `SupplyConstructionAsync`, then returns to origin and docks to restart the cycle; reassigns Idle when the site is complete.
+- [x] `SupplyConstructionAsync` added to `IInOrbitCommandAcceptor` / `InOrbitCommandAcceptor`.
+- [x] `ConstructionSuppliedEvent` registered as a derived-event in `ChainOfCommandEventHandlerRegistrationTests`.
+
 ## Phase 3 checklist
 
 Goal: reliably complete the early SpaceTraders loop described in the quickstart.
@@ -191,3 +203,7 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
   - Result: build successful.
 - `run_tests` for `SpaceTraders.API.Tests` after Phase 9 changes
   - Result: 24 passed, 0 failed, 4 skipped (sandbox token-dependent).
+- `dotnet build SpaceTraders.slnx` after Phase 10 changes
+  - Result: build successful.
+- `run_tests` for `ChainOfCommandEventHandlerRegistrationTests` after Phase 10 changes
+  - Result: 5 passed, 0 failed.

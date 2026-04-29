@@ -276,15 +276,35 @@ Deliverables:
 
 - Dashboard supports operator decisions without requiring direct database/API inspection.
 
-## Phase 10: advanced gameplay backlog
+## Phase 10: jump-gate construction automation
 
-Keep these as later backlog items unless needed by current automation:
+Goal: implement construction as a first-class automation objective, with early-game behavior focused on supplying jump-gate requirements.
 
-- Construction supply automation for jump gates and other waypoints under construction.
-- Webhook/websocket integration if SpaceTraders stabilizes documented support.
-- Faction reputation strategy once reputation materially affects access or pricing.
-- Piracy/patrol/combat if APIs become available and documented.
-- Multi-agent support if operationally useful and within rate-limit constraints.
+Tasks:
+
+- Add typed client support for construction endpoints needed to:
+  - read construction status/material requirements
+  - deliver construction materials
+- Persist construction-site state:
+  - required symbols/units
+  - fulfilled/remaining units
+  - completion status and timestamps
+- Add a construction planner that:
+  - derives required prerequisite goods for jump-gate parts
+  - maps prerequisite sourcing to mining, refining/processing (where applicable), and trading roles
+  - assigns ships to gather, buy, transport, and deliver required materials
+- Make early-game automation prioritize jump-gate construction supply after starter-contract viability checks.
+- Expand trade analysis to score routes by construction contribution, not only immediate profit.
+- Add delivery idempotency and safety checks for construction material hand-ins.
+- Add Razor Pages views for:
+  - construction progress
+  - remaining materials by symbol
+  - assigned ships and inbound deliveries
+
+Deliverables:
+
+- Early-game fleet behavior mines/trades specifically toward jump-gate material prerequisites.
+- Automation can continuously supply construction inputs until jump-gate completion.
 
 ## Suggested milestone order
 
@@ -292,12 +312,13 @@ Keep these as later backlog items unless needed by current automation:
 2. Missing core typed client endpoints.
 3. Persistence enrichment for ships/waypoints/markets.
 4. Contract-first onboarding automation.
-5. Trade and supply-chain analysis improvements.
-6. Navigation/fuel/exploration planning.
-7. Extraction/survey/siphon improvements.
-8. Maintenance/outfitting.
-9. Reset reliability and dashboard alerts.
-10. Dashboard expansion and advanced gameplay.
+5. Navigation/fuel/exploration planning.
+6. Extraction/survey/siphon improvements.
+7. Market and supply-chain analysis improvements with construction-prerequisite scoring.
+8. Jump-gate construction automation.
+9. Maintenance/outfitting.
+10. Reset reliability and dashboard alerts.
+11. Dashboard expansion and advanced gameplay.
 
 ## Validation strategy
 

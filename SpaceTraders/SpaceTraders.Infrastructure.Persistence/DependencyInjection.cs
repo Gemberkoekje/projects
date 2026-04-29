@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<ISystemRepository, SystemRepository>();
         services.AddScoped<ILeaderLeaseRepository, LeaderLeaseRepository>();
         services.AddScoped<IApiEndpointUsageRecorder, ApiEndpointUsageRecorder>();
+        services.AddScoped<IConstructionRepository, ConstructionRepository>();
 
         return services;
     }

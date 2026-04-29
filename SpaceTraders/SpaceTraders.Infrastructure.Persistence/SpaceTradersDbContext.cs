@@ -41,6 +41,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<CachedSurvey> Surveys => Set<CachedSurvey>();
 
+    public DbSet<CachedConstruction> ConstructionSites => Set<CachedConstruction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -225,6 +227,17 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Size).HasMaxLength(30).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.WaypointSymbol, x.Expiration });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<CachedConstruction>(entity =>
+        {
+            entity.ToTable("cached_construction_sites");
+            entity.HasKey(x => new { x.AgentToken, x.WaypointSymbol });
+            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
+            entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
+            entity.HasIndex(x => new { x.AgentToken, x.IsComplete });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
     }

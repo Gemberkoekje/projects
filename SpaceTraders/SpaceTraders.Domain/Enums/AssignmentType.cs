@@ -11,4 +11,6 @@ public enum AssignmentType
     Refuel,
     Scout,
     SellAll,
+    SupplyConstruction,
+    Builder,
 }

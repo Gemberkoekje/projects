@@ -303,6 +303,20 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
+    // Phase 10 additions
+    public Task<ConstructionSite> GetConstructionSiteAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+        => GetWrappedAsync<ConstructionSite>(
+            $"systems/{Uri.EscapeDataString(systemSymbol)}/waypoints/{Uri.EscapeDataString(waypointSymbol)}/construction",
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<SupplyConstructionData> SupplyConstructionAsync(string systemSymbol, string waypointSymbol, SupplyConstructionRequest request, CancellationToken cancellationToken = default)
+        => PostWrappedAsync<SupplyConstructionRequest, SupplyConstructionData>(
+            $"systems/{Uri.EscapeDataString(systemSymbol)}/waypoints/{Uri.EscapeDataString(waypointSymbol)}/construction/supply",
+            request,
+            AuthMode.AgentToken,
+            cancellationToken);
+
     private async Task<T> GetWrappedAsync<T>(string endpoint, AuthMode authMode, CancellationToken cancellationToken)
     {
         var response = await GetAsync<ApiResponse<T>>(endpoint, authMode, cancellationToken);

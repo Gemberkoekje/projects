@@ -81,4 +81,9 @@ public interface ISpaceTradersPort
     Task<ShipOutfitActionResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
 
     Task<ShipOutfitActionResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
+
+    // Phase 10 additions
+    Task<ConstructionSiteModel> GetConstructionSiteAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    Task<SupplyConstructionActionResult> SupplyConstructionAsync(string systemSymbol, string waypointSymbol, string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 }

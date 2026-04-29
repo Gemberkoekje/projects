@@ -65,7 +65,8 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             nameof(ShipIdleDockedEvent),
             nameof(ShipRefueledEvent),
             nameof(ShipRoleSetEvent),
-            nameof(ShipUndockedEvent)
+            nameof(ShipUndockedEvent),
+            nameof(ConstructionSuppliedEvent)
         };
 
         // Get all handler implementations

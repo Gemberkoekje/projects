@@ -972,3 +972,55 @@ public sealed record NegotiateContractActionResult
         this.Contract = Contract;
     }
 }
+
+// Phase 10: jump-gate construction models
+public sealed record ConstructionMaterialModel
+{
+    public required string TradeSymbol { get; init; }
+
+    public required int Required { get; init; }
+
+    public required int Fulfilled { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ConstructionMaterialModel(string TradeSymbol, int Required, int Fulfilled)
+    {
+        this.TradeSymbol = TradeSymbol;
+        this.Required = Required;
+        this.Fulfilled = Fulfilled;
+    }
+}
+
+public sealed record ConstructionSiteModel
+{
+    public required string WaypointSymbol { get; init; }
+
+    public required bool IsComplete { get; init; }
+
+    public required IReadOnlyList<ConstructionMaterialModel> Materials { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ConstructionSiteModel(
+        string WaypointSymbol,
+        bool IsComplete,
+        IReadOnlyList<ConstructionMaterialModel> Materials)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.IsComplete = IsComplete;
+        this.Materials = Materials;
+    }
+}
+
+public sealed record SupplyConstructionActionResult
+{
+    public required ConstructionSiteModel Construction { get; init; }
+
+    public required CargoModel Cargo { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public SupplyConstructionActionResult(ConstructionSiteModel Construction, CargoModel Cargo)
+    {
+        this.Construction = Construction;
+        this.Cargo = Cargo;
+    }
+}

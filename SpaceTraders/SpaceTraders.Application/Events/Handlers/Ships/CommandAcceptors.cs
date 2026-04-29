@@ -43,6 +43,16 @@ public interface IInOrbitCommandAcceptor
     Task SurveyAsync(string shipSymbol, CancellationToken cancellationToken);
 
     Task SiphonAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task SupplyConstructionAsync(
+        string shipSymbol,
+        string systemSymbol,
+        string waypointSymbol,
+        string tradeSymbol,
+        int units,
+        Guid correlationId,
+        Guid causationId,
+        CancellationToken cancellationToken);
 }
 
 public interface IInTransitCommandAcceptor
@@ -104,6 +114,24 @@ public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcc
 
     public Task SiphonAsync(string shipSymbol, CancellationToken cancellationToken)
         => bus.SendAsync(new SiphonResourcesCommand(shipSymbol)).AsTask();
+
+    public Task SupplyConstructionAsync(
+        string shipSymbol,
+        string systemSymbol,
+        string waypointSymbol,
+        string tradeSymbol,
+        int units,
+        Guid correlationId,
+        Guid causationId,
+        CancellationToken cancellationToken)
+        => bus.SendAsync(new SupplyConstructionCommand(
+            shipSymbol,
+            systemSymbol,
+            waypointSymbol,
+            tradeSymbol,
+            units,
+            correlationId,
+            causationId)).AsTask();
 }
 
 public sealed class InTransitCommandAcceptor(IMessageBus bus) : IInTransitCommandAcceptor

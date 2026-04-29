@@ -107,4 +107,9 @@ public interface ISpaceTradersApiClient
     Task<InstallModuleResult> InstallModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
 
     Task<RemoveModuleResult> RemoveModuleAsync(string shipSymbol, string moduleSymbol, CancellationToken cancellationToken = default);
+
+    // Phase 10 additions
+    Task<ConstructionSite> GetConstructionSiteAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
+
+    Task<SupplyConstructionData> SupplyConstructionAsync(string systemSymbol, string waypointSymbol, SupplyConstructionRequest request, CancellationToken cancellationToken = default);
 }

@@ -152,6 +152,25 @@ public static class SpaceTradersDatabaseInitializer
         await EnsureCompositePrimaryKeyAsync(dbContext, "ship_assignment_records", "ship_assignment_records_pkey", "\"AgentToken\", \"ShipSymbol\"", cancellationToken);
         await EnsureCompositePrimaryKeyAsync(dbContext, "leader_leases", "leader_leases_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
         await EnsureCompositePrimaryKeyAsync(dbContext, "cached_surveys", "cached_surveys_pkey", "\"AgentToken\", \"Signature\"", cancellationToken);
+
+        // Phase 10: construction sites
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS cached_construction_sites (
+                "AgentToken" text NOT NULL,
+                "WaypointSymbol" text NOT NULL,
+                "SystemSymbol" text NOT NULL,
+                "IsComplete" boolean NOT NULL DEFAULT FALSE,
+                "MaterialsJson" text NULL,
+                "LastObservedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                CONSTRAINT "cached_construction_sites_pkey" PRIMARY KEY ("AgentToken", "WaypointSymbol")
+            );
+            """,
+            cancellationToken);
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_cached_construction_sites_AgentToken_IsComplete\" ON cached_construction_sites (\"AgentToken\", \"IsComplete\");",
+            cancellationToken);
     }
 
     private static Task EnsureCompositePrimaryKeyAsync(
