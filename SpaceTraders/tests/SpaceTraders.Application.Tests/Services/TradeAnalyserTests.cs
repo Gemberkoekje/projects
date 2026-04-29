@@ -15,7 +15,7 @@ public sealed class TradeAnalyserTests
         string[]? exchange = null)
     {
         var goodSnapshots = goods
-            .Select(g => new TradeGoodSnapshot(g.symbol, g.type, g.purchasePrice, g.sellPrice, g.tradeVolume, "ABUNDANT"))
+            .Select(g => new TradeGoodSnapshot(g.symbol, g.type, g.purchasePrice, g.sellPrice, g.tradeVolume, "ABUNDANT", string.Empty))
             .ToList();
         return new MarketSnapshot(waypoint, system, goodSnapshots, imports ?? [], exports ?? [], exchange ?? []);
     }
@@ -206,5 +206,47 @@ public sealed class TradeAnalyserTests
         var results = analyser.ComputeOpportunities([]);
 
         results.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ComputeOpportunities_PopulatesPhase4RouteMetrics()
+    {
+        var markets = new[]
+        {
+            BuildMarket("SYS-A-WP-1", "SYS-A", [("IRON_ORE", "EXPORT", 100, 0, 75)]),
+            BuildMarket("SYS-A-WP-2", "SYS-A", [("IRON_ORE", "IMPORT", 0, 250, 90)]),
+        };
+
+        var analyser = new TradeAnalyser();
+        var results = analyser.ComputeOpportunities(markets);
+
+        results.Should().ContainSingle();
+        var route = results[0];
+        route.BuyType.Should().Be("EXPORT");
+        route.SellType.Should().Be("IMPORT");
+        route.EffectiveTradeVolume.Should().Be(75);
+        route.EstimatedFuelCost.Should().BeGreaterThan(0m);
+        route.EstimatedTravelTimeMinutes.Should().BeGreaterThan(0m);
+        route.RouteScore.Should().NotBe(0m);
+    }
+
+    [Fact]
+    public void BuildProductionChain_MapsImportsToOutputs()
+    {
+        var markets = new[]
+        {
+            BuildMarket(
+                "SYS-A-WP-1",
+                "SYS-A",
+                [("STEEL", "EXPORT", 200, 0, 10)],
+                imports: ["IRON_ORE"],
+                exports: ["STEEL"]),
+        };
+
+        var analyser = new TradeAnalyser();
+        var production = analyser.BuildProductionChain(markets);
+
+        production.Should().ContainKey("IRON_ORE");
+        production["IRON_ORE"].Should().Contain("STEEL");
     }
 }

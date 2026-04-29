@@ -26,5 +26,23 @@ public sealed class TradeOpportunity
 
     public int SupplyChainDepth { get; init; }
 
+    public string BuyType { get; init; } = string.Empty;
+
+    public string SellType { get; init; } = string.Empty;
+
+    public int EffectiveTradeVolume { get; init; }
+
+    public decimal EstimatedFuelCost { get; init; }
+
+    public decimal EstimatedTravelTimeMinutes { get; init; }
+
+    public decimal OpportunityCostPenalty { get; init; }
+
+    public decimal CooldownPenalty { get; init; }
+
+    public decimal RateLimitPenalty { get; init; }
+
+    public decimal RouteScore { get; init; }
+
     public DateTimeOffset ComputedAt { get; init; }
 }

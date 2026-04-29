@@ -166,8 +166,17 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.TradeSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.BuyWaypoint).HasMaxLength(100).IsRequired();
             entity.Property(x => x.SellWaypoint).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.BuyType).HasMaxLength(30).IsRequired();
+            entity.Property(x => x.SellType).HasMaxLength(30).IsRequired();
             entity.Property(x => x.ProfitPerJump).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.EstimatedFuelCost).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.EstimatedTravelTimeMinutes).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.OpportunityCostPenalty).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.CooldownPenalty).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.RateLimitPenalty).HasColumnType("numeric(18,4)");
+            entity.Property(x => x.RouteScore).HasColumnType("numeric(18,4)");
             entity.HasIndex(x => new { x.AgentToken, x.SupportsSupplyChain, x.SupplyChainDepth, x.ProfitPerJump, x.ComputedAt });
+            entity.HasIndex(x => new { x.AgentToken, x.RouteScore, x.ComputedAt });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 

@@ -233,6 +233,16 @@ public sealed class ShipAssignmentPlanner(
 
         var refreshIntervalMinutes = await settings.GetAsync<int>("Scout.MarketRefreshIntervalMinutes", cancellationToken);
         var staleness = TimeSpan.FromMinutes(refreshIntervalMinutes > 0 ? refreshIntervalMinutes : 10);
+
+        if (IsProbeScout(ship))
+        {
+            var probeTarget = await BuildProbeMarketScoutAssignmentAsync(ship, staleness, cancellationToken);
+            if (probeTarget is not null)
+            {
+                return probeTarget;
+            }
+        }
+
         var staleWaypoints = await waypoints.GetUnscoutedOrStaleAsync(ship.SystemSymbol, staleness, cancellationToken);
         var target = staleWaypoints.FirstOrDefault();
 
@@ -241,6 +251,40 @@ public sealed class ShipAssignmentPlanner(
             : new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: target.Symbol);
     }
 
+    private async Task<AssignShipCommand?> BuildProbeMarketScoutAssignmentAsync(
+        ShipModel ship,
+        TimeSpan staleness,
+        CancellationToken cancellationToken)
+    {
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol ?? string.Empty, cancellationToken);
+        if (systemWaypoints.Count == 0)
+        {
+            return null;
+        }
+
+        var now = TimeProvider.System.GetUtcNow();
+        var staleThreshold = now - staleness;
+
+        var importantTarget = systemWaypoints
+            .Where(w => w.HasMarket || w.HasShipyard)
+            .OrderBy(w => w.LastObservedAt >= staleThreshold)
+            .ThenBy(w => w.HasMarket ? 0 : 1)
+            .ThenBy(w => w.LastObservedAt)
+            .FirstOrDefault();
+
+        if (importantTarget is null)
+        {
+            return null;
+        }
+
+        return new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: importantTarget.Symbol);
+    }
+
+    private static bool IsProbeScout(ShipModel ship)
+        => ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
+           || ship.ShipType.Equals("SHIP_LIGHT_HAULER", StringComparison.OrdinalIgnoreCase)
+           || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase);
+    
     private async Task<AssignShipCommand?> BuildMiningAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ship.SystemSymbol))

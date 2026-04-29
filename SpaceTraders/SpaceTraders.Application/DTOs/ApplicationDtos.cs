@@ -167,6 +167,24 @@ public sealed record TradeOpportunityDto
 
     public required int SupplyChainDepth { get; init; }
 
+    public required string BuyType { get; init; }
+
+    public required string SellType { get; init; }
+
+    public required int EffectiveTradeVolume { get; init; }
+
+    public required decimal EstimatedFuelCost { get; init; }
+
+    public required decimal EstimatedTravelTimeMinutes { get; init; }
+
+    public required decimal OpportunityCostPenalty { get; init; }
+
+    public required decimal CooldownPenalty { get; init; }
+
+    public required decimal RateLimitPenalty { get; init; }
+
+    public required decimal RouteScore { get; init; }
+
     public required DateTimeOffset ComputedAt { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
@@ -182,7 +200,16 @@ public sealed record TradeOpportunityDto
         decimal ProfitPerJump,
         bool SupportsSupplyChain,
         int SupplyChainDepth,
-        DateTimeOffset ComputedAt)
+        DateTimeOffset ComputedAt,
+        string BuyType = "UNKNOWN",
+        string SellType = "UNKNOWN",
+        int EffectiveTradeVolume = 0,
+        decimal EstimatedFuelCost = 0m,
+        decimal EstimatedTravelTimeMinutes = 0m,
+        decimal OpportunityCostPenalty = 0m,
+        decimal CooldownPenalty = 0m,
+        decimal RateLimitPenalty = 0m,
+        decimal RouteScore = 0m)
     {
         this.Id = Id;
         this.TradeSymbol = TradeSymbol;
@@ -195,6 +222,15 @@ public sealed record TradeOpportunityDto
         this.ProfitPerJump = ProfitPerJump;
         this.SupportsSupplyChain = SupportsSupplyChain;
         this.SupplyChainDepth = SupplyChainDepth;
+        this.BuyType = BuyType;
+        this.SellType = SellType;
+        this.EffectiveTradeVolume = EffectiveTradeVolume;
+        this.EstimatedFuelCost = EstimatedFuelCost;
+        this.EstimatedTravelTimeMinutes = EstimatedTravelTimeMinutes;
+        this.OpportunityCostPenalty = OpportunityCostPenalty;
+        this.CooldownPenalty = CooldownPenalty;
+        this.RateLimitPenalty = RateLimitPenalty;
+        this.RouteScore = RouteScore;
         this.ComputedAt = ComputedAt;
     }
 }

@@ -17,7 +17,7 @@ Legend:
 | 1 | API client parity for core gameplay | [x] | All 10 endpoints added: typed client, port adapter, commands, and 14 unit tests. |
 | 2 | Data model enrichment | [x] | Waypoint, ship, market, and shipyard persistence extended; 6 integration tests added. |
 | 3 | Contract-first onboarding automation | [x] | Contract objective planning, assignment metadata, idempotent mutations, milestone logging, onboarding orchestration, and phase-3 tests implemented. |
-| 4 | Market and supply-chain automation | [ ] | Not started. |
+| 4 | Market and supply-chain automation | [x] | Trade scoring upgraded with volume/supply/activity/fuel-time penalties, probe-first market scouting, and Market UI expanded with detail, route comparison, and production-chain views. |
 | 5 | Navigation, fuel, jump, and exploration planning | [ ] | Not started. |
 | 6 | Extraction, survey, siphon, and resource logistics | [ ] | Not started. |
 | 7 | Fleet outfitting, maintenance, repair, and scrapping | [ ] | Not started. |
@@ -47,6 +47,16 @@ Legend:
 
 - [x] A fresh agent can progress through the first contract without manual intervention.
   - Implemented startup-triggered phase 3 onboarding orchestration with sync, accept, assignment, delivery/fulfill progression, and negotiation fallback.
+
+### Phase 4 deliverables
+
+- [x] Better trade opportunity ranking and UI explainability.
+  - Expanded `TradeAnalyser` with normalized symbols, supply-chain map export, and route scoring that includes category type, trade volume, supply/activity, distance, estimated fuel/travel time, opportunity-cost, cooldown, and rate-limit penalties.
+  - Extended `TradeOpportunityDto` and `trade_opportunities` persistence schema with phase-4 scoring/explainability fields (`BuyType`, `SellType`, `EffectiveTradeVolume`, fuel/time/penalty metrics, `RouteScore`) using backward-compatible initializer ALTER statements.
+  - Updated trade opportunity repository ranking and best-route selection to use `RouteScore` while preserving supply-chain prioritization.
+  - Added probe-first scout targeting in `ShipAssignmentPlanner` to prioritize stale market/shipyard waypoints for visibility coverage.
+  - Expanded Razor Pages `Market/Index` into combined market detail, route comparison, and production-chain explorer views.
+  - Added/updated application tests for phase-4 metrics population and production-chain mapping.
 
 ## Phase 3 checklist
 
@@ -93,4 +103,10 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
 - `run_tests` for phase 3-focused application tests (`Phase3ContractAutomationTests`, `ContractMutationHandlerTests`, `NegotiateContractHandlerTests`, `ShipAssignmentPlannerTests`)
   - Result: 11 passed, 0 failed.
 - `dotnet build SpaceTraders.slnx` after Phase 3 changes
+  - Result: build successful.
+- `run_tests` for `SpaceTraders.Application.Tests.Services.TradeAnalyserTests` after Phase 4 changes
+  - Result: 14 passed, 0 failed.
+- `run_tests` for `SpaceTraders.Application.Tests.Services.ShipAssignmentPlannerTests` after Phase 4 changes
+  - Result: 3 passed, 0 failed.
+- `dotnet build SpaceTraders.slnx` after Phase 4 changes
   - Result: build successful.

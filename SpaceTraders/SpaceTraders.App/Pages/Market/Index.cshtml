@@ -26,13 +26,19 @@
                                 <tr>
                                     <th>Good</th>
                                     <th>Priority</th>
+                                    <th>Buy Type</th>
+                                    <th>Sell Type</th>
                                     <th>Buy At</th>
                                     <th>Sell At</th>
                                     <th>Buy Price</th>
                                     <th>Sell Price</th>
+                                    <th>Volume</th>
                                     <th>Profit/Unit</th>
                                     <th>Distance</th>
                                     <th>Profit/Jump</th>
+                                    <th>Fuel Cost</th>
+                                    <th>Travel (min)</th>
+                                    <th>Score</th>
                                     <th>Computed</th>
                                 </tr>
                             </thead>
@@ -40,7 +46,11 @@
                             @foreach (var route in Model.TopRoutes)
                             {
                                 <tr>
-                                    <td><code>@route.TradeSymbol</code></td>
+                                    <td>
+                                        <a asp-page="/Market/Index" asp-route-tradeSymbol="@route.TradeSymbol" asp-route-marketWaypoint="@Model.MarketWaypoint">
+                                            <code>@route.TradeSymbol</code>
+                                        </a>
+                                    </td>
                                     <td>
                                         @if (route.SupportsSupplyChain)
                                         {
@@ -51,15 +61,21 @@
                                             <span class="badge text-bg-secondary">Direct</span>
                                         }
                                     </td>
+                                    <td><code>@route.BuyType</code></td>
+                                    <td><code>@route.SellType</code></td>
                                     <td class="text-nowrap">@route.BuyWaypoint</td>
                                     <td class="text-nowrap">@route.SellWaypoint</td>
                                     <td class="text-end">@route.BuyPrice.ToString("N0")</td>
                                     <td class="text-end">@route.SellPrice.ToString("N0")</td>
+                                    <td class="text-end">@route.EffectiveTradeVolume.ToString("N0")</td>
                                     <td class="text-end fw-semibold @IndexModel.GetProfitPerUnitClass(route)">
                                         @route.ProfitPerUnit.ToString("N0")
                                     </td>
                                     <td class="text-center">@route.DistanceJumps</td>
                                     <td class="text-end">@route.ProfitPerJump.ToString("N0")</td>
+                                    <td class="text-end">@route.EstimatedFuelCost.ToString("N1")</td>
+                                    <td class="text-end">@route.EstimatedTravelTimeMinutes.ToString("N1")</td>
+                                    <td class="text-end fw-semibold @IndexModel.GetRouteScoreClass(route)">@route.RouteScore.ToString("N1")</td>
                                     <td class="text-nowrap text-muted small">@route.ComputedAt.ToLocalTime().ToString("g")</td>
                                 </tr>
                             }
@@ -71,8 +87,8 @@
         </div>
     </div>
 
-    <div class="col-12">
-        <div class="card">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
             <div class="card-header">Known Markets</div>
             <div class="card-body p-0">
                 @if (Model.Markets.Count == 0)
@@ -93,8 +109,14 @@
                             <tbody>
                             @foreach (var market in Model.Markets)
                             {
-                                <tr>
-                                    <td class="text-nowrap">@market.WaypointSymbol</td>
+                                var isSelected = !string.IsNullOrWhiteSpace(Model.MarketWaypoint) &&
+                                                 market.WaypointSymbol.Equals(Model.MarketWaypoint, StringComparison.OrdinalIgnoreCase);
+                                <tr class="@(isSelected ? "table-primary" : string.Empty)">
+                                    <td class="text-nowrap">
+                                        <a asp-page="/Market/Index" asp-route-marketWaypoint="@market.WaypointSymbol" asp-route-tradeSymbol="@Model.TradeSymbol">
+                                            @market.WaypointSymbol
+                                        </a>
+                                    </td>
                                     <td class="text-nowrap">@market.SystemSymbol</td>
                                     <td class="text-nowrap text-muted small">@market.LastObservedAt.ToLocalTime().ToString("g")</td>
                                 </tr>
@@ -102,6 +124,135 @@
                             </tbody>
                         </table>
                     </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Market Detail</div>
+            <div class="card-body p-0">
+                @if (Model.SelectedMarket is null)
+                {
+                    <div class="p-3 text-muted">Select a market waypoint to view trade goods.</div>
+                }
+                else if (Model.SelectedMarketGoods.Count == 0)
+                {
+                    <div class="p-3 text-muted">No trade goods cached for @Model.SelectedMarket.WaypointSymbol.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Supply</th>
+                                    <th>Activity</th>
+                                    <th>Volume</th>
+                                    <th>Buy</th>
+                                    <th>Sell</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var good in Model.SelectedMarketGoods)
+                            {
+                                <tr>
+                                    <td>
+                                        <a asp-page="/Market/Index" asp-route-marketWaypoint="@Model.SelectedMarket.WaypointSymbol" asp-route-tradeSymbol="@good.Symbol">
+                                            <code>@good.Symbol</code>
+                                        </a>
+                                    </td>
+                                    <td><code>@good.Type</code></td>
+                                    <td>@good.Supply</td>
+                                    <td>@(string.IsNullOrWhiteSpace(good.Activity) ? "-" : good.Activity)</td>
+                                    <td class="text-end">@good.TradeVolume.ToString("N0")</td>
+                                    <td class="text-end">@good.PurchasePrice.ToString("N0")</td>
+                                    <td class="text-end">@good.SellPrice.ToString("N0")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Route Comparison @if (!string.IsNullOrWhiteSpace(Model.TradeSymbol)) { <span>for <code>@Model.TradeSymbol</code></span> }</div>
+            <div class="card-body p-0">
+                @if (string.IsNullOrWhiteSpace(Model.TradeSymbol))
+                {
+                    <div class="p-3 text-muted">Select a trade symbol from routes or market detail to compare routes.</div>
+                }
+                else if (Model.SelectedSymbolRoutes.Count == 0)
+                {
+                    <div class="p-3 text-muted">No routes computed for <code>@Model.TradeSymbol</code>.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Buy</th>
+                                    <th>Sell</th>
+                                    <th>Profit/Unit</th>
+                                    <th>Volume</th>
+                                    <th>Fuel</th>
+                                    <th>Time</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var route in Model.SelectedSymbolRoutes)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@route.BuyWaypoint</td>
+                                    <td class="text-nowrap">@route.SellWaypoint</td>
+                                    <td class="text-end">@route.ProfitPerUnit.ToString("N0")</td>
+                                    <td class="text-end">@route.EffectiveTradeVolume.ToString("N0")</td>
+                                    <td class="text-end">@route.EstimatedFuelCost.ToString("N1")</td>
+                                    <td class="text-end">@route.EstimatedTravelTimeMinutes.ToString("N1")</td>
+                                    <td class="text-end fw-semibold @IndexModel.GetRouteScoreClass(route)">@route.RouteScore.ToString("N1")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header">Production Chain @if (!string.IsNullOrWhiteSpace(Model.TradeSymbol)) { <span>for <code>@Model.TradeSymbol</code></span> }</div>
+            <div class="card-body">
+                @if (string.IsNullOrWhiteSpace(Model.TradeSymbol))
+                {
+                    <p class="text-muted mb-0">Select a trade symbol to view known production-chain outputs.</p>
+                }
+                else if (Model.ProductionChainOutputs.Count == 0)
+                {
+                    <p class="text-muted mb-0">No known downstream outputs for <code>@Model.TradeSymbol</code> yet.</p>
+                }
+                else
+                {
+                    <ul class="mb-0">
+                    @foreach (var output in Model.ProductionChainOutputs)
+                    {
+                        <li>
+                            <a asp-page="/Market/Index" asp-route-marketWaypoint="@Model.MarketWaypoint" asp-route-tradeSymbol="@output">
+                                <code>@output</code>
+                            </a>
+                        </li>
+                    }
+                    </ul>
                 }
             </div>
         </div>

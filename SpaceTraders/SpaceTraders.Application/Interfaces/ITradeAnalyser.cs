@@ -21,6 +21,29 @@ public interface ITradeAnalyser
         int minProfitPerUnit,
         int maxDistanceJumps,
         bool prioritizeSupplyChain = true);
+
+    /// <summary>
+    /// Builds a normalized production-chain map of input symbol to produced symbols.
+    /// </summary>
+    IReadOnlyDictionary<string, IReadOnlyCollection<string>> BuildProductionChain(IReadOnlyList<MarketSnapshot> markets);
+}
+
+public interface ITradeSymbolNormalizer
+{
+    string Normalize(string symbol);
+}
+
+public sealed class TradeSymbolNormalizer : ITradeSymbolNormalizer
+{
+    public string Normalize(string symbol)
+    {
+        if (string.IsNullOrWhiteSpace(symbol))
+        {
+            return string.Empty;
+        }
+
+        return symbol.Trim().ToUpperInvariant();
+    }
 }
 
 /// <summary>
@@ -72,7 +95,7 @@ public sealed record TradeGoodSnapshot
 
     public required string Supply { get; init; }
 
-    public string? Activity { get; init; }
+    public required string Activity { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public TradeGoodSnapshot(
@@ -82,7 +105,7 @@ public sealed record TradeGoodSnapshot
         int sellPrice,
         int tradeVolume,
         string supply,
-        string? activity = null)
+        string activity = "")
     {
         this.Symbol = symbol;
         this.Type = type;
