@@ -46,6 +46,7 @@ public sealed class SupplyConstructionHandler(
     ISpaceTradersPort port,
     IConstructionRepository constructions,
     IShipRepository ships,
+    IShipAssignmentRepository assignments,
     IMessageBus bus,
     ILogger<SupplyConstructionHandler> logger)
 {
@@ -94,6 +95,25 @@ public sealed class SupplyConstructionHandler(
         await constructions.UpsertAsync(result.Construction, command.SystemSymbol, cancellationToken);
 
         await ships.UpdateCargoAsync(command.ShipSymbol, result.Cargo, cancellationToken);
+
+        // Mark the assignment so the docked handler knows the supply run is done
+        var assignment = await assignments.FindAsync(command.ShipSymbol, cancellationToken);
+        if (assignment is not null)
+        {
+            await assignments.UpsertAsync(new SpaceTraders.Application.DTOs.ShipAssignmentDto(
+                assignment.ShipSymbol,
+                assignment.AssignmentType,
+                assignment.OriginWaypoint,
+                assignment.DestWaypoint,
+                assignment.CargoSymbol,
+                assignment.ContractId,
+                assignment.StepIndex,
+                assignment.AssignedAt,
+                assignment.CompletedAt,
+                assignment.PurchaseUnitPrice,
+                assignment.RequiredUnits,
+                SupplyCompleted: true), cancellationToken);
+        }
 
         var now = TimeProvider.System.GetUtcNow();
         await bus.PublishAsync(new ConstructionSuppliedEvent(

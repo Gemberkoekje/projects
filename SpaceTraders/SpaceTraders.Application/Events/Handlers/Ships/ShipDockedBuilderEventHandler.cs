@@ -44,7 +44,6 @@ public sealed class ShipDockedBuilderEventHandler(
         }
 
         // Derive system from the construction waypoint symbol (e.g. X1-AB-CC00 → X1-AB)
-        var constructionSystem = ExtractSystemSymbol(assignment.DestWaypoint);
         var site = await constructions.FindAsync(assignment.DestWaypoint, cancellationToken);
 
         if (site is not null && site.IsComplete)
@@ -71,6 +70,20 @@ public sealed class ShipDockedBuilderEventHandler(
             .FirstOrDefault(c => c.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
             .Units ?? 0;
 
+        // Supply run completed — ship has returned to origin docked; hand back to role planner
+        if (assignment.SupplyCompleted)
+        {
+            logger.LogInformation("{Handler}: ship {Ship} completed supply run; reassigning to Idle.", nameof(ShipDockedBuilderEventHandler), @event.ShipSymbol);
+            await bus.InvokeAsync(new AssignShipCommand(
+                @event.ShipSymbol,
+                "Idle",
+                SystemSymbol: @event.SystemSymbol,
+                WaypointSymbol: @event.WaypointSymbol,
+                CorrelationId: @event.CorrelationId,
+                CausationId: @event.EventId), cancellationToken);
+            return ChainOfCommandHandlerResult.Handled();
+        }
+
         var targetUnits = assignment.RequiredUnits > 0 ? assignment.RequiredUnits : 1;
         var cargoCapacity = ship.CargoCapacity > 0 ? ship.CargoCapacity : targetUnits;
         var unitsToBuy = Math.Min(targetUnits - cargoUnits, cargoCapacity - ship.CargoCurrent);
@@ -95,11 +108,5 @@ public sealed class ShipDockedBuilderEventHandler(
         logger.LogInformation("{Handler}: ship {Ship} has {Units}x {Symbol}; orbiting to depart for construction site {Dest}.", nameof(ShipDockedBuilderEventHandler), @event.ShipSymbol, cargoUnits, assignment.CargoSymbol, assignment.DestWaypoint);
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
-    }
-
-    private static string ExtractSystemSymbol(string waypointSymbol)
-    {
-        var lastDash = waypointSymbol.LastIndexOf('-');
-        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 }

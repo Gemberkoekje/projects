@@ -345,6 +345,8 @@ public sealed record ShipAssignmentDto
 
     public int RequiredUnits { get; init; }
 
+    public bool SupplyCompleted { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ShipAssignmentDto(
         string ShipSymbol,
@@ -357,7 +359,8 @@ public sealed record ShipAssignmentDto
         DateTimeOffset AssignedAt,
         DateTimeOffset? CompletedAt,
         int PurchaseUnitPrice = 0,
-        int RequiredUnits = 0)
+        int RequiredUnits = 0,
+        bool SupplyCompleted = false)
     {
         this.ShipSymbol = ShipSymbol;
         this.AssignmentType = AssignmentType;
@@ -370,5 +373,6 @@ public sealed record ShipAssignmentDto
         this.CompletedAt = CompletedAt;
         this.PurchaseUnitPrice = PurchaseUnitPrice;
         this.RequiredUnits = RequiredUnits;
+        this.SupplyCompleted = SupplyCompleted;
     }
 }

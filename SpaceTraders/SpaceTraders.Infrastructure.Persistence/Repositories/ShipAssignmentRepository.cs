@@ -44,6 +44,7 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
             CompletedAt = assignment.CompletedAt,
             PurchaseUnitPrice = assignment.PurchaseUnitPrice,
             RequiredUnits = assignment.RequiredUnits,
+            SupplyCompleted = assignment.SupplyCompleted,
         };
 
         if (existing is null)
@@ -70,5 +71,6 @@ public sealed class ShipAssignmentRepository(SpaceTradersDbContext db) : IShipAs
             entity.AssignedAt,
             entity.CompletedAt,
             entity.PurchaseUnitPrice,
-            entity.RequiredUnits);
+            entity.RequiredUnits,
+            entity.SupplyCompleted);
 }

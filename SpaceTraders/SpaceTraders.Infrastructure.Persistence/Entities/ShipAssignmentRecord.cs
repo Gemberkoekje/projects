@@ -25,4 +25,6 @@ public sealed class ShipAssignmentRecord
     public int PurchaseUnitPrice { get; init; }
 
     public int RequiredUnits { get; init; }
+
+    public bool SupplyCompleted { get; init; }
 }

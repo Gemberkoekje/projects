@@ -23,6 +23,8 @@ public sealed record AssignShipCommand
 
     public int RequiredUnits { get; init; }
 
+    public bool SupplyCompleted { get; init; }
+
     public string SystemSymbol { get; init; }
 
     public string WaypointSymbol { get; init; }
@@ -43,7 +45,8 @@ public sealed record AssignShipCommand
         string WaypointSymbol = "",
         Guid CorrelationId = default,
         Guid CausationId = default,
-        int RequiredUnits = 0)
+        int RequiredUnits = 0,
+        bool SupplyCompleted = false)
     {
         this.ShipSymbol = ShipSymbol;
         this.AssignmentType = AssignmentType;
@@ -56,6 +59,7 @@ public sealed record AssignShipCommand
         this.CorrelationId = CorrelationId;
         this.CausationId = CausationId;
         this.RequiredUnits = RequiredUnits;
+        this.SupplyCompleted = SupplyCompleted;
     }
 }
 
@@ -79,7 +83,8 @@ public sealed class AssignShipHandler(
             now,
             null,
             0,
-            command.RequiredUnits);
+            command.RequiredUnits,
+            command.SupplyCompleted);
         await assignments.UpsertAsync(dto, cancellationToken);
         await bus.PublishAsync(new ShipAssignedEvent(command.ShipSymbol, command.AssignmentType));
         logger.LogInformation("Ship {Symbol} assigned to {Type}.", command.ShipSymbol, command.AssignmentType);

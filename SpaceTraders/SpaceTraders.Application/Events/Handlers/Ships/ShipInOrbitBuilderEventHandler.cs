@@ -11,11 +11,11 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 ///
 /// Decision tree:
 ///   1. Construction complete → reassign Idle.
-///   2. At construction site with cargo → supply materials.
-///   3. At construction site without cargo → navigate back to origin to reload.
+///   2. At construction site with cargo → supply materials (SupplyConstructionCommand marks SupplyCompleted on the assignment).
+///   3. At construction site without cargo → navigate back to origin.
 ///   4. Has cargo but not at site → navigate to the construction site.
-///   5. No cargo and not at origin → navigate to origin so the docked handler can buy cargo.
-///   6. At origin with no cargo → dock so the docked handler can buy cargo.
+///   5. No cargo and not at origin → navigate to origin.
+///   6. At origin with no cargo → dock so the docked handler can check SupplyCompleted and go Idle.
 /// </summary>
 public sealed class ShipInOrbitBuilderEventHandler(
     IShipAssignmentRepository assignments,
@@ -114,18 +114,11 @@ public sealed class ShipInOrbitBuilderEventHandler(
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        // No cargo — dock at origin so the docked handler can buy
+        // No cargo — dock at origin so the docked handler can check SupplyCompleted
         if (atOrigin)
         {
-            logger.LogInformation("{Handler}: ship {Ship} completed supply run; docking at origin {Origin} and returning to Idle.", nameof(ShipInOrbitBuilderEventHandler), @event.ShipSymbol, currentWaypoint);
+            logger.LogInformation("{Handler}: ship {Ship} back at origin {Origin} with no cargo; docking.", nameof(ShipInOrbitBuilderEventHandler), @event.ShipSymbol, currentWaypoint);
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
-            await bus.InvokeAsync(new AssignShipCommand(
-                @event.ShipSymbol,
-                "Idle",
-                SystemSymbol: @event.SystemSymbol,
-                WaypointSymbol: currentWaypoint,
-                CorrelationId: @event.CorrelationId,
-                CausationId: @event.EventId), cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
 
