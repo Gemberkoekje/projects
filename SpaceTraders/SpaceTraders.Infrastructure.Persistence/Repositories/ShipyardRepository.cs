@@ -36,6 +36,7 @@ public sealed class ShipyardRepository(SpaceTradersDbContext db) : IShipyardRepo
             WaypointSymbol = shipyard.WaypointSymbol,
             SystemSymbol = shipyard.SystemSymbol,
             ShipTypesJson = shipyard.ShipTypesJson,
+            ShipsDetailJson = shipyard.ShipsDetailJson,
             LastObservedAt = now
         };
 

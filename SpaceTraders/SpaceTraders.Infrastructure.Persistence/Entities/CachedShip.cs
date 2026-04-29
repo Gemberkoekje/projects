@@ -23,6 +23,16 @@ public sealed class CachedShip
 
     public string? MountsJson { get; set; }
 
+    public string? ModulesJson { get; set; }
+
+    public string? FrameJson { get; set; }
+
+    public string? ReactorJson { get; set; }
+
+    public string? EngineJson { get; set; }
+
+    public DateTimeOffset? CooldownExpiresAt { get; set; }
+
     public int FuelCurrent { get; set; }
 
     public int FuelCapacity { get; set; }

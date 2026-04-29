@@ -71,7 +71,13 @@ public sealed class RefreshSystemDataHandler(
                 waypoint.Y,
                 waypoint.HasMarket,
                 waypoint.HasShipyard,
-                now)));
+                now,
+                waypoint.TraitsJson,
+                waypoint.ModifiersJson,
+                waypoint.OrbitalsJson,
+                waypoint.ParentSymbol,
+                waypoint.IsUnderConstruction,
+                waypoint.ChartJson)));
 
             if (waypointModels.Count >= pageResult.Total)
             {

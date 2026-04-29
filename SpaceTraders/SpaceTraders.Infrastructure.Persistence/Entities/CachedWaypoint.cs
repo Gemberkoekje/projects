@@ -18,5 +18,17 @@ public sealed class CachedWaypoint
 
     public bool HasShipyard { get; init; }
 
+    public string? TraitsJson { get; init; }
+
+    public string? ModifiersJson { get; init; }
+
+    public string? OrbitalsJson { get; init; }
+
+    public string? ParentSymbol { get; init; }
+
+    public bool IsUnderConstruction { get; init; }
+
+    public string? ChartJson { get; init; }
+
     public DateTimeOffset LastObservedAt { get; init; }
 }

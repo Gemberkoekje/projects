@@ -72,6 +72,8 @@ public sealed record TradeGoodSnapshot
 
     public required string Supply { get; init; }
 
+    public string? Activity { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public TradeGoodSnapshot(
         string symbol,
@@ -79,7 +81,8 @@ public sealed record TradeGoodSnapshot
         int purchasePrice,
         int sellPrice,
         int tradeVolume,
-        string supply)
+        string supply,
+        string? activity = null)
     {
         this.Symbol = symbol;
         this.Type = type;
@@ -87,5 +90,6 @@ public sealed record TradeGoodSnapshot
         this.SellPrice = sellPrice;
         this.TradeVolume = tradeVolume;
         this.Supply = supply;
+        this.Activity = activity;
     }
 }

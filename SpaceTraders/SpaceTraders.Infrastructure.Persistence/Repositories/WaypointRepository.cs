@@ -67,6 +67,12 @@ public sealed class WaypointRepository(SpaceTradersDbContext db) : IWaypointRepo
                 Y = waypoint.Y,
                 HasMarket = waypoint.HasMarket,
                 HasShipyard = waypoint.HasShipyard,
+                TraitsJson = waypoint.TraitsJson,
+                ModifiersJson = waypoint.ModifiersJson,
+                OrbitalsJson = waypoint.OrbitalsJson,
+                ParentSymbol = waypoint.ParentSymbol,
+                IsUnderConstruction = waypoint.IsUnderConstruction,
+                ChartJson = waypoint.ChartJson,
                 LastObservedAt = waypoint.LastObservedAt,
             };
 
@@ -94,5 +100,7 @@ public sealed class WaypointRepository(SpaceTradersDbContext db) : IWaypointRepo
 
     private static WaypointCacheModel MapToModel(CachedWaypoint entity) =>
         new(entity.Symbol, entity.SystemSymbol, entity.Type, entity.X, entity.Y,
-            entity.HasMarket, entity.HasShipyard, entity.LastObservedAt);
+            entity.HasMarket, entity.HasShipyard, entity.LastObservedAt,
+            entity.TraitsJson, entity.ModifiersJson, entity.OrbitalsJson,
+            entity.ParentSymbol, entity.IsUnderConstruction, entity.ChartJson);
 }

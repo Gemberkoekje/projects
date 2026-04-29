@@ -15,7 +15,7 @@ Legend:
 |------|-------|--------|-------|
 | 0 | Documentation and build hygiene | [x] | Root build-path issue fixed, docs aligned to implementation, matrix added, smoke tests expanded. |
 | 1 | API client parity for core gameplay | [x] | All 10 endpoints added: typed client, port adapter, commands, and 14 unit tests. |
-| 2 | Data model enrichment | [ ] | Not started. |
+| 2 | Data model enrichment | [x] | Waypoint, ship, market, and shipyard persistence extended; 6 integration tests added. |
 | 3 | Contract-first onboarding automation | [ ] | Not started. |
 | 4 | Market and supply-chain automation | [ ] | Not started. |
 | 5 | Navigation, fuel, jump, and exploration planning | [ ] | Not started. |
@@ -53,6 +53,11 @@ Goal: make the repository easy to build, understand, and validate before expandi
 - [x] Typed client and command support for all core missing quickstart/gameplay endpoints.
 - [x] Tests proving state guards and cache updates after each mutating command.
 
+### Phase 2 deliverables
+
+- [x] Persistence can represent the SpaceTraders concepts currently present in `spacetraders.md` and returned by the typed client.
+- [x] Existing dashboard pages continue to load with older cached data (backward-compatible ALTER TABLE IF NOT EXISTS migrations).
+
 ## Phase 1 checklist
 
 Goal: expose the SpaceTraders endpoints needed by the quickstart and current automation lifecycle.
@@ -76,6 +81,23 @@ Goal: expose the SpaceTraders endpoints needed by the quickstart and current aut
 - [x] All state-gated handlers (survey, siphon, warp, jump) publish `ShipStateMismatchEvent` when the ship is in the wrong state.
 - [x] 14 unit tests added in `Phase1CommandHandlerTests` and `NegotiateContractHandlerTests`.
 
+## Phase 2 checklist
+
+Goal: persist enough reference data to support route planning, market planning, and ship capability decisions.
+
+- [x] Extend `CachedWaypoint` with `TraitsJson`, `ModifiersJson`, `OrbitalsJson`, `ParentSymbol`, `IsUnderConstruction`, `ChartJson`.
+- [x] Extend `CachedShip` with `ModulesJson`, `FrameJson`, `ReactorJson`, `EngineJson`, `CooldownExpiresAt`.
+- [x] Extend `CachedShipyard` with `ShipsDetailJson` for full ship/component availability.
+- [x] Market cache already stores `TradeGoodsJson` with supply/activity; `TradeGoodSnapshot` extended with `Activity` field.
+- [x] `WaypointDataModel` and `WaypointCacheModel` extended with all new fields.
+- [x] `ShipModel` extended with `ModulesJson`, `FrameJson`, `ReactorJson`, `EngineJson`, `CooldownExpiresAt`.
+- [x] `ShipyardDataModel` extended with `ShipsDetailJson`.
+- [x] API models (`Ship.cs`, `Waypoint.cs`) extended with frame/reactor/engine/modules/cooldown and modifiers/orbits/chart/isUnderConstruction.
+- [x] `SpaceTradersPortAdapter` maps all new ship and waypoint fields.
+- [x] `SpaceTradersDatabaseInitializer` adds backward-compatible `ALTER TABLE … ADD COLUMN IF NOT EXISTS` migrations for all new columns.
+- [x] `RefreshSystemDataCommand` forwards new waypoint fields through to the cache.
+- [x] 6 integration tests added in `Phase2DataModelTests` covering migration, ship, waypoint, and shipyard round-trips.
+
 ## Validation log
 
 - `dotnet build SpaceTraders.slnx`
@@ -87,6 +109,12 @@ Goal: expose the SpaceTraders endpoints needed by the quickstart and current aut
   - Result: 14 passed, 0 failed.
 - `dotnet build SpaceTraders.slnx` after Phase 1 changes
   - Result: build successful.
+- `dotnet build SpaceTraders.slnx` after Phase 2 changes
+  - Result: build successful.
+- `run_tests` for `Phase2DataModelTests`
+  - Result: 6 passed, 0 failed.
+- `run_tests` for full `SpaceTraders.Infrastructure.Tests` project after Phase 2
+  - Result: 30 passed, 0 failed.
 
 ## Update protocol
 

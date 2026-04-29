@@ -140,7 +140,7 @@ Tasks:
 
 Deliverables:
 
-- A fresh agent can progress through the first contract with minimal manual intervention.
+- A fresh agent can progress through the first contract without manual intervention.
 
 ## Phase 4: market and supply-chain automation
 

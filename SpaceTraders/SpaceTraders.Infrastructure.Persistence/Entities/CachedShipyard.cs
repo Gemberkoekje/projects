@@ -10,5 +10,7 @@ public sealed class CachedShipyard
 
     public string? ShipTypesJson { get; init; }
 
+    public string? ShipsDetailJson { get; init; }
+
     public DateTimeOffset LastObservedAt { get; init; }
 }

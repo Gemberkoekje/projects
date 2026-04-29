@@ -53,6 +53,11 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
                 FlightMode = ship.FlightMode,
                 ShipType = ship.ShipType,
                 MountsJson = mountsJson,
+                ModulesJson = ship.ModulesJson,
+                FrameJson = ship.FrameJson,
+                ReactorJson = ship.ReactorJson,
+                EngineJson = ship.EngineJson,
+                CooldownExpiresAt = ship.CooldownExpiresAt,
                 FuelCurrent = ship.FuelCurrent,
                 FuelCapacity = ship.FuelCapacity,
                 CargoCurrent = ship.CargoCurrent,
@@ -71,6 +76,11 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
             existing.FlightMode = ship.FlightMode;
             existing.ShipType = ship.ShipType;
             existing.MountsJson = mountsJson;
+            existing.ModulesJson = ship.ModulesJson;
+            existing.FrameJson = ship.FrameJson;
+            existing.ReactorJson = ship.ReactorJson;
+            existing.EngineJson = ship.EngineJson;
+            existing.CooldownExpiresAt = ship.CooldownExpiresAt;
             existing.FuelCurrent = ship.FuelCurrent;
             existing.FuelCapacity = ship.FuelCapacity;
             existing.CargoCurrent = ship.CargoCurrent;
@@ -151,7 +161,12 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
             entity.LastSyncedAt,
             entity.ShipType,
             mounts,
-            cargoInventory);
+            cargoInventory,
+            entity.ModulesJson,
+            entity.FrameJson,
+            entity.ReactorJson,
+            entity.EngineJson,
+            entity.CooldownExpiresAt);
     }
 
     private static IReadOnlyList<string> DeserializeMounts(string? json)

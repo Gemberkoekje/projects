@@ -26,6 +26,18 @@ public sealed record WaypointCacheModel
 
     public required bool HasShipyard { get; init; }
 
+    public string? TraitsJson { get; init; }
+
+    public string? ModifiersJson { get; init; }
+
+    public string? OrbitalsJson { get; init; }
+
+    public string? ParentSymbol { get; init; }
+
+    public bool IsUnderConstruction { get; init; }
+
+    public string? ChartJson { get; init; }
+
     public required DateTimeOffset LastObservedAt { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
@@ -37,7 +49,13 @@ public sealed record WaypointCacheModel
         int Y,
         bool HasMarket,
         bool HasShipyard,
-        DateTimeOffset LastObservedAt)
+        DateTimeOffset LastObservedAt,
+        string? TraitsJson = null,
+        string? ModifiersJson = null,
+        string? OrbitalsJson = null,
+        string? ParentSymbol = null,
+        bool IsUnderConstruction = false,
+        string? ChartJson = null)
     {
         this.Symbol = Symbol;
         this.SystemSymbol = SystemSymbol;
@@ -47,5 +65,11 @@ public sealed record WaypointCacheModel
         this.HasMarket = HasMarket;
         this.HasShipyard = HasShipyard;
         this.LastObservedAt = LastObservedAt;
+        this.TraitsJson = TraitsJson;
+        this.ModifiersJson = ModifiersJson;
+        this.OrbitalsJson = OrbitalsJson;
+        this.ParentSymbol = ParentSymbol;
+        this.IsUnderConstruction = IsUnderConstruction;
+        this.ChartJson = ChartJson;
     }
 }

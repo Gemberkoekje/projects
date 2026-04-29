@@ -94,7 +94,8 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
                     g.PurchasePrice,
                     g.SellPrice,
                     g.TradeVolume,
-                    g.Supply ?? string.Empty))
+                    g.Supply ?? string.Empty,
+                    g.Activity))
                 .ToList();
 
             return new MarketSnapshot(

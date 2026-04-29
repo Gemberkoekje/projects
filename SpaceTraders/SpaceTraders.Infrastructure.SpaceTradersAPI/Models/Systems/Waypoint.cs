@@ -22,8 +22,20 @@ public sealed class Waypoint
     [JsonPropertyName("orbitals")]
     public IReadOnlyList<WaypointOrbital>? Orbitals { get; init; }
 
+    [JsonPropertyName("orbits")]
+    public string? Orbits { get; init; }
+
     [JsonPropertyName("traits")]
     public IReadOnlyList<WaypointTrait>? Traits { get; init; }
+
+    [JsonPropertyName("modifiers")]
+    public IReadOnlyList<WaypointModifier>? Modifiers { get; init; }
+
+    [JsonPropertyName("chart")]
+    public WaypointChart? Chart { get; init; }
+
+    [JsonPropertyName("isUnderConstruction")]
+    public bool IsUnderConstruction { get; init; }
 }
 
 public sealed class WaypointOrbital
@@ -36,4 +48,22 @@ public sealed class WaypointTrait
 {
     [JsonPropertyName("symbol")]
     required public string Symbol { get; init; }
+}
+
+public sealed class WaypointModifier
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+}
+
+public sealed class WaypointChart
+{
+    [JsonPropertyName("waypointSymbol")]
+    public string? WaypointSymbol { get; init; }
+
+    [JsonPropertyName("submittedBy")]
+    public string? SubmittedBy { get; init; }
+
+    [JsonPropertyName("submittedOn")]
+    public DateTimeOffset? SubmittedOn { get; init; }
 }

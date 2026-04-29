@@ -24,6 +24,48 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "UPDATE cached_ships SET \"ShipType\" = '' WHERE \"ShipType\" IS NULL;",
                 cancellationToken);
+
+            // Phase 2: ship component enrichment
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ModulesJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"FrameJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ReactorJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"EngineJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"CooldownExpiresAt\" timestamp with time zone NULL;",
+                cancellationToken);
+
+            // Phase 2: waypoint enrichment
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"TraitsJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ModifiersJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"OrbitalsJson\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ParentSymbol\" text NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"IsUnderConstruction\" boolean NOT NULL DEFAULT FALSE;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ChartJson\" text NULL;",
+                cancellationToken);
+
+            // Phase 2: shipyard enrichment
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_shipyards ADD COLUMN IF NOT EXISTS \"ShipsDetailJson\" text NULL;",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))

@@ -170,6 +170,7 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return new ShipyardDataModel(
             shipyard.Symbol,
             systemSymbol,
+            shipyard.ShipTypes is not null ? JsonSerializer.Serialize(shipyard.ShipTypes) : null,
             shipyard.Ships is not null ? JsonSerializer.Serialize(shipyard.Ships) : null);
     }
 
@@ -298,7 +299,12 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             default,
             ship.Registration?.Role ?? string.Empty,
             ship.Mounts?.Select(m => m.Symbol).ToList(),
-            ship.Cargo?.Inventory?.Select(MapCargoItem).ToList());
+            ship.Cargo?.Inventory?.Select(MapCargoItem).ToList(),
+            ship.Modules is not null ? JsonSerializer.Serialize(ship.Modules) : null,
+            ship.Frame is not null ? JsonSerializer.Serialize(ship.Frame) : null,
+            ship.Reactor is not null ? JsonSerializer.Serialize(ship.Reactor) : null,
+            ship.Engine is not null ? JsonSerializer.Serialize(ship.Engine) : null,
+            ship.Cooldown?.Expiration);
 
     private static ContractModel MapContract(Models.Contracts.Contract contract) =>
         new(contract.Id, contract.FactionSymbol, contract.Type, contract.Accepted, contract.Fulfilled, contract.Expiration, contract.DeadlineToAccept);
@@ -313,6 +319,12 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             waypoint.X,
             waypoint.Y,
             traits.Any(t => t.Symbol.Equals("MARKETPLACE", StringComparison.OrdinalIgnoreCase)),
-            traits.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)));
+            traits.Any(t => t.Symbol.Equals("SHIPYARD", StringComparison.OrdinalIgnoreCase)),
+            traits.Count > 0 ? JsonSerializer.Serialize(traits) : null,
+            waypoint.Modifiers is not null && waypoint.Modifiers.Count > 0 ? JsonSerializer.Serialize(waypoint.Modifiers) : null,
+            waypoint.Orbitals is not null && waypoint.Orbitals.Count > 0 ? JsonSerializer.Serialize(waypoint.Orbitals) : null,
+            waypoint.Orbits,
+            waypoint.IsUnderConstruction,
+            waypoint.Chart is not null ? JsonSerializer.Serialize(waypoint.Chart) : null);
     }
 }

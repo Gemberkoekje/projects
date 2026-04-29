@@ -256,8 +256,33 @@ public sealed record WaypointDataModel
 
     public required bool HasShipyard { get; init; }
 
+    public string? TraitsJson { get; init; }
+
+    public string? ModifiersJson { get; init; }
+
+    public string? OrbitalsJson { get; init; }
+
+    public string? ParentSymbol { get; init; }
+
+    public bool IsUnderConstruction { get; init; }
+
+    public string? ChartJson { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public WaypointDataModel(string Symbol, string SystemSymbol, string Type, int X, int Y, bool HasMarket, bool HasShipyard)
+    public WaypointDataModel(
+        string Symbol,
+        string SystemSymbol,
+        string Type,
+        int X,
+        int Y,
+        bool HasMarket,
+        bool HasShipyard,
+        string? TraitsJson = null,
+        string? ModifiersJson = null,
+        string? OrbitalsJson = null,
+        string? ParentSymbol = null,
+        bool IsUnderConstruction = false,
+        string? ChartJson = null)
     {
         this.Symbol = Symbol;
         this.SystemSymbol = SystemSymbol;
@@ -266,6 +291,12 @@ public sealed record WaypointDataModel
         this.Y = Y;
         this.HasMarket = HasMarket;
         this.HasShipyard = HasShipyard;
+        this.TraitsJson = TraitsJson;
+        this.ModifiersJson = ModifiersJson;
+        this.OrbitalsJson = OrbitalsJson;
+        this.ParentSymbol = ParentSymbol;
+        this.IsUnderConstruction = IsUnderConstruction;
+        this.ChartJson = ChartJson;
     }
 }
 
@@ -301,6 +332,16 @@ public sealed record ShipModel
 
     public IReadOnlyList<CargoItemModel>? CargoInventory { get; init; } = null;
 
+    public string? ModulesJson { get; init; } = null;
+
+    public string? FrameJson { get; init; } = null;
+
+    public string? ReactorJson { get; init; } = null;
+
+    public string? EngineJson { get; init; } = null;
+
+    public DateTimeOffset? CooldownExpiresAt { get; init; } = null;
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ShipModel(
         string Symbol,
@@ -317,7 +358,12 @@ public sealed record ShipModel
         DateTimeOffset LastSyncedAt = default,
         string ShipType = "",
         IReadOnlyList<string>? MountSymbols = null,
-        IReadOnlyList<CargoItemModel>? CargoInventory = null)
+        IReadOnlyList<CargoItemModel>? CargoInventory = null,
+        string? ModulesJson = null,
+        string? FrameJson = null,
+        string? ReactorJson = null,
+        string? EngineJson = null,
+        DateTimeOffset? CooldownExpiresAt = null)
     {
         this.Symbol = Symbol;
         this.SystemSymbol = SystemSymbol;
@@ -334,6 +380,11 @@ public sealed record ShipModel
         this.ShipType = ShipType;
         this.MountSymbols = MountSymbols;
         this.CargoInventory = CargoInventory;
+        this.ModulesJson = ModulesJson;
+        this.FrameJson = FrameJson;
+        this.ReactorJson = ReactorJson;
+        this.EngineJson = EngineJson;
+        this.CooldownExpiresAt = CooldownExpiresAt;
     }
 
     public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
@@ -422,12 +473,15 @@ public sealed record ShipyardDataModel
 
     public string? ShipTypesJson { get; init; }
 
+    public string? ShipsDetailJson { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ShipyardDataModel(string WaypointSymbol, string SystemSymbol, string? ShipTypesJson)
+    public ShipyardDataModel(string WaypointSymbol, string SystemSymbol, string? ShipTypesJson, string? ShipsDetailJson = null)
     {
         this.WaypointSymbol = WaypointSymbol;
         this.SystemSymbol = SystemSymbol;
         this.ShipTypesJson = ShipTypesJson;
+        this.ShipsDetailJson = ShipsDetailJson;
     }
 }
 
