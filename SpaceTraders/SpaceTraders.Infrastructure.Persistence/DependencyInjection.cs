@@ -36,7 +36,11 @@ public static class DependencyInjection
 
         services.AddDbContext<SpaceTradersDbContext>((_, options) =>
         {
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(connectionString, pgOptions =>
+            {
+                pgOptions.CommandTimeout(30);
+                pgOptions.EnableRetryOnFailure(maxRetryCount: 3);
+            });
         });
 
         services.AddScoped<IAgentRepository, AgentRepository>();

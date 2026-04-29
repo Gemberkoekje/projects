@@ -49,9 +49,9 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("stored_credentials");
             entity.HasKey(x => new { x.AgentToken, x.Key });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Key).HasMaxLength(100);
-            entity.Property(x => x.Value).IsRequired();
+            entity.Property(x => x.Value).HasMaxLength(1024).IsRequired();
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 
@@ -59,7 +59,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_agents");
             entity.HasKey(x => new { x.AgentToken, x.Symbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Symbol).HasMaxLength(100);
             entity.Property(x => x.StartingFaction).HasMaxLength(100);
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
@@ -69,7 +69,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_ships");
             entity.HasKey(x => new { x.AgentToken, x.Symbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Symbol).HasMaxLength(100);
             entity.Property(x => x.SystemSymbol).HasMaxLength(100);
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
@@ -84,7 +84,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_contracts");
             entity.HasKey(x => new { x.AgentToken, x.Id });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Id).HasMaxLength(100);
             entity.Property(x => x.FactionSymbol).HasMaxLength(100);
             entity.Property(x => x.Type).HasMaxLength(100);
@@ -96,7 +96,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_markets");
             entity.HasKey(x => new { x.AgentToken, x.WaypointSymbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
             entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
@@ -106,7 +106,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_shipyards");
             entity.HasKey(x => new { x.AgentToken, x.WaypointSymbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
             entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
@@ -116,7 +116,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_waypoints");
             entity.HasKey(x => new { x.AgentToken, x.Symbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Symbol).HasMaxLength(100);
             entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Type).HasMaxLength(100).IsRequired();
@@ -128,7 +128,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_systems");
             entity.HasKey(x => new { x.AgentToken, x.Symbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Symbol).HasMaxLength(100);
             entity.Property(x => x.SectorSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Type).HasMaxLength(100).IsRequired();
@@ -139,7 +139,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("agent_settings");
             entity.HasKey(x => new { x.AgentToken, x.Key });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Key).HasMaxLength(200);
             entity.Property(x => x.Value).IsRequired();
             entity.Property(x => x.Type).HasMaxLength(50).IsRequired();
@@ -151,7 +151,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("ship_assignment_records");
             entity.HasKey(x => new { x.AgentToken, x.ShipSymbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.ShipSymbol).HasMaxLength(100);
             entity.Property(x => x.Type).HasMaxLength(100).IsRequired();
             entity.Property(x => x.OriginWaypoint).HasMaxLength(100);
@@ -166,7 +166,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("trade_opportunities");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.AgentToken).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
             entity.Property(x => x.TradeSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.BuyWaypoint).HasMaxLength(100).IsRequired();
             entity.Property(x => x.SellWaypoint).HasMaxLength(100).IsRequired();
@@ -188,7 +188,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("activity_logs");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.AgentToken).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
             entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.EventType).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Message).IsRequired();
@@ -200,7 +200,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("leader_leases");
             entity.HasKey(x => new { x.AgentToken, x.Key });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Key).HasMaxLength(100);
             entity.Property(x => x.HolderId).HasMaxLength(200).IsRequired();
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
@@ -210,7 +210,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("api_endpoint_usages");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.AgentToken).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
             entity.Property(x => x.HttpMethod).HasMaxLength(10).IsRequired();
             entity.Property(x => x.Endpoint).HasMaxLength(1000).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.HttpMethod, x.Endpoint }).IsUnique();
@@ -221,7 +221,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_surveys");
             entity.HasKey(x => new { x.AgentToken, x.Signature });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.Signature).HasMaxLength(200);
             entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100).IsRequired();
@@ -234,7 +234,7 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("cached_construction_sites");
             entity.HasKey(x => new { x.AgentToken, x.WaypointSymbol });
-            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
             entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
             entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.IsComplete });

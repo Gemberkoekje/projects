@@ -22,11 +22,14 @@ public sealed class ShipInOrbitScoutEventHandler(
     ILogger<ShipInOrbitScoutEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
     public int Priority => 50;
+    private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
     {
         var assignment = await assignments.FindAsync(@event.ShipSymbol, cancellationToken);
-        if (assignment is null || !assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase))
+        if (assignment is null ||
+            (!assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase) &&
+             !assignment.AssignmentType.Equals(MarketProbeAssignmentType, StringComparison.OrdinalIgnoreCase)))
         {
             return ChainOfCommandHandlerResult.Skipped();
         }
@@ -60,7 +63,12 @@ public sealed class ShipInOrbitScoutEventHandler(
         if (string.Equals(currentWaypoint, assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase))
         {
             logger.LogInformation("{Handler}: ship {Ship} at target {Waypoint}; charting and docking.", nameof(ShipInOrbitScoutEventHandler), @event.ShipSymbol, currentWaypoint);
-            await bus.InvokeAsync(new CreateChartCommand(@event.ShipSymbol), cancellationToken);
+
+            if (!assignment.AssignmentType.Equals(MarketProbeAssignmentType, StringComparison.OrdinalIgnoreCase))
+            {
+                await bus.InvokeAsync(new CreateChartCommand(@event.ShipSymbol), cancellationToken);
+            }
+
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }

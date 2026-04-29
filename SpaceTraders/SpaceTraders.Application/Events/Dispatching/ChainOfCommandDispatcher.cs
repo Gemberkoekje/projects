@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.Events.Dispatching;
@@ -29,15 +30,28 @@ public sealed class ChainOfCommandDispatcher(
         {
             var result = await handler.HandleAsync(@event, cancellationToken);
 
-            logger.LogInformation(
-                "Chain decision: event={EventType}, handler={Handler}, result={Result}",
-                typeof(TEvent).Name,
-                handler.GetType().Name,
-                result.GetType().Name);
-
             if (result is SkippedChainOfCommandHandlerResult)
             {
                 continue;
+            }
+
+            if (@event is ShipAssignmentTypeSetEvent shipAssignmentTypeSetEvent)
+            {
+                logger.LogInformation(
+                    "Chain decision: event={EventType}, ship={ShipSymbol}, assignmentType={AssignmentType}, handler={Handler}, result={Result}",
+                    typeof(TEvent).Name,
+                    shipAssignmentTypeSetEvent.ShipSymbol,
+                    shipAssignmentTypeSetEvent.AssignmentType,
+                    handler.GetType().Name,
+                    result.GetType().Name);
+            }
+            else
+            {
+                logger.LogInformation(
+                    "Chain decision: event={EventType}, handler={Handler}, result={Result}",
+                    typeof(TEvent).Name,
+                    handler.GetType().Name,
+                    result.GetType().Name);
             }
 
             if (result is HandledWithoutNextEventChainOfCommandHandlerResult)

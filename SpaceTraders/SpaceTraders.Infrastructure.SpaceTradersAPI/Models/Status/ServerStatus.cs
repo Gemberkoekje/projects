@@ -53,7 +53,7 @@ public sealed class StatusStats
 public sealed class StatusHealth
 {
     [JsonPropertyName("status")]
-    required public string Status { get; init; }
+    public string? Status { get; init; }
 
     [JsonPropertyName("lastUpdated")]
     public string? LastUpdated { get; init; }

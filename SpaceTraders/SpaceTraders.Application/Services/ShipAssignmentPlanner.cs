@@ -158,6 +158,7 @@ public sealed class ShipAssignmentPlanner(
     private const string TradeAssignmentType = "Trade";
     private const string SiphonAssignmentType = "Siphon";
     private const string IdleAssignmentType = "Idle";
+    private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
     {
@@ -175,13 +176,19 @@ public sealed class ShipAssignmentPlanner(
             0m,
             1m);
 
-        var route = await tradeOpportunities.GetBestRouteForCapacityAsync(
-            cargoCapacity: ship.CargoCapacity > 0 ? ship.CargoCapacity : int.MaxValue,
-            minProfitPerUnit: minProfit,
-            maxDistanceJumps: maxDistance,
-            cancellationToken: cancellationToken);
+        var canTrade = CanTrade(ship);
+        var canMine = CanMine(ship);
+        var canSiphon = CanSiphon(ship);
 
-        if (ship.HasMiningEquipment && await ShouldAssignMiningAsync(ship.Symbol, effectiveMiningShipPercentage, cancellationToken))
+        var route = canTrade
+            ? await tradeOpportunities.GetBestRouteForCapacityAsync(
+                cargoCapacity: ship.CargoCapacity,
+                minProfitPerUnit: minProfit,
+                maxDistanceJumps: maxDistance,
+                cancellationToken: cancellationToken)
+            : null;
+
+        if (canMine && await ShouldAssignMiningAsync(ship.Symbol, effectiveMiningShipPercentage, cancellationToken))
         {
             var mineAssignment = await BuildMiningAssignmentAsync(ship, cancellationToken);
             if (mineAssignment is not null)
@@ -190,7 +197,7 @@ public sealed class ShipAssignmentPlanner(
             }
         }
 
-        if (ship.HasGasSiphonEquipment && ship.HasGasProcessor)
+        if (canSiphon)
         {
             var siphonAssignment = await BuildSiphonAssignmentAsync(ship, cancellationToken);
             if (siphonAssignment is not null)
@@ -215,7 +222,7 @@ public sealed class ShipAssignmentPlanner(
             return scoutAssignment;
         }
 
-        return new AssignShipCommand(ship.Symbol, IdleAssignmentType);
+        return new AssignShipCommand(ship.Symbol, MarketProbeAssignmentType);
     }
 
     private async Task<AssignShipCommand> BuildSiphonAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
@@ -416,14 +423,13 @@ public sealed class ShipAssignmentPlanner(
             return null;
         }
 
+        if (!CanScout(ship) && !IsProbeScout(ship))
+        {
+            return null;
+        }
+
         var refreshIntervalMinutes = await settings.GetAsync<int>("Scout.MarketRefreshIntervalMinutes", cancellationToken);
         var staleness = TimeSpan.FromMinutes(refreshIntervalMinutes > 0 ? refreshIntervalMinutes : 10);
-
-        var explorationAssignment = await BuildExplorationAssignmentAsync(ship, cancellationToken);
-        if (explorationAssignment is not null)
-        {
-            return explorationAssignment;
-        }
 
         if (IsProbeScout(ship))
         {
@@ -432,6 +438,12 @@ public sealed class ShipAssignmentPlanner(
             {
                 return probeTarget;
             }
+        }
+
+        var explorationAssignment = await BuildExplorationAssignmentAsync(ship, cancellationToken);
+        if (explorationAssignment is not null)
+        {
+            return explorationAssignment;
         }
 
         var staleWaypoints = await waypoints.GetUnscoutedOrStaleAsync(ship.SystemSymbol, staleness, cancellationToken);
@@ -500,9 +512,8 @@ public sealed class ShipAssignmentPlanner(
         var staleThreshold = now - staleness;
 
         var importantTarget = systemWaypoints
-            .Where(w => w.HasMarket || w.HasShipyard)
+            .Where(w => w.HasMarket)
             .OrderBy(w => w.LastObservedAt >= staleThreshold)
-            .ThenBy(w => w.HasMarket ? 0 : 1)
             .ThenBy(w => w.LastObservedAt)
             .FirstOrDefault();
 
@@ -511,8 +522,20 @@ public sealed class ShipAssignmentPlanner(
             return null;
         }
 
-        return new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: importantTarget.Symbol);
+        return new AssignShipCommand(ship.Symbol, MarketProbeAssignmentType, OriginWaypoint: importantTarget.Symbol);
     }
+
+    private static bool CanScout(ShipModel ship)
+        => ship.FuelCapacity > 0;
+
+    private static bool CanTrade(ShipModel ship)
+        => ship.FuelCapacity > 0 && ship.CargoCapacity > 0;
+
+    private static bool CanMine(ShipModel ship)
+        => ship.HasMiningEquipment && ship.FuelCapacity > 0 && ship.CargoCapacity > 0;
+
+    private static bool CanSiphon(ShipModel ship)
+        => ship.HasGasSiphonEquipment && ship.HasGasProcessor && ship.FuelCapacity > 0;
 
     private static bool IsProbeScout(ShipModel ship)
         => ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)

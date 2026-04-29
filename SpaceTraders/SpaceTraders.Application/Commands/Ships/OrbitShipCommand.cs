@@ -25,6 +25,12 @@ public sealed class OrbitShipHandler(
 {
     public async Task Handle(OrbitShipCommand command, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} for ship {Symbol}.",
+            nameof(OrbitShipHandler),
+            nameof(OrbitShipCommand),
+            command.ShipSymbol);
+
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
         {
@@ -59,6 +65,11 @@ public sealed class OrbitShipHandler(
                 publishedAt));
         }
 
-        logger.LogInformation("Ship {Symbol} in orbit at {Waypoint}.", command.ShipSymbol, nav.WaypointSymbol);
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} handled; Ship {Symbol} in orbit at {Waypoint}.",
+            nameof(OrbitShipHandler),
+            nameof(OrbitShipCommand),
+            command.ShipSymbol,
+            nav.WaypointSymbol);
     }
 }

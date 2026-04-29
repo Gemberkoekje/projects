@@ -55,4 +55,30 @@ public sealed class NavigateShipHandlerTests
                 e.ArrivalTime == arrival),
             Arg.Any<DeliveryOptions>());
     }
+
+    [Fact]
+    public async Task NavigateShip_WhenApiRejectsNotInOrbit_PublishesMismatchAndDoesNotThrow()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var bus = Substitute.For<IMessageBus>();
+
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));
+
+        port.NavigateShipAsync("SHIP-1", "X1-AB-002", Arg.Any<CancellationToken>())
+            .Returns<Task<NavigateActionResult>>(_ => throw new InvalidOperationException("Ship action failed. Ship is not currently in orbit at X1-AB-001."));
+
+        var handler = new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance);
+
+        var act = async () => await handler.Handle(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipStateMismatchEvent>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.RequiredState == "IN_ORBIT" &&
+                e.ActualState == "DOCKED"),
+            Arg.Any<DeliveryOptions>());
+    }
 }

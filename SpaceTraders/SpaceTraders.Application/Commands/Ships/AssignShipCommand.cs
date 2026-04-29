@@ -71,6 +71,13 @@ public sealed class AssignShipHandler(
 {
     public async Task Handle(AssignShipCommand command, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} for ship {Symbol} to assignment {Assignment}.",
+            nameof(AssignShipHandler),
+            nameof(AssignShipCommand),
+            command.ShipSymbol,
+            command.AssignmentType);
+
         var now = TimeProvider.System.GetUtcNow();
         var dto = new ShipAssignmentDto(
             command.ShipSymbol,
@@ -87,7 +94,13 @@ public sealed class AssignShipHandler(
             command.SupplyCompleted);
         await assignments.UpsertAsync(dto, cancellationToken);
         await bus.PublishAsync(new ShipAssignedEvent(command.ShipSymbol, command.AssignmentType));
-        logger.LogInformation("Ship {Symbol} assigned to {Type}.", command.ShipSymbol, command.AssignmentType);
+
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} handled; Ship {Symbol} assigned to {Assignment}.",
+            nameof(AssignShipHandler),
+            nameof(AssignShipCommand),
+            command.ShipSymbol,
+            command.AssignmentType);
 
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         var systemSymbol = string.IsNullOrWhiteSpace(command.SystemSymbol)

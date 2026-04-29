@@ -9,6 +9,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
 /// Handles contract-role ships while in orbit.
+/// Event handlers must emit only commands, never events directly.
 /// </summary>
 public sealed class ShipInOrbitContractEventHandler(
     IShipAssignmentRepository assignments,
@@ -31,15 +32,13 @@ public sealed class ShipInOrbitContractEventHandler(
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
         if (ship is null)
         {
-            return ChainOfCommandHandlerResult.Handled(new ShipStateMismatchEvent(
-                @event.ShipSymbol,
+            logger.LogWarning(
+                "{Handler}: Could not load ship state for {Ship}. Cannot handle contract event.",
                 nameof(ShipInOrbitContractEventHandler),
-                "IN_ORBIT",
-                "UNKNOWN",
-                "Contract in-orbit handler could not load ship state.",
-                @event.CorrelationId,
-                @event.EventId,
-                TimeProvider.System.GetUtcNow()));
+                @event.ShipSymbol);
+
+            return ChainOfCommandHandlerResult.Failed(
+                $"Contract in-orbit handler could not load ship state for {@event.ShipSymbol}.");
         }
 
         if (!string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))

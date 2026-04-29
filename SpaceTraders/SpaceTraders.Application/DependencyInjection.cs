@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
@@ -67,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
 
         // In-orbit event handlers (consolidated)
+        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitFuelRecoveryEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
@@ -83,6 +85,8 @@ public static class DependencyInjection
         services.AddScoped<IChainOfCommandEventHandler<ShipStateMismatchEvent>, ShipStateMismatchEventHandler>();
 
         // Docked event handlers (consolidated)
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedFuelEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedTraderEventHandler>();
@@ -91,17 +95,23 @@ public static class DependencyInjection
 
         // Derived docked events (routed to docked handlers)
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedIdleEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedFuelEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedEventHandler>();
 
+        services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedFuelEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipContractDockedEvent>, ShipDockedEventHandler>();
 
         // ShipAssignmentTypeSetEvent is derived from ShipDockedEvent (re-enters docked chain after assignment type change)
+        services.AddScoped<IChainOfCommandEventHandler<ShipAssignmentTypeSetEvent>, ShipDockedFuelEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipAssignmentTypeSetEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipAssignmentTypeSetEvent>, ShipDockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipAssignmentTypeSetEvent>, ShipDockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipAssignmentTypeSetEvent>, ShipDockedScoutEventHandler>();
@@ -113,6 +123,9 @@ public static class DependencyInjection
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
             configureWolverine(opts);
+
+            // Add retry logging middleware to all message handlers
+            opts.Policies.AddMiddleware(typeof(WolverineRetryLoggingMiddleware));
 
             opts.OnException<Exception>()
                 .RetryWithCooldown(

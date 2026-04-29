@@ -11,6 +11,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 /// Handles <see cref="ShipDockedEvent"/> by running the assignment planner and dispatching
 /// the resulting <see cref="AssignShipCommand"/>, which writes the new assignment and re-enters
 /// the docked chain via <see cref="ShipAssignmentTypeSetEvent"/>.
+/// Event handlers must emit only commands, never events directly.
 /// </summary>
 public sealed class ShipDockedIdleEventHandler(
     IShipAssignmentRepository assignments,
@@ -32,15 +33,13 @@ public sealed class ShipDockedIdleEventHandler(
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
         if (ship is null)
         {
-            return ChainOfCommandHandlerResult.Handled(new ShipStateMismatchEvent(
-                @event.ShipSymbol,
+            logger.LogWarning(
+                "{Handler}: Could not load ship state for {Ship}. Cannot plan assignment.",
                 nameof(ShipDockedIdleEventHandler),
-                "DOCKED",
-                "UNKNOWN",
-                "Idle docked handler could not load ship state.",
-                @event.CorrelationId,
-                @event.EventId,
-                TimeProvider.System.GetUtcNow()));
+                @event.ShipSymbol);
+
+            return ChainOfCommandHandlerResult.Failed(
+                $"Idle docked handler could not load ship state for {@event.ShipSymbol}.");
         }
 
         var command = await planner.PlanAsync(ship, cancellationToken);

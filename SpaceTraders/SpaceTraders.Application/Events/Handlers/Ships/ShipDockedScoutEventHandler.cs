@@ -11,7 +11,6 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipDockedScoutEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
-    ISettingsRepository settings,
     IFleetMaintenancePlanner maintenance,
     IWaypointVisitService waypointVisit,
     IMarketRefreshService markets,
@@ -19,11 +18,14 @@ public sealed class ShipDockedScoutEventHandler(
     IDockedCommandAcceptor dockedCommands) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
     public int Priority => 300;
+    private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {
         var assignment = await assignments.FindAsync(@event.ShipSymbol, cancellationToken);
-        if (assignment is null || !assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase))
+        if (assignment is null ||
+            (!assignment.AssignmentType.Equals("Scout", StringComparison.OrdinalIgnoreCase) &&
+             !assignment.AssignmentType.Equals(MarketProbeAssignmentType, StringComparison.OrdinalIgnoreCase)))
         {
             return ChainOfCommandHandlerResult.Skipped();
         }
@@ -47,17 +49,17 @@ public sealed class ShipDockedScoutEventHandler(
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        var preferredSensorMount = await settings.GetAsync<string>("Outfitting.PreferredScoutSensorMount", cancellationToken);
-        if (!string.IsNullOrWhiteSpace(preferredSensorMount) && !ship.HasSensorArray)
-        {
-            await dockedCommands.InstallMountAsync(@event.ShipSymbol, preferredSensorMount, cancellationToken);
-            return ChainOfCommandHandlerResult.Handled();
-        }
-
         var waypoint = ship.WaypointSymbol ?? @event.WaypointSymbol;
         await waypointVisit.MarkVisitedAsync(waypoint, cancellationToken);
         await markets.RefreshIfApplicableAsync(waypoint, cancellationToken);
         await shipyards.RefreshIfApplicableAsync(waypoint, cancellationToken);
+
+        if (assignment.AssignmentType.Equals(MarketProbeAssignmentType, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(assignment.OriginWaypoint) &&
+            waypoint.Equals(assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase))
+        {
+            return ChainOfCommandHandlerResult.Handled();
+        }
 
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();

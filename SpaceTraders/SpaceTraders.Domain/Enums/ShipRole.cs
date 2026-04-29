@@ -17,4 +17,5 @@ public enum ShipRole
     Satellite,
     Explorer,
     Refinery,
+    MarketProbe,
 }

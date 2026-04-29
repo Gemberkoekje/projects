@@ -39,14 +39,12 @@ public sealed class ShipDockedRoleHandlersTests
     {
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
-        var settings = Substitute.For<ISettingsRepository>();
         var maintenance = Substitute.For<IFleetMaintenancePlanner>();
         var waypointVisit = Substitute.For<IWaypointVisitService>();
         var markets = Substitute.For<IMarketRefreshService>();
         var shipyards = Substitute.For<IShipyardRefreshService>();
         var docked = Substitute.For<IDockedCommandAcceptor>();
 
-        settings.GetAsync<string>("Outfitting.PreferredScoutSensorMount", Arg.Any<CancellationToken>()).Returns(string.Empty);
         maintenance.DecideAsync(Arg.Any<ShipModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new FleetMaintenanceDecision(false, false, false));
 
@@ -55,7 +53,7 @@ public sealed class ShipDockedRoleHandlersTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-HOME", "DOCKED", "CRUISE", 100, 100));
 
-        var handler = new ShipDockedScoutEventHandler(assignments, ships, settings, maintenance, waypointVisit, markets, shipyards, docked);
+        var handler = new ShipDockedScoutEventHandler(assignments, ships, maintenance, waypointVisit, markets, shipyards, docked);
         await handler.HandleAsync(new ShipDockedEvent("SHIP-1", "X1-AB", "X1-AB-HOME", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow), CancellationToken.None);
 
         await docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());

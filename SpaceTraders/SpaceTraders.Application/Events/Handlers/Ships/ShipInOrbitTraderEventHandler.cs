@@ -10,6 +10,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 /// <summary>
 /// Consolidated handler for all trade-role ship in-orbit events.
 /// Handles ShipInOrbitEvent (general), ShipUndockedEvent (navigate), and trading workflow.
+/// Event handlers must emit only commands, never events directly.
 /// </summary>
 public sealed class ShipInOrbitTraderEventHandler(
     IShipAssignmentRepository assignments,
@@ -32,15 +33,13 @@ public sealed class ShipInOrbitTraderEventHandler(
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
         if (ship is null)
         {
-            return ChainOfCommandHandlerResult.Handled(new ShipStateMismatchEvent(
-                @event.ShipSymbol,
+            logger.LogWarning(
+                "{Handler}: Could not load ship state for {Ship}. Cannot handle trade event.",
                 nameof(ShipInOrbitTraderEventHandler),
-                "IN_ORBIT",
-                "UNKNOWN",
-                "Trade in-orbit handler could not load ship state.",
-                @event.CorrelationId,
-                @event.EventId,
-                TimeProvider.System.GetUtcNow()));
+                @event.ShipSymbol);
+
+            return ChainOfCommandHandlerResult.Failed(
+                $"Trade in-orbit handler could not load ship state for {@event.ShipSymbol}.");
         }
 
         if (!string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))

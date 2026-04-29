@@ -15,7 +15,7 @@ public sealed class ChainOfCommandBridgeHandler(
     public async Task Handle(ShipUndockedEvent @event, CancellationToken cancellationToken)
     {
         logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipUndockedEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
+        await dispatcher.DispatchAsync<ShipInOrbitEvent>(@event, cancellationToken);
     }
 
     public async Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
@@ -57,7 +57,7 @@ public sealed class ChainOfCommandBridgeHandler(
     public async Task Handle(ShipIdleDockedEvent @event, CancellationToken cancellationToken)
     {
         logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipIdleDockedEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
+        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
     }
 
     public async Task Handle(ShipRefueledEvent @event, CancellationToken cancellationToken)
@@ -69,6 +69,6 @@ public sealed class ChainOfCommandBridgeHandler(
     public async Task Handle(ShipAssignmentTypeSetEvent @event, CancellationToken cancellationToken)
     {
         logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipAssignmentTypeSetEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
+        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
     }
 }

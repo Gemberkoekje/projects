@@ -23,8 +23,7 @@ public sealed class AgentBootstrapService(
     IServiceScopeFactory serviceScopeFactory,
     IAgentTokenProvider agentTokenProvider,
     IOptions<SpaceTradersBootstrapOptions> options,
-    ILogger<AgentBootstrapService> logger,
-    IMessageBus bus) : IHostedService
+    ILogger<AgentBootstrapService> logger) : IHostedService
 {
     private const string AgentTokenKey = "AgentToken";
 
@@ -32,7 +31,6 @@ public sealed class AgentBootstrapService(
     private readonly IAgentTokenProvider _agentTokenProvider = agentTokenProvider;
     private readonly SpaceTradersBootstrapOptions _options = options.Value;
     private readonly ILogger<AgentBootstrapService> _logger = logger;
-    private readonly IMessageBus _bus = bus;
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -75,7 +73,10 @@ public sealed class AgentBootstrapService(
                 source);
 
             await SetTokenResetMismatchRuntimeFlagAsync(cancellationToken);
-            await _bus.PublishAsync(new TokenResetMismatchDetectedEvent(source));
+
+            await using var scope = _serviceScopeFactory.CreateAsyncScope();
+            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
+            await bus.PublishAsync(new TokenResetMismatchDetectedEvent(source));
             return false;
         }
 

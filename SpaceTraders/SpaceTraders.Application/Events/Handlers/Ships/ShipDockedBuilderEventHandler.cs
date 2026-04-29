@@ -8,7 +8,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
 /// Handles Builder-role ships that are docked at their origin waypoint.
-/// Buys the required construction material when cargo is short, refuels if low, then orbits
+/// Buys the required construction material when cargo is short, then orbits
 /// so the in-orbit handler can navigate to the construction site and supply it.
 /// When the construction site reports completion the ship is reassigned to Idle.
 /// </summary>
@@ -95,16 +95,6 @@ public sealed class ShipDockedBuilderEventHandler(
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        // Refuel before the trip if fuel is low
-        var fuelRatio = ship.FuelCapacity > 0 ? (double)ship.FuelCurrent / ship.FuelCapacity : 1.0;
-        if (fuelRatio < 0.5)
-        {
-            logger.LogInformation("{Handler}: ship {Ship} refueling before construction supply run.", nameof(ShipDockedBuilderEventHandler), @event.ShipSymbol);
-            await dockedCommands.RefuelAsync(@event.ShipSymbol, fromCargo: false, cancellationToken);
-            return ChainOfCommandHandlerResult.Handled();
-        }
-
-        // Cargo loaded and fuelled — orbit to begin the trip to the construction site
         logger.LogInformation("{Handler}: ship {Ship} has {Units}x {Symbol}; orbiting to depart for construction site {Dest}.", nameof(ShipDockedBuilderEventHandler), @event.ShipSymbol, cargoUnits, assignment.CargoSymbol, assignment.DestWaypoint);
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();

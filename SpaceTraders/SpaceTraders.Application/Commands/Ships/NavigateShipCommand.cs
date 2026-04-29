@@ -29,6 +29,13 @@ public sealed class NavigateShipHandler(
 {
     public async Task Handle(NavigateShipCommand command, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} for ship {Symbol} to {Destination}.",
+            nameof(NavigateShipHandler),
+            nameof(NavigateShipCommand),
+            command.ShipSymbol,
+            command.DestinationWaypoint);
+
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
@@ -52,26 +59,57 @@ public sealed class NavigateShipHandler(
         }
 
         var nowNavigate = TimeProvider.System.GetUtcNow();
-        var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
-        await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
-        var inTransitEvent = new ShipInTransitEvent(
-            command.ShipSymbol,
-            ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
-            command.DestinationWaypoint,
-            result.Nav.ArrivesAt ?? nowNavigate,
-            Guid.Empty,
-            Guid.Empty,
-            nowNavigate);
+        try
+        {
+            var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
+            await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
-        await bus.PublishAsync(inTransitEvent);
+            var inTransitEvent = new ShipInTransitEvent(
+                command.ShipSymbol,
+                ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
+                command.DestinationWaypoint,
+                result.Nav.ArrivesAt ?? nowNavigate,
+                Guid.Empty,
+                Guid.Empty,
+                nowNavigate);
 
-        var destinationSystem = ExtractSystemSymbol(command.DestinationWaypoint);
-        await bus.SendAsync(new RefreshSystemDataCommand(destinationSystem));
+            await bus.PublishAsync(inTransitEvent);
 
-        logger.LogInformation("Ship {Symbol} navigating to {Waypoint}, arrives at {Arrival}.",
-            command.ShipSymbol, command.DestinationWaypoint, result.Nav.ArrivesAt);
+            var destinationSystem = ExtractSystemSymbol(command.DestinationWaypoint);
+            await bus.SendAsync(new RefreshSystemDataCommand(destinationSystem));
+
+            logger.LogInformation(
+                "CommandHandler {Handler}: {Command} handled; Ship {Symbol} navigating to {Waypoint}, arrives at {Arrival}.",
+                nameof(NavigateShipHandler),
+                nameof(NavigateShipCommand),
+                command.ShipSymbol,
+                command.DestinationWaypoint,
+                result.Nav.ArrivesAt);
+        }
+        catch (Exception exception) when (LooksLikeNotInOrbitError(exception))
+        {
+            await bus.PublishAsync(new ShipStateMismatchEvent(
+                command.ShipSymbol,
+                nameof(NavigateShipCommand),
+                "IN_ORBIT",
+                "DOCKED",
+                "Navigation was rejected by API because ship is not in orbit.",
+                Guid.Empty,
+                Guid.Empty,
+                nowNavigate));
+
+            logger.LogWarning(
+                exception,
+                "Skipping navigation for ship {Symbol} to {Waypoint}: upstream rejected command because ship is not in orbit.",
+                command.ShipSymbol,
+                command.DestinationWaypoint);
+        }
     }
+
+    private static bool LooksLikeNotInOrbitError(Exception exception)
+        => !string.IsNullOrWhiteSpace(exception.Message)
+            && exception.Message.Contains("not currently in orbit", StringComparison.OrdinalIgnoreCase);
 
     private static string ExtractSystemSymbol(string waypointSymbol)
     {

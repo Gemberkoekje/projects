@@ -10,6 +10,7 @@ public enum AssignmentType
     FulfillContract,
     Refuel,
     Scout,
+    MarketProbe,
     SellAll,
     SupplyConstruction,
     Builder,

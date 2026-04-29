@@ -116,61 +116,178 @@ public static class SpaceTradersDatabaseInitializer
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE leader_leases ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
 
+        // Update column type constraints for AgentToken from varchar(512) to varchar(1024)
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            CREATE TABLE IF NOT EXISTS api_endpoint_usages (
-                "Id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-                "AgentToken" text NOT NULL,
-                "HttpMethod" text NOT NULL,
-                "Endpoint" text NOT NULL,
-                "Calls" integer NOT NULL,
-                "LastCalledAt" timestamp with time zone NOT NULL
-            );
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stored_credentials' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE stored_credentials ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_agents' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_agents ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_ships' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_ships ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_contracts' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_contracts ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_markets' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_markets ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_shipyards' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_shipyards ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_waypoints' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_waypoints ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_systems' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_systems ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_settings' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE agent_settings ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'ship_assignment_records' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE ship_assignment_records ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'trade_opportunities' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE trade_opportunities ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'activity_logs' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE activity_logs ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'leader_leases' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE leader_leases ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'api_endpoint_usages' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE api_endpoint_usages ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_surveys' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_surveys ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'cached_construction_sites' AND column_name = 'AgentToken' AND character_maximum_length = 512) THEN
+                    ALTER TABLE cached_construction_sites ALTER COLUMN "AgentToken" TYPE character varying(1024);
+                END IF;
+            END $$;
             """,
             cancellationToken);
 
-        await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_api_endpoint_usages_AgentToken_HttpMethod_Endpoint\" ON api_endpoint_usages (\"AgentToken\", \"HttpMethod\", \"Endpoint\");",
-            cancellationToken);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_trade_opportunities_AgentToken_SupportsSupplyChain_SupplyChainDepth_ProfitPerJump_ComputedAt\" ON trade_opportunities (\"AgentToken\", \"SupportsSupplyChain\", \"SupplyChainDepth\", \"ProfitPerJump\", \"ComputedAt\");",
-            cancellationToken);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_trade_opportunities_AgentToken_RouteScore_ComputedAt\" ON trade_opportunities (\"AgentToken\", \"RouteScore\", \"ComputedAt\");",
-            cancellationToken);
-
-        await EnsureCompositePrimaryKeyAsync(dbContext, "stored_credentials", "stored_credentials_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_agents", "cached_agents_pkey", "\"AgentToken\", \"Symbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_ships", "cached_ships_pkey", "\"AgentToken\", \"Symbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_contracts", "cached_contracts_pkey", "\"AgentToken\", \"Id\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_markets", "cached_markets_pkey", "\"AgentToken\", \"WaypointSymbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_shipyards", "cached_shipyards_pkey", "\"AgentToken\", \"WaypointSymbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_waypoints", "cached_waypoints_pkey", "\"AgentToken\", \"Symbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_systems", "cached_systems_pkey", "\"AgentToken\", \"Symbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "agent_settings", "agent_settings_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "ship_assignment_records", "ship_assignment_records_pkey", "\"AgentToken\", \"ShipSymbol\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "leader_leases", "leader_leases_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
-        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_surveys", "cached_surveys_pkey", "\"AgentToken\", \"Signature\"", cancellationToken);
-
-        // Phase 10: construction sites
+        // Update Value column in stored_credentials
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            CREATE TABLE IF NOT EXISTS cached_construction_sites (
-                "AgentToken" text NOT NULL,
-                "WaypointSymbol" text NOT NULL,
-                "SystemSymbol" text NOT NULL,
-                "IsComplete" boolean NOT NULL DEFAULT FALSE,
-                "MaterialsJson" text NULL,
-                "LastObservedAt" timestamp with time zone NOT NULL DEFAULT now(),
-                CONSTRAINT "cached_construction_sites_pkey" PRIMARY KEY ("AgentToken", "WaypointSymbol")
-            );
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'stored_credentials' AND column_name = 'Value' AND character_maximum_length = 512) THEN
+                    ALTER TABLE stored_credentials ALTER COLUMN "Value" TYPE character varying(1024);
+                END IF;
+            END $$;
             """,
-            cancellationToken);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            "CREATE INDEX IF NOT EXISTS \"IX_cached_construction_sites_AgentToken_IsComplete\" ON cached_construction_sites (\"AgentToken\", \"IsComplete\");",
             cancellationToken);
     }
 

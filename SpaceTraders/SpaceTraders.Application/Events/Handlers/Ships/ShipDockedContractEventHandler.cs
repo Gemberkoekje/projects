@@ -69,14 +69,6 @@ public sealed class ShipDockedContractEventHandler(
             }
         }
 
-        if (ship.FuelCapacity > 0 && ship.FuelCurrent < (ship.FuelCapacity / 4))
-        {
-            var hasHydrocarbonCargo = ship.CargoInventory?.Any(c =>
-                c.Units > 0 && c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)) == true;
-
-            await dockedCommands.RefuelAsync(@event.ShipSymbol, hasHydrocarbonCargo, cancellationToken);
-        }
-
         var maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
         if (maintenanceDecision.ShouldScrap)
         {
@@ -87,14 +79,6 @@ public sealed class ShipDockedContractEventHandler(
         if (maintenanceDecision.ShouldRepair)
         {
             await dockedCommands.RepairAsync(@event.ShipSymbol, cancellationToken);
-            return ChainOfCommandHandlerResult.Handled();
-        }
-
-        var preferredCargoModule = await settings.GetAsync<string>("Outfitting.TraderCargoModule", cancellationToken);
-        if (!string.IsNullOrWhiteSpace(preferredCargoModule) &&
-            (ship.ModulesJson?.Contains(preferredCargoModule, StringComparison.OrdinalIgnoreCase) != true))
-        {
-            await dockedCommands.InstallModuleAsync(@event.ShipSymbol, preferredCargoModule, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
 

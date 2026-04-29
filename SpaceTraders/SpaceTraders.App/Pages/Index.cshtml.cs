@@ -55,7 +55,7 @@ public sealed class IndexModel : PageModel
         var settings = await _dbContext.Settings
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(s => s.AgentToken == selectedToken && s.Key.StartsWith("Runtime.Alert.", StringComparison.Ordinal))
+            .Where(s => s.AgentToken == selectedToken && s.Key.StartsWith("Runtime.Alert."))
             .ToDictionaryAsync(s => s.Key, s => s.Value, cancellationToken);
 
         AlertApiUnavailable = IsTrue(settings, "Runtime.Alert.ApiUnavailable");

@@ -28,6 +28,12 @@ public sealed class ExtractResourcesHandler(
 {
     public async Task Handle(ExtractResourcesCommand command, CancellationToken cancellationToken)
     {
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} for ship {Symbol}.",
+            nameof(ExtractResourcesHandler),
+            nameof(ExtractResourcesCommand),
+            command.ShipSymbol);
+
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
         if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
@@ -105,7 +111,14 @@ public sealed class ExtractResourcesHandler(
         }
 
         await ships.UpdateCargoAsync(command.ShipSymbol, result.Cargo, cancellationToken);
-        logger.LogInformation("Ship {Symbol} extracted {Units}x {Good}. Cooldown: {Cooldown}s.",
-            command.ShipSymbol, result.YieldUnits, result.YieldSymbol, result.CooldownSeconds);
+
+        logger.LogInformation(
+            "CommandHandler {Handler}: {Command} handled; Ship {Symbol} extracted {Units}x {Good}. Cooldown: {Cooldown}s.",
+            nameof(ExtractResourcesHandler),
+            nameof(ExtractResourcesCommand),
+            command.ShipSymbol,
+            result.YieldUnits,
+            result.YieldSymbol,
+            result.CooldownSeconds);
     }
 }

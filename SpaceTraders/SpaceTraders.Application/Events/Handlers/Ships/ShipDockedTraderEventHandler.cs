@@ -63,14 +63,6 @@ public sealed class ShipDockedTraderEventHandler(
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        var preferredCargoModule = await settings.GetAsync<string>("Outfitting.TraderCargoModule", cancellationToken);
-        if (!string.IsNullOrWhiteSpace(preferredCargoModule) &&
-            (ship.ModulesJson?.Contains(preferredCargoModule, StringComparison.OrdinalIgnoreCase) != true))
-        {
-            await dockedCommands.InstallModuleAsync(@event.ShipSymbol, preferredCargoModule, cancellationToken);
-            return ChainOfCommandHandlerResult.Handled();
-        }
-
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
     }
