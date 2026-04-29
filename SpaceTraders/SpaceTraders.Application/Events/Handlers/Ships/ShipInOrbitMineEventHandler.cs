@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Application.Services;
 using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -15,7 +16,9 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipInOrbitMineEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
+    ISurveyRepository surveys,
     IInOrbitCommandAcceptor inOrbitCommands,
+    INavigationPlanningService navigationPlanning,
     IMessageBus bus,
     ILogger<ShipInOrbitMineEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
@@ -24,7 +27,9 @@ public sealed class ShipInOrbitMineEventHandler(
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
     {
         var assignment = await assignments.FindAsync(@event.ShipSymbol, cancellationToken);
-        if (assignment is null || !assignment.AssignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase))
+        if (assignment is null ||
+            (!assignment.AssignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase) &&
+             !assignment.AssignmentType.Equals("Siphon", StringComparison.OrdinalIgnoreCase)))
         {
             return ChainOfCommandHandlerResult.Skipped();
         }
@@ -47,12 +52,27 @@ public sealed class ShipInOrbitMineEventHandler(
             return ChainOfCommandHandlerResult.Skipped();
         }
 
-        var atMiningOrigin = !string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
+        var atOrigin = !string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
             && ship.WaypointSymbol?.Equals(assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase) == true;
 
         // At mining origin and cargo not full: extract
-        if (atMiningOrigin && ship.CargoCurrent < ship.CargoCapacity)
+        if (atOrigin && ship.CargoCurrent < ship.CargoCapacity)
         {
+            if (assignment.AssignmentType.Equals("Siphon", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogInformation("{Handler}: ship {Ship} siphoning at {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, ship.WaypointSymbol);
+                await inOrbitCommands.SiphonAsync(@event.ShipSymbol, cancellationToken);
+                return ChainOfCommandHandlerResult.Handled();
+            }
+
+            var activeSurveys = await surveys.GetActiveByWaypointAsync(ship.WaypointSymbol ?? string.Empty, cancellationToken);
+            if (ship.HasSurveyEquipment && activeSurveys.Count == 0)
+            {
+                logger.LogInformation("{Handler}: ship {Ship} surveying before extraction at {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, ship.WaypointSymbol);
+                await inOrbitCommands.SurveyAsync(@event.ShipSymbol, cancellationToken);
+                return ChainOfCommandHandlerResult.Handled();
+            }
+
             logger.LogInformation("{Handler}: ship {Ship} extracting at {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, ship.WaypointSymbol);
             await inOrbitCommands.ExtractAsync(@event.ShipSymbol, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
@@ -82,6 +102,7 @@ public sealed class ShipInOrbitMineEventHandler(
             }
 
             logger.LogInformation("{Handler}: ship {Ship} navigating to sell destination {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, assignment.DestWaypoint);
+            await ApplyFlightModeAsync(@event.ShipSymbol, ship, assignment.DestWaypoint, bus, cancellationToken);
             await inOrbitCommands.NavigateAsync(@event.ShipSymbol, assignment.DestWaypoint, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
@@ -99,15 +120,55 @@ public sealed class ShipInOrbitMineEventHandler(
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        if (atMiningOrigin)
+        if (atOrigin)
         {
-            logger.LogInformation("{Handler}: ship {Ship} at mining origin with empty cargo; docking.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, ship.WaypointSymbol);
+            logger.LogInformation("{Handler}: ship {Ship} at origin {Waypoint} with empty cargo; docking.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, ship.WaypointSymbol);
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        logger.LogInformation("{Handler}: ship {Ship} navigating to mining origin {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, assignment.OriginWaypoint);
+        logger.LogInformation("{Handler}: ship {Ship} navigating to origin {Waypoint}.", nameof(ShipInOrbitMineEventHandler), @event.ShipSymbol, assignment.OriginWaypoint);
+        await ApplyFlightModeAsync(@event.ShipSymbol, ship, assignment.OriginWaypoint, bus, cancellationToken);
         await inOrbitCommands.NavigateAsync(@event.ShipSymbol, assignment.OriginWaypoint, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
+    }
+
+    private async Task ApplyFlightModeAsync(
+        string shipSymbol,
+        SpaceTraders.Application.Ports.ShipModel ship,
+        string destinationWaypoint,
+        IMessageBus bus,
+        CancellationToken cancellationToken)
+    {
+        if (!ShouldAdjustFlightMode(ship, destinationWaypoint))
+        {
+            return;
+        }
+
+        var plan = await navigationPlanning.BuildPlanAsync(ship, destinationWaypoint, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(plan.RecommendedFlightMode) &&
+            !string.Equals(ship.FlightMode, plan.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
+        {
+            await bus.InvokeAsync(new PatchShipNavCommand(shipSymbol, plan.RecommendedFlightMode), cancellationToken);
+        }
+    }
+
+    private static bool ShouldAdjustFlightMode(
+        SpaceTraders.Application.Ports.ShipModel ship,
+        string destinationWaypoint)
+    {
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol) || string.IsNullOrWhiteSpace(destinationWaypoint))
+        {
+            return false;
+        }
+
+        var destinationSystem = ExtractSystemSymbol(destinationWaypoint);
+        return ship.SystemSymbol.Equals(destinationSystem, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractSystemSymbol(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 }

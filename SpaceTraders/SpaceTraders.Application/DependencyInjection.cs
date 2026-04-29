@@ -51,6 +51,8 @@ public static class DependencyInjection
 
         services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
+        services.AddScoped<INavigationPlanningService, NavigationPlanningService>();
+        services.AddScoped<IJumpGateCacheService, JumpGateCacheService>();
         services.AddScoped<IContractObjectivePlanner, ContractObjectivePlanner>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();

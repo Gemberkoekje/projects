@@ -18,8 +18,8 @@ Legend:
 | 2 | Data model enrichment | [x] | Waypoint, ship, market, and shipyard persistence extended; 6 integration tests added. |
 | 3 | Contract-first onboarding automation | [x] | Contract objective planning, assignment metadata, idempotent mutations, milestone logging, onboarding orchestration, and phase-3 tests implemented. |
 | 4 | Market and supply-chain automation | [x] | Trade scoring upgraded with volume/supply/activity/fuel-time penalties, probe-first market scouting, and Market UI expanded with detail, route comparison, and production-chain views. |
-| 5 | Navigation, fuel, jump, and exploration planning | [ ] | Not started. |
-| 6 | Extraction, survey, siphon, and resource logistics | [ ] | Not started. |
+| 5 | Navigation, fuel, jump, and exploration planning | [x] | Added navigation planning service with coordinate-based distance/fuel/time estimates and flight-mode selection, cargo-based refuel support, jump-gate connection retrieval/caching, and chart-driven scout exploration targeting. |
+| 6 | Extraction, survey, siphon, and resource logistics | [x] | Added survey persistence and survey-aware extraction, gas-giant/gas-processor siphon validation, mining/siphon assignment targeting, deposit-aware and modifier-aware asteroid prioritization, and docked cargo policies with role-loop coverage tests. |
 | 7 | Fleet outfitting, maintenance, repair, and scrapping | [ ] | Not started. |
 | 8 | Reset awareness and operational reliability | [ ] | Not started. |
 | 9 | Razor Pages dashboard expansion | [ ] | Not started. |
@@ -57,6 +57,27 @@ Legend:
   - Added probe-first scout targeting in `ShipAssignmentPlanner` to prioritize stale market/shipyard waypoints for visibility coverage.
   - Expanded Razor Pages `Market/Index` into combined market detail, route comparison, and production-chain explorer views.
   - Added/updated application tests for phase-4 metrics population and production-chain mapping.
+
+### Phase 5 deliverables
+
+- [x] Ships can choose safer routes, refuel intelligently, and explore beyond the starting system.
+  - Added `NavigationPlanningService` with waypoint/system coordinate distance fallback, estimated fuel/travel time, and adaptive in-system flight-mode selection (`DRIFT`/`CRUISE`/`BURN`) driven by new navigation settings.
+  - Integrated phase-5 flight-mode tuning into in-orbit trade/mine/contract handlers before navigation dispatch while preserving state-gated command issuing.
+  - Added refuel-from-cargo support end-to-end (`fromCargo` request payload support in API client, adapter, port abstraction, command, and docked handlers).
+  - Added jump-gate endpoint support (`GET /systems/{system}/waypoints/{waypoint}/jump-gate`) and cached normalized connected systems via `JumpGateCacheService` during jump handling.
+  - Expanded scout planning/exploration targeting for uncharted waypoints and high-value asteroid traits and triggered charting when scouts reach exploration targets.
+  - Added phase-5 tests: `NavigationPlanningServiceTests`.
+
+### Phase 6 deliverables
+
+- [x] Mining and siphoning roles select resources intentionally rather than only extracting opportunistically.
+  - Added `ISurveyRepository` + `SurveyRepository` with `cached_surveys` persistence for active surveys including expiration, size, and deposit metadata.
+  - Updated `SurveyHandler` to persist survey results and `ExtractResourcesHandler` to prefer `ExtractWithSurveyAsync` when an active matching survey exists for the current waypoint/assignment cargo target.
+  - Added phase-6 ship capability helpers for surveyors and gas siphon/gas processor validation.
+  - Updated `SiphonResourcesHandler` to validate gas-giant location plus required siphon equipment and gas processor before issuing siphon actions.
+  - Expanded `ShipAssignmentPlanner` to create `Siphon` assignments for gas-capable ships and to bias mining toward contract/trade-targeted resources, deposit-aware waypoint signals, better sell markets, and lower-risk asteroid modifiers.
+  - Updated docked mining cargo policy to keep active contract cargo, preserve a hydrocarbon reserve for cargo refueling, sell profitable surplus, and jettison low-value cargo only when full.
+  - Added phase-6 role-loop coverage for in-orbit survey-vs-extract decisions, siphon decisions, and docked cargo policy behavior.
 
 ## Phase 3 checklist
 
@@ -110,3 +131,17 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
   - Result: 3 passed, 0 failed.
 - `dotnet build SpaceTraders.slnx` after Phase 4 changes
   - Result: build successful.
+- `run_tests` for `Phase1CommandHandlerTests` + `ShipAssignmentPlannerTests` during Phase 5
+  - Result: 15 passed, 0 failed.
+- `run_tests` for `NavigationPlanningServiceTests` during Phase 5
+  - Result: 2 passed, 0 failed.
+- `dotnet build SpaceTraders.slnx` after Phase 5 changes
+  - Result: build successful.
+- `dotnet build SpaceTraders.slnx` after Phase 6 slice
+  - Result: build successful.
+- `run_tests` for `ExtractResourcesHandlerTests` + `Phase1CommandHandlerTests` during Phase 6
+  - Result: 15 passed, 0 failed.
+- `dotnet build SpaceTraders.slnx` after completing Phase 6
+  - Result: build successful.
+- `run_tests` for `ShipAssignmentPlannerTests`, `ShipInOrbitMineEventHandlerTests`, and `ShipDockedMineEventHandlerTests` during Phase 6 completion
+  - Result: 9 passed, 0 failed.

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Application.Services;
 using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -14,6 +15,7 @@ public sealed class ShipInOrbitTraderEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
     IInOrbitCommandAcceptor inOrbitCommands,
+    INavigationPlanningService navigationPlanning,
     IMessageBus bus,
     ILogger<ShipInOrbitTraderEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
@@ -67,8 +69,37 @@ public sealed class ShipInOrbitTraderEventHandler(
         }
 
         logger.LogInformation("{Handler}: ship {Ship} navigating to {Waypoint}.", nameof(ShipInOrbitTraderEventHandler), @event.ShipSymbol, destination);
+        if (ShouldAdjustFlightMode(ship, destination))
+        {
+            var plan = await navigationPlanning.BuildPlanAsync(ship, destination, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(plan.RecommendedFlightMode) &&
+                !string.Equals(ship.FlightMode, plan.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
+            {
+                await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, plan.RecommendedFlightMode), cancellationToken);
+            }
+        }
+
         await inOrbitCommands.NavigateAsync(@event.ShipSymbol, destination, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
+    }
+
+    private static bool ShouldAdjustFlightMode(
+        SpaceTraders.Application.Ports.ShipModel ship,
+        string destinationWaypoint)
+    {
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol) || string.IsNullOrWhiteSpace(destinationWaypoint))
+        {
+            return false;
+        }
+
+        var destinationSystem = ExtractSystemSymbol(destinationWaypoint);
+        return ship.SystemSymbol.Equals(destinationSystem, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractSystemSymbol(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
     private static string ResolveDestination(

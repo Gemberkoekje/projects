@@ -81,9 +81,9 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         return new TradeActionResult(result.Agent.Symbol, result.Agent.Credits, MapCargo(result.Cargo), result.Transaction.TotalPrice);
     }
 
-    public async Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    public async Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default)
     {
-        var result = await client.RefuelShipAsync(shipSymbol, cancellationToken);
+        var result = await client.RefuelShipAsync(shipSymbol, fromCargo, cancellationToken);
         return new RefuelActionResult(result.Agent.Credits, MapFuel(result.Fuel), result.Transaction.TotalPrice);
     }
 
@@ -284,6 +284,20 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
     {
         var result = await client.CreateChartAsync(shipSymbol, cancellationToken);
         return new ChartActionResult(result.Waypoint.Symbol, result.Waypoint.Type);
+    }
+
+    public async Task<JumpGateConnectionModel> GetJumpGateConnectionsAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+    {
+        var jumpGate = await client.GetJumpGateAsync(systemSymbol, waypointSymbol, cancellationToken);
+        return new JumpGateConnectionModel(
+            jumpGate.Symbol,
+            jumpGate.Connections?.Select(ExtractSystemSymbol).Distinct(StringComparer.OrdinalIgnoreCase).ToList() ?? []);
+    }
+
+    private static string ExtractSystemSymbol(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
     private static AgentModel MapAgent(Models.Agents.Agent agent) =>

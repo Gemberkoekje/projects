@@ -13,7 +13,7 @@ public interface IDockedCommandAcceptor
 
     Task SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken);
 
-    Task RefuelAsync(string shipSymbol, CancellationToken cancellationToken);
+    Task RefuelAsync(string shipSymbol, bool fromCargo, CancellationToken cancellationToken);
 
     Task DeliverContractAsync(
         string contractId,
@@ -31,6 +31,10 @@ public interface IInOrbitCommandAcceptor
     Task NavigateAsync(string shipSymbol, string destinationWaypoint, CancellationToken cancellationToken);
 
     Task ExtractAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task SurveyAsync(string shipSymbol, CancellationToken cancellationToken);
+
+    Task SiphonAsync(string shipSymbol, CancellationToken cancellationToken);
 }
 
 public interface IInTransitCommandAcceptor
@@ -51,8 +55,8 @@ public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAccep
     public Task SellCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken)
         => bus.SendAsync(new SellCargoCommand(shipSymbol, tradeSymbol, units)).AsTask();
 
-    public Task RefuelAsync(string shipSymbol, CancellationToken cancellationToken)
-        => bus.SendAsync(new RefuelShipCommand(shipSymbol)).AsTask();
+    public Task RefuelAsync(string shipSymbol, bool fromCargo, CancellationToken cancellationToken)
+        => bus.SendAsync(new RefuelShipCommand(shipSymbol, fromCargo)).AsTask();
 
     public Task DeliverContractAsync(
         string contractId,
@@ -74,6 +78,12 @@ public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcc
 
     public Task ExtractAsync(string shipSymbol, CancellationToken cancellationToken)
         => bus.SendAsync(new ExtractResourcesCommand(shipSymbol)).AsTask();
+
+    public Task SurveyAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new SurveyCommand(shipSymbol)).AsTask();
+
+    public Task SiphonAsync(string shipSymbol, CancellationToken cancellationToken)
+        => bus.SendAsync(new SiphonResourcesCommand(shipSymbol)).AsTask();
 }
 
 public sealed class InTransitCommandAcceptor(IMessageBus bus) : IInTransitCommandAcceptor

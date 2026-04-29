@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Application.Services;
 using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -13,6 +14,7 @@ public sealed class ShipInOrbitContractEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
     IInOrbitCommandAcceptor inOrbitCommands,
+    INavigationPlanningService navigationPlanning,
     IMessageBus bus,
     ILogger<ShipInOrbitContractEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
@@ -66,8 +68,48 @@ public sealed class ShipInOrbitContractEventHandler(
         }
 
         logger.LogInformation("{Handler}: ship {Ship} navigating to {Waypoint} for contract assignment.", nameof(ShipInOrbitContractEventHandler), @event.ShipSymbol, destination);
+        await ApplyFlightModeAsync(@event.ShipSymbol, ship, destination, bus, cancellationToken);
         await inOrbitCommands.NavigateAsync(@event.ShipSymbol, destination, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
+    }
+
+    private async Task ApplyFlightModeAsync(
+        string shipSymbol,
+        SpaceTraders.Application.Ports.ShipModel ship,
+        string destinationWaypoint,
+        IMessageBus bus,
+        CancellationToken cancellationToken)
+    {
+        if (!ShouldAdjustFlightMode(ship, destinationWaypoint))
+        {
+            return;
+        }
+
+        var plan = await navigationPlanning.BuildPlanAsync(ship, destinationWaypoint, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(plan.RecommendedFlightMode) &&
+            !string.Equals(ship.FlightMode, plan.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
+        {
+            await bus.InvokeAsync(new PatchShipNavCommand(shipSymbol, plan.RecommendedFlightMode), cancellationToken);
+        }
+    }
+
+    private static bool ShouldAdjustFlightMode(
+        SpaceTraders.Application.Ports.ShipModel ship,
+        string destinationWaypoint)
+    {
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol) || string.IsNullOrWhiteSpace(destinationWaypoint))
+        {
+            return false;
+        }
+
+        var destinationSystem = ExtractSystemSymbol(destinationWaypoint);
+        return ship.SystemSymbol.Equals(destinationSystem, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ExtractSystemSymbol(string waypointSymbol)
+    {
+        var lastDash = waypointSymbol.LastIndexOf('-');
+        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
     private static string ResolveDestination(

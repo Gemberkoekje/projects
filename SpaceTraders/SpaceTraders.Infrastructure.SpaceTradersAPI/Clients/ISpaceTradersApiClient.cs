@@ -54,7 +54,7 @@ public interface ISpaceTradersApiClient
 
     Task<BuyCargoResult> BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 
-    Task<RefuelResult> RefuelShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+    Task<RefuelResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default);
 
     Task<PurchaseShipResult> PurchaseShipAsync(string shipType, string waypointSymbol, CancellationToken cancellationToken = default);
 
@@ -88,4 +88,6 @@ public interface ISpaceTradersApiClient
     Task<JumpResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
 
     Task<ChartResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<JumpGate> GetJumpGateAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 }

@@ -120,10 +120,10 @@ public sealed class SpaceTradersApiClient(
             AuthMode.AgentToken,
             cancellationToken);
 
-    public Task<RefuelResult> RefuelShipAsync(string shipSymbol, CancellationToken cancellationToken = default)
+    public Task<RefuelResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default)
         => PostWrappedAsync<object?, RefuelResult>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/refuel",
-            null,
+            fromCargo ? new { fromCargo = true } : null,
             AuthMode.AgentToken,
             cancellationToken);
 
@@ -240,6 +240,12 @@ public sealed class SpaceTradersApiClient(
         => PostWrappedAsync<object?, ChartResult>(
             $"my/ships/{Uri.EscapeDataString(shipSymbol)}/chart",
             null,
+            AuthMode.AgentToken,
+            cancellationToken);
+
+    public Task<JumpGate> GetJumpGateAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default)
+        => GetWrappedAsync<JumpGate>(
+            $"systems/{Uri.EscapeDataString(systemSymbol)}/waypoints/{Uri.EscapeDataString(waypointSymbol)}/jump-gate",
             AuthMode.AgentToken,
             cancellationToken);
 

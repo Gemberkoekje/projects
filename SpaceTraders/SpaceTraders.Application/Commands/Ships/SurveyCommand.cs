@@ -20,6 +20,7 @@ public sealed record SurveyCommand
 public sealed class SurveyHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
+    ISurveyRepository surveys,
     IMessageBus bus,
     ILogger<SurveyHandler> logger)
 {
@@ -45,6 +46,11 @@ public sealed class SurveyHandler(
         }
 
         var result = await port.SurveyAsync(command.ShipSymbol, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(ship.WaypointSymbol) && result.Surveys.Count > 0)
+        {
+            await surveys.UpsertAsync(command.ShipSymbol, result.Surveys, cancellationToken);
+        }
+
         logger.LogInformation("Ship {Symbol} completed survey. {Count} surveys found, cooldown {Seconds}s.",
             command.ShipSymbol, result.Surveys.Count, result.CooldownSeconds);
     }

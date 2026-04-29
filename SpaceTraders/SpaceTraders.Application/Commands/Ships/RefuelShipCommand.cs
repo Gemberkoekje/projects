@@ -10,10 +10,13 @@ public sealed record RefuelShipCommand
 {
     public required string ShipSymbol { get; init; }
 
+    public bool FromCargo { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public RefuelShipCommand(string ShipSymbol)
+    public RefuelShipCommand(string ShipSymbol, bool FromCargo = false)
     {
         this.ShipSymbol = ShipSymbol;
+        this.FromCargo = FromCargo;
     }
 }
 
@@ -51,9 +54,9 @@ public sealed class RefuelShipHandler(
             await bus.PublishAsync(new ShipStateMismatchEvent(
                 command.ShipSymbol,
                 nameof(RefuelShipCommand),
-                "DOCKED_AT_FUEL_MARKET",
+                "DOCKED",
                 "DOCKED_AT_UNKNOWN_WAYPOINT",
-                "Ship waypoint is unknown, cannot validate fuel market.",
+                "Ship waypoint is unknown, cannot validate refuel preconditions.",
                 Guid.Empty,
                 Guid.Empty,
                 now));
@@ -62,25 +65,28 @@ public sealed class RefuelShipHandler(
             return;
         }
 
-        var waypoint = await waypoints.FindAsync(ship.WaypointSymbol, cancellationToken);
-        if (waypoint?.HasMarket != true)
+        if (!command.FromCargo)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
-                command.ShipSymbol,
-                nameof(RefuelShipCommand),
-                "DOCKED_AT_FUEL_MARKET",
-                "DOCKED_AT_NON_MARKET_WAYPOINT",
-                "Ship is not docked at a market waypoint.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+            var waypoint = await waypoints.FindAsync(ship.WaypointSymbol, cancellationToken);
+            if (waypoint?.HasMarket != true)
+            {
+                var now = TimeProvider.System.GetUtcNow();
+                await bus.PublishAsync(new ShipStateMismatchEvent(
+                    command.ShipSymbol,
+                    nameof(RefuelShipCommand),
+                    "DOCKED_AT_FUEL_MARKET",
+                    "DOCKED_AT_NON_MARKET_WAYPOINT",
+                    "Ship is not docked at a market waypoint and cargo-refuel was not requested.",
+                    Guid.Empty,
+                    Guid.Empty,
+                    now));
 
-            logger.LogWarning("Skipping refuel for ship {Symbol}: waypoint {Waypoint} is not a market.", command.ShipSymbol, ship.WaypointSymbol);
-            return;
+                logger.LogWarning("Skipping refuel for ship {Symbol}: waypoint {Waypoint} is not a market.", command.ShipSymbol, ship.WaypointSymbol);
+                return;
+            }
         }
 
-        var result = await port.RefuelShipAsync(command.ShipSymbol, cancellationToken);
+        var result = await port.RefuelShipAsync(command.ShipSymbol, command.FromCargo, cancellationToken);
 
         await ships.UpdateFuelAsync(command.ShipSymbol, result.Fuel, cancellationToken);
 
@@ -103,7 +109,11 @@ public sealed class RefuelShipHandler(
             Guid.Empty,
             nowRefueled));
 
-        logger.LogInformation("Ship {Symbol} refuelled. Fuel: {Current}/{Capacity}. Cost: {Cost} credits.",
-            command.ShipSymbol, result.Fuel.Current, result.Fuel.Capacity, result.Cost);
+        logger.LogInformation("Ship {Symbol} refuelled ({Mode}). Fuel: {Current}/{Capacity}. Cost: {Cost} credits.",
+            command.ShipSymbol,
+            command.FromCargo ? "from cargo" : "market",
+            result.Fuel.Current,
+            result.Fuel.Capacity,
+            result.Cost);
     }
 }

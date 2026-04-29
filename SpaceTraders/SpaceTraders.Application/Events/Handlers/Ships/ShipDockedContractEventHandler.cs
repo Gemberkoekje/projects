@@ -66,6 +66,14 @@ public sealed class ShipDockedContractEventHandler(
             }
         }
 
+        if (ship.FuelCapacity > 0 && ship.FuelCurrent < (ship.FuelCapacity / 4))
+        {
+            var hasHydrocarbonCargo = ship.CargoInventory?.Any(c =>
+                c.Units > 0 && c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)) == true;
+
+            await dockedCommands.RefuelAsync(@event.ShipSymbol, hasHydrocarbonCargo, cancellationToken);
+        }
+
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
     }

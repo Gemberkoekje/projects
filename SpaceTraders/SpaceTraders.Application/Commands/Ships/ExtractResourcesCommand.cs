@@ -21,6 +21,8 @@ public sealed class ExtractResourcesHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IWaypointRepository waypoints,
+    ISurveyRepository surveys,
+    IShipAssignmentRepository assignments,
     IMessageBus bus,
     ILogger<ExtractResourcesHandler> logger)
 {
@@ -84,7 +86,24 @@ public sealed class ExtractResourcesHandler(
             return;
         }
 
-        var result = await port.ExtractResourcesAsync(command.ShipSymbol, cancellationToken);
+        var assignment = await assignments.FindAsync(command.ShipSymbol, cancellationToken);
+        var preferredSymbol = assignment?.CargoSymbol ?? string.Empty;
+        var survey = await surveys.GetBestActiveSurveyAsync(ship.WaypointSymbol, preferredSymbol, cancellationToken);
+
+        ExtractionActionResult result;
+        if (!string.IsNullOrWhiteSpace(survey.Signature))
+        {
+            result = await port.ExtractWithSurveyAsync(command.ShipSymbol, survey, cancellationToken);
+            logger.LogInformation("Ship {Symbol} extracted with survey {Signature} targeting {PreferredSymbol}.",
+                command.ShipSymbol,
+                survey.Signature,
+                string.IsNullOrWhiteSpace(preferredSymbol) ? "best available deposit" : preferredSymbol);
+        }
+        else
+        {
+            result = await port.ExtractResourcesAsync(command.ShipSymbol, cancellationToken);
+        }
+
         await ships.UpdateCargoAsync(command.ShipSymbol, result.Cargo, cancellationToken);
         logger.LogInformation("Ship {Symbol} extracted {Units}x {Good}. Cooldown: {Cooldown}s.",
             command.ShipSymbol, result.YieldUnits, result.YieldSymbol, result.CooldownSeconds);

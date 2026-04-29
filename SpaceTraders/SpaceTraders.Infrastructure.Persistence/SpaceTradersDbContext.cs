@@ -39,6 +39,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<ApiEndpointUsage> ApiEndpointUsages => Set<ApiEndpointUsage>();
 
+    public DbSet<CachedSurvey> Surveys => Set<CachedSurvey>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -210,6 +212,19 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.HttpMethod).HasMaxLength(10).IsRequired();
             entity.Property(x => x.Endpoint).HasMaxLength(1000).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.HttpMethod, x.Endpoint }).IsUnique();
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<CachedSurvey>(entity =>
+        {
+            entity.ToTable("cached_surveys");
+            entity.HasKey(x => new { x.AgentToken, x.Signature });
+            entity.Property(x => x.AgentToken).HasMaxLength(512);
+            entity.Property(x => x.Signature).HasMaxLength(200);
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.WaypointSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Size).HasMaxLength(30).IsRequired();
+            entity.HasIndex(x => new { x.AgentToken, x.WaypointSymbol, x.Expiration });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
     }

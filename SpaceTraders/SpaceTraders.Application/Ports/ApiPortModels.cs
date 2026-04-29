@@ -449,6 +449,16 @@ public sealed record ShipModel
         (MountSymbols ?? []).Any(m =>
             m.Contains("MINING", StringComparison.OrdinalIgnoreCase) ||
             m.Contains("SURVEYOR", StringComparison.OrdinalIgnoreCase));
+
+    public bool HasSurveyEquipment =>
+        (MountSymbols ?? []).Any(m => m.Contains("SURVEYOR", StringComparison.OrdinalIgnoreCase));
+
+    public bool HasGasSiphonEquipment =>
+        ShipType.Equals("SHIP_SIPHON_DRONE", StringComparison.OrdinalIgnoreCase) ||
+        (MountSymbols ?? []).Any(m => m.Contains("GAS_SIPHON", StringComparison.OrdinalIgnoreCase));
+
+    public bool HasGasProcessor =>
+        !string.IsNullOrWhiteSpace(ModulesJson) && ModulesJson.Contains("MODULE_GAS_PROCESSOR", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record ContractDeliverableModel
@@ -741,6 +751,20 @@ public sealed record ChartActionResult
     {
         this.WaypointSymbol = WaypointSymbol;
         this.WaypointType = WaypointType;
+    }
+}
+
+public sealed record JumpGateConnectionModel
+{
+    public required string WaypointSymbol { get; init; }
+
+    public required IReadOnlyList<string> ConnectedSystems { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public JumpGateConnectionModel(string WaypointSymbol, IReadOnlyList<string> ConnectedSystems)
+    {
+        this.WaypointSymbol = WaypointSymbol;
+        this.ConnectedSystems = ConnectedSystems;
     }
 }
 

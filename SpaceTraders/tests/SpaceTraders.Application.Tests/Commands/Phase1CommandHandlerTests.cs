@@ -68,11 +68,12 @@ public sealed class Phase1CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var surveys = Substitute.For<ISurveyRepository>();
         var bus = Substitute.For<IMessageBus>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100));
 
-        var handler = new SurveyHandler(port, ships, bus, NullLogger<SurveyHandler>.Instance);
+        var handler = new SurveyHandler(port, ships, surveys, bus, NullLogger<SurveyHandler>.Instance);
         await handler.Handle(new SurveyCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
@@ -84,13 +85,15 @@ public sealed class Phase1CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var surveys = Substitute.For<ISurveyRepository>();
         var bus = Substitute.For<IMessageBus>();
+        var result = new SurveyActionResult([], 70);
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
         port.SurveyAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new SurveyActionResult([], 70));
+            .Returns(result);
 
-        var handler = new SurveyHandler(port, ships, bus, NullLogger<SurveyHandler>.Instance);
+        var handler = new SurveyHandler(port, ships, surveys, bus, NullLogger<SurveyHandler>.Instance);
         await handler.Handle(new SurveyCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).SurveyAsync("SHIP-1", Arg.Any<CancellationToken>());
@@ -103,11 +106,12 @@ public sealed class Phase1CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
         var bus = Substitute.For<IMessageBus>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100));
 
-        var handler = new SiphonResourcesHandler(port, ships, bus, NullLogger<SiphonResourcesHandler>.Instance);
+        var handler = new SiphonResourcesHandler(port, ships, waypoints, bus, NullLogger<SiphonResourcesHandler>.Instance);
         await handler.Handle(new SiphonResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
@@ -119,14 +123,17 @@ public sealed class Phase1CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
         var bus = Substitute.For<IMessageBus>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-GG", "IN_ORBIT", "CRUISE", 80, 100, ModulesJson: "MODULE_GAS_PROCESSOR_I", MountSymbols: ["MOUNT_GAS_SIPHON_I"]));
+        waypoints.FindAsync("X1-AB-GG", Arg.Any<CancellationToken>())
+            .Returns(new WaypointCacheModel("X1-AB-GG", "X1-AB", "GAS_GIANT", 0, 0, false, false, DateTimeOffset.UtcNow));
         var cargo = new CargoModel(5, 40);
         port.SiphonResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new SiphonActionResult("HYDROCARBON", 5, cargo, 60));
 
-        var handler = new SiphonResourcesHandler(port, ships, bus, NullLogger<SiphonResourcesHandler>.Instance);
+        var handler = new SiphonResourcesHandler(port, ships, waypoints, bus, NullLogger<SiphonResourcesHandler>.Instance);
         await handler.Handle(new SiphonResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).SiphonResourcesAsync("SHIP-1", Arg.Any<CancellationToken>());

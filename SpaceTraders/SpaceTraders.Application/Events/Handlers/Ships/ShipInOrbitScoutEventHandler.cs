@@ -56,10 +56,11 @@ public sealed class ShipInOrbitScoutEventHandler(
         await markets.RefreshIfApplicableAsync(currentWaypoint, cancellationToken);
         await shipyards.RefreshIfApplicableAsync(currentWaypoint, cancellationToken);
 
-        // At scout target: dock so the docked handler can complete the scouting cycle
+        // At scout target: chart for exploration metadata then dock so the docked handler can complete the scouting cycle
         if (string.Equals(currentWaypoint, assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogInformation("{Handler}: ship {Ship} at target {Waypoint}; docking.", nameof(ShipInOrbitScoutEventHandler), @event.ShipSymbol, currentWaypoint);
+            logger.LogInformation("{Handler}: ship {Ship} at target {Waypoint}; charting and docking.", nameof(ShipInOrbitScoutEventHandler), @event.ShipSymbol, currentWaypoint);
+            await bus.InvokeAsync(new CreateChartCommand(@event.ShipSymbol), cancellationToken);
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }

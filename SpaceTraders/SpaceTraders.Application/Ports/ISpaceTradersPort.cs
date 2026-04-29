@@ -22,7 +22,7 @@ public interface ISpaceTradersPort
 
     Task<TradeActionResult> BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken = default);
 
-    Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, CancellationToken cancellationToken = default);
+    Task<RefuelActionResult> RefuelShipAsync(string shipSymbol, bool fromCargo = false, CancellationToken cancellationToken = default);
 
     Task<ExtractionActionResult> ExtractResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default);
 
@@ -60,4 +60,6 @@ public interface ISpaceTradersPort
     Task<JumpActionResult> JumpShipAsync(string shipSymbol, string systemSymbol, CancellationToken cancellationToken = default);
 
     Task<ChartActionResult> CreateChartAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    Task<JumpGateConnectionModel> GetJumpGateConnectionsAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken = default);
 }

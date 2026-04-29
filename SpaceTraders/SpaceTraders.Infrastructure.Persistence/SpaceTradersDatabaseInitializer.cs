@@ -151,6 +151,7 @@ public static class SpaceTradersDatabaseInitializer
         await EnsureCompositePrimaryKeyAsync(dbContext, "agent_settings", "agent_settings_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
         await EnsureCompositePrimaryKeyAsync(dbContext, "ship_assignment_records", "ship_assignment_records_pkey", "\"AgentToken\", \"ShipSymbol\"", cancellationToken);
         await EnsureCompositePrimaryKeyAsync(dbContext, "leader_leases", "leader_leases_pkey", "\"AgentToken\", \"Key\"", cancellationToken);
+        await EnsureCompositePrimaryKeyAsync(dbContext, "cached_surveys", "cached_surveys_pkey", "\"AgentToken\", \"Signature\"", cancellationToken);
     }
 
     private static Task EnsureCompositePrimaryKeyAsync(

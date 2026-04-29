@@ -16,10 +16,19 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Contract.AutoAccept",                   Value = "true",                Type = "bool",    Description = "Auto-accept contracts when profitable" },
         new AgentSetting { Key = "Scout.MarketRefreshIntervalMinutes",    Value = "10",                  Type = "int",     Description = "How often to re-poll markets with a ship present" },
         new AgentSetting { Key = "Scout.ShipyardRefreshIntervalMinutes",  Value = "30",                  Type = "int",     Description = "How often to re-poll shipyards with a ship present" },
+        new AgentSetting { Key = "Navigation.CriticalFuelRatio",          Value = "0.15",                Type = "decimal", Description = "Fuel ratio at or below which ships force DRIFT mode" },
+        new AgentSetting { Key = "Navigation.LowFuelRatioForDrift",       Value = "0.35",                Type = "decimal", Description = "Fuel ratio below which ships prefer DRIFT mode" },
+        new AgentSetting { Key = "Navigation.BurnFuelRatioMinimum",       Value = "0.50",                Type = "decimal", Description = "Minimum fuel ratio before selecting BURN mode" },
+        new AgentSetting { Key = "Navigation.BurnDistanceThreshold",      Value = "35",                  Type = "decimal", Description = "Distance threshold for selecting BURN mode" },
         new AgentSetting { Key = "Automation.Trade.MaxLossPerUnitBeforeReroute", Value = "50",            Type = "int",     Description = "Max accepted per-unit loss before trying an alternate sell market" },
         new AgentSetting { Key = "Automation.Enabled",                    Value = "true",                Type = "bool",    Description = "Master kill-switch for automation" },
         new AgentSetting { Key = "ActivityLog.RetentionDays",             Value = "30",                  Type = "int",     Description = "Days to retain activity log entries" },
         new AgentSetting { Key = "Alerts.WebhookUrl",                     Value = "",                    Type = "string",  Description = "Slack/webhook URL for operator alerts (empty = disabled)" },
+        new AgentSetting { Key = "Automation.MiningShipPercentage",              Value = "0.25",                Type = "decimal", Description = "Fraction of mining-capable ships assigned to resource extraction roles" },
+        new AgentSetting { Key = "Mining.SurveyMinimumCooldownSeconds",          Value = "0",                   Type = "int",     Description = "Only refresh surveys when cooldown remaining is above this threshold or none are cached" },
+        new AgentSetting { Key = "Mining.JettisonLowValueWhenFull",              Value = "true",                Type = "bool",    Description = "Jettison low-value surplus cargo when a mining ship is full and cannot sell it efficiently" },
+        new AgentSetting { Key = "Mining.MinimumSellPriceToKeepCargo",           Value = "25",                  Type = "int",     Description = "Minimum observed sell price before non-contract cargo is kept for sale instead of jettison" },
+        new AgentSetting { Key = "Mining.ReserveHydrocarbonUnits",               Value = "10",                  Type = "int",     Description = "Hydrocarbon units to reserve for cargo-based refueling logistics" },
     ];
 
     /// <summary>

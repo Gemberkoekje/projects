@@ -3,6 +3,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
+using SpaceTraders.Application.Services;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
@@ -24,8 +25,24 @@ public sealed class JumpShipHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IMessageBus bus,
+    IJumpGateCacheService jumpGates,
     ILogger<JumpShipHandler> logger)
 {
+    private sealed class NoopJumpGateCacheService : IJumpGateCacheService
+    {
+        public Task TryRefreshAsync(string systemSymbol, string waypointSymbol, CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    public JumpShipHandler(
+        ISpaceTradersPort port,
+        IShipRepository ships,
+        IMessageBus bus,
+        ILogger<JumpShipHandler> logger)
+        : this(port, ships, bus, new NoopJumpGateCacheService(), logger)
+    {
+    }
+
     public async Task Handle(JumpShipCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
@@ -45,6 +62,11 @@ public sealed class JumpShipHandler(
             logger.LogWarning("Skipping jump for ship {Symbol}: expected IN_ORBIT but was {Status}.",
                 command.ShipSymbol, ship?.Status ?? "UNKNOWN");
             return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ship?.SystemSymbol) && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            await jumpGates.TryRefreshAsync(ship.SystemSymbol, ship.WaypointSymbol, cancellationToken);
         }
 
         var nowJump = TimeProvider.System.GetUtcNow();

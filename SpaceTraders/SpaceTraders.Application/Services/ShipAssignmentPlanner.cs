@@ -9,14 +9,14 @@ namespace SpaceTraders.Application.Services;
 
 public interface IContractObjectivePlanner
 {
-    Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken);
+    Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken);
 }
 
 public sealed class ContractObjectivePlanner(
     IContractRepository contracts,
     IMarketRepository markets) : IContractObjectivePlanner
 {
-    public async Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
+    public async Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
     {
         var activeContracts = await contracts.GetActiveAsync(cancellationToken);
         var activeContract = activeContracts
@@ -26,7 +26,7 @@ public sealed class ContractObjectivePlanner(
 
         if (activeContract is null)
         {
-            return null;
+            return null!;
         }
 
         var deliverable = DeserializeDeliverables(activeContract.DeliverablesJson)
@@ -34,7 +34,7 @@ public sealed class ContractObjectivePlanner(
 
         if (deliverable is null)
         {
-            return null;
+            return null!;
         }
 
         var remainingUnits = deliverable.UnitsRequired - deliverable.UnitsFulfilled;
@@ -118,12 +118,13 @@ public sealed class ShipAssignmentPlanner(
     ISettingsRepository settings,
     IShipAssignmentRepository assignments,
     IWaypointRepository waypoints,
-    IShipRepository ships) : IShipAssignmentPlanner
+    IShipRepository ships,
+    IMarketRepository markets) : IShipAssignmentPlanner
 {
     private sealed class NoopContractObjectivePlanner : IContractObjectivePlanner
     {
-        public Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
-            => Task.FromResult<AssignShipCommand?>(null);
+        public Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
+            => Task.FromResult<AssignShipCommand>(null!);
     }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
@@ -133,13 +134,29 @@ public sealed class ShipAssignmentPlanner(
         IShipAssignmentRepository assignments,
         IWaypointRepository waypoints,
         IShipRepository ships)
-        : this(new NoopContractObjectivePlanner(), tradeOpportunities, settings, assignments, waypoints, ships)
+        : this(new NoopContractObjectivePlanner(), tradeOpportunities, settings, assignments, waypoints, ships, new NoopMarketRepository())
     {
+    }
+
+    private sealed class NoopMarketRepository : IMarketRepository
+    {
+        public Task<DateTimeOffset?> GetLastObservedAtAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+            => Task.FromResult<DateTimeOffset?>(null);
+
+        public Task UpsertAsync(MarketDataModel market, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<MarketSnapshot> FindSnapshotByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
+            => Task.FromResult<MarketSnapshot>(null!);
+
+        public Task<IReadOnlyList<MarketSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<MarketSnapshot>>([]);
     }
 
     private const string MineAssignmentType = "Mine";
     private const string ScoutAssignmentType = "Scout";
     private const string TradeAssignmentType = "Trade";
+    private const string SiphonAssignmentType = "Siphon";
     private const string IdleAssignmentType = "Idle";
 
     public async Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
@@ -173,6 +190,15 @@ public sealed class ShipAssignmentPlanner(
             }
         }
 
+        if (ship.HasGasSiphonEquipment && ship.HasGasProcessor)
+        {
+            var siphonAssignment = await BuildSiphonAssignmentAsync(ship, cancellationToken);
+            if (siphonAssignment is not null)
+            {
+                return siphonAssignment;
+            }
+        }
+
         if (route is not null)
         {
             return new AssignShipCommand(
@@ -190,6 +216,165 @@ public sealed class ShipAssignmentPlanner(
         }
 
         return new AssignShipCommand(ship.Symbol, IdleAssignmentType);
+    }
+
+    private async Task<AssignShipCommand> BuildSiphonAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        {
+            return null!;
+        }
+
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
+        var gasGiant = systemWaypoints.FirstOrDefault(w => w.Type.Contains("GAS_GIANT", StringComparison.OrdinalIgnoreCase));
+        var market = systemWaypoints.FirstOrDefault(w => w.HasMarket);
+        if (gasGiant is null || market is null)
+        {
+            return null!;
+        }
+
+        return new AssignShipCommand(
+            ship.Symbol,
+            SiphonAssignmentType,
+            OriginWaypoint: gasGiant.Symbol,
+            DestWaypoint: market.Symbol,
+            CargoSymbol: "HYDROCARBON");
+    }
+
+    private async Task<AssignShipCommand> BuildMiningAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        {
+            return null!;
+        }
+
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
+        var marketSnapshots = await markets.GetAllSnapshotsAsync(cancellationToken);
+        var targetCargo = await ResolvePreferredResourceAsync(ship, cancellationToken);
+
+        var asteroid = systemWaypoints
+            .Where(w => w.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(w => ScoreResourceTargetMatch(w, targetCargo))
+            .ThenBy(w => GetAsteroidPriority(w))
+            .ThenBy(w => w.LastObservedAt)
+            .FirstOrDefault();
+
+        var market = SelectBestSellWaypoint(systemWaypoints, marketSnapshots, targetCargo);
+
+        if (asteroid is null || market is null)
+        {
+            return null!;
+        }
+
+        return new AssignShipCommand(
+            ship.Symbol,
+            MineAssignmentType,
+            OriginWaypoint: asteroid.Symbol,
+            DestWaypoint: market.Symbol,
+            CargoSymbol: targetCargo);
+    }
+
+    private async Task<string> ResolvePreferredResourceAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        var contractAssignment = await contractObjectives.PlanAsync(ship, cancellationToken);
+        if (contractAssignment is not null && !string.IsNullOrWhiteSpace(contractAssignment.CargoSymbol))
+        {
+            return contractAssignment.CargoSymbol;
+        }
+
+        var routes = await tradeOpportunities.GetTopRoutesAsync(10, cancellationToken);
+        return routes.FirstOrDefault(r =>
+                r.TradeSymbol.EndsWith("_ORE", StringComparison.OrdinalIgnoreCase) ||
+                r.TradeSymbol.EndsWith("_ICE", StringComparison.OrdinalIgnoreCase))?.TradeSymbol
+            ?? "IRON_ORE";
+    }
+
+    private static int ScoreResourceTargetMatch(WaypointCacheModel waypoint, string targetCargo)
+    {
+        if (string.IsNullOrWhiteSpace(targetCargo))
+        {
+            return 0;
+        }
+
+        var score = 0;
+        var haystack = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}";
+        var normalizedTarget = targetCargo.Replace('_', ' ');
+
+        if (haystack.Contains(targetCargo, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 30;
+        }
+        if (haystack.Contains(normalizedTarget, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 20;
+        }
+        if (targetCargo.EndsWith("_ORE", StringComparison.OrdinalIgnoreCase) && haystack.Contains("ORE", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 10;
+        }
+        if (targetCargo.EndsWith("_ICE", StringComparison.OrdinalIgnoreCase) && haystack.Contains("ICE", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 10;
+        }
+        if (!string.IsNullOrWhiteSpace(waypoint.ModifiersJson) && waypoint.ModifiersJson.Contains("COMMON", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 5;
+        }
+
+        return score;
+    }
+
+    private static int GetAsteroidPriority(WaypointCacheModel waypoint)
+    {
+        var score = 0;
+        var modifiers = waypoint.ModifiersJson ?? string.Empty;
+        var traits = waypoint.TraitsJson ?? string.Empty;
+
+        if (modifiers.Contains("UNSTABLE", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 50;
+        }
+        if (modifiers.Contains("VOLATILE", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 25;
+        }
+        if (modifiers.Contains("STRIPPED", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 20;
+        }
+        if (modifiers.Contains("WEAK_GRAVITY", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 10;
+        }
+        if (traits.Contains("ENGINEERED", StringComparison.OrdinalIgnoreCase))
+        {
+            score -= 20;
+        }
+        if (traits.Contains("PRECIOUS", StringComparison.OrdinalIgnoreCase) || traits.Contains("RARE", StringComparison.OrdinalIgnoreCase))
+        {
+            score -= 10;
+        }
+        if (traits.Contains("COMMON", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 5;
+        }
+
+        return score;
+    }
+
+    private static WaypointCacheModel SelectBestSellWaypoint(
+        IReadOnlyList<WaypointCacheModel> systemWaypoints,
+        IReadOnlyList<MarketSnapshot> marketSnapshots,
+        string targetCargo)
+    {
+        var marketByWaypoint = marketSnapshots.ToDictionary(m => m.WaypointSymbol, StringComparer.OrdinalIgnoreCase);
+        return systemWaypoints
+            .Where(w => w.HasMarket)
+            .OrderByDescending(w => marketByWaypoint.TryGetValue(w.Symbol, out var market)
+                ? market.TradeGoods.FirstOrDefault(g => g.Symbol.Equals(targetCargo, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0
+                : 0)
+            .ThenBy(w => w.LastObservedAt)
+            .FirstOrDefault()!;
     }
 
     private async Task<bool> ShouldAssignMiningAsync(string shipSymbol, decimal miningShipPercentage, CancellationToken cancellationToken)
@@ -234,6 +419,12 @@ public sealed class ShipAssignmentPlanner(
         var refreshIntervalMinutes = await settings.GetAsync<int>("Scout.MarketRefreshIntervalMinutes", cancellationToken);
         var staleness = TimeSpan.FromMinutes(refreshIntervalMinutes > 0 ? refreshIntervalMinutes : 10);
 
+        var explorationAssignment = await BuildExplorationAssignmentAsync(ship, cancellationToken);
+        if (explorationAssignment is not null)
+        {
+            return explorationAssignment;
+        }
+
         if (IsProbeScout(ship))
         {
             var probeTarget = await BuildProbeMarketScoutAssignmentAsync(ship, staleness, cancellationToken);
@@ -249,6 +440,49 @@ public sealed class ShipAssignmentPlanner(
         return target is null
             ? null
             : new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: target.Symbol);
+    }
+
+    private async Task<AssignShipCommand?> BuildExplorationAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol ?? string.Empty, cancellationToken);
+        if (systemWaypoints.Count == 0)
+        {
+            return null;
+        }
+
+        var unchartedTarget = systemWaypoints
+            .Where(w => string.IsNullOrWhiteSpace(w.ChartJson))
+            .OrderBy(w => w.HasShipyard ? 0 : 1)
+            .ThenBy(w => w.HasMarket ? 0 : 1)
+            .ThenBy(w => IsHighValueAsteroid(w) ? 0 : 1)
+            .FirstOrDefault();
+
+        if (unchartedTarget is not null)
+        {
+            return new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: unchartedTarget.Symbol);
+        }
+
+        var asteroidTarget = systemWaypoints
+            .Where(IsHighValueAsteroid)
+            .OrderBy(w => w.LastObservedAt)
+            .FirstOrDefault();
+
+        return asteroidTarget is null
+            ? null
+            : new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: asteroidTarget.Symbol);
+    }
+
+    private static bool IsHighValueAsteroid(WaypointCacheModel waypoint)
+    {
+        if (!waypoint.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var traits = waypoint.TraitsJson ?? string.Empty;
+        return traits.Contains("ENGINEERED", StringComparison.OrdinalIgnoreCase)
+            || traits.Contains("PRECIOUS", StringComparison.OrdinalIgnoreCase)
+            || traits.Contains("RARE", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<AssignShipCommand?> BuildProbeMarketScoutAssignmentAsync(
@@ -284,27 +518,4 @@ public sealed class ShipAssignmentPlanner(
         => ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
            || ship.ShipType.Equals("SHIP_LIGHT_HAULER", StringComparison.OrdinalIgnoreCase)
            || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase);
-    
-    private async Task<AssignShipCommand?> BuildMiningAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
-        {
-            return null;
-        }
-
-        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
-        var asteroid = systemWaypoints.FirstOrDefault(w => w.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase));
-        var market = systemWaypoints.FirstOrDefault(w => w.HasMarket);
-
-        if (asteroid is null || market is null)
-        {
-            return null;
-        }
-
-        return new AssignShipCommand(
-            ship.Symbol,
-            MineAssignmentType,
-            OriginWaypoint: asteroid.Symbol,
-            DestWaypoint: market.Symbol);
-    }
 }
