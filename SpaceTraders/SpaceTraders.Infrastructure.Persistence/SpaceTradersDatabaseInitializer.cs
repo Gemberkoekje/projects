@@ -66,6 +66,14 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_shipyards ADD COLUMN IF NOT EXISTS \"ShipsDetailJson\" text NULL;",
                 cancellationToken);
+
+            // Phase 3: contract objective planning metadata
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"TermsDeadline\" timestamp with time zone NULL;",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"DeliverablesJson\" text NULL;",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))
@@ -89,6 +97,7 @@ public static class SpaceTradersDatabaseInitializer
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"PurchaseUnitPrice\" integer NOT NULL DEFAULT 0;", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"RequiredUnits\" integer NOT NULL DEFAULT 0;", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"ProfitPerJump\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SupportsSupplyChain\" boolean NOT NULL DEFAULT FALSE;", cancellationToken);

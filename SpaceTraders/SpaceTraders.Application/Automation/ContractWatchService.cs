@@ -60,7 +60,7 @@ public sealed class ContractWatchService(
         {
             if (!contract.IsAccepted || contract.IsFulfilled) continue;
 
-            var deadline = contract.Expiration;
+            var deadline = contract.TermsDeadline ?? contract.Expiration;
             if (deadline is null) continue;
 
             var remaining = deadline.Value - now;

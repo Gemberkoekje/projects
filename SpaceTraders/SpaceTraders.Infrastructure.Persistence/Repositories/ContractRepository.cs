@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -39,6 +40,8 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
             IsFulfilled = contract.IsFulfilled,
             Expiration = contract.Expiration,
             DeadlineToAccept = contract.DeadlineToAccept,
+            TermsDeadline = contract.TermsDeadline,
+            DeliverablesJson = contract.DeliverablesJson,
             LastSyncedAt = now
         };
 
@@ -67,5 +70,34 @@ public sealed class ContractRepository(SpaceTradersDbContext db) : IContractRepo
     }
 
     private static ContractDto MapToDto(CachedContract entity) =>
-        new(entity.Id, entity.FactionSymbol, entity.Type, entity.IsAccepted, entity.IsFulfilled, entity.Expiration, entity.DeadlineToAccept);
+        new(
+            entity.Id,
+            entity.FactionSymbol,
+            entity.Type,
+            entity.IsAccepted,
+            entity.IsFulfilled,
+            entity.Expiration,
+            entity.DeadlineToAccept,
+            entity.TermsDeadline,
+            entity.DeliverablesJson);
+
+    public static string SerializeDeliverables(IReadOnlyList<ContractDeliverableDto> deliverables)
+        => JsonSerializer.Serialize(deliverables);
+
+    public static IReadOnlyList<ContractDeliverableDto> DeserializeDeliverables(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ContractDeliverableDto>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
 }

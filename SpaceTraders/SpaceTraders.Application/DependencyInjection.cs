@@ -51,6 +51,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
+        services.AddScoped<IContractObjectivePlanner, ContractObjectivePlanner>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
         services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
@@ -63,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
 
         // In-orbit event handlers (consolidated)
+        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
@@ -79,6 +81,7 @@ public static class DependencyInjection
 
         // Docked event handlers (consolidated)
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedMineEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedScoutEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();

@@ -79,6 +79,26 @@ public sealed record ShipDto
     }
 }
 
+public sealed record ContractDeliverableDto
+{
+    public required string TradeSymbol { get; init; }
+
+    public required string DestinationSymbol { get; init; }
+
+    public required int UnitsRequired { get; init; }
+
+    public required int UnitsFulfilled { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractDeliverableDto(string TradeSymbol, string DestinationSymbol, int UnitsRequired, int UnitsFulfilled)
+    {
+        this.TradeSymbol = TradeSymbol;
+        this.DestinationSymbol = DestinationSymbol;
+        this.UnitsRequired = UnitsRequired;
+        this.UnitsFulfilled = UnitsFulfilled;
+    }
+}
+
 public sealed record ContractDto
 {
     public required string Id { get; init; }
@@ -95,6 +115,10 @@ public sealed record ContractDto
 
     public DateTimeOffset? DeadlineToAccept { get; init; }
 
+    public DateTimeOffset? TermsDeadline { get; init; }
+
+    public string? DeliverablesJson { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ContractDto(
         string Id,
@@ -103,7 +127,9 @@ public sealed record ContractDto
         bool IsAccepted,
         bool IsFulfilled,
         DateTimeOffset? Expiration,
-        DateTimeOffset? DeadlineToAccept)
+        DateTimeOffset? DeadlineToAccept,
+        DateTimeOffset? TermsDeadline = null,
+        string? DeliverablesJson = null)
     {
         this.Id = Id;
         this.FactionSymbol = FactionSymbol;
@@ -112,6 +138,8 @@ public sealed record ContractDto
         this.IsFulfilled = IsFulfilled;
         this.Expiration = Expiration;
         this.DeadlineToAccept = DeadlineToAccept;
+        this.TermsDeadline = TermsDeadline;
+        this.DeliverablesJson = DeliverablesJson;
     }
 }
 
@@ -279,6 +307,8 @@ public sealed record ShipAssignmentDto
 
     public int PurchaseUnitPrice { get; init; }
 
+    public int RequiredUnits { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ShipAssignmentDto(
         string ShipSymbol,
@@ -290,7 +320,8 @@ public sealed record ShipAssignmentDto
         int StepIndex,
         DateTimeOffset AssignedAt,
         DateTimeOffset? CompletedAt,
-        int PurchaseUnitPrice = 0)
+        int PurchaseUnitPrice = 0,
+        int RequiredUnits = 0)
     {
         this.ShipSymbol = ShipSymbol;
         this.AssignmentType = AssignmentType;
@@ -302,5 +333,6 @@ public sealed record ShipAssignmentDto
         this.AssignedAt = AssignedAt;
         this.CompletedAt = CompletedAt;
         this.PurchaseUnitPrice = PurchaseUnitPrice;
+        this.RequiredUnits = RequiredUnits;
     }
 }

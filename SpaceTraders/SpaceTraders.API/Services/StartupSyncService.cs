@@ -1,9 +1,11 @@
 using System.Linq;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Sync;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
+using Wolverine;
 
 namespace SpaceTraders.API.Services;
 
@@ -23,6 +25,7 @@ public sealed class StartupSyncService(
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         var apiClient = scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>();
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         var now = TimeProvider.System.GetUtcNow();
 
         var agent = await apiClient.GetMyAgentAsync(cancellationToken);
@@ -147,6 +150,8 @@ public sealed class StartupSyncService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Completed startup sync for agent, ships, and contracts.");
+
+        await bus.InvokeAsync(new RunPhase3OnboardingCommand(), cancellationToken);
     }
 
     /// <inheritdoc />

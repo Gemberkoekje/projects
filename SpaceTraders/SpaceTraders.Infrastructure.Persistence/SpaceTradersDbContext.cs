@@ -84,6 +84,7 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.Id).HasMaxLength(100);
             entity.Property(x => x.FactionSymbol).HasMaxLength(100);
             entity.Property(x => x.Type).HasMaxLength(100);
+            entity.Property(x => x.DeliverablesJson);
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 
@@ -153,6 +154,7 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.DestWaypoint).HasMaxLength(100);
             entity.Property(x => x.CargoSymbol).HasMaxLength(100);
             entity.Property(x => x.ContractId).HasMaxLength(100);
+            entity.Property(x => x.RequiredUnits);
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 

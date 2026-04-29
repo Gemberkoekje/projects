@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -21,12 +22,31 @@ public sealed class SyncContractsHandler(
             var response = await port.GetMyContractsAsync(page, limit, cancellationToken);
 
             foreach (var c in response.Items)
-                await contracts.UpsertAsync(new ContractDto(c.Id, c.FactionSymbol, c.Type, c.IsAccepted, c.IsFulfilled, c.Expiration, c.DeadlineToAccept), cancellationToken);
+            {
+                var deliverables = c.Deliverables
+                    .Select(d => new ContractDeliverableDto(d.TradeSymbol, d.DestinationSymbol, d.UnitsRequired, d.UnitsFulfilled))
+                    .ToList();
+
+                await contracts.UpsertAsync(
+                    new ContractDto(
+                        c.Id,
+                        c.FactionSymbol,
+                        c.Type,
+                        c.IsAccepted,
+                        c.IsFulfilled,
+                        c.Expiration,
+                        c.DeadlineToAccept,
+                        c.TermsDeadline,
+                        JsonSerializer.Serialize(deliverables)),
+                    cancellationToken);
+            }
 
             total += response.Items.Count;
 
             if (response.Items.Count == 0 || total >= response.Total)
+            {
                 break;
+            }
 
             page++;
         }

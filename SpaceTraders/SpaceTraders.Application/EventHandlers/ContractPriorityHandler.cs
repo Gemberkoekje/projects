@@ -65,7 +65,8 @@ public sealed class ContractPriorityHandler(
                 await bus.SendAsync(new AssignShipCommand(
                     ship.Symbol,
                     "Contract",
-                    ContractId: @event.ContractId));
+                    ContractId: @event.ContractId,
+                    RequiredUnits: assignment?.RequiredUnits ?? 0));
 
                 // Reassign only one ship per event to avoid over-allocating
                 return;

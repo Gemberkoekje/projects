@@ -23,4 +23,6 @@ public sealed class ShipAssignmentRecord
     public DateTimeOffset? CompletedAt { get; init; }
 
     public int PurchaseUnitPrice { get; init; }
+
+    public int RequiredUnits { get; init; }
 }

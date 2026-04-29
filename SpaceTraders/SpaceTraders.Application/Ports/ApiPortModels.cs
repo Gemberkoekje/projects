@@ -195,9 +195,21 @@ public sealed record ContractActionResult
 {
     public required string ContractId { get; init; }
 
+    public required string FactionSymbol { get; init; }
+
+    public required string ContractType { get; init; }
+
     public required bool IsAccepted { get; init; }
 
     public required bool IsFulfilled { get; init; }
+
+    public DateTimeOffset? Expiration { get; init; }
+
+    public DateTimeOffset? DeadlineToAccept { get; init; }
+
+    public DateTimeOffset? TermsDeadline { get; init; }
+
+    public IReadOnlyList<ContractDeliverableModel> Deliverables { get; init; }
 
     public string? AgentSymbol { get; init; }
 
@@ -206,11 +218,53 @@ public sealed record ContractActionResult
     public CargoModel? ShipCargo { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ContractActionResult(string ContractId, bool IsAccepted, bool IsFulfilled, string? AgentSymbol, long? AgentCredits, CargoModel? ShipCargo)
+    public ContractActionResult(
+        string ContractId,
+        bool IsAccepted,
+        bool IsFulfilled,
+        string? AgentSymbol,
+        long? AgentCredits,
+        CargoModel? ShipCargo)
+        : this(
+            ContractId,
+            string.Empty,
+            string.Empty,
+            IsAccepted,
+            IsFulfilled,
+            null,
+            null,
+            null,
+            [],
+            AgentSymbol,
+            AgentCredits,
+            ShipCargo)
+    {
+    }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractActionResult(
+        string ContractId,
+        string FactionSymbol,
+        string ContractType,
+        bool IsAccepted,
+        bool IsFulfilled,
+        DateTimeOffset? Expiration,
+        DateTimeOffset? DeadlineToAccept,
+        DateTimeOffset? TermsDeadline,
+        IReadOnlyList<ContractDeliverableModel>? Deliverables,
+        string? AgentSymbol,
+        long? AgentCredits,
+        CargoModel? ShipCargo)
     {
         this.ContractId = ContractId;
+        this.FactionSymbol = FactionSymbol;
+        this.ContractType = ContractType;
         this.IsAccepted = IsAccepted;
         this.IsFulfilled = IsFulfilled;
+        this.Expiration = Expiration;
+        this.DeadlineToAccept = DeadlineToAccept;
+        this.TermsDeadline = TermsDeadline;
+        this.Deliverables = Deliverables ?? [];
         this.AgentSymbol = AgentSymbol;
         this.AgentCredits = AgentCredits;
         this.ShipCargo = ShipCargo;
@@ -397,6 +451,26 @@ public sealed record ShipModel
             m.Contains("SURVEYOR", StringComparison.OrdinalIgnoreCase));
 }
 
+public sealed record ContractDeliverableModel
+{
+    public required string TradeSymbol { get; init; }
+
+    public required string DestinationSymbol { get; init; }
+
+    public required int UnitsRequired { get; init; }
+
+    public required int UnitsFulfilled { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractDeliverableModel(string TradeSymbol, string DestinationSymbol, int UnitsRequired, int UnitsFulfilled)
+    {
+        this.TradeSymbol = TradeSymbol;
+        this.DestinationSymbol = DestinationSymbol;
+        this.UnitsRequired = UnitsRequired;
+        this.UnitsFulfilled = UnitsFulfilled;
+    }
+}
+
 public sealed record ContractModel
 {
     public required string Id { get; init; }
@@ -413,6 +487,10 @@ public sealed record ContractModel
 
     public DateTimeOffset? DeadlineToAccept { get; init; }
 
+    public DateTimeOffset? TermsDeadline { get; init; }
+
+    public IReadOnlyList<ContractDeliverableModel> Deliverables { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ContractModel(
         string Id,
@@ -422,6 +500,30 @@ public sealed record ContractModel
         bool IsFulfilled,
         DateTimeOffset? Expiration,
         DateTimeOffset? DeadlineToAccept)
+        : this(
+            Id,
+            FactionSymbol,
+            Type,
+            IsAccepted,
+            IsFulfilled,
+            Expiration,
+            DeadlineToAccept,
+            null,
+            [])
+    {
+    }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractModel(
+        string Id,
+        string FactionSymbol,
+        string Type,
+        bool IsAccepted,
+        bool IsFulfilled,
+        DateTimeOffset? Expiration,
+        DateTimeOffset? DeadlineToAccept,
+        DateTimeOffset? TermsDeadline,
+        IReadOnlyList<ContractDeliverableModel>? Deliverables = null)
     {
         this.Id = Id;
         this.FactionSymbol = FactionSymbol;
@@ -430,6 +532,8 @@ public sealed record ContractModel
         this.IsFulfilled = IsFulfilled;
         this.Expiration = Expiration;
         this.DeadlineToAccept = DeadlineToAccept;
+        this.TermsDeadline = TermsDeadline;
+        this.Deliverables = Deliverables ?? [];
     }
 }
 

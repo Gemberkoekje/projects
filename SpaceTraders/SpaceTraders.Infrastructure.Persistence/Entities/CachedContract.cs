@@ -18,5 +18,9 @@ public sealed class CachedContract
 
     public DateTimeOffset? DeadlineToAccept { get; init; }
 
+    public DateTimeOffset? TermsDeadline { get; init; }
+
+    public string? DeliverablesJson { get; init; }
+
     public DateTimeOffset LastSyncedAt { get; init; }
 }

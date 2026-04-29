@@ -132,4 +132,31 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             $"Ship {@event.ShipSymbol} assignment type set to {@event.AssignmentType}.",
             cancellationToken: cancellationToken);
     }
+
+    public async Task Handle(ContractNegotiatedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ContractNegotiatedEvent),
+            $"Ship {@event.ShipSymbol} negotiated contract {@event.ContractId}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ContractAcceptedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "AGENT",
+            nameof(ContractAcceptedEvent),
+            $"Contract {@event.ContractId} accepted.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(ContractDeliveryRecordedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ContractDeliveryRecordedEvent),
+            $"Delivered {@event.UnitsDelivered}x {@event.TradeSymbol} to {@event.DestinationWaypoint} for contract {@event.ContractId}.",
+            cancellationToken: cancellationToken);
+    }
 }

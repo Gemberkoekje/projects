@@ -113,8 +113,14 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         var result = await client.AcceptContractAsync(contractId, cancellationToken);
         return new ContractActionResult(
             result.Contract.Id,
+            result.Contract.FactionSymbol,
+            result.Contract.Type,
             result.Contract.Accepted,
             result.Contract.Fulfilled,
+            result.Contract.Expiration,
+            result.Contract.DeadlineToAccept,
+            result.Contract.Terms?.Deadline,
+            MapDeliverables(result.Contract),
             result.Agent.Symbol,
             result.Agent.Credits,
             null);
@@ -133,8 +139,14 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             cancellationToken);
         return new ContractActionResult(
             result.Contract.Id,
+            result.Contract.FactionSymbol,
+            result.Contract.Type,
             result.Contract.Accepted,
             result.Contract.Fulfilled,
+            result.Contract.Expiration,
+            result.Contract.DeadlineToAccept,
+            result.Contract.Terms?.Deadline,
+            MapDeliverables(result.Contract),
             null,
             null,
             MapCargo(result.Cargo));
@@ -145,8 +157,14 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         var result = await client.FulfillContractAsync(contractId, cancellationToken);
         return new ContractActionResult(
             result.Contract.Id,
+            result.Contract.FactionSymbol,
+            result.Contract.Type,
             result.Contract.Accepted,
             result.Contract.Fulfilled,
+            result.Contract.Expiration,
+            result.Contract.DeadlineToAccept,
+            result.Contract.Terms?.Deadline,
+            MapDeliverables(result.Contract),
             result.Agent.Symbol,
             result.Agent.Credits,
             null);
@@ -306,8 +324,27 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             ship.Engine is not null ? JsonSerializer.Serialize(ship.Engine) : null,
             ship.Cooldown?.Expiration);
 
+    private static IReadOnlyList<ContractDeliverableModel> MapDeliverables(Models.Contracts.Contract contract)
+        => contract.Terms?.Deliver?
+            .Where(d => !string.IsNullOrWhiteSpace(d.TradeSymbol) && !string.IsNullOrWhiteSpace(d.DestinationSymbol))
+            .Select(d => new ContractDeliverableModel(
+                d.TradeSymbol,
+                d.DestinationSymbol,
+                d.UnitsRequired,
+                d.UnitsFulfilled))
+            .ToList() ?? [];
+
     private static ContractModel MapContract(Models.Contracts.Contract contract) =>
-        new(contract.Id, contract.FactionSymbol, contract.Type, contract.Accepted, contract.Fulfilled, contract.Expiration, contract.DeadlineToAccept);
+        new(
+            contract.Id,
+            contract.FactionSymbol,
+            contract.Type,
+            contract.Accepted,
+            contract.Fulfilled,
+            contract.Expiration,
+            contract.DeadlineToAccept,
+            contract.Terms?.Deadline,
+            MapDeliverables(contract));
 
     private static WaypointDataModel MapWaypoint(Models.Systems.Waypoint waypoint)
     {

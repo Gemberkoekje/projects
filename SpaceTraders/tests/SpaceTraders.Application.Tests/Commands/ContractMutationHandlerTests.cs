@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Contracts;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
@@ -19,6 +20,9 @@ public sealed class ContractMutationHandlerTests
         var agents = Substitute.For<IAgentRepository>();
         var bus = Substitute.For<IMessageBus>();
 
+        contracts.FindAsync("CONTRACT-1", Arg.Any<CancellationToken>())
+            .Returns((ContractDto)null!);
+
         port.AcceptContractAsync("CONTRACT-1", Arg.Any<CancellationToken>())
             .Returns(new ContractActionResult("CONTRACT-1", true, false, "AGENT-1", 48_000, null));
 
@@ -36,6 +40,9 @@ public sealed class ContractMutationHandlerTests
         var agents = Substitute.For<IAgentRepository>();
         var bus = Substitute.For<IMessageBus>();
 
+        contracts.FindAsync("CONTRACT-1", Arg.Any<CancellationToken>())
+            .Returns(new ContractDto("CONTRACT-1", "COSMIC", "PROCUREMENT", true, false, null, null));
+
         port.FulfillContractAsync("CONTRACT-1", Arg.Any<CancellationToken>())
             .Returns(new ContractActionResult("CONTRACT-1", true, true, "AGENT-1", 60_000, null));
 
@@ -52,6 +59,9 @@ public sealed class ContractMutationHandlerTests
         var contracts = Substitute.For<IContractRepository>();
         var ships = Substitute.For<IShipRepository>();
         var bus = Substitute.For<IMessageBus>();
+
+        contracts.FindAsync("CONTRACT-1", Arg.Any<CancellationToken>())
+            .Returns(new ContractDto("CONTRACT-1", "COSMIC", "PROCUREMENT", true, false, null, null));
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100));

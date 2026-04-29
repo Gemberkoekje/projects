@@ -124,6 +124,43 @@ public sealed record ContractAcceptedEvent
     }
 }
 
+public sealed record ContractNegotiatedEvent
+{
+    public required string ContractId { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractNegotiatedEvent(string ContractId, string ShipSymbol)
+    {
+        this.ContractId = ContractId;
+        this.ShipSymbol = ShipSymbol;
+    }
+}
+
+public sealed record ContractDeliveryRecordedEvent
+{
+    public required string ContractId { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required int UnitsDelivered { get; init; }
+
+    public required string DestinationWaypoint { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ContractDeliveryRecordedEvent(string ContractId, string ShipSymbol, string TradeSymbol, int UnitsDelivered, string DestinationWaypoint)
+    {
+        this.ContractId = ContractId;
+        this.ShipSymbol = ShipSymbol;
+        this.TradeSymbol = TradeSymbol;
+        this.UnitsDelivered = UnitsDelivered;
+        this.DestinationWaypoint = DestinationWaypoint;
+    }
+}
+
 public sealed record ContractDeadlineApproachingEvent
 {
     public required string ContractId { get; init; }

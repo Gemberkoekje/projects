@@ -55,7 +55,8 @@ public sealed class ShipDockedIdleEventHandler(
             ship.SystemSymbol ?? @event.SystemSymbol,
             ship.WaypointSymbol ?? @event.WaypointSymbol,
             @event.CorrelationId,
-            @event.EventId);
+            @event.EventId,
+            command.RequiredUnits);
 
         logger.LogInformation(
             "{Handler}: ship {Ship} planned as {AssignmentType}.",

@@ -1,8 +1,102 @@
+using System.Text.Json;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Services;
+
+public interface IContractObjectivePlanner
+{
+    Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken);
+}
+
+public sealed class ContractObjectivePlanner(
+    IContractRepository contracts,
+    IMarketRepository markets) : IContractObjectivePlanner
+{
+    public async Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        var activeContracts = await contracts.GetActiveAsync(cancellationToken);
+        var activeContract = activeContracts
+            .Where(c => c.IsAccepted && !c.IsFulfilled)
+            .OrderBy(c => c.TermsDeadline ?? c.Expiration ?? DateTimeOffset.MaxValue)
+            .FirstOrDefault();
+
+        if (activeContract is null)
+        {
+            return null;
+        }
+
+        var deliverable = DeserializeDeliverables(activeContract.DeliverablesJson)
+            .FirstOrDefault(d => d.UnitsRequired > d.UnitsFulfilled);
+
+        if (deliverable is null)
+        {
+            return null;
+        }
+
+        var remainingUnits = deliverable.UnitsRequired - deliverable.UnitsFulfilled;
+        var originWaypoint = await ResolveOriginWaypointAsync(ship, deliverable.TradeSymbol, cancellationToken);
+
+        return new AssignShipCommand(
+            ship.Symbol,
+            "Contract",
+            OriginWaypoint: originWaypoint,
+            DestWaypoint: deliverable.DestinationSymbol,
+            CargoSymbol: deliverable.TradeSymbol,
+            ContractId: activeContract.Id,
+            RequiredUnits: remainingUnits);
+    }
+
+    private async Task<string> ResolveOriginWaypointAsync(ShipModel ship, string tradeSymbol, CancellationToken cancellationToken)
+    {
+        var cargoUnits = ship.CargoInventory?
+            .FirstOrDefault(i => i.Symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase))?
+            .Units ?? 0;
+
+        if (cargoUnits > 0 && !string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            return ship.WaypointSymbol;
+        }
+
+        var marketSnapshots = await markets.GetAllSnapshotsAsync(cancellationToken);
+        var sameSystemMatch = marketSnapshots.FirstOrDefault(snapshot =>
+            string.Equals(snapshot.SystemSymbol, ship.SystemSymbol, StringComparison.OrdinalIgnoreCase) &&
+            SupportsTradeSymbol(snapshot, tradeSymbol));
+
+        if (sameSystemMatch is not null)
+        {
+            return sameSystemMatch.WaypointSymbol;
+        }
+
+        var anyMatch = marketSnapshots.FirstOrDefault(snapshot => SupportsTradeSymbol(snapshot, tradeSymbol));
+        return anyMatch?.WaypointSymbol ?? ship.WaypointSymbol ?? string.Empty;
+    }
+
+    private static bool SupportsTradeSymbol(MarketSnapshot snapshot, string tradeSymbol)
+        => snapshot.Exports.Any(symbol => symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase))
+           || snapshot.Exchange.Any(symbol => symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase))
+           || snapshot.Imports.Any(symbol => symbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase));
+
+    private static IReadOnlyList<ContractDeliverableDto> DeserializeDeliverables(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ContractDeliverableDto>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+}
 
 /// <summary>
 /// Plans the next assignment for a ship based on market opportunities and fleet balance.
@@ -16,15 +110,33 @@ public interface IShipAssignmentPlanner
 }
 
 /// <summary>
-/// Chooses between trading, scouting, and mining for a ship.
+/// Chooses between contract work, trading, scouting, and mining for a ship.
 /// </summary>
 public sealed class ShipAssignmentPlanner(
+    IContractObjectivePlanner contractObjectives,
     ITradeOpportunityRepository tradeOpportunities,
     ISettingsRepository settings,
     IShipAssignmentRepository assignments,
     IWaypointRepository waypoints,
     IShipRepository ships) : IShipAssignmentPlanner
 {
+    private sealed class NoopContractObjectivePlanner : IContractObjectivePlanner
+    {
+        public Task<AssignShipCommand?> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
+            => Task.FromResult<AssignShipCommand?>(null);
+    }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipAssignmentPlanner(
+        ITradeOpportunityRepository tradeOpportunities,
+        ISettingsRepository settings,
+        IShipAssignmentRepository assignments,
+        IWaypointRepository waypoints,
+        IShipRepository ships)
+        : this(new NoopContractObjectivePlanner(), tradeOpportunities, settings, assignments, waypoints, ships)
+    {
+    }
+
     private const string MineAssignmentType = "Mine";
     private const string ScoutAssignmentType = "Scout";
     private const string TradeAssignmentType = "Trade";
@@ -32,6 +144,12 @@ public sealed class ShipAssignmentPlanner(
 
     public async Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
     {
+        var contractAssignment = await contractObjectives.PlanAsync(ship, cancellationToken);
+        if (contractAssignment is not null)
+        {
+            return contractAssignment;
+        }
+
         var minProfit = await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken);
         var maxDistance = await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken);
         var miningShipPercentage = await settings.GetAsync<decimal>("Automation.MiningShipPercentage", cancellationToken);
