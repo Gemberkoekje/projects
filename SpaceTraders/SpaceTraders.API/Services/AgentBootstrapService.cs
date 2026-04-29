@@ -2,6 +2,8 @@ using System.Net;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SpaceTraders.API.Configuration;
+using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
@@ -9,6 +11,7 @@ using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Exceptions;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Accounts;
+using Wolverine;
 
 namespace SpaceTraders.API.Services;
 
@@ -20,7 +23,8 @@ public sealed class AgentBootstrapService(
     IServiceScopeFactory serviceScopeFactory,
     IAgentTokenProvider agentTokenProvider,
     IOptions<SpaceTradersBootstrapOptions> options,
-    ILogger<AgentBootstrapService> logger) : IHostedService
+    ILogger<AgentBootstrapService> logger,
+    IMessageBus bus) : IHostedService
 {
     private const string AgentTokenKey = "AgentToken";
 
@@ -28,6 +32,7 @@ public sealed class AgentBootstrapService(
     private readonly IAgentTokenProvider _agentTokenProvider = agentTokenProvider;
     private readonly SpaceTradersBootstrapOptions _options = options.Value;
     private readonly ILogger<AgentBootstrapService> _logger = logger;
+    private readonly IMessageBus _bus = bus;
 
     /// <inheritdoc />
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -68,6 +73,9 @@ public sealed class AgentBootstrapService(
             _logger.LogWarning(
                 "{Source} agent token is no longer valid after a SpaceTraders reset; registering a new agent.",
                 source);
+
+            await SetTokenResetMismatchRuntimeFlagAsync(cancellationToken);
+            await _bus.PublishAsync(new TokenResetMismatchDetectedEvent(source));
             return false;
         }
 
@@ -126,6 +134,11 @@ public sealed class AgentBootstrapService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await DefaultSettingsSeed.SeedAsync(dbContext, cancellationToken);
+
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        await settings.SetAsync("Runtime.TokenResetMismatchDetected", "false", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.TokenResetMismatch", "false", cancellationToken);
+
         await AgentTokenSelection.SetActiveTokenAsync(dbContext, token, cancellationToken);
         _agentTokenProvider.Set(token);
     }
@@ -144,6 +157,14 @@ public sealed class AgentBootstrapService(
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
 
         return await AgentTokenSelection.GetLatestAgentTokenAsync(dbContext, cancellationToken);
+    }
+
+    private async Task SetTokenResetMismatchRuntimeFlagAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = _serviceScopeFactory.CreateAsyncScope();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        await settings.SetAsync("Runtime.TokenResetMismatchDetected", "true", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.TokenResetMismatch", "true", cancellationToken);
     }
 
     private async Task RegisterNewAgentAsync(CancellationToken cancellationToken)
@@ -269,8 +290,14 @@ public sealed class AgentBootstrapService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await DefaultSettingsSeed.SeedAsync(dbContext, cancellationToken);
+
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
+        await settings.SetAsync("Runtime.TokenResetMismatchDetected", "false", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.TokenResetMismatch", "false", cancellationToken);
+
         await AgentTokenSelection.SetActiveTokenAsync(dbContext, registration.Token, cancellationToken);
         _agentTokenProvider.Set(registration.Token);
+
         _logger.LogInformation("Registered new SpaceTraders agent {AgentSymbol}.", registration.Agent.Symbol);
     }
 }

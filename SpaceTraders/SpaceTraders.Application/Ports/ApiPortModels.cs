@@ -26,6 +26,38 @@ public sealed record AgentModel
     }
 }
 
+public sealed record ServerStatusModel
+{
+    public required string Status { get; init; }
+
+    public required string Version { get; init; }
+
+    public string? ResetDateRaw { get; init; }
+
+    public DateTimeOffset? ResetDate { get; init; }
+
+    public string? NextResetRaw { get; init; }
+
+    public DateTimeOffset? NextResetAt { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ServerStatusModel(
+        string Status,
+        string Version,
+        string? ResetDateRaw,
+        DateTimeOffset? ResetDate,
+        string? NextResetRaw,
+        DateTimeOffset? NextResetAt)
+    {
+        this.Status = Status;
+        this.Version = Version;
+        this.ResetDateRaw = ResetDateRaw;
+        this.ResetDate = ResetDate;
+        this.NextResetRaw = NextResetRaw;
+        this.NextResetAt = NextResetAt;
+    }
+}
+
 public sealed record NavModel
 {
     public required string Status { get; init; }

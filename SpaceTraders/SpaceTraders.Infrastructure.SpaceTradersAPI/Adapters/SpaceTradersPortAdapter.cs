@@ -9,6 +9,18 @@ namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Adapters;
 
 public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISpaceTradersPort
 {
+    public async Task<ServerStatusModel> GetStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var status = await client.GetStatusAsync(cancellationToken);
+        return new ServerStatusModel(
+            status.Status,
+            status.Version,
+            status.ResetDate,
+            TryParseDate(status.ResetDate),
+            status.ServerResets?.Next,
+            TryParseDate(status.ServerResets?.Next));
+    }
+
     public async Task<AgentModel> GetMyAgentAsync(CancellationToken cancellationToken = default)
     {
         var agent = await client.GetMyAgentAsync(cancellationToken);
@@ -372,6 +384,9 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
         var lastDash = waypointSymbol.LastIndexOf('-');
         return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
+
+    private static DateTimeOffset? TryParseDate(string? raw)
+        => DateTimeOffset.TryParse(raw, out var parsed) ? parsed : null;
 
     private static AgentModel MapAgent(Models.Agents.Agent agent) =>
         new(agent.Symbol, agent.AccountId, agent.Headquarters, agent.Credits, agent.StartingFaction, agent.ShipCount);

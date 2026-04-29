@@ -9,6 +9,39 @@
     <p class="text-muted mb-0">Foundation phase read-only overview from the local cache.</p>
 </div>
 
+@if (Model.AlertApiUnavailable || Model.AlertTokenResetMismatch || Model.AlertCacheDivergence || Model.AlertAutomationDisabled || Model.AlertContractDeadlinesApproaching || Model.AlertResetUpcoming)
+{
+    <div class="alert alert-warning" role="alert">
+        <h5 class="mb-2">Operational Alerts</h5>
+        <ul class="mb-0">
+            @if (Model.AlertApiUnavailable)
+            {
+                <li>SpaceTraders API is currently unavailable.</li>
+            }
+            @if (Model.AlertTokenResetMismatch)
+            {
+                <li>Token reset mismatch detected; operator verification recommended.</li>
+            }
+            @if (Model.AlertCacheDivergence)
+            {
+                <li>Cache divergence detected between local state and expected freshness.</li>
+            }
+            @if (Model.AlertAutomationDisabled)
+            {
+                <li>Automation is currently disabled.</li>
+            }
+            @if (Model.AlertContractDeadlinesApproaching)
+            {
+                <li>One or more contract deadlines are within 6 hours.</li>
+            }
+            @if (Model.AlertResetUpcoming)
+            {
+                <li>Server reset is approaching@(string.IsNullOrWhiteSpace(Model.NextResetDisplay) ? "." : $" (next reset: {Model.NextResetDisplay}).")</li>
+            }
+        </ul>
+    </div>
+}
+
 @if (Model.Agent is null)
 {
     <div class="alert alert-info" role="alert">

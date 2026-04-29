@@ -27,9 +27,11 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
     private readonly HttpClient _client;
     private readonly HttpClient _clientWithKey;
+    private readonly SpaceTradersApiFactory _factory;
 
     public ApiIntegrationTests(SpaceTradersApiFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
         _clientWithKey = factory.CreateClient();
         _clientWithKey.DefaultRequestHeaders.Add("X-Api-Key", SpaceTradersApiFactory.TestApiKey);
@@ -95,6 +97,18 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     public async Task StatusContracts_WithValidApiKey_Returns200()
     {
         using var response = await _clientWithKey.GetAsync("/status/contracts");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task StatusSystemAlerts_WithValidApiKey_Returns200()
+    {
+        _factory.SettingsRepository.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _factory.SettingsRepository.GetRawAsync("Runtime.Reset.Next", Arg.Any<CancellationToken>())
+            .Returns(DateTimeOffset.UtcNow.AddHours(1).ToString("O"));
+
+        using var response = await _clientWithKey.GetAsync("/status/system-alerts");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -171,6 +185,16 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     public async Task StatusContracts_WithPathBaseAndValidApiKey_Returns200()
     {
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/contracts");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task StatusSystemAlerts_WithPathBaseAndValidApiKey_Returns200()
+    {
+        _factory.SettingsRepository.GetAsync<bool>(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/system-alerts");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 

@@ -159,4 +159,49 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             $"Delivered {@event.UnitsDelivered}x {@event.TradeSymbol} to {@event.DestinationWaypoint} for contract {@event.ContractId}.",
             cancellationToken: cancellationToken);
     }
+
+    public async Task Handle(ServerResetWarningEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "SYSTEM",
+            nameof(ServerResetWarningEvent),
+            $"Server reset scheduled at {@event.NextResetAt:u} (remaining: {@event.Remaining}).",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(AutomationPausedForServerResetEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "SYSTEM",
+            nameof(AutomationPausedForServerResetEvent),
+            $"Automation paused for upcoming reset at {@event.NextResetAt:u} (remaining: {@event.Remaining}).",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(AutomationResumedAfterServerResetEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "SYSTEM",
+            nameof(AutomationResumedAfterServerResetEvent),
+            $"Automation resumed after reset at {@event.ResumedAt:u}.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(TokenResetMismatchDetectedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "SYSTEM",
+            nameof(TokenResetMismatchDetectedEvent),
+            $"Token reset mismatch detected from '{@event.Source}' source.",
+            cancellationToken: cancellationToken);
+    }
+
+    public async Task Handle(CacheDivergenceDetectedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            "SYSTEM",
+            nameof(CacheDivergenceDetectedEvent),
+            @event.Summary,
+            cancellationToken: cancellationToken);
+    }
 }

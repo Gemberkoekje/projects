@@ -49,4 +49,26 @@ public sealed class AlertHandler(
             await alertNotifier.NotifyAsync("Contract Deadline Approaching", message, cancellationToken);
         }
     }
+
+    public async Task Handle(ServerResetWarningEvent @event, CancellationToken cancellationToken)
+    {
+        var message =
+            $"Server reset scheduled at {@event.NextResetAt:u} (in {(int)@event.Remaining.TotalHours}h {@event.Remaining.Minutes}m).";
+
+        logger.LogWarning("Server reset warning alert: {Message}", message);
+        await alertNotifier.NotifyAsync("Server Reset Upcoming", message, cancellationToken);
+    }
+
+    public async Task Handle(CacheDivergenceDetectedEvent @event, CancellationToken cancellationToken)
+    {
+        logger.LogWarning("Cache divergence alert: {Summary}", @event.Summary);
+        await alertNotifier.NotifyAsync("Cache Divergence Detected", @event.Summary, cancellationToken);
+    }
+
+    public async Task Handle(TokenResetMismatchDetectedEvent @event, CancellationToken cancellationToken)
+    {
+        var message = $"Token reset-date mismatch detected for '{@event.Source}' token source. Automation will re-bootstrap a valid agent token.";
+        logger.LogWarning("Token reset mismatch alert: {Message}", message);
+        await alertNotifier.NotifyAsync("Token Reset Mismatch", message, cancellationToken);
+    }
 }

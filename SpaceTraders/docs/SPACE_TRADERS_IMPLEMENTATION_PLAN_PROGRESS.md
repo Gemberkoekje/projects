@@ -21,7 +21,7 @@ Legend:
 | 5 | Navigation, fuel, jump, and exploration planning | [x] | Added navigation planning service with coordinate-based distance/fuel/time estimates and flight-mode selection, cargo-based refuel support, jump-gate connection retrieval/caching, and chart-driven scout exploration targeting. |
 | 6 | Extraction, survey, siphon, and resource logistics | [x] | Added survey persistence and survey-aware extraction, gas-giant/gas-processor siphon validation, mining/siphon assignment targeting, deposit-aware and modifier-aware asteroid prioritization, and docked cargo policies with role-loop coverage tests. |
 | 7 | Fleet outfitting, maintenance, repair, and scrapping | [x] | Added repair/scrap and mount/module install/remove API support, maintenance/outfitting policy integration in docked role handlers, maintenance planner thresholds, and role-handler command coverage updates. |
-| 8 | Reset awareness and operational reliability | [ ] | Not started. |
+| 8 | Reset awareness and operational reliability | [x] | Added reset/reliability monitor service, API/cache divergence sampling, reset-aware pause/resume with alerts, token reset mismatch signaling, status endpoint alerts, dashboard alert banner, and runbook documentation. |
 | 9 | Razor Pages dashboard expansion | [ ] | Not started. |
 | 10 | Advanced gameplay backlog | [-] | Backlog by design. |
 
@@ -88,6 +88,17 @@ Legend:
   - Added `FleetMaintenancePlanner` with configurable thresholds (`Maintenance.*`) and integrated maintenance/outfitting policy checks into docked mine/trade/scout/contract handlers.
   - Added phase-7 default settings for repair/scrap thresholds and preferred outfitting symbols in `DefaultSettingsSeed`.
   - Updated phase-focused role-handler tests for the new maintenance planner dependencies and behavior paths.
+
+### Phase 8 deliverables
+
+- [x] Operators can see and recover from resets and cache/API drift.
+  - Added `ResetAndReliabilityMonitorService` that polls server status, tracks `serverResets.next`, emits reset warning/pause/resume events, and can auto-pause/re-enable automation around reset windows.
+  - Added phase-8 runtime settings and alert flags (`Runtime.Alert.*`, `Runtime.Reset.*`, `Reliability.PauseAutomationBeforeReset`) via default settings seed.
+  - Added token reset-mismatch signaling from `AgentBootstrapService` (`TokenResetMismatchDetectedEvent` plus runtime flags) while preserving safe re-registration flow.
+  - Added divergence detection that samples cached ship nav against live API ship state and stale-sync thresholds, publishing `CacheDivergenceDetectedEvent` and dashboard/runtime flags.
+  - Extended operator alerting and activity logging for phase-8 events (`ServerResetWarningEvent`, `AutomationPausedForServerResetEvent`, `AutomationResumedAfterServerResetEvent`, `TokenResetMismatchDetectedEvent`, `CacheDivergenceDetectedEvent`).
+  - Added `/status/system-alerts` API endpoint and dashboard home-page alert banner for API unavailable, token mismatch, cache divergence, automation disabled, contract deadlines, and reset-approaching state.
+  - Added phase-8 runbook documentation in `docs/implementation/PHASE8_RESET_RECOVERY_RUNBOOK.md`.
 
 ## Phase 3 checklist
 
@@ -159,3 +170,9 @@ Goal: reliably complete the early SpaceTraders loop described in the quickstart.
   - Result: build successful.
 - `run_tests` for `ShipDockedMineEventHandlerTests`, `ShipDockedRoleHandlersTests`, and `Phase1CommandHandlerTests` during Phase 7
   - Result: 16 passed, 0 failed.
+- `run_tests` for `ResetAndReliabilityMonitorServiceTests`
+  - Result: 4 passed, 0 failed.
+- `run_tests` for `SpaceTraders.API.Tests.ApiIntegrationTests` after Phase 8 changes
+  - Result: passed including `/status/system-alerts` coverage.
+- `dotnet build SpaceTraders.slnx` after Phase 8 changes
+  - Result: build successful.

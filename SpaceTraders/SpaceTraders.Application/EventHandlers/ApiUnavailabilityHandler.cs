@@ -23,6 +23,9 @@ public sealed class ApiUnavailabilityHandler(
         logger.LogWarning("SpaceTraders API unavailable since {DetectedAt}. Disabling automation.", @event.DetectedAt);
 
         await settings.SetAsync("Automation.Enabled", "false", cancellationToken);
+        await settings.SetAsync("Runtime.ApiUnavailable", "true", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.ApiUnavailable", "true", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.AutomationDisabled", "true", cancellationToken);
 
         // Schedule a connectivity probe every 30 s until the API recovers.
         await bus.ScheduleAsync(new ApiAvailabilityProbeCommand(), ProbeInterval);
@@ -33,5 +36,8 @@ public sealed class ApiUnavailabilityHandler(
         logger.LogInformation("SpaceTraders API available again at {RestoredAt}. Re-enabling automation.", @event.RestoredAt);
 
         await settings.SetAsync("Automation.Enabled", "true", cancellationToken);
+        await settings.SetAsync("Runtime.ApiUnavailable", "false", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.ApiUnavailable", "false", cancellationToken);
+        await settings.SetAsync("Runtime.Alert.AutomationDisabled", "false", cancellationToken);
     }
 }

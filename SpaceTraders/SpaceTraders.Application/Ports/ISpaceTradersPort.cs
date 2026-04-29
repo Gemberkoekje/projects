@@ -2,6 +2,8 @@ namespace SpaceTraders.Application.Ports;
 
 public interface ISpaceTradersPort
 {
+    Task<ServerStatusModel> GetStatusAsync(CancellationToken cancellationToken = default);
+
     Task<AgentModel> GetMyAgentAsync(CancellationToken cancellationToken = default);
 
     Task<PagedResult<ShipModel>> GetMyShipsAsync(int page = 1, int limit = 20, CancellationToken cancellationToken = default);

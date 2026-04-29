@@ -81,6 +81,7 @@ builder.Services.AddHostedService<StartupRecoveryService>();
 builder.Services.AddHostedService<SettingsStartupLoggingService>();
 builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddHostedService<ContractWatchService>();
+builder.Services.AddHostedService<ResetAndReliabilityMonitorService>();
 builder.Services.AddHostedService<ActivityLogPruningService>();
 builder.Services.AddHostedService<ShipRefreshWorkerService>();
 builder.Services.AddHostedService<PrometheusMetricsService>();

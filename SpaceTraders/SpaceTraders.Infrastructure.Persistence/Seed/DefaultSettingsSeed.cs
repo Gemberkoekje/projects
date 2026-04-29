@@ -40,6 +40,19 @@ public static class DefaultSettingsSeed
         new AgentSetting { Key = "Outfitting.PreferredGasProcessor",             Value = "MODULE_GAS_PROCESSOR_I", Type = "string", Description = "Preferred gas processor module for siphon roles" },
         new AgentSetting { Key = "Outfitting.PreferredScoutSensorMount",         Value = "MOUNT_SENSOR_ARRAY_I", Type = "string",  Description = "Preferred sensor mount for scout/probe roles" },
         new AgentSetting { Key = "Outfitting.TraderCargoModule",                 Value = "MODULE_CARGO_HOLD_I", Type = "string",  Description = "Preferred cargo module for trader roles" },
+        new AgentSetting { Key = "Reliability.PauseAutomationBeforeReset",       Value = "true",                Type = "bool",    Description = "Pause automation in the final reset window and resume after reset" },
+        new AgentSetting { Key = "Runtime.Reset.Next",                            Value = "",                    Type = "string",  Description = "Last observed server reset timestamp (ISO-8601)" },
+        new AgentSetting { Key = "Runtime.Reset.Warning",                         Value = "false",               Type = "bool",    Description = "True when a near-term reset warning is active" },
+        new AgentSetting { Key = "Runtime.ApiUnavailable",                        Value = "false",               Type = "bool",    Description = "True when API probes detect upstream unavailability" },
+        new AgentSetting { Key = "Runtime.CacheDivergenceDetected",               Value = "false",               Type = "bool",    Description = "True when cache divergence health checks fail" },
+        new AgentSetting { Key = "Runtime.TokenResetMismatchDetected",            Value = "false",               Type = "bool",    Description = "True when token reset-date mismatch has been detected" },
+        new AgentSetting { Key = "Runtime.AutomationPausedByReset",               Value = "false",               Type = "bool",    Description = "True when automation was auto-paused for an imminent reset" },
+        new AgentSetting { Key = "Runtime.Alert.ApiUnavailable",                  Value = "false",               Type = "bool",    Description = "Dashboard alert: API currently unavailable" },
+        new AgentSetting { Key = "Runtime.Alert.TokenResetMismatch",              Value = "false",               Type = "bool",    Description = "Dashboard alert: token reset mismatch encountered" },
+        new AgentSetting { Key = "Runtime.Alert.CacheDivergence",                 Value = "false",               Type = "bool",    Description = "Dashboard alert: cache divergence detected" },
+        new AgentSetting { Key = "Runtime.Alert.AutomationDisabled",              Value = "false",               Type = "bool",    Description = "Dashboard alert: automation disabled" },
+        new AgentSetting { Key = "Runtime.Alert.ContractDeadlinesApproaching",    Value = "false",               Type = "bool",    Description = "Dashboard alert: contract deadlines within 6 hours" },
+        new AgentSetting { Key = "Runtime.Alert.ResetUpcoming",                   Value = "false",               Type = "bool",    Description = "Dashboard alert: server reset is approaching" },
     ];
 
     /// <summary>

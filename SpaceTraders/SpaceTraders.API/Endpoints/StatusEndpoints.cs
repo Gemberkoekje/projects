@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
 using Wolverine;
 
@@ -52,6 +53,22 @@ public static class StatusEndpoints
         {
             var result = await bus.InvokeAsync<Application.DTOs.TradeOpportunityDto?>(new GetBestTradeRouteQuery(int.MaxValue), ct);
             return result is null ? Results.NoContent() : Results.Ok(result);
+        });
+
+        group.MapGet("/system-alerts", async (ISettingsRepository settings, CancellationToken ct) =>
+        {
+            var response = new
+            {
+                ApiUnavailable = await settings.GetAsync<bool>("Runtime.Alert.ApiUnavailable", ct),
+                TokenResetMismatch = await settings.GetAsync<bool>("Runtime.Alert.TokenResetMismatch", ct),
+                CacheDivergence = await settings.GetAsync<bool>("Runtime.Alert.CacheDivergence", ct),
+                AutomationDisabled = await settings.GetAsync<bool>("Runtime.Alert.AutomationDisabled", ct),
+                ContractDeadlinesApproaching = await settings.GetAsync<bool>("Runtime.Alert.ContractDeadlinesApproaching", ct),
+                ResetUpcoming = await settings.GetAsync<bool>("Runtime.Alert.ResetUpcoming", ct),
+                NextReset = await settings.GetRawAsync("Runtime.Reset.Next", ct),
+            };
+
+            return Results.Ok(response);
         });
 
         return app;

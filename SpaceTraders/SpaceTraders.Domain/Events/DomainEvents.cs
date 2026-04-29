@@ -249,3 +249,67 @@ public sealed record ApiAvailableEvent
         this.RestoredAt = RestoredAt;
     }
 }
+
+public sealed record ServerResetWarningEvent
+{
+    public required DateTimeOffset NextResetAt { get; init; }
+
+    public required TimeSpan Remaining { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ServerResetWarningEvent(DateTimeOffset NextResetAt, TimeSpan Remaining)
+    {
+        this.NextResetAt = NextResetAt;
+        this.Remaining = Remaining;
+    }
+}
+
+public sealed record AutomationPausedForServerResetEvent
+{
+    public required DateTimeOffset NextResetAt { get; init; }
+
+    public required TimeSpan Remaining { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public AutomationPausedForServerResetEvent(DateTimeOffset NextResetAt, TimeSpan Remaining)
+    {
+        this.NextResetAt = NextResetAt;
+        this.Remaining = Remaining;
+    }
+}
+
+public sealed record AutomationResumedAfterServerResetEvent
+{
+    public required DateTimeOffset ResumedAt { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public AutomationResumedAfterServerResetEvent(DateTimeOffset ResumedAt)
+    {
+        this.ResumedAt = ResumedAt;
+    }
+}
+
+public sealed record TokenResetMismatchDetectedEvent
+{
+    public required string Source { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public TokenResetMismatchDetectedEvent(string Source)
+    {
+        this.Source = Source;
+    }
+}
+
+public sealed record CacheDivergenceDetectedEvent
+{
+    public required int MismatchCount { get; init; }
+
+    public required string Summary { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CacheDivergenceDetectedEvent(int MismatchCount, string Summary)
+    {
+        this.MismatchCount = MismatchCount;
+        this.Summary = Summary;
+    }
+}
