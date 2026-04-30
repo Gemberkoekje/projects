@@ -429,6 +429,53 @@ Build is green and the full solution test suite (Domain, Application, Infrastruc
 
 Build is green and the full solution test suite passes — 340 passed, 4 pre-existing sandbox integration tests skipped (network-gated, unrelated to this change). Phase 6 is complete; the orchestrator can now assign work from strategic goals while ship planners continue to own per-ship state transitions. Phase 7 will remove the chain-of-command infrastructure entirely.
 
+### Implementation Review Before Cleanup
+
+Reviewing the current solution against this plan shows that the cleanup phase should **not** start yet. The chain infrastructure is still carrying business behavior, not just unused legacy routing:
+
+- `ShipPlannerService` is the explicit automation entry point, but the role planners for mining, trading, contracts, and scouting still return `None` for docked ships. The remaining docked chain handlers still perform core work such as buy, sell, deliver, scout refresh, and orbit.
+- Only `DockShipCommand`, `OrbitShipCommand`, and `NavigateShipCommand` currently return `ShipCommandResult`. Other ship-owned commands used by planners still need the same accepted/rejected result shape before planner-only execution is complete.
+- `IFleetOrchestrator` and its goal evaluators are registered and unit-tested, but the orchestrator is not wired into the runtime flow. Idle docked assignment is still driven by `ShipDockedIdleEventHandler` / `IShipAssignmentPlanner`, so strategic assignment is not yet owned by the orchestrator in production.
+- Many command mismatch paths still publish only `ShipStateMismatchEvent`; planner recovery depends on the chain fallback until those paths also emit `ShipAutomationTickEvent`.
+
+Add the following rectification work before Phase 7 cleanup.
+
+#### Phase 6.5a — Standardize remaining ship-owned command results
+
+- Extend `ShipCommandResult` usage beyond dock/orbit/navigate to the ship-owned commands that can be issued by planners or command acceptors: extract, survey, siphon, refuel, buy cargo, sell cargo, deliver contract cargo, supply construction, repair, scrap, jettison cargo, jump/warp where applicable, and install/remove module or mount where local status validation applies.
+- Each handler should validate `ShipLocalStatus` before calling the SpaceTraders API, return an accepted/rejected result containing the current or updated local state, and keep publishing required factual/global events.
+- Add tests for accepted and rejected cases, especially ensuring invalid local status does not call the port and still produces planner recovery via the mismatch tick work in Phase 6.5e.
+
+#### Phase 6.5b — Complete docked planner coverage
+
+- Add planner decision kinds and executor routes for remaining docked actions: `SellCargo`, `DeliverContractCargo`, `RefuelFromCargo`, `JettisonCargo`, and any explicit "refresh docked scout/market data" action chosen for scouting side effects.
+- Move the role-specific docked behavior currently in `ShipDockedMineEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedContractEventHandler`, and `ShipDockedScoutEventHandler` into planners or planner-executed services:
+  - Mining/siphon: deliver protected contract cargo at the destination when possible; sell eligible non-protected cargo by market/settings policy; optionally jettison low-value cargo when full; refuel from sold hydrocarbons when applicable; then orbit.
+  - Trading: buy at origin, deliver matching contract cargo at destination when possible, otherwise sell assignment cargo at destination, then orbit.
+  - Contract: buy required cargo at origin, deliver it at destination, then orbit.
+  - Scout/market probe: mark visits and refresh market/shipyard data at the current waypoint; orbit for normal scouts, but keep market probes parked at their target market.
+- Keep `FuelRecoveryShipPlanner` and `MaintenanceShipPlanner` ahead of role planners so refuel/repair/scrap still preempt role work.
+- Add planner and `ShipPlannerService` tests proving docked mining, trading, contract, scout, market-probe, maintenance, and fuel-recovery ticks issue exactly one command or side-effect action.
+
+#### Phase 6.5c — Wire strategic orchestration into runtime
+
+- Add an explicit orchestrator trigger in the application flow so global state changes or scheduled ticks call `IFleetOrchestrator.EvaluateAndAssignAsync(...)` before ship-level automation ticks run.
+- Replace idle docked assignment through `ShipDockedIdleEventHandler` / `IShipAssignmentPlanner` with orchestrator-owned assignment. Idle ships should receive strategic assignments from `FleetOrchestrator`; ship planners should only execute the active assignment.
+- Decide how fleet expansion goals are executed. Either add a purchase-ship orchestration command path that respects `IBudgetPolicy`, or keep fleet expansion as an advisory goal and update the plan/tests to state that purchasing is out of scope.
+- Add integration-style tests for the recommended flow: orchestrator assigns an idle ship, a subsequent `ShipAutomationTickEvent` executes one planner command, and no low-level `Dock`/`Orbit`/`Navigate` command is issued directly by the orchestrator.
+
+#### Phase 6.5d — Prove planner-only business behavior
+
+- After docked planner coverage and orchestrator wiring are complete, disable or remove the business-effect chain handler registrations while leaving the chain infrastructure available for the cleanup phase.
+- Add regression tests that `ShipAutomationTickEventHandler` + `ShipPlannerService` cover docked, in-orbit, and in-transit decision points without invoking chain handlers.
+- Update the Phase 5 completion notes if necessary: Phase 5 should only be considered fully correct once chain handlers no longer carry business behavior.
+
+#### Phase 6.5e — Replace state-mismatch recovery before deleting fallback handlers
+
+- When any command publishes `ShipStateMismatchEvent`, also publish `ShipAutomationTickEvent` with the same ship symbol and causal metadata so the planner reasserts the next valid action.
+- Add tests for representative mismatch paths across docked and in-orbit commands.
+- Once covered, `ShipStateMismatchEventHandler` should be a removable legacy fallback rather than required behavior.
+
 ### Phase 7: Remove Chain-of-Command Infrastructure
 
 The remaining cleanup spans many files (legacy chain types, bridge handler, derived events, command publishers, DI, tests, analyzer). To keep each step small, build-green, and reviewable, Phase 7 is split into seven subphases. Each subphase ends with a green build + full test run + a single commit.
@@ -444,7 +491,7 @@ Goal at end of Phase 7:
 
 #### Phase 7a — Retire `ShipStateMismatchEvent` chain fallback
 
-- Replace the legacy `ShipStateMismatchEventHandler` (which docks if in orbit, otherwise issues `AssignShipCommand` Idle) with the same behavior driven directly by the command publisher path. Concretely: when a command publishes `ShipStateMismatchEvent`, also publish `ShipAutomationTickEvent` so the planner reasserts the ship's correct next step.
+- Verify Phase 6.5e is complete: every command path that publishes `ShipStateMismatchEvent` also publishes `ShipAutomationTickEvent`, so planner recovery no longer depends on the chain fallback.
 - Delete `ShipStateMismatchEventHandler.cs` and remove its DI registration.
 - Remove the `ShipStateMismatchEvent` overload from `ChainOfCommandBridgeHandler`.
 - Keep `ShipStateMismatchEvent` itself for now (still factual + logged via `LogActivityHandler`); it loses `ChainOfCommandEvent` inheritance only in 7e.
