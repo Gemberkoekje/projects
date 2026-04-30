@@ -375,6 +375,17 @@ Test-host stabilization (Phase 4 prerequisite) ✅
 - Route state changes to a single ship automation handler.
 - Remove chain priorities from business behavior.
 
+Phase 5a — Single ship automation handler + explicit automation event ✅ COMPLETE
+
+- Added `ShipAutomationTickEvent` in `SpaceTraders.Domain/Events/Ships/ShipAutomationTickEvent.cs`. The event is intentionally **not** derived from `ChainOfCommandEvent`: it is the explicit, factual automation entry point that replaces inheritance-based routing (e.g. `ShipArrivedEvent` being upcast to `ShipInOrbitEvent`). It carries only ship symbol, an optional reason, and standard correlation/causation/occurred-at metadata; the authoritative ship state is loaded by the handler.
+- Added `ShipAutomationTickEventHandler` in `SpaceTraders.Application/EventHandlers/ShipAutomationTickEventHandler.cs`. This is the **single ship automation handler** for the new flow: it delegates to `IShipPlannerService.PlanAndExecuteAsync(...)` so exactly one command (or none) is issued per decision point. No chain priorities are involved; planner ordering inside `ShipPlannerService` is the only precedence (cross-cutting planners preempt role planners as established in Phase 4b).
+- Tests: `tests/SpaceTraders.Application.Tests/EventHandlers/ShipAutomationTickEventHandlerTests.cs` covers (1) delegation to `IShipPlannerService` and (2) a structural assertion that `ShipAutomationTickEvent` is **not** a subclass of `ChainOfCommandEvent`, locking in the Phase 5 "no inheritance-based routing" rule for this event.
+
+The legacy `ChainOfCommandBridgeHandler`, `ChainOfCommandDispatcher`, and chain handler registrations remain in place so existing flows (e.g. `ShipArrivedEvent` upcast to `ShipInOrbitEvent`, `ShipUndockedEvent`/`ShipIdleDockedEvent`/`ShipRefueledEvent`/`ShipAssignmentTypeSetEvent` upcast to their bases) keep working untouched. Phase 5b will start migrating publishers (`GameLoopService`, `DockShipCommand`, `OrbitShipCommand`, `ShipInTransitEventHandler`, `StartupRecoveryService`) to publish `ShipAutomationTickEvent` instead of relying on chain-routed base events. Phase 7 will then remove the chain infrastructure entirely.
+
+Phase 5b — Migrate publishers to the explicit automation event ⏳ PENDING
+Phase 5c — Retire chain priorities from business behavior ⏳ PENDING
+
 ### Phase 6: Build Orchestrator Goal Evaluation
 
 - Add goal models for contracts, construction, market coverage, and fleet expansion.
