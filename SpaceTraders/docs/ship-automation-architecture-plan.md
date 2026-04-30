@@ -405,12 +405,29 @@ Phase 5c — Retire chain priorities from business behavior ✅ COMPLETE
 
 Build is green and the full solution test suite (Domain, Application, Infrastructure, API) passes — 323 passed, 4 pre-existing sandbox integration tests skipped (network-gated, unrelated to this change). Phase 5 is now fully complete; chain priorities no longer influence business behavior, and DI registration is the only explicit ordering left in the chain dispatcher. Phase 7 will remove the chain infrastructure entirely.
 
-### Phase 6: Build Orchestrator Goal Evaluation
+### Phase 6: Build Orchestrator Goal Evaluation ✅ COMPLETE
 
-- Add goal models for contracts, construction, market coverage, and fleet expansion.
-- Add capacity estimation for mining, hauling, trading, and scouting.
-- Add budget policy with reserved credits.
-- Add assignment generation from goals.
+- Goal models for contracts, construction, market coverage, and fleet expansion.
+  - Added `SpaceTraders.Application/Orchestration/OrchestrationModels.cs` with `FleetGoalKind` (`None`, `Contract`, `Construction`, `MarketCoverage`, `FleetExpansion`), the `FleetGoal` record (kind, description, priority, contract id, trade symbol, origin/destination waypoints, remaining units, deadline, estimated cost), `FleetCapacityEstimate`, and `BudgetDecision`.
+- Capacity estimation for mining, hauling, trading, and scouting.
+  - Added `SpaceTraders.Application/Orchestration/FleetCapacityEstimator.cs` (`IFleetCapacityEstimator`/`FleetCapacityEstimator`) which loads ships and active assignments and classifies each ship as mining (`Mine`/`Siphon`), hauling (`Contract`/`Builder`), trading (`Trade`), scouting (`Scout`/`MarketProbe`), or idle (no assignment / `Idle`). Returns total/idle ship counts and total/idle cargo capacity for orchestrator decisions.
+- Budget policy with reserved credits.
+  - Added `SpaceTraders.Application/Orchestration/BudgetPolicy.cs` (`IBudgetPolicy`/`BudgetPolicy`) which reads the `FleetExpansion.MinCreditReserve` setting, computes spendable credits from the agent's balance, and returns a `BudgetDecision` indicating whether a proposed cost can be afforded without breaching the reserve.
+- Assignment generation from goals.
+  - Added `SpaceTraders.Application/Orchestration/FleetGoalEvaluators.cs` with four evaluators implementing `IFleetGoalEvaluator`:
+    - `ContractGoalEvaluator` walks active accepted contracts and emits one `FleetGoalKind.Contract` per unfulfilled deliverable, carrying contract id, trade symbol, destination, remaining units, and deadline.
+    - `ConstructionGoalEvaluator` walks incomplete construction sites and emits one `FleetGoalKind.Construction` per material with remaining units, carrying trade symbol and site waypoint.
+    - `MarketCoverageGoalEvaluator` enumerates known markets across the systems with active ships and emits `FleetGoalKind.MarketCoverage` for any market not already covered by an active `MarketProbe` assignment.
+    - `FleetExpansionGoalEvaluator` consults `IFleetCapacityEstimator`, `IBudgetPolicy`, the `FleetExpansion.MaxShips` setting, and the agent's ship count to emit `FleetGoalKind.FleetExpansion` only when there are no idle ships, the fleet cap is not reached, and there are spendable credits.
+  - Added `SpaceTraders.Application/Orchestration/FleetOrchestrator.cs` (`IFleetOrchestrator`/`FleetOrchestrator`) as the high-level orchestrator. `EvaluateAndAssignAsync(...)` aggregates goals from all evaluators, sorts by priority then deadline, builds the set of idle ships from `IShipAssignmentRepository`, picks one ship per goal (preferring ships with cargo+fuel for contracts/construction and fuel for market coverage), and emits exactly one `AssignShipCommand` per ship via `IMessageBus.SendAsync(...)`. The orchestrator never issues low-level ship commands such as `Dock`, `Orbit`, or `Navigate`; ship planners still own those decisions. Fleet expansion goals intentionally do not produce an `AssignShipCommand` (assignment shape will be handled by the existing `FleetExpansionDecisionHandler` and future iterations).
+- DI registration: `IFleetCapacityEstimator`, `IBudgetPolicy`, all four `IFleetGoalEvaluator` implementations, and `IFleetOrchestrator` are registered in `SpaceTraders.Application/DependencyInjection.cs` under a new Phase 6 block.
+- Tests:
+  - `tests/SpaceTraders.Application.Tests/Orchestration/FleetCapacityEstimatorTests.cs` covers ship classification by assignment type and idle handling for unassigned ships.
+  - `tests/SpaceTraders.Application.Tests/Orchestration/BudgetPolicyTests.cs` covers spend below spendable, rejection when reserve would be breached, and zero-cost auto-approval.
+  - `tests/SpaceTraders.Application.Tests/Orchestration/FleetGoalEvaluatorTests.cs` covers contract deliverable parsing (and skipping fulfilled/unaccepted contracts), construction material remaining-units logic, market coverage gap detection, and fleet expansion suppression at the fleet cap, when idle ships exist, and emission when affordable with no idle ships.
+  - `tests/SpaceTraders.Application.Tests/Orchestration/FleetOrchestratorTests.cs` covers contract-goal assignment, priority ordering across multiple evaluators, skipping busy ships, market-coverage assignment, and the rule that fleet-expansion goals do not emit `AssignShipCommand`.
+
+Build is green and the full solution test suite passes — 340 passed, 4 pre-existing sandbox integration tests skipped (network-gated, unrelated to this change). Phase 6 is complete; the orchestrator can now assign work from strategic goals while ship planners continue to own per-ship state transitions. Phase 7 will remove the chain-of-command infrastructure entirely.
 
 ### Phase 7: Remove Chain-of-Command Infrastructure
 

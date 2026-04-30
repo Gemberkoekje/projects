@@ -78,6 +78,17 @@ public static class DependencyInjection
         services.AddScoped<Planning.IShipPlanner, Planning.BuilderShipPlanner>();
         services.AddScoped<Planning.IShipPlannerService, Planning.ShipPlannerService>();
 
+        // Phase 6: orchestrator goal evaluation. The orchestrator owns strategic goals,
+        // capacity estimation, and budget policy. It assigns work to ships via
+        // AssignShipCommand and never issues low-level ship commands directly.
+        services.AddScoped<Orchestration.IFleetCapacityEstimator, Orchestration.FleetCapacityEstimator>();
+        services.AddScoped<Orchestration.IBudgetPolicy, Orchestration.BudgetPolicy>();
+        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.ContractGoalEvaluator>();
+        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.ConstructionGoalEvaluator>();
+        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketCoverageGoalEvaluator>();
+        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.FleetExpansionGoalEvaluator>();
+        services.AddScoped<Orchestration.IFleetOrchestrator, Orchestration.FleetOrchestrator>();
+
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
