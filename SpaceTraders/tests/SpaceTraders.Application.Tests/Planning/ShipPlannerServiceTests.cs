@@ -35,12 +35,27 @@ public sealed class ShipPlannerServiceTests
         docked = Substitute.For<IDockedCommandAcceptor>();
         bus = Substitute.For<IMessageBus>();
 
+        var constructions = Substitute.For<IConstructionRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+        waypoints.GetBySystemAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns([]);
+        var maintenance = Substitute.For<IFleetMaintenancePlanner>();
+        maintenance.DecideAsync(Arg.Any<ShipModel>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new FleetMaintenanceDecision(ShouldRepair: false, ShouldScrap: false, AvoidLongRoutes: false));
+
         return new ShipPlannerService(
             planners,
             shipsRepo,
             assignmentsRepo,
             surveysRepo,
             navigation,
+            constructions,
+            waypoints,
+            markets,
+            maintenance,
             inOrbit,
             docked,
             bus,

@@ -326,9 +326,9 @@ Orchestrator reacts to global events or next tick
 
 DI: `Planning.IShipPlanner` -> `Planning.MiningShipPlanner` and `Planning.IShipPlannerService` -> `Planning.ShipPlannerService` are registered in `SpaceTraders.Application/DependencyInjection.cs`.
 
-### Phase 4: Move Role Logic Out of Chain Handlers 🟡 IN PROGRESS
+### Phase 4: Move Role Logic Out of Chain Handlers ✅ COMPLETE
 
-Migrate role-specific chain handlers into planners. Phase 4a covers the orbit-time roles whose decisions map cleanly onto the existing `ShipPlannerCommandKind` set (`Dock` / `Orbit` / `Navigate` / `AssignIdle` / `PatchFlightMode`). Phase 4b will introduce the new command kinds (supply, refuel, chart, refresh, repair, scrap) needed by the remaining roles before migrating them.
+Migrate role-specific chain handlers into planners. Phase 4a covered the orbit-time roles whose decisions map cleanly onto the existing `ShipPlannerCommandKind` set (`Dock` / `Orbit` / `Navigate` / `AssignIdle` / `PatchFlightMode`). Phase 4b introduced the new command kinds (`SupplyConstruction`, `Refuel`, `BuyCargo`, `Repair`, `Scrap`) needed by the remaining roles and migrated the cross-cutting fuel-recovery and maintenance branches plus the builder/construction role into planners.
 
 Phase 4a — Orbit role planners ✅ COMPLETE
 
@@ -346,13 +346,24 @@ Phase 4a — Orbit role planners ✅ COMPLETE
 
 DI: `TradingShipPlanner`, `ContractShipPlanner`, and `ScoutingShipPlanner` are registered alongside `MiningShipPlanner` as `IShipPlanner` in `SpaceTraders.Application/DependencyInjection.cs`. The legacy chain handlers (`ShipInOrbitTraderEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitScoutEventHandler`) remain registered so the chain-of-command flow still drives runtime behavior; they will be retired in Phase 5 once `ShipPlannerService` is the active automation entry point.
 
-Phase 4b — Pending role planners
+Phase 4b — Cross-cutting + builder planners ✅ COMPLETE
 
-- Builder/construction planner — needs new planner command kinds (e.g. `Supply`, `Reload`, `Chart`) before migration.
-- Fuel recovery planner — needs new command kinds for fuel-market routing and dock-to-refuel.
-- Maintenance planner — will likely wrap the existing `IFleetMaintenancePlanner` decision service; needs `Repair` / `Scrap` command kinds.
+- Decision/context model expanded
+  - `SpaceTraders.Application/Planning/ShipPlannerDecision.cs` adds `ShipPlannerCommandKind` members `SupplyConstruction`, `Refuel`, `BuyCargo`, `Repair`, and `Scrap`, plus payload properties (`TradeSymbol`, `Units`, `SystemSymbol`, `WaypointSymbol`) and matching factory methods.
+  - `SpaceTraders.Application/Planning/IShipPlanner.cs` extends `ShipPlannerContext` with `FuelMarketWaypoint`, `CurrentWaypointSellsFuel`, `Maintenance` (`FleetMaintenanceDecision`), and `ConstructionComplete`.
+- Planner-service refactor
+  - `SpaceTraders.Application/Planning/ShipPlannerService.cs` now resolves fuel-market data from `IWaypointRepository`/`IMarketRepository`, queries `IFleetMaintenancePlanner` for docked ships, checks construction completion via `IConstructionRepository`, and evaluates all matching planners in registration order — using the first non-`None` decision so cross-cutting planners can preempt role planners. `ExecuteAsync` translates the new decision kinds into `IInOrbitCommandAcceptor.SupplyConstructionAsync`, `IDockedCommandAcceptor.RefuelAsync` / `BuyCargoAsync` / `RepairAsync` / `ScrapAsync` calls.
+- Fuel recovery planner ✅
+  - Added `SpaceTraders.Application/Planning/FuelRecoveryShipPlanner.cs` mirroring `ShipInOrbitFuelRecoveryEventHandler`. Patches DRIFT for fuel-less or critically low ships, navigates to the nearest known fuel market, docks at the fuel market, and refuels when docked at a fuel-selling waypoint. Returns `None` when fuel is acceptable so the role planner runs.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/FuelRecoveryShipPlannerTests.cs`.
+- Maintenance planner ✅
+  - Added `SpaceTraders.Application/Planning/MaintenanceShipPlanner.cs` wrapping `IFleetMaintenancePlanner`. Issues `Scrap` (with precedence) or `Repair` for docked ships when the maintenance decision flags it; returns `None` otherwise.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/MaintenanceShipPlannerTests.cs`.
+- Builder/construction planner ✅
+  - Added `SpaceTraders.Application/Planning/BuilderShipPlanner.cs` mirroring `ShipInOrbitBuilderEventHandler`/`ShipDockedBuilderEventHandler`. Handles the full construction loop: idle when site is complete or assignment is missing metadata, docked buy/orbit cycle, in-orbit `SupplyConstruction` at the site, and navigation between origin and construction site based on cargo state.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/BuilderShipPlannerTests.cs`.
 
-After each Phase 4b role is migrated, the corresponding chain handler registration will be removed or disabled.
+DI: `FuelRecoveryShipPlanner` and `MaintenanceShipPlanner` are registered before the role planners (`MiningShipPlanner`, `TradingShipPlanner`, `ContractShipPlanner`, `ScoutingShipPlanner`, `BuilderShipPlanner`) in `SpaceTraders.Application/DependencyInjection.cs` so they can preempt role decisions while remaining composable. The legacy chain handlers stay registered until Phase 5 retires the chain-of-command flow.
 
 Test-host stabilization (Phase 4 prerequisite) ✅
 - `SpaceTraders.API/Program.cs` now skips Postgres-backed startup work when `ASPNETCORE_ENVIRONMENT=Testing`: the database initializer call, `UseResourceSetupOnStartup()`, and the Wolverine Postgres persistence configuration are all gated. This unblocks `WebApplicationFactory<Program>` integration tests and the strict DI validation host so the full solution test suite is green.

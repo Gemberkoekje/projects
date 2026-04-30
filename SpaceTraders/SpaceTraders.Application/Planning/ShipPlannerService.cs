@@ -31,6 +31,10 @@ public sealed class ShipPlannerService(
     IShipAssignmentRepository assignments,
     ISurveyRepository surveys,
     INavigationPlanningService navigationPlanning,
+    IConstructionRepository constructions,
+    IWaypointRepository waypoints,
+    IMarketRepository markets,
+    IFleetMaintenancePlanner maintenance,
     IInOrbitCommandAcceptor inOrbitCommands,
     IDockedCommandAcceptor dockedCommands,
     IMessageBus bus,
@@ -51,14 +55,29 @@ public sealed class ShipPlannerService(
             return ShipPlannerDecision.None(shipSymbol, "Ship has no active assignment.");
         }
 
-        var planner = planners.FirstOrDefault(p => p.CanPlan(ship, assignment));
-        if (planner is null)
+        var matchingPlanners = planners.Where(p => p.CanPlan(ship, assignment)).ToArray();
+        if (matchingPlanners.Length == 0)
         {
             return ShipPlannerDecision.None(shipSymbol, $"No planner registered for assignment '{assignment.AssignmentType}'.");
         }
 
         var context = await BuildContextAsync(ship, assignment, cancellationToken);
-        var decision = planner.Plan(ship, assignment, context);
+
+        // Phase 4b: planners are evaluated in registration order. Cross-cutting planners
+        // (fuel recovery, maintenance) are registered first so they can preempt the role
+        // planner; if they return None the next matching planner is consulted.
+        ShipPlannerDecision decision = ShipPlannerDecision.None(shipSymbol, "No planner produced a command.");
+        foreach (var planner in matchingPlanners)
+        {
+            var candidate = planner.Plan(ship, assignment, context);
+            if (candidate.Kind != ShipPlannerCommandKind.None)
+            {
+                decision = candidate;
+                break;
+            }
+
+            decision = candidate;
+        }
 
         await ExecuteAsync(ship, assignment, decision, cancellationToken);
         return decision;
@@ -84,11 +103,70 @@ public sealed class ShipPlannerService(
             }
         }
 
+        var fuelMarket = string.Empty;
+        var currentSellsFuel = false;
+        if (!string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        {
+            (fuelMarket, currentSellsFuel) = await ResolveFuelContextAsync(ship, cancellationToken);
+        }
+
+        FleetMaintenanceDecision? maintenanceDecision = null;
+        if (ship.LocalStatus == Domain.Enums.ShipLocalStatus.Docked)
+        {
+            maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
+        }
+
+        var constructionComplete = false;
+        if (assignment.AssignmentType.Equals("Builder", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(assignment.DestWaypoint))
+        {
+            var site = await constructions.FindAsync(assignment.DestWaypoint, cancellationToken);
+            constructionComplete = site is not null && site.IsComplete;
+        }
+
         return new ShipPlannerContext
         {
             ActiveSurveyCount = activeSurveys,
             RecommendedFlightMode = recommendedFlightMode,
+            FuelMarketWaypoint = fuelMarket,
+            CurrentWaypointSellsFuel = currentSellsFuel,
+            Maintenance = maintenanceDecision,
+            ConstructionComplete = constructionComplete,
         };
+    }
+
+    private async Task<(string FuelMarket, bool CurrentSellsFuel)> ResolveFuelContextAsync(
+        ShipModel ship,
+        CancellationToken cancellationToken)
+    {
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol!, cancellationToken);
+        if (systemWaypoints.Count == 0)
+        {
+            return (string.Empty, false);
+        }
+
+        var marketWaypoints = systemWaypoints
+            .Where(w => w.HasMarket)
+            .Select(w => w.Symbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (marketWaypoints.Count == 0)
+        {
+            return (string.Empty, false);
+        }
+
+        var snapshots = await markets.GetAllSnapshotsAsync(cancellationToken);
+        var fuelSellingMarkets = snapshots
+            .Where(s => s.SystemSymbol.Equals(ship.SystemSymbol, StringComparison.OrdinalIgnoreCase))
+            .Where(s => marketWaypoints.Contains(s.WaypointSymbol))
+            .Where(s => s.TradeGoods.Any(g => g.Symbol.Equals("FUEL", StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        var fuelMarket = fuelSellingMarkets.FirstOrDefault()?.WaypointSymbol ?? string.Empty;
+        var currentSellsFuel = !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
+            && fuelSellingMarkets.Any(s => s.WaypointSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase));
+
+        return (fuelMarket, currentSellsFuel);
     }
 
     private static string ResolveNavigationTarget(ShipModel ship, ShipAssignmentDto assignment)
@@ -152,6 +230,34 @@ public sealed class ShipPlannerService(
                     "Idle",
                     SystemSymbol: ship.SystemSymbol ?? string.Empty,
                     WaypointSymbol: ship.WaypointSymbol ?? string.Empty), cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.SupplyConstruction:
+                await inOrbitCommands.SupplyConstructionAsync(
+                    decision.ShipSymbol,
+                    decision.SystemSymbol,
+                    decision.WaypointSymbol,
+                    decision.TradeSymbol,
+                    decision.Units,
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.Refuel:
+                await dockedCommands.RefuelAsync(decision.ShipSymbol, fromCargo: false, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.BuyCargo:
+                await dockedCommands.BuyCargoAsync(decision.ShipSymbol, decision.TradeSymbol, decision.Units, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.Repair:
+                await dockedCommands.RepairAsync(decision.ShipSymbol, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.Scrap:
+                await dockedCommands.ScrapAsync(decision.ShipSymbol, cancellationToken);
                 return;
         }
     }

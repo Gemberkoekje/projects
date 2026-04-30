@@ -33,6 +33,21 @@ public enum ShipPlannerCommandKind
 
     /// <summary>Patch the ship nav flight mode to <see cref="ShipPlannerDecision.FlightMode"/> before navigating.</summary>
     PatchFlightMode,
+
+    /// <summary>Phase 4b: supply construction materials at the current waypoint.</summary>
+    SupplyConstruction,
+
+    /// <summary>Phase 4b: refuel the docked ship from the local fuel market.</summary>
+    Refuel,
+
+    /// <summary>Phase 4b: buy cargo at the docked waypoint (used by the builder planner to load materials).</summary>
+    BuyCargo,
+
+    /// <summary>Phase 4b: repair the docked ship at the local shipyard.</summary>
+    Repair,
+
+    /// <summary>Phase 4b: scrap the docked ship.</summary>
+    Scrap,
 }
 
 /// <summary>
@@ -50,6 +65,18 @@ public sealed record ShipPlannerDecision
     public string FlightMode { get; init; } = string.Empty;
 
     public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Phase 4b: trade good symbol for <see cref="ShipPlannerCommandKind.SupplyConstruction"/> and <see cref="ShipPlannerCommandKind.BuyCargo"/>.</summary>
+    public string TradeSymbol { get; init; } = string.Empty;
+
+    /// <summary>Phase 4b: unit count for cargo / supply commands.</summary>
+    public int Units { get; init; }
+
+    /// <summary>Phase 4b: target system symbol (used by <see cref="ShipPlannerCommandKind.SupplyConstruction"/>).</summary>
+    public string SystemSymbol { get; init; } = string.Empty;
+
+    /// <summary>Phase 4b: target waypoint symbol (used by <see cref="ShipPlannerCommandKind.SupplyConstruction"/>).</summary>
+    public string WaypointSymbol { get; init; } = string.Empty;
 
     public static ShipPlannerDecision None(string shipSymbol, string reason) => new()
     {
@@ -113,6 +140,53 @@ public sealed record ShipPlannerDecision
         ShipSymbol = shipSymbol,
         Kind = ShipPlannerCommandKind.PatchFlightMode,
         FlightMode = flightMode,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision SupplyConstruction(
+        string shipSymbol,
+        string systemSymbol,
+        string waypointSymbol,
+        string tradeSymbol,
+        int units,
+        string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.SupplyConstruction,
+        SystemSymbol = systemSymbol,
+        WaypointSymbol = waypointSymbol,
+        TradeSymbol = tradeSymbol,
+        Units = units,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision Refuel(string shipSymbol, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.Refuel,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision BuyCargo(string shipSymbol, string tradeSymbol, int units, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.BuyCargo,
+        TradeSymbol = tradeSymbol,
+        Units = units,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision Repair(string shipSymbol, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.Repair,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision Scrap(string shipSymbol, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.Scrap,
         Reason = reason,
     };
 }
