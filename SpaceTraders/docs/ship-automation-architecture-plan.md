@@ -431,13 +431,85 @@ Build is green and the full solution test suite passes — 340 passed, 4 pre-exi
 
 ### Phase 7: Remove Chain-of-Command Infrastructure
 
-Once all roles have migrated:
+The remaining cleanup spans many files (legacy chain types, bridge handler, derived events, command publishers, DI, tests, analyzer). To keep each step small, build-green, and reviewable, Phase 7 is split into seven subphases. Each subphase ends with a green build + full test run + a single commit.
 
-- Remove `IChainOfCommandEventHandler`.
-- Remove `ChainOfCommandDispatcher`.
-- Remove `ChainOfCommandBridgeHandler`.
-- Remove chain handler result types.
-- Remove derived events that exist only for routing convenience.
+Goal at end of Phase 7:
+
+- No `ChainOfCommandEvent` base type and no `IChainOfCommandEventHandler` interface.
+- No `ChainOfCommandDispatcher` / `ChainOfCommandBridgeHandler` / `ChainOfCommandHandlerResult` / `ChainOfCommandDispatchResult`.
+- No derived ship events that exist only for chain routing (`ShipArrivedEvent`, `ShipUndockedEvent`, `ShipIdleDockedEvent`, `ShipRefueledEvent`, `ShipRoleSetEvent`, `ShipAssignmentTypeSetEvent`, `ShipContractDockedEvent`).
+- `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`, `ConstructionSuppliedEvent` are plain factual records (no chain base type, no inheritance hierarchy used for routing).
+- `ShipAutomationTickEvent` is the sole automation entry point, handled by `ShipAutomationTickEventHandler` → `IShipPlannerService`.
+- Analyzer no longer encodes chain-of-command assumptions.
+
+#### Phase 7a — Retire `ShipStateMismatchEvent` chain fallback
+
+- Replace the legacy `ShipStateMismatchEventHandler` (which docks if in orbit, otherwise issues `AssignShipCommand` Idle) with the same behavior driven directly by the command publisher path. Concretely: when a command publishes `ShipStateMismatchEvent`, also publish `ShipAutomationTickEvent` so the planner reasserts the ship's correct next step.
+- Delete `ShipStateMismatchEventHandler.cs` and remove its DI registration.
+- Remove the `ShipStateMismatchEvent` overload from `ChainOfCommandBridgeHandler`.
+- Keep `ShipStateMismatchEvent` itself for now (still factual + logged via `LogActivityHandler`); it loses `ChainOfCommandEvent` inheritance only in 7e.
+- Tests: delete `ShipStateMismatchEventHandlerTests.cs`. Add a minimal unit test that a state-mismatch publication also yields a `ShipAutomationTickEvent` if not already implicit.
+
+#### Phase 7b — Replace routing-only docked derived events
+
+- Update publishers so docked-state changes only emit `ShipDockedEvent` (factual) + `ShipAutomationTickEvent` (automation):
+  - `AssignShipCommand` stops publishing `ShipAssignmentTypeSetEvent` (already publishes `ShipAssignedEvent` for downstream listeners).
+  - `RefuelShipCommand` stops publishing `ShipRefueledEvent`; the fuel state is in `ShipModel` and the planner runs via the tick.
+  - Internal `IdleShipDockedEventHandler` / role-specific docked handlers stop being invoked by removing their registrations.
+- Delete the routing-only derived events: `ShipIdleDockedEvent`, `ShipRoleSetEvent`, `ShipAssignmentTypeSetEvent`, `ShipContractDockedEvent`, `ShipRefueledEvent`.
+- Delete the docked chain handlers: `ShipDockedFuelEventHandler`, `ShipDockedBuilderEventHandler`, `ShipDockedMineEventHandler`, `ShipDockedContractEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedScoutEventHandler`, `ShipDockedIdleEventHandler`, `IdleShipDockedEventHandler`, and `ShipDockedEventHandler` (default chain handler).
+- Remove their DI registrations and the matching `ChainOfCommandBridgeHandler` overloads.
+- Remove their references from `LogActivityHandler` (or keep `ShipDockedEvent` only).
+- Tests: delete `ShipDockedEventHandlerTests`, `ShipDockedFuelEventHandlerTests`, `ShipDockedMineEventHandlerTests`, `ShipDockedRoleHandlersTests`. Update `ChainOfCommandEventHandlerRegistrationTests` to drop removed types (or delete it; the planner is now the single source of truth).
+
+#### Phase 7c — Replace routing-only orbit derived events
+
+- Publishers already emit `ShipAutomationTickEvent` for orbit-state changes. Remove the leftover `ShipUndockedEvent` / `ShipArrivedEvent` publications:
+  - `OrbitShipCommand` publishes `ShipInOrbitEvent` + `ShipAutomationTickEvent` (drop `ShipUndockedEvent`).
+  - `GameLoopService` publishes `ShipAutomationTickEvent` only (drop `ShipArrivedEvent`).
+  - `ShipInTransitEventHandler` stops creating `ShipArrivedEvent`; arrival is just `ShipAutomationTickEvent`.
+- Delete `ShipUndockedEvent` and `ShipArrivedEvent`.
+- Delete the orbit chain handlers: `ShipInOrbitFuelRecoveryEventHandler`, `ShipInOrbitScoutEventHandler`, `ShipInOrbitMineEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitTraderEventHandler`, `ShipInOrbitBuilderEventHandler`, `ShipInOrbitEventHandler`, and the legacy `ShipArrivedEventHandler` if present.
+- Remove their DI registrations and bridge overloads.
+- Tests: delete `ShipInOrbitEventHandlerTests`, `ShipInOrbitFuelRecoveryEventHandlerTests`, `ShipInOrbitMineEventHandlerTests`, `ShipUndockedEventHandlerTests`, `ShipUndockedTraderEventHandlerTests`, `ShipArrivedEventHandlerTests`.
+
+#### Phase 7d — Retire transit chain handler
+
+- Convert `ShipInTransitEventHandler` to a plain Wolverine handler (`Handle(ShipInTransitEvent, IMessageBus, CancellationToken)`); its only job is to publish/schedule `ShipAutomationTickEvent` for the arrival time.
+- Drop `IChainOfCommandEventHandler<ShipInTransitEvent>` implementation, `ChainOfCommandHandlerResult` returns, and the `#pragma warning disable CS0618` block.
+- Remove the `ShipInTransitEvent` overload from `ChainOfCommandBridgeHandler` and the corresponding DI registration.
+- Tests: update `ShipInTransitEventHandlerTests` to construct the handler with `IMessageBus` only and assert immediate vs scheduled tick publication (the existing Phase 5b assertions). Drop chain-result assertions.
+
+#### Phase 7e — Decouple remaining events from `ChainOfCommandEvent`
+
+- Make `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent` plain records (each carries its own `EventId`/`OccurredAt`/`CorrelationId`/`CausationId` directly, copied from the current base) — no shared chain base type.
+- Make `ConstructionSuppliedEvent` a plain factual event (no `ShipInOrbitEvent` base). Keep its payload (`TradeSymbol`, `UnitsSupplied`, `IsComplete`, ship/system/waypoint identifiers).
+- Update `SupplyConstructionCommand` constructor call accordingly.
+- Update `LogActivityHandler` overloads to match the new (non-derived) event shapes.
+- Update `ShipChainEventsTests` (rename to `ShipEventsTests`) to assert factual payload preservation only — no inheritance assertions.
+
+#### Phase 7f — Delete chain infrastructure
+
+- Delete `SpaceTraders.Application/Events/Handlers/IChainOfCommandEventHandler.cs`.
+- Delete `SpaceTraders.Application/Events/Handlers/ChainOfCommandHandlerResult.cs`.
+- Delete `SpaceTraders.Application/Events/Dispatching/IChainOfCommandDispatcher.cs`.
+- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatcher.cs`.
+- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatchResult.cs`.
+- Delete `SpaceTraders.Application/EventHandlers/ChainOfCommandBridgeHandler.cs`.
+- Delete `SpaceTraders.Domain/Events/ChainOfCommandEvent.cs`.
+- Remove all chain DI registrations from `SpaceTraders.Application/DependencyInjection.cs`.
+- Delete `tests/SpaceTraders.Application.Tests/Events/Dispatching/ChainOfCommandDispatcherTests.cs` and any remaining `ChainOfCommandEventHandlerRegistrationTests` / `ShipEventHandlerConventionTests` content (or rewrite to assert "no `IChainOfCommandEventHandler` types exist" as a regression guard).
+
+#### Phase 7g — Update analyzer + final cleanup
+
+- Update `SpaceTraders.Analyzers/StateTransitionEventOutsideCommandHandlerAnalyzer.cs` to drop:
+  - `IChainOfCommandEventHandler<T>` references in handler-allowance checks.
+  - `ChainOfCommandEvent` base-type checks.
+  - Naming rules tied to the removed top-level chain events.
+  - Replace with simple "state-transition events may only be constructed inside command handlers or test code" rules using the new flat event list (`ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`).
+- Update analyzer tests accordingly.
+- Run full solution build + full test run; fix any straggling references.
+- Update this plan to mark Phase 7 ✅ COMPLETE with a summary, then commit.
 
 ## Testing Strategy
 
