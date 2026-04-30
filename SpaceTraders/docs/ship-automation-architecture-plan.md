@@ -326,19 +326,36 @@ Orchestrator reacts to global events or next tick
 
 DI: `Planning.IShipPlanner` -> `Planning.MiningShipPlanner` and `Planning.IShipPlannerService` -> `Planning.ShipPlannerService` are registered in `SpaceTraders.Application/DependencyInjection.cs`.
 
-### Phase 4: Move Role Logic Out of Chain Handlers
+### Phase 4: Move Role Logic Out of Chain Handlers 🟡 IN PROGRESS
 
-Migrate role-specific chain handlers into planners:
+Migrate role-specific chain handlers into planners. Phase 4a covers the orbit-time roles whose decisions map cleanly onto the existing `ShipPlannerCommandKind` set (`Dock` / `Orbit` / `Navigate` / `AssignIdle` / `PatchFlightMode`). Phase 4b will introduce the new command kinds (supply, refuel, chart, refresh, repair, scrap) needed by the remaining roles before migrating them.
 
-- Mining planner
-- Trading planner
-- Scouting planner
-- Contract planner
-- Builder/construction planner
-- Fuel recovery planner
-- Maintenance planner
+Phase 4a — Orbit role planners ✅ COMPLETE
 
-After each role is migrated, remove or disable the corresponding chain handler registration.
+- Mining planner ✅ (Phase 3)
+  - `SpaceTraders.Application/Planning/MiningShipPlanner.cs`.
+- Trading planner ✅
+  - Added `SpaceTraders.Application/Planning/TradingShipPlanner.cs` mirroring the destination resolution and dock/navigate/idle decisions of `ShipInOrbitTraderEventHandler`. Cargo-aware destination selection (sell when carrying cargo, otherwise return to buy origin), DRIFT patching for fuel-less ships, and recommended-flight-mode patching reuse the same `ShipPlannerContext` shape as the mining planner.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/TradingShipPlannerTests.cs` covering assignment matching, transit/docked no-ops, dock-at-buy, dock-at-sell, navigate-to-sell, navigate-to-buy, assign-idle when no waypoints are configured, DRIFT patch for zero fuel-capacity ships, and recommended-mode patch.
+- Contract planner ✅
+  - Added `SpaceTraders.Application/Planning/ContractShipPlanner.cs` mirroring the cargo-aware delivery/origin decision of `ShipInOrbitContractEventHandler`. The planner inspects `ShipModel.CargoInventory` for the contract good and routes to the delivery waypoint when carrying it, otherwise back to origin to load.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/ContractShipPlannerTests.cs` covering assignment matching, transit no-op, dock at load, navigate to delivery when carrying cargo, dock at delivery, assign-idle without waypoints, and DRIFT patch.
+- Scouting planner ✅
+  - Added `SpaceTraders.Application/Planning/ScoutingShipPlanner.cs` for the `Scout` and `MarketProbe` assignment types. Side effects in the legacy handler (waypoint visit marking, market refresh, shipyard refresh, chart creation) intentionally remain in `ShipInOrbitScoutEventHandler` so the planner stays pure; the planner only chooses the next dock / navigate / idle / DRIFT-patch command based on `assignment.OriginWaypoint` as the scout target.
+  - Tests: `tests/SpaceTraders.Application.Tests/Planning/ScoutingShipPlannerTests.cs` covering both assignment types, transit no-op, dock-at-target, navigate-when-away, assign-idle without target, and DRIFT patch.
+
+DI: `TradingShipPlanner`, `ContractShipPlanner`, and `ScoutingShipPlanner` are registered alongside `MiningShipPlanner` as `IShipPlanner` in `SpaceTraders.Application/DependencyInjection.cs`. The legacy chain handlers (`ShipInOrbitTraderEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitScoutEventHandler`) remain registered so the chain-of-command flow still drives runtime behavior; they will be retired in Phase 5 once `ShipPlannerService` is the active automation entry point.
+
+Phase 4b — Pending role planners
+
+- Builder/construction planner — needs new planner command kinds (e.g. `Supply`, `Reload`, `Chart`) before migration.
+- Fuel recovery planner — needs new command kinds for fuel-market routing and dock-to-refuel.
+- Maintenance planner — will likely wrap the existing `IFleetMaintenancePlanner` decision service; needs `Repair` / `Scrap` command kinds.
+
+After each Phase 4b role is migrated, the corresponding chain handler registration will be removed or disabled.
+
+Test-host stabilization (Phase 4 prerequisite) ✅
+- `SpaceTraders.API/Program.cs` now skips Postgres-backed startup work when `ASPNETCORE_ENVIRONMENT=Testing`: the database initializer call, `UseResourceSetupOnStartup()`, and the Wolverine Postgres persistence configuration are all gated. This unblocks `WebApplicationFactory<Program>` integration tests and the strict DI validation host so the full solution test suite is green.
 
 ### Phase 5: Replace Chain Dispatch With Explicit Automation Events
 

@@ -49,7 +49,10 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.Enrich.FromLogContext();
     cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
 });
-builder.Host.UseResourceSetupOnStartup();
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Host.UseResourceSetupOnStartup();
+}
 
 builder.Services
     .AddApplication(opts => ConfigureWolverine(opts, builder.Configuration, builder.Environment))
@@ -102,9 +105,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+if (!app.Environment.IsEnvironment("Testing"))
+{
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
     await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext);
+}
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
@@ -134,6 +141,12 @@ static void ConfigureWolverine(
     }
 
     options.Durability.DurabilityAgentEnabled = false;
+
+    if (environment.IsEnvironment("Testing"))
+    {
+        // Do not connect to Postgres in test/DI-validation hosts; keep in-memory message persistence.
+        return;
+    }
 
     options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
     options.PersistMessagesWithPostgresql(connectionString, "wolverine")

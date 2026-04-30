@@ -67,6 +67,9 @@ public static class DependencyInjection
         // ShipPlannerService loads context and dispatches a single command per decision via
         // the existing command acceptors so it can coexist with the chain-of-command handlers.
         services.AddScoped<Planning.IShipPlanner, Planning.MiningShipPlanner>();
+        services.AddScoped<Planning.IShipPlanner, Planning.TradingShipPlanner>();
+        services.AddScoped<Planning.IShipPlanner, Planning.ContractShipPlanner>();
+        services.AddScoped<Planning.IShipPlanner, Planning.ScoutingShipPlanner>();
         services.AddScoped<Planning.IShipPlannerService, Planning.ShipPlannerService>();
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
