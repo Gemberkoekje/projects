@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -27,7 +28,10 @@ public sealed class NavigateShipHandler(
     IMessageBus bus,
     ILogger<NavigateShipHandler> logger)
 {
-    public async Task Handle(NavigateShipCommand command, CancellationToken cancellationToken)
+    public Task Handle(NavigateShipCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(NavigateShipCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
             "CommandHandler {Handler}: {Command} for ship {Symbol} to {Destination}.",
@@ -37,7 +41,9 @@ public sealed class NavigateShipHandler(
             command.DestinationWaypoint);
 
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.InOrbit)
         {
             var now = TimeProvider.System.GetUtcNow();
             await bus.PublishAsync(new ShipStateMismatchEvent(
@@ -55,7 +61,11 @@ public sealed class NavigateShipHandler(
                 command.ShipSymbol,
                 command.DestinationWaypoint,
                 ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
         var nowNavigate = TimeProvider.System.GetUtcNow();
@@ -86,6 +96,17 @@ public sealed class NavigateShipHandler(
                 command.ShipSymbol,
                 command.DestinationWaypoint,
                 result.Nav.ArrivesAt);
+
+            return new ShipCommandResult(
+                command.ShipSymbol,
+                ShipLocalStatusMapper.FromApiStatus(result.Nav.Status),
+                result.Nav.SystemSymbol,
+                result.Nav.WaypointSymbol,
+                ArrivesAt: result.Nav.ArrivesAt ?? nowNavigate,
+                FuelCurrent: result.Fuel?.Current ?? ship?.FuelCurrent ?? 0,
+                FuelCapacity: result.Fuel?.Capacity ?? ship?.FuelCapacity ?? 0,
+                CargoCurrent: ship?.CargoCurrent ?? 0,
+                CargoCapacity: ship?.CargoCapacity ?? 0);
         }
         catch (Exception exception) when (LooksLikeNotInOrbitError(exception))
         {
@@ -104,6 +125,12 @@ public sealed class NavigateShipHandler(
                 "Skipping navigation for ship {Symbol} to {Waypoint}: upstream rejected command because ship is not in orbit.",
                 command.ShipSymbol,
                 command.DestinationWaypoint);
+
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                ShipLocalStatus.Docked,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
         catch (Exception exception) when (LooksLikeInsufficientFuelError(exception))
         {
@@ -114,6 +141,12 @@ public sealed class NavigateShipHandler(
                 command.DestinationWaypoint);
 
             await bus.SendAsync(new DockShipCommand(command.ShipSymbol));
+
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
     }
 

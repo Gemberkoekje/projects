@@ -296,12 +296,17 @@ Orchestrator reacts to global events or next tick
   - `ShipModel.LocalStatus` is a computed property derived from the existing `Status` string; all existing string-based code remains compatible.
   - `StartupRecoveryService` updated to use `LocalStatus` instead of raw string comparisons.
 
-### Phase 2: Standardize Ship Command Results
+### Phase 2: Standardize Ship Command Results ✅ COMPLETE
 
 - Add a shared ship command result model.
+  - Added `ShipCommandResult` record in `SpaceTraders.Application/Commands/Ships/ShipCommandResult.cs` carrying ship symbol, `ShipLocalStatus`, system/waypoint, arrival time, fuel, cargo, and an `Accepted` flag with a `Rejected` factory.
 - Update command handlers such as `DockShipCommand`, `OrbitShipCommand`, and `NavigateShipCommand` to return the updated ship state.
+  - `DockShipHandler`, `OrbitShipHandler`, and `NavigateShipHandler` now expose `ExecuteAsync(...)` returning `Task<ShipCommandResult>`. The Wolverine `Handle(...)` entry point delegates to `ExecuteAsync` so the existing message bus contract (returning `Task`) is unchanged.
 - Ensure commands validate against local status before calling the API.
+  - All three handlers validate against `ShipLocalStatus` (Docked/InOrbit) instead of the raw `Status` string. On mismatch they publish `ShipStateMismatchEvent` and return a rejected `ShipCommandResult` reflecting the current state without calling the port.
 - Keep publishing existing events temporarily for compatibility.
+  - `ShipDockedEvent`, `ShipUndockedEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`, and `RefreshSystemDataCommand` continue to be published exactly as before so existing chain handlers remain functional during the migration.
+- Tests: added `ShipCommandResultTests` covering accepted/rejected cases for `DockShipHandler`, `OrbitShipHandler`, and `NavigateShipHandler`. All existing `NavigateShipHandlerTests` still pass.
 
 ### Phase 3: Add Ship Planner Boundary
 

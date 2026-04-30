@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -23,7 +24,10 @@ public sealed class OrbitShipHandler(
     IMessageBus bus,
     ILogger<OrbitShipHandler> logger)
 {
-    public async Task Handle(OrbitShipCommand command, CancellationToken cancellationToken)
+    public Task Handle(OrbitShipCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(OrbitShipCommand command, CancellationToken cancellationToken)
     {
         logger.LogInformation(
             "CommandHandler {Handler}: {Command} for ship {Symbol}.",
@@ -32,7 +36,9 @@ public sealed class OrbitShipHandler(
             command.ShipSymbol);
 
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.Docked)
         {
             var now = TimeProvider.System.GetUtcNow();
             await bus.PublishAsync(new ShipStateMismatchEvent(
@@ -46,7 +52,11 @@ public sealed class OrbitShipHandler(
                 now));
 
             logger.LogWarning("Skipping orbit for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
         var nav = await port.OrbitShipAsync(command.ShipSymbol, cancellationToken);
@@ -71,5 +81,16 @@ public sealed class OrbitShipHandler(
             nameof(OrbitShipCommand),
             command.ShipSymbol,
             nav.WaypointSymbol);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            ShipLocalStatusMapper.FromApiStatus(nav.Status),
+            nav.SystemSymbol,
+            nav.WaypointSymbol,
+            ArrivesAt: nav.ArrivesAt ?? default,
+            FuelCurrent: ship?.FuelCurrent ?? 0,
+            FuelCapacity: ship?.FuelCapacity ?? 0,
+            CargoCurrent: ship?.CargoCurrent ?? 0,
+            CargoCapacity: ship?.CargoCapacity ?? 0);
     }
 }
