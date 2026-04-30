@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
+using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
 
@@ -22,27 +24,93 @@ public sealed class RemoveModuleHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
     IAgentRepository agents,
+    IWaypointRepository waypoints,
+    IMessageBus bus,
     ILogger<RemoveModuleHandler> logger)
 {
-    public async Task Handle(RemoveModuleCommand command, CancellationToken cancellationToken)
+    public Task Handle(RemoveModuleCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(RemoveModuleCommand command, CancellationToken cancellationToken)
     {
+        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.Docked)
+        {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(RemoveModuleCommand),
+                "DOCKED_AT_SHIPYARD",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be docked at a shipyard waypoint before removing a module.");
+
+            logger.LogWarning("Skipping remove module for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
+        }
+
+        if (string.IsNullOrWhiteSpace(ship!.WaypointSymbol))
+        {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(RemoveModuleCommand),
+                "DOCKED_AT_SHIPYARD",
+                "DOCKED_AT_UNKNOWN_WAYPOINT",
+                "Ship waypoint is unknown, cannot validate shipyard.");
+
+            logger.LogWarning("Skipping remove module for ship {Symbol}: ship waypoint unknown.", command.ShipSymbol);
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship.SystemSymbol ?? string.Empty,
+                string.Empty);
+        }
+
+        var waypoint = await waypoints.FindAsync(ship.WaypointSymbol, cancellationToken);
+        if (waypoint?.HasShipyard != true)
+        {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(RemoveModuleCommand),
+                "DOCKED_AT_SHIPYARD",
+                "DOCKED_AT_NON_SHIPYARD_WAYPOINT",
+                "Ship is not docked at a shipyard waypoint.");
+
+            logger.LogWarning("Skipping remove module for ship {Symbol}: waypoint {Waypoint} is not a shipyard.", command.ShipSymbol, ship.WaypointSymbol);
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol);
+        }
+
         var result = await port.RemoveModuleAsync(command.ShipSymbol, command.ModuleSymbol, cancellationToken);
 
         await agents.UpsertAsync(result.Agent, cancellationToken);
 
-        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (ship is not null)
+        var updated = ship with
         {
-            var updated = ship with
-            {
-                ModulesJson = result.ModulesJson,
-                CargoCurrent = result.Cargo.Units,
-                CargoCapacity = result.Cargo.Capacity,
-                CargoInventory = result.Cargo.Inventory,
-            };
-            await ships.UpsertAsync(updated, cancellationToken);
-        }
+            ModulesJson = result.ModulesJson,
+            CargoCurrent = result.Cargo.Units,
+            CargoCapacity = result.Cargo.Capacity,
+            CargoInventory = result.Cargo.Inventory,
+        };
+        await ships.UpsertAsync(updated, cancellationToken);
 
         logger.LogInformation("Removed module {Module} from ship {Ship} for {Cost} credits.", command.ModuleSymbol, command.ShipSymbol, result.Cost);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            currentStatus,
+            ship.SystemSymbol ?? string.Empty,
+            ship.WaypointSymbol,
+            FuelCurrent: ship.FuelCurrent,
+            FuelCapacity: ship.FuelCapacity,
+            CargoCurrent: result.Cargo.Units,
+            CargoCapacity: result.Cargo.Capacity);
     }
 }

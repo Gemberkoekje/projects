@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -26,25 +27,30 @@ public sealed class WarpShipHandler(
     IMessageBus bus,
     ILogger<WarpShipHandler> logger)
 {
-    public async Task Handle(WarpShipCommand command, CancellationToken cancellationToken)
+    public Task Handle(WarpShipCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(WarpShipCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.InOrbit)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(WarpShipCommand),
                 "IN_ORBIT",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be in orbit to warp.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be in orbit to warp.");
 
             logger.LogWarning("Skipping warp for ship {Symbol}: expected IN_ORBIT but was {Status}.",
                 command.ShipSymbol, ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
         var nowWarp = TimeProvider.System.GetUtcNow();
@@ -53,7 +59,7 @@ public sealed class WarpShipHandler(
 
         var inTransitEvent = new ShipInTransitEvent(
             command.ShipSymbol,
-            ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
+            ship!.WaypointSymbol ?? result.Nav.WaypointSymbol,
             command.DestinationWaypoint,
             result.Nav.ArrivesAt ?? nowWarp,
             Guid.Empty,
@@ -64,5 +70,16 @@ public sealed class WarpShipHandler(
 
         logger.LogInformation("Ship {Symbol} warping to {Waypoint}, arrives at {Arrival}.",
             command.ShipSymbol, command.DestinationWaypoint, result.Nav.ArrivesAt);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            ShipLocalStatusMapper.FromApiStatus(result.Nav.Status),
+            result.Nav.SystemSymbol,
+            result.Nav.WaypointSymbol,
+            ArrivesAt: result.Nav.ArrivesAt ?? nowWarp,
+            FuelCurrent: result.Fuel?.Current ?? ship.FuelCurrent,
+            FuelCapacity: result.Fuel?.Capacity ?? ship.FuelCapacity,
+            CargoCurrent: ship.CargoCurrent,
+            CargoCapacity: ship.CargoCapacity);
     }
 }

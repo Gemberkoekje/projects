@@ -45,16 +45,12 @@ public sealed class NavigateShipHandler(
 
         if (currentStatus != ShipLocalStatus.InOrbit)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(NavigateShipCommand),
                 "IN_ORBIT",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be in orbit before navigation.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be in orbit before navigation.");
 
             logger.LogWarning(
                 "Skipping navigation for ship {Symbol} to {Waypoint}: expected IN_ORBIT but was {Status}.",
@@ -110,15 +106,12 @@ public sealed class NavigateShipHandler(
         }
         catch (Exception exception) when (LooksLikeNotInOrbitError(exception))
         {
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(NavigateShipCommand),
                 "IN_ORBIT",
                 "DOCKED",
-                "Navigation was rejected by API because ship is not in orbit.",
-                Guid.Empty,
-                Guid.Empty,
-                nowNavigate));
+                "Navigation was rejected by API because ship is not in orbit.");
 
             logger.LogWarning(
                 exception,

@@ -40,16 +40,12 @@ public sealed class OrbitShipHandler(
 
         if (currentStatus != ShipLocalStatus.Docked)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(OrbitShipCommand),
                 "DOCKED",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be docked before orbiting.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be docked before orbiting.");
 
             logger.LogWarning("Skipping orbit for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
             return ShipCommandResult.Rejected(
