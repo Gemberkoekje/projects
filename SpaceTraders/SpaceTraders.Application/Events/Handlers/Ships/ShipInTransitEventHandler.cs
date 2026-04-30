@@ -9,7 +9,6 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 /// </summary>
 public sealed class ShipInTransitEventHandler(IMessageBus bus) : IChainOfCommandEventHandler<ShipInTransitEvent>
 {
-    public int Priority => 90;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInTransitEvent @event, CancellationToken cancellationToken)
     {

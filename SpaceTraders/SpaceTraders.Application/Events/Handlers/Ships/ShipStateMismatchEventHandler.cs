@@ -10,7 +10,6 @@ public sealed class ShipStateMismatchEventHandler(
     IInOrbitCommandAcceptor inOrbitCommands,
     IMessageBus bus) : IChainOfCommandEventHandler<ShipStateMismatchEvent>
 {
-    public int Priority => 1000;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipStateMismatchEvent @event, CancellationToken cancellationToken)
     {

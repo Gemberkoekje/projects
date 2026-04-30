@@ -13,7 +13,7 @@ namespace SpaceTraders.Application.Tests.Events.Dispatching;
 public sealed class ChainOfCommandDispatcherTests
 {
     [Fact]
-    public async Task DispatchAsync_UsesPriorityOrder_AndStopsAtFirstHandled()
+    public async Task DispatchAsync_UsesRegistrationOrder_AndStopsAtFirstHandled()
     {
         var bus = Substitute.For<IMessageBus>();
         var tracker = new CallTracker();
@@ -136,7 +136,6 @@ public sealed class ChainOfCommandDispatcherTests
 
     private sealed class SkipUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
     {
-        public int Priority => 100;
 
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
         {
@@ -147,7 +146,6 @@ public sealed class ChainOfCommandDispatcherTests
 
     private sealed class HandleUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
     {
-        public int Priority => 200;
 
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
         {
@@ -159,7 +157,6 @@ public sealed class ChainOfCommandDispatcherTests
 
     private sealed class LateUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
     {
-        public int Priority => 300;
 
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
         {
@@ -170,7 +167,6 @@ public sealed class ChainOfCommandDispatcherTests
 
     private sealed class HandleWithoutNextDockedHandler : IChainOfCommandEventHandler<ShipDockedEvent>
     {
-        public int Priority => 100;
 
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
             => Task.FromResult(ChainOfCommandHandlerResult.Handled());
@@ -178,7 +174,6 @@ public sealed class ChainOfCommandDispatcherTests
 
     private sealed class ScheduleArrivalHandler(IInTransitCommandAcceptor inTransit) : IChainOfCommandEventHandler<ShipInTransitEvent>
     {
-        public int Priority => 100;
 
         public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInTransitEvent @event, CancellationToken cancellationToken)
         {

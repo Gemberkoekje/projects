@@ -22,7 +22,6 @@ public sealed class ShipInOrbitMineEventHandler(
     IMessageBus bus,
     ILogger<ShipInOrbitMineEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
-    public int Priority => 60;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
     {

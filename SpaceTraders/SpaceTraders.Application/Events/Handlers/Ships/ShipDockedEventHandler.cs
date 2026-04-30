@@ -14,7 +14,6 @@ public sealed class ShipDockedEventHandler(
     IMessageBus bus,
     ILogger<ShipDockedEventHandler> logger) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 1000;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {

@@ -18,7 +18,6 @@ public sealed class ShipDockedTraderEventHandler(
     IFleetMaintenancePlanner maintenance,
     IDockedCommandAcceptor dockedCommands) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 200;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {

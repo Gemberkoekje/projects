@@ -395,7 +395,15 @@ Phase 5b — Migrate publishers to the explicit automation event ✅ COMPLETE
 
 The legacy chain handlers (`ShipArrivedEventHandler`, `ShipInOrbitEventHandler`, `ShipDockedEventHandler`, `ShipUndockedEventHandler`, etc.) and the `ChainOfCommandBridgeHandler` remain registered, so the chain-of-command flow continues to drive runtime behavior while planner-driven behavior is validated. Phase 5c will retire chain priorities from business behavior, and Phase 7 will remove the chain infrastructure entirely.
 
-Phase 5c — Retire chain priorities from business behavior ⏳ PENDING
+Phase 5c — Retire chain priorities from business behavior ✅ COMPLETE
+
+- Removed the `Priority` property from `IChainOfCommandEventHandler<TEvent>` (`SpaceTraders.Application/Events/Handlers/IChainOfCommandEventHandler.cs`). The interface now only exposes `HandleAsync(...)`; chain handlers no longer carry per-handler priority constants and cannot influence dispatch order from the business layer.
+- Removed the `public int Priority => N;` overrides from every chain handler implementation in `SpaceTraders.Application/Events/Handlers/Ships/`: `ShipDockedFuelEventHandler`, `ShipDockedBuilderEventHandler`, `ShipDockedMineEventHandler`, `ShipDockedContractEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedScoutEventHandler`, `ShipDockedIdleEventHandler`, `ShipDockedEventHandler`, `ShipInOrbitFuelRecoveryEventHandler`, `ShipInOrbitScoutEventHandler`, `ShipInOrbitMineEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitTraderEventHandler`, `ShipInOrbitEventHandler`, `ShipInTransitEventHandler`, and `ShipStateMismatchEventHandler`.
+- `ChainOfCommandDispatcher` (`SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatcher.cs`) no longer sorts handlers by `Priority`; it iterates handlers in DI registration order. Registration order in `SpaceTraders.Application/DependencyInjection.cs` was reordered for the `ShipInOrbitEvent` (Fuel → Scout → Mine → Contract → Trader → Default) and `ShipDockedEvent` (Fuel → Builder → Mine → Contract → Trader → Scout → Idle → Default) chains so the previous priority-driven order is preserved as the new explicit registration order. Comments in `DependencyInjection.cs` document that DI order IS the chain order.
+- Tests updated:
+  - `tests/SpaceTraders.Application.Tests/Events/Dispatching/ChainOfCommandDispatcherTests.cs` renamed `DispatchAsync_UsesPriorityOrder_AndStopsAtFirstHandled` to `DispatchAsync_UsesRegistrationOrder_AndStopsAtFirstHandled` and stripped the `Priority` overrides from all internal stub handlers (`SkipUndockedHandler`, `HandleUndockedHandler`, `LateUndockedHandler`, `HandleWithoutNextDockedHandler`, `ScheduleArrivalHandler`).
+
+Build is green and the full solution test suite (Domain, Application, Infrastructure, API) passes — 323 passed, 4 pre-existing sandbox integration tests skipped (network-gated, unrelated to this change). Phase 5 is now fully complete; chain priorities no longer influence business behavior, and DI registration is the only explicit ordering left in the chain dispatcher. Phase 7 will remove the chain infrastructure entirely.
 
 ### Phase 6: Build Orchestrator Goal Evaluation
 

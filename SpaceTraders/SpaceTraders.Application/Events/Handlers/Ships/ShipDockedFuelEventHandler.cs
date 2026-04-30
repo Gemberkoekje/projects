@@ -14,7 +14,6 @@ public sealed class ShipDockedFuelEventHandler(
     IDockedCommandAcceptor dockedCommands,
     ILogger<ShipDockedFuelEventHandler> logger) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 10;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {

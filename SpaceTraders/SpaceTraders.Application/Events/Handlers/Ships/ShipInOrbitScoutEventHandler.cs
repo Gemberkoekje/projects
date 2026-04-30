@@ -21,7 +21,6 @@ public sealed class ShipInOrbitScoutEventHandler(
     IMessageBus bus,
     ILogger<ShipInOrbitScoutEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
-    public int Priority => 50;
     private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)

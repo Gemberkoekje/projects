@@ -15,7 +15,6 @@ public sealed class ShipInOrbitEventHandler(
     IInOrbitCommandAcceptor inOrbitCommands,
     ILogger<ShipInOrbitEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
-    public int Priority => 1000;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
     {

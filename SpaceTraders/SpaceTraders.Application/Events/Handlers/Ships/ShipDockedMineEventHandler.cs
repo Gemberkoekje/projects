@@ -20,7 +20,6 @@ public sealed class ShipDockedMineEventHandler(
     IDockedCommandAcceptor dockedCommands,
     IMessageBus bus) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 100;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {

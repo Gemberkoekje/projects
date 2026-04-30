@@ -17,7 +17,6 @@ public sealed class ShipDockedScoutEventHandler(
     IShipyardRefreshService shipyards,
     IDockedCommandAcceptor dockedCommands) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 300;
     private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)

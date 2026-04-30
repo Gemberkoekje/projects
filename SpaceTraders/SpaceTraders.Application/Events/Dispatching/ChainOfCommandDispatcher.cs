@@ -18,7 +18,6 @@ public sealed class ChainOfCommandDispatcher(
         where TEvent : ChainOfCommandEvent
     {
         var handlers = serviceProvider.GetServices<IChainOfCommandEventHandler<TEvent>>()
-            .OrderBy(h => h.Priority)
             .ToList();
 
         if (handlers.Count == 0)

@@ -82,12 +82,13 @@ public static class DependencyInjection
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
 
-        // In-orbit event handlers (consolidated)
+        // In-orbit event handlers (consolidated). Registration order is the only ordering;
+        // chain handler `Priority` was retired in Phase 5c, so DI order IS the chain order.
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitFuelRecoveryEventHandler>();
-        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
-        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitContractEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitEventHandler>();
 
         // Undocked event handlers (ShipUndockedEvent is a state transition to in-orbit)
@@ -99,17 +100,15 @@ public static class DependencyInjection
         // State mismatch handler
         services.AddScoped<IChainOfCommandEventHandler<ShipStateMismatchEvent>, ShipStateMismatchEventHandler>();
 
-        // Docked event handlers (consolidated)
+        // Docked event handlers (consolidated). Registration order is the chain order.
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedFuelEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedMineEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedContractEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedTraderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedScoutEventHandler>();
-        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();
-
-        // Derived docked events (routed to docked handlers)
         services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedIdleEventHandler>();
+        services.AddScoped<IChainOfCommandEventHandler<ShipDockedEvent>, ShipDockedEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedFuelEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedBuilderEventHandler>();
         services.AddScoped<IChainOfCommandEventHandler<ShipIdleDockedEvent>, ShipDockedMineEventHandler>();

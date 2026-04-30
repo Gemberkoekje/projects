@@ -20,7 +20,6 @@ public sealed class ShipDockedIdleEventHandler(
     IMessageBus bus,
     ILogger<ShipDockedIdleEventHandler> logger) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-    public int Priority => 500;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {

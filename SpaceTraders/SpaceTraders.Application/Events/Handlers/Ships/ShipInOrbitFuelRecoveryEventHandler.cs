@@ -22,8 +22,6 @@ public sealed class ShipInOrbitFuelRecoveryEventHandler(
 {
     private const decimal CriticalFuelRatio = 0.15m;
 
-    public int Priority => 10;
-
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
