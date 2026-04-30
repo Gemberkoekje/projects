@@ -40,6 +40,24 @@ public sealed class DeliverContractHandler(
 {
     public async Task Handle(DeliverContractCommand command, CancellationToken cancellationToken)
     {
+        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
+        if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
+        {
+            var now = TimeProvider.System.GetUtcNow();
+            await bus.PublishAsync(new ShipStateMismatchEvent(
+                command.ShipSymbol,
+                nameof(DeliverContractCommand),
+                "DOCKED_AT_CONTRACT_DESTINATION",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be docked before delivering contract goods.",
+                Guid.Empty,
+                Guid.Empty,
+                now));
+
+            logger.LogWarning("Skipping contract delivery for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
+            return;
+        }
+
         var contract = await contracts.FindAsync(command.ContractId, cancellationToken);
         if (contract is null)
         {
@@ -64,24 +82,6 @@ public sealed class DeliverContractHandler(
         if (unitsToDeliver <= 0)
         {
             logger.LogInformation("Skipping contract delivery for {ContractId}: computed deliver units is 0.", command.ContractId);
-            return;
-        }
-
-        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
-        {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
-                command.ShipSymbol,
-                nameof(DeliverContractCommand),
-                "DOCKED_AT_CONTRACT_DESTINATION",
-                ship?.Status ?? "UNKNOWN",
-                "Ship must be docked before delivering contract goods.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
-
-            logger.LogWarning("Skipping contract delivery for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
             return;
         }
 

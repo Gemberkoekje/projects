@@ -44,6 +44,8 @@ public sealed class ShipUndockedEventHandlerTests
         services.AddSingleton(waypointVisit);
         services.AddSingleton(markets);
         services.AddSingleton(shipyards);
+        services.AddSingleton(Substitute.For<ISurveyRepository>());
+        services.AddSingleton(Substitute.For<INavigationPlanningService>());
         services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitScoutEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitMineEventHandler>();
         services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();

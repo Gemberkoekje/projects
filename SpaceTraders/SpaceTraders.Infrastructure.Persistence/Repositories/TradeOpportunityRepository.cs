@@ -31,6 +31,8 @@ public sealed class TradeOpportunityRepository(SpaceTradersDbContext db) : ITrad
             .OrderByDescending(t => t.RouteScore + (t.ProfitPerUnit * Math.Min(t.EffectiveTradeVolume > 0 ? t.EffectiveTradeVolume : effectiveCapacity, effectiveCapacity)))
             .ThenByDescending(t => t.SupportsSupplyChain)
             .ThenByDescending(t => t.SupplyChainDepth)
+            .ThenByDescending(t => t.ProfitPerJump)
+            .ThenByDescending(t => t.ProfitPerUnit)
             .FirstOrDefaultAsync(cancellationToken);
 
         return entity is null ? null : MapToDto(entity);

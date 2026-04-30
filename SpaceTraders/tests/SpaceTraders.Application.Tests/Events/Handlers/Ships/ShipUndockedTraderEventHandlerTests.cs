@@ -21,6 +21,7 @@ public sealed class ShipUndockedTraderEventHandlerTests
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
         var inOrbit = Substitute.For<IInOrbitCommandAcceptor>();
+        var navigation = Substitute.For<SpaceTraders.Application.Services.INavigationPlanningService>();
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new SpaceTraders.Application.DTOs.ShipAssignmentDto(
@@ -44,6 +45,7 @@ public sealed class ShipUndockedTraderEventHandlerTests
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbit);
+        services.AddSingleton(navigation);
         services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
 
         await using var provider = services.BuildServiceProvider();
@@ -66,6 +68,7 @@ public sealed class ShipUndockedTraderEventHandlerTests
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
         var inOrbit = Substitute.For<IInOrbitCommandAcceptor>();
+        var navigation = Substitute.For<SpaceTraders.Application.Services.INavigationPlanningService>();
 
         assignments.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new SpaceTraders.Application.DTOs.ShipAssignmentDto(
@@ -89,6 +92,7 @@ public sealed class ShipUndockedTraderEventHandlerTests
         services.AddSingleton(assignments);
         services.AddSingleton(ships);
         services.AddSingleton(inOrbit);
+        services.AddSingleton(navigation);
         services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, ShipInOrbitTraderEventHandler>();
 
         await using var provider = services.BuildServiceProvider();

@@ -308,12 +308,23 @@ Orchestrator reacts to global events or next tick
   - `ShipDockedEvent`, `ShipUndockedEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`, and `RefreshSystemDataCommand` continue to be published exactly as before so existing chain handlers remain functional during the migration.
 - Tests: added `ShipCommandResultTests` covering accepted/rejected cases for `DockShipHandler`, `OrbitShipHandler`, and `NavigateShipHandler`. All existing `NavigateShipHandlerTests` still pass.
 
-### Phase 3: Add Ship Planner Boundary
+### Phase 3: Add Ship Planner Boundary ✅ COMPLETE
 
 - Introduce one ship planner entry point.
+  - Added `IShipPlanner` and `ShipPlannerContext` in `SpaceTraders.Application/Planning/IShipPlanner.cs` describing the pure planner contract: `CanPlan(ship, assignment)` and `Plan(ship, assignment, context)`.
+  - Added `ShipPlannerDecision` and `ShipPlannerCommandKind` in `SpaceTraders.Application/Planning/ShipPlannerDecision.cs`. The kind enum models the single command produced by a planner (`None`, `Dock`, `Orbit`, `Navigate`, `Extract`, `Survey`, `Siphon`, `AssignIdle`, `PatchFlightMode`).
+  - Added `IShipPlannerService` / `ShipPlannerService` in `SpaceTraders.Application/Planning/ShipPlannerService.cs` as the boundary entry point. It loads the ship and assignment, selects the first matching planner, builds a `ShipPlannerContext` from `ISurveyRepository` and `INavigationPlanningService`, then dispatches exactly one command via the existing `IInOrbitCommandAcceptor`, `IDockedCommandAcceptor`, or the message bus (for `AssignShipCommand` / `PatchShipNavCommand`).
 - Move one role first, preferably mining, from chain handlers into a planner.
+  - Added `MiningShipPlanner` in `SpaceTraders.Application/Planning/MiningShipPlanner.cs` mirroring the legacy mining/siphon decision logic from `ShipInOrbitMineEventHandler` (extract/survey/siphon at origin, dock at sell destination, navigate to sell or origin, assign idle when destinations are missing, patch flight mode when DRIFT or recommended-mode changes are needed).
+  - The legacy `ShipInOrbitMineEventHandler` is intentionally kept registered so chain-of-command and planner can coexist during the migration. Phase 5 will remove the chain handler once all roles have planners.
 - Ensure the planner emits at most one command per decision.
+  - `MiningShipPlanner.Plan(...)` returns a single `ShipPlannerDecision`; the planner itself has no side effects.
+  - `ShipPlannerService.ExecuteAsync(...)` switches on `ShipPlannerCommandKind` and issues exactly one command per call, satisfying the "one decision -> one command" principle.
 - Add tests for each status and assignment combination.
+  - Added `tests/SpaceTraders.Application.Tests/Planning/MiningShipPlannerTests.cs` covering: assignment matching, in-transit/docked no-ops, survey vs extract at origin (with and without survey equipment / active surveys), siphon at siphon origin, dock at sell destination, navigate when cargo must travel, assign-idle when no destination is configured, dock at origin with empty cargo, DRIFT patching for fuel-less ships, and recommended-flight-mode patching when planning navigation.
+  - Added `tests/SpaceTraders.Application.Tests/Planning/ShipPlannerServiceTests.cs` covering: ship-not-found and missing-assignment short-circuit paths, command routing through `IInOrbitCommandAcceptor`, and that no planner match returns `None` without issuing a command.
+
+DI: `Planning.IShipPlanner` -> `Planning.MiningShipPlanner` and `Planning.IShipPlannerService` -> `Planning.ShipPlannerService` are registered in `SpaceTraders.Application/DependencyInjection.cs`.
 
 ### Phase 4: Move Role Logic Out of Chain Handlers
 

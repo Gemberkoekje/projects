@@ -24,17 +24,21 @@ public sealed class ShipInOrbitEventHandler(
         if (ship is null)
         {
             logger.LogWarning(
-                "{Handler}: Cannot load ship state for {Ship}. Marking as failed.",
+                "{Handler}: Cannot load ship state for {Ship}; ignoring fallback orbit event.",
                 nameof(ShipInOrbitEventHandler),
                 @event.ShipSymbol);
 
-            return ChainOfCommandHandlerResult.Failed(
-                $"Fallback in-orbit handler could not load ship state for {@event.ShipSymbol}.");
+            return ChainOfCommandHandlerResult.Handled();
         }
 
         if (!string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
         {
-            return ChainOfCommandHandlerResult.Skipped();
+            logger.LogDebug(
+                "{Handler}: Ship {Ship} not in orbit (status={Status}); ignoring fallback orbit event.",
+                nameof(ShipInOrbitEventHandler),
+                @event.ShipSymbol,
+                ship.Status);
+            return ChainOfCommandHandlerResult.Handled();
         }
 
         logger.LogInformation(

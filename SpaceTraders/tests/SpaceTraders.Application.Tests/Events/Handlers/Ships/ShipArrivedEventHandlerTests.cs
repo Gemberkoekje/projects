@@ -36,6 +36,8 @@ public sealed class ShipArrivedEventHandlerTests
         services.AddSingleton<IMarketRefreshService, MarketRefreshService>();
         services.AddSingleton<IShipyardRefreshService, ShipyardRefreshService>();
         services.AddSingleton<IInOrbitCommandAcceptor>(Substitute.For<IInOrbitCommandAcceptor>());
+        services.AddSingleton(Substitute.For<ISurveyRepository>());
+        services.AddSingleton(Substitute.For<INavigationPlanningService>());
         return services;
     }
 

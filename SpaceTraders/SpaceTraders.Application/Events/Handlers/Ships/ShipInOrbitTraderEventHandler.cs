@@ -78,8 +78,9 @@ public sealed class ShipInOrbitTraderEventHandler(
         else if (ShouldAdjustFlightMode(ship, destination))
         {
             var plan = await navigationPlanning.BuildPlanAsync(ship, destination, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(plan.RecommendedFlightMode) &&
-                !string.Equals(ship.FlightMode, plan.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
+            if (plan is not null
+                && !string.IsNullOrWhiteSpace(plan.RecommendedFlightMode)
+                && !string.Equals(ship.FlightMode, plan.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
             {
                 await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, plan.RecommendedFlightMode), cancellationToken);
             }
