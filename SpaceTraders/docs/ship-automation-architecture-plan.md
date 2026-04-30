@@ -383,7 +383,18 @@ Phase 5a — Single ship automation handler + explicit automation event ✅ COMP
 
 The legacy `ChainOfCommandBridgeHandler`, `ChainOfCommandDispatcher`, and chain handler registrations remain in place so existing flows (e.g. `ShipArrivedEvent` upcast to `ShipInOrbitEvent`, `ShipUndockedEvent`/`ShipIdleDockedEvent`/`ShipRefueledEvent`/`ShipAssignmentTypeSetEvent` upcast to their bases) keep working untouched. Phase 5b will start migrating publishers (`GameLoopService`, `DockShipCommand`, `OrbitShipCommand`, `ShipInTransitEventHandler`, `StartupRecoveryService`) to publish `ShipAutomationTickEvent` instead of relying on chain-routed base events. Phase 7 will then remove the chain infrastructure entirely.
 
-Phase 5b — Migrate publishers to the explicit automation event ⏳ PENDING
+Phase 5b — Migrate publishers to the explicit automation event ✅ COMPLETE
+
+- `SpaceTraders.Application/Automation/GameLoopService.cs` now publishes a `ShipAutomationTickEvent` (reason `"Arrived"`) immediately after the dead-reckoning `ShipArrivedEvent`, so arrivals trigger the planner without depending on the chain-of-command upcast `ShipArrivedEvent → ShipInOrbitEvent`.
+- `SpaceTraders.Application/Commands/Ships/DockShipCommand.cs` and `OrbitShipCommand.cs` publish a `ShipAutomationTickEvent` (reasons `"Docked"` / `"Undocked"`) on success, alongside the legacy `ShipDockedEvent` / `ShipUndockedEvent` so the planner runs after every successful state transition while existing chain handlers stay functional.
+- `SpaceTraders.Application/Events/Handlers/Ships/ShipInTransitEventHandler.cs` now also drives the explicit automation flow: it publishes the tick immediately when arrival is due, and calls `bus.ScheduleAsync(tick, arrivalTime)` when arrival is in the future. The legacy `ChainOfCommandHandlerResult.Handled(ShipArrivedEvent)` / `Scheduled(...)` return values are preserved so the chain dispatcher path continues to work during migration.
+- `SpaceTraders.API/Services/StartupRecoveryService.cs` emits an automation tick for every recovered ship: docked, in-orbit, arrival-elapsed, and a scheduled tick at `ship.ArrivesAt` for ships still in transit. The legacy recovery events (`ShipInTransitEvent`, `ShipDockedEvent`, `ShipInOrbitEvent`) keep being published so chain handlers remain unaffected.
+- Tests:
+  - `tests/SpaceTraders.Application.Tests/Commands/ShipCommandResultTests.cs` adds `DockShip_WhenAccepted_PublishesShipAutomationTickEvent` and `OrbitShip_WhenAccepted_PublishesShipAutomationTickEvent` covering the new tick publication on accepted dock/orbit commands.
+  - `tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipInTransitEventHandlerTests.cs` constructs the handler with an `IMessageBus` and asserts: (1) immediate `ShipAutomationTickEvent` publish when arrival is due, and (2) scheduled publish (via `DeliveryOptions.ScheduledTime`) when arrival is in the future.
+
+The legacy chain handlers (`ShipArrivedEventHandler`, `ShipInOrbitEventHandler`, `ShipDockedEventHandler`, `ShipUndockedEventHandler`, etc.) and the `ChainOfCommandBridgeHandler` remain registered, so the chain-of-command flow continues to drive runtime behavior while planner-driven behavior is validated. Phase 5c will retire chain priorities from business behavior, and Phase 7 will remove the chain infrastructure entirely.
+
 Phase 5c — Retire chain priorities from business behavior ⏳ PENDING
 
 ### Phase 6: Build Orchestrator Goal Evaluation

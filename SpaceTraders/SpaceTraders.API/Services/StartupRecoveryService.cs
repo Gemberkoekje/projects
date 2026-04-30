@@ -84,6 +84,15 @@ public sealed class StartupRecoveryService(
                 now);
 
             await bus.PublishAsync(transitEvent);
+
+            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+            await bus.PublishAsync(new ShipAutomationTickEvent(
+                ship.Symbol,
+                "StartupRecovery: Arrived",
+                now,
+                transitEvent.CorrelationId,
+                transitEvent.EventId));
+
             logger.LogInformation(
                 "StartupRecovery: Ship {Symbol} arrived at {Waypoint}; emitting ShipInTransitEvent (arrival elapsed).",
                 ship.Symbol, arrivedWaypoint);
@@ -102,6 +111,17 @@ public sealed class StartupRecoveryService(
                 now);
 
             await bus.PublishAsync(transitEvent);
+
+            // Phase 5b: schedule an explicit automation tick for the future arrival time.
+            await bus.ScheduleAsync(
+                new ShipAutomationTickEvent(
+                    ship.Symbol,
+                    "StartupRecovery: Arriving",
+                    ship.ArrivesAt.Value,
+                    transitEvent.CorrelationId,
+                    transitEvent.EventId),
+                ship.ArrivesAt.Value);
+
             logger.LogInformation(
                 "StartupRecovery: Ship {Symbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule in-orbit event.",
                 ship.Symbol, ship.ArrivesAt.Value);
@@ -117,6 +137,15 @@ public sealed class StartupRecoveryService(
                 now);
 
             await bus.PublishAsync(dockedEvent);
+
+            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+            await bus.PublishAsync(new ShipAutomationTickEvent(
+                ship.Symbol,
+                "StartupRecovery: Docked",
+                now,
+                dockedEvent.CorrelationId,
+                dockedEvent.EventId));
+
             logger.LogInformation(
                 "StartupRecovery: Ship {Symbol} is docked; emitting ShipDockedEvent.",
                 ship.Symbol);
@@ -132,6 +161,15 @@ public sealed class StartupRecoveryService(
                 now);
 
             await bus.PublishAsync(orbitEvent);
+
+            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+            await bus.PublishAsync(new ShipAutomationTickEvent(
+                ship.Symbol,
+                "StartupRecovery: InOrbit",
+                now,
+                orbitEvent.CorrelationId,
+                orbitEvent.EventId));
+
             logger.LogInformation(
                 "StartupRecovery: Ship {Symbol} is in orbit; emitting ShipInOrbitEvent.",
                 ship.Symbol);

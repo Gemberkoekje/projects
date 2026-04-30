@@ -73,6 +73,15 @@ public sealed class OrbitShipHandler(
                 Guid.Empty,
                 Guid.Empty,
                 publishedAt));
+
+            // Phase 5b: explicit automation tick so the planner-driven flow runs without
+            // depending on chain-of-command inheritance routing (ShipUndockedEvent -> ShipInOrbitEvent).
+            await bus.PublishAsync(new ShipAutomationTickEvent(
+                command.ShipSymbol,
+                "Undocked",
+                publishedAt,
+                Guid.NewGuid(),
+                Guid.Empty));
         }
 
         logger.LogInformation(

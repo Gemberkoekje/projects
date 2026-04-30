@@ -104,6 +104,14 @@ public sealed class GameLoopService(
 
                 await bus.PublishAsync(arrivedEvent);
                 logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipArrivedEvent.", ship.Symbol, arrivedWaypoint);
+
+                // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+                await bus.PublishAsync(new ShipAutomationTickEvent(
+                    ship.Symbol,
+                    "Arrived",
+                    now,
+                    Guid.NewGuid(),
+                    arrivedEvent.EventId));
             }
         }
     }

@@ -74,6 +74,15 @@ public sealed class DockShipHandler(
                 Guid.Empty,
                 Guid.Empty,
                 publishedAt));
+
+            // Phase 5b: explicit automation tick so the planner-driven flow runs without
+            // depending on chain-of-command inheritance routing.
+            await bus.PublishAsync(new ShipAutomationTickEvent(
+                command.ShipSymbol,
+                "Docked",
+                publishedAt,
+                Guid.NewGuid(),
+                Guid.Empty));
         }
 
         logger.LogInformation(

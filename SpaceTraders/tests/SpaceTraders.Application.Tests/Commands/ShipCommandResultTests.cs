@@ -134,4 +134,46 @@ public sealed class ShipCommandResultTests
         await port.DidNotReceive().NavigateShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
     }
+
+    [Fact]
+    public async Task DockShip_WhenAccepted_PublishesShipAutomationTickEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var bus = Substitute.For<IMessageBus>();
+
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
+
+        port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new NavModel("DOCKED", "X1-AB", "X1-AB-001", "CRUISE", null, null));
+
+        var handler = new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance);
+        await handler.ExecuteAsync(new DockShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "Docked"),
+            Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task OrbitShip_WhenAccepted_PublishesShipAutomationTickEvent()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var bus = Substitute.For<IMessageBus>();
+
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100));
+
+        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new NavModel("IN_ORBIT", "X1-AB", "X1-AB-001", "CRUISE", null, null));
+
+        var handler = new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance);
+        await handler.ExecuteAsync(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
+
+        await bus.Received(1).PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "Undocked"),
+            Arg.Any<DeliveryOptions>());
+    }
 }
