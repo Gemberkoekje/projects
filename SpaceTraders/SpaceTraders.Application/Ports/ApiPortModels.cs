@@ -1,3 +1,5 @@
+using SpaceTraders.Domain.Enums;
+
 namespace SpaceTraders.Application.Ports;
 
 public sealed record AgentModel
@@ -474,6 +476,11 @@ public sealed record ShipModel
     }
 
     public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
+
+    /// <summary>
+    /// Local ship status mapped from the SpaceTraders API nav status string.
+    /// </summary>
+    public ShipLocalStatus LocalStatus => ShipLocalStatusMapper.FromApiStatus(Status);
 
     public bool HasMiningEquipment =>
         ShipType.Equals("SHIP_MINING_DRONE", StringComparison.OrdinalIgnoreCase) ||

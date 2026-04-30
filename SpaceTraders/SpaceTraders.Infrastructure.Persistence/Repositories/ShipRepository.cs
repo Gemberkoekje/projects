@@ -65,7 +65,8 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
                 CargoJson = cargoJson,
                 ArrivesAt = ship.ArrivesAt,
                 DestWaypointSymbol = ship.DestWaypointSymbol,
-                LastSyncedAt = now
+                LastSyncedAt = now,
+                LocalStatus = ship.LocalStatus
             });
         }
         else
@@ -89,6 +90,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
             existing.ArrivesAt = ship.ArrivesAt;
             existing.DestWaypointSymbol = ship.DestWaypointSymbol;
             existing.LastSyncedAt = now;
+            existing.LocalStatus = ship.LocalStatus;
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -105,6 +107,7 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         entity.FlightMode = nav.FlightMode;
         entity.DestWaypointSymbol = nav.DestWaypointSymbol;
         entity.ArrivesAt = nav.ArrivesAt;
+        entity.LocalStatus = ShipLocalStatusMapper.FromApiStatus(nav.Status);
         entity.LastSyncedAt = TimeProvider.System.GetUtcNow();
 
         if (fuel is not null)

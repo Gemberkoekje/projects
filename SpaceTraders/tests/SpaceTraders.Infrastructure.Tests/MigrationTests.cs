@@ -73,4 +73,34 @@ ORDER BY column_name;";
 
         columns.Should().BeEquivalentTo(["MountsJson", "ShipType"]);
     }
+
+    [SkippableFact]
+    public async Task InitializeAsync_AddsLocalStatusColumn_WhenMissing()
+    {
+        await Db.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships DROP COLUMN IF EXISTS \"LocalStatus\";");
+
+        await SpaceTradersDatabaseInitializer.InitializeAsync(Db);
+
+        await using var command = Db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = @"
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'cached_ships'
+  AND column_name = 'LocalStatus';";
+
+        if (command.Connection is not null && command.Connection.State != System.Data.ConnectionState.Open)
+        {
+            await command.Connection.OpenAsync();
+        }
+
+        var columns = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(0));
+        }
+
+        columns.Should().BeEquivalentTo(["LocalStatus"]);
+    }
 }

@@ -1,6 +1,6 @@
 namespace SpaceTraders.Domain.Enums;
 
-public enum ShipStatus
+public enum ShipLocalStatus
 {
     None,
     Docked,

@@ -12,7 +12,7 @@ public sealed class Ship : AggregateRoot
 
     public string Symbol { get; private set; }
     public ShipRole Role { get; private set; }
-    public ShipStatus Status { get; private set; }
+    public ShipLocalStatus Status { get; private set; }
     public FlightMode FlightMode { get; private set; }
     public WaypointSymbol CurrentWaypoint { get; private set; }
     public SystemSymbol CurrentSystem { get; private set; }
@@ -25,7 +25,7 @@ public sealed class Ship : AggregateRoot
     private Ship(
         string symbol,
         ShipRole role,
-        ShipStatus status,
+        ShipLocalStatus status,
         FlightMode flightMode,
         WaypointSymbol currentWaypoint,
         SystemSymbol currentSystem,
@@ -51,7 +51,7 @@ public sealed class Ship : AggregateRoot
     public static Ship Reconstitute(
         string symbol,
         ShipRole role,
-        ShipStatus status,
+        ShipLocalStatus status,
         FlightMode flightMode,
         WaypointSymbol currentWaypoint,
         SystemSymbol currentSystem,
@@ -71,15 +71,15 @@ public sealed class Ship : AggregateRoot
             RaiseDomainEvent(new ShipFuelLowEvent(Symbol, fuel.Current, fuel.Capacity));
     }
 
-    public void UpdateNav(ShipStatus status, WaypointSymbol waypoint, SystemSymbol system, DateTimeOffset? arrivesAt)
+    public void UpdateNav(ShipLocalStatus status, WaypointSymbol waypoint, SystemSymbol system, DateTimeOffset? arrivesAt)
     {
-        var wasInTransit = Status == ShipStatus.InTransit;
+        var wasInTransit = Status == ShipLocalStatus.InTransit;
         Status = status;
         CurrentWaypoint = waypoint;
         CurrentSystem = system;
         ArrivesAt = arrivesAt;
 
-        if (wasInTransit && status != ShipStatus.InTransit)
+        if (wasInTransit && status != ShipLocalStatus.InTransit)
             RaiseDomainEvent(new ShipArrivedAtWaypointEvent(Symbol, waypoint));
     }
 

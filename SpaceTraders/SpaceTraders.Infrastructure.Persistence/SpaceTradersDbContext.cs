@@ -76,6 +76,7 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.DestWaypointSymbol).HasMaxLength(100);
             entity.Property(x => x.Status).HasMaxLength(50);
             entity.Property(x => x.FlightMode).HasMaxLength(50);
+            entity.Property(x => x.LocalStatus).HasDefaultValue(ShipLocalStatus.None);
             entity.Property(x => x.ShipType).HasMaxLength(100).IsRequired();
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });

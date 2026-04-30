@@ -74,6 +74,11 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"DeliverablesJson\" text NULL;",
                 cancellationToken);
+
+            // Phase 1: local ship status
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"LocalStatus\" integer NOT NULL DEFAULT 0;",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Sync;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Infrastructure.Persistence;
 using Wolverine;
@@ -105,7 +106,7 @@ public sealed class StartupRecoveryService(
                 "StartupRecovery: Ship {Symbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule in-orbit event.",
                 ship.Symbol, ship.ArrivesAt.Value);
         }
-        else if (string.Equals(ship.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
+        else if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
             var dockedEvent = new ShipDockedEvent(
                 ship.Symbol,
@@ -120,7 +121,7 @@ public sealed class StartupRecoveryService(
                 "StartupRecovery: Ship {Symbol} is docked; emitting ShipDockedEvent.",
                 ship.Symbol);
         }
-        else if (string.Equals(ship.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
+        else if (ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
             var orbitEvent = new ShipInOrbitEvent(
                 ship.Symbol,

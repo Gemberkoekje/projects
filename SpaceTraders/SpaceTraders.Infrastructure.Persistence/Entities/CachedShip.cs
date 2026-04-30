@@ -47,6 +47,8 @@ public sealed class CachedShip
 
     public DateTimeOffset LastSyncedAt { get; set; }
 
+    public ShipLocalStatus LocalStatus { get; set; }
+
     [NotMapped]
     public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
 
@@ -58,6 +60,7 @@ public sealed class CachedShip
             DestWaypointSymbol = null;
             ArrivesAt = null;
             Status = "IN_ORBIT";
+            LocalStatus = ShipLocalStatus.InOrbit;
         }
     }
 }

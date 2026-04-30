@@ -9,7 +9,7 @@ namespace SpaceTraders.Domain.Tests.Aggregates;
 public sealed class ShipTests
 {
     private static Ship CreateShip(
-        ShipStatus status = ShipStatus.Docked,
+        ShipLocalStatus status = ShipLocalStatus.Docked,
         int fuelCurrent = 80,
         int fuelCapacity = 100) =>
         Ship.Reconstitute(
@@ -59,10 +59,10 @@ public sealed class ShipTests
     [Fact]
     public void UpdateNav_FromInTransit_RaisesShipArrivedAtWaypointEvent()
     {
-        var ship = CreateShip(status: ShipStatus.InTransit);
+        var ship = CreateShip(status: ShipLocalStatus.InTransit);
 
         ship.UpdateNav(
-            ShipStatus.Docked,
+            ShipLocalStatus.Docked,
             new WaypointSymbol("X1-AB-002"),
             new SystemSymbol("X1-AB"),
             arrivesAt: null);
@@ -75,10 +75,10 @@ public sealed class ShipTests
     [Fact]
     public void UpdateNav_NotFromInTransit_DoesNotRaiseArrivedEvent()
     {
-        var ship = CreateShip(status: ShipStatus.InOrbit);
+        var ship = CreateShip(status: ShipLocalStatus.InOrbit);
 
         ship.UpdateNav(
-            ShipStatus.Docked,
+            ShipLocalStatus.Docked,
             new WaypointSymbol("X1-AB-002"),
             new SystemSymbol("X1-AB"),
             arrivesAt: null);

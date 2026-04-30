@@ -282,12 +282,19 @@ Orchestrator reacts to global events or next tick
 
 ## Migration Plan
 
-### Phase 1: Introduce Local Ship Status
+### Phase 1: Introduce Local Ship Status ✅ COMPLETE
 
 - Add a first-class local ship status enum or value object.
+  - Renamed `ShipStatus` to `ShipLocalStatus` in `SpaceTraders.Domain/Enums/ShipLocalStatus.cs`.
 - Map SpaceTraders API nav statuses into local statuses.
+  - Added `ShipLocalStatusMapper` in `SpaceTraders.Domain/Enums/ShipLocalStatusMapper.cs` mapping `"DOCKED"`, `"IN_ORBIT"`, `"IN_TRANSIT"` to enum values.
 - Persist local status with ship state.
+  - Added `LocalStatus` (int) column to `cached_ships` table.
+  - Added `LocalStatus` property to `CachedShip` entity and persisted in `ShipRepository`.
+  - Added DB migration SQL in `SpaceTradersDatabaseInitializer`.
 - Keep compatibility with existing string statuses during migration.
+  - `ShipModel.LocalStatus` is a computed property derived from the existing `Status` string; all existing string-based code remains compatible.
+  - `StartupRecoveryService` updated to use `LocalStatus` instead of raw string comparisons.
 
 ### Phase 2: Standardize Ship Command Results
 
