@@ -14,7 +14,7 @@ public static class WolverineRetryLoggingMiddleware
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Finally(Envelope envelope, ILogger logger)
     {
-        if (envelope.Attempts > 0)
+        if (envelope.Attempts > 1)
         {
             logger.LogWarning(
                 "Wolverine retry #{RetryAttempt} for message type {MessageType} with envelope ID {EnvelopeId}",

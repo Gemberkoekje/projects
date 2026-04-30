@@ -105,7 +105,22 @@ public sealed class NavigateShipHandler(
                 command.ShipSymbol,
                 command.DestinationWaypoint);
         }
+        catch (Exception exception) when (LooksLikeInsufficientFuelError(exception))
+        {
+            logger.LogWarning(
+                exception,
+                "Navigation for ship {Symbol} to {Waypoint} rejected due to insufficient fuel; docking for refuel.",
+                command.ShipSymbol,
+                command.DestinationWaypoint);
+
+            await bus.SendAsync(new DockShipCommand(command.ShipSymbol));
+        }
     }
+
+    private static bool LooksLikeInsufficientFuelError(Exception exception)
+        => !string.IsNullOrWhiteSpace(exception.Message)
+            && exception.Message.Contains("requires", StringComparison.OrdinalIgnoreCase)
+            && exception.Message.Contains("more fuel", StringComparison.OrdinalIgnoreCase);
 
     private static bool LooksLikeNotInOrbitError(Exception exception)
         => !string.IsNullOrWhiteSpace(exception.Message)

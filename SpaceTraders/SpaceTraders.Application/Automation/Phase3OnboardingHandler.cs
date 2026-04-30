@@ -88,8 +88,19 @@ public sealed class Phase3OnboardingHandler(
 
         await EnsureFleetExpansionForContractAsync(agent, primaryShip, cancellationToken);
 
-        var deliverable = ResolvePendingDeliverable(starterContract);
-        if (deliverable is null)
+        if (string.IsNullOrWhiteSpace(starterContract.DeliverablesJson))
+        {
+            logger.LogInformation("Phase 3 onboarding skipped fulfill for contract {ContractId}: deliverables are not available yet.", starterContract.Id);
+            return;
+        }
+
+        if (!TryResolvePendingDeliverable(starterContract.DeliverablesJson, out var hasPendingDeliverable, out var deliverable))
+        {
+            logger.LogWarning("Phase 3 onboarding skipped fulfill for contract {ContractId}: deliverables payload could not be parsed.", starterContract.Id);
+            return;
+        }
+
+        if (!hasPendingDeliverable)
         {
             await bus.InvokeAsync(new FulfillContractCommand(starterContract.Id), cancellationToken);
             return;
@@ -115,6 +126,12 @@ public sealed class Phase3OnboardingHandler(
             return;
         }
 
+        var fleet = await ships.GetAllAsync(cancellationToken);
+        if (fleet.Any(s => s.HasMiningEquipment))
+        {
+            return;
+        }
+
         var knownShipyard = await shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", cancellationToken);
         if (knownShipyard is null && !string.IsNullOrWhiteSpace(ship.SystemSymbol))
         {
@@ -134,21 +151,28 @@ public sealed class Phase3OnboardingHandler(
         await bus.InvokeAsync(new PurchaseShipCommand("SHIP_MINING_DRONE", knownShipyard), cancellationToken);
     }
 
-    private static ContractDeliverableDto? ResolvePendingDeliverable(ContractDto contract)
+    private static bool TryResolvePendingDeliverable(string deliverablesJson, out bool hasPendingDeliverable, out ContractDeliverableDto deliverable)
     {
-        if (string.IsNullOrWhiteSpace(contract.DeliverablesJson))
-        {
-            return null;
-        }
-
         try
         {
-            var deliverables = JsonSerializer.Deserialize<List<ContractDeliverableDto>>(contract.DeliverablesJson) ?? [];
-            return deliverables.FirstOrDefault(d => d.UnitsRequired > d.UnitsFulfilled);
+            var deliverables = JsonSerializer.Deserialize<List<ContractDeliverableDto>>(deliverablesJson) ?? [];
+            var pending = deliverables.FirstOrDefault(d => d.UnitsRequired > d.UnitsFulfilled);
+            if (pending is null)
+            {
+                hasPendingDeliverable = false;
+                deliverable = new ContractDeliverableDto(string.Empty, string.Empty, 0, 0);
+                return true;
+            }
+
+            hasPendingDeliverable = true;
+            deliverable = pending;
+            return true;
         }
         catch (JsonException)
         {
-            return null;
+            hasPendingDeliverable = false;
+            deliverable = new ContractDeliverableDto(string.Empty, string.Empty, 0, 0);
+            return false;
         }
     }
 }

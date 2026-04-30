@@ -1,4 +1,6 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 
@@ -11,6 +13,7 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 public sealed class ShipDockedTraderEventHandler(
     IShipAssignmentRepository assignments,
     IShipRepository ships,
+    IContractRepository contracts,
     ISettingsRepository settings,
     IFleetMaintenancePlanner maintenance,
     IDockedCommandAcceptor dockedCommands) : IChainOfCommandEventHandler<ShipDockedEvent>
@@ -45,9 +48,13 @@ public sealed class ShipDockedTraderEventHandler(
                 await dockedCommands.BuyCargoAsync(@event.ShipSymbol, assignment.CargoSymbol, unitsToBuy, cancellationToken);
             }
         }
-        else if (atSellWaypoint && !string.IsNullOrWhiteSpace(assignment.CargoSymbol) && ship.CargoCurrent > 0)
+        else if (atSellWaypoint)
         {
-            await dockedCommands.SellCargoAsync(@event.ShipSymbol, assignment.CargoSymbol, ship.CargoCurrent, cancellationToken);
+            var deliveredAnyContractCargo = await TryDeliverContractCargoAtCurrentWaypointAsync(ship, cancellationToken);
+            if (!deliveredAnyContractCargo && !string.IsNullOrWhiteSpace(assignment.CargoSymbol) && ship.CargoCurrent > 0)
+            {
+                await dockedCommands.SellCargoAsync(@event.ShipSymbol, assignment.CargoSymbol, ship.CargoCurrent, cancellationToken);
+            }
         }
 
         var maintenanceDecision = await maintenance.DecideAsync(ship, assignment.AssignmentType, cancellationToken);
@@ -65,5 +72,74 @@ public sealed class ShipDockedTraderEventHandler(
 
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
+    }
+
+    private async Task<bool> TryDeliverContractCargoAtCurrentWaypointAsync(ShipModel ship, CancellationToken cancellationToken)
+    {
+        if (ship.CargoInventory is null || string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            return false;
+        }
+
+        var activeContracts = await contracts.GetActiveAsync(cancellationToken);
+        var deliveredAny = false;
+
+        foreach (var contract in activeContracts.Where(c => c.IsAccepted && !c.IsFulfilled && !string.IsNullOrWhiteSpace(c.DeliverablesJson)))
+        {
+            var deliverables = DeserializeDeliverables(contract.DeliverablesJson);
+            foreach (var deliverable in deliverables)
+            {
+                if (!deliverable.DestinationSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase)
+                    || deliverable.UnitsRequired <= deliverable.UnitsFulfilled)
+                {
+                    continue;
+                }
+
+                var cargoUnits = ship.CargoInventory
+                    .FirstOrDefault(i => i.Symbol.Equals(deliverable.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
+                    .Units ?? 0;
+
+                if (cargoUnits <= 0)
+                {
+                    continue;
+                }
+
+                var pending = deliverable.UnitsRequired - deliverable.UnitsFulfilled;
+                var unitsToDeliver = Math.Min(cargoUnits, pending);
+                if (unitsToDeliver <= 0)
+                {
+                    continue;
+                }
+
+                await dockedCommands.DeliverContractAsync(
+                    contract.Id,
+                    ship.Symbol,
+                    deliverable.TradeSymbol,
+                    unitsToDeliver,
+                    ship.WaypointSymbol,
+                    cancellationToken);
+
+                deliveredAny = true;
+            }
+        }
+
+        return deliveredAny;
+    }
+
+    private static IReadOnlyList<ContractDeliverableDto> DeserializeDeliverables(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<ContractDeliverableDto>>(json) ?? [];
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return [];
+        }
     }
 }

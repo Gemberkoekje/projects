@@ -31,14 +31,24 @@ public sealed class FleetExpansionDecisionHandlerTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(MakeAgent(500_000, shipCount: 1));
 
         var ships = Substitute.For<IShipRepository>();
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100)
+        ]);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow)
+            ]);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
         var shipyards = Substitute.For<IShipyardRepository>();
-        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>())
+        shipyards.FindShipyardForTypeAsync("SHIP_PROBE", Arg.Any<CancellationToken>())
             .Returns("X1-AB-SHIPYARD");
 
         var bus = Substitute.For<IMessageBus>();
         var settings = MakeSettings(maxShips: 5, reserve: 100_000);
 
-        var handler = new FleetExpansionDecisionHandler(agents, ships, shipyards, settings, bus,
+        var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
         await handler.Handle(
@@ -46,7 +56,7 @@ public sealed class FleetExpansionDecisionHandlerTests
             CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<PurchaseShipCommand>(c => c.ShipType == "SHIP_MINING_DRONE" && c.ShipyardWaypoint == "X1-AB-SHIPYARD"),
+            Arg.Is<PurchaseShipCommand>(c => c.ShipType == "SHIP_PROBE" && c.ShipyardWaypoint == "X1-AB-SHIPYARD" && c.TargetAssignmentType == "MarketProbe" && c.TargetOriginWaypoint == "X1-AB-MKT-1"),
             Arg.Any<DeliveryOptions>());
     }
 
@@ -57,11 +67,13 @@ public sealed class FleetExpansionDecisionHandlerTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(MakeAgent(500_000, shipCount: 5));
 
         var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
         var shipyards = Substitute.For<IShipyardRepository>();
         var bus = Substitute.For<IMessageBus>();
         var settings = MakeSettings(maxShips: 5);
 
-        var handler = new FleetExpansionDecisionHandler(agents, ships, shipyards, settings, bus,
+        var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
         await handler.Handle(
@@ -78,11 +90,13 @@ public sealed class FleetExpansionDecisionHandlerTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(MakeAgent(100_000, shipCount: 1));
 
         var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var assignments = Substitute.For<IShipAssignmentRepository>();
         var shipyards = Substitute.For<IShipyardRepository>();
         var bus = Substitute.For<IMessageBus>();
         var settings = MakeSettings(reserve: 100_000);
 
-        var handler = new FleetExpansionDecisionHandler(agents, ships, shipyards, settings, bus,
+        var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
         await handler.Handle(
@@ -99,6 +113,16 @@ public sealed class FleetExpansionDecisionHandlerTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(MakeAgent(500_000, shipCount: 1));
 
         var ships = Substitute.For<IShipRepository>();
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100)
+        ]);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow)
+            ]);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
         var shipyards = Substitute.For<IShipyardRepository>();
         shipyards.FindShipyardForTypeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((string?)null);
@@ -106,7 +130,7 @@ public sealed class FleetExpansionDecisionHandlerTests
         var bus = Substitute.For<IMessageBus>();
         var settings = MakeSettings();
 
-        var handler = new FleetExpansionDecisionHandler(agents, ships, shipyards, settings, bus,
+        var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
         await handler.Handle(
@@ -123,14 +147,24 @@ public sealed class FleetExpansionDecisionHandlerTests
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(MakeAgent(500_000, shipCount: 1));
 
         var ships = Substitute.For<IShipRepository>();
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100)
+        ]);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow)
+            ]);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
         var shipyards = Substitute.For<IShipyardRepository>();
-        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>())
+        shipyards.FindShipyardForTypeAsync("SHIP_PROBE", Arg.Any<CancellationToken>())
             .Returns("X1-AB-SHIPYARD");
 
         var bus = Substitute.For<IMessageBus>();
         var settings = MakeSettings();
 
-        var handler = new FleetExpansionDecisionHandler(agents, ships, shipyards, settings, bus,
+        var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
         await handler.Handle(new ContractFulfilledEvent("CONTRACT-1", 200_000), CancellationToken.None);

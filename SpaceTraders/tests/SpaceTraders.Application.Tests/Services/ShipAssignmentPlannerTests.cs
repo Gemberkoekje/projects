@@ -215,7 +215,7 @@ public sealed class ShipAssignmentPlannerTests
 
         var assignment = await planner.PlanAsync(ship, CancellationToken.None);
 
-        assignment.AssignmentType.Should().Be("Idle");
+        assignment.AssignmentType.Should().Be("MarketProbe");
     }
 
     [Fact]
@@ -295,6 +295,90 @@ public sealed class ShipAssignmentPlannerTests
 
         assignment.AssignmentType.Should().Be("MarketProbe");
         assignment.OriginWaypoint.Should().Be("X1-AB-MKT-1");
+    }
+
+    [Fact]
+    public async Task PlanAsync_AssignsMarketProbe_ForAnyShip_WhenMarketExists()
+    {
+        var routes = Substitute.For<ITradeOpportunityRepository>();
+        var settings = MakeSettings(minProfit: 99999);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var ships = Substitute.For<IShipRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+
+        routes.GetBestRouteForCapacityAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns((TradeOpportunityDto)null!);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow.AddMinutes(-30)),
+                new WaypointCacheModel("X1-AB-MKT-2", "X1-AB", "PLANET", 5, 5, true, false, DateTimeOffset.UtcNow.AddMinutes(-5))
+            ]);
+
+        var nonProbeShip = new ShipModel(
+            "TRADER-1",
+            "X1-AB",
+            "X1-AB-MKT-2",
+            "DOCKED",
+            "CRUISE",
+            80,
+            100,
+            ShipType: "SHIP_INTERCEPTOR",
+            CargoCurrent: 0,
+            CargoCapacity: 0);
+
+        var planner = new ShipAssignmentPlanner(new StubContractObjectivePlanner(), routes, settings, assignments, waypoints, ships, markets);
+
+        var assignment = await planner.PlanAsync(nonProbeShip, CancellationToken.None);
+
+        assignment.AssignmentType.Should().Be("Scout");
+        assignment.OriginWaypoint.Should().Be("X1-AB-MKT-1");
+    }
+
+    [Fact]
+    public async Task PlanAsync_AssignsMine_WhenNoTradeRouteExists_AndShipCanMine()
+    {
+        var routes = Substitute.For<ITradeOpportunityRepository>();
+        var settings = MakeSettings(miningPercentage: 0.25m);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var ships = Substitute.For<IShipRepository>();
+
+        routes.GetBestRouteForCapacityAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns((TradeOpportunityDto)null!);
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                new ShipAssignmentDto("SHIP-1", "Mine", "X1-AB-AST", "X1-AB-MKT", "IRON_ORE", null, 0, DateTimeOffset.UtcNow, null)
+            ]);
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                new WaypointCacheModel("X1-AB-AST", "X1-AB", "ASTEROID_FIELD", 0, 0, false, false, DateTimeOffset.UtcNow),
+                new WaypointCacheModel("X1-AB-MKT", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow)
+            ]);
+
+        var miningShip = new ShipModel(
+            "SHIP-1",
+            "X1-AB",
+            "X1-AB-001",
+            "DOCKED",
+            "CRUISE",
+            80,
+            100,
+            null,
+            CargoCurrent: 0,
+            CargoCapacity: 40,
+            ShipType: "SHIP_MINING_DRONE",
+            MountSymbols: ["MOUNT_MINING_LASER_I"]);
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miningShip]);
+
+        var planner = new ShipAssignmentPlanner(routes, settings, assignments, waypoints, ships);
+
+        var assignment = await planner.PlanAsync(miningShip, CancellationToken.None);
+
+        assignment.AssignmentType.Should().Be("Mine");
+        assignment.OriginWaypoint.Should().Be("X1-AB-AST");
+        assignment.DestWaypoint.Should().Be("X1-AB-MKT");
     }
 
     private sealed class StubContractObjectivePlanner(string cargoSymbol = "") : IContractObjectivePlanner

@@ -140,6 +140,16 @@ public sealed class ShipInOrbitMineEventHandler(
         IMessageBus bus,
         CancellationToken cancellationToken)
     {
+        if (ship.FuelCapacity <= 0)
+        {
+            if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+            {
+                await bus.InvokeAsync(new PatchShipNavCommand(shipSymbol, "DRIFT"), cancellationToken);
+            }
+
+            return;
+        }
+
         if (!ShouldAdjustFlightMode(ship, destinationWaypoint))
         {
             return;

@@ -162,15 +162,11 @@ public sealed class ShipAssignmentPlanner(
 
     public async Task<AssignShipCommand> PlanAsync(ShipModel ship, CancellationToken cancellationToken)
     {
-        var contractAssignment = await contractObjectives.PlanAsync(ship, cancellationToken);
-        if (contractAssignment is not null)
-        {
-            return contractAssignment;
-        }
-
         var minProfit = await settings.GetAsync<int>("Trade.MinProfitPerUnit", cancellationToken);
         var maxDistance = await settings.GetAsync<int>("Trade.MaxHaulDistance", cancellationToken);
         var miningShipPercentage = await settings.GetAsync<decimal>("Automation.MiningShipPercentage", cancellationToken);
+        var refreshIntervalMinutes = await settings.GetAsync<int>("Scout.MarketRefreshIntervalMinutes", cancellationToken);
+        var staleness = TimeSpan.FromMinutes(refreshIntervalMinutes > 0 ? refreshIntervalMinutes : 10);
         var effectiveMiningShipPercentage = decimal.Clamp(
             miningShipPercentage == 0m ? 0.25m : miningShipPercentage,
             0m,
@@ -216,10 +212,25 @@ public sealed class ShipAssignmentPlanner(
                 CargoSymbol: route.TradeSymbol);
         }
 
-        var scoutAssignment = await BuildScoutAssignmentAsync(ship, cancellationToken);
+        if (canMine)
+        {
+            var fallbackMineAssignment = await BuildMiningAssignmentAsync(ship, cancellationToken);
+            if (fallbackMineAssignment is not null)
+            {
+                return fallbackMineAssignment;
+            }
+        }
+
+        var scoutAssignment = await BuildScoutAssignmentAsync(ship, staleness, cancellationToken);
         if (scoutAssignment is not null)
         {
             return scoutAssignment;
+        }
+
+        var marketProbeAssignment = await BuildProbeMarketScoutAssignmentAsync(ship, staleness, cancellationToken);
+        if (marketProbeAssignment is not null)
+        {
+            return marketProbeAssignment;
         }
 
         return new AssignShipCommand(ship.Symbol, MarketProbeAssignmentType);
@@ -416,28 +427,16 @@ public sealed class ShipAssignmentPlanner(
         return activeMiningAssignments < targetMiningShips;
     }
 
-    private async Task<AssignShipCommand?> BuildScoutAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
+    private async Task<AssignShipCommand?> BuildScoutAssignmentAsync(ShipModel ship, TimeSpan staleness, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
         {
             return null;
         }
 
-        if (!CanScout(ship) && !IsProbeScout(ship))
+        if (!CanScout(ship))
         {
             return null;
-        }
-
-        var refreshIntervalMinutes = await settings.GetAsync<int>("Scout.MarketRefreshIntervalMinutes", cancellationToken);
-        var staleness = TimeSpan.FromMinutes(refreshIntervalMinutes > 0 ? refreshIntervalMinutes : 10);
-
-        if (IsProbeScout(ship))
-        {
-            var probeTarget = await BuildProbeMarketScoutAssignmentAsync(ship, staleness, cancellationToken);
-            if (probeTarget is not null)
-            {
-                return probeTarget;
-            }
         }
 
         var explorationAssignment = await BuildExplorationAssignmentAsync(ship, cancellationToken);
@@ -449,9 +448,12 @@ public sealed class ShipAssignmentPlanner(
         var staleWaypoints = await waypoints.GetUnscoutedOrStaleAsync(ship.SystemSymbol, staleness, cancellationToken);
         var target = staleWaypoints.FirstOrDefault();
 
-        return target is null
-            ? null
-            : new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: target.Symbol);
+        if (target is not null)
+        {
+            return new AssignShipCommand(ship.Symbol, ScoutAssignmentType, OriginWaypoint: target.Symbol);
+        }
+
+        return null;
     }
 
     private async Task<AssignShipCommand?> BuildExplorationAssignmentAsync(ShipModel ship, CancellationToken cancellationToken)
@@ -502,7 +504,7 @@ public sealed class ShipAssignmentPlanner(
         TimeSpan staleness,
         CancellationToken cancellationToken)
     {
-        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol ?? string.Empty, cancellationToken);
+        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol ?? string.Empty, cancellationToken) ?? [];
         if (systemWaypoints.Count == 0)
         {
             return null;
@@ -510,10 +512,20 @@ public sealed class ShipAssignmentPlanner(
 
         var now = TimeProvider.System.GetUtcNow();
         var staleThreshold = now - staleness;
+        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken) ?? [];
+        var assignedMarkets = activeAssignments
+            .Where(a =>
+                a.AssignmentType.Equals(MarketProbeAssignmentType, StringComparison.OrdinalIgnoreCase)
+                && !a.CompletedAt.HasValue
+                && !string.IsNullOrWhiteSpace(a.OriginWaypoint)
+                && !a.ShipSymbol.Equals(ship.Symbol, StringComparison.OrdinalIgnoreCase))
+            .Select(a => a.OriginWaypoint!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var importantTarget = systemWaypoints
             .Where(w => w.HasMarket)
-            .OrderBy(w => w.LastObservedAt >= staleThreshold)
+            .OrderBy(w => assignedMarkets.Contains(w.Symbol))
+            .ThenBy(w => w.LastObservedAt >= staleThreshold)
             .ThenBy(w => w.LastObservedAt)
             .FirstOrDefault();
 
@@ -540,5 +552,6 @@ public sealed class ShipAssignmentPlanner(
     private static bool IsProbeScout(ShipModel ship)
         => ship.ShipType.Equals("SHIP_PROBE", StringComparison.OrdinalIgnoreCase)
            || ship.ShipType.Equals("SHIP_LIGHT_HAULER", StringComparison.OrdinalIgnoreCase)
-           || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase);
+           || ship.Symbol.Contains("PROBE", StringComparison.OrdinalIgnoreCase)
+           || ship.Symbol.Contains("SATELLITE", StringComparison.OrdinalIgnoreCase);
 }

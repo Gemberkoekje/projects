@@ -75,6 +75,11 @@ public sealed class ShipInOrbitScoutEventHandler(
 
         // Not at target: navigate towards it
         logger.LogInformation("{Handler}: ship {Ship} navigating to scout target {Waypoint}.", nameof(ShipInOrbitScoutEventHandler), @event.ShipSymbol, assignment.OriginWaypoint);
+        if (ship is not null && ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+        {
+            await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, "DRIFT"), cancellationToken);
+        }
+
         await inOrbitCommands.NavigateAsync(@event.ShipSymbol, assignment.OriginWaypoint, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
     }

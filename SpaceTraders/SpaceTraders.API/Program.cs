@@ -1,13 +1,13 @@
+using ImTools;
+using JasperFx.MultiTenancy;
+using JasperFx.Resources;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
-using Wolverine;
-using Wolverine.EntityFrameworkCore;
-using Wolverine.Persistence;
-using Wolverine.Postgresql;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Endpoints;
 using SpaceTraders.API.Middleware;
@@ -18,6 +18,10 @@ using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Configuration;
+using Wolverine;
+using Wolverine.EntityFrameworkCore;
+using Wolverine.Persistence;
+using Wolverine.Postgresql;
 
 const string PathBase = "/spacetraders/api";
 
@@ -45,9 +49,10 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.Enrich.FromLogContext();
     cfg.Enrich.WithProperty("Application", "SpaceTraders.API");
 });
+builder.Host.UseResourceSetupOnStartup();
 
 builder.Services
-    .AddApplication(options => ConfigureWolverine(options, builder.Configuration, builder.Environment))
+    .AddApplication(opts => ConfigureWolverine(opts, builder.Configuration, builder.Environment))
     .AddPersistence(builder.Configuration)
     .AddSpaceTradersApi(options =>
     {
@@ -56,6 +61,8 @@ builder.Services
         options.AccountToken ??= builder.Configuration["SpaceTraders:AccountToken"];
         options.AgentToken ??= builder.Configuration["SpaceTraders:AgentToken"];
     });
+
+builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistoryService, SpaceTraders.Application.Services.CreditHistoryService>();
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
 
@@ -95,14 +102,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
-// Skip database initialization in Testing environment to avoid requiring a real DB connection.
-if (!app.Environment.IsEnvironment("Testing"))
-{
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
     await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext);
-}
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
@@ -131,16 +133,11 @@ static void ConfigureWolverine(
         throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
     }
 
-    if (environment.IsEnvironment("Testing"))
-    {
-        options.Durability.DurabilityAgentEnabled = false;
-        return;
-    }
+    options.Durability.DurabilityAgentEnabled = false;
 
     options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
     options.PersistMessagesWithPostgresql(connectionString, "wolverine")
-        .Enroll<SpaceTradersDbContext>()
-        .EnableCommandQueues(false);
+        .Enroll<SpaceTradersDbContext>();
     options.Policies.UseDurableLocalQueues();
 }
 

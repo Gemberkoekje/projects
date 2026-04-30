@@ -14,6 +14,7 @@ public sealed class ShipDockedRoleHandlersTests
     {
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var ships = Substitute.For<IShipRepository>();
+        var contracts = Substitute.For<IContractRepository>();
         var settings = Substitute.For<ISettingsRepository>();
         var maintenance = Substitute.For<IFleetMaintenancePlanner>();
         var docked = Substitute.For<IDockedCommandAcceptor>();
@@ -27,7 +28,7 @@ public sealed class ShipDockedRoleHandlersTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-BUY", "DOCKED", "CRUISE", 100, 100, CargoCurrent: 0, CargoCapacity: 30));
 
-        var handler = new ShipDockedTraderEventHandler(assignments, ships, settings, maintenance, docked);
+        var handler = new ShipDockedTraderEventHandler(assignments, ships, contracts, settings, maintenance, docked);
         await handler.HandleAsync(new ShipDockedEvent("SHIP-1", "X1-AB", "X1-AB-BUY", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow), CancellationToken.None);
 
         await docked.Received(1).BuyCargoAsync("SHIP-1", "IRON_ORE", 30, Arg.Any<CancellationToken>());

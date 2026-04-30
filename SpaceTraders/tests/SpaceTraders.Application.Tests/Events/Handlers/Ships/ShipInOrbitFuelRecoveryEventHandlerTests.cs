@@ -88,4 +88,27 @@ public sealed class ShipInOrbitFuelRecoveryEventHandlerTests
         await bus.DidNotReceive().InvokeAsync(Arg.Any<PatchShipNavCommand>(), Arg.Any<CancellationToken>());
         await inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task HandleAsync_PatchesToDrift_AndSkips_WhenFuelCapacityIsZero()
+    {
+        var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+        var inOrbit = Substitute.For<IInOrbitCommandAcceptor>();
+        var bus = Substitute.For<IMessageBus>();
+
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 0, 0));
+
+        var handler = new ShipInOrbitFuelRecoveryEventHandler(ships, waypoints, markets, inOrbit, bus, NullLogger<ShipInOrbitFuelRecoveryEventHandler>.Instance);
+
+        var result = await handler.HandleAsync(
+            new ShipInOrbitEvent("SHIP-1", "X1-AB", "X1-AB-001", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow),
+            CancellationToken.None);
+
+        result.Should().BeSameAs(ChainOfCommandHandlerResult.Skipped());
+        await bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.ShipSymbol == "SHIP-1" && c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
+        await inOrbit.DidNotReceive().NavigateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
 }

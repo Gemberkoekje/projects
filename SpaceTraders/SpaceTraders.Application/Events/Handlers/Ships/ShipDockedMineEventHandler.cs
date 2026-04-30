@@ -1,5 +1,6 @@
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -37,54 +38,69 @@ public sealed class ShipDockedMineEventHandler(
             return ChainOfCommandHandlerResult.Skipped();
         }
 
-        var reserveHydrocarbonUnits = await settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", cancellationToken);
-        var minimumSellPrice = await settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", cancellationToken);
-        var jettisonLowValueWhenFull = await settings.GetAsync<bool>("Mining.JettisonLowValueWhenFull", cancellationToken);
-        var market = string.IsNullOrWhiteSpace(ship.WaypointSymbol)
-            ? null
-            : await markets.FindSnapshotByWaypointAsync(ship.WaypointSymbol, cancellationToken);
-        var protectedCargo = await GetProtectedContractCargoAsync(contracts, cancellationToken);
+        var deliveredAnyContractCargo = await TryDeliverContractCargoAtCurrentWaypointAsync(ship, contracts, dockedCommands, cancellationToken);
 
-        if (ship.CargoInventory is not null)
+        if (!deliveredAnyContractCargo)
         {
-            foreach (var cargo in ship.CargoInventory.Where(c => c.Units > 0))
+            var reserveHydrocarbonUnits = await settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", cancellationToken);
+            var minimumSellPrice = await settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", cancellationToken);
+            var jettisonLowValueWhenFull = await settings.GetAsync<bool>("Mining.JettisonLowValueWhenFull", cancellationToken);
+            var market = string.IsNullOrWhiteSpace(ship.WaypointSymbol)
+                ? null
+                : await markets.FindSnapshotByWaypointAsync(ship.WaypointSymbol, cancellationToken);
+            var protectedCargo = await GetProtectedContractCargoAsync(contracts, cancellationToken);
+            var soldHydrocarbon = false;
+
+            if (ship.CargoInventory is not null)
             {
-                if (protectedCargo.Contains(cargo.Symbol))
+                foreach (var cargo in ship.CargoInventory.Where(c => c.Units > 0))
                 {
-                    continue;
-                }
-
-                if (cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase) && cargo.Units <= reserveHydrocarbonUnits)
-                {
-                    continue;
-                }
-
-                var sellPrice = market?.TradeGoods.FirstOrDefault(g => g.Symbol.Equals(cargo.Symbol, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0;
-                if (sellPrice >= minimumSellPrice)
-                {
-                    var sellUnits = cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)
-                        ? Math.Max(0, cargo.Units - reserveHydrocarbonUnits)
-                        : cargo.Units;
-
-                    if (sellUnits > 0)
+                    if (protectedCargo.Contains(cargo.Symbol))
                     {
-                        await dockedCommands.SellCargoAsync(@event.ShipSymbol, cargo.Symbol, sellUnits, cancellationToken);
+                        continue;
                     }
 
-                    continue;
-                }
-
-                if (jettisonLowValueWhenFull && ship.CargoCurrent >= ship.CargoCapacity)
-                {
-                    var jettisonUnits = cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)
-                        ? Math.Max(0, cargo.Units - reserveHydrocarbonUnits)
-                        : cargo.Units;
-
-                    if (jettisonUnits > 0)
+                    if (cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase) && cargo.Units <= reserveHydrocarbonUnits)
                     {
-                        await bus.InvokeAsync(new JettisonCargoCommand(@event.ShipSymbol, cargo.Symbol, jettisonUnits), cancellationToken);
+                        continue;
+                    }
+
+                    var sellPrice = market?.TradeGoods.FirstOrDefault(g => g.Symbol.Equals(cargo.Symbol, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0;
+                    if (sellPrice >= minimumSellPrice)
+                    {
+                        var sellUnits = cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)
+                            ? Math.Max(0, cargo.Units - reserveHydrocarbonUnits)
+                            : cargo.Units;
+
+                        if (sellUnits > 0)
+                        {
+                            await dockedCommands.SellCargoAsync(@event.ShipSymbol, cargo.Symbol, sellUnits, cancellationToken);
+                            if (cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase))
+                            {
+                                soldHydrocarbon = true;
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    if (jettisonLowValueWhenFull && ship.CargoCurrent >= ship.CargoCapacity)
+                    {
+                        var jettisonUnits = cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase)
+                            ? Math.Max(0, cargo.Units - reserveHydrocarbonUnits)
+                            : cargo.Units;
+
+                        if (jettisonUnits > 0)
+                        {
+                            await bus.InvokeAsync(new JettisonCargoCommand(@event.ShipSymbol, cargo.Symbol, jettisonUnits), cancellationToken);
+                        }
                     }
                 }
+            }
+
+            if (soldHydrocarbon)
+            {
+                await dockedCommands.RefuelAsync(@event.ShipSymbol, fromCargo: true, cancellationToken);
             }
         }
 
@@ -103,6 +119,61 @@ public sealed class ShipDockedMineEventHandler(
 
         await dockedCommands.OrbitAsync(@event.ShipSymbol, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
+    }
+
+    private static async Task<bool> TryDeliverContractCargoAtCurrentWaypointAsync(
+        ShipModel ship,
+        IContractRepository contractRepository,
+        IDockedCommandAcceptor dockedCommands,
+        CancellationToken cancellationToken)
+    {
+        if (ship.CargoInventory is null || string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            return false;
+        }
+
+        var activeContracts = await contractRepository.GetActiveAsync(cancellationToken);
+        var deliveredAny = false;
+
+        foreach (var contract in activeContracts.Where(c => c.IsAccepted && !c.IsFulfilled && !string.IsNullOrWhiteSpace(c.DeliverablesJson)))
+        {
+            var deliverables = DeserializeDeliverables(contract.DeliverablesJson);
+            foreach (var deliverable in deliverables)
+            {
+                if (!deliverable.DestinationSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase)
+                    || deliverable.UnitsRequired <= deliverable.UnitsFulfilled)
+                {
+                    continue;
+                }
+
+                var cargoUnits = ship.CargoInventory
+                    .FirstOrDefault(i => i.Symbol.Equals(deliverable.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
+                    .Units ?? 0;
+                if (cargoUnits <= 0)
+                {
+                    continue;
+                }
+
+                var pending = deliverable.UnitsRequired - deliverable.UnitsFulfilled;
+                var unitsToDeliver = Math.Min(cargoUnits, pending);
+                if (unitsToDeliver <= 0)
+                {
+                    continue;
+                }
+
+                await dockedCommands.DeliverContractAsync(
+                    contract.Id,
+                    ship.Symbol,
+                    deliverable.TradeSymbol,
+                    unitsToDeliver,
+                    ship.WaypointSymbol,
+                    cancellationToken);
+
+                deliveredAny = true;
+            }
+        }
+
+        return deliveredAny;
     }
 
     private static async Task<HashSet<string>> GetProtectedContractCargoAsync(

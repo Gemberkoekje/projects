@@ -68,7 +68,14 @@ public sealed class ShipInOrbitTraderEventHandler(
         }
 
         logger.LogInformation("{Handler}: ship {Ship} navigating to {Waypoint}.", nameof(ShipInOrbitTraderEventHandler), @event.ShipSymbol, destination);
-        if (ShouldAdjustFlightMode(ship, destination))
+        if (ship.FuelCapacity <= 0)
+        {
+            if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+            {
+                await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, "DRIFT"), cancellationToken);
+            }
+        }
+        else if (ShouldAdjustFlightMode(ship, destination))
         {
             var plan = await navigationPlanning.BuildPlanAsync(ship, destination, cancellationToken);
             if (!string.IsNullOrWhiteSpace(plan.RecommendedFlightMode) &&

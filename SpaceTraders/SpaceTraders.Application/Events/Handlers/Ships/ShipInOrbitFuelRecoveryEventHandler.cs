@@ -7,7 +7,10 @@ using Wolverine;
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
-/// Handles ships in orbit that are out of fuel by switching to drift mode and routing them to a fuel market.
+/// Handles ships in orbit that are out of fuel or critically low on fuel by routing them to a fuel market.
+/// Ships with zero fuel are switched to drift mode and navigated to the nearest known fuel market.
+/// Ships with critically low fuel (below 15% capacity) are docked at the current waypoint if it sells
+/// fuel, or switched to drift mode and directed to the nearest known fuel market.
 /// </summary>
 public sealed class ShipInOrbitFuelRecoveryEventHandler(
     IShipRepository ships,
@@ -17,6 +20,8 @@ public sealed class ShipInOrbitFuelRecoveryEventHandler(
     IMessageBus bus,
     ILogger<ShipInOrbitFuelRecoveryEventHandler> logger) : IChainOfCommandEventHandler<ShipInOrbitEvent>
 {
+    private const decimal CriticalFuelRatio = 0.15m;
+
     public int Priority => 10;
 
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
@@ -27,11 +32,30 @@ public sealed class ShipInOrbitFuelRecoveryEventHandler(
             return ChainOfCommandHandlerResult.Skipped();
         }
 
-        if (ship.FuelCapacity <= 0 || ship.FuelCurrent > 0 || string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        if (ship.FuelCapacity <= 0)
+        {
+            if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
+            {
+                await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, "DRIFT"), cancellationToken);
+            }
+
+            return ChainOfCommandHandlerResult.Skipped();
+        }
+
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
         {
             return ChainOfCommandHandlerResult.Skipped();
         }
 
+        var fuelRatio = (decimal)ship.FuelCurrent / ship.FuelCapacity;
+        var isCriticallyLow = fuelRatio <= CriticalFuelRatio;
+
+        if (ship.FuelCurrent > 0 && !isCriticallyLow)
+        {
+            return ChainOfCommandHandlerResult.Skipped();
+        }
+
+        // Ship is empty or critically low on fuel — route to a fuel market.
         if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(@event.ShipSymbol, "DRIFT"), cancellationToken);
@@ -40,18 +64,32 @@ public sealed class ShipInOrbitFuelRecoveryEventHandler(
         var targetFuelMarket = await FindFuelMarketInSystemAsync(ship.SystemSymbol, cancellationToken);
         if (string.IsNullOrWhiteSpace(targetFuelMarket))
         {
-            logger.LogWarning("{Handler}: ship {Ship} is out of fuel in {System} and no fuel market is known.", nameof(ShipInOrbitFuelRecoveryEventHandler), @event.ShipSymbol, ship.SystemSymbol);
+            logger.LogWarning(
+                "{Handler}: ship {Ship} has critically low fuel in {System} and no fuel market is known.",
+                nameof(ShipInOrbitFuelRecoveryEventHandler),
+                @event.ShipSymbol,
+                ship.SystemSymbol);
             return ChainOfCommandHandlerResult.Handled();
         }
 
         if (string.Equals(ship.WaypointSymbol, targetFuelMarket, StringComparison.OrdinalIgnoreCase))
         {
-            logger.LogInformation("{Handler}: ship {Ship} is at fuel market {Waypoint}; docking for refuel.", nameof(ShipInOrbitFuelRecoveryEventHandler), @event.ShipSymbol, targetFuelMarket);
+            logger.LogInformation(
+                "{Handler}: ship {Ship} is at fuel market {Waypoint} with critically low fuel; docking for refuel.",
+                nameof(ShipInOrbitFuelRecoveryEventHandler),
+                @event.ShipSymbol,
+                targetFuelMarket);
             await inOrbitCommands.DockAsync(@event.ShipSymbol, cancellationToken);
             return ChainOfCommandHandlerResult.Handled();
         }
 
-        logger.LogInformation("{Handler}: ship {Ship} is out of fuel; coasting to fuel market {Waypoint}.", nameof(ShipInOrbitFuelRecoveryEventHandler), @event.ShipSymbol, targetFuelMarket);
+        logger.LogInformation(
+            "{Handler}: ship {Ship} has critically low fuel ({Current}/{Capacity}); coasting to fuel market {Waypoint}.",
+            nameof(ShipInOrbitFuelRecoveryEventHandler),
+            @event.ShipSymbol,
+            ship.FuelCurrent,
+            ship.FuelCapacity,
+            targetFuelMarket);
         await inOrbitCommands.NavigateAsync(@event.ShipSymbol, targetFuelMarket, cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
     }

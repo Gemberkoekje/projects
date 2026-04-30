@@ -42,6 +42,12 @@ public sealed class FulfillContractHandler(
                 logger.LogInformation("Skipping fulfill for contract {ContractId}: already fulfilled.", command.ContractId);
                 return;
             }
+
+            if (HasPendingDeliverables(existing.DeliverablesJson))
+            {
+                logger.LogInformation("Skipping fulfill for contract {ContractId}: one or more deliverables are still pending.", command.ContractId);
+                return;
+            }
         }
 
         var result = await port.FulfillContractAsync(command.ContractId, cancellationToken);
@@ -70,5 +76,23 @@ public sealed class FulfillContractHandler(
         var credits = result.AgentCredits ?? 0;
         await bus.PublishAsync(new ContractFulfilledEvent(command.ContractId, credits));
         logger.LogInformation("Contract {ContractId} fulfilled. Agent credits: {Credits}.", command.ContractId, credits);
+    }
+
+    private static bool HasPendingDeliverables(string? deliverablesJson)
+    {
+        if (string.IsNullOrWhiteSpace(deliverablesJson))
+        {
+            return true;
+        }
+
+        try
+        {
+            var deliverables = JsonSerializer.Deserialize<List<ContractDeliverableDto>>(deliverablesJson) ?? [];
+            return deliverables.Any(d => d.UnitsRequired > d.UnitsFulfilled);
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
     }
 }
