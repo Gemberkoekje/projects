@@ -18,8 +18,8 @@ public sealed class ShipEventHandlerConventionTests
 
         var allowedExceptionHandlers = new HashSet<Type>
         {
-            typeof(ShipInTransitEventHandler),
             // Phase 7a: ShipStateMismatchEventHandler deleted.
+            // Phase 7d: ShipInTransitEventHandler converted to plain Wolverine handler; removed from exceptions.
         };
 
         var handlerTypes = typeof(ShipInTransitEventHandler).Assembly

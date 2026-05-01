@@ -9,31 +9,16 @@ namespace SpaceTraders.Application.Tests.Events.Handlers;
 public sealed class ChainOfCommandEventHandlerRegistrationTests
 {
     /// <summary>
-    /// Phase 6.5d: Only ShipInTransitEvent requires a DI-registered chain handler.
-    /// It schedules the ShipAutomationTickEvent on arrival so ships are ticked when they
-    /// reach their destination. All other chain events (docked, orbit, mismatch) are now
-    /// handled exclusively by ShipAutomationTickEventHandler → ShipPlannerService.
-    /// </summary>
-    [Fact]
-    public void ShipInTransitEvent_ShouldHaveDiRegisteredHandler()
-    {
-        var services = new ServiceCollection();
-        services.AddApplication();
-
-        var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(typeof(ShipInTransitEvent));
-        services.Any(d => d.ServiceType == handlerInterfaceType)
-            .Should().BeTrue("ShipInTransitEventHandler must remain registered to schedule arrival-tick events.");
-    }
-
-    /// <summary>
     /// Phase 6.5d: business-effect chain handlers for docked, orbit, and mismatch events have
     /// been removed. Planner-only automation means these event types no longer need registered
     /// chain handlers; ShipAutomationTickEvent drives all ship decisions instead.
+    /// Phase 7d: ShipInTransitEvent handler converted to a plain Wolverine handler; also removed.
     /// </summary>
     [Theory]
     [InlineData(typeof(ShipDockedEvent))]
     [InlineData(typeof(ShipInOrbitEvent))]
     [InlineData(typeof(ShipStateMismatchEvent))]
+    [InlineData(typeof(ShipInTransitEvent))]
     public void BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers(Type chainEventType)
     {
         var services = new ServiceCollection();
@@ -72,6 +57,9 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             // ShipInOrbitEvent no longer needs a chain handler; automation is driven by ShipAutomationTickEvent.
             // Phase 7e will decouple ShipInOrbitEvent from ChainOfCommandEvent.
             nameof(ShipInOrbitEvent),
+            // Phase 7d: ShipInTransitEventHandler converted to a plain Wolverine handler; chain handler removed.
+            // Phase 7e will decouple ShipInTransitEvent from ChainOfCommandEvent.
+            nameof(ShipInTransitEvent),
         };
 
         // Get all handler implementations
@@ -111,12 +99,12 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
     public void BaseDispatchableEventTypes_ShouldHaveHandlerTypes()
     {
         // Arrange - Only base event types that have dedicated handlers
-        var baseDispatchableEventTypes = new[]
+        var baseDispatchableEventTypes = new Type[]
         {
+            // Phase 7a: ShipStateMismatchEventHandler deleted; removed from this list.
             // Phase 7b: ShipDockedEvent chain handlers deleted; removed from this list.
             // Phase 7c: ShipInOrbitEvent chain handlers deleted; removed from this list.
-            typeof(ShipInTransitEvent),
-            // Phase 7a: ShipStateMismatchEventHandler deleted; removed from this list.
+            // Phase 7d: ShipInTransitEventHandler converted to plain Wolverine handler; removed from this list.
         };
 
         // Get all handler implementations

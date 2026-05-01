@@ -1,9 +1,5 @@
 using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SpaceTraders.Application.Events.Dispatching;
-using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -13,14 +9,10 @@ namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 public sealed class ShipInTransitEventHandlerTests
 {
     [Fact]
-    public async Task DispatchAsync_SchedulesArrival_WhenArrivalIsInFuture()
+    public async Task Handle_SchedulesArrivalTick_WhenArrivalIsInFuture()
     {
         var bus = Substitute.For<IMessageBus>();
-        var services = new ServiceCollection();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>>(_ => new ShipInTransitEventHandler(bus));
-
-        await using var provider = services.BuildServiceProvider();
-        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
+        var handler = new ShipInTransitEventHandler();
 
         var now = DateTimeOffset.UtcNow;
         var @event = new ShipInTransitEvent(
@@ -32,28 +24,18 @@ public sealed class ShipInTransitEventHandlerTests
             Guid.Empty,
             now);
 
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
+        await handler.Handle(@event, bus, CancellationToken.None);
 
-        result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
-        result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().BeNullOrEmpty();
-        result.IsScheduled.Should().BeFalse();
-
-        // ShipAutomationTickEvent is scheduled for the future arrival time.
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == @event.ShipSymbol && e.Reason == "Arrived"),
             Arg.Is<DeliveryOptions>(o => o != null && o.ScheduledTime != null));
     }
 
     [Fact]
-    public async Task DispatchAsync_PublishesArrivalImmediately_WhenArrivalIsDue()
+    public async Task Handle_PublishesArrivalTickImmediately_WhenArrivalIsDue()
     {
         var bus = Substitute.For<IMessageBus>();
-        var services = new ServiceCollection();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>>(_ => new ShipInTransitEventHandler(bus));
-
-        await using var provider = services.BuildServiceProvider();
-        var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
+        var handler = new ShipInTransitEventHandler();
 
         var now = DateTimeOffset.UtcNow;
         var @event = new ShipInTransitEvent(
@@ -65,12 +47,7 @@ public sealed class ShipInTransitEventHandlerTests
             Guid.Empty,
             now.AddMinutes(-2));
 
-        var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
-
-        result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
-        result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().BeNullOrEmpty();
-        result.IsScheduled.Should().BeFalse();
+        await handler.Handle(@event, bus, CancellationToken.None);
 
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipAutomationTickEvent>(e =>

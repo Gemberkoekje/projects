@@ -1,22 +1,16 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Events.Dispatching;
-using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.EventHandlers;
 
 /// <summary>
-/// Wolverine message handler that routes incoming chain-of-command events to the
+/// Wolverine message handler that routed incoming chain-of-command events to the
 /// <see cref="IChainOfCommandDispatcher"/>.
-/// Phase 7c: Overloads for ShipUndockedEvent, ShipArrivedEvent, and ShipInOrbitEvent removed —
-/// orbit routing deleted. Only ShipInTransitEvent remains (Phase 7d will remove it).
+/// Phase 7d: All overloads removed (ShipInTransitEvent was the last). Phase 7f will delete this class
+/// and the chain infrastructure entirely.
 /// </summary>
-public sealed class ChainOfCommandBridgeHandler(
-    IChainOfCommandDispatcher dispatcher,
-    ILogger<ChainOfCommandBridgeHandler> logger)
+#pragma warning disable CA1812 // Avoid uninstantiated internal classes — retained for Phase 7f deletion
+public sealed class ChainOfCommandBridgeHandler
 {
-    public async Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipInTransitEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
-    }
 }
+#pragma warning restore CA1812

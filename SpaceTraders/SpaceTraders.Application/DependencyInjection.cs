@@ -1,12 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Dispatching;
-using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Sync;
-using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 using Wolverine.ErrorHandling;
 
@@ -18,9 +16,9 @@ namespace SpaceTraders.Application;
 /// <remarks>
 /// Phase 6.5d: All ship automation is now driven by <see cref="EventHandlers.ShipAutomationTickEventHandler"/>
 /// → <see cref="Planning.IShipPlannerService"/>. Chain-of-command business-effect handler registrations
-/// have been removed; only <see cref="Events.Handlers.Ships.ShipInTransitEventHandler"/> remains to
-/// schedule the <see cref="Domain.Events.Ships.ShipAutomationTickEvent"/> on arrival.
-/// The chain infrastructure types are retained for Phase 7 cleanup.
+/// have been removed.
+/// Phase 7d: <see cref="Events.Handlers.Ships.ShipInTransitEventHandler"/> converted to a plain Wolverine
+/// handler; chain DI registration removed. The chain infrastructure types are retained for Phase 7f cleanup.
 /// </remarks>
 public static class DependencyInjection
 {
@@ -76,12 +74,9 @@ public static class DependencyInjection
 
         // Phase 6.5d: Business-effect chain handler registrations have been removed.
         // ShipAutomationTickEventHandler → ShipPlannerService now covers all docked, in-orbit,
-        // and in-transit decision points. The chain infrastructure (ChainOfCommandDispatcher,
-        // ChainOfCommandBridgeHandler, handler types) is retained for Phase 7 cleanup.
-
-        // Transit handler retained: schedules the ShipAutomationTickEvent on arrival so ships
-        // in transit are ticked when they reach their destination.
-        services.AddScoped<IChainOfCommandEventHandler<ShipInTransitEvent>, ShipInTransitEventHandler>();
+        // and in-transit decision points.
+        // Phase 7d: ShipInTransitEventHandler converted to plain Wolverine handler; chain DI
+        // registration removed. Chain infrastructure retained for Phase 7f cleanup.
 
         services.AddScoped<SyncAllShipsHandler>();
 
