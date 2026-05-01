@@ -565,12 +565,16 @@ Build green. Full test suite: 396 passed, 4 skipped (pre-existing network-gated 
 - Tests: deleted `ShipInOrbitEventHandlerTests`, `ShipInOrbitFuelRecoveryEventHandlerTests`, `ShipInOrbitMineEventHandlerTests`, `ShipUndockedEventHandlerTests`, `ShipUndockedTraderEventHandlerTests`, `ShipArrivedEventHandlerTests`. ✅
 - Updated `ChainOfCommandDispatcherTests`, `ChainOfCommandEventHandlerRegistrationTests`, `ShipChainEventsTests`, `ShipInTransitEventHandlerTests`. ✅
 
-#### Phase 7d — Retire transit chain handler
+#### Phase 7d — Retire transit chain handler ✅ COMPLETE
 
-- Convert `ShipInTransitEventHandler` to a plain Wolverine handler (`Handle(ShipInTransitEvent, IMessageBus, CancellationToken)`); its only job is to publish/schedule `ShipAutomationTickEvent` for the arrival time.
-- Drop `IChainOfCommandEventHandler<ShipInTransitEvent>` implementation, `ChainOfCommandHandlerResult` returns, and the `#pragma warning disable CS0618` block.
-- Remove the `ShipInTransitEvent` overload from `ChainOfCommandBridgeHandler` and the corresponding DI registration.
-- Tests: update `ShipInTransitEventHandlerTests` to construct the handler with `IMessageBus` only and assert immediate vs scheduled tick publication (the existing Phase 5b assertions). Drop chain-result assertions.
+- Converted `ShipInTransitEventHandler` to a plain Wolverine handler (`Handle(ShipInTransitEvent, IMessageBus, CancellationToken)`); its only job is to publish/schedule `ShipAutomationTickEvent` for the arrival time. ✅
+- Dropped `IChainOfCommandEventHandler<ShipInTransitEvent>` implementation and `ChainOfCommandHandlerResult` returns. ✅
+- Removed the `ShipInTransitEvent` overload from `ChainOfCommandBridgeHandler` (now empty, to be deleted in Phase 7f) and the corresponding DI registration. ✅
+- Tests: updated `ShipInTransitEventHandlerTests` to construct the handler directly with `IMessageBus` only and assert immediate vs scheduled tick publication. Dropped chain-result assertions. ✅
+- Updated `ChainOfCommandEventHandlerRegistrationTests`: removed `ShipInTransitEvent_ShouldHaveDiRegisteredHandler`, added `ShipInTransitEvent` to no-handler exemption set, removed from `baseDispatchableEventTypes` array, added `ShipInTransitEvent` as unregistered in `BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers`. ✅
+- Updated `ShipEventHandlerConventionTests`: removed `ShipInTransitEventHandler` from exception list. ✅
+
+Build is green and the full solution test suite passes — 382 passed, 4 pre-existing sandbox integration tests skipped. Phase 7d is complete; `ShipInTransitEventHandler` is now a plain Wolverine handler with no chain-of-command dependency.
 
 #### Phase 7e — Decouple remaining events from `ChainOfCommandEvent`
 

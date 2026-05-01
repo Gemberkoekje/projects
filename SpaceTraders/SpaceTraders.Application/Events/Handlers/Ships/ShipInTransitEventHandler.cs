@@ -4,17 +4,16 @@ using Wolverine;
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
-/// Schedules or publishes a <see cref="ShipAutomationTickEvent"/> based on the ship's arrival time.
+/// Wolverine handler that schedules or publishes a <see cref="ShipAutomationTickEvent"/> based on the ship's arrival time.
 /// If the arrival is in the future, the tick is scheduled; otherwise it is published immediately.
+/// Phase 7d: converted from IChainOfCommandEventHandler to a plain Wolverine handler.
 /// </summary>
-public sealed class ShipInTransitEventHandler(IMessageBus bus) : IChainOfCommandEventHandler<ShipInTransitEvent>
+public sealed class ShipInTransitEventHandler
 {
-
-    public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInTransitEvent @event, CancellationToken cancellationToken)
+    public async Task Handle(ShipInTransitEvent @event, IMessageBus bus, CancellationToken cancellationToken)
     {
         var now = TimeProvider.System.GetUtcNow();
 
-        // Phase 7c: ShipArrivedEvent deleted; arrival is signalled by ShipAutomationTickEvent only.
         var tick = new ShipAutomationTickEvent(
             @event.ShipSymbol,
             "Arrived",
@@ -30,7 +29,5 @@ public sealed class ShipInTransitEventHandler(IMessageBus bus) : IChainOfCommand
         {
             await bus.PublishAsync(tick);
         }
-
-        return ChainOfCommandHandlerResult.Handled();
     }
 }
