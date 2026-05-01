@@ -446,9 +446,11 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ **Annotation markers** — `FinancePage` and `RunsPage` read `AgentSetting` rows with key prefix `Annotation.*`; the credits line charts render vertical dashed markers with labels at the annotation timestamps.
 - ✅ Backend: 5 new integration tests (38 API tests total). Frontend: 10 new unit tests (108 total).
 
-### Phase 6 — retire `SpaceTraders.App`
+### Phase 6 — retire `SpaceTraders.App` ✅ *Implemented*
 
-- Once the new UI covers all views still actively used, remove `SpaceTraders.App` from k8s.
+- ✅ Removed `SpaceTraders.App` project from the solution (`SpaceTraders.slnx`).
+- ✅ Deleted `SpaceTraders.App` project directory and `Dockerfile.app`.
+- ✅ Updated CI workflow (`ci-spacetraders.yml`): removed `SpaceTraders.App` restore/build steps and the `spacetraders-app` Docker image build/push step.
 - Remaining deployment: `SpaceTraders.API` + `SpaceTraders.WebUI` + PostgreSQL.
 
 ## 12. Decisions
