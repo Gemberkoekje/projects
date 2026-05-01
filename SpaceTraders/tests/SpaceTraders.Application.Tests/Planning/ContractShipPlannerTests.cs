@@ -86,4 +86,52 @@ public sealed class ContractShipPlannerTests
         decision.Kind.Should().Be(ShipPlannerCommandKind.PatchFlightMode);
         decision.FlightMode.Should().Be("DRIFT");
     }
+
+    // ---- Phase 6.5b: docked-state tests ----
+
+    [Fact]
+    public void Plan_ReturnsBuyCargo_WhenDockedAtOriginNeedingCargo()
+    {
+        var ship = Ship("X1-AB-LOAD", status: "DOCKED");
+        var decision = Planner.Plan(ship, ContractAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.BuyCargo);
+        decision.TradeSymbol.Should().Be("ALUMINUM_ORE");
+    }
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedAtOriginWithFullRequiredCargo()
+    {
+        var ship = Ship("X1-AB-LOAD", status: "DOCKED",
+            inventory: [new CargoItemModel("ALUMINUM_ORE", 20)]);
+        var assignment = new ShipAssignmentDto("SHIP-1", "Contract", "X1-AB-LOAD", "X1-AB-DELIVER", "ALUMINUM_ORE", "CT-1", 0, DateTimeOffset.UtcNow, null, RequiredUnits: 20);
+        var decision = Planner.Plan(ship, assignment, new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ReturnsDeliverContractCargo_WhenDockedAtDestinationWithCargo()
+    {
+        var ship = Ship("X1-AB-DELIVER", status: "DOCKED",
+            inventory: [new CargoItemModel("ALUMINUM_ORE", 10)]);
+        var decision = Planner.Plan(ship, ContractAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.DeliverContractCargo);
+        decision.TradeSymbol.Should().Be("ALUMINUM_ORE");
+        decision.ContractId.Should().Be("CT-1");
+    }
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedAtDestinationWithNoCargo()
+    {
+        var ship = Ship("X1-AB-DELIVER", status: "DOCKED");
+        var decision = Planner.Plan(ship, ContractAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedElsewhere()
+    {
+        var ship = Ship("X1-AB-OTHER", status: "DOCKED");
+        var decision = Planner.Plan(ship, ContractAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
 }

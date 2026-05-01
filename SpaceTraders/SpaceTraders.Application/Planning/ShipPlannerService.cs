@@ -34,7 +34,12 @@ public sealed class ShipPlannerService(
     IConstructionRepository constructions,
     IWaypointRepository waypoints,
     IMarketRepository markets,
+    IContractRepository contracts,
+    ISettingsRepository settings,
     IFleetMaintenancePlanner maintenance,
+    IWaypointVisitService waypointVisit,
+    IMarketRefreshService marketRefresh,
+    IShipyardRefreshService shipyardRefresh,
     IInOrbitCommandAcceptor inOrbitCommands,
     IDockedCommandAcceptor dockedCommands,
     IMessageBus bus,
@@ -124,6 +129,31 @@ public sealed class ShipPlannerService(
             constructionComplete = site is not null && site.IsComplete;
         }
 
+        // Phase 6.5b: load docked context for role planners that now handle docked state.
+        IReadOnlyList<ContractDto> activeContracts = [];
+        Interfaces.MarketSnapshot? currentMarketSnapshot = null;
+        var miningReserveHydrocarbonUnits = 0;
+        var miningMinimumSellPrice = 0;
+        var miningJettisonLowValueWhenFull = false;
+
+        if (ship.LocalStatus == Domain.Enums.ShipLocalStatus.Docked)
+        {
+            activeContracts = await contracts.GetActiveAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+            {
+                currentMarketSnapshot = await markets.FindSnapshotByWaypointAsync(ship.WaypointSymbol, cancellationToken);
+            }
+
+            if (assignment.AssignmentType.Equals("Mine", StringComparison.OrdinalIgnoreCase)
+                || assignment.AssignmentType.Equals("Siphon", StringComparison.OrdinalIgnoreCase))
+            {
+                miningReserveHydrocarbonUnits = await settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", cancellationToken);
+                miningMinimumSellPrice = await settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", cancellationToken);
+                miningJettisonLowValueWhenFull = await settings.GetAsync<bool>("Mining.JettisonLowValueWhenFull", cancellationToken);
+            }
+        }
+
         return new ShipPlannerContext
         {
             ActiveSurveyCount = activeSurveys,
@@ -132,6 +162,11 @@ public sealed class ShipPlannerService(
             CurrentWaypointSellsFuel = currentSellsFuel,
             Maintenance = maintenanceDecision,
             ConstructionComplete = constructionComplete,
+            ActiveContracts = activeContracts,
+            CurrentMarketSnapshot = currentMarketSnapshot,
+            MiningReserveHydrocarbonUnits = miningReserveHydrocarbonUnits,
+            MiningMinimumSellPrice = miningMinimumSellPrice,
+            MiningJettisonLowValueWhenFull = miningJettisonLowValueWhenFull,
         };
     }
 
@@ -258,6 +293,42 @@ public sealed class ShipPlannerService(
 
             case ShipPlannerCommandKind.Scrap:
                 await dockedCommands.ScrapAsync(decision.ShipSymbol, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.SellCargo:
+                await dockedCommands.SellCargoAsync(decision.ShipSymbol, decision.TradeSymbol, decision.Units, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.DeliverContractCargo:
+                await dockedCommands.DeliverContractAsync(
+                    decision.ContractId,
+                    decision.ShipSymbol,
+                    decision.TradeSymbol,
+                    decision.Units,
+                    decision.WaypointSymbol,
+                    cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.RefuelFromCargo:
+                await dockedCommands.RefuelAsync(decision.ShipSymbol, fromCargo: true, cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.JettisonCargo:
+                await bus.InvokeAsync(new JettisonCargoCommand(decision.ShipSymbol, decision.TradeSymbol, decision.Units), cancellationToken);
+                return;
+
+            case ShipPlannerCommandKind.RefreshScoutData:
+                var waypoint = ship.WaypointSymbol ?? string.Empty;
+                await waypointVisit.MarkVisitedAsync(waypoint, cancellationToken);
+                await marketRefresh.RefreshIfApplicableAsync(waypoint, cancellationToken);
+                await shipyardRefresh.RefreshIfApplicableAsync(waypoint, cancellationToken);
+                var isMarketProbeAtTarget = assignment.AssignmentType.Equals("MarketProbe", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
+                    && waypoint.Equals(assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase);
+                if (!isMarketProbeAtTarget)
+                {
+                    await dockedCommands.OrbitAsync(decision.ShipSymbol, cancellationToken);
+                }
                 return;
         }
     }

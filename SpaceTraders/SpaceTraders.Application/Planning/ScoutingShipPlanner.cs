@@ -33,9 +33,16 @@ public sealed class ScoutingShipPlanner : IShipPlanner
             return ShipPlannerDecision.None(ship.Symbol, "Ship is in transit; waiting for arrival.");
         }
 
+        // Phase 6.5b: when docked, refresh market/shipyard data and orbit (unless this is a
+        // market probe already parked at its target, which the executor handles).
+        if (ship.LocalStatus == ShipLocalStatus.Docked)
+        {
+            return ShipPlannerDecision.RefreshScoutData(ship.Symbol, "Docked at waypoint; refreshing data.");
+        }
+
         if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
-            return ShipPlannerDecision.None(ship.Symbol, "Scouting planner only handles in-orbit decisions.");
+            return ShipPlannerDecision.None(ship.Symbol, "Scouting planner cannot handle current ship status.");
         }
 
         if (string.IsNullOrWhiteSpace(assignment.OriginWaypoint))

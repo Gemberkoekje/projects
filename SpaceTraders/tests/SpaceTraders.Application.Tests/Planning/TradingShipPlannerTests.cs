@@ -21,9 +21,10 @@ public sealed class TradingShipPlannerTests
         int cargo = 0,
         int fuelCurrent = 80,
         int fuelCapacity = 100,
-        string flightMode = "CRUISE") =>
+        string flightMode = "CRUISE",
+        IReadOnlyList<CargoItemModel>? cargoInventory = null) =>
         new("SHIP-1", "X1-AB", waypoint, status, flightMode, fuelCurrent, fuelCapacity,
-            CargoCurrent: cargo, CargoCapacity: 40);
+            CargoCurrent: cargo, CargoCapacity: 40, CargoInventory: cargoInventory);
 
     [Fact]
     public void CanPlan_ReturnsTrue_ForTradeAssignment()
@@ -46,10 +47,12 @@ public sealed class TradingShipPlannerTests
     }
 
     [Fact]
-    public void Plan_ReturnsNone_WhenDocked()
+    public void Plan_ReturnsBuyCargo_WhenDockedAtBuyWaypoint()
     {
         var ship = Ship("X1-AB-BUY", status: "DOCKED");
-        Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext()).Kind.Should().Be(ShipPlannerCommandKind.None);
+        var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.BuyCargo);
+        decision.TradeSymbol.Should().Be("FUEL");
     }
 
     [Fact]
@@ -110,5 +113,55 @@ public sealed class TradingShipPlannerTests
         var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext { RecommendedFlightMode = "BURN" });
         decision.Kind.Should().Be(ShipPlannerCommandKind.PatchFlightMode);
         decision.FlightMode.Should().Be("BURN");
+    }
+
+    // ---- Phase 6.5b: docked-state tests ----
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedAtBuyWaypointWithFullCargo()
+    {
+        var ship = Ship("X1-AB-BUY", status: "DOCKED", cargo: 40);
+        var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ReturnsDeliverContractCargo_WhenDockedAtSellWaypointWithContractDeliverable()
+    {
+        var ship = Ship("X1-AB-SELL", status: "DOCKED", cargo: 10,
+            cargoInventory: [new CargoItemModel("FUEL", 10)]);
+        var contract = new ContractDto("CT-1", "FAC", "PROCUREMENT", true, false, null, null, null,
+            """[{"TradeSymbol":"FUEL","DestinationSymbol":"X1-AB-SELL","UnitsRequired":20,"UnitsFulfilled":0}]""");
+        var context = new ShipPlannerContext { ActiveContracts = [contract] };
+        var decision = Planner.Plan(ship, TradeAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.DeliverContractCargo);
+        decision.ContractId.Should().Be("CT-1");
+    }
+
+    [Fact]
+    public void Plan_ReturnsSellCargo_WhenDockedAtSellWaypointWithCargoAndNoContracts()
+    {
+        var ship = Ship("X1-AB-SELL", status: "DOCKED", cargo: 15,
+            cargoInventory: [new CargoItemModel("FUEL", 15)]);
+        var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.SellCargo);
+        decision.TradeSymbol.Should().Be("FUEL");
+        decision.Units.Should().Be(15);
+    }
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedAtSellWaypointWithNoCargoAndNoContracts()
+    {
+        var ship = Ship("X1-AB-SELL", status: "DOCKED", cargo: 0);
+        var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ReturnsOrbit_WhenDockedElsewhere()
+    {
+        var ship = Ship("X1-AB-OTHER", status: "DOCKED", cargo: 0);
+        var decision = Planner.Plan(ship, TradeAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
     }
 }

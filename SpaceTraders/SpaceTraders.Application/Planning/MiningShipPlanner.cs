@@ -1,6 +1,8 @@
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using System.Text.Json;
 
 namespace SpaceTraders.Application.Planning;
 
@@ -31,11 +33,15 @@ public sealed class MiningShipPlanner : IShipPlanner
             return ShipPlannerDecision.None(ship.Symbol, "Ship is in transit; waiting for arrival.");
         }
 
-        // Only orbit-state decisions are migrated in Phase 3.
-        // Docked transitions are still handled by the docked chain handlers for now.
+        // Phase 6.5b: handle docked state — deliver, sell, jettison, refuel, then orbit.
+        if (ship.LocalStatus == ShipLocalStatus.Docked)
+        {
+            return PlanDocked(ship, context);
+        }
+
         if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
-            return ShipPlannerDecision.None(ship.Symbol, "Mining planner only handles in-orbit decisions in Phase 3.");
+            return ShipPlannerDecision.None(ship.Symbol, "Mining planner cannot handle current ship status.");
         }
 
         var atOrigin = !string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
@@ -98,6 +104,159 @@ public sealed class MiningShipPlanner : IShipPlanner
         }
 
         return ShipPlannerDecision.Navigate(ship.Symbol, assignment.OriginWaypoint!, "Navigating to mining origin.");
+    }
+
+    private static ShipPlannerDecision PlanDocked(ShipModel ship, ShipPlannerContext context)
+    {
+        // 1. Deliver contract cargo at the current waypoint if possible.
+        var deliverDecision = TryPlanContractDelivery(ship, context);
+        if (deliverDecision is not null)
+        {
+            return deliverDecision;
+        }
+
+        // 2. Sell eligible non-protected cargo.
+        if (ship.CargoInventory is not null)
+        {
+            var protectedCargo = GetProtectedCargo(context);
+            foreach (var cargo in ship.CargoInventory.Where(c => c.Units > 0))
+            {
+                if (protectedCargo.Contains(cargo.Symbol))
+                {
+                    continue;
+                }
+
+                var isHydrocarbon = cargo.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase);
+                if (isHydrocarbon && cargo.Units <= context.MiningReserveHydrocarbonUnits)
+                {
+                    continue;
+                }
+
+                var sellPrice = context.CurrentMarketSnapshot?.TradeGoods
+                    .FirstOrDefault(g => g.Symbol.Equals(cargo.Symbol, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0;
+
+                if (sellPrice > 0 && sellPrice >= context.MiningMinimumSellPrice)
+                {
+                    var sellUnits = isHydrocarbon
+                        ? Math.Max(0, cargo.Units - context.MiningReserveHydrocarbonUnits)
+                        : cargo.Units;
+
+                    if (sellUnits > 0)
+                    {
+                        return ShipPlannerDecision.SellCargo(
+                            ship.Symbol,
+                            cargo.Symbol,
+                            sellUnits,
+                            $"Selling {sellUnits}x {cargo.Symbol} at market.");
+                    }
+                }
+
+                // 3. Jettison low-value cargo when full.
+                if (context.MiningJettisonLowValueWhenFull && ship.CargoCurrent >= ship.CargoCapacity)
+                {
+                    var jettisonUnits = isHydrocarbon
+                        ? Math.Max(0, cargo.Units - context.MiningReserveHydrocarbonUnits)
+                        : cargo.Units;
+
+                    if (jettisonUnits > 0)
+                    {
+                        return ShipPlannerDecision.JettisonCargo(
+                            ship.Symbol,
+                            cargo.Symbol,
+                            jettisonUnits,
+                            $"Jettisoning {jettisonUnits}x {cargo.Symbol}: low-value cargo when hold is full.");
+                    }
+                }
+            }
+        }
+
+        // 4. Refuel from hydrocarbon cargo if the hold has enough hydrocarbons above the reserve and the tank is not full.
+        if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity)
+        {
+            var hydrocarbonUnits = ship.CargoInventory?
+                .FirstOrDefault(c => c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase))?
+                .Units ?? 0;
+            if (hydrocarbonUnits > context.MiningReserveHydrocarbonUnits)
+            {
+                return ShipPlannerDecision.RefuelFromCargo(ship.Symbol, "Refueling from hydrocarbon cargo reserves.");
+            }
+        }
+
+        // 5. Nothing more to do docked; orbit to continue the mining cycle.
+        return ShipPlannerDecision.Orbit(ship.Symbol, "Docked miner: no cargo action needed; orbiting to continue cycle.");
+    }
+
+    private static ShipPlannerDecision? TryPlanContractDelivery(ShipModel ship, ShipPlannerContext context)
+    {
+        if (ship.CargoInventory is null || string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        {
+            return null;
+        }
+
+        foreach (var contract in context.ActiveContracts.Where(c => c.IsAccepted && !c.IsFulfilled && !string.IsNullOrWhiteSpace(c.DeliverablesJson)))
+        {
+            var deliverables = DeserializeDeliverables(contract.DeliverablesJson);
+            foreach (var deliverable in deliverables)
+            {
+                if (!deliverable.DestinationSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase)
+                    || deliverable.UnitsRequired <= deliverable.UnitsFulfilled)
+                {
+                    continue;
+                }
+
+                var cargoUnits = ship.CargoInventory
+                    .FirstOrDefault(i => i.Symbol.Equals(deliverable.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
+                    .Units ?? 0;
+                if (cargoUnits <= 0)
+                {
+                    continue;
+                }
+
+                var pending = deliverable.UnitsRequired - deliverable.UnitsFulfilled;
+                var unitsToDeliver = Math.Min(cargoUnits, pending);
+                if (unitsToDeliver <= 0)
+                {
+                    continue;
+                }
+
+                return ShipPlannerDecision.DeliverContractCargo(
+                    ship.Symbol,
+                    contract.Id,
+                    deliverable.TradeSymbol,
+                    unitsToDeliver,
+                    ship.WaypointSymbol,
+                    $"Delivering {unitsToDeliver}x {deliverable.TradeSymbol} for contract {contract.Id}.");
+            }
+        }
+
+        return null;
+    }
+
+    private static HashSet<string> GetProtectedCargo(ShipPlannerContext context)
+    {
+        return context.ActiveContracts
+            .Where(c => c.IsAccepted && !c.IsFulfilled)
+            .SelectMany(c => DeserializeDeliverables(c.DeliverablesJson))
+            .Where(d => d.UnitsRequired > d.UnitsFulfilled)
+            .Select(d => d.TradeSymbol)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<ContractDeliverableDto> DeserializeDeliverables(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ContractDeliverableDto>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static ShipPlannerDecision? TryAdjustFlightMode(ShipModel ship, string destinationWaypoint, ShipPlannerContext context)

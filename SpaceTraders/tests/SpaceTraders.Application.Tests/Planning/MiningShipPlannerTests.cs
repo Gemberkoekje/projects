@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Planning;
 using SpaceTraders.Application.Ports;
 
@@ -26,9 +27,10 @@ public sealed class MiningShipPlannerTests
         IReadOnlyList<string>? mounts = null,
         int fuelCurrent = 80,
         int fuelCapacity = 100,
-        string flightMode = "CRUISE") =>
+        string flightMode = "CRUISE",
+        IReadOnlyList<CargoItemModel>? cargoInventory = null) =>
         new("SHIP-1", "X1-AB", waypoint, status, flightMode, fuelCurrent, fuelCapacity,
-            CargoCurrent: cargo, CargoCapacity: capacity, MountSymbols: mounts);
+            CargoCurrent: cargo, CargoCapacity: capacity, MountSymbols: mounts, CargoInventory: cargoInventory);
 
     [Fact]
     public void CanPlan_ReturnsTrue_ForMineAssignment()
@@ -58,11 +60,11 @@ public sealed class MiningShipPlannerTests
     }
 
     [Fact]
-    public void Plan_ReturnsNone_WhenDocked()
+    public void Plan_ReturnsOrbit_WhenDockedAtOriginWithNoCargo()
     {
         var ship = Ship("X1-AB-AST", status: "DOCKED");
         var decision = Planner.Plan(ship, MineAssignment(), new ShipPlannerContext());
-        decision.Kind.Should().Be(ShipPlannerCommandKind.None);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
     }
 
     [Fact]
@@ -171,5 +173,118 @@ public sealed class MiningShipPlannerTests
             MineAssignment(),
             new ShipPlannerContext { RecommendedFlightMode = "CRUISE" });
         decision.Kind.Should().Be(ShipPlannerCommandKind.Navigate);
+    }
+
+    // ---- Phase 6.5b: docked-state tests ----
+
+    [Fact]
+    public void Plan_ReturnsDeliverContractCargo_WhenDockedWithDeliverableContractAtWaypoint()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
+            cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+        var contract = new ContractDto("CT-1", "FAC", "PROCUREMENT", true, false, null, null, null,
+            """[{"TradeSymbol":"IRON_ORE","DestinationSymbol":"X1-AB-MKT","UnitsRequired":20,"UnitsFulfilled":0}]""");
+        var context = new ShipPlannerContext { ActiveContracts = [contract] };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.DeliverContractCargo);
+        decision.TradeSymbol.Should().Be("IRON_ORE");
+        decision.Units.Should().Be(10);
+        decision.ContractId.Should().Be("CT-1");
+    }
+
+    [Fact]
+    public void Plan_ReturnsSellCargo_WhenDockedWithEligibleNonProtectedCargo()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
+            cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+            "X1-AB-MKT", "X1-AB",
+            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
+            [], [], []);
+        var context = new ShipPlannerContext { CurrentMarketSnapshot = snapshot, MiningMinimumSellPrice = 100 };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.SellCargo);
+        decision.TradeSymbol.Should().Be("IRON_ORE");
+        decision.Units.Should().Be(10);
+    }
+
+    [Fact]
+    public void Plan_SkipsSellCargo_WhenCargoIsBelowMinimumSellPrice()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
+            cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+            "X1-AB-MKT", "X1-AB",
+            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 5, 50, 10, "WEAK", "DECLINING")],
+            [], [], []);
+        var context = new ShipPlannerContext { CurrentMarketSnapshot = snapshot, MiningMinimumSellPrice = 100 };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        // Hold is not full so jettison does not apply either; just orbits.
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ReturnsJettisonCargo_WhenFullAndLowValueAndJettisonEnabled()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10, capacity: 10,
+            cargoInventory: [new CargoItemModel("ROCK", 10)]);
+        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+            "X1-AB-MKT", "X1-AB",
+            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("ROCK", "EXCHANGE", 1, 5, 10, "ABUNDANT", "DECLINING")],
+            [], [], []);
+        var context = new ShipPlannerContext
+        {
+            CurrentMarketSnapshot = snapshot,
+            MiningMinimumSellPrice = 100,
+            MiningJettisonLowValueWhenFull = true,
+        };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.JettisonCargo);
+        decision.TradeSymbol.Should().Be("ROCK");
+    }
+
+    [Fact]
+    public void Plan_ReturnsRefuelFromCargo_WhenHydrocarbonAboveReserveAndFuelNotFull()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10, capacity: 40,
+            fuelCurrent: 50, fuelCapacity: 100,
+            cargoInventory: [new CargoItemModel("HYDROCARBON", 10)]);
+        var context = new ShipPlannerContext { MiningReserveHydrocarbonUnits = 5 };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.RefuelFromCargo);
+    }
+
+    [Fact]
+    public void Plan_SkipsRefuelFromCargo_WhenHydrocarbonAtOrBelowReserve()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 5, capacity: 40,
+            fuelCurrent: 50, fuelCapacity: 100,
+            cargoInventory: [new CargoItemModel("HYDROCARBON", 5)]);
+        var context = new ShipPlannerContext { MiningReserveHydrocarbonUnits = 5 };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
+    }
+
+    [Fact]
+    public void Plan_ProtectsContractCargo_FromSell()
+    {
+        var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
+            cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
+        // Contract protects IRON_ORE (undeliverable at this waypoint, but still in the protected set)
+        var contract = new ContractDto("CT-1", "FAC", "PROCUREMENT", true, false, null, null, null,
+            """[{"TradeSymbol":"IRON_ORE","DestinationSymbol":"X1-AB-OTHER","UnitsRequired":20,"UnitsFulfilled":0}]""");
+        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+            "X1-AB-MKT", "X1-AB",
+            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
+            [], [], []);
+        var context = new ShipPlannerContext
+        {
+            ActiveContracts = [contract],
+            CurrentMarketSnapshot = snapshot,
+            MiningMinimumSellPrice = 100,
+        };
+        var decision = Planner.Plan(ship, MineAssignment(), context);
+        // Iron ore is protected; nothing to sell/jettison → orbit.
+        decision.Kind.Should().Be(ShipPlannerCommandKind.Orbit);
     }
 }

@@ -1,7 +1,6 @@
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
-
 namespace SpaceTraders.Application.Planning;
 
 /// <summary>
@@ -32,9 +31,15 @@ public sealed class ContractShipPlanner : IShipPlanner
             return ShipPlannerDecision.None(ship.Symbol, "Ship is in transit; waiting for arrival.");
         }
 
+        // Phase 6.5b: handle docked state — buy at origin, deliver at destination, then orbit.
+        if (ship.LocalStatus == ShipLocalStatus.Docked)
+        {
+            return PlanDocked(ship, assignment);
+        }
+
         if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
-            return ShipPlannerDecision.None(ship.Symbol, "Contract planner only handles in-orbit decisions.");
+            return ShipPlannerDecision.None(ship.Symbol, "Contract planner cannot handle current ship status.");
         }
 
         var destination = ResolveDestination(assignment, ship);
@@ -55,6 +60,59 @@ public sealed class ContractShipPlanner : IShipPlanner
         }
 
         return ShipPlannerDecision.Navigate(ship.Symbol, destination, "Navigating to contract waypoint.");
+    }
+
+    private static ShipPlannerDecision PlanDocked(ShipModel ship, ShipAssignmentDto assignment)
+    {
+        var atOrigin = !string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
+            && ship.WaypointSymbol?.Equals(assignment.OriginWaypoint, StringComparison.OrdinalIgnoreCase) == true;
+
+        var atDestination = !string.IsNullOrWhiteSpace(assignment.DestWaypoint)
+            && ship.WaypointSymbol?.Equals(assignment.DestWaypoint, StringComparison.OrdinalIgnoreCase) == true;
+
+        if (atOrigin && !string.IsNullOrWhiteSpace(assignment.CargoSymbol))
+        {
+            var cargoUnits = ship.CargoInventory?
+                .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
+                .Units ?? 0;
+
+            var remainingRequired = assignment.RequiredUnits > 0
+                ? assignment.RequiredUnits - cargoUnits
+                : ship.CargoCapacity - ship.CargoCurrent;
+            var unitsToBuy = Math.Min(ship.CargoCapacity - ship.CargoCurrent, Math.Max(0, remainingRequired));
+
+            if (unitsToBuy > 0)
+            {
+                return ShipPlannerDecision.BuyCargo(
+                    ship.Symbol,
+                    assignment.CargoSymbol,
+                    unitsToBuy,
+                    $"Buying {unitsToBuy}x {assignment.CargoSymbol} for contract at origin.");
+            }
+        }
+        else if (atDestination && !string.IsNullOrWhiteSpace(assignment.CargoSymbol) && !string.IsNullOrWhiteSpace(assignment.ContractId))
+        {
+            var cargoUnits = ship.CargoInventory?
+                .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
+                .Units ?? 0;
+
+            var unitsToDeliver = assignment.RequiredUnits > 0
+                ? Math.Min(cargoUnits, assignment.RequiredUnits)
+                : cargoUnits;
+
+            if (unitsToDeliver > 0)
+            {
+                return ShipPlannerDecision.DeliverContractCargo(
+                    ship.Symbol,
+                    assignment.ContractId,
+                    assignment.CargoSymbol,
+                    unitsToDeliver,
+                    assignment.DestWaypoint ?? ship.WaypointSymbol ?? string.Empty,
+                    $"Delivering {unitsToDeliver}x {assignment.CargoSymbol} for contract {assignment.ContractId}.");
+            }
+        }
+
+        return ShipPlannerDecision.Orbit(ship.Symbol, "Docked contract ship: no cargo action needed; orbiting.");
     }
 
     private static string ResolveDestination(ShipAssignmentDto assignment, ShipModel ship)

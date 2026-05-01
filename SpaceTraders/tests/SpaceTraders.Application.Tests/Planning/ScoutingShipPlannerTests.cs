@@ -82,4 +82,31 @@ public sealed class ScoutingShipPlannerTests
         decision.Kind.Should().Be(ShipPlannerCommandKind.PatchFlightMode);
         decision.FlightMode.Should().Be("DRIFT");
     }
+
+    // ---- Phase 6.5b: docked-state tests ----
+
+    [Fact]
+    public void Plan_ReturnsRefreshScoutData_WhenDockedAtTarget()
+    {
+        var ship = Ship("X1-AB-TGT", status: "DOCKED");
+        var decision = Planner.Plan(ship, ScoutAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.RefreshScoutData);
+    }
+
+    [Fact]
+    public void Plan_ReturnsRefreshScoutData_WhenDockedAtNonTarget()
+    {
+        // Even when docked at a non-target waypoint, the scout should refresh data and orbit away.
+        var ship = Ship("X1-AB-OTHER", status: "DOCKED");
+        var decision = Planner.Plan(ship, ScoutAssignment(), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.RefreshScoutData);
+    }
+
+    [Fact]
+    public void Plan_ReturnsRefreshScoutData_WhenMarketProbeDockedAtTarget()
+    {
+        var ship = Ship("X1-AB-TGT", status: "DOCKED");
+        var decision = Planner.Plan(ship, ScoutAssignment(type: "MarketProbe"), new ShipPlannerContext());
+        decision.Kind.Should().Be(ShipPlannerCommandKind.RefreshScoutData);
+    }
 }
