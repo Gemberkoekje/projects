@@ -1283,3 +1283,156 @@ describe('RunDetailPage', () => {
     )
   })
 })
+
+describe('RunComparePage', () => {
+  const base = Date.now()
+
+  const runA = {
+    id: 'run-a',
+    name: 'Trade Run A',
+    strategyLabel: 'TRADE',
+    startedAt: new Date(base - 7_200_000).toISOString(),
+    endedAt: new Date(base - 3_600_000).toISOString(),
+    startingCredits: 100_000,
+    endingCredits: 300_000,
+  }
+
+  const runB = {
+    id: 'run-b',
+    name: 'Mining Run B',
+    strategyLabel: 'MINE',
+    startedAt: new Date(base - 10_800_000).toISOString(),
+    endedAt: new Date(base - 3_600_000).toISOString(),
+    startingCredits: 80_000,
+    endingCredits: 200_000,
+  }
+
+  const compareData = {
+    runA: {
+      run: runA,
+      creditHighlights: [
+        { id: 1, runId: 'run-a', occurredAt: new Date(base - 7_200_000).toISOString(), credits: 100_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+        { id: 2, runId: 'run-a', occurredAt: new Date(base - 3_600_000).toISOString(), credits: 300_000, deltaCredits: 200_000, eventKind: 'RunClose', label: 'End' },
+      ],
+      ledgerSummary: [
+        { category: 'TradeSell', totalAmount: 250_000, entryCount: 8 },
+        { category: 'FuelPurchase', totalAmount: -50_000, entryCount: 12 },
+      ],
+    },
+    runB: {
+      run: runB,
+      creditHighlights: [
+        { id: 3, runId: 'run-b', occurredAt: new Date(base - 10_800_000).toISOString(), credits: 80_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+        { id: 4, runId: 'run-b', occurredAt: new Date(base - 3_600_000).toISOString(), credits: 200_000, deltaCredits: 120_000, eventKind: 'RunClose', label: 'End' },
+      ],
+      ledgerSummary: [
+        { category: 'TradeSell', totalAmount: 180_000, entryCount: 6 },
+        { category: 'FuelPurchase', totalAmount: -60_000, entryCount: 15 },
+      ],
+    },
+  }
+
+  it('renders the Compare Runs heading', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Compare Runs' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('shows missing-params message when query params absent', () => {
+    mockApiFetch.mockResolvedValue(null)
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/compare">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText(/Missing run IDs/)).toBeInTheDocument()
+  })
+
+  it('renders side-by-side run headers with both run names', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Run comparison headers' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('Trade Run A').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Mining Run B').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders normalised credits chart when highlights are present', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Normalised credits comparison' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders category comparison table with Δ column', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Category comparison' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('TradeSell').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('FuelPurchase').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Δ (B − A)')).toBeInTheDocument()
+  })
+
+  it('renders back link to runs list', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: '← Runs' })).toBeInTheDocument(),
+    )
+  })
+})
+

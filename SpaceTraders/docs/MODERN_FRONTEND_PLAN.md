@@ -395,8 +395,15 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Added `RunDetailDto` TypeScript interface to `src/types.ts` matching the `/runs/{id}/summary` response shape (`run`, `creditHighlights`, `ledgerSummary`).
 - ✅ Tests: `pages.test.tsx` extended with 10 tests (`RunsListPage`: heading, loading, run rows with ΔCredits, pending badge, active badge, empty state; `RunDetailPage`: heading + back link, loading, summary card, category table, credits chart). Total: 76 tests passing.
 
-**3b — compare view**
-- Compare (`/runs/compare?a=&b=`): side-by-side headers, overlaid normalised charts (credits, income, cargo throughput, fuel efficiency, API efficiency), per-good table, decisions diff.
+**3b — compare view** ✅ *Implemented*
+- ✅ `RunComparePage` implemented at `/runs/compare?a=&b=` with internal sub-routing via React Router `<Routes>`:
+  - Side-by-side headers (run name with colour dot, strategy, duration, ΔCredits, total income, net P&L per run).
+  - Overlaid normalised credits chart: both runs' credit highlight series drawn on a shared 0–100 % time axis with colour-coded paths and a legend.
+  - Per-category income & expense comparison table (category, run A amount, run B amount, Δ B − A column).
+  - Run selector checkboxes added to `RunsListPage` (select up to 2 runs, "Compare" button navigates to `/runs/compare?a=…&b=…`).
+- ✅ Added `RunCompareDto` TypeScript interface to `src/types.ts`.
+- ✅ `NormalisedCreditChart` SVG component added (dual-series, colour-coded, normalised time axis).
+- ✅ Tests: `pages.test.tsx` extended with 7 tests (`RunComparePage`: heading, loading, missing-params message, side-by-side headers, normalised chart, category table, back link). Total: 83 tests passing.
 
 **3c — efficiency KPIs**
 - Add backend computation and frontend display of: credits/hour, credits/ship/hour, credits/API-call, idle %, fuel cost per credit earned.
