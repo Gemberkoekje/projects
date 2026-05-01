@@ -106,6 +106,15 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
+    public async Task Handle(ConstructionSuppliedEvent @event, CancellationToken cancellationToken)
+    {
+        await activityLog.AppendAsync(
+            @event.ShipSymbol,
+            nameof(ConstructionSuppliedEvent),
+            $"Ship {@event.ShipSymbol} supplied {@event.UnitsSupplied}x {@event.TradeSymbol} to construction site {@event.WaypointSymbol}. Complete: {@event.IsComplete}.",
+            cancellationToken: cancellationToken);
+    }
+
     public async Task Handle(ContractNegotiatedEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(

@@ -9,29 +9,24 @@ namespace SpaceTraders.Application.Tests.Events.Handlers;
 public sealed class ChainOfCommandEventHandlerRegistrationTests
 {
     /// <summary>
-    /// Phase 6.5d: business-effect chain handlers for docked, orbit, and mismatch events have
-    /// been removed. Planner-only automation means these event types no longer need registered
-    /// chain handlers; ShipAutomationTickEvent drives all ship decisions instead.
-    /// Phase 7d: ShipInTransitEvent handler converted to a plain Wolverine handler; also removed.
+    /// Phase 7e: All ship-state events (ShipDockedEvent, ShipInOrbitEvent, ShipStateMismatchEvent,
+    /// ShipInTransitEvent, ConstructionSuppliedEvent) have been decoupled from ChainOfCommandEvent.
+    /// No concrete ChainOfCommandEvent subtypes remain; the chain infrastructure is empty and will
+    /// be deleted in Phase 7f.
     /// </summary>
-    [Theory]
-    [InlineData(typeof(ShipDockedEvent))]
-    [InlineData(typeof(ShipInOrbitEvent))]
-    [InlineData(typeof(ShipStateMismatchEvent))]
-    [InlineData(typeof(ShipInTransitEvent))]
-    public void BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers(Type chainEventType)
+    [Fact]
+    public void AfterPhase7e_NoConcreteChainOfCommandEventSubtypes_ShouldExist()
     {
-        var services = new ServiceCollection();
-        services.AddApplication();
+        var chainEventTypes = typeof(ChainOfCommandEvent).Assembly
+            .GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false })
+            .Where(t => typeof(ChainOfCommandEvent).IsAssignableFrom(t) && t != typeof(ChainOfCommandEvent))
+            .ToList();
 
-        var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(chainEventType);
-        services.Any(d => d.ServiceType == handlerInterfaceType)
-            .Should().BeFalse(
-                "Phase 6.5d removed business-effect chain handler registrations for {0}; " +
-                "ShipAutomationTickEventHandler + ShipPlannerService now covers these decision points.",
-                chainEventType.Name);
+        chainEventTypes.Should().BeEmpty(
+            "Phase 7e decoupled all ship-state events from ChainOfCommandEvent; no concrete subtypes should remain. " +
+            "Found: {0}", string.Join(", ", chainEventTypes.Select(t => t.Name)));
     }
-
 
     [Fact]
     public void AllChainOfCommandEventTypes_ShouldHaveImplementedHandlers()
@@ -43,22 +38,24 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             .Where(t => typeof(ChainOfCommandEvent).IsAssignableFrom(t) && t != typeof(ChainOfCommandEvent))
             .ToList();
 
-        // Events that are pattern-matched inside base handlers, or whose chain handler has been retired
+        // Events that are pattern-matched inside base handlers, or whose chain handler has been retired,
+        // or which have been decoupled from ChainOfCommandEvent entirely (Phase 7e).
         var derivedEventsHandledViaPatternMatching = new HashSet<string>
         {
+            // Phase 7e: ConstructionSuppliedEvent decoupled from ShipInOrbitEvent; plain factual event.
             nameof(ConstructionSuppliedEvent),
             // Phase 7a: ShipStateMismatchEventHandler deleted; recovery is now covered by the
             // ShipAutomationTickEvent published alongside every ShipStateMismatchEvent (Phase 6.5e).
+            // Phase 7e: ShipStateMismatchEvent decoupled from ChainOfCommandEvent.
             nameof(ShipStateMismatchEvent),
             // Phase 7b: Docked derived events deleted; docked chain handlers removed.
-            // ShipDockedEvent has no registered chain handler; automation is driven by ShipAutomationTickEvent.
+            // Phase 7e: ShipDockedEvent decoupled from ChainOfCommandEvent.
             nameof(ShipDockedEvent),
             // Phase 7c: ShipArrivedEvent and ShipUndockedEvent deleted; all orbit chain handlers removed.
-            // ShipInOrbitEvent no longer needs a chain handler; automation is driven by ShipAutomationTickEvent.
-            // Phase 7e will decouple ShipInOrbitEvent from ChainOfCommandEvent.
+            // Phase 7e: ShipInOrbitEvent decoupled from ChainOfCommandEvent.
             nameof(ShipInOrbitEvent),
             // Phase 7d: ShipInTransitEventHandler converted to a plain Wolverine handler; chain handler removed.
-            // Phase 7e will decouple ShipInTransitEvent from ChainOfCommandEvent.
+            // Phase 7e: ShipInTransitEvent decoupled from ChainOfCommandEvent.
             nameof(ShipInTransitEvent),
         };
 
