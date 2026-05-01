@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router'
 import { apiFetch } from '@/lib/api-fetch'
 import type { SystemDto, JumpConnectionDto, ShipDto } from '@/types'
 
@@ -36,9 +37,10 @@ interface UniverseMapProps {
   connections: JumpConnectionDto[]
   ships: ShipDto[]
   search: string
+  onSystemClick: (symbol: string) => void
 }
 
-function UniverseMap({ systems, connections, ships, search }: UniverseMapProps) {
+function UniverseMap({ systems, connections, ships, search, onSystemClick }: UniverseMapProps) {
   const vb = useMemo(() => computeViewBox(systems), [systems])
 
   // Build lookup: system symbol → SystemDto
@@ -149,6 +151,8 @@ function UniverseMap({ systems, connections, ships, search }: UniverseMapProps) 
             stroke={isHighlighted ? '#fff' : 'none'}
             strokeWidth={isHighlighted ? 1.5 : 0}
             aria-label={s.symbol}
+            style={{ cursor: 'pointer' }}
+            onClick={() => onSystemClick(s.symbol)}
           >
             <title>{s.symbol} ({s.type}){s.isVisited ? ' — visited' : isFrontier ? ' — frontier' : ''}</title>
           </circle>
@@ -203,6 +207,7 @@ function Legend() {
 
 export default function UniversePage() {
   const [search, setSearch] = useState('')
+  const navigate = useNavigate()
 
   const { data: systems, isLoading: loadingSystems } = useQuery<SystemDto[]>({
     queryKey: ['universe-systems'],
@@ -270,6 +275,7 @@ export default function UniversePage() {
         connections={connections ?? []}
         ships={ships ?? []}
         search={search}
+        onSystemClick={symbol => navigate(`/systems/${symbol}`)}
       />
     </div>
   )

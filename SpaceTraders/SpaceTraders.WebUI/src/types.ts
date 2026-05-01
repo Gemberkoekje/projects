@@ -252,3 +252,29 @@ export interface JumpConnectionDto {
   fromSystem: string
   toSystem: string
 }
+
+export interface WaypointTraitDto {
+  symbol: string
+  name: string
+  description: string
+}
+
+export interface WaypointDto {
+  symbol: string
+  systemSymbol: string
+  type: string
+  x: number
+  y: number
+  hasMarket: boolean
+  hasShipyard: boolean
+  traitsJson: string | null
+  orbitalsJson: string | null
+  parentSymbol: string | null
+  isUnderConstruction: boolean
+  lastObservedAt: string
+}
+
+export interface SystemMapResponseDto {
+  system: SystemDto
+  waypoints: WaypointDto[]
+}

@@ -9,6 +9,7 @@ import FinancePage from '@/pages/FinancePage'
 import MarketsPage from '@/pages/MarketsPage'
 import RunsPage from '@/pages/RunsPage'
 import UniversePage from '@/pages/UniversePage'
+import SystemMapPage from '@/pages/SystemMapPage'
 import ContractsPage from '@/pages/ContractsPage'
 import ActivityPage from '@/pages/ActivityPage'
 import HealthPage from '@/pages/HealthPage'
@@ -32,6 +33,7 @@ export function AppShell() {
             <Route path="/markets/*" element={<MarketsPage />} />
             <Route path="/runs/*" element={<RunsPage />} />
             <Route path="/universe" element={<UniversePage />} />
+            <Route path="/systems/:symbol" element={<SystemMapPage />} />
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/activity" element={<ActivityPage />} />
             <Route path="/health" element={<HealthPage />} />

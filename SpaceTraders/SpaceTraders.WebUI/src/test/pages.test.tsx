@@ -1623,4 +1623,170 @@ describe('UniversePage', () => {
   })
 })
 
+// ─── SystemMapPage ─────────────────────────────────────────────────────────────
 
+import SystemMapPage from '../pages/SystemMapPage'
+
+describe('SystemMapPage', () => {
+  const waypoints = [
+    {
+      symbol: 'X1-AB-00',
+      systemSymbol: 'X1-AB',
+      type: 'PLANET',
+      x: 0,
+      y: 30,
+      hasMarket: false,
+      hasShipyard: false,
+      traitsJson: null,
+      orbitalsJson: JSON.stringify(['X1-AB-01']),
+      parentSymbol: null,
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+    {
+      symbol: 'X1-AB-01',
+      systemSymbol: 'X1-AB',
+      type: 'MOON',
+      x: 5,
+      y: 32,
+      hasMarket: true,
+      hasShipyard: false,
+      traitsJson: JSON.stringify([{ symbol: 'MARKETPLACE', name: 'Marketplace', description: 'A marketplace.' }]),
+      orbitalsJson: null,
+      parentSymbol: 'X1-AB-00',
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+    {
+      symbol: 'X1-AB-JG',
+      systemSymbol: 'X1-AB',
+      type: 'JUMP_GATE',
+      x: 100,
+      y: 0,
+      hasMarket: false,
+      hasShipyard: false,
+      traitsJson: null,
+      orbitalsJson: null,
+      parentSymbol: null,
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+  ]
+
+  const system = {
+    symbol: 'X1-AB',
+    sectorSymbol: 'X1',
+    type: 'RED_STAR',
+    x: 10,
+    y: -20,
+    lastObservedAt: new Date().toISOString(),
+    isVisited: true,
+  }
+
+  const mapData = { system, waypoints }
+
+  it('renders the system symbol as heading', async () => {
+    mockApiFetch.mockResolvedValue(mapData)
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'X1-AB' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders the breadcrumb with Universe link', async () => {
+    mockApiFetch.mockResolvedValue(mapData)
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: 'Universe' })).toBeInTheDocument()
+  })
+
+  it('renders the SVG system map', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'System map for X1-AB' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders the waypoints table with all waypoints', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Waypoints list' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('X1-AB-00').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('X1-AB-01').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('X1-AB-JG').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows jump connection toggle button when system has a jump gate', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /jump connections/i })).toBeInTheDocument(),
+    )
+  })
+
+  it('opens waypoint detail panel when a waypoint row is clicked', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Waypoints list' })).toBeInTheDocument(),
+    )
+    // Click the planet row (first data row)
+    const rows = screen.getAllByRole('row')
+    // Skip header row (index 0), click first data row
+    rows[1].click()
+    await waitFor(() =>
+      expect(screen.getByRole('complementary', { name: 'Waypoint detail panel' })).toBeInTheDocument(),
+    )
+  })
+})
