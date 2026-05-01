@@ -418,9 +418,15 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 4 — universe & system maps
 
-**4a — universe map (`/universe`)**
-- 2D scatter of all known systems (ECharts scatter + custom overlay).
-- Colour by visited/unvisited/known-only; jump-gate connection lines; ships layer updated via SignalR; search; exploration frontier highlight.
+**4a — universe map (`/universe`)** ✅ *Implemented*
+- ✅ Added `GetVisitedSystemSymbolsAsync` to `IWaypointRepository` (and implementation) to return distinct system symbols with cached waypoints.
+- ✅ Added `GetByKeyPrefixAsync` to `ISettingsRepository` (and implementation) to efficiently fetch all jump-gate connection settings entries.
+- ✅ Enriched `GET /universe/systems` to include `IsVisited` flag per system (true when waypoints for that system are cached).
+- ✅ Added `GET /universe/jump-connections` endpoint: reads all `Navigation.JumpGateConnections.*` settings entries and returns `{FromSystem, ToSystem}` pairs.
+- ✅ Added `SystemDto` and `JumpConnectionDto` TypeScript interfaces to `src/types.ts`.
+- ✅ `UniversePage.tsx` fully implemented: SVG scatter map of all known systems; colour by visited/frontier/known-only; jump-gate connection lines; ships layer (orange dots) from `/status/ships` query, updated automatically via SignalR invalidation; search input highlights matching system and shows result count; exploration frontier highlight (yellow) for systems adjacent to visited ones via jump gate; visited/total count in header; legend.
+- ✅ Backend: `ISystemRepository` and `IWaypointRepository` mocks registered in `SpaceTradersApiFactory`; 2 new integration tests (`UniverseSystems_WithValidApiKey_Returns200WithIsVisitedFlag`, `UniverseJumpConnections_WithValidApiKey_Returns200`). Total backend tests: 33 passing.
+- ✅ Tests: `pages.test.tsx` extended with 6 tests (`UniversePage`: heading, loading state, visited/total count, SVG map rendered, search input, legend). Total: 91 tests passing.
 
 **4b — system map (`/systems/:symbol`)**
 - In-system 2D layout: waypoints by coordinate, orbital clustering, waypoint-type icons, trait badges.

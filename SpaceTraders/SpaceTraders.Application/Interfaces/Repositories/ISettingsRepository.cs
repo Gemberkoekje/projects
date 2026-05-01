@@ -10,5 +10,8 @@ public interface ISettingsRepository
 
     Task<IReadOnlyList<(string Key, string Value, string Type, string Description)>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Returns key-value pairs for all settings whose key starts with <paramref name="prefix"/>.</summary>
+    Task<IReadOnlyList<(string Key, string Value)>> GetByKeyPrefixAsync(string prefix, CancellationToken cancellationToken = default);
+
     Task ResetToDefaultsAsync(CancellationToken cancellationToken = default);
 }

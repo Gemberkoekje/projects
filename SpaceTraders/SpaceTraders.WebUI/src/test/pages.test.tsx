@@ -1516,3 +1516,111 @@ describe('RunComparePage', () => {
   })
 })
 
+// ─── UniversePage ──────────────────────────────────────────────────────────────
+
+import UniversePage from '../pages/UniversePage'
+
+describe('UniversePage', () => {
+  const systems = [
+    { symbol: 'X1-SN', sectorSymbol: 'X1', type: 'RED_STAR', x: 10, y: -20, lastObservedAt: new Date().toISOString(), isVisited: true },
+    { symbol: 'X1-SF', sectorSymbol: 'X1', type: 'BLUE_STAR', x: -5, y: 30, lastObservedAt: new Date().toISOString(), isVisited: false },
+    { symbol: 'X1-VM', sectorSymbol: 'X1', type: 'YOUNG_STAR', x: 80, y: 5, lastObservedAt: new Date().toISOString(), isVisited: false },
+  ]
+
+  const connections = [
+    { fromSystem: 'X1-SN', toSystem: 'X1-SF' },
+  ]
+
+  it('renders the Universe heading', async () => {
+    mockApiFetch.mockResolvedValue(systems)
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Universe' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders visited/total system count after data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText(/1 \/ 3 systems visited/)).toBeInTheDocument(),
+    )
+  })
+
+  it('renders the universe map SVG', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Universe map' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders search input and filters results', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Universe map' })).toBeInTheDocument(),
+    )
+    const searchInput = screen.getByRole('textbox', { name: 'Search systems' })
+    expect(searchInput).toBeInTheDocument()
+  })
+
+  it('renders legend with visited, frontier and known-only entries', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Universe map legend' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Visited')).toBeInTheDocument()
+    expect(screen.getByText(/Frontier/)).toBeInTheDocument()
+    expect(screen.getByText(/Known only/)).toBeInTheDocument()
+  })
+})
+
+
