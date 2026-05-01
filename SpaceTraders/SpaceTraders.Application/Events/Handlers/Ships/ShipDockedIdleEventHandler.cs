@@ -1,26 +1,21 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Services;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Domain.Events.Ships;
-using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
-/// Handles <see cref="ShipDockedEvent"/> by running the assignment planner and dispatching
-/// the resulting <see cref="AssignShipCommand"/>, which writes the new assignment and re-enters
-/// the docked chain via <see cref="ShipAssignmentTypeSetEvent"/>.
-/// Event handlers must emit only commands, never events directly.
+/// Handles <see cref="ShipDockedEvent"/> for idle ships by triggering the fleet orchestrator
+/// so that idle ships receive strategic assignments from <see cref="IFleetOrchestrator"/>
+/// rather than being planned locally via <see cref="Services.IShipAssignmentPlanner"/>.
+/// Ship planners then execute the active assignment on the next automation tick.
 /// </summary>
 public sealed class ShipDockedIdleEventHandler(
     IShipAssignmentRepository assignments,
-    IShipRepository ships,
-    IShipAssignmentPlanner planner,
-    IMessageBus bus,
+    IFleetOrchestrator orchestrator,
     ILogger<ShipDockedIdleEventHandler> logger) : IChainOfCommandEventHandler<ShipDockedEvent>
 {
-
     public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipDockedEvent @event, CancellationToken cancellationToken)
     {
         var assignment = await assignments.FindAsync(@event.ShipSymbol, cancellationToken);
@@ -29,40 +24,14 @@ public sealed class ShipDockedIdleEventHandler(
             return ChainOfCommandHandlerResult.Skipped();
         }
 
-        var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
-        if (ship is null)
-        {
-            logger.LogWarning(
-                "{Handler}: Could not load ship state for {Ship}. Cannot plan assignment.",
-                nameof(ShipDockedIdleEventHandler),
-                @event.ShipSymbol);
-
-            return ChainOfCommandHandlerResult.Failed(
-                $"Idle docked handler could not load ship state for {@event.ShipSymbol}.");
-        }
-
-        var command = await planner.PlanAsync(ship, cancellationToken);
-
-        var commandWithContext = new AssignShipCommand(
-            command.ShipSymbol,
-            command.AssignmentType,
-            command.OriginWaypoint,
-            command.DestWaypoint,
-            command.CargoSymbol,
-            command.ContractId,
-            ship.SystemSymbol ?? @event.SystemSymbol,
-            ship.WaypointSymbol ?? @event.WaypointSymbol,
-            @event.CorrelationId,
-            @event.EventId,
-            command.RequiredUnits);
-
         logger.LogInformation(
-            "{Handler}: ship {Ship} planned as {AssignmentType}.",
+            "{Handler}: ship {Ship} is idle; triggering fleet orchestrator to assign work.",
             nameof(ShipDockedIdleEventHandler),
-            @event.ShipSymbol,
-            command.AssignmentType);
+            @event.ShipSymbol);
 
-        await bus.InvokeAsync(commandWithContext, cancellationToken);
+        // Phase 6.5c: delegate assignment to the orchestrator so idle ships receive
+        // strategic role assignments instead of locally-planned ones.
+        await orchestrator.EvaluateAndAssignAsync(cancellationToken);
         return ChainOfCommandHandlerResult.Handled();
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
@@ -60,6 +61,11 @@ public sealed class GameLoopService(
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
+        var orchestrator = scope.ServiceProvider.GetRequiredService<IFleetOrchestrator>();
+
+        // Phase 6.5c: orchestrator evaluates and assigns idle ships before any ship-level
+        // automation ticks run, so every planner invocation executes an already-assigned role.
+        await orchestrator.EvaluateAndAssignAsync(cancellationToken);
 
         await ApplyDeadReckoningAsync(ships, bus, cancellationToken);
         await CheckFuelAsync(ships, bus, cancellationToken);
