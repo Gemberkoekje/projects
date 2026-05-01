@@ -23,4 +23,11 @@ public sealed class ApiEndpointUsageRecorder(SpaceTradersDbContext db) : IApiEnd
                 "LastCalledAt" = EXCLUDED."LastCalledAt";
             """, cancellationToken);
     }
+
+    public async Task<long> GetTotalCallsAsync(CancellationToken cancellationToken = default)
+    {
+        return await db.ApiEndpointUsages
+            .AsNoTracking()
+            .SumAsync(u => (long)u.Calls, cancellationToken);
+    }
 }

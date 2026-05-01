@@ -1282,6 +1282,86 @@ describe('RunDetailPage', () => {
       expect(screen.getByRole('img', { name: 'Credits over time' })).toBeInTheDocument(),
     )
   })
+
+  it('renders Efficiency KPIs section when kpis data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'KPI Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 7_200_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 500_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      if (path === '/runs/run-abc/kpis')
+        return Promise.resolve({
+          creditsPerHour: 200_000,
+          creditsPerShipPerHour: 100_000,
+          creditsPerApiCall: 12.5,
+          idlePercent: 15.3,
+          fuelCostPerCreditEarned: 0.04,
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Efficiency KPIs' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Credits / Hour')).toBeInTheDocument()
+    expect(screen.getByText('Credits / Ship / Hour')).toBeInTheDocument()
+    expect(screen.getByText('Credits / API Call')).toBeInTheDocument()
+    expect(screen.getByText('Idle %')).toBeInTheDocument()
+    expect(screen.getByText('Fuel Cost / Credit Earned')).toBeInTheDocument()
+  })
+
+  it('shows em-dashes when KPI values are null', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Empty KPI Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date().toISOString(),
+            endedAt: null,
+            startingCredits: 100_000,
+            endingCredits: null,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      if (path === '/runs/run-abc/kpis')
+        return Promise.resolve({
+          creditsPerHour: null,
+          creditsPerShipPerHour: null,
+          creditsPerApiCall: null,
+          idlePercent: null,
+          fuelCostPerCreditEarned: null,
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Efficiency KPIs' })).toBeInTheDocument(),
+    )
+    // All five KPI cards should show '—' for null values
+    const dashes = screen.getAllByText('—')
+    expect(dashes.length).toBeGreaterThanOrEqual(5)
+  })
 })
 
 describe('RunComparePage', () => {

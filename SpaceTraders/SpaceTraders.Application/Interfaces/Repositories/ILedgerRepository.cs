@@ -32,6 +32,9 @@ public interface ILedgerRepository
     /// <summary>Returns total income and expense grouped by <see cref="LedgerCategory"/> for the given run (or all entries if <paramref name="runId"/> is null).</summary>
     Task<IReadOnlyList<LedgerSummaryDto>> GetSummaryAsync(Guid? runId = null, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns the number of distinct ship symbols that have ledger entries for the given run.</summary>
+    Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes all ledger entries with <c>OccurredAt</c> older than <paramref name="olderThan"/>.</summary>
     /// <returns>Number of rows deleted.</returns>
     Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);

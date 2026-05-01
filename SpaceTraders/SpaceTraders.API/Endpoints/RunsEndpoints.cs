@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 
 namespace SpaceTraders.API.Endpoints;
@@ -71,6 +72,67 @@ public static class RunsEndpoints
             var summary = await ledgerRepo.GetSummaryAsync(id, ct);
 
             return Results.Ok(new { Run = run, CreditHighlights = highlights, LedgerSummary = summary });
+        });
+
+        group.MapGet("/{id:guid}/kpis", async (
+            Guid id,
+            IRunRepository runRepo,
+            ILedgerRepository ledgerRepo,
+            IShipTaskRecordRepository taskRepo,
+            IApiEndpointUsageRecorder apiUsageRecorder,
+            CancellationToken ct) =>
+        {
+            var run = await runRepo.GetByIdAsync(id, ct);
+            if (run is null)
+            {
+                return Results.NotFound();
+            }
+
+            var runEnd = run.EndedAt ?? DateTimeOffset.UtcNow;
+            var durationHours = (runEnd - run.StartedAt).TotalHours;
+            var deltaCredits = (run.EndingCredits ?? 0L) - run.StartingCredits;
+
+            // credits/hour
+            double? creditsPerHour = durationHours > 0 ? deltaCredits / durationHours : null;
+
+            // credits/ship/hour — derive ship count from distinct ships in the ledger
+            var shipCount = await ledgerRepo.GetDistinctShipCountAsync(id, ct);
+            double? creditsPerShipPerHour = shipCount > 0 && creditsPerHour.HasValue
+                ? creditsPerHour / shipCount
+                : null;
+
+            // credits/API-call — uses lifetime cumulative total as the best available approximation
+            var totalApiCalls = await apiUsageRecorder.GetTotalCallsAsync(ct);
+            double? creditsPerApiCall = totalApiCalls > 0 ? (double)deltaCredits / totalApiCalls : null;
+
+            // idle % — computed from ShipTaskRecord rows within the run's time window
+            double? idlePercent = null;
+            if (shipCount > 0 && durationHours > 0)
+            {
+                var taskRecords = await taskRepo.GetAllInTimeWindowAsync(run.StartedAt, runEnd, ct);
+                var totalShipSeconds = shipCount * (runEnd - run.StartedAt).TotalSeconds;
+                var idleSeconds = taskRecords
+                    .Where(t => string.Equals(t.TaskKind, "Idle", StringComparison.OrdinalIgnoreCase))
+                    .Sum(t => ((t.EndedAt ?? runEnd) - t.StartedAt).TotalSeconds);
+                idlePercent = totalShipSeconds > 0 ? idleSeconds / totalShipSeconds * 100.0 : null;
+            }
+
+            // fuel cost per credit earned
+            var ledgerSummary = await ledgerRepo.GetSummaryAsync(id, ct);
+            var totalIncome = ledgerSummary.Where(s => s.TotalAmount > 0).Sum(s => s.TotalAmount);
+            var fuelCost = ledgerSummary
+                .Where(s => string.Equals(s.Category, "FuelPurchase", StringComparison.Ordinal))
+                .Sum(s => Math.Abs(s.TotalAmount));
+            double? fuelCostPerCreditEarned = totalIncome > 0 ? (double)fuelCost / totalIncome : null;
+
+            return Results.Ok(new
+            {
+                CreditsPerHour = creditsPerHour,
+                CreditsPerShipPerHour = creditsPerShipPerHour,
+                CreditsPerApiCall = creditsPerApiCall,
+                IdlePercent = idlePercent,
+                FuelCostPerCreditEarned = fuelCostPerCreditEarned,
+            });
         });
 
         return app;

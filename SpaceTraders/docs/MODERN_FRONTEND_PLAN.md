@@ -405,8 +405,16 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ `NormalisedCreditChart` SVG component added (dual-series, colour-coded, normalised time axis).
 - ✅ Tests: `pages.test.tsx` extended with 7 tests (`RunComparePage`: heading, loading, missing-params message, side-by-side headers, normalised chart, category table, back link). Total: 83 tests passing.
 
-**3c — efficiency KPIs**
-- Add backend computation and frontend display of: credits/hour, credits/ship/hour, credits/API-call, idle %, fuel cost per credit earned.
+**3c — efficiency KPIs** ✅ *Implemented*
+- ✅ Added `GetDistinctShipCountAsync(Guid runId)` to `ILedgerRepository` (and implementation) to derive the active ship count for a run from ledger entries.
+- ✅ Added `GetAllInTimeWindowAsync(DateTimeOffset from, DateTimeOffset to)` to `IShipTaskRecordRepository` (and implementation) to retrieve all ship task records in the run's time window.
+- ✅ Added `GetTotalCallsAsync()` to `IApiEndpointUsageRecorder` (and implementation) so the lifetime API-call total can be obtained without injecting `SpaceTradersDbContext` directly into endpoints.
+- ✅ Added `RunKpisDto` sealed record to `ApplicationDtos.cs` with five nullable fields: `CreditsPerHour`, `CreditsPerShipPerHour`, `CreditsPerApiCall`, `IdlePercent`, `FuelCostPerCreditEarned`.
+- ✅ Added `GET /runs/{id}/kpis` endpoint to `RunsEndpoints.cs`: returns 404 when run not found; computes credits/hour from delta credits and duration; credits/ship/hour by dividing by distinct ship count from the ledger; credits/API-call using the lifetime cumulative API-call total as the best available approximation (per-run call counts are not stored); idle % from `ShipTaskRecord` rows with `TaskKind == "Idle"` in the run time window, weighted by ship count × duration; fuel cost per credit earned from the `FuelPurchase` ledger category vs total income.
+- ✅ Added `RunKpisDto` TypeScript interface to `src/types.ts`.
+- ✅ Added **Efficiency KPIs** section to `RunDetailPage` in `RunsPage.tsx`: a second `useQuery` fetches `/runs/{id}/kpis`; renders a five-card grid (Credits / Hour, Credits / Ship / Hour, Credits / API Call, Idle %, Fuel Cost / Credit Earned); null values render `—`.
+- ✅ Updated `SpaceTradersApiFactory` in `ApiIntegrationTests.cs` to expose and register mocks for `ILedgerRepository`, `IShipTaskRecordRepository`, and `IApiEndpointUsageRecorder`.
+- ✅ Tests: `pages.test.tsx` extended with 2 tests (`RunDetailPage`: Efficiency KPIs section renders with data, em-dashes for null KPI values). Total: 85 tests passing. Backend: 2 new integration tests (`RunKpis_WithValidRunId_Returns200`, `RunKpis_WithUnknownRunId_Returns404`).
 
 ### Phase 4 — universe & system maps
 

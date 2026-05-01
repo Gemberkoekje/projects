@@ -376,3 +376,25 @@ public sealed record ShipAssignmentDto
         this.SupplyCompleted = SupplyCompleted;
     }
 }
+
+/// <summary>Efficiency KPIs computed for a single run.</summary>
+public sealed record RunKpisDto
+{
+    /// <summary>Credits earned per wall-clock hour.</summary>
+    public double? CreditsPerHour { get; init; }
+
+    /// <summary>Credits earned per active ship per hour.</summary>
+    public double? CreditsPerShipPerHour { get; init; }
+
+    /// <summary>
+    /// Credits earned divided by total cumulative API calls recorded for this agent.
+    /// This is a lifetime-rate approximation because per-run API call counts are not stored.
+    /// </summary>
+    public double? CreditsPerApiCall { get; init; }
+
+    /// <summary>Percentage of ship-time spent in the Idle task (0–100).</summary>
+    public double? IdlePercent { get; init; }
+
+    /// <summary>Absolute fuel spend divided by total income (0–1 ratio).</summary>
+    public double? FuelCostPerCreditEarned { get; init; }
+}
