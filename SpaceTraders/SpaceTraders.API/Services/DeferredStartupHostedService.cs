@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Infrastructure.Persistence;
 
 namespace SpaceTraders.API.Services;
 
@@ -9,6 +10,7 @@ namespace SpaceTraders.API.Services;
 public sealed class DeferredStartupHostedService(
     IServiceProvider serviceProvider,
     IHostApplicationLifetime applicationLifetime,
+    IHostEnvironment hostEnvironment,
     StartupInitializationState startupState,
     ILogger<DeferredStartupHostedService> logger) : IHostedService
 {
@@ -54,6 +56,11 @@ public sealed class DeferredStartupHostedService(
 
         try
         {
+            if (!hostEnvironment.IsEnvironment("Testing"))
+            {
+                await InitializeDatabaseAsync(cancellationToken);
+            }
+
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
             await StartServiceAsync<RunLifecycleService>(cancellationToken);
             await StartServiceAsync<LeaderElectionService>(cancellationToken);
@@ -94,5 +101,12 @@ public sealed class DeferredStartupHostedService(
         {
             _startedServices.Add(service);
         }
+    }
+
+    private async Task InitializeDatabaseAsync(CancellationToken cancellationToken)
+    {
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+        await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext, cancellationToken);
     }
 }

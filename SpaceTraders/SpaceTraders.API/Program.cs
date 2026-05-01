@@ -142,13 +142,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-if (!app.Environment.IsEnvironment("Testing"))
-{
-    await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-    await SpaceTradersDatabaseInitializer.InitializeAsync(dbContext);
-}
-
 app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseHttpMetrics();
