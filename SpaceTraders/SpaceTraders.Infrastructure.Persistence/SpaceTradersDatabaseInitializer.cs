@@ -79,6 +79,22 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"LocalStatus\" integer NOT NULL DEFAULT 0;",
                 cancellationToken);
+
+            // Startup snapshots table
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS startup_snapshots (
+                    "Id" serial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "SnapshotJson" text NOT NULL DEFAULT '',
+                    "CapturedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "IsInitialSnapshot" boolean NOT NULL DEFAULT FALSE
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_startup_snapshots_agent_captured ON startup_snapshots (\"AgentToken\", \"CapturedAt\");",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))

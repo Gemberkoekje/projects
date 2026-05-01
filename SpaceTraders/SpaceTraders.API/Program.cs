@@ -87,6 +87,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<LeaderElectionServ
 
 builder.Services.AddHostedService<AgentBootstrapService>();
 builder.Services.AddHostedService<StartupSyncService>();
+builder.Services.AddHostedService<StartupSnapshotService>();
 builder.Services.AddHostedService<StartupRecoveryService>();
 builder.Services.AddHostedService<SettingsStartupLoggingService>();
 builder.Services.AddHostedService<GameLoopService>();

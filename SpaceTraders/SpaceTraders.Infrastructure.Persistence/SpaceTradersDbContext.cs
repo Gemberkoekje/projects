@@ -43,6 +43,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<CachedConstruction> ConstructionSites => Set<CachedConstruction>();
 
+    public DbSet<StartupSnapshot> StartupSnapshots => Set<StartupSnapshot>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -240,6 +242,16 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.SystemSymbol).HasMaxLength(100).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.IsComplete });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<StartupSnapshot>(entity =>
+        {
+            entity.ToTable("startup_snapshots");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.SnapshotJson).IsRequired();
+            entity.HasIndex(x => new { x.AgentToken, x.CapturedAt });
         });
     }
 }
