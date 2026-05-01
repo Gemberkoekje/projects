@@ -278,3 +278,43 @@ export interface SystemMapResponseDto {
   system: SystemDto
   waypoints: WaypointDto[]
 }
+
+export interface TradeRouteDto {
+  good: string
+  buyWaypoint: string
+  sellWaypoint: string
+  totalUnits: number
+  totalProfit: number
+  runDurationHours: number
+  profitPerHour: number
+}
+
+export interface ContractRoiDto {
+  contractId: string
+  totalPayout: number
+  estimatedFuelCost: number
+  netRoi: number
+  isProfitable: boolean
+}
+
+export interface MarketFreshnessDto {
+  waypointSymbol: string
+  systemSymbol: string
+  lastObservedAt: string
+  ageMinutes: number
+}
+
+export interface PriceAnomalyDto {
+  good: string
+  waypoint: string
+  currentPrice: number
+  avgPrice: number
+  changePercent: number
+}
+
+export interface AnomalyDto {
+  creditGrowthAnomaly: boolean
+  recentCreditRatePerHour: number
+  avgCreditRatePerHour: number
+  priceAnomalies: PriceAnomalyDto[]
+}

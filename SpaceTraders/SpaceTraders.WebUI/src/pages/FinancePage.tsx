@@ -7,6 +7,8 @@ import type {
   LedgerSummaryDto,
   LedgerEntryDto,
   RunCreditHighlightDto,
+  TradeRouteDto,
+  SettingDto,
 } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -30,14 +32,21 @@ interface ChartPoint {
   label?: string
 }
 
+interface AnnotationMark {
+  t: number
+  label: string
+}
+
 function LineChart({
   points,
   width = 560,
   height = 130,
+  annotations = [],
 }: {
   points: ChartPoint[]
   width?: number
   height?: number
+  annotations?: AnnotationMark[]
 }) {
   if (points.length < 2) return null
 
@@ -112,6 +121,33 @@ function LineChart({
       {annotated.map((p, i) => (
         <circle key={i} cx={sx(p.t)} cy={sy(p.v)} r={3} fill="currentColor" />
       ))}
+      {annotations.map((a, i) => {
+        const x = sx(a.t)
+        if (x < pad.left || x > pad.left + innerW) return null
+        return (
+          <g key={i}>
+            <line
+              x1={x}
+              y1={pad.top}
+              x2={x}
+              y2={pad.top + innerH}
+              stroke="currentColor"
+              strokeOpacity={0.5}
+              strokeDasharray="3 2"
+              strokeWidth={1}
+            />
+            <text
+              x={x + 3}
+              y={pad.top + 10}
+              fontSize={9}
+              fill="currentColor"
+              fillOpacity={0.7}
+            >
+              {a.label}
+            </text>
+          </g>
+        )
+      })}
     </svg>
   )
 }
@@ -168,8 +204,41 @@ export default function FinancePage() {
     refetchInterval: isActiveRun ? 120_000 : undefined,
   })
 
+  // Trade routes heatmap
+  const tradeRoutesQ = useQuery<TradeRouteDto[]>({
+    queryKey: ['trade-routes', effectiveRunId],
+    queryFn: () =>
+      apiFetch(effectiveRunId ? `/finance/trade-routes?runId=${effectiveRunId}` : '/finance/trade-routes'),
+    refetchInterval: isActiveRun ? 120_000 : undefined,
+  })
+
+  // Annotation markers from settings
+  const settingsQ = useQuery<SettingDto[]>({
+    queryKey: ['settings-all'],
+    queryFn: () => apiFetch('/settings/'),
+    staleTime: 300_000,
+  })
+
+  const annotations = useMemo<AnnotationMark[]>(() => {
+    if (!settingsQ.data) return []
+    return settingsQ.data
+      .filter(s => s.key.startsWith('Annotation.'))
+      .flatMap(s => {
+        try {
+          const parsed = JSON.parse(s.value) as { label?: string; timestamp?: string }
+          if (parsed.timestamp && parsed.label) {
+            return [{ t: new Date(parsed.timestamp).getTime(), label: parsed.label }]
+          }
+          return []
+        } catch {
+          return []
+        }
+      })
+  }, [settingsQ.data])
+
   const summary = summaryQ.data ?? []
   const ledgerEntries = ledgerQ.data ?? []
+  const tradeRoutes = tradeRoutesQ.data ?? []
 
   // Chart data points
   const chartPoints = useMemo<ChartPoint[]>(() => {
@@ -245,6 +314,16 @@ export default function FinancePage() {
       .sort((a, b) => b.profit - a.profit)
   }, [ledgerEntries])
 
+  const maxProfitPerHour = tradeRoutes.length > 0 ? Math.max(...tradeRoutes.map(r => r.profitPerHour)) : 1
+
+  function profitHeatColor(profitPerHour: number): string {
+    if (maxProfitPerHour <= 0) return ''
+    const ratio = profitPerHour / maxProfitPerHour
+    if (ratio >= 0.66) return 'text-status-green'
+    if (ratio >= 0.33) return 'text-yellow-500'
+    return 'text-destructive'
+  }
+
   const isLoading = runsQ.isLoading || summaryQ.isLoading
 
   return (
@@ -280,7 +359,7 @@ export default function FinancePage() {
             Credits Over Time
           </h2>
           <div className="rounded-lg border border-border bg-background p-4">
-            <LineChart points={chartPoints} />
+            <LineChart points={chartPoints} annotations={annotations} />
           </div>
         </section>
       )}
@@ -489,6 +568,52 @@ export default function FinancePage() {
           </div>
         </section>
       )}
+
+      {/* Trade Routes heatmap */}
+      <section aria-label="Trade routes">
+        <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+          Trade Routes
+        </h2>
+        {tradeRoutes.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No trade route data available.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2">Good</th>
+                  <th className="px-3 py-2">Buy Waypoint</th>
+                  <th className="px-3 py-2">Sell Waypoint</th>
+                  <th className="px-3 py-2 text-right">Units</th>
+                  <th className="px-3 py-2 text-right">Total Profit</th>
+                  <th className="px-3 py-2 text-right">Profit/Hour</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeRoutes.map((row, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2 font-mono">{row.good}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{row.buyWaypoint}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{row.sellWaypoint}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{row.totalUnits}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-status-green">
+                      +{formatCredits(row.totalProfit)}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-3 py-2 text-right tabular-nums font-medium',
+                        profitHeatColor(row.profitPerHour),
+                      )}
+                    >
+                      {formatCredits(Math.round(row.profitPerHour))}/h
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

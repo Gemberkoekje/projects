@@ -71,6 +71,53 @@ public static class StatusEndpoints
             return Results.Ok(response);
         });
 
+        group.MapGet("/anomalies", async (
+            IAgentCreditsSampleRepository creditRepo,
+            CancellationToken ct) =>
+        {
+            var now = DateTimeOffset.UtcNow;
+            var samples = await creditRepo.GetRangeAsync(now.AddHours(-25), now, ct);
+
+            var sample24hAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-25) && s.ObservedAt <= now.AddHours(-24)).OrderBy(s => s.ObservedAt).LastOrDefault();
+            var sampleNow = samples.OrderBy(s => s.ObservedAt).LastOrDefault();
+            var sampleOnehAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-1)).OrderBy(s => s.ObservedAt).FirstOrDefault();
+
+            double avgCreditRatePerHour = 0;
+            double recentCreditRatePerHour = 0;
+
+            if (sample24hAgo is not null && sampleNow is not null)
+            {
+                avgCreditRatePerHour = (sampleNow.Credits - sample24hAgo.Credits) / 24.0;
+            }
+
+            if (sampleOnehAgo is not null && sampleNow is not null)
+            {
+                var hoursElapsed = (sampleNow.ObservedAt - sampleOnehAgo.ObservedAt).TotalHours;
+                if (hoursElapsed > 0)
+                    recentCreditRatePerHour = (sampleNow.Credits - sampleOnehAgo.Credits) / hoursElapsed;
+            }
+
+            var creditGrowthAnomaly = avgCreditRatePerHour > 1000
+                && recentCreditRatePerHour < 0.5 * avgCreditRatePerHour;
+
+            return Results.Ok(new
+            {
+                CreditGrowthAnomaly = creditGrowthAnomaly,
+                RecentCreditRatePerHour = recentCreditRatePerHour,
+                AvgCreditRatePerHour = avgCreditRatePerHour,
+                PriceAnomalies = Array.Empty<object>(),
+            });
+        });
+
+        group.MapGet("/top-trade-routes", async (
+            ITradeOpportunityRepository repo,
+            int limit = 10,
+            CancellationToken ct = default) =>
+        {
+            var result = await repo.GetTopRoutesAsync(limit, ct);
+            return Results.Ok(result);
+        });
+
         return app;
     }
 }

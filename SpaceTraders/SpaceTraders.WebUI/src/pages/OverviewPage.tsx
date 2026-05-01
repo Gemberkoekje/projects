@@ -11,6 +11,8 @@ import type {
   RunSummaryDto,
   ContractDeliverableDto,
   CreditSampleDto,
+  AnomalyDto,
+  TradeRouteDto,
 } from '@/types'
 import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -169,6 +171,18 @@ export default function OverviewPage() {
     refetchInterval: 60_000,
   })
 
+  const anomalyQ = useQuery<AnomalyDto>({
+    queryKey: ['anomalies'],
+    queryFn: () => apiFetch('/status/anomalies'),
+    refetchInterval: 60_000,
+  })
+
+  const topRoutesQ = useQuery<TradeRouteDto[]>({
+    queryKey: ['top-trade-routes'],
+    queryFn: () => apiFetch('/status/top-trade-routes?limit=5'),
+    refetchInterval: 120_000,
+  })
+
   const agent = agentQ.data
   const ships = shipsQ.data ?? []
   const contracts = contractsQ.data ?? []
@@ -177,6 +191,8 @@ export default function OverviewPage() {
   const alerts = alertsQ.data
   const activeRun = runsQ.data?.find(r => r.endedAt === null) ?? null
   const creditSamples = creditsHistoryQ.data ?? []
+  const anomaly = anomalyQ.data ?? null
+  const topRoutes = topRoutesQ.data ?? []
 
   // Compute 24h delta from credits history
   const now = Date.now()
@@ -349,6 +365,59 @@ export default function OverviewPage() {
               {trade.distanceJumps} jump{trade.distanceJumps !== 1 ? 's' : ''} ·
               score {Math.round(Number(trade.routeScore))}
             </p>
+          </div>
+        </section>
+      )}
+
+      {/* Anomaly warning */}
+      {anomaly?.creditGrowthAnomaly && (
+        <section aria-label="Credit growth anomaly">
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 flex items-start gap-2">
+            <AlertTriangle size={16} className="text-destructive mt-0.5 shrink-0" aria-hidden />
+            <div className="flex flex-col gap-0.5 text-sm">
+              <span className="font-semibold text-destructive">Credit Growth Anomaly</span>
+              <span className="text-muted-foreground text-xs">
+                Recent rate: {formatCredits(Math.round(anomaly.recentCreditRatePerHour))}/h · 24h avg:{' '}
+                {formatCredits(Math.round(anomaly.avgCreditRatePerHour))}/h
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Decision candidates — top trade routes */}
+      {topRoutes.length > 0 && (
+        <section aria-label="Decision candidates">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Decision Candidates
+          </h2>
+          <div className="flex flex-col gap-2">
+            {topRoutes.map((r, i) => (
+              <div
+                key={i}
+                className={cn(
+                  'rounded-lg border bg-background p-3 text-sm flex items-center justify-between gap-2',
+                  i === 0 ? 'border-primary/50' : 'border-border',
+                )}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    {i === 0 && (
+                      <span className="text-xs bg-primary/15 text-primary rounded-full px-1.5 py-0.5 font-medium">
+                        #1
+                      </span>
+                    )}
+                    <span className="font-mono font-medium">{r.good}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {r.buyWaypoint} → {r.sellWaypoint}
+                  </span>
+                </div>
+                <span className="font-semibold text-status-green tabular-nums">
+                  {formatCredits(Math.round(r.profitPerHour))}/h
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       )}

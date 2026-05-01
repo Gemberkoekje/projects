@@ -62,6 +62,23 @@ public static class MarketsEndpoints
             return result is null ? Results.NoContent() : Results.Ok(result);
         });
 
+        group.MapGet("/freshness", async (IMarketRepository repo, CancellationToken ct) =>
+        {
+            var freshness = await repo.GetAllFreshnessAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var result = freshness
+                .Select(f => new
+                {
+                    f.WaypointSymbol,
+                    f.SystemSymbol,
+                    f.LastObservedAt,
+                    AgeMinutes = (int)Math.Round((now - f.LastObservedAt).TotalMinutes),
+                })
+                .OrderBy(f => f.LastObservedAt)
+                .ToList();
+            return Results.Ok(result);
+        });
+
         return app;
     }
 }
