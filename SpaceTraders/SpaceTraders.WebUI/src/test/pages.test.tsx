@@ -376,7 +376,16 @@ describe('HealthPage', () => {
             lastCalledAt: new Date().toISOString(),
           },
         ])
-      return Promise.resolve({ remaining: 60, limit: 60, burstRemaining: 20, burstLimit: 20, resetAt: new Date().toISOString(), limitType: null, totalRequests: 0, throttledCount: 0 })
+      return Promise.resolve({
+        remaining: 60,
+        limit: 60,
+        burstRemaining: 20,
+        burstLimit: 20,
+        resetAt: new Date().toISOString(),
+        limitType: null,
+        totalRequests: 0,
+        throttledCount: 0,
+      })
     })
 
     render(

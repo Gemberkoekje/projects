@@ -38,7 +38,7 @@ function formatRelative(iso: string | null) {
   const abs = Math.abs(ms)
   const h = Math.floor(abs / 3_600_000)
   const m = Math.floor((abs % 3_600_000) / 60_000)
-  const suffix = ms < 0 ? ' ago' : ''
+  const suffix = ms < 0 ? ' ago' : ' from now'
   if (h > 0) return `${h}h ${m}m${suffix}`
   return `${m}m${suffix}`
 }

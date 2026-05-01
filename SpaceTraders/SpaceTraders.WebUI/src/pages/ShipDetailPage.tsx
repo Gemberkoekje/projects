@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/lib/api-fetch'
-import type { ShipDto, ShipTaskRecordDto, LedgerSummaryDto, ActivityLogDto } from '@/types'
+import type { ShipDto, ShipTaskRecordDto, ActivityLogDto, ShipStatsResponse } from '@/types'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -51,12 +51,6 @@ function ProgressBar({ value, max, label }: { value: number; max: number; label:
       </div>
     </div>
   )
-}
-
-interface ShipStatsResponse {
-  ship: ShipDto
-  ledger: unknown[]
-  summary: LedgerSummaryDto[]
 }
 
 export default function ShipDetailPage() {
