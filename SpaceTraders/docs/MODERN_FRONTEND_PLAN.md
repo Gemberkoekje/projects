@@ -311,12 +311,20 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Fixed `SpaceTradersApiFactory` (`ApiIntegrationTests`) — added a properly-stubbed `IRunRepository` mock (returns an active run so `RunLifecycleService` resumes without a DB call), restoring the 20 previously-failing `ApiIntegrationTests`.
 - ✅ Added `DataRetentionServiceTests` (5 unit tests: calls all four repos, passes correct cutoffs to each, propagates repository exceptions).
 
-**0d — SignalR hub & read endpoints**
-- Add `Microsoft.AspNetCore.SignalR` hub at `/hubs/dashboard`.
-- Publish lightweight invalidation events from existing event handlers.
-- Add all new `GET` read endpoints (`/finance/*`, `/runs/*`, `/universe/*`, `/ships/:symbol/timeline`, `/ships/:symbol/stats`, `/contracts/:id/timeline`, `/health/automation`, `/health/rate-limit/history`).
-- Add CORS policy on `SpaceTraders.API` allowing the configured WebUI origin.
-- Add OpenAPI schema for all new endpoints; generate TypeScript client (`openapi-typescript`).
+**0d — SignalR hub & read endpoints** ✅ *Implemented*
+- ✅ Added `IDashboardNotifier` interface to `SpaceTraders.Application.Interfaces`.
+- ✅ Created `DashboardHub` (typed SignalR hub with `IDashboardHubClient.ReceiveInvalidation`) at `/hubs/dashboard`.
+- ✅ Created `DashboardNotifier` singleton implementation of `IDashboardNotifier` that uses `IHubContext<DashboardHub, IDashboardHubClient>`; swallows exceptions so SignalR failures never propagate to event handlers.
+- ✅ Updated `AgentCreditsSampleHandler`, `LedgerEntryHandler`, `MarketPriceSampleHandler`, and `ShipTaskRecordHandler` to inject `IDashboardNotifier` and push lightweight invalidation events (`"agent-credits"`, `"ship"`, `"market"`, `"contract"`) after each write.
+- ✅ Extended `IAgentCreditsSampleRepository` with `GetRangeAsync(from, to)`; extended `ILedgerRepository` with `GetRangeAsync(...)` and `GetSummaryAsync(runId)`; extended `IShipTaskRecordRepository` with `GetTimelineAsync(symbol, from, to)`; extended `ISystemRepository` with `GetAllAsync()`; extended `IMarketPriceSampleRepository` with `GetGoodPricesAsync(...)` and `GetWaypointPricesAsync(...)`.
+- ✅ Extended `IRunRepository` with `GetAllAsync()`, `GetByIdAsync(id)`, `GetScheduledRunsAsync()`, and `GetRunHighlightsAsync(runId)`.
+- ✅ Implemented all new repository query methods in the corresponding `SpaceTraders.Infrastructure.Persistence.Repositories` classes.
+- ✅ Added new endpoint files: `FinanceEndpoints` (`/finance/credits-history`, `/finance/ledger`, `/finance/summary`, `/finance/run-highlights`), `RunsEndpoints` (`/runs`, `/runs/scheduled`, `/runs/compare`, `/runs/{id}`, `/runs/{id}/summary`), `MarketsEndpoints` (`/markets/goods/{symbol}/prices`, `/markets/waypoints/{symbol}/prices`, `/markets/best-routes`), `UniverseEndpoints` (`/universe/systems`, `/universe/systems/{symbol}/map`), `ShipsReadEndpoints` (`/ships/{symbol}/timeline`, `/ships/{symbol}/stats`), `ContractsReadEndpoints` (`/contracts/{id}/timeline`), `HealthExtendedEndpoints` (`/health/automation`, `/health/rate-limit/history`).
+- ✅ Added CORS policy `"Dashboard"` in `Program.cs` allowing the configured `WebUI:Origin` (falls back to any origin for dev when blank).
+- ✅ Registered `AddSignalR()`, `DashboardNotifier` singleton, and `MapHub<DashboardHub>("/hubs/dashboard")` in `Program.cs`.
+- ✅ Added `WebUI:Origin` key to `appsettings.json`.
+- ✅ Updated `DiValidationTests` to mock `IDashboardNotifier`.
+- Note: TypeScript client generation (`openapi-typescript`) is deferred to Phase 1a when the `SpaceTraders.WebUI` project is created.
 
 ### Phase 1 — frontend skeleton
 

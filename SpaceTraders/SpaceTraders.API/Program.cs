@@ -10,10 +10,12 @@ using Serilog;
 using Serilog.Formatting.Compact;
 using SpaceTraders.API.Configuration;
 using SpaceTraders.API.Endpoints;
+using SpaceTraders.API.Hubs;
 using SpaceTraders.API.Middleware;
 using SpaceTraders.API.Services;
 using SpaceTraders.Application;
 using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Seed;
 using SpaceTraders.Infrastructure.SpaceTradersAPI;
@@ -33,6 +35,26 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.Configure<SpaceTradersBootstrapOptions>(builder.Configuration.GetSection("SpaceTraders"));
+
+// CORS — allow the configured WebUI origin (or any origin if not configured, for development convenience).
+var webUiOrigin = builder.Configuration["WebUI:Origin"];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Dashboard", policy =>
+    {
+        if (!string.IsNullOrWhiteSpace(webUiOrigin))
+        {
+            policy.WithOrigins(webUiOrigin)
+                  .AllowAnyHeader()
+                  .WithMethods("GET")
+                  .AllowCredentials(); // required for SignalR WebSocket upgrade
+        }
+        else
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().WithMethods("GET");
+        }
+    });
+});
 
 builder.Host.UseSerilog((ctx, cfg) =>
 {
@@ -78,6 +100,10 @@ builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.IRunLifecycleM
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// SignalR hub for real-time dashboard invalidation events.
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IDashboardNotifier, DashboardNotifier>();
+
 builder.Services
     .AddHealthChecks()
     .AddDbContextCheck<SpaceTradersDbContext>("postgresql");
@@ -108,6 +134,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<RunLifecycleServic
 var app = builder.Build();
 
 app.UsePathBase(PathBase);
+app.UseCors("Dashboard");
 
 if (app.Environment.IsDevelopment())
 {
@@ -134,6 +161,14 @@ app.MapMetrics();
 app.MapStatusEndpoints();
 app.MapSettingsEndpoints();
 app.MapControlEndpoints();
+app.MapFinanceEndpoints();
+app.MapRunsEndpoints();
+app.MapMarketsEndpoints();
+app.MapUniverseEndpoints();
+app.MapShipsReadEndpoints();
+app.MapContractsReadEndpoints();
+app.MapHealthExtendedEndpoints();
+app.MapHub<DashboardHub>("/hubs/dashboard");
 
 await app.RunAsync();
 

@@ -51,6 +51,44 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<MarketPriceSampleDto>> GetGoodPricesAsync(
+        string goodSymbol,
+        string? waypointSymbol,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default)
+    {
+        var query = db.MarketPriceSamples
+            .AsNoTracking()
+            .Where(s => s.GoodSymbol == goodSymbol && s.ObservedAt >= from && s.ObservedAt <= to);
+
+        if (!string.IsNullOrWhiteSpace(waypointSymbol))
+        {
+            query = query.Where(s => s.WaypointSymbol == waypointSymbol);
+        }
+
+        var rows = await query
+            .OrderBy(s => s.ObservedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(MapToDto).ToList();
+    }
+
+    public async Task<IReadOnlyList<MarketPriceSampleDto>> GetWaypointPricesAsync(
+        string waypointSymbol,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await db.MarketPriceSamples
+            .AsNoTracking()
+            .Where(s => s.WaypointSymbol == waypointSymbol && s.ObservedAt >= from && s.ObservedAt <= to)
+            .OrderBy(s => s.ObservedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(MapToDto).ToList();
+    }
+
     public async Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default)
     {
         // Step 1: Downsample the 7–90 day window — keep one row per (waypoint, good, hour), delete duplicates.
@@ -87,4 +125,8 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
         public string? Activity { get; init; }
         public int TradeVolume { get; init; }
     }
+
+    private static MarketPriceSampleDto MapToDto(MarketPriceSample s) =>
+        new(s.ObservedAt, s.WaypointSymbol, s.GoodSymbol,
+            s.PurchasePrice, s.SellPrice, s.Supply, s.Activity, s.TradeVolume);
 }

@@ -114,6 +114,9 @@ public sealed class DiValidationFactory : WebApplicationFactory<Program>
             services.RemoveAll<Application.Interfaces.Repositories.IRunRepository>();
             services.AddScoped(_ => Substitute.For<Application.Interfaces.Repositories.IRunRepository>());
 
+            services.RemoveAll<Application.Interfaces.IDashboardNotifier>();
+            services.AddSingleton(Substitute.For<Application.Interfaces.IDashboardNotifier>());
+
             // Remove app-level hosted services so they don't run during validation.
             var appServices = services
                 .Where(d =>

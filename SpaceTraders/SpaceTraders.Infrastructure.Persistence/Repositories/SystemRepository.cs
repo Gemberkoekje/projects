@@ -14,7 +14,17 @@ public sealed class SystemRepository(SpaceTradersDbContext db) : ISystemReposito
 
         return entity is null
             ? null
-            : new SystemCacheModel(entity.Symbol, entity.SectorSymbol, entity.Type, entity.X, entity.Y, entity.LastObservedAt);
+            : MapToModel(entity);
+    }
+
+    public async Task<IReadOnlyList<SystemCacheModel>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var entities = await db.Systems
+            .AsNoTracking()
+            .OrderBy(s => s.Symbol)
+            .ToListAsync(cancellationToken);
+
+        return entities.Select(MapToModel).ToList();
     }
 
     public async Task UpsertAsync(SystemCacheModel system, CancellationToken cancellationToken = default)
@@ -42,4 +52,7 @@ public sealed class SystemRepository(SpaceTradersDbContext db) : ISystemReposito
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static SystemCacheModel MapToModel(CachedSystem entity) =>
+        new(entity.Symbol, entity.SectorSymbol, entity.Type, entity.X, entity.Y, entity.LastObservedAt);
 }

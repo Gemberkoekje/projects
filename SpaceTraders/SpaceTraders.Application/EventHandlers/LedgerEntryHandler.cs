@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
@@ -5,9 +6,10 @@ using SpaceTraders.Domain.Events;
 namespace SpaceTraders.Application.EventHandlers;
 
 /// <summary>
-/// Records credit-affecting domain events into the ledger for financial analytics.
+/// Records credit-affecting domain events into the ledger for financial analytics
+/// and notifies dashboard clients via SignalR.
 /// </summary>
-public sealed class LedgerEntryHandler(ILedgerRepository ledger)
+public sealed class LedgerEntryHandler(ILedgerRepository ledger, IDashboardNotifier notifier)
 {
     public async Task Handle(ShipCargoSoldEvent @event, CancellationToken cancellationToken)
     {
@@ -18,6 +20,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             goodSymbol: @event.Good.Value,
             units: @event.Units,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(CargoPurchasedEvent @event, CancellationToken cancellationToken)
@@ -31,6 +34,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             units: @event.Units,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(ShipRefueledEvent @event, CancellationToken cancellationToken)
@@ -41,6 +45,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             -@event.Cost,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(ShipRepairedEvent @event, CancellationToken cancellationToken)
@@ -51,6 +56,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             -@event.Cost,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(MountInstalledEvent @event, CancellationToken cancellationToken)
@@ -62,6 +68,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             goodSymbol: @event.MountSymbol,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(ModuleInstalledEvent @event, CancellationToken cancellationToken)
@@ -73,6 +80,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             goodSymbol: @event.ModuleSymbol,
             waypointSymbol: @event.WaypointSymbol,
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(NewShipPurchasedEvent @event, CancellationToken cancellationToken)
@@ -83,6 +91,7 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             -@event.CostPaid,
             goodSymbol: @event.Type.ToString(),
             cancellationToken: cancellationToken);
+        notifier.Notify("ship", @event.ShipSymbol);
     }
 
     public async Task Handle(ContractFulfilledEvent @event, CancellationToken cancellationToken)
@@ -93,5 +102,6 @@ public sealed class LedgerEntryHandler(ILedgerRepository ledger)
             @event.Payment,
             sourceEventId: @event.ContractId,
             cancellationToken: cancellationToken);
+        notifier.Notify("contract", @event.ContractId);
     }
 }

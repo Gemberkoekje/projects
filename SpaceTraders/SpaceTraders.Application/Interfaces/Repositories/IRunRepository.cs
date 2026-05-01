@@ -10,6 +10,18 @@ public interface IRunRepository
     /// <summary>Returns the currently open run (where <c>EndedAt</c> is null), or <c>null</c>.</summary>
     Task<ActiveRunInfo?> GetActiveRunAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Returns all runs ordered by <c>StartedAt</c> descending.</summary>
+    Task<IReadOnlyList<RunSummaryDto>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns a single run by ID, or <c>null</c> if not found.</summary>
+    Task<RunDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns all scheduled (not yet promoted) runs ordered by <c>CreatedAt</c>.</summary>
+    Task<IReadOnlyList<ScheduledRunDto>> GetScheduledRunsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Returns all credit-highlight rows for the given run, ordered by <c>OccurredAt</c> ascending.</summary>
+    Task<IReadOnlyList<RunCreditHighlightDto>> GetRunHighlightsAsync(Guid runId, CancellationToken cancellationToken = default);
+
     /// <summary>Opens a new run, persists it, and returns its new ID.</summary>
     Task<Guid> OpenRunAsync(
         string name,
@@ -59,3 +71,40 @@ public interface IRunRepository
     /// <summary>Returns the total number of runs ever opened for the current agent (used for run naming).</summary>
     Task<int> GetRunCountAsync(CancellationToken cancellationToken = default);
 }
+
+public sealed record RunSummaryDto(
+    Guid Id,
+    string Name,
+    string StrategyLabel,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    long StartingCredits,
+    long? EndingCredits);
+
+public sealed record RunDetailDto(
+    Guid Id,
+    string Name,
+    string StrategyLabel,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    long StartingCredits,
+    long? EndingCredits,
+    string? SettingsSnapshotJson);
+
+public sealed record ScheduledRunDto(
+    Guid Id,
+    string Name,
+    string StrategyLabel,
+    string? ScheduledSettingsJson,
+    DateTimeOffset? ActivatesAt,
+    bool ActivatesOnNextRestart,
+    DateTimeOffset CreatedAt);
+
+public sealed record RunCreditHighlightDto(
+    long Id,
+    Guid RunId,
+    DateTimeOffset OccurredAt,
+    long Credits,
+    long DeltaCredits,
+    string EventKind,
+    string? Label);
