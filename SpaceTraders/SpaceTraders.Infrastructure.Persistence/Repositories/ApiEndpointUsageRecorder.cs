@@ -28,6 +28,6 @@ public sealed class ApiEndpointUsageRecorder(SpaceTradersDbContext db) : IApiEnd
     {
         return await db.ApiEndpointUsages
             .AsNoTracking()
-            .SumAsync(u => (long)u.Calls, cancellationToken);
+            .SumAsync(u => (long?)u.Calls, cancellationToken) ?? 0L;
     }
 }

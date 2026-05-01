@@ -98,7 +98,7 @@ public static class RunsEndpoints
             // credits/ship/hour — derive ship count from distinct ships in the ledger
             var shipCount = await ledgerRepo.GetDistinctShipCountAsync(id, ct);
             double? creditsPerShipPerHour = shipCount > 0 && creditsPerHour.HasValue
-                ? creditsPerHour / shipCount
+                ? creditsPerHour.Value / shipCount
                 : null;
 
             // credits/API-call — uses lifetime cumulative total as the best available approximation
