@@ -58,7 +58,8 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./AiUsageMonitoring/src/AiUsageMonitor
+          context: ./AiUsageMonitoring
+          file: ./AiUsageMonitoring/src/AiUsageMonitor/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ env.REPOSITORY_OWNER_LC }}/aiusagemonitor:latest
