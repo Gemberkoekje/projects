@@ -80,7 +80,7 @@ public static class StatusEndpoints
 
             var sample24hAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-25) && s.ObservedAt <= now.AddHours(-24)).OrderBy(s => s.ObservedAt).LastOrDefault();
             var sampleNow = samples.OrderBy(s => s.ObservedAt).LastOrDefault();
-            var sampleOnehAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-1)).OrderBy(s => s.ObservedAt).FirstOrDefault();
+            var sampleOneHourAgo = samples.Where(s => s.ObservedAt >= now.AddHours(-1)).OrderBy(s => s.ObservedAt).FirstOrDefault();
 
             double avgCreditRatePerHour = 0;
             double recentCreditRatePerHour = 0;
@@ -90,11 +90,11 @@ public static class StatusEndpoints
                 avgCreditRatePerHour = (sampleNow.Credits - sample24hAgo.Credits) / 24.0;
             }
 
-            if (sampleOnehAgo is not null && sampleNow is not null)
+            if (sampleOneHourAgo is not null && sampleNow is not null)
             {
-                var hoursElapsed = (sampleNow.ObservedAt - sampleOnehAgo.ObservedAt).TotalHours;
+                var hoursElapsed = (sampleNow.ObservedAt - sampleOneHourAgo.ObservedAt).TotalHours;
                 if (hoursElapsed > 0)
-                    recentCreditRatePerHour = (sampleNow.Credits - sampleOnehAgo.Credits) / hoursElapsed;
+                    recentCreditRatePerHour = (sampleNow.Credits - sampleOneHourAgo.Credits) / hoursElapsed;
             }
 
             var creditGrowthAnomaly = avgCreditRatePerHour > 1000
