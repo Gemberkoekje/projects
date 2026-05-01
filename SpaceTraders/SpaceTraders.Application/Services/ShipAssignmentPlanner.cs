@@ -151,6 +151,9 @@ public sealed class ShipAssignmentPlanner(
 
         public Task<IReadOnlyList<MarketSnapshot>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<MarketSnapshot>>([]);
+
+        public Task<IReadOnlyList<MarketFreshnessRecord>> GetAllFreshnessAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<MarketFreshnessRecord>>([]);
     }
 
     private const string MineAssignmentType = "Mine";

@@ -21,6 +21,15 @@ public interface IShipTaskRecordRepository
         DateTimeOffset to,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns all ship task records across all ships whose <c>StartedAt</c> falls within
+    /// [<paramref name="from"/>, <paramref name="to"/>], ordered by <c>StartedAt</c> ascending.
+    /// </summary>
+    Task<IReadOnlyList<ShipTaskRecordDto>> GetAllInTimeWindowAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Deletes all ship task records with <c>StartedAt</c> older than <paramref name="olderThan"/>.</summary>
     /// <returns>Number of rows deleted.</returns>
     Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);

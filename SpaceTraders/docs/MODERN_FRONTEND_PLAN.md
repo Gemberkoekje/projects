@@ -388,38 +388,69 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 3 — runs & comparison
 
-**3a — runs list & detail**
-- Runs list (`/runs`): all runs + scheduled/pending runs with distinct badge.
-- Run detail: summary card, per-category income, ships at start/end, contracts completed.
+**3a — runs list & detail** ✅ *Implemented*
+- ✅ `RunsPage.tsx` implemented with internal sub-routing via React Router `<Routes>`:
+  - Runs list (`/runs`): all runs from `/runs/` with ΔCredits, duration, strategy label, and start time; active run flagged with green "Active" badge; scheduled/pending runs from `/runs/scheduled` shown in a separate "Scheduled / Pending" section with yellow "Pending" badge and activation condition.
+  - Run detail (`/runs/:id`): back link to Runs list; heading with run name + "Active" badge when ongoing; summary stat cards (strategy, started, duration, starting credits, ΔCredits); credits-over-time SVG chart from `RunCreditHighlight` data; net P&L stat cards (total income, total expenses, net P&L); per-category income & expense table with proportional bars, sourced from `/runs/{id}/summary`.
+- ✅ Added `RunDetailDto` TypeScript interface to `src/types.ts` matching the `/runs/{id}/summary` response shape (`run`, `creditHighlights`, `ledgerSummary`).
+- ✅ Tests: `pages.test.tsx` extended with 10 tests (`RunsListPage`: heading, loading, run rows with ΔCredits, pending badge, active badge, empty state; `RunDetailPage`: heading + back link, loading, summary card, category table, credits chart). Total: 76 tests passing.
 
-**3b — compare view**
-- Compare (`/runs/compare?a=&b=`): side-by-side headers, overlaid normalised charts (credits, income, cargo throughput, fuel efficiency, API efficiency), per-good table, decisions diff.
+**3b — compare view** ✅ *Implemented*
+- ✅ `RunComparePage` implemented at `/runs/compare?a=&b=` with internal sub-routing via React Router `<Routes>`:
+  - Side-by-side headers (run name with colour dot, strategy, duration, ΔCredits, total income, net P&L per run).
+  - Overlaid normalised credits chart: both runs' credit highlight series drawn on a shared 0–100 % time axis with colour-coded paths and a legend.
+  - Per-category income & expense comparison table (category, run A amount, run B amount, Δ B − A column).
+  - Run selector checkboxes added to `RunsListPage` (select up to 2 runs, "Compare" button navigates to `/runs/compare?a=…&b=…`).
+- ✅ Added `RunCompareDto` TypeScript interface to `src/types.ts`.
+- ✅ `NormalisedCreditChart` SVG component added (dual-series, colour-coded, normalised time axis).
+- ✅ Tests: `pages.test.tsx` extended with 7 tests (`RunComparePage`: heading, loading, missing-params message, side-by-side headers, normalised chart, category table, back link). Total: 83 tests passing.
 
-**3c — efficiency KPIs**
-- Add backend computation and frontend display of: credits/hour, credits/ship/hour, credits/API-call, idle %, fuel cost per credit earned.
+**3c — efficiency KPIs** ✅ *Implemented*
+- ✅ Added `GetDistinctShipCountAsync(Guid runId)` to `ILedgerRepository` (and implementation) to derive the active ship count for a run from ledger entries.
+- ✅ Added `GetAllInTimeWindowAsync(DateTimeOffset from, DateTimeOffset to)` to `IShipTaskRecordRepository` (and implementation) to retrieve all ship task records in the run's time window.
+- ✅ Added `GetTotalCallsAsync()` to `IApiEndpointUsageRecorder` (and implementation) so the lifetime API-call total can be obtained without injecting `SpaceTradersDbContext` directly into endpoints.
+- ✅ Added `RunKpisDto` sealed record to `ApplicationDtos.cs` with five nullable fields: `CreditsPerHour`, `CreditsPerShipPerHour`, `CreditsPerApiCall`, `IdlePercent`, `FuelCostPerCreditEarned`.
+- ✅ Added `GET /runs/{id}/kpis` endpoint to `RunsEndpoints.cs`: returns 404 when run not found; computes credits/hour from delta credits and duration; credits/ship/hour by dividing by distinct ship count from the ledger; credits/API-call using the lifetime cumulative API-call total as the best available approximation (per-run call counts are not stored); idle % from `ShipTaskRecord` rows with `TaskKind == "Idle"` in the run time window, weighted by ship count × duration; fuel cost per credit earned from the `FuelPurchase` ledger category vs total income.
+- ✅ Added `RunKpisDto` TypeScript interface to `src/types.ts`.
+- ✅ Added **Efficiency KPIs** section to `RunDetailPage` in `RunsPage.tsx`: a second `useQuery` fetches `/runs/{id}/kpis`; renders a five-card grid (Credits / Hour, Credits / Ship / Hour, Credits / API Call, Idle %, Fuel Cost / Credit Earned); null values render `—`.
+- ✅ Updated `SpaceTradersApiFactory` in `ApiIntegrationTests.cs` to expose and register mocks for `ILedgerRepository`, `IShipTaskRecordRepository`, and `IApiEndpointUsageRecorder`.
+- ✅ Tests: `pages.test.tsx` extended with 2 tests (`RunDetailPage`: Efficiency KPIs section renders with data, em-dashes for null KPI values). Total: 85 tests passing. Backend: 2 new integration tests (`RunKpis_WithValidRunId_Returns200`, `RunKpis_WithUnknownRunId_Returns404`).
 
 ### Phase 4 — universe & system maps
 
-**4a — universe map (`/universe`)**
-- 2D scatter of all known systems (ECharts scatter + custom overlay).
-- Colour by visited/unvisited/known-only; jump-gate connection lines; ships layer updated via SignalR; search; exploration frontier highlight.
+**4a — universe map (`/universe`)** ✅ *Implemented*
+- ✅ Added `GetVisitedSystemSymbolsAsync` to `IWaypointRepository` (and implementation) to return distinct system symbols with cached waypoints.
+- ✅ Added `GetByKeyPrefixAsync` to `ISettingsRepository` (and implementation) to efficiently fetch all jump-gate connection settings entries.
+- ✅ Enriched `GET /universe/systems` to include `IsVisited` flag per system (true when waypoints for that system are cached).
+- ✅ Added `GET /universe/jump-connections` endpoint: reads all `Navigation.JumpGateConnections.*` settings entries and returns `{FromSystem, ToSystem}` pairs.
+- ✅ Added `SystemDto` and `JumpConnectionDto` TypeScript interfaces to `src/types.ts`.
+- ✅ `UniversePage.tsx` fully implemented: SVG scatter map of all known systems; colour by visited/frontier/known-only; jump-gate connection lines; ships layer (orange dots) from `/status/ships` query, updated automatically via SignalR invalidation; search input highlights matching system and shows result count; exploration frontier highlight (yellow) for systems adjacent to visited ones via jump gate; visited/total count in header; legend.
+- ✅ Backend: `ISystemRepository` and `IWaypointRepository` mocks registered in `SpaceTradersApiFactory`; 2 new integration tests (`UniverseSystems_WithValidApiKey_Returns200WithIsVisitedFlag`, `UniverseJumpConnections_WithValidApiKey_Returns200`). Total backend tests: 33 passing.
+- ✅ Tests: `pages.test.tsx` extended with 6 tests (`UniversePage`: heading, loading state, visited/total count, SVG map rendered, search input, legend). Total: 91 tests passing.
 
-**4b — system map (`/systems/:symbol`)**
-- In-system 2D layout: waypoints by coordinate, orbital clustering, waypoint-type icons, trait badges.
-- Ship position dots updated via SignalR; jump-gate connection edges; automation annotation rings; side-panel on click.
+**4b — system map (`/systems/:symbol`)** ✅ *Implemented*
+- ✅ Added `WaypointTraitDto`, `WaypointDto`, and `SystemMapResponseDto` TypeScript interfaces to `src/types.ts`.
+- ✅ Created `SystemMapPage.tsx`: breadcrumb (`Universe → :system`), system header with type/coordinates/ship count; SVG scatter map of waypoints using their `x`/`y` coordinates; orbital dashed lines from parent to child waypoints; distinct shapes per waypoint type (circle for planet/moon/gas giant/nebula/gravity well, diamond for jump gate, square for stations); colour-coded by type; automation annotation rings (green outline) on waypoints with non-transiting ships; ship count dots (orange) on waypoints with ships present; waypoint labels for larger bodies; jump-gate connection toggle button (shows connected system symbols from `/universe/jump-connections` when enabled); click-to-select highlights waypoint in both map and table; `WaypointPanel` side-sheet (symbol, type, coordinates, last-scan age, trait badges, facility links, ships list, market link).
+- ✅ Waypoints table below the map: symbol, type, coordinates, facility badges (Market links to `/markets/waypoints/:symbol`, Shipyard, Under Construction), top-3 trait badges; row click selects in map and opens side panel.
+- ✅ Added `/systems/:symbol` route to `AppShell.tsx`.
+- ✅ Updated `UniversePage.tsx`: system dots are now clickable and navigate to `/systems/:symbol` (uses `useNavigate`).
+- ✅ Tests: `pages.test.tsx` extended with 7 tests (`SystemMapPage`: heading, loading state, breadcrumb + Universe link, SVG map rendered, waypoints table, jump-gate toggle button, side panel opens on row click). Total: 98 tests passing.
 
-### Phase 5 — strategy aids
+### Phase 5 — strategy aids ✅ *Implemented*
 
-- Trade-route heatmap (origin × destination matrix, coloured by realised margin/hour).
-- Decision attribution: top-N rejected alternatives shown per automation decision.
-- Contract ROI panel.
-- Market freshness map and rate-limit pressure overlay on time-series charts.
-- Anomaly badges (server-computed, pushed via SignalR): ship credits/hour drop, good price spike.
-- Annotation markers on charts (from operator-authored `AgentSetting` notes).
+- ✅ **Trade-route heatmap** — `GET /finance/trade-routes?runId=` aggregates `LedgerEntry` TradeBuy/TradeSell pairs per ship+good to produce (buyWaypoint × sellWaypoint × good) profit matrix; `FinancePage` renders a sortable table colour-coded by profit/hour.
+- ✅ **Decision attribution** — `GET /status/top-trade-routes?limit=` returns top-N `TradeOpportunityDto` scored candidates; `OverviewPage` renders a "Decision Candidates" panel marking the #1 route as "Selected by automation".
+- ✅ **Contract ROI panel** — `GET /contracts/{id}/roi` computes payout vs estimated fuel cost; `ContractsPage` implemented in full (list with status badges, deliverables progress bars, per-contract ROI card).
+- ✅ **Market freshness map** — `GET /markets/freshness` returns `(waypointSymbol, lastObservedAt, ageMinutes)` for all known markets; `MarketsPage` adds a "Last Scan" column colour-coded green/yellow/red by age.
+- ✅ **Anomaly badges** — `GET /status/anomalies` computes last-1h vs 24h average credits rate; `OverviewPage` shows a yellow warning card when `creditGrowthAnomaly` is true.
+- ✅ **Annotation markers** — `FinancePage` and `RunsPage` read `AgentSetting` rows with key prefix `Annotation.*`; the credits line charts render vertical dashed markers with labels at the annotation timestamps.
+- ✅ Backend: 5 new integration tests (38 API tests total). Frontend: 10 new unit tests (108 total).
 
-### Phase 6 — retire `SpaceTraders.App`
+### Phase 6 — retire `SpaceTraders.App` ✅ *Implemented*
 
-- Once the new UI covers all views still actively used, remove `SpaceTraders.App` from k8s.
+- ✅ Removed `SpaceTraders.App` project from the solution (`SpaceTraders.slnx`).
+- ✅ Deleted `SpaceTraders.App` project directory and `Dockerfile.app`.
+- ✅ Updated CI workflow (`ci-spacetraders.yml`): removed `SpaceTraders.App` restore/build steps and the `spacetraders-app` Docker image build/push step.
 - Remaining deployment: `SpaceTraders.API` + `SpaceTraders.WebUI` + PostgreSQL.
 
 ## 12. Decisions

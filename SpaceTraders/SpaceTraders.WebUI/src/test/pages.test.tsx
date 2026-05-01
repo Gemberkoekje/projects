@@ -1029,3 +1029,993 @@ describe('WaypointDetailPage', () => {
     )
   })
 })
+
+// ─── RunsPage ─────────────────────────────────────────────────────────────────
+
+import RunsPage from '../pages/RunsPage'
+
+describe('RunsListPage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders run rows when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/')
+        return Promise.resolve([
+          {
+            id: 'run-1',
+            name: 'Run #1',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 250_000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Run #1')).toBeInTheDocument())
+    expect(screen.getByRole('link', { name: 'View run Run #1' })).toBeInTheDocument()
+    expect(screen.getByText('+150k')).toBeInTheDocument()
+  })
+
+  it('renders scheduled runs with pending badge', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/runs/scheduled')
+        return Promise.resolve([
+          {
+            id: 'sched-1',
+            name: 'Run #2',
+            strategyLabel: 'MINE',
+            scheduledSettingsJson: null,
+            activatesAt: null,
+            activatesOnNextRestart: true,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Run #2')).toBeInTheDocument())
+    expect(screen.getByText('Pending')).toBeInTheDocument()
+    expect(screen.getByText('On next restart')).toBeInTheDocument()
+  })
+
+  it('marks the active (ongoing) run with Active badge', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/')
+        return Promise.resolve([
+          {
+            id: 'run-active',
+            name: 'Active Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 1_800_000).toISOString(),
+            endedAt: null,
+            startingCredits: 50_000,
+            endingCredits: null,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Active Run')).toBeInTheDocument())
+    expect(screen.getByText('Active')).toBeInTheDocument()
+  })
+
+  it('shows no-runs message when list is empty', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No runs recorded yet.')).toBeInTheDocument(),
+    )
+  })
+})
+
+describe('RunDetailPage', () => {
+  it('renders run name as heading', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Mining Run',
+            strategyLabel: 'MINE',
+            startedAt: new Date(Date.now() - 7_200_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 80_000,
+            endingCredits: 200_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Mining Run' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: '← Runs' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching detail', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders summary card with strategy and ΔCredits', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Trade Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 400_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Run summary' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('TRADE')).toBeInTheDocument()
+    expect(screen.getByText('+300k')).toBeInTheDocument()
+  })
+
+  it('renders income/expense category table when ledger summary present', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Trade Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 400_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [
+            { category: 'TradeSell', totalAmount: 300_000, entryCount: 5 },
+            { category: 'FuelPurchase', totalAmount: -20_000, entryCount: 10 },
+          ],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Income and expenses by category' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByText('TradeSell')).toBeInTheDocument()
+    expect(screen.getAllByText('FuelPurchase').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders credits chart when highlights are present', async () => {
+    const base = Date.now()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Highlight Run',
+            strategyLabel: 'MINE',
+            startedAt: new Date(base - 7_200_000).toISOString(),
+            endedAt: new Date(base).toISOString(),
+            startingCredits: 50_000,
+            endingCredits: 150_000,
+          },
+          creditHighlights: [
+            { id: 1, runId: 'run-abc', occurredAt: new Date(base - 7_200_000).toISOString(), credits: 50_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+            { id: 2, runId: 'run-abc', occurredAt: new Date(base).toISOString(), credits: 150_000, deltaCredits: 100_000, eventKind: 'RunClose', label: 'End' },
+          ],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Credits over time' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders Efficiency KPIs section when kpis data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'KPI Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 7_200_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 500_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      if (path === '/runs/run-abc/kpis')
+        return Promise.resolve({
+          creditsPerHour: 200_000,
+          creditsPerShipPerHour: 100_000,
+          creditsPerApiCall: 12.5,
+          idlePercent: 15.3,
+          fuelCostPerCreditEarned: 0.04,
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Efficiency KPIs' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Credits / Hour')).toBeInTheDocument()
+    expect(screen.getByText('Credits / Ship / Hour')).toBeInTheDocument()
+    expect(screen.getByText('Credits / API Call')).toBeInTheDocument()
+    expect(screen.getByText('Idle %')).toBeInTheDocument()
+    expect(screen.getByText('Fuel Cost / Credit Earned')).toBeInTheDocument()
+  })
+
+  it('shows em-dashes when KPI values are null', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Empty KPI Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date().toISOString(),
+            endedAt: null,
+            startingCredits: 100_000,
+            endingCredits: null,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      if (path === '/runs/run-abc/kpis')
+        return Promise.resolve({
+          creditsPerHour: null,
+          creditsPerShipPerHour: null,
+          creditsPerApiCall: null,
+          idlePercent: null,
+          fuelCostPerCreditEarned: null,
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Efficiency KPIs' })).toBeInTheDocument(),
+    )
+    // All five KPI cards should show '—' for null values
+    const dashes = screen.getAllByText('—')
+    expect(dashes.length).toBeGreaterThanOrEqual(5)
+  })
+})
+
+describe('RunComparePage', () => {
+  const base = Date.now()
+
+  const runA = {
+    id: 'run-a',
+    name: 'Trade Run A',
+    strategyLabel: 'TRADE',
+    startedAt: new Date(base - 7_200_000).toISOString(),
+    endedAt: new Date(base - 3_600_000).toISOString(),
+    startingCredits: 100_000,
+    endingCredits: 300_000,
+  }
+
+  const runB = {
+    id: 'run-b',
+    name: 'Mining Run B',
+    strategyLabel: 'MINE',
+    startedAt: new Date(base - 10_800_000).toISOString(),
+    endedAt: new Date(base - 3_600_000).toISOString(),
+    startingCredits: 80_000,
+    endingCredits: 200_000,
+  }
+
+  const compareData = {
+    runA: {
+      run: runA,
+      creditHighlights: [
+        { id: 1, runId: 'run-a', occurredAt: new Date(base - 7_200_000).toISOString(), credits: 100_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+        { id: 2, runId: 'run-a', occurredAt: new Date(base - 3_600_000).toISOString(), credits: 300_000, deltaCredits: 200_000, eventKind: 'RunClose', label: 'End' },
+      ],
+      ledgerSummary: [
+        { category: 'TradeSell', totalAmount: 250_000, entryCount: 8 },
+        { category: 'FuelPurchase', totalAmount: -50_000, entryCount: 12 },
+      ],
+    },
+    runB: {
+      run: runB,
+      creditHighlights: [
+        { id: 3, runId: 'run-b', occurredAt: new Date(base - 10_800_000).toISOString(), credits: 80_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+        { id: 4, runId: 'run-b', occurredAt: new Date(base - 3_600_000).toISOString(), credits: 200_000, deltaCredits: 120_000, eventKind: 'RunClose', label: 'End' },
+      ],
+      ledgerSummary: [
+        { category: 'TradeSell', totalAmount: 180_000, entryCount: 6 },
+        { category: 'FuelPurchase', totalAmount: -60_000, entryCount: 15 },
+      ],
+    },
+  }
+
+  it('renders the Compare Runs heading', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Compare Runs' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('shows missing-params message when query params absent', () => {
+    mockApiFetch.mockResolvedValue(null)
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/compare">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText(/Missing run IDs/)).toBeInTheDocument()
+  })
+
+  it('renders side-by-side run headers with both run names', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Run comparison headers' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('Trade Run A').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Mining Run B').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders normalised credits chart when highlights are present', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Normalised credits comparison' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders category comparison table with Δ column', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Category comparison' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('TradeSell').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('FuelPurchase').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Δ (B − A)')).toBeInTheDocument()
+  })
+
+  it('renders back link to runs list', async () => {
+    mockApiFetch.mockResolvedValue(compareData)
+    render(
+      <WrapperWithRoute
+        path="/runs/*"
+        initialEntry="/runs/compare?a=run-a&b=run-b"
+      >
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: '← Runs' })).toBeInTheDocument(),
+    )
+  })
+})
+
+// ─── UniversePage ──────────────────────────────────────────────────────────────
+
+import UniversePage from '../pages/UniversePage'
+
+describe('UniversePage', () => {
+  const systems = [
+    { symbol: 'X1-SN', sectorSymbol: 'X1', type: 'RED_STAR', x: 10, y: -20, lastObservedAt: new Date().toISOString(), isVisited: true },
+    { symbol: 'X1-SF', sectorSymbol: 'X1', type: 'BLUE_STAR', x: -5, y: 30, lastObservedAt: new Date().toISOString(), isVisited: false },
+    { symbol: 'X1-VM', sectorSymbol: 'X1', type: 'YOUNG_STAR', x: 80, y: 5, lastObservedAt: new Date().toISOString(), isVisited: false },
+  ]
+
+  const connections = [
+    { fromSystem: 'X1-SN', toSystem: 'X1-SF' },
+  ]
+
+  it('renders the Universe heading', async () => {
+    mockApiFetch.mockResolvedValue(systems)
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Universe' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders visited/total system count after data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText(/1 \/ 3 systems visited/)).toBeInTheDocument(),
+    )
+  })
+
+  it('renders the universe map SVG', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Universe map' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders search input and filters results', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Universe map' })).toBeInTheDocument(),
+    )
+    const searchInput = screen.getByRole('textbox', { name: 'Search systems' })
+    expect(searchInput).toBeInTheDocument()
+  })
+
+  it('renders legend with visited, frontier and known-only entries', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems') return Promise.resolve(systems)
+      if (path === '/universe/jump-connections') return Promise.resolve(connections)
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <UniversePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Universe map legend' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Visited')).toBeInTheDocument()
+    expect(screen.getByText(/Frontier/)).toBeInTheDocument()
+    expect(screen.getByText(/Known only/)).toBeInTheDocument()
+  })
+})
+
+// ─── SystemMapPage ─────────────────────────────────────────────────────────────
+
+import SystemMapPage from '../pages/SystemMapPage'
+
+describe('SystemMapPage', () => {
+  const waypoints = [
+    {
+      symbol: 'X1-AB-00',
+      systemSymbol: 'X1-AB',
+      type: 'PLANET',
+      x: 0,
+      y: 30,
+      hasMarket: false,
+      hasShipyard: false,
+      traitsJson: null,
+      orbitalsJson: JSON.stringify(['X1-AB-01']),
+      parentSymbol: null,
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+    {
+      symbol: 'X1-AB-01',
+      systemSymbol: 'X1-AB',
+      type: 'MOON',
+      x: 5,
+      y: 32,
+      hasMarket: true,
+      hasShipyard: false,
+      traitsJson: JSON.stringify([{ symbol: 'MARKETPLACE', name: 'Marketplace', description: 'A marketplace.' }]),
+      orbitalsJson: null,
+      parentSymbol: 'X1-AB-00',
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+    {
+      symbol: 'X1-AB-JG',
+      systemSymbol: 'X1-AB',
+      type: 'JUMP_GATE',
+      x: 100,
+      y: 0,
+      hasMarket: false,
+      hasShipyard: false,
+      traitsJson: null,
+      orbitalsJson: null,
+      parentSymbol: null,
+      isUnderConstruction: false,
+      lastObservedAt: new Date().toISOString(),
+    },
+  ]
+
+  const system = {
+    symbol: 'X1-AB',
+    sectorSymbol: 'X1',
+    type: 'RED_STAR',
+    x: 10,
+    y: -20,
+    lastObservedAt: new Date().toISOString(),
+    isVisited: true,
+  }
+
+  const mapData = { system, waypoints }
+
+  it('renders the system symbol as heading', async () => {
+    mockApiFetch.mockResolvedValue(mapData)
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'X1-AB' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders the breadcrumb with Universe link', async () => {
+    mockApiFetch.mockResolvedValue(mapData)
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: 'Universe' })).toBeInTheDocument()
+  })
+
+  it('renders the SVG system map', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'System map for X1-AB' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders the waypoints table with all waypoints', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Waypoints list' })).toBeInTheDocument(),
+    )
+    expect(screen.getAllByText('X1-AB-00').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('X1-AB-01').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('X1-AB-JG').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows jump connection toggle button when system has a jump gate', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /jump connections/i })).toBeInTheDocument(),
+    )
+  })
+
+  it('opens waypoint detail panel when a waypoint row is clicked', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/universe/systems/X1-AB/map') return Promise.resolve(mapData)
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/systems/:symbol" initialEntry="/systems/X1-AB">
+        <SystemMapPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Waypoints list' })).toBeInTheDocument(),
+    )
+    // Click the planet row (first data row)
+    const rows = screen.getAllByRole('row')
+    // Skip header row (index 0), click first data row
+    rows[1].click()
+    await waitFor(() =>
+      expect(screen.getByRole('complementary', { name: 'Waypoint detail panel' })).toBeInTheDocument(),
+    )
+  })
+})
+
+// ─── ContractsPage ────────────────────────────────────────────────────────────
+
+import ContractsPage from '../pages/ContractsPage'
+
+describe('ContractsPage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    expect(screen.getByRole('heading', { name: 'Contracts' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders contract rows when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/contracts')
+        return Promise.resolve([
+          {
+            id: 'CONTRACT-1',
+            type: 'PROCUREMENT',
+            factionSymbol: 'COSMIC',
+            isAccepted: true,
+            isFulfilled: false,
+            termsDeadline: new Date(Date.now() + 86_400_000).toISOString(),
+            deliverablesJson: JSON.stringify([
+              { tradeSymbol: 'IRON', destinationSymbol: 'X1-AB-00', unitsRequired: 100, unitsFulfilled: 50 },
+            ]),
+          },
+        ])
+      return Promise.resolve(null)
+    })
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('CONTRACT-1')).toBeInTheDocument())
+    expect(screen.getByText('Active')).toBeInTheDocument()
+  })
+
+  it('shows empty state when there are no contracts', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No contracts found.')).toBeInTheDocument(),
+    )
+  })
+})
+
+
+// ─── FinancePage — trade routes section ──────────────────────────────────────
+
+describe('FinancePage — trade routes', () => {
+  it('renders the trade routes section heading', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Trade routes' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders trade route rows when data is available', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/finance/trade-routes'))
+        return Promise.resolve([
+          {
+            good: 'IRON_ORE',
+            buyWaypoint: 'X1-AB-00',
+            sellWaypoint: 'X1-AB-01',
+            totalUnits: 400,
+            totalProfit: 8000,
+            runDurationHours: 2,
+            profitPerHour: 4000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('IRON_ORE')).toBeInTheDocument())
+    expect(screen.getByText('X1-AB-00')).toBeInTheDocument()
+  })
+})
+
+
+// ─── MarketsPage — freshness column ──────────────────────────────────────────
+
+describe('MarketsPage — freshness', () => {
+  it('shows the Last Scan column header', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            tradeGoods: [],
+            imports: [],
+            exports: [],
+            exchange: [],
+          },
+        ])
+      if (path === '/markets/freshness') return Promise.resolve([])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <MarketsPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Last Scan' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows freshness age text when freshness data loads', async () => {
+    const now = new Date()
+    const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            tradeGoods: [],
+            imports: [],
+            exports: [],
+            exchange: [],
+          },
+        ])
+      if (path === '/markets/freshness')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            lastObservedAt: thirtyMinAgo,
+            ageMinutes: 30,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <MarketsPage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('30m ago')).toBeInTheDocument())
+  })
+})
+
+// ─── OverviewPage — anomalies + decision candidates ──────────────────────────
+
+describe('OverviewPage — anomalies and decision candidates', () => {
+  it('shows credit anomaly warning when anomaly is active', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/agent')
+        return Promise.resolve({
+          symbol: 'TEST', credits: 100000, startingFaction: 'COSMIC', shipCount: 1, headquartersSymbol: null,
+        })
+      if (path === '/status/anomalies')
+        return Promise.resolve({
+          creditGrowthAnomaly: true,
+          recentCreditRatePerHour: 500,
+          avgCreditRatePerHour: 5000,
+          priceAnomalies: [],
+        })
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <OverviewPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Credit growth anomaly' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Credit Growth Anomaly')).toBeInTheDocument()
+  })
+
+  it('renders decision candidates section when top routes load', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/top-trade-routes?limit=5')
+        return Promise.resolve([
+          {
+            good: 'FUEL',
+            buyWaypoint: 'X1-AB-00',
+            sellWaypoint: 'X1-AB-01',
+            totalUnits: 100,
+            totalProfit: 5000,
+            runDurationHours: 1,
+            profitPerHour: 5000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <OverviewPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Decision candidates' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('FUEL')).toBeInTheDocument()
+  })
+})

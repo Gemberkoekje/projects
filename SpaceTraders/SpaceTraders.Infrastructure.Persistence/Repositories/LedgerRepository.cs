@@ -91,6 +91,16 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
             .ToList();
     }
 
+    public async Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        return await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.RunId == runId)
+            .Select(e => e.ShipSymbol)
+            .Distinct()
+            .CountAsync(cancellationToken);
+    }
+
     public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
     {
         return await db.LedgerEntries

@@ -8,6 +8,9 @@ public interface IWaypointRepository
     Task<IReadOnlyList<WaypointCacheModel>> GetUnscoutedOrStaleAsync(string systemSymbol, TimeSpan staleness, CancellationToken cancellationToken = default);
     Task UpsertRangeAsync(IReadOnlyList<WaypointCacheModel> waypoints, CancellationToken cancellationToken = default);
     Task MarkVisitedAsync(string waypointSymbol, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the distinct system symbols for which at least one waypoint has been cached.</summary>
+    Task<IReadOnlyList<string>> GetVisitedSystemSymbolsAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record WaypointCacheModel

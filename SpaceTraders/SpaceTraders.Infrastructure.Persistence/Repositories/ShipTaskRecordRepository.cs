@@ -77,6 +77,24 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
             .ToList();
     }
 
+    public async Task<IReadOnlyList<ShipTaskRecordDto>> GetAllInTimeWindowAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await db.ShipTaskRecords
+            .AsNoTracking()
+            .Where(r => r.StartedAt >= from && r.StartedAt <= to)
+            .OrderBy(r => r.StartedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new ShipTaskRecordDto(
+                r.Id, r.ShipSymbol, r.StartedAt, r.EndedAt,
+                r.TaskKind, r.TargetWaypoint, r.PayloadJson))
+            .ToList();
+    }
+
     public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
     {
         return await db.ShipTaskRecords

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Route, Routes, useParams } from 'react-router'
 import { apiFetch } from '@/lib/api-fetch'
 import { cn } from '@/lib/utils'
-import type { MarketWaypointDto, MarketPriceSampleDto, TradeOpportunityDto } from '@/types'
+import type { MarketWaypointDto, MarketPriceSampleDto, TradeOpportunityDto, MarketFreshnessDto } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -652,6 +652,18 @@ function MarketsListPage() {
     staleTime: 120_000,
   })
 
+  const freshnessQ = useQuery<MarketFreshnessDto[]>({
+    queryKey: ['markets-freshness'],
+    queryFn: () => apiFetch('/markets/freshness'),
+    staleTime: 120_000,
+  })
+
+  const freshnessMap = useMemo(() => {
+    const map = new Map<string, MarketFreshnessDto>()
+    for (const f of freshnessQ.data ?? []) map.set(f.waypointSymbol, f)
+    return map
+  }, [freshnessQ.data])
+
   const markets = marketsQ.data ?? []
 
   // All goods across all markets for the heatmap selector
@@ -791,6 +803,7 @@ function MarketsListPage() {
                   <th className="px-3 py-2 text-right">Goods</th>
                   <th className="px-3 py-2">Imports</th>
                   <th className="px-3 py-2">Exports</th>
+                  <th className="px-3 py-2 text-right">Last Scan</th>
                 </tr>
               </thead>
               <tbody>
@@ -815,6 +828,26 @@ function MarketsListPage() {
                     <td className="px-3 py-2 text-xs text-status-green">
                       {m.exports.slice(0, 3).join(', ')}
                       {m.exports.length > 3 && ` +${m.exports.length - 3}`}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums">
+                      {(() => {
+                        const f = freshnessMap.get(m.waypointSymbol)
+                        if (!f) return <span className="text-muted-foreground">—</span>
+                        const age = f.ageMinutes
+                        const cls =
+                          age < 60
+                            ? 'text-status-green'
+                            : age < 360
+                              ? 'text-yellow-500'
+                              : 'text-destructive'
+                        const label =
+                          age < 60
+                            ? `${age}m ago`
+                            : age < 1440
+                              ? `${Math.floor(age / 60)}h ago`
+                              : `${Math.floor(age / 1440)}d ago`
+                        return <span className={cls}>{label}</span>
+                      })()}
                     </td>
                   </tr>
                 ))}

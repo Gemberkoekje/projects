@@ -218,3 +218,103 @@ export interface MarketWaypointDto {
   exchange: string[]
   tradeGoods: TradeGoodSnapshotDto[]
 }
+
+export interface RunDetailDto {
+  run: RunSummaryDto
+  creditHighlights: RunCreditHighlightDto[]
+  ledgerSummary: LedgerSummaryDto[]
+}
+
+export interface RunCompareDto {
+  runA: RunDetailDto
+  runB: RunDetailDto
+}
+
+export interface RunKpisDto {
+  creditsPerHour: number | null
+  creditsPerShipPerHour: number | null
+  creditsPerApiCall: number | null
+  idlePercent: number | null
+  fuelCostPerCreditEarned: number | null
+}
+
+export interface SystemDto {
+  symbol: string
+  sectorSymbol: string
+  type: string
+  x: number
+  y: number
+  lastObservedAt: string
+  isVisited: boolean
+}
+
+export interface JumpConnectionDto {
+  fromSystem: string
+  toSystem: string
+}
+
+export interface WaypointTraitDto {
+  symbol: string
+  name: string
+  description: string
+}
+
+export interface WaypointDto {
+  symbol: string
+  systemSymbol: string
+  type: string
+  x: number
+  y: number
+  hasMarket: boolean
+  hasShipyard: boolean
+  traitsJson: string | null
+  orbitalsJson: string | null
+  parentSymbol: string | null
+  isUnderConstruction: boolean
+  lastObservedAt: string
+}
+
+export interface SystemMapResponseDto {
+  system: SystemDto
+  waypoints: WaypointDto[]
+}
+
+export interface TradeRouteDto {
+  good: string
+  buyWaypoint: string
+  sellWaypoint: string
+  totalUnits: number
+  totalProfit: number
+  runDurationHours: number
+  profitPerHour: number
+}
+
+export interface ContractRoiDto {
+  contractId: string
+  totalPayout: number
+  estimatedFuelCost: number
+  netRoi: number
+  isProfitable: boolean
+}
+
+export interface MarketFreshnessDto {
+  waypointSymbol: string
+  systemSymbol: string
+  lastObservedAt: string
+  ageMinutes: number
+}
+
+export interface PriceAnomalyDto {
+  good: string
+  waypoint: string
+  currentPrice: number
+  avgPrice: number
+  changePercent: number
+}
+
+export interface AnomalyDto {
+  creditGrowthAnomaly: boolean
+  recentCreditRatePerHour: number
+  avgCreditRatePerHour: number
+  priceAnomalies: PriceAnomalyDto[]
+}

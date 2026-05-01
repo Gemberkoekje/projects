@@ -12,6 +12,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 
 namespace SpaceTraders.API.Tests;
@@ -204,6 +205,112 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var response = await _client.GetAsync($"{ApiPathBase}/metrics");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    // ── Run KPIs endpoint ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RunKpis_WithValidRunId_Returns200()
+    {
+        var runId = Guid.NewGuid();
+        var runRepoMock = _factory.Services.GetRequiredService<IRunRepository>();
+        runRepoMock.GetByIdAsync(runId, Arg.Any<CancellationToken>())
+            .Returns(new RunDetailDto(
+                runId, "Test Run", "TRADE",
+                DateTimeOffset.UtcNow.AddHours(-2), DateTimeOffset.UtcNow,
+                100_000L, 300_000L, null));
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/runs/{runId}/kpis");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task RunKpis_WithUnknownRunId_Returns404()
+    {
+        var runId = Guid.NewGuid();
+        var runRepoMock = _factory.Services.GetRequiredService<IRunRepository>();
+        runRepoMock.GetByIdAsync(runId, Arg.Any<CancellationToken>())
+            .Returns((RunDetailDto?)null);
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/runs/{runId}/kpis");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    // ── Universe endpoints ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UniverseSystems_WithValidApiKey_Returns200WithIsVisitedFlag()
+    {
+        _factory.SystemRepository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new SystemCacheModel("X1-SN", "X1", "RED_STAR", 10, -20, DateTimeOffset.UtcNow),
+                new SystemCacheModel("X1-SF", "X1", "BLUE_STAR", -5, 30, DateTimeOffset.UtcNow),
+            });
+        _factory.WaypointRepository.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[] { "X1-SN" });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/universe/systems");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("X1-SN");
+        body.Should().Contain("isVisited");
+    }
+
+    [Fact]
+    public async Task UniverseJumpConnections_WithValidApiKey_Returns200()
+    {
+        _factory.SettingsRepository.GetByKeyPrefixAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                ("Navigation.JumpGateConnections.X1-SN-12345",
+                 """{"WaypointSymbol":"X1-SN-12345","ConnectedSystems":["X1-SF"],"ObservedAt":"2024-01-01T00:00:00Z"}"""),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/universe/jump-connections");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("X1-SN");
+        body.Should().Contain("X1-SF");
+    }
+
+    // ── Phase 5: new endpoints ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TradeRoutes_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/finance/trade-routes");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ContractRoi_WithUnknownContractId_Returns404()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/contracts/UNKNOWN/roi");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task MarketFreshness_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/markets/freshness");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Anomalies_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/anomalies");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task TopTradeRoutes_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/top-trade-routes");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
 
 /// <summary>
@@ -242,18 +349,61 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public ICreditHistoryService CreditHistory { get; } = Substitute.For<ICreditHistoryService>();
 
+    public ILedgerRepository LedgerRepository { get; } = Substitute.For<ILedgerRepository>();
+
+    public IShipTaskRecordRepository ShipTaskRecordRepository { get; } = Substitute.For<IShipTaskRecordRepository>();
+
+    public IApiEndpointUsageRecorder ApiEndpointUsageRecorder { get; } = Substitute.For<IApiEndpointUsageRecorder>();
+
+    public ISystemRepository SystemRepository { get; } = Substitute.For<ISystemRepository>();
+
+    public IWaypointRepository WaypointRepository { get; } = Substitute.For<IWaypointRepository>();
+
+    public IAgentCreditsSampleRepository AgentCreditsSampleRepository { get; } = Substitute.For<IAgentCreditsSampleRepository>();
+
+    public IMarketRepository MarketRepository { get; } = Substitute.For<IMarketRepository>();
+
     public SpaceTradersApiFactory()
     {
         // Default stub responses
         AgentRepository.GetAsync(default).ReturnsForAnyArgs((Application.Ports.AgentModel?)null);
         ShipRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<Application.Ports.ShipModel>());
         ContractRepository.GetActiveAsync(default).ReturnsForAnyArgs(Array.Empty<ContractDto>());
+        ContractRepository.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((ContractDto?)null);
         ActivityLogRepository.GetPagedAsync(1, 50, null, default).ReturnsForAnyArgs(Array.Empty<ActivityLogDto>());
         SettingsRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<(string, string, string, string)>());
+        SettingsRepository.GetByKeyPrefixAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<(string, string)>());
         TradeOpportunityRepository.GetBestRouteForCapacityAsync(default, default, default, default)
             .ReturnsForAnyArgs((TradeOpportunityDto?)null);
+        TradeOpportunityRepository.GetTopRoutesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<TradeOpportunityDto>());
         LeaderElection.IsLeader.Returns(true);
         CreditHistory.GetHistory().Returns(Array.Empty<(DateTimeOffset, long)>());
+        LedgerRepository.GetSummaryAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.LedgerSummaryDto>());
+        LedgerRepository.GetDistinctShipCountAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(0);
+        LedgerRepository.GetRangeAsync(
+                Arg.Any<DateTimeOffset?>(), Arg.Any<DateTimeOffset?>(),
+                Arg.Any<string?>(), Arg.Any<LedgerCategory?>(),
+                Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.LedgerEntryDto>());
+        ShipTaskRecordRepository.GetAllInTimeWindowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.ShipTaskRecordDto>());
+        ApiEndpointUsageRecorder.GetTotalCallsAsync(Arg.Any<CancellationToken>())
+            .Returns(0L);
+        SystemRepository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<SystemCacheModel>());
+        WaypointRepository.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<string>());
+        AgentCreditsSampleRepository.GetRangeAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.CreditsSampleDto>());
+        MarketRepository.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.MarketSnapshot>());
+        MarketRepository.GetAllFreshnessAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.MarketFreshnessRecord>());
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -299,6 +449,15 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<ILeaderLeaseRepository>();
             services.AddScoped(_ => Substitute.For<ILeaderLeaseRepository>());
 
+            services.RemoveAll<ILedgerRepository>();
+            services.AddScoped(_ => LedgerRepository);
+
+            services.RemoveAll<IShipTaskRecordRepository>();
+            services.AddScoped(_ => ShipTaskRecordRepository);
+
+            services.RemoveAll<IApiEndpointUsageRecorder>();
+            services.AddScoped(_ => ApiEndpointUsageRecorder);
+
             // ── Run lifecycle (Phase 0b) ──────────────────────────────────────
             // RunLifecycleService is a hosted service that tries to access the DB
             // at startup. Provide a properly-stubbed IRunRepository so it can
@@ -313,6 +472,19 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
                 .Returns(new Application.Ports.ActiveRunInfo(testRunId, "Test Run", "default", DateTimeOffset.UtcNow, 100_000L));
             services.RemoveAll<Application.Interfaces.Repositories.IRunRepository>();
             services.AddScoped(_ => runRepoMock);
+
+            // ── Universe repositories ─────────────────────────────────────────
+            services.RemoveAll<ISystemRepository>();
+            services.AddScoped(_ => SystemRepository);
+
+            services.RemoveAll<IWaypointRepository>();
+            services.AddScoped(_ => WaypointRepository);
+
+            services.RemoveAll<IAgentCreditsSampleRepository>();
+            services.AddScoped(_ => AgentCreditsSampleRepository);
+
+            services.RemoveAll<IMarketRepository>();
+            services.AddScoped(_ => MarketRepository);
 
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();
