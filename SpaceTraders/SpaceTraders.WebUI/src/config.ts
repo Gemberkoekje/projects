@@ -8,6 +8,9 @@
 interface RuntimeConfig {
   apiBaseUrl: string
   dashboardApiKey: string
+  /** Base path for the SignalR hub.  Defaults to '/hubs' which is routed to
+   *  the API service by the ingress independently of the REST API prefix. */
+  hubBaseUrl: string
 }
 
 declare global {
@@ -21,6 +24,7 @@ function getConfig(): RuntimeConfig {
   return {
     apiBaseUrl: rc.apiBaseUrl ?? '/spacetraders/api',
     dashboardApiKey: rc.dashboardApiKey ?? '',
+    hubBaseUrl: rc.hubBaseUrl ?? '/hubs',
   }
 }
 

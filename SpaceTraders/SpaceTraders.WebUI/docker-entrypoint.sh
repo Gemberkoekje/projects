@@ -9,6 +9,7 @@
 
 API_BASE_URL="${API_BASE_URL:-/spacetraders/api}"
 DASHBOARD_API_KEY="${DASHBOARD_API_KEY:-}"
+HUB_BASE_URL="${HUB_BASE_URL:-/hubs}"
 
 # Escape values for safe embedding in a JSON string:
 # replace \ with \\, then " with \", then newlines with \n
@@ -18,9 +19,10 @@ json_escape() {
 
 ESCAPED_API_BASE_URL="$(json_escape "$API_BASE_URL")"
 ESCAPED_DASHBOARD_API_KEY="$(json_escape "$DASHBOARD_API_KEY")"
+ESCAPED_HUB_BASE_URL="$(json_escape "$HUB_BASE_URL")"
 
-printf 'window.__RUNTIME_CONFIG__ = { "apiBaseUrl": "%s", "dashboardApiKey": "%s" };\n' \
-  "$ESCAPED_API_BASE_URL" "$ESCAPED_DASHBOARD_API_KEY" \
+printf 'window.__RUNTIME_CONFIG__ = { "apiBaseUrl": "%s", "dashboardApiKey": "%s", "hubBaseUrl": "%s" };\n' \
+  "$ESCAPED_API_BASE_URL" "$ESCAPED_DASHBOARD_API_KEY" "$ESCAPED_HUB_BASE_URL" \
   > /usr/share/nginx/html/config.js
 
 echo "Runtime config written to /usr/share/nginx/html/config.js"
