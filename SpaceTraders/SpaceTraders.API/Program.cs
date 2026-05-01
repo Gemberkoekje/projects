@@ -100,6 +100,7 @@ builder.Services.AddHostedService<GameLoopService>();
 builder.Services.AddHostedService<ContractWatchService>();
 builder.Services.AddHostedService<ResetAndReliabilityMonitorService>();
 builder.Services.AddHostedService<ActivityLogPruningService>();
+builder.Services.AddHostedService<DataRetentionService>();
 builder.Services.AddHostedService<ShipRefreshWorkerService>();
 builder.Services.AddHostedService<PrometheusMetricsService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunLifecycleService>());

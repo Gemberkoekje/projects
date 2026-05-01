@@ -15,4 +15,8 @@ public interface ILedgerRepository
         string? sourceEventId = null,
         Guid? runId = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes all ledger entries with <c>OccurredAt</c> older than <paramref name="olderThan"/>.</summary>
+    /// <returns>Number of rows deleted.</returns>
+    Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
 }

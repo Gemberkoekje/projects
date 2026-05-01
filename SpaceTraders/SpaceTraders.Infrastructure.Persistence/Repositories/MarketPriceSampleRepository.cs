@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Entities;
@@ -48,6 +49,33 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
         }
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default)
+    {
+        // Step 1: Downsample the 7–90 day window — keep one row per (waypoint, good, hour), delete duplicates.
+        var downsampledDeleted = await db.Database.ExecuteSqlAsync(
+            $"""
+            DELETE FROM market_price_samples
+            WHERE agent_token = {db.AgentToken}
+              AND observed_at < {rawRetentionCutoff}
+              AND observed_at >= {aggregateRetentionCutoff}
+              AND id NOT IN (
+                SELECT MIN(id)
+                FROM market_price_samples
+                WHERE agent_token = {db.AgentToken}
+                  AND observed_at < {rawRetentionCutoff}
+                  AND observed_at >= {aggregateRetentionCutoff}
+                GROUP BY waypoint_symbol, good_symbol, date_trunc('hour', observed_at)
+              )
+            """, cancellationToken);
+
+        // Step 2: Delete all rows older than the 90-day aggregate retention cutoff (query filter applies automatically).
+        var purgedDeleted = await db.MarketPriceSamples
+            .Where(s => s.ObservedAt < aggregateRetentionCutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return downsampledDeleted + purgedDeleted;
     }
 
     private sealed class TradeGoodJson
