@@ -24,6 +24,6 @@ public sealed class StartupInitializationHealthCheck(StartupInitializationState 
                 state.Failure));
         }
 
-        return Task.FromResult(HealthCheckResult.Unhealthy("Deferred startup initialization is still running."));
+        return Task.FromResult(HealthCheckResult.Degraded("Deferred startup initialization is still running."));
     }
 }
