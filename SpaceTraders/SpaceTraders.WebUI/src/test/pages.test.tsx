@@ -1029,3 +1029,257 @@ describe('WaypointDetailPage', () => {
     )
   })
 })
+
+// ─── RunsPage ─────────────────────────────────────────────────────────────────
+
+import RunsPage from '../pages/RunsPage'
+
+describe('RunsListPage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByRole('heading', { name: 'Runs' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders run rows when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/')
+        return Promise.resolve([
+          {
+            id: 'run-1',
+            name: 'Run #1',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 250_000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Run #1')).toBeInTheDocument())
+    expect(screen.getByRole('link', { name: 'View run Run #1' })).toBeInTheDocument()
+    expect(screen.getByText('+150k')).toBeInTheDocument()
+  })
+
+  it('renders scheduled runs with pending badge', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/runs/scheduled')
+        return Promise.resolve([
+          {
+            id: 'sched-1',
+            name: 'Run #2',
+            strategyLabel: 'MINE',
+            scheduledSettingsJson: null,
+            activatesAt: null,
+            activatesOnNextRestart: true,
+            createdAt: new Date().toISOString(),
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Run #2')).toBeInTheDocument())
+    expect(screen.getByText('Pending')).toBeInTheDocument()
+    expect(screen.getByText('On next restart')).toBeInTheDocument()
+  })
+
+  it('marks the active (ongoing) run with Active badge', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/')
+        return Promise.resolve([
+          {
+            id: 'run-active',
+            name: 'Active Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 1_800_000).toISOString(),
+            endedAt: null,
+            startingCredits: 50_000,
+            endingCredits: null,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('Active Run')).toBeInTheDocument())
+    expect(screen.getByText('Active')).toBeInTheDocument()
+  })
+
+  it('shows no-runs message when list is empty', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No runs recorded yet.')).toBeInTheDocument(),
+    )
+  })
+})
+
+describe('RunDetailPage', () => {
+  it('renders run name as heading', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Mining Run',
+            strategyLabel: 'MINE',
+            startedAt: new Date(Date.now() - 7_200_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 80_000,
+            endingCredits: 200_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Mining Run' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('link', { name: '← Runs' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching detail', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders summary card with strategy and ΔCredits', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Trade Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 400_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Run summary' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('TRADE')).toBeInTheDocument()
+    expect(screen.getByText('+300k')).toBeInTheDocument()
+  })
+
+  it('renders income/expense category table when ledger summary present', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Trade Run',
+            strategyLabel: 'TRADE',
+            startedAt: new Date(Date.now() - 3_600_000).toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 400_000,
+          },
+          creditHighlights: [],
+          ledgerSummary: [
+            { category: 'TradeSell', totalAmount: 300_000, entryCount: 5 },
+            { category: 'FuelPurchase', totalAmount: -20_000, entryCount: 10 },
+          ],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Income and expenses by category' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByText('TradeSell')).toBeInTheDocument()
+    expect(screen.getAllByText('FuelPurchase').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders credits chart when highlights are present', async () => {
+    const base = Date.now()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/run-abc/summary')
+        return Promise.resolve({
+          run: {
+            id: 'run-abc',
+            name: 'Highlight Run',
+            strategyLabel: 'MINE',
+            startedAt: new Date(base - 7_200_000).toISOString(),
+            endedAt: new Date(base).toISOString(),
+            startingCredits: 50_000,
+            endingCredits: 150_000,
+          },
+          creditHighlights: [
+            { id: 1, runId: 'run-abc', occurredAt: new Date(base - 7_200_000).toISOString(), credits: 50_000, deltaCredits: 0, eventKind: 'RunOpen', label: 'Start' },
+            { id: 2, runId: 'run-abc', occurredAt: new Date(base).toISOString(), credits: 150_000, deltaCredits: 100_000, eventKind: 'RunClose', label: 'End' },
+          ],
+          ledgerSummary: [],
+        })
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/runs/*" initialEntry="/runs/run-abc">
+        <RunsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Credits over time' })).toBeInTheDocument(),
+    )
+  })
+})
