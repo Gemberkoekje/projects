@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <UserSecretsId>SpaceTraders-API</UserSecretsId>
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
+    <IsPublishable>true</IsPublishable>
   </PropertyGroup>
 
   <ItemGroup>
