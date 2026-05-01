@@ -47,16 +47,58 @@ public sealed class ShipRegistration
     required public string Role { get; init; }
 }
 
+public sealed class ShipRequirements
+{
+    [JsonPropertyName("power")]
+    public int? Power { get; init; }
+
+    [JsonPropertyName("crew")]
+    public int? Crew { get; init; }
+
+    [JsonPropertyName("slots")]
+    public int? Slots { get; init; }
+}
+
 public sealed class ShipMount
 {
     [JsonPropertyName("symbol")]
     required public string Symbol { get; init; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("strength")]
+    public int? Strength { get; init; }
+
+    [JsonPropertyName("deposits")]
+    public IReadOnlyList<string>? Deposits { get; init; }
+
+    [JsonPropertyName("requirements")]
+    public ShipRequirements? Requirements { get; init; }
 }
 
 public sealed class ShipModule
 {
     [JsonPropertyName("symbol")]
     required public string Symbol { get; init; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; init; }
+
+    [JsonPropertyName("capacity")]
+    public int? Capacity { get; init; }
+
+    [JsonPropertyName("range")]
+    public int? Range { get; init; }
+
+    [JsonPropertyName("requirements")]
+    public ShipRequirements? Requirements { get; init; }
 }
 
 public sealed class ShipComponent
@@ -64,11 +106,38 @@ public sealed class ShipComponent
     [JsonPropertyName("symbol")]
     required public string Symbol { get; init; }
 
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+
+    [JsonPropertyName("description")]
+    public string? Description { get; init; }
+
     [JsonPropertyName("condition")]
     public double Condition { get; init; }
 
     [JsonPropertyName("integrity")]
     public double Integrity { get; init; }
+
+    // Frame-specific
+    [JsonPropertyName("moduleSlots")]
+    public int? ModuleSlots { get; init; }
+
+    [JsonPropertyName("mountingPoints")]
+    public int? MountingPoints { get; init; }
+
+    [JsonPropertyName("fuelCapacity")]
+    public int? FuelCapacity { get; init; }
+
+    // Reactor-specific
+    [JsonPropertyName("powerOutput")]
+    public int? PowerOutput { get; init; }
+
+    // Engine-specific
+    [JsonPropertyName("speed")]
+    public int? Speed { get; init; }
+
+    [JsonPropertyName("requirements")]
+    public ShipRequirements? Requirements { get; init; }
 }
 
 public sealed class ShipCooldown
