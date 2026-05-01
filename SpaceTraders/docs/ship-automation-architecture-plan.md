@@ -576,13 +576,18 @@ Build green. Full test suite: 396 passed, 4 skipped (pre-existing network-gated 
 
 Build is green and the full solution test suite passes — 382 passed, 4 pre-existing sandbox integration tests skipped. Phase 7d is complete; `ShipInTransitEventHandler` is now a plain Wolverine handler with no chain-of-command dependency.
 
-#### Phase 7e — Decouple remaining events from `ChainOfCommandEvent`
+#### Phase 7e — Decouple remaining events from `ChainOfCommandEvent` ✅ COMPLETE
 
-- Make `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent` plain records (each carries its own `EventId`/`OccurredAt`/`CorrelationId`/`CausationId` directly, copied from the current base) — no shared chain base type.
-- Make `ConstructionSuppliedEvent` a plain factual event (no `ShipInOrbitEvent` base). Keep its payload (`TradeSymbol`, `UnitsSupplied`, `IsComplete`, ship/system/waypoint identifiers).
-- Update `SupplyConstructionCommand` constructor call accordingly.
-- Update `LogActivityHandler` overloads to match the new (non-derived) event shapes.
-- Update `ShipChainEventsTests` (rename to `ShipEventsTests`) to assert factual payload preservation only — no inheritance assertions.
+- Made `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent` plain sealed records (each carries its own `EventId`/`OccurredAt`/`CorrelationId`/`CausationId` directly, copied from the former base) — no shared chain base type. ✅
+- Made `ConstructionSuppliedEvent` a plain sealed factual record (no `ShipInOrbitEvent` base); carries all payload fields (`TradeSymbol`, `UnitsSupplied`, `IsComplete`, ship/system/waypoint identifiers) directly. ✅
+- `SupplyConstructionCommand` constructor call unchanged — same parameter signature. ✅
+- Added `Handle(ConstructionSuppliedEvent)` overload to `LogActivityHandler` to log supply events now that the type is no longer implicitly dispatched via `ShipInOrbitEvent`. ✅
+- Renamed `ShipChainEventsTests` → `ShipEventsTests`; added payload-preservation tests for all five decoupled event types (`ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`, `ConstructionSuppliedEvent`) — no inheritance assertions. ✅
+- Updated `ChainOfCommandDispatcherTests`: replaced ship event types (which no longer satisfy the `ChainOfCommandEvent` constraint) with local test-only record types; dispatcher mechanics tests preserved. ✅
+- Updated `ChainOfCommandEventHandlerRegistrationTests`: replaced `BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers` (MakeGenericType violation) with `AfterPhase7e_NoConcreteChainOfCommandEventSubtypes_ShouldExist` asserting zero concrete subtypes remain. ✅
+- Updated `Phase65dPlannerRegressionTests`: replaced `MakeGenericType` loop with the same no-concrete-subtypes assertion. ✅
+
+Build is green and the full solution test suite passes — 381 passed, 4 pre-existing sandbox integration tests skipped. Phase 7e is complete; all ship-state and supply events are now plain records with no chain-of-command dependency. `ChainOfCommandEvent` has no remaining concrete subtypes and will be deleted in Phase 7f.
 
 #### Phase 7f — Delete chain infrastructure
 

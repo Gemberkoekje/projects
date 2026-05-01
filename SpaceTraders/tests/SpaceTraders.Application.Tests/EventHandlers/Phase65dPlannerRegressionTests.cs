@@ -10,6 +10,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Planning;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -337,22 +338,18 @@ public sealed class Phase65dPlannerRegressionTests
     [Fact]
     public void Phase65d_ChainHandlerTypes_AreNotRegisteredForDockedAndOrbitEvents()
     {
-        var services = new ServiceCollection();
-        services.AddApplication();
+        // Phase 7e: ShipDockedEvent, ShipInOrbitEvent, ShipStateMismatchEvent no longer derive
+        // from ChainOfCommandEvent, so MakeGenericType with those types would violate the constraint.
+        // The invariant is now enforced by AfterPhase7e_NoConcreteChainOfCommandEventSubtypes_ShouldExist
+        // in ChainOfCommandEventHandlerRegistrationTests: no chain event types exist at all.
+        var chainEventTypes = typeof(ChainOfCommandEvent).Assembly
+            .GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false })
+            .Where(t => typeof(ChainOfCommandEvent).IsAssignableFrom(t) && t != typeof(ChainOfCommandEvent))
+            .ToList();
 
-        var businessEffectEventTypes = new[]
-        {
-            typeof(ShipDockedEvent),
-            typeof(ShipInOrbitEvent),
-            typeof(ShipStateMismatchEvent),
-        };
-
-        foreach (var eventType in businessEffectEventTypes)
-        {
-            var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(eventType);
-            services.Should().NotContain(
-                d => d.ServiceType == handlerInterfaceType,
-                $"Phase 6.5d: chain handlers for {eventType.Name} should not be registered; planner handles these.");
-        }
+        chainEventTypes.Should().BeEmpty(
+            "Phase 7e decoupled ShipDockedEvent, ShipInOrbitEvent, ShipStateMismatchEvent and all other " +
+            "ship-state events from ChainOfCommandEvent; no concrete chain subtypes should remain.");
     }
 }

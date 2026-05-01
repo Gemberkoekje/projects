@@ -1,9 +1,15 @@
-using SpaceTraders.Domain.Events;
-
 namespace SpaceTraders.Domain.Events.Ships;
 
-public record ShipInTransitEvent : ChainOfCommandEvent
+public sealed record ShipInTransitEvent
 {
+    public Guid EventId { get; init; }
+
+    public DateTimeOffset OccurredAt { get; init; }
+
+    public Guid CorrelationId { get; init; }
+
+    public Guid CausationId { get; init; }
+
     public string ShipSymbol { get; init; }
 
     public string OriginWaypointSymbol { get; init; }
@@ -20,8 +26,11 @@ public record ShipInTransitEvent : ChainOfCommandEvent
         Guid correlationId,
         Guid causationId,
         DateTimeOffset occurredAt)
-        : base(correlationId, causationId, occurredAt)
     {
+        EventId = Guid.NewGuid();
+        OccurredAt = occurredAt;
+        CorrelationId = correlationId == Guid.Empty ? EventId : correlationId;
+        CausationId = causationId;
         ShipSymbol = shipSymbol;
         OriginWaypointSymbol = originWaypointSymbol;
         DestinationWaypointSymbol = destinationWaypointSymbol;
