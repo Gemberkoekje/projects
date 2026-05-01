@@ -328,11 +328,16 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 1 — frontend skeleton
 
-**1a — project setup**
-- New `SpaceTraders.WebUI` project: Vite + React + TypeScript, shadcn/ui, Tailwind CSS.
-- `Dockerfile` (multi-stage: build → nginx), `k8s/deployment-webui.yaml`, `k8s/service-webui.yaml`, `k8s/ingress` update.
-- Inject dashboard API key via environment variable at deploy time (not baked into the bundle).
-- CI pipeline step: `npm run build` + Docker image push.
+**1a — project setup** ✅ *Implemented*
+- ✅ Created `SpaceTraders.WebUI` project: Vite + React + TypeScript, shadcn/ui dependencies (class-variance-authority, clsx, tailwind-merge, lucide-react), Tailwind CSS v4.
+- ✅ Configured Tailwind CSS v4 via `@tailwindcss/vite` plugin; set up `@` path alias.
+- ✅ Configured Vitest (jsdom environment, `@testing-library/react`, `@testing-library/jest-dom`); 3 passing smoke tests.
+- ✅ Runtime config mechanism: `public/config.js` stub for dev; `docker-entrypoint.sh` writes `window.__RUNTIME_CONFIG__` from `DASHBOARD_API_KEY` and `API_BASE_URL` env vars at container startup (key never baked into the bundle); `src/config.ts` reads it.
+- ✅ `Dockerfile.webui` (multi-stage: `node:22-alpine` build → `nginx:1.27-alpine`; entrypoint script runs before nginx starts).
+- ✅ `k8s/deployment-webui.yaml` — nginx container, `DASHBOARD_API_KEY` from secret, `API_BASE_URL` from configmap, probes, resource limits.
+- ✅ `k8s/service-webui.yaml` — ClusterIP service on port 80.
+- ✅ `k8s/ingress.yaml` updated — `/` now routes to `spacetraders-webui` instead of `spacetraders-app`.
+- ✅ CI pipeline updated: new `build-webui` job (`npm ci` → `npm test` → `npm run build`); `docker` job now depends on both `build` and `build-webui` and pushes `spacetraders-webui` image to GHCR.
 
 **1b — auth, transport & layout**
 - `X-Api-Key` header wired from runtime config into every API call (TanStack Query default headers).

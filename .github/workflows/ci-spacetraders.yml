@@ -39,9 +39,34 @@ jobs:
           dotnet build ./SpaceTraders/SpaceTraders.API/SpaceTraders.API.csproj --no-restore --configuration Release
           dotnet build ./SpaceTraders/SpaceTraders.App/SpaceTraders.App.csproj --no-restore --configuration Release
 
+  build-webui:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: SpaceTraders/SpaceTraders.WebUI/package-lock.json
+
+      - name: Install dependencies
+        working-directory: SpaceTraders/SpaceTraders.WebUI
+        run: npm ci
+
+      - name: Test
+        working-directory: SpaceTraders/SpaceTraders.WebUI
+        run: npm test
+
+      - name: Build
+        working-directory: SpaceTraders/SpaceTraders.WebUI
+        run: npm run build
+
   docker:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, build-webui]
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -80,3 +105,13 @@ jobs:
           tags: |
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-app:latest
             ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-app:${{ github.sha }}
+
+      - name: Build and push WebUI image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./SpaceTraders/Dockerfile.webui
+          push: true
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-webui:latest
+            ghcr.io/${{ steps.owner.outputs.owner }}/spacetraders-webui:${{ github.sha }}
