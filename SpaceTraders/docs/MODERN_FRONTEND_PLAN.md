@@ -33,34 +33,36 @@ A plan for a new, modern frontend for SpaceTraders that focuses on **observabili
 | Routing | **TanStack Router** or React Router | Either is fine; pick one and stick with it. |
 | Date/number | **date-fns**, `Intl.NumberFormat` | Avoid moment; render credits with locale grouping. |
 | Tests | **Vitest** + **Playwright** | Unit + a couple of smoke E2E flows. |
-| Build/host | New project `SpaceTraders.WebUI` served as static assets behind the existing API host (or its own nginx pod) | Keeps deployment story compatible with current k8s manifests. |
+| Build/host | New project `SpaceTraders.WebUI` built as static assets, served from its **own pod** (nginx or `serve`). Uses the existing `SpaceTraders.API` — no second API. | Clean separation; API host stays unchanged; CORS configured for the WebUI origin. |
 
 The existing Razor Pages `SpaceTraders.App` stays around during migration and is retired once the new UI has feature parity for the read views we keep.
 
 ## 4. Architecture
 
 ```
-┌────────────────────────┐       SignalR / SSE        ┌─────────────────────────┐
-│ SpaceTraders.WebUI     │ ◄─────────────────────────  │ SpaceTraders.API        │
-│ (React + TS, static)   │                             │ (existing host)         │
-│                        │  REST GET /spacetraders/api │  - read endpoints       │
-│  - TanStack Query      │ ──────────────────────────► │  - new /hubs/dashboard  │
-│  - ECharts             │                             │  - new /metrics/*       │
-└────────────────────────┘                             │  - new /runs/*          │
-                                                       └─────────────────────────┘
-                                                                  │
-                                                                  ▼
-                                                       ┌─────────────────────────┐
-                                                       │ PostgreSQL              │
-                                                       │ + new time-series tables│
-                                                       └─────────────────────────┘
+┌────────────────────────┐       SignalR / WSS         ┌─────────────────────────┐
+│ SpaceTraders.WebUI     │ ◄──────────────────────────  │ SpaceTraders.API        │
+│ (React + TS, static)   │                              │ (existing host, 1 API)  │
+│ own pod / nginx        │  REST GET /spacetraders/api  │  - existing endpoints   │
+│                        │ ───────────────────────────► │  - new /hubs/dashboard  │
+│  - TanStack Query      │                              │  - new /finance/*       │
+│  - ECharts             │                              │  - new /runs/*          │
+│  - SignalR client      │                              │  - new /universe/*      │
+└────────────────────────┘                              └─────────────────────────┘
+                                                                   │
+                                                                   ▼
+                                                        ┌─────────────────────────┐
+                                                        │ PostgreSQL              │
+                                                        │ + new time-series tables│
+                                                        └─────────────────────────┘
 ```
 
 Key principles:
 
+- **One API, separate UI pod.** `SpaceTraders.WebUI` is its own deployment (nginx serving static files); `SpaceTraders.API` is the only backend. No second API is introduced. CORS is configured on the API to allow the WebUI origin.
 - **All reads go through the API**, not directly to the DB. The new frontend never gets a connection string. (Today `SpaceTraders.App` reads the DB directly; we don't repeat that.)
 - **One SignalR hub** (`/hubs/dashboard`) pushes typed events. The frontend uses those events to invalidate the relevant TanStack Query cache keys, then re-fetches the small REST payload. This keeps payloads cacheable, ETag-able, and easy to test, while still feeling realtime.
-- **Read-only by construction.** The frontend bundle is built with no client for `/control/*` endpoints. The API host should additionally enforce that the dashboard's API key (a separate one) only has access to read scopes — see §10.
+- **Read-only by construction.** The frontend bundle is built with no client for `/control/*` endpoints. The API host enforces that the dashboard's API key (a separate one) only has access to read scopes — see §10.
 
 ## 5. Realtime update strategy
 
@@ -130,8 +132,9 @@ The IA is small and task-oriented. Each view has a clear question it answers.
 - **Waypoint detail (`/markets/waypoints/:symbol`)**: imports/exports/exchanges, current prices, recent transactions involving this waypoint.
 
 ### 6.6 Runs & strategy comparison (`/runs`)
-- A "run" is a contiguous period during which a particular strategy/configuration was active. Runs are auto-created when configuration changes that affect strategy (or explicitly marked by the operator via the existing settings API).
-- List of runs: name, strategy label, start, end (or "active"), starting credits, ending credits, ΔCredits, Δ/hour, ships at start/end, contracts completed.
+- A "run" is a contiguous period during which a particular strategy/configuration was active.
+- **Run lifecycle**: auto-created when configuration that affects strategy changes; the previous run closes atomically. A run can also be **scheduled in advance** — operators create a `ScheduledRun` (via the existing operator-scoped settings/control API) with an optional `activatesAt` timestamp or `activatesOnNextRestart` flag. The current run stays open until the scheduled time (or next restart) arrives; only then does the transition happen. This means strategy changes can be queued for future runs without interrupting the current one.
+- List of runs: name, strategy label, start, end (or "active"), starting credits, ending credits, ΔCredits, Δ/hour, ships at start/end, contracts completed. Scheduled/pending future runs shown with a distinct badge.
 - **Compare view (`/runs/compare?a=:idA&b=:idB`)**:
   - Side-by-side header cards (strategy, duration, ships, ΔCredits, Δ/hour, credits/ship/hour).
   - Overlaid charts (normalised to "hours since run start" so different absolute timestamps line up):
@@ -152,8 +155,8 @@ The IA is small and task-oriented. Each view has a clear question it answers.
 - Unified, filterable feed of all automation events (already partially exposed at `/status/activity`). Filters: ship, system, event type, time range. Free-text search.
 
 ### 6.9 Systems & waypoints (`/systems`, `/systems/:symbol`)
-- Map (2D scatter) of known systems, coloured by whether automation has been there.
-- System detail: list of waypoints, traits, ships currently present, markets, shipyards.
+- Map (2D scatter) of known systems, coloured by whether automation has been there. See §6.12 for the full universe map.
+- System detail: list of waypoints, traits, ships currently present, markets, shipyards. See §6.13 for the in-system map.
 - Read-only — no "send ship here" button.
 
 ### 6.10 Health & ops (`/health`)
@@ -165,43 +168,84 @@ The IA is small and task-oriented. Each view has a clear question it answers.
 ### 6.11 Settings (read-only mirror) (`/settings`)
 - Shows all `AgentSetting` rows and current effective values, last changed at, last changed by. No edit form.
 - Useful when comparing runs to see what was different.
+- **Scheduled runs panel**: shows any pending `ScheduledRun` (name, strategy, queued settings snapshot, `activatesAt` or "on next restart"). Operator creates/cancels these via the control API; this view is read-only.
+
+### 6.12 Universe map (`/universe`)
+
+A full 2D scatter-plot of every known system in the current server instance.
+
+- **X/Y axes** are the SpaceTraders coordinate plane (`x`, `y` from `CachedSystem`). Each system is a dot; hover shows symbol, faction, type, and whether it has been visited.
+- **Colour encoding**:
+  - Green — visited (automation has been here).
+  - Orange — known but unvisited.
+  - Grey — charted by others (scanned from the system list) but never visited by our agent.
+- **Jump-gate overlay**: draw lines between systems with known jump-gate connections (`cached_jump_gate_connections`). Lines are solid for confirmed bi-directional connections and dashed for one-way/unconfirmed.
+- **Faction regions**: optional soft background shading by faction territory (if faction headquarters coordinates are known).
+- **Ships layer**: live dots (updated via SignalR) showing each ship's current system. In-transit ships are rendered along the line between source and destination, positioned by interpolated ETA progress.
+- **Interaction**:
+  - Click a system → opens `/systems/:symbol` detail panel (side-sheet, no full-page nav).
+  - Click a jump-gate line → shows both connected systems and the ships currently queued for the connection.
+  - Zoom and pan (mouse wheel / touch pinch). "Reset view" button.
+  - Search box to jump to a named system.
+- **Exploration frontier**: a toggle that highlights systems reachable in ≤N jumps from our current position (N configurable, default 3), useful for planning scouting runs.
+
+### 6.13 System map (`/systems/:symbol`)
+
+A zoomed-in 2D map of a single system's waypoints.
+
+- **Layout**: waypoints placed by their `x`/`y` coordinates within the system. Orbital bodies (moons, orbitals) are shown as small satellites clustered around their parent.
+- **Waypoint icons** by type: asteroid belt (ring), planet (circle), moon (small circle), jump gate (diamond), station (square), gas giant (large circle with gradient), asteroid (irregular), debris field, etc.
+- **Trait badges**: MARKETPLACE, SHIPYARD, UNCHARTED, MINERAL_DEPOSITS, VOLCANIC, STRIPPED, etc., shown as small icon overlays on the waypoint dot.
+- **Ship positions**: live dots per ship currently in this system (position updates via SignalR), with a tooltip showing symbol, role, current task, and ETA if in transit within the system.
+- **Jump-gate connections**: a button to toggle an edge from this system's jump gate to every connected system symbol (abbreviated), linking out to the universe map at that position.
+- **Automation annotations**: a coloured ring on waypoints the automation is actively using (mining, trading, probing) so the operator can see the activity hotspots at a glance.
+- **Side panel on click**: opens waypoint detail (traits, market snapshot, shipyard snapshot, last-scan age, chart status) without leaving the map.
+- **Mini-breadcrumb**: "Universe → :system" for easy navigation back.
 
 ## 7. Backend additions required
 
 The data is mostly there. The gaps that the frontend needs the backend to fill:
 
-1. **Time-series price history** — today the latest `CachedMarket` is overwritten on each scan. Add `MarketPriceSample(waypointSymbol, goodSymbol, observedAt, purchasePrice, sellPrice, supply, activity, tradeVolume)` written on every market refresh. Index on `(goodSymbol, observedAt)` and `(waypointSymbol, goodSymbol, observedAt)`. Retention: keep raw for 30 days, then 1h-aggregated forever.
-2. **Credits history** — `AgentCreditsSample(token, observedAt, credits)` written on every change (already known from API responses). Cheap; one row per change.
-3. **Ledger / financial events** — `LedgerEntry(occurredAt, shipSymbol, runId, category, amount, goodSymbol?, unitPrice?, units?, waypointSymbol?, sourceEventId)`. `category ∈ {TradeBuy, TradeSell, MiningSell, ContractPayout, ContractDeposit, FuelPurchase, ShipPurchase, ModulePurchase, MountPurchase, Repair, Other}`. This is the source of truth for the Finance view.
-4. **Runs** — `Run(id, name, strategyLabel, startedAt, endedAt?, settingsSnapshotJson, startingCredits, endingCredits?)`. A run starts at boot and on settings changes that touch strategy keys; previous run is closed atomically. Activity, ledger, and price samples are tagged with `runId` where applicable.
-5. **Ship task & assignment timeline** — promote the in-memory automation decision into a persisted `ShipTaskRecord(shipSymbol, startedAt, endedAt?, taskKind, targetWaypoint?, payloadJson)` so the ship-detail "what is it doing and why" view is reconstructable after restart.
-6. **SignalR hub** `Microsoft.AspNetCore.SignalR` with methods:
+1. **Time-series price history** — today the latest `CachedMarket` is overwritten on each scan. Add `MarketPriceSample(waypointSymbol, goodSymbol, observedAt, purchasePrice, sellPrice, supply, activity, tradeVolume)` written on every market refresh. Index on `(goodSymbol, observedAt)` and `(waypointSymbol, goodSymbol, observedAt)`. Retention: keep raw for **7 days**, hourly aggregates for **90 days**; raw beyond 7 days is pruned by a nightly job.
+2. **Credits history** — `AgentCreditsSample(token, observedAt, credits)` written on every change (already known from API responses). Cheap; one row per change. Retained for 90 days; older samples are pruned keeping one row per hour.
+3. **Ledger / financial events** — `LedgerEntry(occurredAt, shipSymbol, runId, category, amount, goodSymbol?, unitPrice?, units?, waypointSymbol?, sourceEventId)`. `category ∈ {TradeBuy, TradeSell, MiningSell, ContractPayout, ContractDeposit, FuelPurchase, ShipPurchase, ModulePurchase, MountPurchase, Repair, Other}`. Raw ledger entries retained for **30 days**; a nightly job rolls them into `RunCreditHighlight` (see §8) so the Finance view always has the per-run summary regardless of raw age.
+4. **Runs** — `Run(id, name, strategyLabel, startedAt, endedAt?, settingsSnapshotJson, startingCredits, endingCredits?)`. Auto-created when a strategy-relevant setting changes; previous run closes atomically. Additionally, a `ScheduledRun(id, name, strategyLabel, scheduledSettingsJson, activatesAt?, activatesOnNextRestart, createdAt)` table lets operators queue a future run via the operator-scoped control API (`POST /control/runs/schedule`, `DELETE /control/runs/schedule/:id`) without closing the current run. When `activatesAt` is reached (or on next process startup if `activatesOnNextRestart`), the pending `ScheduledRun` is promoted to an active `Run` and the current run closes. Activity, ledger, and price samples are tagged with `runId` where applicable.
+5. **Run credit highlights** — `RunCreditHighlight(runId, occurredAt, credits, deltaCredits, eventKind, label?)`. Written for every significant credit event during a run (start, contract payout, large purchase, hourly snapshot, end). These rows are kept **indefinitely** — they are small and directly answer "how did this run go credit-wise?" without touching the pruned raw ledger. The Finance and Runs views use these for historical runs; they fall back to live `LedgerEntry` for the active run.
+6. **Ship task & assignment timeline** — promote the in-memory automation decision into a persisted `ShipTaskRecord(shipSymbol, startedAt, endedAt?, taskKind, targetWaypoint?, payloadJson)` so the ship-detail "what is it doing and why" view is reconstructable after restart.
+7. **Jump-gate connections cache** — `CachedJumpGateConnection(fromSystem, toSystem, waypointSymbol, recordedAt)` for the universe map jump-link overlay. Already partially exists from Phase 5; verify it is queryable by system pair.
+8. **SignalR hub** `Microsoft.AspNetCore.SignalR` with methods:
    - `SubscribeAgent(token)`, `SubscribeShip(symbol)`, `SubscribeMarket(goodSymbol)`, `SubscribeRun(runId)`, etc.
    - Server pushes lightweight `{ kind, id, version, occurredAt }` envelopes; clients use them as cache invalidations.
-7. **New REST read endpoints** on the existing `/spacetraders/api` group (all `GET`, all `X-Api-Key`):
+9. **New REST read endpoints** on the existing `/spacetraders/api` group (all `GET`, all `X-Api-Key`):
    - `/finance/credits-history?from=&to=&runId=`
    - `/finance/ledger?from=&to=&shipSymbol=&category=&runId=`
    - `/finance/summary?runId=` (income/expense by category)
+   - `/finance/run-highlights?runId=` (credit highlight events for a specific run, works for any age)
    - `/markets/goods/{symbol}/prices?waypoint=&from=&to=&granularity=raw|hour|day`
    - `/markets/waypoints/{symbol}/prices?from=&to=`
    - `/markets/best-routes?cargoCapacity=&fuelCapacity=&maxJumps=`
    - `/runs`, `/runs/{id}`, `/runs/{id}/summary`, `/runs/compare?a=&b=`
+   - `/runs/scheduled` (list pending scheduled runs)
    - `/ships/{symbol}/timeline?from=&to=`
    - `/ships/{symbol}/stats?runId=`
    - `/contracts/{id}/timeline`
    - `/health/automation` (worker heartbeats), `/health/rate-limit/history`
-8. **CORS** configured to allow the new web UI origin (configurable, defaults to same-origin when served from the API host).
-9. **OpenAPI/Swagger** schema for these read endpoints, used to generate a typed TypeScript client (`openapi-typescript` or NSwag) so the frontend can never silently drift from the backend.
+   - `/universe/systems` (all known systems with coordinates + jump-gate edge list for map rendering)
+   - `/universe/systems/{symbol}/map` (waypoints with coordinates, traits, orbital relationships)
+10. **OpenAPI/Swagger** schema for these read endpoints, used to generate a typed TypeScript client (`openapi-typescript` or NSwag) so the frontend can never silently drift from the backend.
 
 ## 8. Data model summary (new tables)
 
-| Table | Purpose | Hot indexes |
-|---|---|---|
-| `MarketPriceSample` | Time series of buy/sell/supply per (waypoint, good) | `(goodSymbol, observedAt)`, `(waypointSymbol, goodSymbol, observedAt)` |
-| `AgentCreditsSample` | Time series of credits per agent token | `(agentToken, observedAt)` |
-| `LedgerEntry` | Every credit-affecting event, categorised | `(occurredAt)`, `(runId)`, `(shipSymbol, occurredAt)` |
-| `Run` | Strategy run boundaries + settings snapshot | `(startedAt)` |
-| `ShipTaskRecord` | Persisted automation task per ship | `(shipSymbol, startedAt)` |
+| Table | Purpose | Retention | Hot indexes |
+|---|---|---|---|
+| `MarketPriceSample` | Time series of buy/sell/supply per (waypoint, good) | 7 days raw; 90 days hourly agg | `(goodSymbol, observedAt)`, `(waypointSymbol, goodSymbol, observedAt)` |
+| `AgentCreditsSample` | Time series of credits per agent token | 90 days (1 row/hour after 7 days) | `(agentToken, observedAt)` |
+| `LedgerEntry` | Every credit-affecting event, categorised | 30 days raw; rolled into `RunCreditHighlight` | `(occurredAt)`, `(runId)`, `(shipSymbol, occurredAt)` |
+| `RunCreditHighlight` | Compact per-run credit milestones for long-term history | Indefinite (small) | `(runId, occurredAt)` |
+| `Run` | Strategy run boundaries + settings snapshot | Indefinite | `(startedAt)` |
+| `ScheduledRun` | Future run queued by operator without closing current run | Until promoted or cancelled | `(activatesAt)` |
+| `ShipTaskRecord` | Persisted automation task per ship | 30 days | `(shipSymbol, startedAt)` |
+| `CachedJumpGateConnection` | Jump-gate edges for universe map overlay | Until overwritten | `(fromSystem)`, `(toSystem)` |
 
 `AgentSetting`, `CachedShip`, `CachedMarket`, `CachedContract`, `ActivityLog`, `ApiEndpointUsage` already exist and are reused.
 
@@ -224,43 +268,115 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 ## 10. Security & accuracy
 
 - The frontend uses a **dashboard-scoped API key** distinct from the operator key. The API host adds a "scope" claim to keys; the dashboard key is allowed only on `GET` endpoints in `/status/*`, `/finance/*`, `/markets/*`, `/runs/*`, `/ships/*`, `/contracts/*`, `/health/*`, `/settings/` (read), and on the SignalR hub. `/control/*` and `PUT /settings/*` are forbidden for this scope. Defence in depth on top of "frontend has no UI for those calls".
-- API key never leaves the server; the static UI is served from the same origin as the API and the key is injected as an `HttpOnly` cookie on first load by the host, which the API host then translates to `X-Api-Key` for downstream auth (or the API just trusts the cookie for the dashboard scope). No key in `localStorage`, no key in the JS bundle.
+- The dashboard API key is stored in the WebUI container's environment (injected at deploy time as an env var, read by the nginx config or a thin start-up script that writes it into the built JS config). It is **not** baked into the static bundle. No key in the JS source or `localStorage`.
+- **CORS**: `SpaceTraders.API` is configured with a CORS policy allowing the WebUI origin (configurable via `appsettings`, e.g. `WebUI:Origin`). Only `GET` and the SignalR upgrade are allowed for the dashboard scope.
 - All numbers shown carry an `as of <timestamp>` tooltip sourced from the row's `LastUpdatedAt` (or `observedAt` for time series). Stale data (>configurable threshold) is rendered with a subtle warning badge, not silently.
 - Charts always use the same backend-computed aggregates as the tables on the same page (no client-side recomputation that could disagree with the API).
 
 ## 11. Phased delivery
 
-**Phase 0 — foundations (backend)**
-- Add `Run`, `LedgerEntry`, `AgentCreditsSample`, `MarketPriceSample`, `ShipTaskRecord` tables and the writes that populate them.
-- Add SignalR hub and event publishing from existing event handlers.
-- Add new GET endpoints + OpenAPI.
+## 11. Phased delivery
 
-**Phase 1 — frontend skeleton**
-- New `SpaceTraders.WebUI` project (Vite + React + TS), Dockerfile, k8s manifest, served behind the API host.
-- Auth wiring, SignalR client, generated typed API client, layout, dark/light theme, health strip.
-- Implement Overview, Fleet, Ship detail, Activity, Health, Settings (read).
+### Phase 0 — backend foundations
 
-**Phase 2 — finance & markets**
-- Implement Finance view (credits-over-time, income/expense, per-good, budgets).
-- Implement Markets view + good detail with price-over-time and supply.
+**0a — new tables & writes**
+- Add `Run`, `ScheduledRun`, `LedgerEntry`, `RunCreditHighlight`, `AgentCreditsSample`, `MarketPriceSample`, `ShipTaskRecord` tables with EF Core migrations.
+- Wire writes into existing event handlers (credits change → `AgentCreditsSample`, market sync → `MarketPriceSample`, every credit-affecting action → `LedgerEntry` + `RunCreditHighlight` milestone, ship assignment change → `ShipTaskRecord`).
 
-**Phase 3 — runs & comparison**
-- Run lifecycle on the backend (auto-open/close on settings change).
-- Implement Runs list and compare-two-runs view with overlaid charts and decisions-diff.
-- Add credits/hour, credits/API-call, idle %, fuel efficiency KPIs.
+**0b — run lifecycle**
+- Auto-open a new `Run` on startup and on any strategy-relevant settings change (previous run closes atomically).
+- Implement `ScheduledRun` promotion logic: on startup and via a background timer, promote a pending `ScheduledRun` whose `activatesAt` has passed (or `activatesOnNextRestart` is set) into an active `Run`.
+- Add operator control endpoints (`POST /control/runs/schedule`, `DELETE /control/runs/schedule/:id`) under the existing operator-scoped key.
 
-**Phase 4 — strategy aids**
-- Trade-route heatmap, decision attribution, contract ROI, market-freshness map.
-- Anomaly badges pushed via SignalR.
-- Annotations on charts.
+**0c — nightly data retention jobs**
+- Prune `MarketPriceSample` rows older than 7 days (keeping hourly aggregates for 90 days).
+- Prune `AgentCreditsSample` rows older than 7 days (keeping one row/hour beyond that, for 90 days).
+- Prune `LedgerEntry` rows older than 30 days (highlights already safely in `RunCreditHighlight`).
+- Prune `ShipTaskRecord` rows older than 30 days.
 
-**Phase 5 — retire `SpaceTraders.App`**
-- Remove the Razor Pages app from k8s once the new UI covers all the views still in use, leaving only the API host + WebUI + Postgres.
+**0d — SignalR hub & read endpoints**
+- Add `Microsoft.AspNetCore.SignalR` hub at `/hubs/dashboard`.
+- Publish lightweight invalidation events from existing event handlers.
+- Add all new `GET` read endpoints (`/finance/*`, `/runs/*`, `/universe/*`, `/ships/:symbol/timeline`, `/ships/:symbol/stats`, `/contracts/:id/timeline`, `/health/automation`, `/health/rate-limit/history`).
+- Add CORS policy on `SpaceTraders.API` allowing the configured WebUI origin.
+- Add OpenAPI schema for all new endpoints; generate TypeScript client (`openapi-typescript`).
 
-## 12. Open questions
+### Phase 1 — frontend skeleton
 
-1. Do we want the frontend served by the existing API host or as its own pod (separate scaling, separate cache headers)?
-2. Retention policy for `MarketPriceSample` and `LedgerEntry` — is 30 days raw + indefinite hourly aggregates acceptable, or do we want longer raw retention for replay?
-3. Should "run" boundaries be fully automatic (any change to a strategy-tagged setting closes and opens a run) or operator-driven via a `POST /runs` call (which is a write — fine because it's still on the operator-scoped key, not the dashboard key)?
-4. SignalR vs plain Server-Sent Events — SSE is simpler and read-only by nature, which fits the goal; SignalR is more idiomatic in .NET. Recommend SignalR but flag SSE as a valid alternative.
-5. Is multi-agent (multiple tokens) something the frontend needs to switch between (the current Razor app already does via `AgentViewSelection`)? Plan assumes yes; the agent selector lives in the top bar.
+**1a — project setup**
+- New `SpaceTraders.WebUI` project: Vite + React + TypeScript, shadcn/ui, Tailwind CSS.
+- `Dockerfile` (multi-stage: build → nginx), `k8s/deployment-webui.yaml`, `k8s/service-webui.yaml`, `k8s/ingress` update.
+- Inject dashboard API key via environment variable at deploy time (not baked into the bundle).
+- CI pipeline step: `npm run build` + Docker image push.
+
+**1b — auth, transport & layout**
+- `X-Api-Key` header wired from runtime config into every API call (TanStack Query default headers).
+- SignalR client with auto-reconnect, exponential backoff, "live updates paused" banner on missed heartbeat.
+- App shell: top nav (logo, active agent name, health strip), sidebar (Overview, Fleet, Finance, Markets, Runs, Universe, Contracts, Activity, Health, Settings).
+- Dark / light theme toggle persisted in `localStorage`.
+
+**1c — core read views**
+- Overview (`/`): credits, 24h delta, run info, ship counts, active contracts, top trade opportunities, credits sparkline, health strip.
+- Fleet (`/fleet`): filterable ship table.
+- Ship detail (`/fleet/:symbol`): activity timeline, lifetime stats, cargo, fuel, assignment history, "what is it doing and why" panel.
+- Activity log (`/activity`): filterable event feed.
+- Health & ops (`/health`): rate-limit budget, worker heartbeats, API usage table.
+- Settings mirror (`/settings`): `AgentSetting` rows + scheduled runs panel.
+
+### Phase 2 — finance & markets
+
+**2a — finance views**
+- Finance (`/finance`): credits-over-time chart, income/expense stacked area by category, per-ship P&L, per-good profit table, budget panel.
+- Falls back to `RunCreditHighlight` for historical runs, uses live `LedgerEntry` for the active run.
+
+**2b — market views**
+- Markets list (`/markets`): searchable waypoint list, heatmap by good.
+- Good detail (`/markets/goods/:symbol`): price-over-time, candlestick, supply step chart, best buy→sell pairs.
+- Waypoint detail (`/markets/waypoints/:symbol`): imports/exports/exchanges, current prices, recent transactions.
+
+### Phase 3 — runs & comparison
+
+**3a — runs list & detail**
+- Runs list (`/runs`): all runs + scheduled/pending runs with distinct badge.
+- Run detail: summary card, per-category income, ships at start/end, contracts completed.
+
+**3b — compare view**
+- Compare (`/runs/compare?a=&b=`): side-by-side headers, overlaid normalised charts (credits, income, cargo throughput, fuel efficiency, API efficiency), per-good table, decisions diff.
+
+**3c — efficiency KPIs**
+- Add backend computation and frontend display of: credits/hour, credits/ship/hour, credits/API-call, idle %, fuel cost per credit earned.
+
+### Phase 4 — universe & system maps
+
+**4a — universe map (`/universe`)**
+- 2D scatter of all known systems (ECharts scatter + custom overlay).
+- Colour by visited/unvisited/known-only; jump-gate connection lines; ships layer updated via SignalR; search; exploration frontier highlight.
+
+**4b — system map (`/systems/:symbol`)**
+- In-system 2D layout: waypoints by coordinate, orbital clustering, waypoint-type icons, trait badges.
+- Ship position dots updated via SignalR; jump-gate connection edges; automation annotation rings; side-panel on click.
+
+### Phase 5 — strategy aids
+
+- Trade-route heatmap (origin × destination matrix, coloured by realised margin/hour).
+- Decision attribution: top-N rejected alternatives shown per automation decision.
+- Contract ROI panel.
+- Market freshness map and rate-limit pressure overlay on time-series charts.
+- Anomaly badges (server-computed, pushed via SignalR): ship credits/hour drop, good price spike.
+- Annotation markers on charts (from operator-authored `AgentSetting` notes).
+
+### Phase 6 — retire `SpaceTraders.App`
+
+- Once the new UI covers all views still actively used, remove `SpaceTraders.App` from k8s.
+- Remaining deployment: `SpaceTraders.API` + `SpaceTraders.WebUI` + PostgreSQL.
+
+## 12. Decisions
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Frontend served by the existing API host or its own pod? | **Own pod** (`SpaceTraders.WebUI` nginx container). Uses the existing `SpaceTraders.API` — no second API. CORS configured for the WebUI origin. |
+| 2 | Retention policy for `MarketPriceSample` and `LedgerEntry`? | Raw samples pruned after 7 days (market) / 30 days (ledger). Hourly aggregates kept 90 days. **`RunCreditHighlight`** kept indefinitely — compact per-run credit milestones answer "how did this run go?" for any historical run without touching pruned raw data. |
+| 3 | Run boundaries automatic or operator-driven? | **Hybrid**: runs auto-close on strategy-relevant settings changes. Operators can additionally queue a `ScheduledRun` (with optional `activatesAt` or `activatesOnNextRestart`) that promotes to an active run at the right time — letting strategy changes be prepared for a future run without touching the current one. |
+| 4 | SignalR vs SSE? | **SignalR.** Already idiomatic in .NET 10; SSE remains a valid simpler fallback if SignalR proves overkill. |
+| 5 | Multi-agent frontend? | **Single active agent shown by default** (the one with the currently configured API key). Any other agent token, regardless of age, is treated as a "historic agent" accessible via a separate historical view. No agent selector in the top bar for the live view. |
+
