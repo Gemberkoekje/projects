@@ -30,12 +30,6 @@ public sealed class ChainOfCommandBridgeHandler(
         await dispatcher.DispatchAsync(@event, cancellationToken);
     }
 
-    public async Task Handle(ShipStateMismatchEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipStateMismatchEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
-    }
-
     public async Task Handle(ShipArrivedEvent @event, CancellationToken cancellationToken)
     {
         logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipArrivedEvent), @event.ShipSymbol);
