@@ -40,11 +40,11 @@ public sealed class ChainOfCommandDispatcherTests
 
         result.HandlerName.Should().Be(nameof(HandleUndockedHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipAssignmentTypeSetEvent));
+        result.NextEventType.Should().Be(nameof(ShipInOrbitEvent));
         result.IsScheduled.Should().BeFalse();
         tracker.Calls.Should().ContainInOrder(nameof(SkipUndockedHandler), nameof(HandleUndockedHandler));
         tracker.Calls.Should().NotContain(nameof(LateUndockedHandler));
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAssignmentTypeSetEvent>(), Arg.Any<DeliveryOptions>());
+        await bus.Received(1).PublishAsync(Arg.Any<ShipInOrbitEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class ChainOfCommandDispatcherTests
         public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
         {
             tracker.Calls.Add(nameof(HandleUndockedHandler));
-            var nextEvent = new ShipAssignmentTypeSetEvent(@event.ShipSymbol, @event.SystemSymbol, @event.WaypointSymbol, "Idle", @event.CorrelationId, @event.EventId, DateTimeOffset.UtcNow);
+            var nextEvent = new ShipInOrbitEvent(@event.ShipSymbol, @event.SystemSymbol, @event.WaypointSymbol, @event.CorrelationId, @event.EventId, DateTimeOffset.UtcNow);
             return Task.FromResult(ChainOfCommandHandlerResult.Handled(nextEvent));
         }
     }

@@ -65,7 +65,6 @@ public sealed record AssignShipCommand
 
 public sealed class AssignShipHandler(
     IShipAssignmentRepository assignments,
-    IShipRepository ships,
     IMessageBus bus,
     ILogger<AssignShipHandler> logger)
 {
@@ -102,23 +101,16 @@ public sealed class AssignShipHandler(
             command.ShipSymbol,
             command.AssignmentType);
 
-        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        var systemSymbol = string.IsNullOrWhiteSpace(command.SystemSymbol)
-            ? (ship?.SystemSymbol ?? string.Empty)
-            : command.SystemSymbol;
-        var waypointSymbol = string.IsNullOrWhiteSpace(command.WaypointSymbol)
-            ? (ship?.WaypointSymbol ?? string.Empty)
-            : command.WaypointSymbol;
         var correlationId = command.CorrelationId == Guid.Empty ? Guid.NewGuid() : command.CorrelationId;
         var causationId = command.CausationId;
 
-        await bus.PublishAsync(new ShipAssignmentTypeSetEvent(
+        // Phase 7b: ShipAssignmentTypeSetEvent deleted; publish a ShipAutomationTickEvent so
+        // the planner re-evaluates the ship with its new assignment immediately.
+        await bus.PublishAsync(new ShipAutomationTickEvent(
             command.ShipSymbol,
-            systemSymbol,
-            waypointSymbol,
-            command.AssignmentType,
+            $"Assigned:{command.AssignmentType}",
+            now,
             correlationId,
-            causationId,
-            now));
+            causationId));
     }
 }

@@ -7,9 +7,8 @@ namespace SpaceTraders.Application.Planning;
 /// <summary>
 /// Phase 4b: cross-cutting maintenance planner that wraps <see cref="Services.IFleetMaintenancePlanner"/>.
 /// Migrates the repair/scrap branches that were duplicated across the docked role handlers
-/// (<c>ShipDockedTraderEventHandler</c>, <c>ShipDockedScoutEventHandler</c>,
-/// <c>ShipDockedMineEventHandler</c>, <c>ShipDockedContractEventHandler</c>) into a single
-/// planner that runs ahead of the role planners.
+/// into a single planner that runs ahead of the role planners.
+/// Phase 7b: legacy docked role handlers deleted; planner is the sole implementation.
 ///
 /// The planner returns <see cref="ShipPlannerCommandKind.None"/> when no maintenance action
 /// is needed so <see cref="ShipPlannerService"/> can fall through to the role planner.

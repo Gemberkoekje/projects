@@ -6,8 +6,9 @@ namespace SpaceTraders.Application.Planning;
 
 /// <summary>
 /// Phase 4b: builder/construction-role ship planner migrated out of
-/// <c>ShipInOrbitBuilderEventHandler</c> and the docked-builder branch of
-/// <c>ShipDockedBuilderEventHandler</c>. The planner makes the next decision for ships
+/// <c>ShipInOrbitBuilderEventHandler</c> and the docked-builder chain handler.
+/// Phase 7b: legacy docked builder chain handler deleted; planner is the sole implementation.
+/// The planner makes the next decision for ships
 /// with the "Builder" assignment based on cargo, location, and construction progress.
 ///
 /// Decision tree (mirrors the legacy chain handler):
