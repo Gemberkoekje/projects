@@ -224,3 +224,8 @@ export interface RunDetailDto {
   creditHighlights: RunCreditHighlightDto[]
   ledgerSummary: LedgerSummaryDto[]
 }
+
+export interface RunCompareDto {
+  runA: RunDetailDto
+  runB: RunDetailDto
+}
