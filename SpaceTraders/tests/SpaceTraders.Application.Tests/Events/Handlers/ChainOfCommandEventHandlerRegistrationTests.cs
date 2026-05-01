@@ -9,40 +9,43 @@ namespace SpaceTraders.Application.Tests.Events.Handlers;
 
 public sealed class ChainOfCommandEventHandlerRegistrationTests
 {
+    /// <summary>
+    /// Phase 6.5d: Only ShipInTransitEvent requires a DI-registered chain handler.
+    /// It schedules the ShipAutomationTickEvent on arrival so ships are ticked when they
+    /// reach their destination. All other chain events (docked, orbit, mismatch) are now
+    /// handled exclusively by ShipAutomationTickEventHandler → ShipPlannerService.
+    /// </summary>
     [Fact]
-    public void AllChainOfCommandEventTypes_ShouldHaveDiRegisteredHandlers()
+    public void ShipInTransitEvent_ShouldHaveDiRegisteredHandler()
     {
-        // Arrange - discover all concrete ChainOfCommandEvent subtypes that are dispatched directly
-        // (i.e., events whose immediate base type is ChainOfCommandEvent, as the bridge dispatches
-        // derived events upcast to their base type)
-        var chainEventTypes = typeof(ChainOfCommandEvent).Assembly
-            .GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false })
-            .Where(t => t.BaseType == typeof(ChainOfCommandEvent))
-            .ToList();
-
-        // Act - invoke the real DI registration and inspect descriptors
         var services = new ServiceCollection();
         services.AddApplication();
 
-        var unhandledEvents = new List<string>();
+        var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(typeof(ShipInTransitEvent));
+        services.Any(d => d.ServiceType == handlerInterfaceType)
+            .Should().BeTrue("ShipInTransitEventHandler must remain registered to schedule arrival-tick events.");
+    }
 
-        foreach (var eventType in chainEventTypes)
-        {
-            var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(eventType);
-            var hasRegistration = services.Any(d => d.ServiceType == handlerInterfaceType);
+    /// <summary>
+    /// Phase 6.5d: business-effect chain handlers for docked, orbit, and mismatch events have
+    /// been removed. Planner-only automation means these event types no longer need registered
+    /// chain handlers; ShipAutomationTickEvent drives all ship decisions instead.
+    /// </summary>
+    [Theory]
+    [InlineData(typeof(ShipDockedEvent))]
+    [InlineData(typeof(ShipInOrbitEvent))]
+    [InlineData(typeof(ShipStateMismatchEvent))]
+    public void BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers(Type chainEventType)
+    {
+        var services = new ServiceCollection();
+        services.AddApplication();
 
-            if (!hasRegistration)
-            {
-                unhandledEvents.Add(eventType.Name);
-            }
-        }
-
-        // Assert
-        unhandledEvents.Should().BeEmpty(
-            "all top-level ChainOfCommandEvent types must have at least one IChainOfCommandEventHandler<TEvent> registered in DI. " +
-            "Missing registrations: {0}",
-            string.Join(", ", unhandledEvents));
+        var handlerInterfaceType = typeof(IChainOfCommandEventHandler<>).MakeGenericType(chainEventType);
+        services.Any(d => d.ServiceType == handlerInterfaceType)
+            .Should().BeFalse(
+                "Phase 6.5d removed business-effect chain handler registrations for {0}; " +
+                "ShipAutomationTickEventHandler + ShipPlannerService now covers these decision points.",
+                chainEventType.Name);
     }
 
 
