@@ -233,6 +233,46 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/runs/{runId}/kpis");
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    // ── Universe endpoints ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UniverseSystems_WithValidApiKey_Returns200WithIsVisitedFlag()
+    {
+        _factory.SystemRepository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new SystemCacheModel("X1-SN", "X1", "RED_STAR", 10, -20, DateTimeOffset.UtcNow),
+                new SystemCacheModel("X1-SF", "X1", "BLUE_STAR", -5, 30, DateTimeOffset.UtcNow),
+            });
+        _factory.WaypointRepository.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[] { "X1-SN" });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/universe/systems");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("X1-SN");
+        body.Should().Contain("isVisited");
+    }
+
+    [Fact]
+    public async Task UniverseJumpConnections_WithValidApiKey_Returns200()
+    {
+        _factory.SettingsRepository.GetByKeyPrefixAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                ("Navigation.JumpGateConnections.X1-SN-12345",
+                 """{"WaypointSymbol":"X1-SN-12345","ConnectedSystems":["X1-SF"],"ObservedAt":"2024-01-01T00:00:00Z"}"""),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/universe/jump-connections");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("X1-SN");
+        body.Should().Contain("X1-SF");
+    }
 }
 
 /// <summary>
@@ -277,6 +317,10 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public IApiEndpointUsageRecorder ApiEndpointUsageRecorder { get; } = Substitute.For<IApiEndpointUsageRecorder>();
 
+    public ISystemRepository SystemRepository { get; } = Substitute.For<ISystemRepository>();
+
+    public IWaypointRepository WaypointRepository { get; } = Substitute.For<IWaypointRepository>();
+
     public SpaceTradersApiFactory()
     {
         // Default stub responses
@@ -285,6 +329,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
         ContractRepository.GetActiveAsync(default).ReturnsForAnyArgs(Array.Empty<ContractDto>());
         ActivityLogRepository.GetPagedAsync(1, 50, null, default).ReturnsForAnyArgs(Array.Empty<ActivityLogDto>());
         SettingsRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<(string, string, string, string)>());
+        SettingsRepository.GetByKeyPrefixAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<(string, string)>());
         TradeOpportunityRepository.GetBestRouteForCapacityAsync(default, default, default, default)
             .ReturnsForAnyArgs((TradeOpportunityDto?)null);
         LeaderElection.IsLeader.Returns(true);
@@ -297,6 +343,10 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .Returns(Array.Empty<Application.Interfaces.Repositories.ShipTaskRecordDto>());
         ApiEndpointUsageRecorder.GetTotalCallsAsync(Arg.Any<CancellationToken>())
             .Returns(0L);
+        SystemRepository.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<SystemCacheModel>());
+        WaypointRepository.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<string>());
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -365,6 +415,13 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
                 .Returns(new Application.Ports.ActiveRunInfo(testRunId, "Test Run", "default", DateTimeOffset.UtcNow, 100_000L));
             services.RemoveAll<Application.Interfaces.Repositories.IRunRepository>();
             services.AddScoped(_ => runRepoMock);
+
+            // ── Universe repositories ─────────────────────────────────────────
+            services.RemoveAll<ISystemRepository>();
+            services.AddScoped(_ => SystemRepository);
+
+            services.RemoveAll<IWaypointRepository>();
+            services.AddScoped(_ => WaypointRepository);
 
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();

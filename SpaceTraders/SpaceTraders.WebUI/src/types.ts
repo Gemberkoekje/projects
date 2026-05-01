@@ -237,3 +237,18 @@ export interface RunKpisDto {
   idlePercent: number | null
   fuelCostPerCreditEarned: number | null
 }
+
+export interface SystemDto {
+  symbol: string
+  sectorSymbol: string
+  type: string
+  x: number
+  y: number
+  lastObservedAt: string
+  isVisited: boolean
+}
+
+export interface JumpConnectionDto {
+  fromSystem: string
+  toSystem: string
+}

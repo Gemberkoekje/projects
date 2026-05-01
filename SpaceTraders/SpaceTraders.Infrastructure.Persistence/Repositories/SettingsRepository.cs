@@ -76,6 +76,19 @@ public sealed class SettingsRepository(SpaceTradersDbContext db, ILogger<Setting
             .ToList();
     }
 
+    public async Task<IReadOnlyList<(string Key, string Value)>> GetByKeyPrefixAsync(string prefix, CancellationToken cancellationToken = default)
+    {
+        var settings = await db.Settings
+            .AsNoTracking()
+            .Where(s => s.Key.StartsWith(prefix))
+            .OrderBy(s => s.Key)
+            .ToListAsync(cancellationToken);
+
+        return settings
+            .Select(s => (s.Key, s.Value))
+            .ToList();
+    }
+
     public async Task ResetToDefaultsAsync(CancellationToken cancellationToken = default)
     {
         await DefaultSettingsSeed.ResetAsync(db, cancellationToken);

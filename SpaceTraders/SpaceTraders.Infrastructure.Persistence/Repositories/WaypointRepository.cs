@@ -98,6 +98,16 @@ public sealed class WaypointRepository(SpaceTradersDbContext db) : IWaypointRepo
                 cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> GetVisitedSystemSymbolsAsync(CancellationToken cancellationToken = default)
+    {
+        return await db.Waypoints
+            .AsNoTracking()
+            .Select(w => w.SystemSymbol)
+            .Distinct()
+            .OrderBy(s => s)
+            .ToListAsync(cancellationToken);
+    }
+
     private static WaypointCacheModel MapToModel(CachedWaypoint entity) =>
         new(entity.Symbol, entity.SystemSymbol, entity.Type, entity.X, entity.Y,
             entity.HasMarket, entity.HasShipyard, entity.LastObservedAt,
