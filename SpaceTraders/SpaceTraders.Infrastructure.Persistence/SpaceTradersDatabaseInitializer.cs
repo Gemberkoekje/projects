@@ -95,6 +95,145 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_startup_snapshots_agent_captured ON startup_snapshots (\"AgentToken\", \"CapturedAt\");",
                 cancellationToken);
+
+            // Phase 0a: analytics & observability tables
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS runs (
+                    "Id" uuid PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "Name" character varying(200) NOT NULL DEFAULT '',
+                    "StrategyLabel" character varying(200) NOT NULL DEFAULT '',
+                    "StartedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "EndedAt" timestamp with time zone NULL,
+                    "SettingsSnapshotJson" text NULL,
+                    "StartingCredits" bigint NOT NULL DEFAULT 0,
+                    "EndingCredits" bigint NULL
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_runs_agent_started ON runs (\"AgentToken\", \"StartedAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS scheduled_runs (
+                    "Id" uuid PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "Name" character varying(200) NOT NULL DEFAULT '',
+                    "StrategyLabel" character varying(200) NOT NULL DEFAULT '',
+                    "ScheduledSettingsJson" text NULL,
+                    "ActivatesAt" timestamp with time zone NULL,
+                    "ActivatesOnNextRestart" boolean NOT NULL DEFAULT FALSE,
+                    "CreatedAt" timestamp with time zone NOT NULL DEFAULT now()
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_scheduled_runs_agent_activates ON scheduled_runs (\"AgentToken\", \"ActivatesAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS ledger_entries (
+                    "Id" bigserial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "OccurredAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "ShipSymbol" character varying(100) NOT NULL DEFAULT '',
+                    "RunId" uuid NULL,
+                    "Category" character varying(50) NOT NULL DEFAULT '',
+                    "Amount" bigint NOT NULL DEFAULT 0,
+                    "GoodSymbol" character varying(100) NULL,
+                    "UnitPrice" integer NULL,
+                    "Units" integer NULL,
+                    "WaypointSymbol" character varying(100) NULL,
+                    "SourceEventId" character varying(200) NULL
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_occurred ON ledger_entries (\"AgentToken\", \"OccurredAt\");",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_run ON ledger_entries (\"AgentToken\", \"RunId\");",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_ship_occurred ON ledger_entries (\"AgentToken\", \"ShipSymbol\", \"OccurredAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS run_credit_highlights (
+                    "Id" bigserial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "RunId" uuid NOT NULL,
+                    "OccurredAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "Credits" bigint NOT NULL DEFAULT 0,
+                    "DeltaCredits" bigint NOT NULL DEFAULT 0,
+                    "EventKind" character varying(100) NOT NULL DEFAULT '',
+                    "Label" character varying(500) NULL
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_run_credit_highlights_agent_run_occurred ON run_credit_highlights (\"AgentToken\", \"RunId\", \"OccurredAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS agent_credits_samples (
+                    "Id" bigserial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "ObservedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "Credits" bigint NOT NULL DEFAULT 0
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_agent_credits_samples_agent_observed ON agent_credits_samples (\"AgentToken\", \"ObservedAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS market_price_samples (
+                    "Id" bigserial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "WaypointSymbol" character varying(100) NOT NULL DEFAULT '',
+                    "GoodSymbol" character varying(100) NOT NULL DEFAULT '',
+                    "ObservedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "PurchasePrice" integer NOT NULL DEFAULT 0,
+                    "SellPrice" integer NOT NULL DEFAULT 0,
+                    "Supply" character varying(50) NULL,
+                    "Activity" character varying(50) NULL,
+                    "TradeVolume" integer NOT NULL DEFAULT 0
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_market_price_samples_agent_good_observed ON market_price_samples (\"AgentToken\", \"GoodSymbol\", \"ObservedAt\");",
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_market_price_samples_agent_waypoint_good_observed ON market_price_samples (\"AgentToken\", \"WaypointSymbol\", \"GoodSymbol\", \"ObservedAt\");",
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS ship_task_records (
+                    "Id" bigserial PRIMARY KEY,
+                    "AgentToken" character varying(1024) NOT NULL DEFAULT '',
+                    "ShipSymbol" character varying(100) NOT NULL DEFAULT '',
+                    "StartedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "EndedAt" timestamp with time zone NULL,
+                    "TaskKind" character varying(100) NOT NULL DEFAULT '',
+                    "TargetWaypoint" character varying(100) NULL,
+                    "PayloadJson" text NULL
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_ship_task_records_agent_ship_started ON ship_task_records (\"AgentToken\", \"ShipSymbol\", \"StartedAt\");",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))

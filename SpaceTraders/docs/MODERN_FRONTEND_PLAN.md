@@ -279,9 +279,14 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 0 — backend foundations
 
-**0a — new tables & writes**
-- Add `Run`, `ScheduledRun`, `LedgerEntry`, `RunCreditHighlight`, `AgentCreditsSample`, `MarketPriceSample`, `ShipTaskRecord` tables with EF Core migrations.
-- Wire writes into existing event handlers (credits change → `AgentCreditsSample`, market sync → `MarketPriceSample`, every credit-affecting action → `LedgerEntry` + `RunCreditHighlight` milestone, ship assignment change → `ShipTaskRecord`).
+**0a — new tables & writes** ✅ *Implemented*
+- ✅ Added `Run`, `ScheduledRun`, `LedgerEntry`, `RunCreditHighlight`, `AgentCreditsSample`, `MarketPriceSample`, `ShipTaskRecord` entity classes and table creation in `SpaceTradersDatabaseInitializer`.
+- ✅ Added `LedgerCategory` enum to Domain.
+- ✅ Wired writes into event handlers: `AgentCreditsSampleHandler` (credits change → `AgentCreditsSample`), `MarketPriceSampleHandler` (market sync → `MarketPriceSample`), `LedgerEntryHandler` (every credit-affecting action → `LedgerEntry`), `ShipTaskRecordHandler` (ship assignment change → `ShipTaskRecord`).
+- ✅ Added new domain events: `CargoPurchasedEvent`, `ShipRefueledEvent`, `ShipRepairedEvent`, `MountInstalledEvent`, `ModuleInstalledEvent` and published them from `BuyCargoHandler`, `RefuelShipHandler`, `RepairShipHandler`, `InstallMountHandler`, `InstallModuleHandler`.
+- ✅ Added repository interfaces and implementations: `IAgentCreditsSampleRepository`, `IMarketPriceSampleRepository`, `ILedgerRepository`, `IShipTaskRecordRepository`.
+- ✅ `MarketDataRefreshedEvent` enriched with `TradeGoodsJson` payload to avoid a second DB read in the sample handler.
+- Note: `RunCreditHighlight` rows are not yet written — full highlight production requires the `Run` lifecycle from phase 0b (active run ID needed).
 
 **0b — run lifecycle**
 - Auto-open a new `Run` on startup and on any strategy-relevant settings change (previous run closes atomically).

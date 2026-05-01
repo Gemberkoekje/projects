@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
 
@@ -44,6 +45,20 @@ public sealed class SpaceTradersDbContext(
     public DbSet<CachedConstruction> ConstructionSites => Set<CachedConstruction>();
 
     public DbSet<StartupSnapshot> StartupSnapshots => Set<StartupSnapshot>();
+
+    public DbSet<Run> Runs => Set<Run>();
+
+    public DbSet<ScheduledRun> ScheduledRuns => Set<ScheduledRun>();
+
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
+    public DbSet<RunCreditHighlight> RunCreditHighlights => Set<RunCreditHighlight>();
+
+    public DbSet<AgentCreditsSample> AgentCreditsSamples => Set<AgentCreditsSample>();
+
+    public DbSet<MarketPriceSample> MarketPriceSamples => Set<MarketPriceSample>();
+
+    public DbSet<ShipTaskRecord> ShipTaskRecords => Set<ShipTaskRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -252,6 +267,98 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
             entity.Property(x => x.SnapshotJson).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.CapturedAt });
+        });
+
+        modelBuilder.Entity<Run>(entity =>
+        {
+            entity.ToTable("runs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.StrategyLabel).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.SettingsSnapshotJson);
+            entity.HasIndex(x => new { x.AgentToken, x.StartedAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<ScheduledRun>(entity =>
+        {
+            entity.ToTable("scheduled_runs");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.StrategyLabel).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ScheduledSettingsJson);
+            entity.HasIndex(x => new { x.AgentToken, x.ActivatesAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<LedgerEntry>(entity =>
+        {
+            entity.ToTable("ledger_entries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Category).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(x => x.GoodSymbol).HasMaxLength(100);
+            entity.Property(x => x.WaypointSymbol).HasMaxLength(100);
+            entity.Property(x => x.SourceEventId).HasMaxLength(200);
+            entity.HasIndex(x => new { x.AgentToken, x.OccurredAt });
+            entity.HasIndex(x => new { x.AgentToken, x.RunId });
+            entity.HasIndex(x => new { x.AgentToken, x.ShipSymbol, x.OccurredAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<RunCreditHighlight>(entity =>
+        {
+            entity.ToTable("run_credit_highlights");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.EventKind).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Label).HasMaxLength(500);
+            entity.HasIndex(x => new { x.AgentToken, x.RunId, x.OccurredAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<AgentCreditsSample>(entity =>
+        {
+            entity.ToTable("agent_credits_samples");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.HasIndex(x => new { x.AgentToken, x.ObservedAt });
+        });
+
+        modelBuilder.Entity<MarketPriceSample>(entity =>
+        {
+            entity.ToTable("market_price_samples");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.WaypointSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.GoodSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Supply).HasMaxLength(50);
+            entity.Property(x => x.Activity).HasMaxLength(50);
+            entity.HasIndex(x => new { x.AgentToken, x.GoodSymbol, x.ObservedAt });
+            entity.HasIndex(x => new { x.AgentToken, x.WaypointSymbol, x.GoodSymbol, x.ObservedAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<ShipTaskRecord>(entity =>
+        {
+            entity.ToTable("ship_task_records");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).UseIdentityColumn();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TaskKind).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TargetWaypoint).HasMaxLength(100);
+            entity.HasIndex(x => new { x.AgentToken, x.ShipSymbol, x.StartedAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
     }
 }

@@ -27,6 +27,13 @@ public sealed class MigrationTests : IntegrationTestBase
         var assignmentCount = await ctx.ShipAssignments.CountAsync();
         var tradeCount = await ctx.TradeOpportunities.CountAsync();
         var logCount = await ctx.ActivityLogs.CountAsync();
+        var runCount = await ctx.Runs.CountAsync();
+        var scheduledRunCount = await ctx.ScheduledRuns.CountAsync();
+        var ledgerCount = await ctx.LedgerEntries.CountAsync();
+        var highlightCount = await ctx.RunCreditHighlights.CountAsync();
+        var creditSampleCount = await ctx.AgentCreditsSamples.CountAsync();
+        var marketSampleCount = await ctx.MarketPriceSamples.CountAsync();
+        var shipTaskCount = await ctx.ShipTaskRecords.CountAsync();
 
         credentialCount.Should().Be(0);
         agentCount.Should().Be(0);
@@ -40,6 +47,13 @@ public sealed class MigrationTests : IntegrationTestBase
         assignmentCount.Should().Be(0);
         tradeCount.Should().Be(0);
         logCount.Should().Be(0);
+        runCount.Should().Be(0);
+        scheduledRunCount.Should().Be(0);
+        ledgerCount.Should().Be(0);
+        highlightCount.Should().Be(0);
+        creditSampleCount.Should().Be(0);
+        marketSampleCount.Should().Be(0);
+        shipTaskCount.Should().Be(0);
     }
 
     [SkippableFact]

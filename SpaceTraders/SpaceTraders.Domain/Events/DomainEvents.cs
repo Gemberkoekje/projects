@@ -193,10 +193,13 @@ public sealed record MarketDataRefreshedEvent
 {
     public required WaypointSymbol Waypoint { get; init; }
 
+    public string? TradeGoodsJson { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MarketDataRefreshedEvent(WaypointSymbol Waypoint)
+    public MarketDataRefreshedEvent(WaypointSymbol Waypoint, string? TradeGoodsJson = null)
     {
         this.Waypoint = Waypoint;
+        this.TradeGoodsJson = TradeGoodsJson;
     }
 }
 
@@ -311,5 +314,117 @@ public sealed record CacheDivergenceDetectedEvent
     {
         this.MismatchCount = MismatchCount;
         this.Summary = Summary;
+    }
+}
+
+public sealed record CargoPurchasedEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required TradeSymbol Good { get; init; }
+
+    public required int Units { get; init; }
+
+    public required long Cost { get; init; }
+
+    public required long NewAgentCredits { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public CargoPurchasedEvent(string ShipSymbol, TradeSymbol Good, int Units, long Cost, long NewAgentCredits, string WaypointSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.Good = Good;
+        this.Units = Units;
+        this.Cost = Cost;
+        this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
+    }
+}
+
+public sealed record ShipRefueledEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required long Cost { get; init; }
+
+    public required long NewAgentCredits { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipRefueledEvent(string ShipSymbol, long Cost, long NewAgentCredits, string WaypointSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.Cost = Cost;
+        this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
+    }
+}
+
+public sealed record ShipRepairedEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required long Cost { get; init; }
+
+    public required long NewAgentCredits { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipRepairedEvent(string ShipSymbol, long Cost, long NewAgentCredits, string WaypointSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.Cost = Cost;
+        this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
+    }
+}
+
+public sealed record MountInstalledEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string MountSymbol { get; init; }
+
+    public required long Cost { get; init; }
+
+    public required long NewAgentCredits { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public MountInstalledEvent(string ShipSymbol, string MountSymbol, long Cost, long NewAgentCredits, string WaypointSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.MountSymbol = MountSymbol;
+        this.Cost = Cost;
+        this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
+    }
+}
+
+public sealed record ModuleInstalledEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string ModuleSymbol { get; init; }
+
+    public required long Cost { get; init; }
+
+    public required long NewAgentCredits { get; init; }
+
+    public required string WaypointSymbol { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ModuleInstalledEvent(string ShipSymbol, string ModuleSymbol, long Cost, long NewAgentCredits, string WaypointSymbol)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.ModuleSymbol = ModuleSymbol;
+        this.Cost = Cost;
+        this.NewAgentCredits = NewAgentCredits;
+        this.WaypointSymbol = WaypointSymbol;
     }
 }
