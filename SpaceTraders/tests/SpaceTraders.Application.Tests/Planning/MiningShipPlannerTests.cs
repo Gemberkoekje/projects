@@ -197,9 +197,9 @@ public sealed class MiningShipPlannerTests
     {
         var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
             cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+        var snapshot = new MarketSnapshot(
             "X1-AB-MKT", "X1-AB",
-            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
+            [new TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
             [], [], []);
         var context = new ShipPlannerContext { CurrentMarketSnapshot = snapshot, MiningMinimumSellPrice = 100 };
         var decision = Planner.Plan(ship, MineAssignment(), context);
@@ -213,9 +213,9 @@ public sealed class MiningShipPlannerTests
     {
         var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10,
             cargoInventory: [new CargoItemModel("IRON_ORE", 10)]);
-        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+        var snapshot = new MarketSnapshot(
             "X1-AB-MKT", "X1-AB",
-            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 5, 50, 10, "WEAK", "DECLINING")],
+            [new TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 5, 50, 10, "WEAK", "DECLINING")],
             [], [], []);
         var context = new ShipPlannerContext { CurrentMarketSnapshot = snapshot, MiningMinimumSellPrice = 100 };
         var decision = Planner.Plan(ship, MineAssignment(), context);
@@ -228,9 +228,9 @@ public sealed class MiningShipPlannerTests
     {
         var ship = Ship("X1-AB-MKT", status: "DOCKED", cargo: 10, capacity: 10,
             cargoInventory: [new CargoItemModel("ROCK", 10)]);
-        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+        var snapshot = new MarketSnapshot(
             "X1-AB-MKT", "X1-AB",
-            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("ROCK", "EXCHANGE", 1, 5, 10, "ABUNDANT", "DECLINING")],
+            [new TradeGoodSnapshot("ROCK", "EXCHANGE", 1, 5, 10, "ABUNDANT", "DECLINING")],
             [], [], []);
         var context = new ShipPlannerContext
         {
@@ -273,9 +273,9 @@ public sealed class MiningShipPlannerTests
         // Contract protects IRON_ORE (undeliverable at this waypoint, but still in the protected set)
         var contract = new ContractDto("CT-1", "FAC", "PROCUREMENT", true, false, null, null, null,
             """[{"TradeSymbol":"IRON_ORE","DestinationSymbol":"X1-AB-OTHER","UnitsRequired":20,"UnitsFulfilled":0}]""");
-        var snapshot = new SpaceTraders.Application.Interfaces.MarketSnapshot(
+        var snapshot = new MarketSnapshot(
             "X1-AB-MKT", "X1-AB",
-            [new SpaceTraders.Application.Interfaces.TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
+            [new TradeGoodSnapshot("IRON_ORE", "EXCHANGE", 50, 300, 10, "MODERATE", "GROWING")],
             [], [], []);
         var context = new ShipPlannerContext
         {

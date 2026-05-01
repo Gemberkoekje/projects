@@ -92,13 +92,19 @@ public sealed class TradingShipPlanner : IShipPlanner
             }
 
             // Sell the assignment cargo if any is on board.
-            if (!string.IsNullOrWhiteSpace(assignment.CargoSymbol) && ship.CargoCurrent > 0)
+            if (!string.IsNullOrWhiteSpace(assignment.CargoSymbol))
             {
-                return ShipPlannerDecision.SellCargo(
-                    ship.Symbol,
-                    assignment.CargoSymbol,
-                    ship.CargoCurrent,
-                    $"Selling {ship.CargoCurrent}x {assignment.CargoSymbol} at trade destination.");
+                var sellUnits = ship.CargoInventory?
+                    .FirstOrDefault(c => c.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
+                    .Units ?? 0;
+                if (sellUnits > 0)
+                {
+                    return ShipPlannerDecision.SellCargo(
+                        ship.Symbol,
+                        assignment.CargoSymbol,
+                        sellUnits,
+                        $"Selling {sellUnits}x {assignment.CargoSymbol} at trade destination.");
+                }
             }
         }
 
