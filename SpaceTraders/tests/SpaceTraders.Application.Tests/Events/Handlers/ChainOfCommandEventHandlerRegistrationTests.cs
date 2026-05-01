@@ -59,7 +59,7 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             .Where(t => typeof(ChainOfCommandEvent).IsAssignableFrom(t) && t != typeof(ChainOfCommandEvent))
             .ToList();
 
-        // Events that are pattern-matched inside base handlers (no direct handler needed)
+        // Events that are pattern-matched inside base handlers, or whose chain handler has been retired
         var derivedEventsHandledViaPatternMatching = new HashSet<string>
         {
             nameof(ShipArrivedEvent),
@@ -69,7 +69,10 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             nameof(ShipRefueledEvent),
             nameof(ShipRoleSetEvent),
             nameof(ShipUndockedEvent),
-            nameof(ConstructionSuppliedEvent)
+            nameof(ConstructionSuppliedEvent),
+            // Phase 7a: ShipStateMismatchEventHandler deleted; recovery is now covered by the
+            // ShipAutomationTickEvent published alongside every ShipStateMismatchEvent (Phase 6.5e).
+            nameof(ShipStateMismatchEvent),
         };
 
         // Get all handler implementations
@@ -114,7 +117,7 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             typeof(ShipDockedEvent),
             typeof(ShipInOrbitEvent),
             typeof(ShipInTransitEvent),
-            typeof(ShipStateMismatchEvent)
+            // Phase 7a: ShipStateMismatchEventHandler deleted; removed from this list.
         };
 
         // Get all handler implementations

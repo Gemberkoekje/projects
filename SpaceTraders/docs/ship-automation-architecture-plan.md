@@ -522,13 +522,22 @@ Goal at end of Phase 7:
 - `ShipAutomationTickEvent` is the sole automation entry point, handled by `ShipAutomationTickEventHandler` → `IShipPlannerService`.
 - Analyzer no longer encodes chain-of-command assumptions.
 
-#### Phase 7a — Retire `ShipStateMismatchEvent` chain fallback
+#### Phase 7a — Retire `ShipStateMismatchEvent` chain fallback ✅ Done
 
 - Verify Phase 6.5e is complete: every command path that publishes `ShipStateMismatchEvent` also publishes `ShipAutomationTickEvent`, so planner recovery no longer depends on the chain fallback.
 - Delete `ShipStateMismatchEventHandler.cs` and remove its DI registration.
 - Remove the `ShipStateMismatchEvent` overload from `ChainOfCommandBridgeHandler`.
 - Keep `ShipStateMismatchEvent` itself for now (still factual + logged via `LogActivityHandler`); it loses `ChainOfCommandEvent` inheritance only in 7e.
 - Tests: delete `ShipStateMismatchEventHandlerTests.cs`. Add a minimal unit test that a state-mismatch publication also yields a `ShipAutomationTickEvent` if not already implicit.
+
+Implementation notes:
+
+- Phase 6.5e confirmed complete: `ShipStateMismatchPublisher.PublishMismatchAndTickAsync` is used by all command handlers that publish a mismatch event, ensuring `ShipAutomationTickEvent` is always co-published.
+- `ShipStateMismatchEventHandler.cs` deleted; it had no DI registration (already removed in Phase 6.5d).
+- `ShipStateMismatchEvent` overload removed from `ChainOfCommandBridgeHandler`.
+- `ShipStateMismatchEventHandlerTests.cs` deleted. Mismatch-tick coverage was already present in `Phase65CommandHandlerTests` (Dock, Orbit, Navigate, SellCargo paths).
+- `ChainOfCommandEventHandlerRegistrationTests`: added `ShipStateMismatchEvent` to the retired-handler exclusion set; removed it from `BaseDispatchableEventTypes_ShouldHaveHandlerTypes`.
+- `ShipEventHandlerConventionTests`: removed `ShipStateMismatchEventHandler` from allowed exceptions.
 
 #### Phase 7b — Replace routing-only docked derived events
 
