@@ -440,11 +440,18 @@ Reviewing the current solution against this plan shows that the cleanup phase sh
 
 Add the following rectification work before Phase 7 cleanup.
 
-#### Phase 6.5a — Standardize remaining ship-owned command results
+#### Phase 6.5a — Standardize remaining ship-owned command results ✅ Done
 
 - Extend `ShipCommandResult` usage beyond dock/orbit/navigate to the ship-owned commands that can be issued by planners or command acceptors: extract, survey, siphon, refuel, buy cargo, sell cargo, deliver contract cargo, supply construction, repair, scrap, jettison cargo, jump/warp where applicable, and install/remove module or mount where local status validation applies.
 - Each handler should validate `ShipLocalStatus` before calling the SpaceTraders API, return an accepted/rejected result containing the current or updated local state, and keep publishing required factual/global events.
 - Add tests for accepted and rejected cases, especially ensuring invalid local status does not call the port and still produces planner recovery via the mismatch tick work in Phase 6.5e.
+
+Implementation notes:
+
+- All listed ship-owned command handlers now expose a public `ExecuteAsync(...)` returning `ShipCommandResult` (`Handle(...)` delegates to it for Wolverine), validate `ShipLocalStatus` via `ShipModel.LocalStatus`, and produce an accepted result on success or a rejected result on guard failure.
+- `Repair`, `Scrap`, `JettisonCargo`, and `Install/Remove Module/Mount` previously had no local-status guard; they now validate `Docked` (or "not in transit" for jettison) and publish `ShipStateMismatchEvent` + `ShipAutomationTickEvent` on rejection.
+- `SupplyConstructionCommand` now publishes `ShipStateMismatchEvent` on a state guard failure (it previously only logged).
+- Accepted/rejected unit tests added in `Phase65CommandHandlerTests`; existing handler tests are unchanged.
 
 #### Phase 6.5b — Complete docked planner coverage
 
@@ -470,11 +477,16 @@ Add the following rectification work before Phase 7 cleanup.
 - Add regression tests that `ShipAutomationTickEventHandler` + `ShipPlannerService` cover docked, in-orbit, and in-transit decision points without invoking chain handlers.
 - Update the Phase 5 completion notes if necessary: Phase 5 should only be considered fully correct once chain handlers no longer carry business behavior.
 
-#### Phase 6.5e — Replace state-mismatch recovery before deleting fallback handlers
+#### Phase 6.5e — Replace state-mismatch recovery before deleting fallback handlers ✅ Done
 
 - When any command publishes `ShipStateMismatchEvent`, also publish `ShipAutomationTickEvent` with the same ship symbol and causal metadata so the planner reasserts the next valid action.
 - Add tests for representative mismatch paths across docked and in-orbit commands.
 - Once covered, `ShipStateMismatchEventHandler` should be a removable legacy fallback rather than required behavior.
+
+Implementation notes:
+
+- A small internal helper `ShipStateMismatchPublisher.PublishMismatchAndTickAsync` publishes both events together with `Reason = "StateMismatch:{CommandName}"`, used by every ship-owned command handler that previously published `ShipStateMismatchEvent`.
+- Phase65CommandHandlerTests covers representative docked + in-orbit mismatch paths (Dock, Orbit, Navigate, SellCargo, plus rejected accepted-result tests for the rest) verifying both events are published.
 
 ### Phase 7: Remove Chain-of-Command Infrastructure
 

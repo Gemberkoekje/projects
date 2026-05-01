@@ -4,7 +4,6 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
@@ -36,59 +35,64 @@ public sealed class SellCargoHandler(
     IMessageBus bus,
     ILogger<SellCargoHandler> logger)
 {
-    public async Task Handle(SellCargoCommand command, CancellationToken cancellationToken)
+    public Task Handle(SellCargoCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(SellCargoCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "DOCKED", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.Docked)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(SellCargoCommand),
                 "DOCKED_AT_MARKET",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be docked before selling cargo.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be docked before selling cargo.");
 
             logger.LogWarning("Skipping sell for ship {Symbol}: expected DOCKED but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
-        if (string.IsNullOrWhiteSpace(ship.WaypointSymbol))
+        if (string.IsNullOrWhiteSpace(ship!.WaypointSymbol))
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(SellCargoCommand),
                 "DOCKED_AT_MARKET",
                 "DOCKED_AT_UNKNOWN_WAYPOINT",
-                "Ship waypoint is unknown, cannot validate market.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship waypoint is unknown, cannot validate market.");
 
             logger.LogWarning("Skipping sell for ship {Symbol}: ship waypoint unknown.", command.ShipSymbol);
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship.SystemSymbol ?? string.Empty,
+                string.Empty);
         }
 
         var waypoint = await waypoints.FindAsync(ship.WaypointSymbol, cancellationToken);
         if (waypoint?.HasMarket != true)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(SellCargoCommand),
                 "DOCKED_AT_MARKET",
                 "DOCKED_AT_NON_MARKET_WAYPOINT",
-                "Ship is not docked at a market waypoint.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship is not docked at a market waypoint.");
 
             logger.LogWarning("Skipping sell for ship {Symbol}: waypoint {Waypoint} is not a market.", command.ShipSymbol, ship.WaypointSymbol);
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol);
         }
 
         var result = await port.SellCargoAsync(command.ShipSymbol, command.TradeSymbol, command.Units, cancellationToken);
@@ -125,6 +129,16 @@ public sealed class SellCargoHandler(
 
         logger.LogInformation("Ship {Symbol} sold {Units}x {Good} for {Revenue} credits.",
             command.ShipSymbol, command.Units, command.TradeSymbol, result.Revenue);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            currentStatus,
+            ship.SystemSymbol ?? string.Empty,
+            ship.WaypointSymbol,
+            FuelCurrent: ship.FuelCurrent,
+            FuelCapacity: ship.FuelCapacity,
+            CargoCurrent: result.Cargo.Units,
+            CargoCapacity: result.Cargo.Capacity);
     }
 
     private static AssignmentType ResolveAssignmentType(string assignmentType)

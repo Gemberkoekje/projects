@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -21,10 +22,38 @@ public sealed class ScrapShipHandler(
     IAgentRepository agents,
     IShipRepository ships,
     IShipAssignmentRepository assignments,
+    IMessageBus bus,
     ILogger<ScrapShipHandler> logger)
 {
-    public async Task Handle(ScrapShipCommand command, CancellationToken cancellationToken)
+    public Task Handle(ScrapShipCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(ScrapShipCommand command, CancellationToken cancellationToken)
     {
+        var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.Docked)
+        {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(ScrapShipCommand),
+                "DOCKED_AT_SHIPYARD",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be docked at a shipyard before scrapping.");
+
+            logger.LogWarning("Skipping scrap for ship {Symbol}: expected DOCKED but was {Status}.",
+                command.ShipSymbol, ship?.Status ?? "UNKNOWN");
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
+        }
+
+        var systemSymbol = ship!.SystemSymbol ?? string.Empty;
+        var waypointSymbol = ship.WaypointSymbol ?? string.Empty;
+
         var result = await port.ScrapShipAsync(command.ShipSymbol, cancellationToken);
 
         await agents.UpsertAsync(result.Agent, cancellationToken);
@@ -43,5 +72,12 @@ public sealed class ScrapShipHandler(
             cancellationToken);
 
         logger.LogInformation("Scrapped ship {Symbol} for {Value} credits.", command.ShipSymbol, result.Value);
+
+        // After scrap the ship is gone; report the last known status/location.
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            currentStatus,
+            systemSymbol,
+            waypointSymbol);
     }
 }

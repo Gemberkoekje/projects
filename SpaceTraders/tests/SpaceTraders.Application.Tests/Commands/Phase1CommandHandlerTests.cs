@@ -35,11 +35,14 @@ public sealed class Phase1CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var bus = Substitute.For<IMessageBus>();
+        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
         var cargo = new CargoModel(0, 40);
         port.JettisonCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>())
             .Returns(new JettisonActionResult(cargo));
 
-        var handler = new JettisonCargoHandler(port, ships, NullLogger<JettisonCargoHandler>.Instance);
+        var handler = new JettisonCargoHandler(port, ships, bus, NullLogger<JettisonCargoHandler>.Instance);
         await handler.Handle(new JettisonCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
         await ships.Received(1).UpdateCargoAsync("SHIP-1", cargo, Arg.Any<CancellationToken>());

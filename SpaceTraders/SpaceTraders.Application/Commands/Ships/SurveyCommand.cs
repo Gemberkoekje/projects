@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Domain.Enums;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -24,34 +24,49 @@ public sealed class SurveyHandler(
     IMessageBus bus,
     ILogger<SurveyHandler> logger)
 {
-    public async Task Handle(SurveyCommand command, CancellationToken cancellationToken)
+    public Task Handle(SurveyCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(SurveyCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.InOrbit)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(SurveyCommand),
                 "IN_ORBIT",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be in orbit to survey.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be in orbit to survey.");
 
             logger.LogWarning("Skipping survey for ship {Symbol}: expected IN_ORBIT but was {Status}.",
                 command.ShipSymbol, ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
         var result = await port.SurveyAsync(command.ShipSymbol, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(ship.WaypointSymbol) && result.Surveys.Count > 0)
+        if (!string.IsNullOrWhiteSpace(ship!.WaypointSymbol) && result.Surveys.Count > 0)
         {
             await surveys.UpsertAsync(command.ShipSymbol, result.Surveys, cancellationToken);
         }
 
         logger.LogInformation("Ship {Symbol} completed survey. {Count} surveys found, cooldown {Seconds}s.",
             command.ShipSymbol, result.Surveys.Count, result.CooldownSeconds);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            currentStatus,
+            ship.SystemSymbol ?? string.Empty,
+            ship.WaypointSymbol ?? string.Empty,
+            FuelCurrent: ship.FuelCurrent,
+            FuelCapacity: ship.FuelCapacity,
+            CargoCurrent: ship.CargoCurrent,
+            CargoCapacity: ship.CargoCapacity);
     }
 }

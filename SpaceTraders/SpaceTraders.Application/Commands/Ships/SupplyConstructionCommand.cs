@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -50,19 +51,35 @@ public sealed class SupplyConstructionHandler(
     IMessageBus bus,
     ILogger<SupplyConstructionHandler> logger)
 {
-    public async Task Handle(SupplyConstructionCommand command, CancellationToken cancellationToken)
+    public Task Handle(SupplyConstructionCommand command, CancellationToken cancellationToken)
+        => ExecuteAsync(command, cancellationToken);
+
+    public async Task<ShipCommandResult> ExecuteAsync(SupplyConstructionCommand command, CancellationToken cancellationToken)
     {
         var ship = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        if (!string.Equals(ship?.Status, "IN_ORBIT", StringComparison.OrdinalIgnoreCase))
+        var currentStatus = ship?.LocalStatus ?? ShipLocalStatus.None;
+
+        if (currentStatus != ShipLocalStatus.InOrbit)
         {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(SupplyConstructionCommand),
+                "IN_ORBIT_AT_CONSTRUCTION_SITE",
+                ship?.Status ?? "UNKNOWN",
+                "Ship must be in orbit at the construction site before supplying.");
+
             logger.LogWarning(
                 "Skipping construction supply for ship {Symbol}: expected IN_ORBIT but was {Status}.",
                 command.ShipSymbol,
                 ship?.Status ?? "UNKNOWN");
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship?.SystemSymbol ?? string.Empty,
+                ship?.WaypointSymbol ?? string.Empty);
         }
 
-        var cargoUnits = ship.CargoInventory?
+        var cargoUnits = ship!.CargoInventory?
             .FirstOrDefault(i => i.Symbol.Equals(command.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
             .Units ?? 0;
 
@@ -72,7 +89,11 @@ public sealed class SupplyConstructionHandler(
                 "Skipping construction supply for ship {Symbol}: no {TradeSymbol} cargo available.",
                 command.ShipSymbol,
                 command.TradeSymbol);
-            return;
+            return ShipCommandResult.Rejected(
+                command.ShipSymbol,
+                currentStatus,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol ?? string.Empty);
         }
 
         var unitsToSupply = Math.Min(cargoUnits, command.Units);
@@ -133,5 +154,15 @@ public sealed class SupplyConstructionHandler(
             unitsToSupply,
             command.TradeSymbol,
             result.Construction.IsComplete);
+
+        return new ShipCommandResult(
+            command.ShipSymbol,
+            currentStatus,
+            ship.SystemSymbol ?? string.Empty,
+            ship.WaypointSymbol ?? string.Empty,
+            FuelCurrent: ship.FuelCurrent,
+            FuelCapacity: ship.FuelCapacity,
+            CargoCurrent: result.Cargo.Units,
+            CargoCapacity: result.Cargo.Capacity);
     }
 }

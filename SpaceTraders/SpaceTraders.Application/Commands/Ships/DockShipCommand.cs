@@ -41,16 +41,12 @@ public sealed class DockShipHandler(
 
         if (currentStatus != ShipLocalStatus.InOrbit)
         {
-            var now = TimeProvider.System.GetUtcNow();
-            await bus.PublishAsync(new ShipStateMismatchEvent(
+            await bus.PublishMismatchAndTickAsync(
                 command.ShipSymbol,
                 nameof(DockShipCommand),
                 "IN_ORBIT",
                 ship?.Status ?? "UNKNOWN",
-                "Ship must be in orbit before docking.",
-                Guid.Empty,
-                Guid.Empty,
-                now));
+                "Ship must be in orbit before docking.");
 
             logger.LogWarning("Skipping dock for ship {Symbol}: expected IN_ORBIT but was {Status}.", command.ShipSymbol, ship?.Status ?? "UNKNOWN");
             return ShipCommandResult.Rejected(
