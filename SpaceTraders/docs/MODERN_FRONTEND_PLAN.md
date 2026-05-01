@@ -428,9 +428,13 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Backend: `ISystemRepository` and `IWaypointRepository` mocks registered in `SpaceTradersApiFactory`; 2 new integration tests (`UniverseSystems_WithValidApiKey_Returns200WithIsVisitedFlag`, `UniverseJumpConnections_WithValidApiKey_Returns200`). Total backend tests: 33 passing.
 - ✅ Tests: `pages.test.tsx` extended with 6 tests (`UniversePage`: heading, loading state, visited/total count, SVG map rendered, search input, legend). Total: 91 tests passing.
 
-**4b — system map (`/systems/:symbol`)**
-- In-system 2D layout: waypoints by coordinate, orbital clustering, waypoint-type icons, trait badges.
-- Ship position dots updated via SignalR; jump-gate connection edges; automation annotation rings; side-panel on click.
+**4b — system map (`/systems/:symbol`)** ✅ *Implemented*
+- ✅ Added `WaypointTraitDto`, `WaypointDto`, and `SystemMapResponseDto` TypeScript interfaces to `src/types.ts`.
+- ✅ Created `SystemMapPage.tsx`: breadcrumb (`Universe → :system`), system header with type/coordinates/ship count; SVG scatter map of waypoints using their `x`/`y` coordinates; orbital dashed lines from parent to child waypoints; distinct shapes per waypoint type (circle for planet/moon/gas giant/nebula/gravity well, diamond for jump gate, square for stations); colour-coded by type; automation annotation rings (green outline) on waypoints with non-transiting ships; ship count dots (orange) on waypoints with ships present; waypoint labels for larger bodies; jump-gate connection toggle button (shows connected system symbols from `/universe/jump-connections` when enabled); click-to-select highlights waypoint in both map and table; `WaypointPanel` side-sheet (symbol, type, coordinates, last-scan age, trait badges, facility links, ships list, market link).
+- ✅ Waypoints table below the map: symbol, type, coordinates, facility badges (Market links to `/markets/waypoints/:symbol`, Shipyard, Under Construction), top-3 trait badges; row click selects in map and opens side panel.
+- ✅ Added `/systems/:symbol` route to `AppShell.tsx`.
+- ✅ Updated `UniversePage.tsx`: system dots are now clickable and navigate to `/systems/:symbol` (uses `useNavigate`).
+- ✅ Tests: `pages.test.tsx` extended with 7 tests (`SystemMapPage`: heading, loading state, breadcrumb + Universe link, SVG map rendered, waypoints table, jump-gate toggle button, side panel opens on row click). Total: 98 tests passing.
 
 ### Phase 5 — strategy aids
 
