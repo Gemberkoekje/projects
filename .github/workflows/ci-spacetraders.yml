@@ -39,6 +39,9 @@ jobs:
           dotnet build ./SpaceTraders/SpaceTraders.API/SpaceTraders.API.csproj --no-restore --configuration Release
           dotnet build ./SpaceTraders/SpaceTraders.App/SpaceTraders.App.csproj --no-restore --configuration Release
 
+      - name: Test
+        run: dotnet test ./SpaceTraders/SpaceTraders.slnx --configuration Release --filter "Category!=Integration"
+
   build-webui:
     runs-on: ubuntu-latest
 

@@ -112,6 +112,7 @@ Build from the parent repository root because the Dockerfiles publish `SpaceTrad
 cd C:\git\projects
 docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
 docker build -f SpaceTraders/Dockerfile.app -t spacetraders-app:latest .
+docker build -f SpaceTraders/Dockerfile.webui -t spacetraders-webui:latest .
 ```
 
 ## Kubernetes notes

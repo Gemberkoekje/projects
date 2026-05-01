@@ -9,7 +9,7 @@
 
 API_BASE_URL="${API_BASE_URL:-/spacetraders/api}"
 DASHBOARD_API_KEY="${DASHBOARD_API_KEY:-}"
-HUB_BASE_URL="${HUB_BASE_URL:-/hubs}"
+HUB_BASE_URL="${HUB_BASE_URL:-/spacetraders/api/hubs}"
 
 # Escape values for safe embedding in a JSON string:
 # replace \ with \\, then " with \", then newlines with \n

@@ -3,5 +3,5 @@
 window.__RUNTIME_CONFIG__ = {
   apiBaseUrl: '/spacetraders/api',
   dashboardApiKey: '',
-  hubBaseUrl: '/hubs',
+  hubBaseUrl: '/spacetraders/api/hubs',
 }

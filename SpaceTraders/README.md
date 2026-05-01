@@ -8,6 +8,7 @@ This repository contains a .NET automation and dashboard system for the [SpaceTr
 - PostgreSQL persistence for cached agent/ship/contract/token data (`SpaceTraders.Infrastructure.Persistence`)
 - API host with bootstrap + startup sync + game-loop + ship-worker automation (`SpaceTraders.API`)
 - Razor Pages dashboard for operational views (`SpaceTraders.App`)
+- React WebUI dashboard for live operational monitoring (`SpaceTraders.WebUI`)
 
 SpaceTraders is a headless, open-universe space game exposed through HTTP endpoints. Players write their own clients to control agents, ships, contracts, mining, trading, navigation, and exploration. This project uses that API as the backend for automated fleet operations and a local Razor Pages dashboard.
 
@@ -25,8 +26,9 @@ SpaceTraders is a headless, open-universe space game exposed through HTTP endpoi
 - Event handlers: `ContractPriorityHandler`, `ShipFuelLowHandler`, `ApiUnavailabilityHandler`
 - Internal REST API (`/status/*`, `/settings/*`, `/control/*`, `/health/*`)
 - API key authentication middleware (`X-Api-Key` header)
-- Kubernetes manifests + Dockerfiles (`k8s/`, `Dockerfile.api`, `Dockerfile.app`)
+- Kubernetes manifests + Dockerfiles (`k8s/`, `Dockerfile.api`, `Dockerfile.app`, `Dockerfile.webui`)
 - Razor Pages dashboard
+- React WebUI dashboard served at `/spacetraders/dashboard`
 
 ---
 
@@ -139,6 +141,7 @@ Build and push container images:
 # From C:\git\projects, the parent directory that contains SpaceTraders:
 docker build -f SpaceTraders/Dockerfile.api -t spacetraders-api:latest .
 docker build -f SpaceTraders/Dockerfile.app -t spacetraders-app:latest .
+docker build -f SpaceTraders/Dockerfile.webui -t spacetraders-webui:latest .
 ```
 
 ---

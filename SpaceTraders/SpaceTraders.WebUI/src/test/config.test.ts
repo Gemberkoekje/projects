@@ -15,4 +15,9 @@ describe('config', () => {
     const { config } = await import('../config')
     expect(config.dashboardApiKey).toBe('')
   })
+
+  it('uses default hubBaseUrl when runtime config is absent', async () => {
+    const { config } = await import('../config')
+    expect(config.hubBaseUrl).toBe('/spacetraders/api/hubs')
+  })
 })
