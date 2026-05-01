@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <UserSecretsId>SpaceTraders-App</UserSecretsId>
+
+    <!-- Prevent publish from trying to generate/transform IIS web.config in Linux containers -->
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
 
   <ItemGroup>

@@ -10,11 +10,11 @@ COPY src/AiUsageMonitor/AiUsageMonitor.csproj src/AiUsageMonitor/
 RUN dotnet restore src/AiUsageMonitor/AiUsageMonitor.csproj
 
 COPY . .
-RUN dotnet publish src/AiUsageMonitor/AiUsageMonitor.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/AiUsageMonitor/AiUsageMonitor.csproj -c Release -o /src/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS runtime
 WORKDIR /app
-COPY --from=build /app/publish .
+COPY --from=build /src/publish .
 
 # Run as non-root if desired (optional)
 # RUN useradd -m appuser && chown -R appuser /app
