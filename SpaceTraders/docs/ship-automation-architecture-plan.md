@@ -453,7 +453,7 @@ Implementation notes:
 - `SupplyConstructionCommand` now publishes `ShipStateMismatchEvent` on a state guard failure (it previously only logged).
 - Accepted/rejected unit tests added in `Phase65CommandHandlerTests`; existing handler tests are unchanged.
 
-#### Phase 6.5b — Complete docked planner coverage
+#### Phase 6.5b — Complete docked planner coverage ✅ Done
 
 - Add planner decision kinds and executor routes for remaining docked actions: `SellCargo`, `DeliverContractCargo`, `RefuelFromCargo`, `JettisonCargo`, and any explicit "refresh docked scout/market data" action chosen for scouting side effects.
 - Move the role-specific docked behavior currently in `ShipDockedMineEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedContractEventHandler`, and `ShipDockedScoutEventHandler` into planners or planner-executed services:
@@ -464,18 +464,39 @@ Implementation notes:
 - Keep `FuelRecoveryShipPlanner` and `MaintenanceShipPlanner` ahead of role planners so refuel/repair/scrap still preempt role work.
 - Add planner and `ShipPlannerService` tests proving docked mining, trading, contract, scout, market-probe, maintenance, and fuel-recovery ticks issue exactly one command or side-effect action.
 
-#### Phase 6.5c — Wire strategic orchestration into runtime
+Implementation notes:
+
+- `SellCargo`, `DeliverContractCargo`, `RefuelFromCargo`, `JettisonCargo`, `RefreshScoutData` added to `ShipPlannerCommandKind` and routed in `ShipPlannerService.ExecuteAsync`.
+- `MiningShipPlanner`, `TradingShipPlanner`, `ContractShipPlanner`, and `ScoutingShipPlanner` now handle `ShipLocalStatus.Docked`.
+- `ShipPlannerService.BuildContextAsync` loads `ActiveContracts`, `CurrentMarketSnapshot`, and mining settings when docked.
+- Phase 6.5b docked-state tests in `MiningShipPlannerTests`, `TradingShipPlannerTests`, `ContractShipPlannerTests`, `ScoutingShipPlannerTests`, and `ShipPlannerServiceTests`.
+
+#### Phase 6.5c — Wire strategic orchestration into runtime ✅ Done
 
 - Add an explicit orchestrator trigger in the application flow so global state changes or scheduled ticks call `IFleetOrchestrator.EvaluateAndAssignAsync(...)` before ship-level automation ticks run.
 - Replace idle docked assignment through `ShipDockedIdleEventHandler` / `IShipAssignmentPlanner` with orchestrator-owned assignment. Idle ships should receive strategic assignments from `FleetOrchestrator`; ship planners should only execute the active assignment.
 - Decide how fleet expansion goals are executed. Either add a purchase-ship orchestration command path that respects `IBudgetPolicy`, or keep fleet expansion as an advisory goal and update the plan/tests to state that purchasing is out of scope.
 - Add integration-style tests for the recommended flow: orchestrator assigns an idle ship, a subsequent `ShipAutomationTickEvent` executes one planner command, and no low-level `Dock`/`Orbit`/`Navigate` command is issued directly by the orchestrator.
 
-#### Phase 6.5d — Prove planner-only business behavior
+Implementation notes:
+
+- `GameLoopService` calls `orchestrator.EvaluateAndAssignAsync(cancellationToken)` at the top of each game-loop iteration (Phase 6.5c comment), before any ship-level automation ticks.
+- `ShipDockedIdleEventHandler` delegates assignment to `IFleetOrchestrator` (removed from DI registrations in Phase 6.5d; orchestrator is now triggered exclusively via `GameLoopService`).
+- Fleet expansion is kept as an advisory goal only; purchasing ships is out of scope for the orchestrator.
+- `Phase65cOrchestratorWiringTests` covers all four integration-style requirements.
+
+#### Phase 6.5d — Prove planner-only business behavior ✅ Done
 
 - After docked planner coverage and orchestrator wiring are complete, disable or remove the business-effect chain handler registrations while leaving the chain infrastructure available for the cleanup phase.
 - Add regression tests that `ShipAutomationTickEventHandler` + `ShipPlannerService` cover docked, in-orbit, and in-transit decision points without invoking chain handlers.
 - Update the Phase 5 completion notes if necessary: Phase 5 should only be considered fully correct once chain handlers no longer carry business behavior.
+
+Implementation notes:
+
+- All `IChainOfCommandEventHandler<T>` registrations for `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipUndockedEvent`, `ShipStateMismatchEvent`, `ShipIdleDockedEvent`, `ShipContractDockedEvent`, and `ShipAssignmentTypeSetEvent` removed from `DependencyInjection.cs`.
+- `ShipInTransitEventHandler` registration retained because it schedules the `ShipAutomationTickEvent` on arrival — the sole remaining chain-handled concern.
+- `ChainOfCommandEventHandlerRegistrationTests` updated: old `AllChainOfCommandEventTypes_ShouldHaveDiRegisteredHandlers` test replaced with `ShipInTransitEvent_ShouldHaveDiRegisteredHandler` and `BusinessEffectChainEventTypes_ShouldNotHaveDiRegisteredHandlers` theory.
+- `Phase65dPlannerRegressionTests` added: 12 tests covering docked, in-orbit, and in-transit decision points for Mining, Trading, Contract, Scout, and Builder roles, verifying the planner invokes acceptors without any chain handler involvement.
 
 #### Phase 6.5e — Replace state-mismatch recovery before deleting fallback handlers ✅ Done
 
