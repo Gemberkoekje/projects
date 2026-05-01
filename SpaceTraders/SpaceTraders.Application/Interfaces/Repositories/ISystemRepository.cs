@@ -4,6 +4,9 @@ public interface ISystemRepository
 {
     Task<SystemCacheModel?> FindAsync(string systemSymbol, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns all cached systems ordered by symbol.</summary>
+    Task<IReadOnlyList<SystemCacheModel>> GetAllAsync(CancellationToken cancellationToken = default);
+
     Task UpsertAsync(SystemCacheModel system, CancellationToken cancellationToken = default);
 }
 

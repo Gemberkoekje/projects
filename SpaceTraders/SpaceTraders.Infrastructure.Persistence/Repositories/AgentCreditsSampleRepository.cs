@@ -19,6 +19,20 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CreditsSampleDto>> GetRangeAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await db.AgentCreditsSamples
+            .AsNoTracking()
+            .Where(s => s.ObservedAt >= from && s.ObservedAt <= to)
+            .OrderBy(s => s.ObservedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(s => new CreditsSampleDto(s.ObservedAt, s.Credits)).ToList();
+    }
+
     public async Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default)
     {
         // Step 1: Downsample the 7–90 day window — keep one row per hour (lowest id), delete duplicates.

@@ -20,6 +20,67 @@ public sealed class RunRepository(SpaceTradersDbContext db) : IRunRepository
             : new ActiveRunInfo(run.Id, run.Name, run.StrategyLabel, run.StartedAt, run.StartingCredits);
     }
 
+    public async Task<IReadOnlyList<RunSummaryDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await db.Runs
+            .AsNoTracking()
+            .OrderByDescending(r => r.StartedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new RunSummaryDto(
+                r.Id, r.Name, r.StrategyLabel,
+                r.StartedAt, r.EndedAt,
+                r.StartingCredits, r.EndingCredits))
+            .ToList();
+    }
+
+    public async Task<RunDetailDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var run = await db.Runs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+
+        return run is null
+            ? null
+            : new RunDetailDto(
+                run.Id, run.Name, run.StrategyLabel,
+                run.StartedAt, run.EndedAt,
+                run.StartingCredits, run.EndingCredits,
+                run.SettingsSnapshotJson);
+    }
+
+    public async Task<IReadOnlyList<ScheduledRunDto>> GetScheduledRunsAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await db.ScheduledRuns
+            .AsNoTracking()
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(r => new ScheduledRunDto(
+                r.Id, r.Name, r.StrategyLabel,
+                r.ScheduledSettingsJson, r.ActivatesAt,
+                r.ActivatesOnNextRestart, r.CreatedAt))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<RunCreditHighlightDto>> GetRunHighlightsAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var rows = await db.RunCreditHighlights
+            .AsNoTracking()
+            .Where(h => h.RunId == runId)
+            .OrderBy(h => h.OccurredAt)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(h => new RunCreditHighlightDto(
+                h.Id, h.RunId, h.OccurredAt,
+                h.Credits, h.DeltaCredits,
+                h.EventKind, h.Label))
+            .ToList();
+    }
+
     public async Task<Guid> OpenRunAsync(
         string name,
         string strategyLabel,

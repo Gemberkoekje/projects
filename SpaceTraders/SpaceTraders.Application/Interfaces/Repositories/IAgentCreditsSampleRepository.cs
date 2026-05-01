@@ -4,6 +4,12 @@ public interface IAgentCreditsSampleRepository
 {
     Task AppendAsync(long credits, CancellationToken cancellationToken = default);
 
+    /// <summary>Returns credits samples within the given UTC time range, ordered by <c>ObservedAt</c> ascending.</summary>
+    Task<IReadOnlyList<CreditsSampleDto>> GetRangeAsync(
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Prunes old credits samples.
     /// Rows between <paramref name="aggregateRetentionCutoff"/> and <paramref name="rawRetentionCutoff"/>
@@ -13,3 +19,5 @@ public interface IAgentCreditsSampleRepository
     /// <returns>Total number of rows deleted.</returns>
     Task<int> PruneAsync(DateTimeOffset rawRetentionCutoff, DateTimeOffset aggregateRetentionCutoff, CancellationToken cancellationToken = default);
 }
+
+public sealed record CreditsSampleDto(DateTimeOffset ObservedAt, long Credits);
