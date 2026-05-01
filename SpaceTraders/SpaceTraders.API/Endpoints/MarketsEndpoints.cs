@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 
 namespace SpaceTraders.API.Endpoints;
@@ -9,6 +10,18 @@ public static class MarketsEndpoints
     public static IEndpointRouteBuilder MapMarketsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/markets");
+
+        group.MapGet("/waypoints", async (IMarketRepository repo, CancellationToken ct) =>
+        {
+            var snapshots = await repo.GetAllSnapshotsAsync(ct);
+            return Results.Ok(snapshots);
+        });
+
+        group.MapGet("/waypoints/{symbol}", async (string symbol, IMarketRepository repo, CancellationToken ct) =>
+        {
+            var snapshot = await repo.FindSnapshotByWaypointAsync(symbol, ct);
+            return snapshot is null ? Results.NotFound() : Results.Ok(snapshot);
+        });
 
         group.MapGet("/goods/{symbol}/prices", async (
             string symbol,

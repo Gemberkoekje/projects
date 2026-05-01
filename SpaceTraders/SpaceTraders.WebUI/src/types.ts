@@ -188,3 +188,33 @@ export interface RunCreditHighlightDto {
   eventKind: string
   label: string | null
 }
+
+export interface MarketPriceSampleDto {
+  observedAt: string
+  waypointSymbol: string
+  goodSymbol: string
+  purchasePrice: number
+  sellPrice: number
+  supply: string | null
+  activity: string | null
+  tradeVolume: number
+}
+
+export interface TradeGoodSnapshotDto {
+  symbol: string
+  type: string
+  purchasePrice: number
+  sellPrice: number
+  tradeVolume: number
+  supply: string
+  activity: string
+}
+
+export interface MarketWaypointDto {
+  waypointSymbol: string
+  systemSymbol: string
+  imports: string[]
+  exports: string[]
+  exchange: string[]
+  tradeGoods: TradeGoodSnapshotDto[]
+}
