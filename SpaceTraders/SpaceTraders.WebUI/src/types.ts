@@ -165,3 +165,26 @@ export interface CreditSampleDto {
   recordedAt: string
   credits: number
 }
+
+export interface LedgerEntryDto {
+  id: number
+  occurredAt: string
+  shipSymbol: string
+  runId: string | null
+  category: string
+  amount: number
+  goodSymbol: string | null
+  unitPrice: number | null
+  units: number | null
+  waypointSymbol: string | null
+}
+
+export interface RunCreditHighlightDto {
+  id: number
+  runId: string
+  occurredAt: string
+  credits: number
+  deltaCredits: number
+  eventKind: string
+  label: string | null
+}

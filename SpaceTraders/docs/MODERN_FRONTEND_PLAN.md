@@ -370,9 +370,11 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 2 — finance & markets
 
-**2a — finance views**
-- Finance (`/finance`): credits-over-time chart, income/expense stacked area by category, per-ship P&L, per-good profit table, budget panel.
-- Falls back to `RunCreditHighlight` for historical runs, uses live `LedgerEntry` for the active run.
+**2a — finance views** ✅ *Implemented*
+- ✅ Finance (`/finance`): run selector (active vs historical runs), credits-over-time SVG line chart, income/expense by category table with proportional bars, summary stat cards (total income, total expenses, net P&L), budget panel (expense breakdown by category), per-ship P&L table (aggregated from `/finance/ledger`), per-good profit table (units sold, avg buy/sell price, total profit — computed client-side from `/finance/ledger`).
+- ✅ Falls back to `RunCreditHighlight` (via `/finance/run-highlights`) for historical runs; uses live `CreditSample` (via `/finance/credits-history`) for the active run.
+- ✅ Added `LedgerEntryDto` and `RunCreditHighlightDto` TypeScript types to `src/types.ts`.
+- ✅ Tests: `pages.test.tsx` extended with 6 FinancePage tests (heading, loading state, run selector, category summary, per-ship P&L, per-good profit, credits chart). Total: 50 tests passing.
 
 **2b — market views**
 - Markets list (`/markets`): searchable waypoint list, heatmap by good.
