@@ -2,12 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- base href must be the first element in <head> so that all subsequent
+         relative URL references (including config.js below) are resolved
+         against the dashboard sub-path, regardless of which client-side route
+         the browser is currently on. -->
+    <base href="/spacetraders/dashboard/" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SpaceTraders WebUI</title>
     <!-- Runtime config: injected by the container entrypoint at startup.
-         Provides window.__RUNTIME_CONFIG__ without baking secrets into the bundle. -->
-    <script src="/config.js"></script>
+         Provides window.__RUNTIME_CONFIG__ without baking secrets into the bundle.
+         The relative src is resolved against the <base href> above, so it
+         always loads from /spacetraders/dashboard/config.js. -->
+    <script src="config.js"></script>
   </head>
   <body>
     <div id="root"></div>

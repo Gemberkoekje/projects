@@ -3,24 +3,40 @@ kind: Ingress
 metadata:
   name: spacetraders-ingress
   namespace: spacetraders
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+  # No rewrite-target annotation: nginx inside the WebUI pod handles its own
+  # /spacetraders/dashboard/ prefix internally, and the API handles its own
+  # /spacetraders/api/ prefix natively.  Each backend receives the full request
+  # path without any prefix stripping by the ingress controller.
 spec:
   rules:
     - host: spacetraders.internal
       http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: spacetraders-api
-                port:
-                  number: 80
-          - path: /
+          # Dashboard WebUI — served by the nginx container which internally
+          # rewrites /spacetraders/dashboard/* to the static-file root.
+          - path: /spacetraders/dashboard
             pathType: Prefix
             backend:
               service:
                 name: spacetraders-webui
                 port:
                   number: 80
+          # SignalR hub — routed to the API so WebSocket / SSE upgrades reach
+          # the correct pod.  Must be listed before the broader /spacetraders
+          # prefix so it is matched first.
+          - path: /hubs
+            pathType: Prefix
+            backend:
+              service:
+                name: spacetraders-api
+                port:
+                  number: 8080
+          # REST API — the API application handles all /spacetraders/api/* routes
+          # natively; the ingress forwards the full path unchanged.
+          - path: /spacetraders/api
+            pathType: Prefix
+            backend:
+              service:
+                name: spacetraders-api
+                port:
+                  number: 8080

@@ -1,2 +1,72 @@
 @import "tailwindcss";
 
+/*
+ * Enable class-based dark mode: add/remove the `dark` class on <html> to
+ * switch themes.  The ThemeProvider in src/lib/theme.tsx manages this.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens — light mode defaults.  The `dark` class on <html> overrides
+ * them for dark mode.  @theme inline maps each token to a Tailwind utility
+ * (e.g. bg-background, text-foreground, border-border).
+ */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --muted: oklch(0.961 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --border: oklch(0.922 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.908 0 0);
+  --accent: oklch(0.961 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.55 0.22 27);
+  --status-green: oklch(0.548 0.135 145);
+  --status-yellow: oklch(0.795 0.184 86);
+  --status-red: oklch(0.55 0.22 27);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --border: oklch(0.269 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.65 0.22 27);
+  --status-green: oklch(0.648 0.135 145);
+  --status-yellow: oklch(0.875 0.184 86);
+  --status-red: oklch(0.65 0.22 27);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-status-green: var(--status-green);
+  --color-status-yellow: var(--status-yellow);
+  --color-status-red: var(--status-red);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+

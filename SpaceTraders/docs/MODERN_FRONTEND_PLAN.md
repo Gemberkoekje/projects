@@ -339,11 +339,27 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ `k8s/ingress.yaml` updated — `/` now routes to `spacetraders-webui` instead of `spacetraders-app`.
 - ✅ CI pipeline updated: new `build-webui` job (`npm ci` → `npm test` → `npm run build`); `docker` job now depends on both `build` and `build-webui` and pushes `spacetraders-webui` image to GHCR.
 
-**1b — auth, transport & layout**
-- `X-Api-Key` header wired from runtime config into every API call (TanStack Query default headers).
-- SignalR client with auto-reconnect, exponential backoff, "live updates paused" banner on missed heartbeat.
-- App shell: top nav (logo, active agent name, health strip), sidebar (Overview, Fleet, Finance, Markets, Runs, Universe, Contracts, Activity, Health, Settings).
-- Dark / light theme toggle persisted in `localStorage`.
+**1b — auth, transport & layout** ✅ *Implemented*
+- ✅ Installed `@tanstack/react-query` (v5), `@microsoft/signalr` (v10), `react-router` (v7).
+- ✅ `src/lib/api-fetch.ts` — `apiFetch<T>` wrapper injects `X-Api-Key` header (from `config.dashboardApiKey`) into every fetch; `Content-Type: application/json` is set only when a body is present; caller headers are merged before the key so it cannot be accidentally overridden.
+- ✅ `src/lib/query-client.ts` — `QueryClient` with `staleTime: 30 s`, `retry: 2`.
+- ✅ `src/lib/theme.tsx` — `ThemeProvider` + `useTheme` hook; persists `'light' | 'dark'` in `localStorage`; respects `prefers-color-scheme` system preference as fallback; applies class to `document.documentElement`.
+- ✅ `src/lib/signalr.tsx` — `SignalRProvider` (inner component uses `useQueryClient`); auto-reconnect with delays `[0, 2 s, 5 s, 10 s, 30 s]`; on reconnect invalidates all TanStack Query cache; `liveUpdatesPaused` is true when disconnected/reconnecting or when server heartbeat has not been received for >30 s. Hub URL uses `config.hubBaseUrl` (independent of the REST API base path) so the SignalR path `/hubs/dashboard` is routed correctly through the ingress.
+- ✅ `src/index.css` — Tailwind CSS v4 `@custom-variant dark` for class-based dark mode; CSS custom properties for light/dark design tokens mapped to Tailwind utilities via `@theme inline`.
+- ✅ `src/components/ui/ThemeToggle.tsx` — Sun/Moon button, aria-label describes current action.
+- ✅ `src/components/ui/LiveUpdatesBanner.tsx` — yellow banner shown when `liveUpdatesPaused`; distinguishes reconnecting / disconnected / heartbeat-stale states.
+- ✅ `src/components/layout/TopNav.tsx` — logo, connection-state dot (green/yellow/red with accessible title), theme toggle.
+- ✅ `src/components/layout/Sidebar.tsx` — `NavLink` items for all 10 pages with `lucide-react` icons; active item highlighted.
+- ✅ `src/components/layout/AppShell.tsx` — full layout: TopNav → LiveUpdatesBanner → Sidebar + `<main>`; React Router `<Routes>` defined here; all 10 routes wired to placeholder pages.
+- ✅ Placeholder pages created for all routes: Overview, Fleet, Finance, Markets, Runs, Universe, Contracts, Activity, Health, Settings.
+- ✅ `src/App.tsx` — wraps `QueryClientProvider` → `ThemeProvider` → `SignalRProvider` → `BrowserRouter(basename="/spacetraders/dashboard")` → `AppShell`.
+- ✅ **Base-path alignment**: `vite.config.ts` sets `base: '/spacetraders/dashboard/'` so all built asset URLs are rooted there; `index.html` adds `<base href="/spacetraders/dashboard/">` as the first `<head>` element so `config.js` (and any other relative references) resolve correctly at any route depth; `BrowserRouter` uses the matching `basename`.
+- ✅ `k8s/nginx.conf` — nginx handles the sub-path internally via `rewrite ^/spacetraders/dashboard/(.*)$ /$1 break` rules; SPA fallback serves `index.html`; `/healthz` endpoint added for probes; no ingress prefix-stripping required.
+- ✅ `k8s/ingress.yaml` — removed `rewrite-target: /` annotation; routes updated: `/spacetraders/dashboard` → WebUI, `/spacetraders/api` → API, `/hubs` → API (for SignalR). Each backend receives the full unmodified request path.
+- ✅ `k8s/configmap.yaml` — added explicit `API_BASE_URL: "/spacetraders/api"` entry.
+- ✅ `k8s/deployment-webui.yaml` — liveness and readiness probes updated to `path: /healthz`.
+- ✅ `src/config.ts` — added `hubBaseUrl` (default `/hubs`) alongside `apiBaseUrl` and `dashboardApiKey`; `docker-entrypoint.sh` and `public/config.js` dev stub updated accordingly; `k8s/configmap.yaml` and `k8s/deployment-webui.yaml` include `HUB_BASE_URL`.
+- ✅ Tests: `App.test.tsx` updated (4 tests: top nav, sidebar presence, all 10 nav links, theme toggle); `apiFetch.test.ts` added (6 tests: header injection, URL construction, JSON parse, error throw, no Content-Type on GET, Content-Type on POST with body); `theme.test.tsx` added (7 tests: default light, DOM class, localStorage persist, read stored theme, toggle, system preference, outside-provider safety); `signalr.test.tsx` added (3 tests: renders children, exposes state, initial paused=true); `setup.ts` updated with class-based `HubConnectionBuilder` mock and `history.pushState` to base path. Total: 22 tests passing.
 
 **1c — core read views**
 - Overview (`/`): credits, 24h delta, run info, ship counts, active contracts, top trade opportunities, credits sparkline, health strip.

@@ -8,3 +8,9 @@ data:
   SpaceTradersApi__BaseUrl: "https://api.spacetraders.io/v2/"
   Logging__LogLevel__Default: "Information"
   Logging__LogLevel__Microsoft.AspNetCore: "Warning"
+  # Base URL used by the WebUI container to reach the API.
+  # Must be an absolute path reachable from the browser (goes through the ingress).
+  API_BASE_URL: "/spacetraders/api"
+  # Base path for the SignalR hub endpoint, routed to the API by the ingress
+  # independently of the REST API prefix.
+  HUB_BASE_URL: "/hubs"
