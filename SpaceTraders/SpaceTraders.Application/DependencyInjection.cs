@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.EventHandlers;
-using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
@@ -18,7 +17,8 @@ namespace SpaceTraders.Application;
 /// → <see cref="Planning.IShipPlannerService"/>. Chain-of-command business-effect handler registrations
 /// have been removed.
 /// Phase 7d: <see cref="Events.Handlers.Ships.ShipInTransitEventHandler"/> converted to a plain Wolverine
-/// handler; chain DI registration removed. The chain infrastructure types are retained for Phase 7f cleanup.
+/// handler; chain DI registration removed.
+/// Phase 7f: Chain-of-command infrastructure deleted entirely.
 /// </remarks>
 public static class DependencyInjection
 {
@@ -35,7 +35,6 @@ public static class DependencyInjection
         services.AddScoped<IContractObjectivePlanner, ContractObjectivePlanner>();
         services.AddScoped<IFleetMaintenancePlanner, FleetMaintenancePlanner>();
         services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
-        services.AddScoped<IChainOfCommandDispatcher, ChainOfCommandDispatcher>();
 
         services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
         services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
@@ -75,8 +74,7 @@ public static class DependencyInjection
         // Phase 6.5d: Business-effect chain handler registrations have been removed.
         // ShipAutomationTickEventHandler → ShipPlannerService now covers all docked, in-orbit,
         // and in-transit decision points.
-        // Phase 7d: ShipInTransitEventHandler converted to plain Wolverine handler; chain DI
-        // registration removed. Chain infrastructure retained for Phase 7f cleanup.
+        // Phase 7f: Chain-of-command infrastructure deleted entirely.
 
         services.AddScoped<SyncAllShipsHandler>();
 
