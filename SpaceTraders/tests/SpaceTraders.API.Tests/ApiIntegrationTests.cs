@@ -204,6 +204,35 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var response = await _client.GetAsync($"{ApiPathBase}/metrics");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    // ── Run KPIs endpoint ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RunKpis_WithValidRunId_Returns200()
+    {
+        var runId = Guid.NewGuid();
+        var runRepoMock = _factory.Services.GetRequiredService<IRunRepository>();
+        runRepoMock.GetByIdAsync(runId, Arg.Any<CancellationToken>())
+            .Returns(new RunDetailDto(
+                runId, "Test Run", "TRADE",
+                DateTimeOffset.UtcNow.AddHours(-2), DateTimeOffset.UtcNow,
+                100_000L, 300_000L, null));
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/runs/{runId}/kpis");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task RunKpis_WithUnknownRunId_Returns404()
+    {
+        var runId = Guid.NewGuid();
+        var runRepoMock = _factory.Services.GetRequiredService<IRunRepository>();
+        runRepoMock.GetByIdAsync(runId, Arg.Any<CancellationToken>())
+            .Returns((RunDetailDto?)null);
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/runs/{runId}/kpis");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 }
 
 /// <summary>
@@ -242,6 +271,12 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public ICreditHistoryService CreditHistory { get; } = Substitute.For<ICreditHistoryService>();
 
+    public ILedgerRepository LedgerRepository { get; } = Substitute.For<ILedgerRepository>();
+
+    public IShipTaskRecordRepository ShipTaskRecordRepository { get; } = Substitute.For<IShipTaskRecordRepository>();
+
+    public IApiEndpointUsageRecorder ApiEndpointUsageRecorder { get; } = Substitute.For<IApiEndpointUsageRecorder>();
+
     public SpaceTradersApiFactory()
     {
         // Default stub responses
@@ -254,6 +289,14 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .ReturnsForAnyArgs((TradeOpportunityDto?)null);
         LeaderElection.IsLeader.Returns(true);
         CreditHistory.GetHistory().Returns(Array.Empty<(DateTimeOffset, long)>());
+        LedgerRepository.GetSummaryAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.LedgerSummaryDto>());
+        LedgerRepository.GetDistinctShipCountAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(0);
+        ShipTaskRecordRepository.GetAllInTimeWindowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.ShipTaskRecordDto>());
+        ApiEndpointUsageRecorder.GetTotalCallsAsync(Arg.Any<CancellationToken>())
+            .Returns(0L);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -298,6 +341,15 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ILeaderLeaseRepository>();
             services.AddScoped(_ => Substitute.For<ILeaderLeaseRepository>());
+
+            services.RemoveAll<ILedgerRepository>();
+            services.AddScoped(_ => LedgerRepository);
+
+            services.RemoveAll<IShipTaskRecordRepository>();
+            services.AddScoped(_ => ShipTaskRecordRepository);
+
+            services.RemoveAll<IApiEndpointUsageRecorder>();
+            services.AddScoped(_ => ApiEndpointUsageRecorder);
 
             // ── Run lifecycle (Phase 0b) ──────────────────────────────────────
             // RunLifecycleService is a hosted service that tries to access the DB

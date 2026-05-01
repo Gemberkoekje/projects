@@ -229,3 +229,11 @@ export interface RunCompareDto {
   runA: RunDetailDto
   runB: RunDetailDto
 }
+
+export interface RunKpisDto {
+  creditsPerHour: number | null
+  creditsPerShipPerHour: number | null
+  creditsPerApiCall: number | null
+  idlePercent: number | null
+  fuelCostPerCreditEarned: number | null
+}

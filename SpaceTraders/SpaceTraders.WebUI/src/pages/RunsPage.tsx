@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router'
 import { apiFetch } from '@/lib/api-fetch'
 import { cn } from '@/lib/utils'
-import type { RunSummaryDto, ScheduledRunDto, RunDetailDto, RunCompareDto } from '@/types'
+import type { RunSummaryDto, ScheduledRunDto, RunDetailDto, RunCompareDto, RunKpisDto } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -418,7 +418,14 @@ function RunDetailPage() {
     enabled: Boolean(id),
   })
 
+  const kpisQ = useQuery<RunKpisDto>({
+    queryKey: ['run-kpis', id],
+    queryFn: () => apiFetch<RunKpisDto>(`/runs/${id}/kpis`),
+    enabled: Boolean(id),
+  })
+
   const detail = detailQ.data
+  const kpis = kpisQ.data
   const run = detail?.run
   const highlights = detail?.creditHighlights ?? []
   const ledgerSummary = detail?.ledgerSummary ?? []
@@ -611,6 +618,47 @@ function RunDetailPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        </section>
+      )}
+
+      {/* Efficiency KPIs */}
+      {kpis && (
+        <section aria-label="Efficiency KPIs">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Efficiency KPIs
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="rounded-lg border border-border bg-background p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Credits / Hour</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {kpis.creditsPerHour != null ? fmtShort(kpis.creditsPerHour) : '—'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Credits / Ship / Hour</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {kpis.creditsPerShipPerHour != null ? fmtShort(kpis.creditsPerShipPerHour) : '—'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Credits / API Call</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {kpis.creditsPerApiCall != null ? kpis.creditsPerApiCall.toFixed(2) : '—'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Idle %</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {kpis.idlePercent != null ? `${kpis.idlePercent.toFixed(1)}%` : '—'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Fuel Cost / Credit Earned</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {kpis.fuelCostPerCreditEarned != null ? kpis.fuelCostPerCreditEarned.toFixed(4) : '—'}
+              </p>
+            </div>
           </div>
         </section>
       )}
