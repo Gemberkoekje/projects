@@ -48,6 +48,21 @@ public enum ShipPlannerCommandKind
 
     /// <summary>Phase 4b: scrap the docked ship.</summary>
     Scrap,
+
+    /// <summary>Phase 6.5b: sell a specific cargo good at the docked market.</summary>
+    SellCargo,
+
+    /// <summary>Phase 6.5b: deliver cargo for a contract at the current docked waypoint.</summary>
+    DeliverContractCargo,
+
+    /// <summary>Phase 6.5b: refuel the docked ship using cargo hydrocarbons (fromCargo = true).</summary>
+    RefuelFromCargo,
+
+    /// <summary>Phase 6.5b: jettison a specific cargo good.</summary>
+    JettisonCargo,
+
+    /// <summary>Phase 6.5b: mark the current waypoint as visited and refresh market/shipyard data (used by the scouting planner).</summary>
+    RefreshScoutData,
 }
 
 /// <summary>
@@ -75,8 +90,11 @@ public sealed record ShipPlannerDecision
     /// <summary>Phase 4b: target system symbol (used by <see cref="ShipPlannerCommandKind.SupplyConstruction"/>).</summary>
     public string SystemSymbol { get; init; } = string.Empty;
 
-    /// <summary>Phase 4b: target waypoint symbol (used by <see cref="ShipPlannerCommandKind.SupplyConstruction"/>).</summary>
+    /// <summary>Phase 4b: target waypoint symbol (used by <see cref="ShipPlannerCommandKind.SupplyConstruction"/> and <see cref="ShipPlannerCommandKind.DeliverContractCargo"/>).</summary>
     public string WaypointSymbol { get; init; } = string.Empty;
+
+    /// <summary>Phase 6.5b: contract identifier (used by <see cref="ShipPlannerCommandKind.DeliverContractCargo"/>).</summary>
+    public string ContractId { get; init; } = string.Empty;
 
     public static ShipPlannerDecision None(string shipSymbol, string reason) => new()
     {
@@ -187,6 +205,55 @@ public sealed record ShipPlannerDecision
     {
         ShipSymbol = shipSymbol,
         Kind = ShipPlannerCommandKind.Scrap,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision SellCargo(string shipSymbol, string tradeSymbol, int units, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.SellCargo,
+        TradeSymbol = tradeSymbol,
+        Units = units,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision DeliverContractCargo(
+        string shipSymbol,
+        string contractId,
+        string tradeSymbol,
+        int units,
+        string destinationWaypoint,
+        string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.DeliverContractCargo,
+        ContractId = contractId,
+        TradeSymbol = tradeSymbol,
+        Units = units,
+        WaypointSymbol = destinationWaypoint,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision RefuelFromCargo(string shipSymbol, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.RefuelFromCargo,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision JettisonCargo(string shipSymbol, string tradeSymbol, int units, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.JettisonCargo,
+        TradeSymbol = tradeSymbol,
+        Units = units,
+        Reason = reason,
+    };
+
+    public static ShipPlannerDecision RefreshScoutData(string shipSymbol, string reason) => new()
+    {
+        ShipSymbol = shipSymbol,
+        Kind = ShipPlannerCommandKind.RefreshScoutData,
         Reason = reason,
     };
 }

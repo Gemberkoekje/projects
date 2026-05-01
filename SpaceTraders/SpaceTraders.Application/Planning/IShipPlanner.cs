@@ -1,4 +1,5 @@
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 
@@ -47,4 +48,19 @@ public sealed record ShipPlannerContext
 
     /// <summary>Phase 4b: true when the ship's builder construction site is complete.</summary>
     public bool ConstructionComplete { get; init; }
+
+    /// <summary>Phase 6.5b: active contracts (accepted, not fulfilled) used for docked delivery decisions and identifying protected cargo.</summary>
+    public IReadOnlyList<ContractDto> ActiveContracts { get; init; } = [];
+
+    /// <summary>Phase 6.5b: market snapshot at the ship's current docked waypoint, if available.</summary>
+    public MarketSnapshot? CurrentMarketSnapshot { get; init; }
+
+    /// <summary>Phase 6.5b: how many HYDROCARBON units to keep in cargo as a fuel reserve (Mining.ReserveHydrocarbonUnits setting).</summary>
+    public int MiningReserveHydrocarbonUnits { get; init; }
+
+    /// <summary>Phase 6.5b: minimum sell price below which cargo is considered low-value (Mining.MinimumSellPriceToKeepCargo setting).</summary>
+    public int MiningMinimumSellPrice { get; init; }
+
+    /// <summary>Phase 6.5b: whether to jettison low-value cargo when the hold is full (Mining.JettisonLowValueWhenFull setting).</summary>
+    public bool MiningJettisonLowValueWhenFull { get; init; }
 }
