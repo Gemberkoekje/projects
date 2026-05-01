@@ -720,3 +720,312 @@ describe('FinancePage', () => {
     )
   })
 })
+
+// ─── MarketsPage ──────────────────────────────────────────────────────────────
+
+import MarketsPage from '../pages/MarketsPage'
+
+describe('MarketsPage (list)', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByRole('heading', { name: 'Markets' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders market list when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-01',
+            systemSymbol: 'X1-AB',
+            imports: ['FUEL'],
+            exports: ['IRON_ORE'],
+            exchange: [],
+            tradeGoods: [],
+          },
+        ])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() => expect(screen.getByText('X1-AB-01')).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Markets list' })).toBeInTheDocument()
+  })
+
+  it('renders search input and good filter', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByRole('searchbox', { name: 'Search markets' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Filter by good' })).toBeInTheDocument()
+  })
+
+  it('shows heatmap when a good is selected', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-01',
+            systemSymbol: 'X1-AB',
+            imports: [],
+            exports: ['IRON_ORE'],
+            exchange: [],
+            tradeGoods: [
+              {
+                symbol: 'IRON_ORE',
+                type: 'EXPORT',
+                purchasePrice: 80,
+                sellPrice: 120,
+                tradeVolume: 100,
+                supply: 'HIGH',
+                activity: 'GROWING',
+              },
+            ],
+          },
+        ])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    // Wait for good filter to be populated, then select the good
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: 'IRON_ORE' })).toBeInTheDocument(),
+    )
+    const select = screen.getByRole('combobox', { name: 'Filter by good' })
+    const { fireEvent } = await import('@testing-library/react')
+    fireEvent.change(select, { target: { value: 'IRON_ORE' } })
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Price heatmap for IRON_ORE' }),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it('shows no-data message when markets list is empty', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No market data available yet.')).toBeInTheDocument(),
+    )
+  })
+})
+
+describe('GoodDetailPage', () => {
+  it('renders good symbol in heading', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/goods/IRON_ORE">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'IRON_ORE' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders back link', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/goods/IRON_ORE">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    expect(screen.getByText('← Markets')).toBeInTheDocument()
+  })
+
+  it('renders price chart and best pairs when price history loads', async () => {
+    const base = Date.now()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/goods/IRON_ORE/prices')
+        return Promise.resolve([
+          {
+            observedAt: new Date(base - 3_600_000).toISOString(),
+            waypointSymbol: 'X1-AB-01',
+            goodSymbol: 'IRON_ORE',
+            purchasePrice: 80,
+            sellPrice: 90,
+            supply: 'HIGH',
+            activity: 'GROWING',
+            tradeVolume: 100,
+          },
+          {
+            observedAt: new Date(base).toISOString(),
+            waypointSymbol: 'X1-AB-01',
+            goodSymbol: 'IRON_ORE',
+            purchasePrice: 85,
+            sellPrice: 95,
+            supply: 'MODERATE',
+            activity: 'GROWING',
+            tradeVolume: 100,
+          },
+          {
+            observedAt: new Date(base - 3_600_000).toISOString(),
+            waypointSymbol: 'X1-CD-02',
+            goodSymbol: 'IRON_ORE',
+            purchasePrice: 120,
+            sellPrice: 140,
+            supply: 'LIMITED',
+            activity: 'WEAK',
+            tradeVolume: 50,
+          },
+          {
+            observedAt: new Date(base).toISOString(),
+            waypointSymbol: 'X1-CD-02',
+            goodSymbol: 'IRON_ORE',
+            purchasePrice: 125,
+            sellPrice: 145,
+            supply: 'LIMITED',
+            activity: 'WEAK',
+            tradeVolume: 50,
+          },
+        ])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/goods/IRON_ORE">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('img', { name: 'IRON_ORE price over time' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('region', { name: 'Best buy-sell pairs' })).toBeInTheDocument()
+  })
+
+  it('shows not-found message when no price history', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.startsWith('/markets/goods/')) return Promise.resolve([])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/goods/UNKNOWN_GOOD">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByText('No price history found for UNKNOWN_GOOD.'),
+      ).toBeInTheDocument(),
+    )
+  })
+})
+
+describe('WaypointDetailPage', () => {
+  it('renders waypoint symbol in heading', async () => {
+    mockApiFetch.mockResolvedValue(null)
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/waypoints/X1-AB-01">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'X1-AB-01' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders imports/exports/exchange when waypoint data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints/X1-AB-01')
+        return Promise.resolve({
+          waypointSymbol: 'X1-AB-01',
+          systemSymbol: 'X1-AB',
+          imports: ['FUEL'],
+          exports: ['IRON_ORE'],
+          exchange: ['FOOD'],
+          tradeGoods: [],
+        })
+      if (path === '/markets/waypoints/X1-AB-01/prices') return Promise.resolve([])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/waypoints/X1-AB-01">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('region', { name: 'Imports exports exchanges' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.getByText('FUEL')).toBeInTheDocument()
+    expect(screen.getByText('IRON_ORE')).toBeInTheDocument()
+    expect(screen.getByText('FOOD')).toBeInTheDocument()
+  })
+
+  it('renders current prices table when trade goods are present', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints/X1-AB-01')
+        return Promise.resolve({
+          waypointSymbol: 'X1-AB-01',
+          systemSymbol: 'X1-AB',
+          imports: [],
+          exports: [],
+          exchange: [],
+          tradeGoods: [
+            {
+              symbol: 'IRON_ORE',
+              type: 'EXPORT',
+              purchasePrice: 80,
+              sellPrice: 120,
+              tradeVolume: 100,
+              supply: 'HIGH',
+              activity: 'GROWING',
+            },
+          ],
+        })
+      if (path === '/markets/waypoints/X1-AB-01/prices') return Promise.resolve([])
+      return Promise.resolve(null)
+    })
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/waypoints/X1-AB-01">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Current prices' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('IRON_ORE')).toBeInTheDocument()
+  })
+
+  it('shows not-found message when waypoint does not exist', async () => {
+    mockApiFetch.mockResolvedValue(null)
+    render(
+      <WrapperWithRoute path="/markets/*" initialEntry="/markets/waypoints/UNKNOWN">
+        <MarketsPage />
+      </WrapperWithRoute>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText(/Waypoint "UNKNOWN" not found\./)).toBeInTheDocument(),
+    )
+  })
+})

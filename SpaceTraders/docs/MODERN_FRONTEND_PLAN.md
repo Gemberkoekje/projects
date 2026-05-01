@@ -376,10 +376,15 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Added `LedgerEntryDto` and `RunCreditHighlightDto` TypeScript types to `src/types.ts`.
 - ✅ Tests: `pages.test.tsx` extended with 6 FinancePage tests (heading, loading state, run selector, category summary, per-ship P&L, per-good profit, credits chart). Total: 50 tests passing.
 
-**2b — market views**
-- Markets list (`/markets`): searchable waypoint list, heatmap by good.
-- Good detail (`/markets/goods/:symbol`): price-over-time, candlestick, supply step chart, best buy→sell pairs.
-- Waypoint detail (`/markets/waypoints/:symbol`): imports/exports/exchanges, current prices, recent transactions.
+**2b — market views** ✅ *Implemented*
+- ✅ Added `MarketPriceSampleDto`, `TradeGoodSnapshotDto`, `MarketWaypointDto` TypeScript types to `src/types.ts`.
+- ✅ Added backend endpoints `GET /markets/waypoints` (list all known market waypoints) and `GET /markets/waypoints/{symbol}` (snapshot for one waypoint) to `MarketsEndpoints.cs`.
+- ✅ `MarketsPage.tsx` fully implemented with internal sub-routing via React Router `<Routes>`:
+  - Markets list (`/markets`): searchable by waypoint/system name; good filter populates from all known goods across all snapshots; price heatmap (buy/sell/supply table) shown when a good is selected; waypoint table links to waypoint detail.
+  - Good detail (`/markets/goods/:symbol`): SVG price-over-time chart with separate buy and sell series for up to 5 waypoints (colour-coded legend); supply step chart (step-line rendering of `SCARCE`→`ABUNDANT`); best buy→sell pairs table sorted by margin per unit; best-route card from `/markets/best-routes`.
+  - Waypoint detail (`/markets/waypoints/:symbol`): trade-classification panel (imports/exports/exchange with coloured links to good detail); current prices table from trade-goods snapshot; falls back to latest price-history rows when no live snapshot is available; all good symbols link to good detail.
+- ✅ `AppShell.tsx` already routes `/markets/*` to `MarketsPage`, which handles its own sub-routes.
+- ✅ Tests: `pages.test.tsx` extended with 14 market tests (5 MarketsListPage, 4 GoodDetailPage, 4 WaypointDetailPage, plus supply-step rendering coverage). Total: 64 tests passing.
 
 ### Phase 3 — runs & comparison
 
