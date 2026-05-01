@@ -848,8 +848,6 @@ function RunComparePage() {
   )
 }
 
-
-
 export default function RunsPage() {
   return (
     <Routes>
