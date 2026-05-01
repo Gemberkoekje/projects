@@ -4,11 +4,14 @@
 # static bundle at build time.
 #
 # Environment variables consumed:
-#   DASHBOARD_API_KEY   — dashboard-scoped read-only API key (required in prod)
+#   SPACETRADERS_INTERNAL_API_KEY — internal API key used by both API and WebUI
+#   DASHBOARD_API_KEY   — legacy override for the dashboard API key (optional)
 #   API_BASE_URL        — override for the API base URL (optional)
 
 API_BASE_URL="${API_BASE_URL:-/spacetraders/api}"
-DASHBOARD_API_KEY="${DASHBOARD_API_KEY:-}"
+# Prefer the shared API key so only one secret key is required in Kubernetes.
+# Keep DASHBOARD_API_KEY as an optional override for backward compatibility.
+DASHBOARD_API_KEY="${DASHBOARD_API_KEY:-${SPACETRADERS_INTERNAL_API_KEY:-}}"
 HUB_BASE_URL="${HUB_BASE_URL:-/spacetraders/api/hubs}"
 
 # Escape values for safe embedding in a JSON string:
