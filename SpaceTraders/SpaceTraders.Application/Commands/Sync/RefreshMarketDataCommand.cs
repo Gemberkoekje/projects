@@ -53,7 +53,7 @@ public sealed class RefreshMarketDataHandler(
 
         var market = await port.GetMarketAsync(command.SystemSymbol, command.WaypointSymbol, cancellationToken);
         await markets.UpsertAsync(market, cancellationToken);
-        await bus.PublishAsync(new MarketDataRefreshedEvent(new WaypointSymbol(command.WaypointSymbol)));
+        await bus.PublishAsync(new MarketDataRefreshedEvent(new WaypointSymbol(command.WaypointSymbol), market.TradeGoodsJson));
         logger.LogInformation("Market data refreshed for {Waypoint}.", command.WaypointSymbol);
     }
 }

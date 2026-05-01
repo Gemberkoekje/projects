@@ -59,6 +59,11 @@ public static class DependencyInjection
         services.AddScoped<IApiEndpointUsageRecorder, ApiEndpointUsageRecorder>();
         services.AddScoped<IConstructionRepository, ConstructionRepository>();
 
+        services.AddScoped<IAgentCreditsSampleRepository, AgentCreditsSampleRepository>();
+        services.AddScoped<IMarketPriceSampleRepository, MarketPriceSampleRepository>();
+        services.AddScoped<ILedgerRepository, LedgerRepository>();
+        services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
+
         return services;
     }
 }

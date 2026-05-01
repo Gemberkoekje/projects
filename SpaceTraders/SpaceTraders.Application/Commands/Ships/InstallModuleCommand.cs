@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -100,6 +101,13 @@ public sealed class InstallModuleHandler(
             CargoInventory = result.Cargo.Inventory,
         };
         await ships.UpsertAsync(updated, cancellationToken);
+
+        await bus.PublishAsync(new ModuleInstalledEvent(
+            command.ShipSymbol,
+            command.ModuleSymbol,
+            result.Cost,
+            result.Agent.Credits,
+            ship.WaypointSymbol ?? string.Empty));
 
         logger.LogInformation("Installed module {Module} on ship {Ship} for {Cost} credits.", command.ModuleSymbol, command.ShipSymbol, result.Cost);
 

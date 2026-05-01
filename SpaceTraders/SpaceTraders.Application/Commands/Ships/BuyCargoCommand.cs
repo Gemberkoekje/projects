@@ -3,6 +3,7 @@ using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -106,6 +107,14 @@ public sealed class BuyCargoHandler(
         {
             await bus.SendAsync(new RefreshMarketDataCommand(ship.SystemSymbol, ship.WaypointSymbol, ForceRefresh: true));
         }
+
+        await bus.PublishAsync(new SpaceTraders.Domain.Events.CargoPurchasedEvent(
+            command.ShipSymbol,
+            new TradeSymbol(command.TradeSymbol),
+            command.Units,
+            result.Revenue,
+            result.AgentCredits,
+            ship.WaypointSymbol ?? string.Empty));
 
         logger.LogInformation("Ship {Symbol} bought {Units}x {Good} for {Cost} credits.",
             command.ShipSymbol, command.Units, command.TradeSymbol, result.Revenue);

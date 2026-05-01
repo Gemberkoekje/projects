@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -100,6 +101,13 @@ public sealed class InstallMountHandler(
             CargoInventory = result.Cargo.Inventory,
         };
         await ships.UpsertAsync(updated, cancellationToken);
+
+        await bus.PublishAsync(new MountInstalledEvent(
+            command.ShipSymbol,
+            command.MountSymbol,
+            result.Cost,
+            result.Agent.Credits,
+            ship.WaypointSymbol ?? string.Empty));
 
         logger.LogInformation("Installed mount {Mount} on ship {Ship} for {Cost} credits.", command.MountSymbol, command.ShipSymbol, result.Cost);
 

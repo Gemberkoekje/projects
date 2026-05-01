@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -54,6 +55,12 @@ public sealed class RepairShipHandler(
 
         await agents.UpsertAsync(result.Agent, cancellationToken);
         await ships.UpsertAsync(result.Ship, cancellationToken);
+
+        await bus.PublishAsync(new ShipRepairedEvent(
+            command.ShipSymbol,
+            result.Cost,
+            result.Agent.Credits,
+            ship!.WaypointSymbol ?? string.Empty));
 
         logger.LogInformation("Repaired ship {Symbol} for {Cost} credits.", command.ShipSymbol, result.Cost);
 

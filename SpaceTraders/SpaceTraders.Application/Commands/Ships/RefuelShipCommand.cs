@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
+using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -103,6 +104,12 @@ public sealed class RefuelShipHandler(
         }
 
         var nowRefueled = TimeProvider.System.GetUtcNow();
+
+        await bus.PublishAsync(new ShipRefueledEvent(
+            command.ShipSymbol,
+            result.Cost,
+            result.AgentCredits,
+            ship.WaypointSymbol ?? string.Empty));
 
         // Phase 7b: ShipRefueledEvent deleted; publish ShipAutomationTickEvent so the planner
         // re-evaluates the ship with its updated fuel state immediately.
