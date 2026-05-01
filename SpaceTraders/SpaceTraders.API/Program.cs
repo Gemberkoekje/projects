@@ -69,6 +69,12 @@ builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistory
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
 
+// RunLifecycleService is both a singleton IHostedService and the IRunLifecycleManager implementation.
+// It is registered as a singleton first so the same instance is reused for both roles.
+builder.Services.AddSingleton<RunLifecycleService>();
+builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.IRunLifecycleManager>(
+    sp => sp.GetRequiredService<RunLifecycleService>());
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -96,6 +102,7 @@ builder.Services.AddHostedService<ResetAndReliabilityMonitorService>();
 builder.Services.AddHostedService<ActivityLogPruningService>();
 builder.Services.AddHostedService<ShipRefreshWorkerService>();
 builder.Services.AddHostedService<PrometheusMetricsService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RunLifecycleService>());
 
 var app = builder.Build();
 

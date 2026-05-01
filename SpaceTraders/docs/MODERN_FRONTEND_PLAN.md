@@ -286,12 +286,22 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Added new domain events: `CargoPurchasedEvent`, `ShipRefueledEvent`, `ShipRepairedEvent`, `MountInstalledEvent`, `ModuleInstalledEvent` and published them from `BuyCargoHandler`, `RefuelShipHandler`, `RepairShipHandler`, `InstallMountHandler`, `InstallModuleHandler`.
 - ✅ Added repository interfaces and implementations: `IAgentCreditsSampleRepository`, `IMarketPriceSampleRepository`, `ILedgerRepository`, `IShipTaskRecordRepository`.
 - ✅ `MarketDataRefreshedEvent` enriched with `TradeGoodsJson` payload to avoid a second DB read in the sample handler.
-- Note: `RunCreditHighlight` rows are not yet written — full highlight production requires the `Run` lifecycle from phase 0b (active run ID needed).
 
-**0b — run lifecycle**
-- Auto-open a new `Run` on startup and on any strategy-relevant settings change (previous run closes atomically).
-- Implement `ScheduledRun` promotion logic: on startup and via a background timer, promote a pending `ScheduledRun` whose `activatesAt` has passed (or `activatesOnNextRestart` is set) into an active `Run`.
-- Add operator control endpoints (`POST /control/runs/schedule`, `DELETE /control/runs/schedule/:id`) under the existing operator-scoped key.
+**0b — run lifecycle** ✅ *Implemented*
+- ✅ Added `IActiveRunIdProvider` interface and `ActiveRunIdProvider` singleton implementation (Application) — tracks current active run ID in memory, removing the need for a DB round-trip on every ledger write.
+- ✅ Added `IRunLifecycleManager` interface (Application) — `RotateForSettingsChangeAsync` called by `SettingsEndpoints.PUT /{key}` for strategy-relevant key changes.
+- ✅ Added `ActiveRunInfo` and `PendingScheduledRunInfo` port models (Application).
+- ✅ Added `IRunRepository` interface (Application) — covers `GetActiveRunAsync`, `OpenRunAsync`, `CloseRunAsync`, `GetPendingScheduledRunsAsync`, `ScheduleRunAsync`, `DeleteScheduledRunAsync`, `AppendCreditHighlightAsync`, `GetRunCountAsync`.
+- ✅ Added `RunRepository` implementation (Infrastructure.Persistence).
+- ✅ Updated `LedgerRepository` to automatically tag entries with `activeRunIdProvider.ActiveRunId` (explicit `runId` parameter still overrides).
+- ✅ Registered `ActiveRunIdProvider`, `IActiveRunIdProvider`, and `IRunRepository` in `DependencyInjection.cs` (Persistence).
+- ✅ Created `RunLifecycleService` (API/Services) — implements `IHostedService` + `IRunLifecycleManager`; on startup promotes pending `ScheduledRun`s or resumes/opens a fresh `Run`; 60 s `PeriodicTimer` loop promotes time-triggered `ScheduledRun`s; `RotateForSettingsChangeAsync` closes + reopens on strategy-relevant key changes.
+- ✅ Updated `SettingsEndpoints` (`PUT /{key}`) to call `IRunLifecycleManager.RotateForSettingsChangeAsync`.
+- ✅ Added `POST /control/runs/schedule` and `DELETE /control/runs/schedule/{id}` endpoints.
+- ✅ Registered `RunLifecycleService` as singleton + `IHostedService` in `Program.cs`.
+- ✅ Updated `DiValidationTests` to mock `IActiveRunIdProvider`, `IRunLifecycleManager`, and `IRunRepository`.
+- ✅ Added `RunLifecycleServiceTests` (5 unit tests covering startup paths and settings-change rotation).
+- Note: `RunCreditHighlight` rows are now written on run open and close via `AppendCreditHighlightAsync`.
 
 **0c — nightly data retention jobs**
 - Prune `MarketPriceSample` rows older than 7 days (keeping hourly aggregates for 90 days).

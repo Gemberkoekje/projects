@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
 using SpaceTraders.Infrastructure.Persistence.Scoping;
 
@@ -34,6 +35,10 @@ public static class DependencyInjection
             return scope;
         });
 
+        // Singleton: tracks current active run ID in memory so LedgerRepository can tag entries.
+        services.AddSingleton<ActiveRunIdProvider>();
+        services.AddSingleton<IActiveRunIdProvider>(sp => sp.GetRequiredService<ActiveRunIdProvider>());
+
         services.AddDbContext<SpaceTradersDbContext>((_, options) =>
         {
             options.UseNpgsql(connectionString, pgOptions =>
@@ -63,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IMarketPriceSampleRepository, MarketPriceSampleRepository>();
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
+        services.AddScoped<IRunRepository, RunRepository>();
 
         return services;
     }

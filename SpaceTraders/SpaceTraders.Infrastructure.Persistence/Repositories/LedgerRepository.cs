@@ -1,10 +1,11 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 
 namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
-public sealed class LedgerRepository(SpaceTradersDbContext db) : ILedgerRepository
+public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvider activeRunIdProvider) : ILedgerRepository
 {
     public async Task AppendAsync(
         string shipSymbol,
@@ -23,7 +24,7 @@ public sealed class LedgerRepository(SpaceTradersDbContext db) : ILedgerReposito
             AgentToken = db.AgentToken,
             OccurredAt = TimeProvider.System.GetUtcNow(),
             ShipSymbol = shipSymbol,
-            RunId = runId,
+            RunId = runId ?? activeRunIdProvider.ActiveRunId,
             Category = category,
             Amount = amount,
             GoodSymbol = goodSymbol,

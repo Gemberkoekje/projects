@@ -1,5 +1,6 @@
 using SpaceTraders.API.Services;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Sync;
 using Wolverine;
 
@@ -112,6 +113,32 @@ public static class ControlEndpoints
             return Results.Accepted();
         });
 
+        group.MapPost("/runs/schedule", async (
+            ScheduleRunRequest body,
+            IServiceProvider sp,
+            CancellationToken ct) =>
+        {
+            var runRepo = sp.GetRequiredService<IRunRepository>();
+            var id = await runRepo.ScheduleRunAsync(
+                body.Name,
+                body.StrategyLabel,
+                body.ScheduledSettingsJson,
+                body.ActivatesAt,
+                body.ActivatesOnNextRestart,
+                ct);
+            return Results.Created($"/control/runs/schedule/{id}", new { id });
+        });
+
+        group.MapDelete("/runs/schedule/{id:guid}", async (
+            Guid id,
+            IServiceProvider sp,
+            CancellationToken ct) =>
+        {
+            var runRepo = sp.GetRequiredService<IRunRepository>();
+            var deleted = await runRepo.DeleteScheduledRunAsync(id, ct);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        });
+
         return app;
     }
 }
@@ -139,4 +166,17 @@ public sealed record FlightModeRequest
 public sealed record InstallOrRemoveEquipmentRequest
 {
     public required string Symbol { get; init; }
+}
+
+public sealed record ScheduleRunRequest
+{
+    public required string Name { get; init; }
+
+    public required string StrategyLabel { get; init; }
+
+    public string? ScheduledSettingsJson { get; init; }
+
+    public DateTimeOffset? ActivatesAt { get; init; }
+
+    public bool ActivatesOnNextRestart { get; init; }
 }
