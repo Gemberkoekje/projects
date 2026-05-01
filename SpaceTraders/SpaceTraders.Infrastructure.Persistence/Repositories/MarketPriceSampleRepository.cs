@@ -95,16 +95,16 @@ public sealed class MarketPriceSampleRepository(SpaceTradersDbContext db) : IMar
         var downsampledDeleted = await db.Database.ExecuteSqlAsync(
             $"""
             DELETE FROM market_price_samples
-            WHERE agent_token = {db.AgentToken}
-              AND observed_at < {rawRetentionCutoff}
-              AND observed_at >= {aggregateRetentionCutoff}
-              AND id NOT IN (
-                SELECT MIN(id)
+            WHERE "AgentToken" = {db.AgentToken}
+              AND "ObservedAt" < {rawRetentionCutoff}
+              AND "ObservedAt" >= {aggregateRetentionCutoff}
+              AND "Id" NOT IN (
+                SELECT MIN("Id")
                 FROM market_price_samples
-                WHERE agent_token = {db.AgentToken}
-                  AND observed_at < {rawRetentionCutoff}
-                  AND observed_at >= {aggregateRetentionCutoff}
-                GROUP BY waypoint_symbol, good_symbol, date_trunc('hour', observed_at)
+                WHERE "AgentToken" = {db.AgentToken}
+                  AND "ObservedAt" < {rawRetentionCutoff}
+                  AND "ObservedAt" >= {aggregateRetentionCutoff}
+                GROUP BY "WaypointSymbol", "GoodSymbol", date_trunc('hour', "ObservedAt")
               )
             """, cancellationToken);
 

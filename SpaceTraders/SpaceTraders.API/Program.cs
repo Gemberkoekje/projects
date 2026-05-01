@@ -35,6 +35,7 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.Configure<SpaceTradersBootstrapOptions>(builder.Configuration.GetSection("SpaceTraders"));
+builder.Services.AddSingleton<StartupInitializationState>();
 
 // CORS — allow the configured WebUI origin (or any origin if not configured, for development convenience).
 var webUiOrigin = builder.Configuration["WebUI:Origin"];
@@ -90,9 +91,20 @@ builder.Services
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ICreditHistoryService, SpaceTraders.Application.Services.CreditHistoryService>();
 
 builder.Services.AddSingleton<SettingsSnapshotLogger>();
+builder.Services.AddSingleton<AgentBootstrapService>();
+builder.Services.AddSingleton<StartupSyncService>();
+builder.Services.AddSingleton<StartupSnapshotService>();
+builder.Services.AddSingleton<StartupRecoveryService>();
+builder.Services.AddSingleton<SettingsStartupLoggingService>();
+builder.Services.AddSingleton<GameLoopService>();
+builder.Services.AddSingleton<ContractWatchService>();
+builder.Services.AddSingleton<ResetAndReliabilityMonitorService>();
+builder.Services.AddSingleton<ActivityLogPruningService>();
+builder.Services.AddSingleton<DataRetentionService>();
+builder.Services.AddSingleton<ShipRefreshWorkerService>();
+builder.Services.AddSingleton<PrometheusMetricsService>();
 
-// RunLifecycleService is both a singleton IHostedService and the IRunLifecycleManager implementation.
-// It is registered as a singleton first so the same instance is reused for both roles.
+// RunLifecycleService is both a singleton startup-managed service and the IRunLifecycleManager implementation.
 builder.Services.AddSingleton<RunLifecycleService>();
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.IRunLifecycleManager>(
     sp => sp.GetRequiredService<RunLifecycleService>());
@@ -106,30 +118,18 @@ builder.Services.AddSingleton<IDashboardNotifier, DashboardNotifier>();
 
 builder.Services
     .AddHealthChecks()
-    .AddDbContextCheck<SpaceTradersDbContext>("postgresql");
+    .AddDbContextCheck<SpaceTradersDbContext>("postgresql", tags: ["ready"])
+    .AddCheck<StartupInitializationHealthCheck>("startup", tags: ["startup"]);
 
 builder.Services.Configure<HostOptions>(opts =>
     opts.ShutdownTimeout = TimeSpan.FromSeconds(60));
 
-// LeaderElectionService doubles as ILeaderElection (singleton) and IHostedService.
+// LeaderElectionService doubles as ILeaderElection (singleton) and is started after deferred bootstrap completes.
 builder.Services.AddSingleton<LeaderElectionService>();
 builder.Services.AddSingleton<SpaceTraders.Application.Interfaces.ILeaderElection>(
     sp => sp.GetRequiredService<LeaderElectionService>());
-builder.Services.AddHostedService(sp => sp.GetRequiredService<LeaderElectionService>());
 
-builder.Services.AddHostedService<AgentBootstrapService>();
-builder.Services.AddHostedService<StartupSyncService>();
-builder.Services.AddHostedService<StartupSnapshotService>();
-builder.Services.AddHostedService<StartupRecoveryService>();
-builder.Services.AddHostedService<SettingsStartupLoggingService>();
-builder.Services.AddHostedService<GameLoopService>();
-builder.Services.AddHostedService<ContractWatchService>();
-builder.Services.AddHostedService<ResetAndReliabilityMonitorService>();
-builder.Services.AddHostedService<ActivityLogPruningService>();
-builder.Services.AddHostedService<DataRetentionService>();
-builder.Services.AddHostedService<ShipRefreshWorkerService>();
-builder.Services.AddHostedService<PrometheusMetricsService>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<RunLifecycleService>());
+builder.Services.AddHostedService<DeferredStartupHostedService>();
 
 var app = builder.Build();
 
@@ -154,8 +154,14 @@ app.UseMiddleware<ApiKeyMiddleware>();
 app.UseHttpMetrics();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
-app.MapHealthChecks("/health/ready");
-app.MapHealthChecks("/health/startup");
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+});
+app.MapHealthChecks("/health/startup", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("startup"),
+});
 
 app.MapMetrics();
 app.MapStatusEndpoints();

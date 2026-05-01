@@ -78,7 +78,7 @@ public static class DependencyInjection
 
         services.AddScoped<SyncAllShipsHandler>();
 
-        services.AddWolverine(opts =>
+        services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {
             opts.Discovery.IncludeAssembly(typeof(DependencyInjection).Assembly);
             configureWolverine(opts);

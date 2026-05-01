@@ -58,7 +58,13 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
         var entities = await db.Surveys
             .AsNoTracking()
             .Where(s => s.WaypointSymbol == waypointSymbol && s.Expiration > now)
-            .OrderByDescending(s => ScoreSize(s.Size))
+            .OrderByDescending(s => s.Size == "LARGE"
+                ? 3
+                : s.Size == "MODERATE"
+                    ? 2
+                    : s.Size == "SMALL"
+                        ? 1
+                        : 0)
             .ThenByDescending(s => s.Expiration)
             .ToListAsync(cancellationToken);
 
@@ -103,25 +109,5 @@ public sealed class SurveyRepository(SpaceTradersDbContext db) : ISurveyReposito
         {
             return [];
         }
-    }
-
-    private static int ScoreSize(string size)
-    {
-        if (size.Equals("LARGE", StringComparison.OrdinalIgnoreCase))
-        {
-            return 3;
-        }
-
-        if (size.Equals("MODERATE", StringComparison.OrdinalIgnoreCase))
-        {
-            return 2;
-        }
-
-        if (size.Equals("SMALL", StringComparison.OrdinalIgnoreCase))
-        {
-            return 1;
-        }
-
-        return 0;
     }
 }

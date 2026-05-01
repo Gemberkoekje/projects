@@ -12,6 +12,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/spacetraders/api': {
+        target: 'https://localhost:49305',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
