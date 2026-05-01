@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.API.Services;
-using SpaceTraders.Application.Events.Dispatching;
 using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;

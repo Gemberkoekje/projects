@@ -589,17 +589,25 @@ Build is green and the full solution test suite passes — 382 passed, 4 pre-exi
 
 Build is green and the full solution test suite passes — 381 passed, 4 pre-existing sandbox integration tests skipped. Phase 7e is complete; all ship-state and supply events are now plain records with no chain-of-command dependency. `ChainOfCommandEvent` has no remaining concrete subtypes and will be deleted in Phase 7f.
 
-#### Phase 7f — Delete chain infrastructure
+#### Phase 7f — Delete chain infrastructure ✅ COMPLETE
 
-- Delete `SpaceTraders.Application/Events/Handlers/IChainOfCommandEventHandler.cs`.
-- Delete `SpaceTraders.Application/Events/Handlers/ChainOfCommandHandlerResult.cs`.
-- Delete `SpaceTraders.Application/Events/Dispatching/IChainOfCommandDispatcher.cs`.
-- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatcher.cs`.
-- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatchResult.cs`.
-- Delete `SpaceTraders.Application/EventHandlers/ChainOfCommandBridgeHandler.cs`.
-- Delete `SpaceTraders.Domain/Events/ChainOfCommandEvent.cs`.
-- Remove all chain DI registrations from `SpaceTraders.Application/DependencyInjection.cs`.
-- Delete `tests/SpaceTraders.Application.Tests/Events/Dispatching/ChainOfCommandDispatcherTests.cs` and any remaining `ChainOfCommandEventHandlerRegistrationTests` / `ShipEventHandlerConventionTests` content (or rewrite to assert "no `IChainOfCommandEventHandler` types exist" as a regression guard).
+- Delete `SpaceTraders.Application/Events/Handlers/IChainOfCommandEventHandler.cs`. ✅
+- Delete `SpaceTraders.Application/Events/Handlers/ChainOfCommandHandlerResult.cs`. ✅
+- Delete `SpaceTraders.Application/Events/Dispatching/IChainOfCommandDispatcher.cs`. ✅
+- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatcher.cs`. ✅
+- Delete `SpaceTraders.Application/Events/Dispatching/ChainOfCommandDispatchResult.cs`. ✅
+- Delete `SpaceTraders.Application/EventHandlers/ChainOfCommandBridgeHandler.cs`. ✅
+- Delete `SpaceTraders.Domain/Events/ChainOfCommandEvent.cs`. ✅
+- Remove all chain DI registrations from `SpaceTraders.Application/DependencyInjection.cs`. ✅
+- Delete `tests/SpaceTraders.Application.Tests/Events/Dispatching/ChainOfCommandDispatcherTests.cs` and any remaining `ChainOfCommandEventHandlerRegistrationTests` / `ShipEventHandlerConventionTests` content (or rewrite to assert "no `IChainOfCommandEventHandler` types exist" as a regression guard). ✅
+  - `ChainOfCommandDispatcherTests.cs` deleted.
+  - `ShipEventHandlerConventionTests.cs` deleted.
+  - `ChainOfCommandEventHandlerRegistrationTests.cs` rewritten as a regression guard asserting no `IChainOfCommandEventHandler<>` implementations exist.
+  - `Phase65dPlannerRegressionTests.cs` updated: replaced `ChainOfCommandEvent` type reference with a Phase 7f guard asserting the type no longer exists in the domain assembly.
+  - `ShipAutomationTickEventHandlerTests.cs` updated: replaced chain-hierarchy assertion with a Phase 7f guard asserting `ChainOfCommandEvent` no longer exists in the domain assembly.
+  - Removed stale `using SpaceTraders.Application.Events.Dispatching` import from `StartupRecoveryServiceTests.cs`.
+
+Build is green and the full solution test suite passes — 374 passed, 4 pre-existing sandbox integration tests skipped. Phase 7f is complete; all chain-of-command infrastructure files have been deleted, the DI registration removed, and the test suite updated with regression guards.
 
 #### Phase 7g — Update analyzer + final cleanup
 

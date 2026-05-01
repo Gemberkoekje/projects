@@ -4,13 +4,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.EventHandlers;
-using SpaceTraders.Application.Events.Handlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Planning;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
-using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
@@ -335,21 +333,20 @@ public sealed class Phase65dPlannerRegressionTests
 
     // ── Planner-only proof: no chain handler types are instantiated ─────────────
 
+    /// <summary>
+    /// Phase 7f: ChainOfCommandEvent and IChainOfCommandEventHandler have been deleted entirely.
+    /// No type in the domain assembly should carry the name "ChainOfCommandEvent".
+    /// </summary>
     [Fact]
-    public void Phase65d_ChainHandlerTypes_AreNotRegisteredForDockedAndOrbitEvents()
+    public void Phase7f_ChainOfCommandEvent_TypeDoesNotExistInDomainAssembly()
     {
-        // Phase 7e: ShipDockedEvent, ShipInOrbitEvent, ShipStateMismatchEvent no longer derive
-        // from ChainOfCommandEvent, so MakeGenericType with those types would violate the constraint.
-        // The invariant is now enforced by AfterPhase7e_NoConcreteChainOfCommandEventSubtypes_ShouldExist
-        // in ChainOfCommandEventHandlerRegistrationTests: no chain event types exist at all.
-        var chainEventTypes = typeof(ChainOfCommandEvent).Assembly
-            .GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false })
-            .Where(t => typeof(ChainOfCommandEvent).IsAssignableFrom(t) && t != typeof(ChainOfCommandEvent))
-            .ToList();
+        var domainAssembly = typeof(ShipDockedEvent).Assembly;
 
-        chainEventTypes.Should().BeEmpty(
-            "Phase 7e decoupled ShipDockedEvent, ShipInOrbitEvent, ShipStateMismatchEvent and all other " +
-            "ship-state events from ChainOfCommandEvent; no concrete chain subtypes should remain.");
+        var chainType = domainAssembly
+            .GetTypes()
+            .FirstOrDefault(t => t.Name == "ChainOfCommandEvent");
+
+        chainType.Should().BeNull(
+            "Phase 7f deleted ChainOfCommandEvent; it must not exist in the domain assembly.");
     }
 }

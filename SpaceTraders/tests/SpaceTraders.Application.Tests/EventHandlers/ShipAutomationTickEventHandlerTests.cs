@@ -30,13 +30,20 @@ public sealed class ShipAutomationTickEventHandlerTests
         await planner.Received(1).PlanAndExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// Phase 7f: ChainOfCommandEvent has been deleted. Assert it no longer exists in the domain assembly
+    /// as a regression guard (prevents accidental re-introduction).
+    /// </summary>
     [Fact]
-    public void ShipAutomationTickEvent_IsNotPartOfChainOfCommandHierarchy()
+    public void Phase7f_ChainOfCommandEvent_NoLongerExistsInDomainAssembly()
     {
-        var eventType = typeof(ShipAutomationTickEvent);
+        var domainAssembly = typeof(ShipAutomationTickEvent).Assembly;
 
-        eventType.IsSubclassOf(typeof(SpaceTraders.Domain.Events.ChainOfCommandEvent))
-            .Should().BeFalse(
-                "Phase 5 requires automation events to be explicit and factual, not routed via chain-of-command inheritance.");
+        var chainType = domainAssembly
+            .GetTypes()
+            .FirstOrDefault(t => t.Name == "ChainOfCommandEvent");
+
+        chainType.Should().BeNull(
+            "Phase 7f deleted ChainOfCommandEvent; it must not be re-introduced in the domain assembly.");
     }
 }
