@@ -537,3 +537,186 @@ describe('ShipDetailPage', () => {
     )
   })
 })
+
+// ─── FinancePage ──────────────────────────────────────────────────────────────
+
+import FinancePage from '../pages/FinancePage'
+
+describe('FinancePage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    expect(screen.getByRole('heading', { name: 'Finance' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders run selector when runs are available', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/')
+        return Promise.resolve([
+          {
+            id: 'run-1',
+            name: 'Run #1',
+            strategyLabel: 'TRADE',
+            startedAt: new Date().toISOString(),
+            endedAt: new Date().toISOString(),
+            startingCredits: 100_000,
+            endingCredits: 200_000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Select run' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders category summary table when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/finance/credits-history') return Promise.resolve([])
+      if (path === '/finance/summary')
+        return Promise.resolve([
+          { category: 'TradeSell', totalAmount: 500_000, entryCount: 10 },
+          { category: 'FuelPurchase', totalAmount: -50_000, entryCount: 20 },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('TradeSell')).toBeInTheDocument())
+    // FuelPurchase and +500,000 appear in both category table and summary cards / budget panel
+    expect(screen.getAllByText('FuelPurchase').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('+500,000').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('renders per-ship P&L table when ledger has entries', async () => {
+    const now = new Date().toISOString()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/finance/credits-history') return Promise.resolve([])
+      if (path === '/finance/summary') return Promise.resolve([])
+      if (path.startsWith('/finance/ledger'))
+        return Promise.resolve([
+          {
+            id: 1,
+            occurredAt: now,
+            shipSymbol: 'SHIP-1',
+            runId: null,
+            category: 'TradeSell',
+            amount: 300_000,
+            goodSymbol: null,
+            unitPrice: null,
+            units: null,
+            waypointSymbol: null,
+          },
+          {
+            id: 2,
+            occurredAt: now,
+            shipSymbol: 'SHIP-1',
+            runId: null,
+            category: 'FuelPurchase',
+            amount: -10_000,
+            goodSymbol: null,
+            unitPrice: null,
+            units: null,
+            waypointSymbol: null,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('SHIP-1')).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Per-ship P&L' })).toBeInTheDocument()
+  })
+
+  it('renders per-good profit table when ledger has trade entries', async () => {
+    const now = new Date().toISOString()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/finance/credits-history') return Promise.resolve([])
+      if (path === '/finance/summary') return Promise.resolve([])
+      if (path.startsWith('/finance/ledger'))
+        return Promise.resolve([
+          {
+            id: 1,
+            occurredAt: now,
+            shipSymbol: 'SHIP-1',
+            runId: null,
+            category: 'TradeBuy',
+            amount: -80_000,
+            goodSymbol: 'IRON_ORE',
+            unitPrice: 80,
+            units: 1000,
+            waypointSymbol: 'X1-AB-01',
+          },
+          {
+            id: 2,
+            occurredAt: now,
+            shipSymbol: 'SHIP-1',
+            runId: null,
+            category: 'TradeSell',
+            amount: 120_000,
+            goodSymbol: 'IRON_ORE',
+            unitPrice: 120,
+            units: 1000,
+            waypointSymbol: 'X1-CD-02',
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('IRON_ORE')).toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Per-good profit' })).toBeInTheDocument()
+  })
+
+  it('renders credits-over-time chart when history data loads', async () => {
+    const base = Date.now()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/runs/') return Promise.resolve([])
+      if (path === '/finance/credits-history')
+        return Promise.resolve([
+          { recordedAt: new Date(base - 3_600_000).toISOString(), credits: 100_000 },
+          { recordedAt: new Date(base).toISOString(), credits: 150_000 },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: 'Credits over time' })).toBeInTheDocument(),
+    )
+  })
+})
