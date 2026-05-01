@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router'
 import { apiFetch } from '@/lib/api-fetch'
 import { cn } from '@/lib/utils'
-import type { RunSummaryDto, ScheduledRunDto, RunDetailDto, RunCompareDto, RunKpisDto } from '@/types'
+import type { RunSummaryDto, ScheduledRunDto, RunDetailDto, RunCompareDto, RunKpisDto, SettingDto } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +46,13 @@ interface ChartPoint {
   label?: string
 }
 
-function CreditChart({ points }: { points: ChartPoint[] }) {
+function CreditChart({
+  points,
+  annotations = [],
+}: {
+  points: ChartPoint[]
+  annotations?: Array<{ t: number; label: string }>
+}) {
   if (points.length < 2) return null
 
   const width = 560
@@ -117,6 +123,27 @@ function CreditChart({ points }: { points: ChartPoint[] }) {
       {annotated.map((p, i) => (
         <circle key={i} cx={sx(p.t)} cy={sy(p.v)} r={3} fill="currentColor" />
       ))}
+      {annotations.map((a, i) => {
+        const x = sx(a.t)
+        if (x < pad.left || x > pad.left + innerW) return null
+        return (
+          <g key={i}>
+            <line
+              x1={x}
+              y1={pad.top}
+              x2={x}
+              y2={pad.top + innerH}
+              stroke="currentColor"
+              strokeOpacity={0.5}
+              strokeDasharray="3 2"
+              strokeWidth={1}
+            />
+            <text x={x + 3} y={pad.top + 10} fontSize={9} fill="currentColor" fillOpacity={0.7}>
+              {a.label}
+            </text>
+          </g>
+        )
+      })}
     </svg>
   )
 }
@@ -424,6 +451,29 @@ function RunDetailPage() {
     enabled: Boolean(id),
   })
 
+  const settingsQ = useQuery<SettingDto[]>({
+    queryKey: ['settings-all'],
+    queryFn: () => apiFetch('/settings/'),
+    staleTime: 300_000,
+  })
+
+  const annotations = useMemo(() => {
+    if (!settingsQ.data) return []
+    return settingsQ.data
+      .filter(s => s.key.startsWith('Annotation.'))
+      .flatMap(s => {
+        try {
+          const parsed = JSON.parse(s.value) as { label?: string; timestamp?: string }
+          if (parsed.timestamp && parsed.label) {
+            return [{ t: new Date(parsed.timestamp).getTime(), label: parsed.label }]
+          }
+          return []
+        } catch {
+          return []
+        }
+      })
+  }, [settingsQ.data])
+
   const detail = detailQ.data
   const kpis = kpisQ.data
   const run = detail?.run
@@ -536,7 +586,7 @@ function RunDetailPage() {
             Credits Over Time
           </h2>
           <div className="rounded-lg border border-border bg-background p-4">
-            <CreditChart points={chartPoints} />
+            <CreditChart points={chartPoints} annotations={annotations} />
           </div>
         </section>
       )}

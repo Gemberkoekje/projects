@@ -1790,3 +1790,232 @@ describe('SystemMapPage', () => {
     )
   })
 })
+
+// ─── ContractsPage ────────────────────────────────────────────────────────────
+
+import ContractsPage from '../pages/ContractsPage'
+
+describe('ContractsPage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    expect(screen.getByRole('heading', { name: 'Contracts' })).toBeInTheDocument()
+  })
+
+  it('shows loading state while fetching', () => {
+    mockApiFetch.mockReturnValue(new Promise(() => {}))
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+  })
+
+  it('renders contract rows when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/contracts')
+        return Promise.resolve([
+          {
+            id: 'CONTRACT-1',
+            type: 'PROCUREMENT',
+            factionSymbol: 'COSMIC',
+            isAccepted: true,
+            isFulfilled: false,
+            termsDeadline: new Date(Date.now() + 86_400_000).toISOString(),
+            deliverablesJson: JSON.stringify([
+              { tradeSymbol: 'IRON', destinationSymbol: 'X1-AB-00', unitsRequired: 100, unitsFulfilled: 50 },
+            ]),
+          },
+        ])
+      return Promise.resolve(null)
+    })
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('CONTRACT-1')).toBeInTheDocument())
+    expect(screen.getByText('Active')).toBeInTheDocument()
+  })
+
+  it('shows empty state when there are no contracts', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <ContractsPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No contracts found.')).toBeInTheDocument(),
+    )
+  })
+})
+
+
+// ─── FinancePage — trade routes section ──────────────────────────────────────
+
+describe('FinancePage — trade routes', () => {
+  it('renders the trade routes section heading', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Trade routes' })).toBeInTheDocument(),
+    )
+  })
+
+  it('renders trade route rows when data is available', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path.includes('/finance/trade-routes'))
+        return Promise.resolve([
+          {
+            good: 'IRON_ORE',
+            buyWaypoint: 'X1-AB-00',
+            sellWaypoint: 'X1-AB-01',
+            totalUnits: 400,
+            totalProfit: 8000,
+            runDurationHours: 2,
+            profitPerHour: 4000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <FinancePage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('IRON_ORE')).toBeInTheDocument())
+    expect(screen.getByText('X1-AB-00')).toBeInTheDocument()
+  })
+})
+
+
+// ─── MarketsPage — freshness column ──────────────────────────────────────────
+
+describe('MarketsPage — freshness', () => {
+  it('shows the Last Scan column header', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            tradeGoods: [],
+            imports: [],
+            exports: [],
+            exchange: [],
+          },
+        ])
+      if (path === '/markets/freshness') return Promise.resolve([])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <MarketsPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('columnheader', { name: 'Last Scan' })).toBeInTheDocument(),
+    )
+  })
+
+  it('shows freshness age text when freshness data loads', async () => {
+    const now = new Date()
+    const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000).toISOString()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/markets/waypoints')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            tradeGoods: [],
+            imports: [],
+            exports: [],
+            exchange: [],
+          },
+        ])
+      if (path === '/markets/freshness')
+        return Promise.resolve([
+          {
+            waypointSymbol: 'X1-AB-00',
+            systemSymbol: 'X1-AB',
+            lastObservedAt: thirtyMinAgo,
+            ageMinutes: 30,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <MarketsPage />
+      </Wrapper>,
+    )
+    await waitFor(() => expect(screen.getByText('30m ago')).toBeInTheDocument())
+  })
+})
+
+// ─── OverviewPage — anomalies + decision candidates ──────────────────────────
+
+describe('OverviewPage — anomalies and decision candidates', () => {
+  it('shows credit anomaly warning when anomaly is active', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/agent')
+        return Promise.resolve({
+          symbol: 'TEST', credits: 100000, startingFaction: 'COSMIC', shipCount: 1, headquartersSymbol: null,
+        })
+      if (path === '/status/anomalies')
+        return Promise.resolve({
+          creditGrowthAnomaly: true,
+          recentCreditRatePerHour: 500,
+          avgCreditRatePerHour: 5000,
+          priceAnomalies: [],
+        })
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <OverviewPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Credit growth anomaly' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('Credit Growth Anomaly')).toBeInTheDocument()
+  })
+
+  it('renders decision candidates section when top routes load', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/top-trade-routes?limit=5')
+        return Promise.resolve([
+          {
+            good: 'FUEL',
+            buyWaypoint: 'X1-AB-00',
+            sellWaypoint: 'X1-AB-01',
+            totalUnits: 100,
+            totalProfit: 5000,
+            runDurationHours: 1,
+            profitPerHour: 5000,
+          },
+        ])
+      return Promise.resolve([])
+    })
+    render(
+      <Wrapper>
+        <OverviewPage />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Decision candidates' })).toBeInTheDocument(),
+    )
+    expect(screen.getByText('FUEL')).toBeInTheDocument()
+  })
+})

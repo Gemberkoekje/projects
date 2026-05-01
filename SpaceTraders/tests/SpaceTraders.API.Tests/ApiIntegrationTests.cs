@@ -12,6 +12,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
 
 namespace SpaceTraders.API.Tests;
@@ -273,6 +274,43 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         body.Should().Contain("X1-SN");
         body.Should().Contain("X1-SF");
     }
+
+    // ── Phase 5: new endpoints ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task TradeRoutes_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/finance/trade-routes");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ContractRoi_WithUnknownContractId_Returns404()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/contracts/UNKNOWN/roi");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task MarketFreshness_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/markets/freshness");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Anomalies_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/anomalies");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task TopTradeRoutes_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/top-trade-routes");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
 
 /// <summary>
@@ -321,24 +359,37 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public IWaypointRepository WaypointRepository { get; } = Substitute.For<IWaypointRepository>();
 
+    public IAgentCreditsSampleRepository AgentCreditsSampleRepository { get; } = Substitute.For<IAgentCreditsSampleRepository>();
+
+    public IMarketRepository MarketRepository { get; } = Substitute.For<IMarketRepository>();
+
     public SpaceTradersApiFactory()
     {
         // Default stub responses
         AgentRepository.GetAsync(default).ReturnsForAnyArgs((Application.Ports.AgentModel?)null);
         ShipRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<Application.Ports.ShipModel>());
         ContractRepository.GetActiveAsync(default).ReturnsForAnyArgs(Array.Empty<ContractDto>());
+        ContractRepository.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((ContractDto?)null);
         ActivityLogRepository.GetPagedAsync(1, 50, null, default).ReturnsForAnyArgs(Array.Empty<ActivityLogDto>());
         SettingsRepository.GetAllAsync(default).ReturnsForAnyArgs(Array.Empty<(string, string, string, string)>());
         SettingsRepository.GetByKeyPrefixAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<(string, string)>());
         TradeOpportunityRepository.GetBestRouteForCapacityAsync(default, default, default, default)
             .ReturnsForAnyArgs((TradeOpportunityDto?)null);
+        TradeOpportunityRepository.GetTopRoutesAsync(Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<TradeOpportunityDto>());
         LeaderElection.IsLeader.Returns(true);
         CreditHistory.GetHistory().Returns(Array.Empty<(DateTimeOffset, long)>());
         LedgerRepository.GetSummaryAsync(Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Application.Interfaces.Repositories.LedgerSummaryDto>());
         LedgerRepository.GetDistinctShipCountAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(0);
+        LedgerRepository.GetRangeAsync(
+                Arg.Any<DateTimeOffset?>(), Arg.Any<DateTimeOffset?>(),
+                Arg.Any<string?>(), Arg.Any<LedgerCategory?>(),
+                Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.LedgerEntryDto>());
         ShipTaskRecordRepository.GetAllInTimeWindowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Application.Interfaces.Repositories.ShipTaskRecordDto>());
         ApiEndpointUsageRecorder.GetTotalCallsAsync(Arg.Any<CancellationToken>())
@@ -347,6 +398,12 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .Returns(Array.Empty<SystemCacheModel>());
         WaypointRepository.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<string>());
+        AgentCreditsSampleRepository.GetRangeAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.CreditsSampleDto>());
+        MarketRepository.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.MarketSnapshot>());
+        MarketRepository.GetAllFreshnessAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.Interfaces.Repositories.MarketFreshnessRecord>());
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -422,6 +479,12 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IWaypointRepository>();
             services.AddScoped(_ => WaypointRepository);
+
+            services.RemoveAll<IAgentCreditsSampleRepository>();
+            services.AddScoped(_ => AgentCreditsSampleRepository);
+
+            services.RemoveAll<IMarketRepository>();
+            services.AddScoped(_ => MarketRepository);
 
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();

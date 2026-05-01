@@ -72,6 +72,16 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
         return snapshots;
     }
 
+    public async Task<IReadOnlyList<MarketFreshnessRecord>> GetAllFreshnessAsync(CancellationToken cancellationToken = default)
+    {
+        var markets = await db.Markets.AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return markets
+            .Select(m => new MarketFreshnessRecord(m.WaypointSymbol, m.SystemSymbol, m.LastObservedAt))
+            .ToList();
+    }
+
     private static MarketSnapshot? TryCreateSnapshot(CachedMarket market)
     {
         if (market.TradeGoodsJson is null)

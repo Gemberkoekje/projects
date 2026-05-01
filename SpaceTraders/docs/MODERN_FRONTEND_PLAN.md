@@ -436,14 +436,15 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Updated `UniversePage.tsx`: system dots are now clickable and navigate to `/systems/:symbol` (uses `useNavigate`).
 - ✅ Tests: `pages.test.tsx` extended with 7 tests (`SystemMapPage`: heading, loading state, breadcrumb + Universe link, SVG map rendered, waypoints table, jump-gate toggle button, side panel opens on row click). Total: 98 tests passing.
 
-### Phase 5 — strategy aids
+### Phase 5 — strategy aids ✅ *Implemented*
 
-- Trade-route heatmap (origin × destination matrix, coloured by realised margin/hour).
-- Decision attribution: top-N rejected alternatives shown per automation decision.
-- Contract ROI panel.
-- Market freshness map and rate-limit pressure overlay on time-series charts.
-- Anomaly badges (server-computed, pushed via SignalR): ship credits/hour drop, good price spike.
-- Annotation markers on charts (from operator-authored `AgentSetting` notes).
+- ✅ **Trade-route heatmap** — `GET /finance/trade-routes?runId=` aggregates `LedgerEntry` TradeBuy/TradeSell pairs per ship+good to produce (buyWaypoint × sellWaypoint × good) profit matrix; `FinancePage` renders a sortable table colour-coded by profit/hour.
+- ✅ **Decision attribution** — `GET /status/top-trade-routes?limit=` returns top-N `TradeOpportunityDto` scored candidates; `OverviewPage` renders a "Decision Candidates" panel marking the #1 route as "Selected by automation".
+- ✅ **Contract ROI panel** — `GET /contracts/{id}/roi` computes payout vs estimated fuel cost; `ContractsPage` implemented in full (list with status badges, deliverables progress bars, per-contract ROI card).
+- ✅ **Market freshness map** — `GET /markets/freshness` returns `(waypointSymbol, lastObservedAt, ageMinutes)` for all known markets; `MarketsPage` adds a "Last Scan" column colour-coded green/yellow/red by age.
+- ✅ **Anomaly badges** — `GET /status/anomalies` computes last-1h vs 24h average credits rate; `OverviewPage` shows a yellow warning card when `creditGrowthAnomaly` is true.
+- ✅ **Annotation markers** — `FinancePage` and `RunsPage` read `AgentSetting` rows with key prefix `Annotation.*`; the credits line charts render vertical dashed markers with labels at the annotation timestamps.
+- ✅ Backend: 5 new integration tests (38 API tests total). Frontend: 10 new unit tests (108 total).
 
 ### Phase 6 — retire `SpaceTraders.App`
 
