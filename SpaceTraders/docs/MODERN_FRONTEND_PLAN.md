@@ -354,11 +354,8 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Placeholder pages created for all routes: Overview, Fleet, Finance, Markets, Runs, Universe, Contracts, Activity, Health, Settings.
 - ✅ `src/App.tsx` — wraps `QueryClientProvider` → `ThemeProvider` → `SignalRProvider` → `BrowserRouter(basename="/spacetraders/dashboard")` → `AppShell`.
 - ✅ **Base-path alignment**: `vite.config.ts` sets `base: '/spacetraders/dashboard/'` so all built asset URLs are rooted there; `index.html` adds `<base href="/spacetraders/dashboard/">` as the first `<head>` element so `config.js` (and any other relative references) resolve correctly at any route depth; `BrowserRouter` uses the matching `basename`.
-- ✅ `k8s/nginx.conf` — nginx handles the sub-path internally via `rewrite ^/spacetraders/dashboard/(.*)$ /$1 break` rules; SPA fallback serves `index.html`; `/healthz` endpoint added for probes; no ingress prefix-stripping required.
-- ✅ `k8s/ingress.yaml` — removed `rewrite-target: /` annotation; routes updated: `/spacetraders/dashboard` → WebUI, `/spacetraders/api` → API, `/hubs` → API (for SignalR). Each backend receives the full unmodified request path.
-- ✅ `k8s/configmap.yaml` — added explicit `API_BASE_URL: "/spacetraders/api"` entry.
-- ✅ `k8s/deployment-webui.yaml` — liveness and readiness probes updated to `path: /healthz`.
-- ✅ `src/config.ts` — added `hubBaseUrl` (default `/hubs`) alongside `apiBaseUrl` and `dashboardApiKey`; `docker-entrypoint.sh` and `public/config.js` dev stub updated accordingly; `k8s/configmap.yaml` and `k8s/deployment-webui.yaml` include `HUB_BASE_URL`.
+- ✅ `nginx.conf` — nginx handles the sub-path internally via `rewrite ^/spacetraders/dashboard/(.*)$ /$1 break` rules; SPA fallback serves `index.html`; `/healthz` endpoint added for probes; no ingress prefix-stripping required.
+- ✅ `src/config.ts` — added `hubBaseUrl` (default `/hubs`) alongside `apiBaseUrl` and `dashboardApiKey`; `docker-entrypoint.sh` and `public/config.js` dev stub updated accordingly.
 - ✅ Tests: `App.test.tsx` updated (4 tests: top nav, sidebar presence, all 10 nav links, theme toggle); `apiFetch.test.ts` added (6 tests: header injection, URL construction, JSON parse, error throw, no Content-Type on GET, Content-Type on POST with body); `theme.test.tsx` added (7 tests: default light, DOM class, localStorage persist, read stored theme, toggle, system preference, outside-provider safety); `signalr.test.tsx` added (3 tests: renders children, exposes state, initial paused=true); `setup.ts` updated with class-based `HubConnectionBuilder` mock and `history.pushState` to base path. Total: 22 tests passing.
 
 **1c — core read views**
