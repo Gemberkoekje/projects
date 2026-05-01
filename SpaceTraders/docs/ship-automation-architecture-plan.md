@@ -368,7 +368,7 @@ DI: `FuelRecoveryShipPlanner` and `MaintenanceShipPlanner` are registered before
 Test-host stabilization (Phase 4 prerequisite) ✅
 - `SpaceTraders.API/Program.cs` now skips Postgres-backed startup work when `ASPNETCORE_ENVIRONMENT=Testing`: the database initializer call, `UseResourceSetupOnStartup()`, and the Wolverine Postgres persistence configuration are all gated. This unblocks `WebApplicationFactory<Program>` integration tests and the strict DI validation host so the full solution test suite is green.
 
-### Phase 5: Replace Chain Dispatch With Explicit Automation Events
+### Phase 5: Replace Chain Dispatch With Explicit Automation Events ✅ COMPLETE
 
 - Remove inheritance-based routing such as arrived events being dispatched as in-orbit events.
 - Keep events factual and explicit.
@@ -509,7 +509,7 @@ Implementation notes:
 - A small internal helper `ShipStateMismatchPublisher.PublishMismatchAndTickAsync` publishes both events together with `Reason = "StateMismatch:{CommandName}"`, used by every ship-owned command handler that previously published `ShipStateMismatchEvent`.
 - Phase65CommandHandlerTests covers representative docked + in-orbit mismatch paths (Dock, Orbit, Navigate, SellCargo, plus rejected accepted-result tests for the rest) verifying both events are published.
 
-### Phase 7: Remove Chain-of-Command Infrastructure
+### Phase 7: Remove Chain-of-Command Infrastructure ✅ COMPLETE
 
 The remaining cleanup spans many files (legacy chain types, bridge handler, derived events, command publishers, DI, tests, analyzer). To keep each step small, build-green, and reviewable, Phase 7 is split into seven subphases. Each subphase ends with a green build + full test run + a single commit.
 
@@ -609,16 +609,30 @@ Build is green and the full solution test suite passes — 381 passed, 4 pre-exi
 
 Build is green and the full solution test suite passes — 374 passed, 4 pre-existing sandbox integration tests skipped. Phase 7f is complete; all chain-of-command infrastructure files have been deleted, the DI registration removed, and the test suite updated with regression guards.
 
-#### Phase 7g — Update analyzer + final cleanup
+#### Phase 7g — Update analyzer + final cleanup ✅ COMPLETE
 
-- Update `SpaceTraders.Analyzers/StateTransitionEventOutsideCommandHandlerAnalyzer.cs` to drop:
-  - `IChainOfCommandEventHandler<T>` references in handler-allowance checks.
-  - `ChainOfCommandEvent` base-type checks.
-  - Naming rules tied to the removed top-level chain events.
-  - Replace with simple "state-transition events may only be constructed inside command handlers or test code" rules using the new flat event list (`ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`).
-- Update analyzer tests accordingly.
-- Run full solution build + full test run; fix any straggling references.
-- Update this plan to mark Phase 7 ✅ COMPLETE with a summary, then commit.
+- `SpaceTraders.Analyzers/StateTransitionEventOutsideCommandHandlerAnalyzer.cs` updated:
+  - Removed `ST0002` (`TopLevelHandlerRule`): checked that chain handlers target top-level `ChainOfCommandEvent` subtypes — no longer applicable; `IChainOfCommandEventHandler<T>` and `ChainOfCommandEvent` are deleted.
+  - Removed `ST0003` (`NonChainOfCommandHandlerRule`): required all ship event handlers to implement `IChainOfCommandEventHandler<T>` — no longer applicable.
+  - Removed `ST0004` (`HandlerNamingConventionRule`): enforced `ShipDocked[Role]EventHandler` naming tied to the chain dispatch model — no longer applicable.
+  - Kept `ST0001` (Rule) and updated the `StateTransitionEvents` flat set to the full set of plain factual ship state records: `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`.
+  - Removed the legacy path filter that restricted checks to `Events\Handlers` / `EventHandlers` directories; the rule now applies to all `SpaceTraders.Application.*` code.
+  - Updated the allowed-origins check: any class in the `SpaceTraders.Application.Commands.*` namespace (handlers, publishers, helpers) is permitted to construct these events; test code (namespace containing `Tests`) is also excluded from the rule.
+  - Removed all chain-related helper methods and data (`IsChainEvent`, `IsDirectlyDerivedFromChainOfCommandEvent`, `MatchesNamingConvention`, `ClassNameIndicatesEventHandler`, `TopLevelEventNameMap`, `AnalyzeNamedType`, `AnalyzeCompilation`).
+- No analyzer-specific unit test project exists; the rule is exercised at compile time across the solution. Build is green and no new ST0001 violations were introduced.
+- Full solution test suite: **374 passed**, 4 pre-existing sandbox integration tests skipped.
+
+### Phase 7 ✅ COMPLETE
+
+All seven subphases of Phase 7 are now done. Summary of what was removed:
+
+- **Chain infrastructure deleted**: `ChainOfCommandEvent`, `IChainOfCommandEventHandler<T>`, `ChainOfCommandHandlerResult`, `IChainOfCommandDispatcher`, `ChainOfCommandDispatcher`, `ChainOfCommandDispatchResult`, `ChainOfCommandBridgeHandler`.
+- **Routing-only derived events deleted**: `ShipArrivedEvent`, `ShipUndockedEvent`, `ShipIdleDockedEvent`, `ShipRefueledEvent`, `ShipRoleSetEvent`, `ShipAssignmentTypeSetEvent`, `ShipContractDockedEvent`.
+- **All chain handler classes deleted**: every `Ship*EventHandler` that implemented `IChainOfCommandEventHandler<T>`.
+- **Plain factual events decoupled**: `ShipDockedEvent`, `ShipInOrbitEvent`, `ShipInTransitEvent`, `ShipStateMismatchEvent`, `ConstructionSuppliedEvent` are now plain sealed records with no shared base type.
+- **`ShipAutomationTickEvent`** is the sole automation entry point, handled by `ShipAutomationTickEventHandler` → `IShipPlannerService`.
+- **`ShipInTransitEventHandler`** is the only remaining ship event handler; it is a plain Wolverine handler whose sole job is to schedule or publish `ShipAutomationTickEvent`.
+- **Analyzer cleaned up**: `StateTransitionEventOutsideCommandHandlerAnalyzer` retains only `ST0001`, updated for the flat event list and simplified allowed-origins logic.
 
 ## Testing Strategy
 
