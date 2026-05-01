@@ -1,5 +1,6 @@
 import {
   Activity,
+  Database,
   FileText,
   Globe,
   HeartPulse,
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/universe', label: 'Universe', Icon: Globe },
   { path: '/contracts', label: 'Contracts', Icon: FileText },
   { path: '/activity', label: 'Activity', Icon: Activity },
+  { path: '/snapshots', label: 'Snapshots', Icon: Database },
   { path: '/health', label: 'Health', Icon: HeartPulse },
   { path: '/settings', label: 'Settings', Icon: Settings },
 ]

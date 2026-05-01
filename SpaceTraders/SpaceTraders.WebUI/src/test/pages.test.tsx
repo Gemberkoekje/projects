@@ -478,6 +478,56 @@ describe('SettingsPage', () => {
   })
 })
 
+// ─── SnapshotsPage ───────────────────────────────────────────────────────────
+
+import SnapshotsPage from '../pages/SnapshotsPage'
+
+describe('SnapshotsPage', () => {
+  it('renders the heading', () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <SnapshotsPage />
+      </Wrapper>,
+    )
+    expect(screen.getByRole('heading', { name: 'Snapshots' })).toBeInTheDocument()
+  })
+
+  it('renders empty state when no snapshots are returned', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <SnapshotsPage />
+      </Wrapper>,
+    )
+
+    await waitFor(() => expect(screen.getByText('No snapshots found.')).toBeInTheDocument())
+  })
+
+  it('renders snapshot rows when data loads', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/startup-snapshots')
+        return Promise.resolve([
+          {
+            id: 42,
+            capturedAt: new Date().toISOString(),
+            isInitialSnapshot: true,
+          },
+        ])
+      return Promise.resolve([])
+    })
+
+    render(
+      <Wrapper>
+        <SnapshotsPage />
+      </Wrapper>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Initial')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Download JSON' })).toBeInTheDocument()
+  })
+})
+
 // ─── ShipDetailPage ───────────────────────────────────────────────────────────
 
 import ShipDetailPage from '../pages/ShipDetailPage'

@@ -66,26 +66,37 @@ public sealed class AgentBootstrapService(
             return false;
         }
 
-        if (!await IsTokenValidAsync(token, cancellationToken))
+        var validation = await ValidateTokenAsync(token, cancellationToken);
+        if (!validation.IsValid)
         {
+            if (validation.IsResetMismatch)
+            {
+                _logger.LogWarning(
+                    "{Source} agent token is no longer valid after a SpaceTraders reset; registering a new agent.",
+                    source);
+
+                await SetTokenResetMismatchRuntimeFlagAsync(cancellationToken);
+
+                await using var scope = _serviceScopeFactory.CreateAsyncScope();
+                var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
+                await bus.PublishAsync(new TokenResetMismatchDetectedEvent(source));
+                return false;
+            }
+
             _logger.LogWarning(
-                "{Source} agent token is no longer valid after a SpaceTraders reset; registering a new agent.",
-                source);
-
-            await SetTokenResetMismatchRuntimeFlagAsync(cancellationToken);
-
-            await using var scope = _serviceScopeFactory.CreateAsyncScope();
-            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-            await bus.PublishAsync(new TokenResetMismatchDetectedEvent(source));
+                "{Source} agent token belongs to agent {ActualAgentName}, but SpaceTraders:AgentName is {ConfiguredAgentName}; registering a new agent.",
+                source,
+                validation.AgentSymbol,
+                _options.AgentName);
             return false;
         }
 
         await BootstrapWithTokenAsync(token, cancellationToken);
-        _logger.LogInformation("Loaded {Source} agent token.", source);
+        _logger.LogInformation("Loaded {Source} agent token for agent {AgentSymbol}.", source, validation.AgentSymbol);
         return true;
     }
 
-    private async Task<bool> IsTokenValidAsync(string token, CancellationToken cancellationToken)
+    private async Task<TokenValidationResult> ValidateTokenAsync(string token, CancellationToken cancellationToken)
     {
         _agentTokenProvider.Set(token);
 
@@ -94,12 +105,20 @@ public sealed class AgentBootstrapService(
 
         try
         {
-            await apiClient.GetMyAgentAsync(cancellationToken);
-            return true;
+            var agent = await apiClient.GetMyAgentAsync(cancellationToken);
+            var configuredAgentName = _options.AgentName ?? string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(configuredAgentName)
+                && !string.Equals(agent.Symbol, configuredAgentName, StringComparison.OrdinalIgnoreCase))
+            {
+                return TokenValidationResult.AgentNameMismatch(agent.Symbol);
+            }
+
+            return TokenValidationResult.Valid(agent.Symbol);
         }
         catch (SpaceTradersApiException exception) when (IsTokenResetDateMismatch(exception))
         {
-            return false;
+            return TokenValidationResult.ResetMismatch();
         }
     }
 
@@ -300,5 +319,14 @@ public sealed class AgentBootstrapService(
         _agentTokenProvider.Set(registration.Token);
 
         _logger.LogInformation("Registered new SpaceTraders agent {AgentSymbol}.", registration.Agent.Symbol);
+    }
+
+    private readonly record struct TokenValidationResult(bool IsValid, bool IsResetMismatch, string AgentSymbol)
+    {
+        public static TokenValidationResult Valid(string agentSymbol) => new(true, false, agentSymbol);
+
+        public static TokenValidationResult ResetMismatch() => new(false, true, string.Empty);
+
+        public static TokenValidationResult AgentNameMismatch(string agentSymbol) => new(false, false, agentSymbol);
     }
 }

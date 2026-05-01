@@ -12,6 +12,7 @@ import UniversePage from '@/pages/UniversePage'
 import SystemMapPage from '@/pages/SystemMapPage'
 import ContractsPage from '@/pages/ContractsPage'
 import ActivityPage from '@/pages/ActivityPage'
+import SnapshotsPage from '@/pages/SnapshotsPage'
 import HealthPage from '@/pages/HealthPage'
 import SettingsPage from '@/pages/SettingsPage'
 
@@ -36,6 +37,7 @@ export function AppShell() {
             <Route path="/systems/:symbol" element={<SystemMapPage />} />
             <Route path="/contracts" element={<ContractsPage />} />
             <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/snapshots" element={<SnapshotsPage />} />
             <Route path="/health" element={<HealthPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

@@ -203,11 +203,11 @@ public sealed class StartupSyncService(
         {
             var isSystemCached = await dbContext.Systems
                 .AsNoTracking()
-                .AnyAsync(s => s.Symbol == systemSymbol, cancellationToken);
+                .AnyAsync(s => s.AgentToken == dbContext.AgentToken && s.Symbol == systemSymbol, cancellationToken);
 
             var hasWaypointsCached = await dbContext.Waypoints
                 .AsNoTracking()
-                .AnyAsync(w => w.SystemSymbol == systemSymbol, cancellationToken);
+                .AnyAsync(w => w.AgentToken == dbContext.AgentToken && w.SystemSymbol == systemSymbol, cancellationToken);
 
             if (!isSystemCached)
             {

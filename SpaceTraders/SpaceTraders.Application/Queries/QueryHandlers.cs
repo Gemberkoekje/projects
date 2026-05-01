@@ -77,6 +77,17 @@ public sealed record GetActivityLogQuery
     }
 }
 
+public sealed class GetActivityLogQueryHandler(IActivityLogRepository activityLogs)
+{
+    public async Task<IReadOnlyList<ActivityLogDto>> Handle(GetActivityLogQuery query, CancellationToken cancellationToken)
+    {
+        var page = query.Page < 1 ? 1 : query.Page;
+        var pageSize = query.PageSize < 1 ? 50 : query.PageSize;
+
+        return await activityLogs.GetPagedAsync(page, pageSize, query.ShipFilter, cancellationToken);
+    }
+}
+
 public sealed record GetBestTradeRouteQuery
 {
     public required int CargoCapacity { get; init; }

@@ -23,6 +23,7 @@ describe('App', () => {
       'Universe',
       'Contracts',
       'Activity',
+      'Snapshots',
       'Health',
       'Settings',
     ]

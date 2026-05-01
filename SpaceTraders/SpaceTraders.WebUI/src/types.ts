@@ -259,24 +259,18 @@ export interface WaypointTraitDto {
   description: string
 }
 
-export interface WaypointDto {
-  symbol: string
-  systemSymbol: string
-  type: string
-  x: number
-  y: number
-  hasMarket: boolean
-  hasShipyard: boolean
-  traitsJson: string | null
-  orbitalsJson: string | null
-  parentSymbol: string | null
-  isUnderConstruction: boolean
-  lastObservedAt: string
+export interface StartupSnapshotListItemDto {
+  id: number
+  capturedAt: string
+  isInitialSnapshot: boolean
 }
 
-export interface SystemMapResponseDto {
-  system: SystemDto
-  waypoints: WaypointDto[]
+export interface ContractRoiDto {
+  contractId: string
+  totalPayout: number
+  estimatedFuelCost: number
+  netRoi: number
+  isProfitable: boolean
 }
 
 export interface TradeRouteDto {
@@ -289,14 +283,6 @@ export interface TradeRouteDto {
   profitPerHour: number
 }
 
-export interface ContractRoiDto {
-  contractId: string
-  totalPayout: number
-  estimatedFuelCost: number
-  netRoi: number
-  isProfitable: boolean
-}
-
 export interface MarketFreshnessDto {
   waypointSymbol: string
   systemSymbol: string
@@ -304,17 +290,29 @@ export interface MarketFreshnessDto {
   ageMinutes: number
 }
 
-export interface PriceAnomalyDto {
-  good: string
-  waypoint: string
-  currentPrice: number
-  avgPrice: number
-  changePercent: number
-}
-
 export interface AnomalyDto {
   creditGrowthAnomaly: boolean
   recentCreditRatePerHour: number
   avgCreditRatePerHour: number
-  priceAnomalies: PriceAnomalyDto[]
+  priceAnomalies: unknown[]
+}
+
+export interface WaypointDto {
+  symbol: string
+  systemSymbol: string
+  type: string
+  x: number
+  y: number
+  traitsJson: string | null
+  orbitalsJson: string | null
+  parentSymbol: string | null
+  hasMarket: boolean
+  hasShipyard: boolean
+  isUnderConstruction: boolean
+  lastObservedAt: string
+}
+
+export interface SystemMapResponseDto {
+  system: SystemDto
+  waypoints: WaypointDto[]
 }

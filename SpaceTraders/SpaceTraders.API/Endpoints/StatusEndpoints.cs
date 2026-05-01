@@ -1,5 +1,8 @@
+using System.Text;
+using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
+using SpaceTraders.Infrastructure.Persistence;
 using Wolverine;
 
 namespace SpaceTraders.API.Endpoints;
@@ -53,6 +56,48 @@ public static class StatusEndpoints
         {
             var result = await bus.InvokeAsync<Application.DTOs.TradeOpportunityDto?>(new GetBestTradeRouteQuery(int.MaxValue), ct);
             return result is null ? Results.NoContent() : Results.Ok(result);
+        });
+
+        group.MapGet("/startup-snapshots", async (SpaceTradersDbContext db, CancellationToken ct) =>
+        {
+            var snapshots = await db.StartupSnapshots
+                .AsNoTracking()
+                .Where(s => s.AgentToken == db.AgentToken)
+                .OrderByDescending(s => s.CapturedAt)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.CapturedAt,
+                    s.IsInitialSnapshot,
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(snapshots);
+        });
+
+        group.MapGet("/startup-snapshots/{id:int}/download", async (int id, SpaceTradersDbContext db, CancellationToken ct) =>
+        {
+            var snapshot = await db.StartupSnapshots
+                .AsNoTracking()
+                .Where(s => s.AgentToken == db.AgentToken && s.Id == id)
+                .Select(s => new
+                {
+                    s.SnapshotJson,
+                    s.CapturedAt,
+                    s.IsInitialSnapshot,
+                })
+                .SingleOrDefaultAsync(ct);
+
+            if (snapshot is null)
+            {
+                return Results.NotFound();
+            }
+
+            var capturedAt = snapshot.CapturedAt.UtcDateTime.ToString("yyyyMMdd-HHmmss");
+            var initialSuffix = snapshot.IsInitialSnapshot ? "-initial" : string.Empty;
+            var fileName = $"startup-snapshot-{id}-{capturedAt}{initialSuffix}.json";
+
+            return Results.File(Encoding.UTF8.GetBytes(snapshot.SnapshotJson), "application/json", fileName);
         });
 
         group.MapGet("/system-alerts", async (ISettingsRepository settings, CancellationToken ct) =>

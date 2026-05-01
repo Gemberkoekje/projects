@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
@@ -49,89 +50,118 @@ public sealed class StartupSnapshotService(
         await using var scope = serviceScopeFactory.CreateAsyncScope();
         var apiClient = scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>();
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
+        var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
 
-        var isInitial = !await dbContext.StartupSnapshots
-            .AsNoTracking()
-            .AnyAsync(s => s.AgentToken == dbContext.AgentToken, cancellationToken);
-
-        var agent = await apiClient.GetMyAgentAsync(cancellationToken);
-        var ships = await FetchAllShipsAsync(apiClient, cancellationToken);
-
-        var systemSymbols = ships
-            .Select(s => s.Nav?.SystemSymbol)
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Cast<string>()
-            .ToList();
-
-        var systemSnapshots = new List<SystemSnapshotData>();
-        foreach (var systemSymbol in systemSymbols)
+        var wasAutomationEnabled = await settings.GetAsync<bool>("Automation.Enabled", cancellationToken) == true;
+        if (wasAutomationEnabled)
         {
-            var systemInfo = await apiClient.GetSystemAsync(systemSymbol, cancellationToken);
-            var waypoints = await FetchAllWaypointsAsync(apiClient, systemSymbol, cancellationToken);
-
-            var waypointSnapshots = new List<WaypointSnapshotData>();
-            foreach (var waypoint in waypoints)
-            {
-                var hasMarket = waypoint.Traits?.Any(t => t.Symbol == "MARKETPLACE") == true;
-                var hasShipyard = waypoint.Traits?.Any(t => t.Symbol == "SHIPYARD") == true;
-
-                Market? market = null;
-                Shipyard? shipyard = null;
-
-                if (hasMarket)
-                {
-                    try
-                    {
-                        market = await apiClient.GetMarketAsync(systemSymbol, waypoint.Symbol, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Could not fetch market data for waypoint {Waypoint}.", waypoint.Symbol);
-                    }
-                }
-
-                if (hasShipyard)
-                {
-                    try
-                    {
-                        shipyard = await apiClient.GetShipyardAsync(systemSymbol, waypoint.Symbol, cancellationToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {Waypoint}.", waypoint.Symbol);
-                    }
-                }
-
-                waypointSnapshots.Add(new WaypointSnapshotData(waypoint, market, shipyard));
-            }
-
-            systemSnapshots.Add(new SystemSnapshotData(systemInfo, waypointSnapshots));
+            await settings.SetAsync("Automation.Enabled", "false", cancellationToken);
+            logger.LogInformation("Automation paused for startup snapshot.");
         }
 
-        var snapshot = new GameStateSnapshotData(
-            CapturedAt: TimeProvider.System.GetUtcNow(),
-            Agent: agent,
-            Ships: ships,
-            Systems: systemSnapshots);
-
-        var json = JsonSerializer.Serialize(snapshot, SerializerOptions);
-
-        dbContext.StartupSnapshots.Add(new StartupSnapshot
+        try
         {
-            AgentToken = dbContext.AgentToken,
-            SnapshotJson = json,
-            CapturedAt = snapshot.CapturedAt,
-            IsInitialSnapshot = isInitial,
-        });
+            var isInitial = !await dbContext.StartupSnapshots
+                .AsNoTracking()
+                .AnyAsync(s => s.AgentToken == dbContext.AgentToken, cancellationToken);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+            var agent = await apiClient.GetMyAgentAsync(cancellationToken);
+            var ships = await FetchAllShipsAsync(apiClient, cancellationToken);
 
-        logger.LogInformation(
-            "Startup snapshot saved (initial: {IsInitial}, ships: {ShipCount}, systems: {SystemCount}).",
-            isInitial,
-            ships.Count,
-            systemSnapshots.Count);
+            var dockedWaypointSymbols = ships
+                .Where(s => s.Nav is not null
+                    && !string.Equals(s.Nav.Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(s.Nav.WaypointSymbol))
+                .Select(s => s.Nav!.WaypointSymbol)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var systemSymbols = ships
+                .Select(s => s.Nav?.SystemSymbol)
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Cast<string>()
+                .ToList();
+
+            var systemSnapshots = new List<SystemSnapshotData>();
+            foreach (var systemSymbol in systemSymbols)
+            {
+                var systemInfo = await apiClient.GetSystemAsync(systemSymbol, cancellationToken);
+                var waypoints = await FetchAllWaypointsAsync(apiClient, systemSymbol, cancellationToken);
+
+                var waypointSnapshots = new List<WaypointSnapshotData>();
+                foreach (var waypoint in waypoints)
+                {
+                    Market? market = null;
+                    Shipyard? shipyard = null;
+
+                    if (dockedWaypointSymbols.Contains(waypoint.Symbol))
+                    {
+                        var hasMarket = waypoint.Traits?.Any(t => t.Symbol == "MARKETPLACE") == true;
+                        var hasShipyard = waypoint.Traits?.Any(t => t.Symbol == "SHIPYARD") == true;
+
+                        if (hasMarket)
+                        {
+                            try
+                            {
+                                market = await apiClient.GetMarketAsync(systemSymbol, waypoint.Symbol, cancellationToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogWarning(ex, "Could not fetch market data for waypoint {Waypoint}.", waypoint.Symbol);
+                            }
+                        }
+
+                        if (hasShipyard)
+                        {
+                            try
+                            {
+                                shipyard = await apiClient.GetShipyardAsync(systemSymbol, waypoint.Symbol, cancellationToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogWarning(ex, "Could not fetch shipyard data for waypoint {Waypoint}.", waypoint.Symbol);
+                            }
+                        }
+                    }
+
+                    waypointSnapshots.Add(new WaypointSnapshotData(waypoint, market, shipyard));
+                }
+
+                systemSnapshots.Add(new SystemSnapshotData(systemInfo, waypointSnapshots));
+            }
+
+            var snapshot = new GameStateSnapshotData(
+                CapturedAt: TimeProvider.System.GetUtcNow(),
+                Agent: agent,
+                Ships: ships,
+                Systems: systemSnapshots);
+
+            var json = JsonSerializer.Serialize(snapshot, SerializerOptions);
+
+            dbContext.StartupSnapshots.Add(new StartupSnapshot
+            {
+                AgentToken = dbContext.AgentToken,
+                SnapshotJson = json,
+                CapturedAt = snapshot.CapturedAt,
+                IsInitialSnapshot = isInitial,
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Startup snapshot saved (initial: {IsInitial}, ships: {ShipCount}, systems: {SystemCount}).",
+                isInitial,
+                ships.Count,
+                systemSnapshots.Count);
+        }
+        finally
+        {
+            if (wasAutomationEnabled)
+            {
+                await settings.SetAsync("Automation.Enabled", "true", cancellationToken);
+                logger.LogInformation("Automation resumed after startup snapshot.");
+            }
+        }
     }
 
     private static async Task<List<Infrastructure.SpaceTradersAPI.Models.Fleet.Ship>> FetchAllShipsAsync(

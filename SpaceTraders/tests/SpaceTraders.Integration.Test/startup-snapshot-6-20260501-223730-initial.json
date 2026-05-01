@@ -1,0 +1,3321 @@
+{
+  "CapturedAt": "2026-05-01T22:37:30.8735524+00:00",
+  "Agent": {
+    "accountId": "cmi76lja3003ftm165xcti8kd",
+    "symbol": "SPECTERDEBUG3",
+    "headquarters": "X1-BQ60-A1",
+    "credits": 176394,
+    "startingFaction": "COBALT",
+    "shipCount": 2
+  },
+  "Ships": [
+    {
+      "symbol": "SPECTERDEBUG3-1",
+      "registration": {
+        "role": "COMMAND"
+      },
+      "nav": {
+        "systemSymbol": "X1-BQ60",
+        "waypointSymbol": "X1-BQ60-A1",
+        "status": "DOCKED",
+        "flightMode": "CRUISE",
+        "route": {
+          "arrival": "2026-05-01T22:36:30.989+00:00",
+          "departureTime": "2026-05-01T22:36:30.989+00:00",
+          "origin": {
+            "symbol": "X1-BQ60-A1",
+            "systemSymbol": "X1-BQ60"
+          },
+          "destination": {
+            "symbol": "X1-BQ60-A1",
+            "systemSymbol": "X1-BQ60"
+          }
+        }
+      },
+      "crew": {
+        "current": 57,
+        "capacity": 80
+      },
+      "fuel": {
+        "current": 400,
+        "capacity": 400
+      },
+      "cargo": {
+        "units": 0,
+        "capacity": 40,
+        "inventory": []
+      },
+      "mounts": [
+        {
+          "symbol": "MOUNT_SENSOR_ARRAY_II",
+          "name": "Sensor Array II",
+          "description": "An advanced sensor array that improves a ship\u0027s ability to detect and track other objects in space with greater accuracy and range.",
+          "strength": 4,
+          "requirements": {
+            "power": 2,
+            "crew": 2
+          }
+        },
+        {
+          "symbol": "MOUNT_GAS_SIPHON_II",
+          "name": "Gas Siphon II",
+          "description": "An advanced gas siphon that can extract gas and other resources from gas giants and other gas-rich bodies more efficiently and at a higher rate.",
+          "strength": 20,
+          "requirements": {
+            "power": 2,
+            "crew": 2
+          }
+        },
+        {
+          "symbol": "MOUNT_MINING_LASER_II",
+          "name": "Mining Laser II",
+          "description": "An advanced mining laser that is more efficient and effective at extracting valuable minerals from asteroids and other space objects.",
+          "strength": 5,
+          "requirements": {
+            "power": 2,
+            "crew": 2
+          }
+        },
+        {
+          "symbol": "MOUNT_SURVEYOR_II",
+          "name": "Surveyor II",
+          "description": "An advanced survey probe that can be used to gather information about a mineral deposit with greater accuracy.",
+          "strength": 2,
+          "deposits": [
+            "QUARTZ_SAND",
+            "SILICON_CRYSTALS",
+            "PRECIOUS_STONES",
+            "ICE_WATER",
+            "AMMONIA_ICE",
+            "IRON_ORE",
+            "COPPER_ORE",
+            "SILVER_ORE",
+            "ALUMINUM_ORE",
+            "GOLD_ORE",
+            "PLATINUM_ORE",
+            "DIAMONDS",
+            "URANITE_ORE"
+          ],
+          "requirements": {
+            "power": 3,
+            "crew": 4
+          }
+        }
+      ],
+      "modules": [
+        {
+          "symbol": "MODULE_CARGO_HOLD_II",
+          "name": "Expanded Cargo Hold",
+          "description": "An expanded cargo hold module that provides more efficient storage space for a ship\u0027s cargo.",
+          "capacity": 40,
+          "requirements": {
+            "power": 2,
+            "crew": 2,
+            "slots": 2
+          }
+        },
+        {
+          "symbol": "MODULE_CREW_QUARTERS_I",
+          "name": "Crew Quarters",
+          "description": "A module that provides living space and amenities for the crew.",
+          "capacity": 40,
+          "requirements": {
+            "power": 1,
+            "crew": 2,
+            "slots": 1
+          }
+        },
+        {
+          "symbol": "MODULE_CREW_QUARTERS_I",
+          "name": "Crew Quarters",
+          "description": "A module that provides living space and amenities for the crew.",
+          "capacity": 40,
+          "requirements": {
+            "power": 1,
+            "crew": 2,
+            "slots": 1
+          }
+        },
+        {
+          "symbol": "MODULE_MINERAL_PROCESSOR_I",
+          "name": "Mineral Processor",
+          "description": "Crushes and processes extracted minerals and ores into their component parts, filters out impurities, and containerizes them into raw storage units.",
+          "requirements": {
+            "power": 1,
+            "crew": 0,
+            "slots": 2
+          }
+        },
+        {
+          "symbol": "MODULE_GAS_PROCESSOR_I",
+          "name": "Gas Processor",
+          "description": "Filters and processes extracted gases into their component parts, filters out impurities, and containerizes them into raw storage units.",
+          "requirements": {
+            "power": 1,
+            "crew": 0,
+            "slots": 2
+          }
+        }
+      ],
+      "frame": {
+        "symbol": "FRAME_FRIGATE",
+        "name": "Frigate",
+        "description": "A medium-sized, multi-purpose spacecraft, often used for combat, transport, or support operations.",
+        "condition": 1,
+        "integrity": 1,
+        "moduleSlots": 8,
+        "mountingPoints": 5,
+        "fuelCapacity": 400,
+        "requirements": {
+          "power": 8,
+          "crew": 25
+        }
+      },
+      "reactor": {
+        "symbol": "REACTOR_FISSION_I",
+        "name": "Fission Reactor I",
+        "description": "A basic fission power reactor, used to generate electricity from nuclear fission reactions.",
+        "condition": 1,
+        "integrity": 1,
+        "powerOutput": 31,
+        "requirements": {
+          "crew": 8
+        }
+      },
+      "engine": {
+        "symbol": "ENGINE_ION_DRIVE_II",
+        "name": "Ion Drive II",
+        "description": "An advanced propulsion system that uses ionized particles to generate high-speed, low-thrust acceleration, with improved efficiency and performance.",
+        "condition": 1,
+        "integrity": 1,
+        "speed": 36,
+        "requirements": {
+          "power": 6,
+          "crew": 8
+        }
+      },
+      "cooldown": {
+        "totalSeconds": 0,
+        "remainingSeconds": 0
+      }
+    },
+    {
+      "symbol": "SPECTERDEBUG3-2",
+      "registration": {
+        "role": "SATELLITE"
+      },
+      "nav": {
+        "systemSymbol": "X1-BQ60",
+        "waypointSymbol": "X1-BQ60-H62",
+        "status": "DOCKED",
+        "flightMode": "CRUISE",
+        "route": {
+          "arrival": "2026-05-01T22:36:30.997+00:00",
+          "departureTime": "2026-05-01T22:36:30.997+00:00",
+          "origin": {
+            "symbol": "X1-BQ60-H62",
+            "systemSymbol": "X1-BQ60"
+          },
+          "destination": {
+            "symbol": "X1-BQ60-H62",
+            "systemSymbol": "X1-BQ60"
+          }
+        }
+      },
+      "crew": {
+        "current": 0,
+        "capacity": 0
+      },
+      "fuel": {
+        "current": 0,
+        "capacity": 0
+      },
+      "cargo": {
+        "units": 0,
+        "capacity": 0,
+        "inventory": []
+      },
+      "mounts": [],
+      "modules": [],
+      "frame": {
+        "symbol": "FRAME_PROBE",
+        "name": "Probe",
+        "description": "A small, unmanned spacecraft used for exploration, reconnaissance, and scientific research.",
+        "condition": 1,
+        "integrity": 1,
+        "moduleSlots": 0,
+        "mountingPoints": 0,
+        "fuelCapacity": 0,
+        "requirements": {
+          "power": 1,
+          "crew": 0
+        }
+      },
+      "reactor": {
+        "symbol": "REACTOR_SOLAR_I",
+        "name": "Solar Reactor I",
+        "description": "A basic solar power reactor, used to generate electricity from solar energy.",
+        "condition": 1,
+        "integrity": 1,
+        "powerOutput": 3,
+        "requirements": {
+          "crew": 0
+        }
+      },
+      "engine": {
+        "symbol": "ENGINE_IMPULSE_DRIVE_I",
+        "name": "Impulse Drive I",
+        "description": "A basic low-energy propulsion system that generates thrust for interplanetary travel.",
+        "condition": 1,
+        "integrity": 1,
+        "speed": 9,
+        "requirements": {
+          "power": 1,
+          "crew": 0
+        }
+      },
+      "cooldown": {
+        "totalSeconds": 0,
+        "remainingSeconds": 0
+      }
+    }
+  ],
+  "Systems": [
+    {
+      "System": {
+        "symbol": "X1-BQ60",
+        "sectorSymbol": "X1",
+        "type": "RED_STAR",
+        "x": -39099,
+        "y": -11421
+      },
+      "Waypoints": [
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-A1",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": 17,
+            "y": 18,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-A2"
+              },
+              {
+                "symbol": "X1-BQ60-A3"
+              },
+              {
+                "symbol": "X1-BQ60-A4"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "SWAMP"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "FOSSILS"
+              },
+              {
+                "symbol": "MAGMA_SEAS"
+              },
+              {
+                "symbol": "PERPETUAL_OVERCAST"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-A1",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          },
+          "Market": {
+            "symbol": "X1-BQ60-A1",
+            "exports": [],
+            "imports": [
+              {
+                "symbol": "FOOD"
+              },
+              {
+                "symbol": "MEDICINE"
+              },
+              {
+                "symbol": "CLOTHING"
+              },
+              {
+                "symbol": "EQUIPMENT"
+              },
+              {
+                "symbol": "JEWELRY"
+              },
+              {
+                "symbol": "EXOTIC_MATTER"
+              }
+            ],
+            "exchange": [
+              {
+                "symbol": "FUEL"
+              }
+            ],
+            "tradeGoods": [
+              {
+                "symbol": "FOOD",
+                "type": "IMPORT",
+                "tradeVolume": 60,
+                "supply": "LIMITED",
+                "activity": "WEAK",
+                "purchasePrice": 4362,
+                "sellPrice": 2123
+              },
+              {
+                "symbol": "MEDICINE",
+                "type": "IMPORT",
+                "tradeVolume": 20,
+                "supply": "MODERATE",
+                "activity": "WEAK",
+                "purchasePrice": 9436,
+                "sellPrice": 4491
+              },
+              {
+                "symbol": "CLOTHING",
+                "type": "IMPORT",
+                "tradeVolume": 20,
+                "supply": "MODERATE",
+                "activity": "WEAK",
+                "purchasePrice": 9546,
+                "sellPrice": 4582
+              },
+              {
+                "symbol": "EQUIPMENT",
+                "type": "IMPORT",
+                "tradeVolume": 20,
+                "supply": "LIMITED",
+                "activity": "WEAK",
+                "purchasePrice": 6664,
+                "sellPrice": 3231
+              },
+              {
+                "symbol": "JEWELRY",
+                "type": "IMPORT",
+                "tradeVolume": 20,
+                "supply": "MODERATE",
+                "activity": "WEAK",
+                "purchasePrice": 6192,
+                "sellPrice": 2905
+              },
+              {
+                "symbol": "EXOTIC_MATTER",
+                "type": "IMPORT",
+                "tradeVolume": 6,
+                "supply": "SCARCE",
+                "activity": "WEAK",
+                "purchasePrice": 71512,
+                "sellPrice": 35700
+              },
+              {
+                "symbol": "FUEL",
+                "type": "EXCHANGE",
+                "tradeVolume": 180,
+                "supply": "MODERATE",
+                "purchasePrice": 72,
+                "sellPrice": 68
+              }
+            ]
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-DB5E",
+            "type": "ENGINEERED_ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -9,
+            "y": 24,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "STRIPPED"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-DB5E",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B6",
+            "type": "FUEL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": 182,
+            "y": 53,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B6",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B7",
+            "type": "ASTEROID_BASE",
+            "systemSymbol": "X1-BQ60",
+            "x": 225,
+            "y": 262,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B7",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B8",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -50,
+            "y": 350,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B8",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B9",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 57,
+            "y": 360,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B9",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B10",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -43,
+            "y": 337,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B10",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B11",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 40,
+            "y": 328,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B11",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B12",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -167,
+            "y": 269,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B12",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B13",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -129,
+            "y": 357,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B13",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B14",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -308,
+            "y": 163,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B14",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B15",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -215,
+            "y": 238,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B15",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B16",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -306,
+            "y": 180,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B16",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B17",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -237,
+            "y": 216,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B17",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B18",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -206,
+            "y": 299,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B18",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B19",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -324,
+            "y": 65,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B19",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B20",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -285,
+            "y": -138,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "UNSTABLE_COMPOSITION"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B20",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B21",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -354,
+            "y": -146,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "RARE_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B21",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B22",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -274,
+            "y": -270,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B22",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B23",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -294,
+            "y": -92,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B23",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B24",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -220,
+            "y": -224,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "PRECIOUS_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B24",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B25",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -223,
+            "y": -264,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B25",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B26",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -184,
+            "y": -293,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B26",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B27",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -75,
+            "y": -338,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              },
+              {
+                "symbol": "MICRO_GRAVITY_ANOMALIES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B27",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B28",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -80,
+            "y": -320,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B28",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B29",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 139,
+            "y": -333,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B29",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B30",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 252,
+            "y": -229,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B30",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B31",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 213,
+            "y": -326,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B31",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B32",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 326,
+            "y": -26,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B32",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B33",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 305,
+            "y": -100,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B33",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B34",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 289,
+            "y": -161,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B34",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B35",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 374,
+            "y": -81,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B35",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B36",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 333,
+            "y": -43,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B36",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B37",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 350,
+            "y": -47,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B37",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B38",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 356,
+            "y": 42,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B38",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B39",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 298,
+            "y": 138,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B39",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B40",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 309,
+            "y": 200,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B40",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B41",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 227,
+            "y": 292,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "UNSTABLE_COMPOSITION"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B41",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-B42",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 168,
+            "y": 307,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "PRECIOUS_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-B42",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-C43",
+            "type": "GAS_GIANT",
+            "systemSymbol": "X1-BQ60",
+            "x": -86,
+            "y": -128,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-C44"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "VIBRANT_AURORAS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-C43",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-C45",
+            "type": "FUEL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": -64,
+            "y": -95,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-C45",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-D46",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": -74,
+            "y": 38,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-D47"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "FOSSILS"
+              },
+              {
+                "symbol": "MAGMA_SEAS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-D46",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-E48",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": 54,
+            "y": -15,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-E49"
+              },
+              {
+                "symbol": "X1-BQ60-E50"
+              },
+              {
+                "symbol": "X1-BQ60-E51"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "JUNGLE"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "ICE_CRYSTALS"
+              },
+              {
+                "symbol": "CANYONS"
+              },
+              {
+                "symbol": "FOSSILS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-E48",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F52",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-F53"
+              },
+              {
+                "symbol": "X1-BQ60-F54"
+              },
+              {
+                "symbol": "X1-BQ60-F55"
+              },
+              {
+                "symbol": "X1-BQ60-F56"
+              },
+              {
+                "symbol": "X1-BQ60-F57"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "MAGMA_SEAS"
+              },
+              {
+                "symbol": "SCARCE_LIFE"
+              },
+              {
+                "symbol": "DRY_SEABEDS"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F52",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-G58",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": -3,
+            "y": -63,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-G59"
+              },
+              {
+                "symbol": "X1-BQ60-G60"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "CANYONS"
+              },
+              {
+                "symbol": "SCARCE_LIFE"
+              },
+              {
+                "symbol": "MAGMA_SEAS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-G58",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-H61",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": -41,
+            "y": 21,
+            "orbitals": [
+              {
+                "symbol": "X1-BQ60-H62"
+              },
+              {
+                "symbol": "X1-BQ60-H63"
+              },
+              {
+                "symbol": "X1-BQ60-H64"
+              }
+            ],
+            "traits": [
+              {
+                "symbol": "BARREN"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              },
+              {
+                "symbol": "MAGMA_SEAS"
+              },
+              {
+                "symbol": "ICE_CRYSTALS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-H61",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-I65",
+            "type": "JUMP_GATE",
+            "systemSymbol": "X1-BQ60",
+            "x": 355,
+            "y": -280,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-I65",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": true
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-I66",
+            "type": "FUEL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": 180,
+            "y": -141,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-I66",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J67",
+            "type": "FUEL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": 470,
+            "y": -371,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J67",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J68",
+            "type": "ASTEROID_BASE",
+            "systemSymbol": "X1-BQ60",
+            "x": 566,
+            "y": -447,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              },
+              {
+                "symbol": "PIRATE_BASE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J68",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J69",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -596,
+            "y": 432,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "RARE_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J69",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J70",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -487,
+            "y": 583,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J70",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J71",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -721,
+            "y": 178,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              },
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J71",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J72",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -610,
+            "y": -363,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J72",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J73",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -782,
+            "y": 68,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J73",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J74",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -362,
+            "y": -703,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J74",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J75",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -780,
+            "y": -115,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "UNSTABLE_COMPOSITION"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J75",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J76",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -233,
+            "y": -736,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "RARE_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J76",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J77",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -453,
+            "y": -625,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J77",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J78",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -286,
+            "y": -706,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "UNSTABLE_COMPOSITION"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J78",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J79",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 61,
+            "y": -764,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J79",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J80",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 428,
+            "y": -647,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J80",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J81",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 337,
+            "y": -707,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "RARE_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J81",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J82",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 349,
+            "y": -629,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J82",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J83",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 771,
+            "y": 159,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J83",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J84",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 728,
+            "y": -72,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEBRIS_CLUSTER"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J84",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J85",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 720,
+            "y": -270,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J85",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J86",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 693,
+            "y": 215,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J86",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J87",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 770,
+            "y": 55,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J87",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J88",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 230,
+            "y": 742,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "UNSTABLE_COMPOSITION"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J88",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J89",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 382,
+            "y": 636,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J89",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J90",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": 336,
+            "y": 674,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "HOLLOWED_INTERIOR"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J90",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J91",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -237,
+            "y": 684,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "COMMON_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "RADIOACTIVE"
+              },
+              {
+                "symbol": "EXPLOSIVE_GASES"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J91",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J92",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -358,
+            "y": 679,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              },
+              {
+                "symbol": "SHALLOW_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J92",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J93",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -261,
+            "y": 708,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "MINERAL_DEPOSITS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J93",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-J94",
+            "type": "ASTEROID",
+            "systemSymbol": "X1-BQ60",
+            "x": -418,
+            "y": 628,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "PRECIOUS_METAL_DEPOSITS"
+              },
+              {
+                "symbol": "DEEP_CRATERS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-J94",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-K95",
+            "type": "PLANET",
+            "systemSymbol": "X1-BQ60",
+            "x": 54,
+            "y": -89,
+            "orbitals": [],
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "MUTATED_FLORA"
+              },
+              {
+                "symbol": "DIVERSE_LIFE"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-K95",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.167+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-A2",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 17,
+            "y": 18,
+            "orbitals": [],
+            "orbits": "X1-BQ60-A1",
+            "traits": [
+              {
+                "symbol": "BARREN"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "STRONG_MAGNETOSPHERE"
+              },
+              {
+                "symbol": "TOXIC_ATMOSPHERE"
+              },
+              {
+                "symbol": "EXTREME_PRESSURE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              },
+              {
+                "symbol": "SHIPYARD"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-A2",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-A3",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 17,
+            "y": 18,
+            "orbitals": [],
+            "orbits": "X1-BQ60-A1",
+            "traits": [
+              {
+                "symbol": "BARREN"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "EXTREME_TEMPERATURES"
+              },
+              {
+                "symbol": "CORROSIVE_ATMOSPHERE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-A3",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-A4",
+            "type": "ORBITAL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": 17,
+            "y": 18,
+            "orbitals": [],
+            "orbits": "X1-BQ60-A1",
+            "traits": [
+              {
+                "symbol": "RESEARCH_FACILITY"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-A4",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-C44",
+            "type": "ORBITAL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": -86,
+            "y": -128,
+            "orbitals": [],
+            "orbits": "X1-BQ60-C43",
+            "traits": [
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              },
+              {
+                "symbol": "SHIPYARD"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-C44",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-D47",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -74,
+            "y": 38,
+            "orbitals": [],
+            "orbits": "X1-BQ60-D46",
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "OUTPOST"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-D47",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-E49",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 54,
+            "y": -15,
+            "orbitals": [],
+            "orbits": "X1-BQ60-E48",
+            "traits": [
+              {
+                "symbol": "VOLCANIC"
+              },
+              {
+                "symbol": "SPRAWLING_CITIES"
+              },
+              {
+                "symbol": "CORROSIVE_ATMOSPHERE"
+              },
+              {
+                "symbol": "TOXIC_ATMOSPHERE"
+              },
+              {
+                "symbol": "EXTREME_TEMPERATURES"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-E49",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-E50",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 54,
+            "y": -15,
+            "orbitals": [],
+            "orbits": "X1-BQ60-E48",
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "EXTREME_PRESSURE"
+              },
+              {
+                "symbol": "STRONG_MAGNETOSPHERE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-E50",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-E51",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 54,
+            "y": -15,
+            "orbitals": [],
+            "orbits": "X1-BQ60-E48",
+            "traits": [
+              {
+                "symbol": "ROCKY"
+              },
+              {
+                "symbol": "EXTREME_TEMPERATURES"
+              },
+              {
+                "symbol": "STRONG_MAGNETOSPHERE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-E51",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F53",
+            "type": "ORBITAL_STATION",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [],
+            "orbits": "X1-BQ60-F52",
+            "traits": [
+              {
+                "symbol": "VOLCANIC"
+              },
+              {
+                "symbol": "SPRAWLING_CITIES"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "STRONG_MAGNETOSPHERE"
+              },
+              {
+                "symbol": "HIGH_TECH"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F53",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F54",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [],
+            "orbits": "X1-BQ60-F52",
+            "traits": [
+              {
+                "symbol": "ROCKY"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "TOXIC_ATMOSPHERE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F54",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F55",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [],
+            "orbits": "X1-BQ60-F52",
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "EXTREME_PRESSURE"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "VIBRANT_AURORAS"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F55",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F56",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [],
+            "orbits": "X1-BQ60-F52",
+            "traits": [
+              {
+                "symbol": "VOLCANIC"
+              },
+              {
+                "symbol": "EXTREME_PRESSURE"
+              },
+              {
+                "symbol": "VIBRANT_AURORAS"
+              },
+              {
+                "symbol": "EXTREME_TEMPERATURES"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F56",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-F57",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": 67,
+            "y": 36,
+            "orbitals": [],
+            "orbits": "X1-BQ60-F52",
+            "traits": [
+              {
+                "symbol": "FROZEN"
+              },
+              {
+                "symbol": "VIBRANT_AURORAS"
+              },
+              {
+                "symbol": "THIN_ATMOSPHERE"
+              },
+              {
+                "symbol": "CORROSIVE_ATMOSPHERE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-F57",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-G59",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -3,
+            "y": -63,
+            "orbitals": [],
+            "orbits": "X1-BQ60-G58",
+            "traits": [
+              {
+                "symbol": "BARREN"
+              },
+              {
+                "symbol": "TERRAFORMED"
+              },
+              {
+                "symbol": "TOXIC_ATMOSPHERE"
+              },
+              {
+                "symbol": "CORROSIVE_ATMOSPHERE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-G59",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-G60",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -3,
+            "y": -63,
+            "orbitals": [],
+            "orbits": "X1-BQ60-G58",
+            "traits": [
+              {
+                "symbol": "VOLCANIC"
+              },
+              {
+                "symbol": "THIN_ATMOSPHERE"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-G60",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-H62",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -41,
+            "y": 21,
+            "orbitals": [],
+            "orbits": "X1-BQ60-H61",
+            "traits": [
+              {
+                "symbol": "ROCKY"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              },
+              {
+                "symbol": "SHIPYARD"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-H62",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          },
+          "Market": {
+            "symbol": "X1-BQ60-H62",
+            "exports": [],
+            "imports": [
+              {
+                "symbol": "SHIP_PLATING"
+              },
+              {
+                "symbol": "SHIP_PARTS"
+              }
+            ],
+            "exchange": [
+              {
+                "symbol": "FUEL"
+              }
+            ],
+            "tradeGoods": [
+              {
+                "symbol": "SHIP_PLATING",
+                "type": "IMPORT",
+                "tradeVolume": 6,
+                "supply": "MODERATE",
+                "activity": "WEAK",
+                "purchasePrice": 12714,
+                "sellPrice": 6016
+              },
+              {
+                "symbol": "SHIP_PARTS",
+                "type": "IMPORT",
+                "tradeVolume": 6,
+                "supply": "MODERATE",
+                "activity": "WEAK",
+                "purchasePrice": 13632,
+                "sellPrice": 6450
+              },
+              {
+                "symbol": "FUEL",
+                "type": "EXCHANGE",
+                "tradeVolume": 180,
+                "supply": "MODERATE",
+                "purchasePrice": 72,
+                "sellPrice": 68
+              }
+            ]
+          },
+          "Shipyard": {
+            "symbol": "X1-BQ60-H62",
+            "shipTypes": [
+              {
+                "type": "SHIP_MINING_DRONE"
+              },
+              {
+                "type": "SHIP_SURVEYOR"
+              }
+            ],
+            "ships": [
+              {
+                "type": "SHIP_MINING_DRONE",
+                "name": "Mining Drone",
+                "description": "A small, unmanned spacecraft that can be used for mining operations, such as extracting valuable minerals from asteroids.",
+                "supply": "HIGH",
+                "activity": "GROWING",
+                "purchasePrice": 38957,
+                "frame": {
+                  "symbol": "FRAME_DRONE",
+                  "name": "Drone",
+                  "description": "A small, unmanned spacecraft used for various tasks, such as surveillance, transportation, or combat.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "moduleSlots": 3,
+                  "mountingPoints": 2,
+                  "fuelCapacity": 80,
+                  "requirements": {
+                    "power": 1,
+                    "crew": -4
+                  }
+                },
+                "reactor": {
+                  "symbol": "REACTOR_CHEMICAL_I",
+                  "name": "Chemical Reactor I",
+                  "description": "A basic chemical power reactor, used to generate electricity from chemical reactions.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "powerOutput": 15,
+                  "requirements": {
+                    "crew": 3
+                  }
+                },
+                "engine": {
+                  "symbol": "ENGINE_IMPULSE_DRIVE_I",
+                  "name": "Impulse Drive I",
+                  "description": "A basic low-energy propulsion system that generates thrust for interplanetary travel.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "speed": 9,
+                  "requirements": {
+                    "power": 1,
+                    "crew": 0
+                  }
+                },
+                "modules": [
+                  {
+                    "symbol": "MODULE_CARGO_HOLD_I",
+                    "name": "Cargo Hold",
+                    "description": "A module that increases a ship\u0027s cargo capacity.",
+                    "capacity": 15,
+                    "requirements": {
+                      "power": 1,
+                      "crew": 0,
+                      "slots": 1
+                    }
+                  },
+                  {
+                    "symbol": "MODULE_MINERAL_PROCESSOR_I",
+                    "name": "Mineral Processor",
+                    "description": "Crushes and processes extracted minerals and ores into their component parts, filters out impurities, and containerizes them into raw storage units.",
+                    "requirements": {
+                      "power": 1,
+                      "crew": 0,
+                      "slots": 2
+                    }
+                  }
+                ],
+                "mounts": [
+                  {
+                    "symbol": "MOUNT_MINING_LASER_I",
+                    "name": "Mining Laser I",
+                    "description": "A basic mining laser that can be used to extract valuable minerals from asteroids and other space objects.",
+                    "strength": 3,
+                    "requirements": {
+                      "power": 1,
+                      "crew": 1
+                    }
+                  }
+                ],
+                "crew": {
+                  "current": 0,
+                  "capacity": 0
+                }
+              },
+              {
+                "type": "SHIP_SURVEYOR",
+                "name": "Surveyor Craft",
+                "description": "A specialized spacecraft equipped with surveying mounts, designed for detailed surveying of celestial bodies, resource identification, and scientific research.",
+                "supply": "HIGH",
+                "activity": "GROWING",
+                "purchasePrice": 29860,
+                "frame": {
+                  "symbol": "FRAME_DRONE",
+                  "name": "Drone",
+                  "description": "A small, unmanned spacecraft used for various tasks, such as surveillance, transportation, or combat.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "moduleSlots": 3,
+                  "mountingPoints": 2,
+                  "fuelCapacity": 80,
+                  "requirements": {
+                    "power": 1,
+                    "crew": -4
+                  }
+                },
+                "reactor": {
+                  "symbol": "REACTOR_CHEMICAL_I",
+                  "name": "Chemical Reactor I",
+                  "description": "A basic chemical power reactor, used to generate electricity from chemical reactions.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "powerOutput": 15,
+                  "requirements": {
+                    "crew": 3
+                  }
+                },
+                "engine": {
+                  "symbol": "ENGINE_IMPULSE_DRIVE_I",
+                  "name": "Impulse Drive I",
+                  "description": "A basic low-energy propulsion system that generates thrust for interplanetary travel.",
+                  "condition": 1,
+                  "integrity": 1,
+                  "speed": 9,
+                  "requirements": {
+                    "power": 1,
+                    "crew": 0
+                  }
+                },
+                "modules": [],
+                "mounts": [
+                  {
+                    "symbol": "MOUNT_SURVEYOR_I",
+                    "name": "Surveyor I",
+                    "description": "A basic survey probe that can be used to gather information about a mineral deposit.",
+                    "strength": 1,
+                    "deposits": [
+                      "QUARTZ_SAND",
+                      "SILICON_CRYSTALS",
+                      "PRECIOUS_STONES",
+                      "ICE_WATER",
+                      "AMMONIA_ICE",
+                      "IRON_ORE",
+                      "COPPER_ORE",
+                      "SILVER_ORE",
+                      "ALUMINUM_ORE",
+                      "GOLD_ORE",
+                      "PLATINUM_ORE"
+                    ],
+                    "requirements": {
+                      "power": 1,
+                      "crew": 1
+                    }
+                  }
+                ],
+                "crew": {
+                  "current": 0,
+                  "capacity": 0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-H63",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -41,
+            "y": 21,
+            "orbitals": [],
+            "orbits": "X1-BQ60-H61",
+            "traits": [
+              {
+                "symbol": "BARREN"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "EXTREME_TEMPERATURES"
+              },
+              {
+                "symbol": "STRONG_MAGNETOSPHERE"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-H63",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        },
+        {
+          "Waypoint": {
+            "symbol": "X1-BQ60-H64",
+            "type": "MOON",
+            "systemSymbol": "X1-BQ60",
+            "x": -41,
+            "y": 21,
+            "orbitals": [],
+            "orbits": "X1-BQ60-H61",
+            "traits": [
+              {
+                "symbol": "ROCKY"
+              },
+              {
+                "symbol": "SCATTERED_SETTLEMENTS"
+              },
+              {
+                "symbol": "VIBRANT_AURORAS"
+              },
+              {
+                "symbol": "INDUSTRIAL"
+              },
+              {
+                "symbol": "MARKETPLACE"
+              }
+            ],
+            "modifiers": [],
+            "chart": {
+              "waypointSymbol": "X1-BQ60-H64",
+              "submittedBy": "COBALT",
+              "submittedOn": "2026-04-26T13:02:46.192+00:00"
+            },
+            "isUnderConstruction": false
+          }
+        }
+      ]
+    }
+  ]
+}
