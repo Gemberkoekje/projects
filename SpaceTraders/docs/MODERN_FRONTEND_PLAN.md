@@ -388,9 +388,12 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 
 ### Phase 3 — runs & comparison
 
-**3a — runs list & detail**
-- Runs list (`/runs`): all runs + scheduled/pending runs with distinct badge.
-- Run detail: summary card, per-category income, ships at start/end, contracts completed.
+**3a — runs list & detail** ✅ *Implemented*
+- ✅ `RunsPage.tsx` implemented with internal sub-routing via React Router `<Routes>`:
+  - Runs list (`/runs`): all runs from `/runs/` with ΔCredits, duration, strategy label, and start time; active run flagged with green "Active" badge; scheduled/pending runs from `/runs/scheduled` shown in a separate "Scheduled / Pending" section with yellow "Pending" badge and activation condition.
+  - Run detail (`/runs/:id`): back link to Runs list; heading with run name + "Active" badge when ongoing; summary stat cards (strategy, started, duration, starting credits, ΔCredits); credits-over-time SVG chart from `RunCreditHighlight` data; net P&L stat cards (total income, total expenses, net P&L); per-category income & expense table with proportional bars, sourced from `/runs/{id}/summary`.
+- ✅ Added `RunDetailDto` TypeScript interface to `src/types.ts` matching the `/runs/{id}/summary` response shape (`run`, `creditHighlights`, `ledgerSummary`).
+- ✅ Tests: `pages.test.tsx` extended with 10 tests (`RunsListPage`: heading, loading, run rows with ΔCredits, pending badge, active badge, empty state; `RunDetailPage`: heading + back link, loading, summary card, category table, credits chart). Total: 76 tests passing.
 
 **3b — compare view**
 - Compare (`/runs/compare?a=&b=`): side-by-side headers, overlaid normalised charts (credits, income, cargo throughput, fuel efficiency, API efficiency), per-good table, decisions diff.

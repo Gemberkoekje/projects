@@ -218,3 +218,9 @@ export interface MarketWaypointDto {
   exchange: string[]
   tradeGoods: TradeGoodSnapshotDto[]
 }
+
+export interface RunDetailDto {
+  run: RunSummaryDto
+  creditHighlights: RunCreditHighlightDto[]
+  ledgerSummary: LedgerSummaryDto[]
+}
