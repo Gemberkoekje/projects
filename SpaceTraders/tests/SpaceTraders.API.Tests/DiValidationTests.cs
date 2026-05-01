@@ -105,6 +105,15 @@ public sealed class DiValidationFactory : WebApplicationFactory<Program>
             services.RemoveAll<IAgentTokenProvider>();
             services.AddSingleton(Substitute.For<IAgentTokenProvider>());
 
+            services.RemoveAll<Application.Interfaces.IActiveRunIdProvider>();
+            services.AddSingleton(Substitute.For<Application.Interfaces.IActiveRunIdProvider>());
+
+            services.RemoveAll<Application.Interfaces.IRunLifecycleManager>();
+            services.AddSingleton(Substitute.For<Application.Interfaces.IRunLifecycleManager>());
+
+            services.RemoveAll<Application.Interfaces.Repositories.IRunRepository>();
+            services.AddScoped(_ => Substitute.For<Application.Interfaces.Repositories.IRunRepository>());
+
             // Remove app-level hosted services so they don't run during validation.
             var appServices = services
                 .Where(d =>

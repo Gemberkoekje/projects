@@ -1,5 +1,6 @@
 using SpaceTraders.Application.Queries;
 using SpaceTraders.API.Services;
+using SpaceTraders.Application.Interfaces;
 using Wolverine;
 
 namespace SpaceTraders.API.Endpoints;
@@ -24,8 +25,10 @@ public static class SettingsEndpoints
         {
             var settings = sp.GetRequiredService<Application.Interfaces.Repositories.ISettingsRepository>();
             var snapshotLogger = sp.GetRequiredService<SettingsSnapshotLogger>();
+            var runLifecycle = sp.GetRequiredService<IRunLifecycleManager>();
             await settings.SetAsync(key, body.Value, ct);
             await snapshotLogger.LogAsync($"settings updated: {key}", ct);
+            await runLifecycle.RotateForSettingsChangeAsync(key, ct);
             return Results.Ok();
         });
 
