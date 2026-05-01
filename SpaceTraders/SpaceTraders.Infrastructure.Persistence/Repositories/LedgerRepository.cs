@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
@@ -36,5 +37,12 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
 
         db.LedgerEntries.Add(entry);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
+    {
+        return await db.LedgerEntries
+            .Where(e => e.OccurredAt < olderThan)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 }

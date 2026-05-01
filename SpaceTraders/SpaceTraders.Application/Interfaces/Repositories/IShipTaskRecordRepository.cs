@@ -10,4 +10,8 @@ public interface IShipTaskRecordRepository
         CancellationToken cancellationToken = default);
 
     Task EndCurrentTaskAsync(string shipSymbol, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes all ship task records with <c>StartedAt</c> older than <paramref name="olderThan"/>.</summary>
+    /// <returns>Number of rows deleted.</returns>
+    Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default);
 }

@@ -57,4 +57,11 @@ public sealed class ShipTaskRecordRepository(SpaceTradersDbContext db) : IShipTa
         db.ShipTaskRecords.Update(openTask);
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<int> PruneAsync(DateTimeOffset olderThan, CancellationToken cancellationToken = default)
+    {
+        return await db.ShipTaskRecords
+            .Where(r => r.StartedAt < olderThan)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
 }

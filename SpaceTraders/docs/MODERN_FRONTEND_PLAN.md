@@ -303,11 +303,13 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ Added `RunLifecycleServiceTests` (5 unit tests covering startup paths and settings-change rotation).
 - Note: `RunCreditHighlight` rows are now written on run open and close via `AppendCreditHighlightAsync`.
 
-**0c — nightly data retention jobs**
-- Prune `MarketPriceSample` rows older than 7 days (keeping hourly aggregates for 90 days).
-- Prune `AgentCreditsSample` rows older than 7 days (keeping one row/hour beyond that, for 90 days).
-- Prune `LedgerEntry` rows older than 30 days (highlights already safely in `RunCreditHighlight`).
-- Prune `ShipTaskRecord` rows older than 30 days.
+**0c — nightly data retention jobs** ✅ *Implemented*
+- ✅ Added `PruneAsync(rawRetentionCutoff, aggregateRetentionCutoff)` to `IMarketPriceSampleRepository` and `IAgentCreditsSampleRepository`; implemented with a two-phase SQL strategy: delete hourly-duplicate rows in the 7–90-day window (`NOT IN (SELECT MIN(id) ... GROUP BY ... date_trunc('hour', …))`), then delete everything older than 90 days.
+- ✅ Added `PruneAsync(olderThan)` to `ILedgerRepository` and `IShipTaskRecordRepository`; implemented with `ExecuteDeleteAsync`.
+- ✅ Created `DataRetentionService` (`SpaceTraders.Application/Automation/`) — `BackgroundService` with a 24 h loop; runs all four prune operations and logs counts when rows are deleted.
+- ✅ Registered `DataRetentionService` as a hosted service in `Program.cs`.
+- ✅ Fixed `SpaceTradersApiFactory` (`ApiIntegrationTests`) — added a properly-stubbed `IRunRepository` mock (returns an active run so `RunLifecycleService` resumes without a DB call), restoring the 20 previously-failing `ApiIntegrationTests`.
+- ✅ Added `DataRetentionServiceTests` (5 unit tests: calls all four repos, passes correct cutoffs to each, propagates repository exceptions).
 
 **0d — SignalR hub & read endpoints**
 - Add `Microsoft.AspNetCore.SignalR` hub at `/hubs/dashboard`.

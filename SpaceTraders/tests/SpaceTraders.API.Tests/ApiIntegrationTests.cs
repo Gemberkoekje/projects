@@ -299,6 +299,21 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<ILeaderLeaseRepository>();
             services.AddScoped(_ => Substitute.For<ILeaderLeaseRepository>());
 
+            // ── Run lifecycle (Phase 0b) ──────────────────────────────────────
+            // RunLifecycleService is a hosted service that tries to access the DB
+            // at startup. Provide a properly-stubbed IRunRepository so it can
+            // initialise without a real database connection.
+            var runRepoMock = Substitute.For<Application.Interfaces.Repositories.IRunRepository>();
+            runRepoMock
+                .GetPendingScheduledRunsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+                .Returns(Array.Empty<Application.Ports.PendingScheduledRunInfo>());
+            var testRunId = Guid.NewGuid();
+            runRepoMock
+                .GetActiveRunAsync(Arg.Any<CancellationToken>())
+                .Returns(new Application.Ports.ActiveRunInfo(testRunId, "Test Run", "default", DateTimeOffset.UtcNow, 100_000L));
+            services.RemoveAll<Application.Interfaces.Repositories.IRunRepository>();
+            services.AddScoped(_ => runRepoMock);
+
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();
             services.AddSingleton(Substitute.For<ISpaceTradersApiClient>());
