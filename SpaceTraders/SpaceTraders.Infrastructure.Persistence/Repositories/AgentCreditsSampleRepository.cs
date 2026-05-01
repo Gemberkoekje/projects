@@ -39,6 +39,8 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
             """, cancellationToken);
 
         // Step 2: Delete all rows older than the 90-day aggregate retention cutoff.
+        // Note: AgentCreditsSample has no global query filter (unlike MarketPriceSample),
+        // so agent_token must be filtered explicitly here.
         var purgedDeleted = await db.AgentCreditsSamples
             .Where(s => s.AgentToken == db.AgentToken && s.ObservedAt < aggregateRetentionCutoff)
             .ExecuteDeleteAsync(cancellationToken);
