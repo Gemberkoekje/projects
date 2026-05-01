@@ -358,13 +358,15 @@ Beyond the explicit asks, these are the views/metrics that meaningfully help ite
 - ✅ `src/config.ts` — added `hubBaseUrl` (default `/hubs`) alongside `apiBaseUrl` and `dashboardApiKey`; `docker-entrypoint.sh` and `public/config.js` dev stub updated accordingly.
 - ✅ Tests: `App.test.tsx` updated (4 tests: top nav, sidebar presence, all 10 nav links, theme toggle); `apiFetch.test.ts` added (6 tests: header injection, URL construction, JSON parse, error throw, no Content-Type on GET, Content-Type on POST with body); `theme.test.tsx` added (7 tests: default light, DOM class, localStorage persist, read stored theme, toggle, system preference, outside-provider safety); `signalr.test.tsx` added (3 tests: renders children, exposes state, initial paused=true); `setup.ts` updated with class-based `HubConnectionBuilder` mock and `history.pushState` to base path. Total: 22 tests passing.
 
-**1c — core read views**
-- Overview (`/`): credits, 24h delta, run info, ship counts, active contracts, top trade opportunities, credits sparkline, health strip.
-- Fleet (`/fleet`): filterable ship table.
-- Ship detail (`/fleet/:symbol`): activity timeline, lifetime stats, cargo, fuel, assignment history, "what is it doing and why" panel.
-- Activity log (`/activity`): filterable event feed.
-- Health & ops (`/health`): rate-limit budget, worker heartbeats, API usage table.
-- Settings mirror (`/settings`): `AgentSetting` rows + scheduled runs panel.
+**1c — core read views** ✅ *Implemented*
+- ✅ `src/types.ts` — TypeScript type definitions for all API response shapes (AgentDto, ShipDto, ContractDto, TradeOpportunityDto, RateLimitStatusDto, SystemAlertsDto, ActivityLogDto, SettingDto, RunSummaryDto, ScheduledRunDto, ShipTaskRecordDto, LedgerSummaryDto, AutomationHealthDto, ApiEndpointUsageDto, CreditSampleDto).
+- ✅ Overview (`/`): credits (formatted with locale grouping), 24h delta derived from `/finance/credits-history`, active run name + strategy + uptime, ship counts (total / in-transit / docked / in-orbit), active contracts with per-deliverable progress bars and time-to-deadline, top trade opportunity card, SVG credits sparkline, health strip with alert dots (API, automation, token, cache, contract deadline, server reset).
+- ✅ Fleet (`/fleet`): filterable ship table; filters by symbol search, nav state (all/transit/docked/orbit), and system; fuel and cargo progress bars; ETA display for in-transit ships; "Details" link per row navigating to ship detail.
+- ✅ Ship detail (`/fleet/:symbol`): added `/fleet/:symbol` route in `AppShell`; `ShipDetailPage` shows header with nav state badge + waypoint, fuel/cargo bars, lifetime stats table from `/ships/{symbol}/stats`, recent activity timeline from `/status/activity?ship=`, and task timeline from `/ships/{symbol}/timeline`.
+- ✅ Activity log (`/activity`): paginated event feed from `/status/activity`; filters by ship (populated from `/status/ships`) and event type (auto-populated from loaded events); previous/next pagination.
+- ✅ Health & ops (`/health`): automation status (enabled/leader) from `/health/automation`; rate-limit headroom bar + stats from `/status/rate-limit`; API endpoint usage table from `/health/rate-limit/history`; read-only badge.
+- ✅ Settings mirror (`/settings`): `AgentSetting` rows table from `/settings/`; scheduled runs panel from `/runs/scheduled` showing activation condition; read-only badge.
+- ✅ Tests: `pages.test.tsx` added (21 tests covering all 6 pages: headings, loading states, data rendering, filter controls, pagination). Total: 43 tests passing.
 
 ### Phase 2 — finance & markets
 

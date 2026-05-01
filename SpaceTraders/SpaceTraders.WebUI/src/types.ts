@@ -1,0 +1,167 @@
+/**
+ * TypeScript types matching the SpaceTraders API DTOs.
+ * These mirror the C# record types in SpaceTraders.Application.DTOs and
+ * related namespaces so callers get type-safe responses from apiFetch.
+ */
+
+export interface AgentDto {
+  symbol: string
+  credits: number
+  startingFaction: string
+  shipCount: number
+  headquartersSymbol: string | null
+}
+
+export interface ShipDto {
+  symbol: string
+  systemSymbol: string | null
+  waypointSymbol: string | null
+  status: string | null
+  flightMode: string | null
+  fuelCurrent: number
+  fuelCapacity: number
+  cargoCurrent: number
+  cargoCapacity: number
+  arrivesAt: string | null
+  isInTransit: boolean
+  lastSyncedAt: string
+}
+
+export interface ContractDeliverableDto {
+  tradeSymbol: string
+  destinationSymbol: string
+  unitsRequired: number
+  unitsFulfilled: number
+}
+
+export interface ContractDto {
+  id: string
+  factionSymbol: string
+  type: string
+  isAccepted: boolean
+  isFulfilled: boolean
+  expiration: string | null
+  deadlineToAccept: string | null
+  termsDeadline: string | null
+  deliverablesJson: string | null
+}
+
+export interface TradeOpportunityDto {
+  id: number
+  tradeSymbol: string
+  buyWaypoint: string
+  sellWaypoint: string
+  buyPrice: number
+  sellPrice: number
+  profitPerUnit: number
+  distanceJumps: number
+  profitPerJump: number
+  supportsSupplyChain: boolean
+  supplyChainDepth: number
+  buyType: string
+  sellType: string
+  effectiveTradeVolume: number
+  estimatedFuelCost: number
+  estimatedTravelTimeMinutes: number
+  opportunityCostPenalty: number
+  cooldownPenalty: number
+  rateLimitPenalty: number
+  routeScore: number
+  computedAt: string
+}
+
+export interface RateLimitStatusDto {
+  remaining: number
+  limit: number
+  burstRemaining: number
+  burstLimit: number
+  resetAt: string
+  limitType: string | null
+  totalRequests: number
+  throttledCount: number
+}
+
+export interface SystemAlertsDto {
+  apiUnavailable: boolean
+  tokenResetMismatch: boolean
+  cacheDivergence: boolean
+  automationDisabled: boolean
+  contractDeadlinesApproaching: boolean
+  resetUpcoming: boolean
+  nextReset: string | null
+}
+
+export interface ActivityLogDto {
+  id: number
+  timestamp: string
+  shipSymbol: string
+  eventType: string
+  message: string
+  jsonDetails: string | null
+}
+
+export interface SettingDto {
+  key: string
+  value: string
+  type: string
+  description: string
+}
+
+export interface RunSummaryDto {
+  id: string
+  name: string
+  strategyLabel: string
+  startedAt: string
+  endedAt: string | null
+  startingCredits: number
+  endingCredits: number | null
+}
+
+export interface ScheduledRunDto {
+  id: string
+  name: string
+  strategyLabel: string
+  scheduledSettingsJson: string | null
+  activatesAt: string | null
+  activatesOnNextRestart: boolean
+  createdAt: string
+}
+
+export interface ShipTaskRecordDto {
+  id: number
+  shipSymbol: string
+  startedAt: string
+  endedAt: string | null
+  taskKind: string
+  targetWaypoint: string | null
+  payloadJson: string | null
+}
+
+export interface LedgerSummaryDto {
+  category: string
+  totalAmount: number
+  entryCount: number
+}
+
+export interface ShipStatsResponse {
+  ship: ShipDto
+  ledger: unknown[]
+  summary: LedgerSummaryDto[]
+}
+
+export interface AutomationHealthDto {
+  automationEnabled: boolean
+  isLeader: boolean
+}
+
+export interface ApiEndpointUsageDto {
+  httpMethod: string
+  endpoint: string
+  calls: number
+  lastCalledAt: string
+}
+
+export interface CreditSampleDto {
+  recordedAt: string
+  credits: number
+}

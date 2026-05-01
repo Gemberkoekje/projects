@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar'
 import { LiveUpdatesBanner } from '@/components/ui/LiveUpdatesBanner'
 import OverviewPage from '@/pages/OverviewPage'
 import FleetPage from '@/pages/FleetPage'
+import ShipDetailPage from '@/pages/ShipDetailPage'
 import FinancePage from '@/pages/FinancePage'
 import MarketsPage from '@/pages/MarketsPage'
 import RunsPage from '@/pages/RunsPage'
@@ -26,6 +27,7 @@ export function AppShell() {
           <Routes>
             <Route path="/" element={<OverviewPage />} />
             <Route path="/fleet" element={<FleetPage />} />
+            <Route path="/fleet/:symbol" element={<ShipDetailPage />} />
             <Route path="/finance" element={<FinancePage />} />
             <Route path="/markets/*" element={<MarketsPage />} />
             <Route path="/runs/*" element={<RunsPage />} />
