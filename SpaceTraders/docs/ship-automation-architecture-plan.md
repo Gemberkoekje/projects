@@ -539,17 +539,19 @@ Implementation notes:
 - `ChainOfCommandEventHandlerRegistrationTests`: added `ShipStateMismatchEvent` to the retired-handler exclusion set; removed it from `BaseDispatchableEventTypes_ShouldHaveHandlerTypes`.
 - `ShipEventHandlerConventionTests`: removed `ShipStateMismatchEventHandler` from allowed exceptions.
 
-#### Phase 7b — Replace routing-only docked derived events
+#### Phase 7b — Replace routing-only docked derived events ✅ COMPLETE
 
-- Update publishers so docked-state changes only emit `ShipDockedEvent` (factual) + `ShipAutomationTickEvent` (automation):
-  - `AssignShipCommand` stops publishing `ShipAssignmentTypeSetEvent` (already publishes `ShipAssignedEvent` for downstream listeners).
-  - `RefuelShipCommand` stops publishing `ShipRefueledEvent`; the fuel state is in `ShipModel` and the planner runs via the tick.
-  - Internal `IdleShipDockedEventHandler` / role-specific docked handlers stop being invoked by removing their registrations.
-- Delete the routing-only derived events: `ShipIdleDockedEvent`, `ShipRoleSetEvent`, `ShipAssignmentTypeSetEvent`, `ShipContractDockedEvent`, `ShipRefueledEvent`.
-- Delete the docked chain handlers: `ShipDockedFuelEventHandler`, `ShipDockedBuilderEventHandler`, `ShipDockedMineEventHandler`, `ShipDockedContractEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedScoutEventHandler`, `ShipDockedIdleEventHandler`, `IdleShipDockedEventHandler`, and `ShipDockedEventHandler` (default chain handler).
-- Remove their DI registrations and the matching `ChainOfCommandBridgeHandler` overloads.
-- Remove their references from `LogActivityHandler` (or keep `ShipDockedEvent` only).
-- Tests: delete `ShipDockedEventHandlerTests`, `ShipDockedFuelEventHandlerTests`, `ShipDockedMineEventHandlerTests`, `ShipDockedRoleHandlersTests`. Update `ChainOfCommandEventHandlerRegistrationTests` to drop removed types (or delete it; the planner is now the single source of truth).
+- Updated publishers so docked-state changes emit `ShipAutomationTickEvent` instead of chain-routing events:
+  - `AssignShipCommand` (`AssignShipHandler`) now publishes `ShipAutomationTickEvent(reason: "Assigned:{type}")` instead of `ShipAssignmentTypeSetEvent`. The `IShipRepository` dependency removed (no longer needed). `ShipAssignedEvent` still published for downstream listeners.
+  - `RefuelShipCommand` (`RefuelShipHandler`) now publishes `ShipAutomationTickEvent(reason: "Refueled")` instead of `ShipRefueledEvent`; the fuel state is in `ShipModel` and the planner runs via the tick.
+- Deleted routing-only derived events: `ShipIdleDockedEvent`, `ShipRoleSetEvent`, `ShipAssignmentTypeSetEvent`, `ShipContractDockedEvent`, `ShipRefueledEvent` (all in `SpaceTraders.Domain/Events/Ships/`).
+- Deleted docked chain handlers: `ShipDockedFuelEventHandler`, `ShipDockedBuilderEventHandler`, `ShipDockedMineEventHandler`, `ShipDockedContractEventHandler`, `ShipDockedTraderEventHandler`, `ShipDockedScoutEventHandler`, `ShipDockedIdleEventHandler`, `IdleShipDockedEventHandler`, `ShipDockedEventHandler` (all in `SpaceTraders.Application/Events/Handlers/Ships/`).
+- Removed bridge handler overloads for `ShipDockedEvent`, `ShipIdleDockedEvent`, `ShipRefueledEvent`, `ShipAssignmentTypeSetEvent`, `ShipRoleSetEvent` from `ChainOfCommandBridgeHandler`. Overloads for `ShipUndockedEvent`, `ShipInTransitEvent`, `ShipInOrbitEvent`, `ShipArrivedEvent` retained (Phase 7c/7d).
+- Removed `ShipIdleDockedEvent` and `ShipAssignmentTypeSetEvent` handlers from `LogActivityHandler`. `ShipDockedEvent` handler retained.
+- Removed `ShipAssignmentTypeSetEvent`-specific log branch from `ChainOfCommandDispatcher`; dispatcher now logs uniformly for all event types.
+- Tests: deleted `ShipDockedEventHandlerTests`, `ShipDockedFuelEventHandlerTests`, `ShipDockedMineEventHandlerTests`, `ShipDockedRoleHandlersTests`. Updated `ChainOfCommandEventHandlerRegistrationTests` to remove deleted event names from exclusion set and remove `ShipDockedEvent` from `BaseDispatchableEventTypes_ShouldHaveHandlerTypes`. Updated `ChainOfCommandDispatcherTests` stub handler to produce `ShipInOrbitEvent` instead of deleted `ShipAssignmentTypeSetEvent`. Removed 3 `ShipDockedIdleEventHandler` tests from `Phase65cOrchestratorWiringTests`. Updated `ShipEventHandlerConventionTests` assembly reference. Updated comments in `BuilderShipPlanner` and `MaintenanceShipPlanner`.
+
+Build green. Full test suite: 396 passed, 4 skipped (pre-existing network-gated sandbox tests).
 
 #### Phase 7c — Replace routing-only orbit derived events
 

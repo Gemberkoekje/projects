@@ -79,15 +79,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
-    public async Task Handle(ShipIdleDockedEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipIdleDockedEvent),
-            $"Ship {@event.ShipSymbol} is idle and docked at {@event.WaypointSymbol}; awaiting role assignment.",
-            cancellationToken: cancellationToken);
-    }
-
     public async Task Handle(ShipUndockedEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(
@@ -121,15 +112,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             @event.ShipSymbol,
             nameof(ShipInOrbitEvent),
             $"Ship {@event.ShipSymbol} entered orbit at {@event.WaypointSymbol}.",
-            cancellationToken: cancellationToken);
-    }
-
-    public async Task Handle(ShipAssignmentTypeSetEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipAssignmentTypeSetEvent),
-            $"Ship {@event.ShipSymbol} assignment type set to {@event.AssignmentType}.",
             cancellationToken: cancellationToken);
     }
 

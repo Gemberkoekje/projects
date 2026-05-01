@@ -2,10 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.EventHandlers;
-using SpaceTraders.Application.Events.Handlers;
-using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Planning;
@@ -17,111 +14,17 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 
 /// <summary>
 /// Phase 6.5c integration-style tests.
-/// Verifies that:
-///   1. <see cref="ShipDockedIdleEventHandler"/> delegates to <see cref="IFleetOrchestrator"/>
-///      rather than using a local assignment planner.
-///   2. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipCommand"/> and never issues
+/// Phase 7b: ShipDockedIdleEventHandler tests removed (handler deleted).
+/// Remaining tests verify that:
+///   1. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipCommand"/> and never issues
 ///      low-level Dock/Orbit/Navigate commands directly.
-///   3. After the orchestrator assigns a ship, a subsequent <see cref="ShipAutomationTickEvent"/>
+///   2. After the orchestrator assigns a ship, a subsequent <see cref="ShipAutomationTickEvent"/>
 ///      causes the planner to execute exactly one command.
-///   4. Fleet expansion is treated as an advisory goal only; purchasing ships is out of scope
+///   3. Fleet expansion is treated as an advisory goal only; purchasing ships is out of scope
 ///      for the orchestrator.
 /// </summary>
 public sealed class Phase65cOrchestratorWiringTests
 {
-    // ──────────────────────────────────────────────────────────────────────────────
-    // ShipDockedIdleEventHandler — delegates to IFleetOrchestrator
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ShipDockedIdleEventHandler_WhenShipIsIdle_CallsOrchestratorInsteadOfLocalPlanner()
-    {
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var orchestrator = Substitute.For<IFleetOrchestrator>();
-
-        assignments.FindAsync("IDLE-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
-                ShipSymbol: "IDLE-1",
-                AssignmentType: "Idle",
-                OriginWaypoint: null,
-                DestWaypoint: null,
-                CargoSymbol: null,
-                ContractId: null,
-                StepIndex: 0,
-                AssignedAt: DateTimeOffset.UtcNow,
-                CompletedAt: null));
-
-        var handler = new ShipDockedIdleEventHandler(
-            assignments,
-            orchestrator,
-            NullLogger<ShipDockedIdleEventHandler>.Instance);
-
-        var result = await handler.HandleAsync(
-            new ShipDockedEvent("IDLE-1", "X1-AB", "X1-AB-WP", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow),
-            CancellationToken.None);
-
-        result.Should().BeSameAs(ChainOfCommandHandlerResult.Handled(),
-            "an idle ship should trigger the orchestrator and return Handled");
-        await orchestrator.Received(1).EvaluateAndAssignAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ShipDockedIdleEventHandler_WhenShipIsNotIdle_SkipsOrchestratorCall()
-    {
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var orchestrator = Substitute.For<IFleetOrchestrator>();
-
-        assignments.FindAsync("BUSY-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipAssignmentDto(
-                ShipSymbol: "BUSY-1",
-                AssignmentType: "Trade",
-                OriginWaypoint: "X1-A",
-                DestWaypoint: "X1-B",
-                CargoSymbol: "IRON_ORE",
-                ContractId: null,
-                StepIndex: 0,
-                AssignedAt: DateTimeOffset.UtcNow,
-                CompletedAt: null));
-
-        var handler = new ShipDockedIdleEventHandler(
-            assignments,
-            orchestrator,
-            NullLogger<ShipDockedIdleEventHandler>.Instance);
-
-        var result = await handler.HandleAsync(
-            new ShipDockedEvent("BUSY-1", "X1-AB", "X1-AB-WP", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow),
-            CancellationToken.None);
-
-        result.Should().BeSameAs(ChainOfCommandHandlerResult.Skipped(),
-            "a non-idle ship should not trigger the orchestrator");
-        await orchestrator.DidNotReceive().EvaluateAndAssignAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ShipDockedIdleEventHandler_WhenNoAssignment_SkipsOrchestratorCall()
-    {
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        var orchestrator = Substitute.For<IFleetOrchestrator>();
-
-        assignments.FindAsync("UNASSIGNED-1", Arg.Any<CancellationToken>())
-            .Returns((ShipAssignmentDto?)null);
-
-        var handler = new ShipDockedIdleEventHandler(
-            assignments,
-            orchestrator,
-            NullLogger<ShipDockedIdleEventHandler>.Instance);
-
-        var result = await handler.HandleAsync(
-            new ShipDockedEvent("UNASSIGNED-1", "X1-AB", "X1-AB-WP", Guid.NewGuid(), Guid.Empty, DateTimeOffset.UtcNow),
-            CancellationToken.None);
-
-        result.Should().BeSameAs(ChainOfCommandHandlerResult.Skipped());
-        await orchestrator.DidNotReceive().EvaluateAndAssignAsync(Arg.Any<CancellationToken>());
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // FleetOrchestrator — emits AssignShipCommand, never navigation commands
-    // ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Orchestrator_WhenIdleShipAndContractGoal_EmitsAssignShipCommandOnly()

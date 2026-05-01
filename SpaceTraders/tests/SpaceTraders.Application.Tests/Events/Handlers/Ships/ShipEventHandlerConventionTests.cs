@@ -22,7 +22,7 @@ public sealed class ShipEventHandlerConventionTests
             // Phase 7a: ShipStateMismatchEventHandler deleted.
         };
 
-        var handlerTypes = typeof(ShipDockedEventHandler).Assembly
+        var handlerTypes = typeof(ShipInTransitEventHandler).Assembly
             .GetTypes()
             .Where(t => t is { IsClass: true, IsAbstract: false })
             .Where(t => t.Namespace == "SpaceTraders.Application.Events.Handlers.Ships")

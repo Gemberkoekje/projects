@@ -103,17 +103,15 @@ public sealed class RefuelShipHandler(
         }
 
         var nowRefueled = TimeProvider.System.GetUtcNow();
-        var refueledShip = await ships.FindAsync(command.ShipSymbol, cancellationToken);
-        await bus.PublishAsync(new ShipRefueledEvent(
+
+        // Phase 7b: ShipRefueledEvent deleted; publish ShipAutomationTickEvent so the planner
+        // re-evaluates the ship with its updated fuel state immediately.
+        await bus.PublishAsync(new ShipAutomationTickEvent(
             command.ShipSymbol,
-            refueledShip?.SystemSymbol ?? string.Empty,
-            refueledShip?.WaypointSymbol ?? string.Empty,
-            result.Fuel.Current,
-            result.Fuel.Capacity,
-            result.Cost,
+            "Refueled",
+            nowRefueled,
             Guid.Empty,
-            Guid.Empty,
-            nowRefueled));
+            Guid.Empty));
 
         logger.LogInformation("Ship {Symbol} refuelled ({Mode}). Fuel: {Current}/{Capacity}. Cost: {Cost} credits.",
             command.ShipSymbol,

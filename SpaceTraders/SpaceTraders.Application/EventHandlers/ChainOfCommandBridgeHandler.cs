@@ -7,6 +7,8 @@ namespace SpaceTraders.Application.EventHandlers;
 /// <summary>
 /// Wolverine message handler that routes incoming chain-of-command events to the
 /// <see cref="IChainOfCommandDispatcher"/>.
+/// Phase 7b: Overloads for ShipDockedEvent, ShipIdleDockedEvent, ShipRefueledEvent,
+/// ShipAssignmentTypeSetEvent, and ShipRoleSetEvent removed — docked routing deleted.
 /// </summary>
 public sealed class ChainOfCommandBridgeHandler(
     IChainOfCommandDispatcher dispatcher,
@@ -34,35 +36,5 @@ public sealed class ChainOfCommandBridgeHandler(
     {
         logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipArrivedEvent), @event.ShipSymbol);
         await dispatcher.DispatchAsync<ShipInOrbitEvent>(@event, cancellationToken);
-    }
-
-    public async Task Handle(ShipRoleSetEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipRoleSetEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
-    }
-
-    public async Task Handle(ShipDockedEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipDockedEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync(@event, cancellationToken);
-    }
-
-    public async Task Handle(ShipIdleDockedEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipIdleDockedEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
-    }
-
-    public async Task Handle(ShipRefueledEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipRefueledEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
-    }
-
-    public async Task Handle(ShipAssignmentTypeSetEvent @event, CancellationToken cancellationToken)
-    {
-        logger.LogDebug("Chain: routing {Event} for ship {Ship}.", nameof(ShipAssignmentTypeSetEvent), @event.ShipSymbol);
-        await dispatcher.DispatchAsync<ShipDockedEvent>(@event, cancellationToken);
     }
 }
