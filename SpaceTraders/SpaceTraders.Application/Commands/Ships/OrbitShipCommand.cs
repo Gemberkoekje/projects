@@ -62,7 +62,7 @@ public sealed class OrbitShipHandler(
 
         if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
         {
-            await bus.PublishAsync(new ShipUndockedEvent(
+            await bus.PublishAsync(new ShipInOrbitEvent(
                 command.ShipSymbol,
                 nav.SystemSymbol,
                 nav.WaypointSymbol,
@@ -70,8 +70,7 @@ public sealed class OrbitShipHandler(
                 Guid.Empty,
                 publishedAt));
 
-            // Phase 5b: explicit automation tick so the planner-driven flow runs without
-            // depending on chain-of-command inheritance routing (ShipUndockedEvent -> ShipInOrbitEvent).
+            // Phase 7c: publish ShipInOrbitEvent + explicit automation tick (ShipUndockedEvent deleted).
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 command.ShipSymbol,
                 "Undocked",

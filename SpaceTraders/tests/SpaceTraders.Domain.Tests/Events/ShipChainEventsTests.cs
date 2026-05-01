@@ -6,25 +6,6 @@ namespace SpaceTraders.Domain.Tests.Events;
 public sealed class ShipChainEventsTests
 {
     [Fact]
-    public void ShipUndockedEvent_WithEmptyCorrelation_UsesEventIdAsCorrelation()
-    {
-        var occurredAt = DateTimeOffset.UtcNow;
-
-        var @event = new ShipUndockedEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-001",
-            Guid.Empty,
-            Guid.Empty,
-            occurredAt);
-
-        @event.EventId.Should().NotBe(Guid.Empty);
-        @event.CorrelationId.Should().Be(@event.EventId);
-        @event.CausationId.Should().Be(Guid.Empty);
-        @event.OccurredAt.Should().Be(occurredAt);
-    }
-
-    [Fact]
     public void ShipInTransitEvent_PreservesProvidedCorrelationAndPayload()
     {
         var correlationId = Guid.NewGuid();

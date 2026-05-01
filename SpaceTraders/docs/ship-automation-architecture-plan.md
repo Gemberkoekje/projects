@@ -553,16 +553,17 @@ Implementation notes:
 
 Build green. Full test suite: 396 passed, 4 skipped (pre-existing network-gated sandbox tests).
 
-#### Phase 7c — Replace routing-only orbit derived events
+#### Phase 7c — Replace routing-only orbit derived events ✅ COMPLETE
 
 - Publishers already emit `ShipAutomationTickEvent` for orbit-state changes. Remove the leftover `ShipUndockedEvent` / `ShipArrivedEvent` publications:
-  - `OrbitShipCommand` publishes `ShipInOrbitEvent` + `ShipAutomationTickEvent` (drop `ShipUndockedEvent`).
-  - `GameLoopService` publishes `ShipAutomationTickEvent` only (drop `ShipArrivedEvent`).
-  - `ShipInTransitEventHandler` stops creating `ShipArrivedEvent`; arrival is just `ShipAutomationTickEvent`.
-- Delete `ShipUndockedEvent` and `ShipArrivedEvent`.
-- Delete the orbit chain handlers: `ShipInOrbitFuelRecoveryEventHandler`, `ShipInOrbitScoutEventHandler`, `ShipInOrbitMineEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitTraderEventHandler`, `ShipInOrbitBuilderEventHandler`, `ShipInOrbitEventHandler`, and the legacy `ShipArrivedEventHandler` if present.
-- Remove their DI registrations and bridge overloads.
-- Tests: delete `ShipInOrbitEventHandlerTests`, `ShipInOrbitFuelRecoveryEventHandlerTests`, `ShipInOrbitMineEventHandlerTests`, `ShipUndockedEventHandlerTests`, `ShipUndockedTraderEventHandlerTests`, `ShipArrivedEventHandlerTests`.
+  - `OrbitShipCommand` publishes `ShipInOrbitEvent` + `ShipAutomationTickEvent` (drop `ShipUndockedEvent`). ✅
+  - `GameLoopService` publishes `ShipAutomationTickEvent` only (drop `ShipArrivedEvent`). ✅
+  - `ShipInTransitEventHandler` stops creating `ShipArrivedEvent`; arrival is just `ShipAutomationTickEvent`. ✅
+- Delete `ShipUndockedEvent` and `ShipArrivedEvent`. ✅
+- Delete the orbit chain handlers: `ShipInOrbitFuelRecoveryEventHandler`, `ShipInOrbitScoutEventHandler`, `ShipInOrbitMineEventHandler`, `ShipInOrbitContractEventHandler`, `ShipInOrbitTraderEventHandler`, `ShipInOrbitBuilderEventHandler`, `ShipInOrbitEventHandler`. ✅
+- Remove their DI registrations and bridge overloads. ✅
+- Tests: deleted `ShipInOrbitEventHandlerTests`, `ShipInOrbitFuelRecoveryEventHandlerTests`, `ShipInOrbitMineEventHandlerTests`, `ShipUndockedEventHandlerTests`, `ShipUndockedTraderEventHandlerTests`, `ShipArrivedEventHandlerTests`. ✅
+- Updated `ChainOfCommandDispatcherTests`, `ChainOfCommandEventHandlerRegistrationTests`, `ShipChainEventsTests`, `ShipInTransitEventHandlerTests`. ✅
 
 #### Phase 7d — Retire transit chain handler
 
