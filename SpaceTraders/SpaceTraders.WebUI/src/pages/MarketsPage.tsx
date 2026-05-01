@@ -201,6 +201,19 @@ function SupplyStepChart({
   )
 }
 
+// ─── Chart colours (module-level constant — safe to omit from useMemo deps) ───
+
+/** Hex colours for the up-to-5 waypoint series in the price chart. */
+const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6']
+
+/** Returns a semi-transparent (60 %) version of a #rrggbb hex colour. */
+function withAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
 // ─── Good Detail page (`/markets/goods/:symbol`) ──────────────────────────────
 
 function GoodDetailPage() {
@@ -240,8 +253,6 @@ function GoodDetailPage() {
       .map(([wp]) => wp)
   }, [waypointSeries])
 
-  const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6']
-
   const priceSeries: PriceSeries[] = useMemo(() => {
     const result: PriceSeries[] = []
     topWaypoints.forEach((wp, i) => {
@@ -249,10 +260,9 @@ function GoodDetailPage() {
         t: new Date(s.observedAt).getTime(),
         v: s.purchasePrice,
       }))
-      result.push({ label: `${wp} (buy)`, color: COLORS[i % COLORS.length], points: pts })
+      result.push({ label: `${wp} (buy)`, color: CHART_COLORS[i % CHART_COLORS.length], points: pts })
     })
     return result
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topWaypoints, waypointSeries])
 
   const sellSeries: PriceSeries[] = useMemo(() => {
@@ -264,12 +274,12 @@ function GoodDetailPage() {
       }))
       result.push({
         label: `${wp} (sell)`,
-        color: COLORS[i % COLORS.length] + '99',
+        // 60 % opacity variant of the same colour for the sell series
+        color: withAlpha(CHART_COLORS[i % CHART_COLORS.length], 0.6),
         points: pts,
       })
     })
     return result
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topWaypoints, waypointSeries])
 
   // Best buy→sell pairs: latest sample per waypoint, sorted by margin
@@ -341,7 +351,7 @@ function GoodDetailPage() {
                   <span key={wp} className="flex items-center gap-1 text-xs text-muted-foreground">
                     <span
                       className="inline-block h-2 w-4 rounded-sm"
-                      style={{ background: COLORS[i % COLORS.length] }}
+                      style={{ background: CHART_COLORS[i % CHART_COLORS.length] }}
                     />
                     {wp}
                   </span>
