@@ -57,8 +57,6 @@ public interface IInOrbitCommandAcceptor
 
 public interface IInTransitCommandAcceptor
 {
-    Task ScheduleArrivalAsync(ShipArrivedEvent arrivedEvent, DateTimeOffset dueAt, CancellationToken cancellationToken);
-
     Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken);
 }
 
@@ -136,9 +134,6 @@ public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcc
 
 public sealed class InTransitCommandAcceptor(IMessageBus bus) : IInTransitCommandAcceptor
 {
-    public Task ScheduleArrivalAsync(ShipArrivedEvent arrivedEvent, DateTimeOffset dueAt, CancellationToken cancellationToken)
-        => bus.ScheduleAsync(arrivedEvent, dueAt).AsTask();
-
     public Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken)
         => bus.PublishAsync(inOrbitEvent).AsTask();
 }

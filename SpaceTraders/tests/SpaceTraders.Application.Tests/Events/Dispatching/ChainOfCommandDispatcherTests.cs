@@ -21,14 +21,14 @@ public sealed class ChainOfCommandDispatcherTests
 
         services.AddSingleton(tracker);
         services.AddSingleton(bus);
-        services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, SkipUndockedHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, HandleUndockedHandler>();
-        services.AddSingleton<IChainOfCommandEventHandler<ShipUndockedEvent>, LateUndockedHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, SkipInOrbitHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, HandleInOrbitHandler>();
+        services.AddSingleton<IChainOfCommandEventHandler<ShipInOrbitEvent>, LateInOrbitHandler>();
 
         await using var provider = services.BuildServiceProvider();
         var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
 
-        var @event = new ShipUndockedEvent(
+        var @event = new ShipInOrbitEvent(
             "SHIP-1",
             "X1-AB",
             "X1-AB-001",
@@ -38,13 +38,13 @@ public sealed class ChainOfCommandDispatcherTests
 
         var result = await dispatcher.DispatchAsync(@event, CancellationToken.None);
 
-        result.HandlerName.Should().Be(nameof(HandleUndockedHandler));
+        result.HandlerName.Should().Be(nameof(HandleInOrbitHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipInOrbitEvent));
+        result.NextEventType.Should().BeEmpty();
         result.IsScheduled.Should().BeFalse();
-        tracker.Calls.Should().ContainInOrder(nameof(SkipUndockedHandler), nameof(HandleUndockedHandler));
-        tracker.Calls.Should().NotContain(nameof(LateUndockedHandler));
-        await bus.Received(1).PublishAsync(Arg.Any<ShipInOrbitEvent>(), Arg.Any<DeliveryOptions>());
+        tracker.Calls.Should().ContainInOrder(nameof(SkipInOrbitHandler), nameof(HandleInOrbitHandler));
+        tracker.Calls.Should().NotContain(nameof(LateInOrbitHandler));
+        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -81,9 +81,7 @@ public sealed class ChainOfCommandDispatcherTests
     {
         var bus = Substitute.For<IMessageBus>();
         var services = new ServiceCollection();
-        var inTransit = Substitute.For<IInTransitCommandAcceptor>();
 
-        services.AddSingleton(inTransit);
         services.AddSingleton<IChainOfCommandEventHandler<ShipInTransitEvent>, ScheduleArrivalHandler>();
 
         await using var provider = services.BuildServiceProvider();
@@ -103,7 +101,7 @@ public sealed class ChainOfCommandDispatcherTests
 
         result.HandlerName.Should().Be(nameof(ScheduleArrivalHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipArrivedEvent));
+        result.NextEventType.Should().Be(nameof(ShipInOrbitEvent));
         result.IsScheduled.Should().BeTrue();
     }
 
@@ -116,7 +114,7 @@ public sealed class ChainOfCommandDispatcherTests
         await using var provider = services.BuildServiceProvider();
         var dispatcher = new ChainOfCommandDispatcher(provider, bus, NullLogger<ChainOfCommandDispatcher>.Instance);
 
-        var @event = new ShipUndockedEvent(
+        var @event = new ShipInOrbitEvent(
             "SHIP-1",
             "X1-AB",
             "X1-AB-001",
@@ -134,33 +132,32 @@ public sealed class ChainOfCommandDispatcherTests
         public List<string> Calls { get; } = [];
     }
 
-    private sealed class SkipUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
+    private sealed class SkipInOrbitHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipInOrbitEvent>
     {
 
-        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
+        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
         {
-            tracker.Calls.Add(nameof(SkipUndockedHandler));
+            tracker.Calls.Add(nameof(SkipInOrbitHandler));
             return Task.FromResult(ChainOfCommandHandlerResult.Skipped());
         }
     }
 
-    private sealed class HandleUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
+    private sealed class HandleInOrbitHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipInOrbitEvent>
     {
 
-        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
+        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
         {
-            tracker.Calls.Add(nameof(HandleUndockedHandler));
-            var nextEvent = new ShipInOrbitEvent(@event.ShipSymbol, @event.SystemSymbol, @event.WaypointSymbol, @event.CorrelationId, @event.EventId, DateTimeOffset.UtcNow);
-            return Task.FromResult(ChainOfCommandHandlerResult.Handled(nextEvent));
+            tracker.Calls.Add(nameof(HandleInOrbitHandler));
+            return Task.FromResult(ChainOfCommandHandlerResult.Handled());
         }
     }
 
-    private sealed class LateUndockedHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipUndockedEvent>
+    private sealed class LateInOrbitHandler(CallTracker tracker) : IChainOfCommandEventHandler<ShipInOrbitEvent>
     {
 
-        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipUndockedEvent @event, CancellationToken cancellationToken)
+        public Task<ChainOfCommandHandlerResult> HandleAsync(ShipInOrbitEvent @event, CancellationToken cancellationToken)
         {
-            tracker.Calls.Add(nameof(LateUndockedHandler));
+            tracker.Calls.Add(nameof(LateInOrbitHandler));
             return Task.FromResult(ChainOfCommandHandlerResult.Skipped());
         }
     }
@@ -172,22 +169,22 @@ public sealed class ChainOfCommandDispatcherTests
             => Task.FromResult(ChainOfCommandHandlerResult.Handled());
     }
 
-    private sealed class ScheduleArrivalHandler(IInTransitCommandAcceptor inTransit) : IChainOfCommandEventHandler<ShipInTransitEvent>
+    private sealed class ScheduleArrivalHandler : IChainOfCommandEventHandler<ShipInTransitEvent>
     {
 
         public async Task<ChainOfCommandHandlerResult> HandleAsync(ShipInTransitEvent @event, CancellationToken cancellationToken)
         {
-            var arrivalEvent = new ShipArrivedEvent(
+            var orbitEvent = new ShipInOrbitEvent(
                 @event.ShipSymbol,
                 "X1-AB",
                 @event.DestinationWaypointSymbol,
-                @event.ArrivalTime,
                 @event.CorrelationId,
                 @event.EventId,
                 DateTimeOffset.UtcNow);
 
-            await inTransit.ScheduleArrivalAsync(arrivalEvent, @event.ArrivalTime, cancellationToken);
-            return ChainOfCommandHandlerResult.Scheduled(arrivalEvent, @event.ArrivalTime);
+#pragma warning disable CS0618
+            return await Task.FromResult(ChainOfCommandHandlerResult.Scheduled(orbitEvent, @event.ArrivalTime));
+#pragma warning restore CS0618
         }
     }
 }

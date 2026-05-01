@@ -58,7 +58,6 @@ public sealed class StateTransitionEventOutsideCommandHandlerAnalyzer : Diagnost
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
             "ShipDockedEvent",
-            "ShipUndockedEvent",
             "ShipInTransitEvent");
 
     private static readonly Dictionary<string, string> TopLevelEventNameMap = new(StringComparer.Ordinal)

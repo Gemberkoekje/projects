@@ -36,12 +36,10 @@ public sealed class ShipInTransitEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipArrivedEvent));
-        result.IsScheduled.Should().BeTrue();
+        result.NextEventType.Should().BeNullOrEmpty();
+        result.IsScheduled.Should().BeFalse();
 
-        // ShipAutomationTickEvent is also scheduled for the future arrival time. Wolverine's
-        // ScheduleAsync extension publishes via PublishAsync(message, options); verify the
-        // tick was emitted with a delivery options carrying the scheduled time.
+        // ShipAutomationTickEvent is scheduled for the future arrival time.
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == @event.ShipSymbol && e.Reason == "Arrived"),
             Arg.Is<DeliveryOptions>(o => o != null && o.ScheduledTime != null));
@@ -71,17 +69,8 @@ public sealed class ShipInTransitEventHandlerTests
 
         result.HandlerName.Should().Be(nameof(ShipInTransitEventHandler));
         result.Outcome.Should().Be("Handled");
-        result.NextEventType.Should().Be(nameof(ShipArrivedEvent));
+        result.NextEventType.Should().BeNullOrEmpty();
         result.IsScheduled.Should().BeFalse();
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipArrivedEvent>(e =>
-                e.ShipSymbol == @event.ShipSymbol &&
-                e.WaypointSymbol == @event.DestinationWaypointSymbol &&
-                e.SystemSymbol == "X1-AB" &&
-                e.CorrelationId == @event.CorrelationId &&
-                e.CausationId == @event.EventId),
-            Arg.Any<DeliveryOptions>());
 
         await bus.Received(1).PublishAsync(
             Arg.Is<ShipAutomationTickEvent>(e =>

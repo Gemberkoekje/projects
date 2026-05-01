@@ -61,8 +61,6 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
         // Events that are pattern-matched inside base handlers, or whose chain handler has been retired
         var derivedEventsHandledViaPatternMatching = new HashSet<string>
         {
-            nameof(ShipArrivedEvent),
-            nameof(ShipUndockedEvent),
             nameof(ConstructionSuppliedEvent),
             // Phase 7a: ShipStateMismatchEventHandler deleted; recovery is now covered by the
             // ShipAutomationTickEvent published alongside every ShipStateMismatchEvent (Phase 6.5e).
@@ -70,6 +68,10 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
             // Phase 7b: Docked derived events deleted; docked chain handlers removed.
             // ShipDockedEvent has no registered chain handler; automation is driven by ShipAutomationTickEvent.
             nameof(ShipDockedEvent),
+            // Phase 7c: ShipArrivedEvent and ShipUndockedEvent deleted; all orbit chain handlers removed.
+            // ShipInOrbitEvent no longer needs a chain handler; automation is driven by ShipAutomationTickEvent.
+            // Phase 7e will decouple ShipInOrbitEvent from ChainOfCommandEvent.
+            nameof(ShipInOrbitEvent),
         };
 
         // Get all handler implementations
@@ -112,7 +114,7 @@ public sealed class ChainOfCommandEventHandlerRegistrationTests
         var baseDispatchableEventTypes = new[]
         {
             // Phase 7b: ShipDockedEvent chain handlers deleted; removed from this list.
-            typeof(ShipInOrbitEvent),
+            // Phase 7c: ShipInOrbitEvent chain handlers deleted; removed from this list.
             typeof(ShipInTransitEvent),
             // Phase 7a: ShipStateMismatchEventHandler deleted; removed from this list.
         };

@@ -79,15 +79,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
-    public async Task Handle(ShipUndockedEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipUndockedEvent),
-            $"Ship {@event.ShipSymbol} undocked and is in orbit at {@event.WaypointSymbol}.",
-            cancellationToken: cancellationToken);
-    }
-
     public async Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(

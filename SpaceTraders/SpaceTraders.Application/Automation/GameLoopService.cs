@@ -16,7 +16,7 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and publishes <see cref="ShipArrivedEvent"/> for arrival processing.
+///    updates their nav state in the DB, and publishes <see cref="ShipAutomationTickEvent"/> for arrival processing.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
@@ -98,34 +98,18 @@ public sealed class GameLoopService(
             if (arrivedWaypoint is not null)
             {
                 var now = TimeProvider.System.GetUtcNow();
-                var systemSymbol = ExtractSystemSymbol(arrivedWaypoint);
-                var arrivedEvent = new ShipArrivedEvent(
-                    ship.Symbol,
-                    systemSymbol,
-                    arrivedWaypoint,
-                    now,
-                    Guid.NewGuid(),
-                    Guid.Empty,
-                    now);
 
-                await bus.PublishAsync(arrivedEvent);
-                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipArrivedEvent.", ship.Symbol, arrivedWaypoint);
-
-                // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+                // Phase 7c: ShipArrivedEvent deleted; arrival is signalled by ShipAutomationTickEvent only.
                 await bus.PublishAsync(new ShipAutomationTickEvent(
                     ship.Symbol,
                     "Arrived",
                     now,
                     Guid.NewGuid(),
-                    arrivedEvent.EventId));
+                    Guid.Empty));
+
+                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipAutomationTickEvent.", ship.Symbol, arrivedWaypoint);
             }
         }
-    }
-
-    private static string ExtractSystemSymbol(string waypointSymbol)
-    {
-        var lastDash = waypointSymbol.LastIndexOf('-');
-        return lastDash > 0 ? waypointSymbol[..lastDash] : waypointSymbol;
     }
 
     private async Task CheckFuelAsync(
