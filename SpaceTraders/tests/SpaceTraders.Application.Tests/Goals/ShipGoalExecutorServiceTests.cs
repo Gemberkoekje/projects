@@ -214,12 +214,9 @@ public sealed class ShipGoalExecutorServiceTests
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
         // Nothing should be published or scheduled when waiting for arrival.
+        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
         await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
         await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalBlockedEvent>(), Arg.Any<DeliveryOptions>());
-        // No immediate tick or scheduled tick should be published.
-        await _bus.DidNotReceive().PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.Reason != "CooldownExpired" && e.Reason != "CooldownRetry"),
-            Arg.Any<DeliveryOptions>());
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
