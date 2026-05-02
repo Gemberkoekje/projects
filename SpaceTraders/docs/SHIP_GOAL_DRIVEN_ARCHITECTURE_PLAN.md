@@ -343,51 +343,54 @@ Deliverables:
 - ✅ Given an abstract resource need and a ship, the resolver produces a concrete goal with a specific
   source waypoint.
 
-### Phase 10: Ship goal executors
+### Phase 10: Ship goal executors ✅
 
 Goal: replace the `IShipPlanner`/`ShipPlannerDecision` model with goal executors. This is the
 largest phase.
 
 Tasks:
 
-- Add `IShipGoalExecutor` interface in `SpaceTraders.Application/Goals`:
+- ✅ Add `IShipGoalExecutor` interface in `SpaceTraders.Application/Goals`:
   ```csharp
   bool CanExecute(ShipGoal goal);
   Task<GoalExecutionResult> ExecuteStepAsync(ShipModel ship, ShipGoal goal, ShipGoalContext ctx, CancellationToken ct);
   ```
-- `GoalExecutionResult` replaces `ShipPlannerDecision` for the goal layer. It carries:
-  - The outcome of this step (`Progressing`, `Completed`, `Blocked`).
+- ✅ `GoalExecutionResult` replaces `ShipPlannerDecision` for the goal layer. It carries:
+  - The outcome of this step (`Progressing`, `WaitingForArrival`, `WaitingForCooldown`, `Completed`, `Blocked`).
   - An optional blocking reason.
-  - The updated ship state (same as `ShipCommandResult`).
-- Add `ShipGoalContext` (analogous to `ShipPlannerContext`) with the read-only contextual data a
+  - An optional `CooldownExpiresAt` timestamp for cooldown scheduling.
+- ✅ Add `ShipGoalContext` (analogous to `ShipPlannerContext`) with the read-only contextual data a
   goal executor needs (fuel market waypoint, capability flags, active surveys, market snapshot,
-  active contracts).
-- Add `ShipGoalExecutorService` (replaces `ShipPlannerService`) that:
+  active contracts, nearest sell market, construction complete flag).
+- ✅ Add `ShipGoalExecutorService` (replaces `ShipPlannerService`) that:
   - Loads the ship's active goal from `IShipGoalRepository`.
   - Builds `ShipGoalContext`.
   - Selects the matching executor.
   - Calls `ExecuteStepAsync` and handles `GoalExecutionResult`.
   - Publishes `GoalCompletedEvent`, `GoalBlockedEvent`, or a follow-up `ShipAutomationTickEvent`.
-- Implement goal executors, starting with `MineResourceGoalExecutor` (as the most complete
-  reference case), then:
+  - Falls back to `IShipPlannerService` for ships with no active goal (backward-compatibility bridge).
+- ✅ Implement goal executors:
+  - `IdleGoalExecutor`
+  - `MineResourceGoalExecutor` (full mine → sell cycle, survey-aware, fuel-aware)
   - `MoveToWaypointGoalExecutor`
   - `SellCargoGoalExecutor`
-  - `SiphonResourceGoalExecutor`
+  - `SiphonResourceGoalExecutor` (full siphon → sell cycle, fuel-aware)
   - `DeliverCargoGoalExecutor`
   - `SupplyConstructionGoalExecutor`
   - `ScoutWaypointGoalExecutor`
   - `PatrolMarketGoalExecutor`
-- Update `ShipAutomationTickEventHandler` to call `IShipGoalExecutorService` instead of
+- ✅ Update `ShipAutomationTickEventHandler` to call `IShipGoalExecutorService` instead of
   `IShipPlannerService`.
-- Deprecate `IShipPlanner`, `ShipPlannerDecision`, `ShipPlannerCommandKind`, `ShipPlannerContext`,
-  and `ShipPlannerService` (remove after executors are proven in production).
-- Add unit tests for each executor covering: every starting `ShipLocalStatus`, low-fuel path,
+- ✅ Deprecate `IShipPlanner`, `ShipPlannerDecision`, `ShipPlannerCommandKind`, `ShipPlannerContext`,
+  and `ShipPlannerService` with `[Obsolete]` (remove in Phase 12 after executors are proven in production).
+- ✅ Add unit tests for each executor covering: every starting `ShipLocalStatus`, low-fuel path,
   capability missing path, cooldown waiting, goal completion detection, and goal blocked detection.
+  365 tests pass in total.
 
 Deliverables:
 
-- Ships execute goals autonomously through any starting state.
-- Old planner infrastructure is deprecated and can be removed.
+- ✅ Ships execute goals autonomously through any starting state.
+- ✅ Old planner infrastructure is deprecated and can be removed in Phase 12.
 
 ### Phase 11: Orchestrator evolution to resource production goals
 

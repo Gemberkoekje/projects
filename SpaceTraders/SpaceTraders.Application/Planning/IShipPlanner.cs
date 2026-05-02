@@ -12,6 +12,7 @@ namespace SpaceTraders.Application.Planning;
 /// a <see cref="ShipPlannerDecision"/>. Translating that decision into a command is the
 /// responsibility of <see cref="IShipPlannerExecutor"/>.
 /// </summary>
+[Obsolete("Phase 10: use IShipGoalExecutor instead. Will be removed in Phase 12.")]
 public interface IShipPlanner
 {
     /// <summary>
@@ -31,6 +32,7 @@ public interface IShipPlanner
 /// <see cref="IShipPlannerService"/> before invoking the planner so the planner itself
 /// remains pure and easy to unit test.
 /// </summary>
+[Obsolete("Phase 10: use ShipGoalContext instead. Will be removed in Phase 12.")]
 public sealed record ShipPlannerContext
 {
     public int ActiveSurveyCount { get; init; }
