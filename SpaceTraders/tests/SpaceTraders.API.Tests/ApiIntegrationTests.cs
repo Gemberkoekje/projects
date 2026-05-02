@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
+using ApiDtos = SpaceTraders.API.Dtos;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -357,6 +358,152 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/X1-TEST-1");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // ── Phase 16d: Fleet status endpoint content tests ───────────────────────
+
+    [Fact]
+    public async Task GetGoalChains_ReturnsCorrectChainCountAndResourceNeeds()
+    {
+        var goalId = Guid.NewGuid();
+        _factory.FleetStatusQueryService
+            .GetGoalChainsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new OrchestratorGoalChain(
+                    goalId,
+                    FleetGoalKind.Construction,
+                    1,
+                    "Supply Jump Gate at X1-TD7-JG",
+                    new[]
+                    {
+                        new ResourceNeedEntry("BAUXITE", 100, 30, "needed for Jump Gate", new[] { "X1-TD7-1" }),
+                    }),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/goal-chains");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var chains = await response.Content.ReadFromJsonAsync<List<ApiDtos.FleetGoalChainDto>>();
+        chains.Should().HaveCount(1);
+
+        var chain = chains![0];
+        chain.FleetGoalId.Should().Be(goalId);
+        chain.FleetGoalKind.Should().Be("Construction");
+        chain.Priority.Should().Be(1);
+        chain.FleetGoalDescription.Should().Be("Supply Jump Gate at X1-TD7-JG");
+        chain.ResourceNeeds.Should().HaveCount(1);
+
+        var need = chain.ResourceNeeds[0];
+        need.TradeSymbol.Should().Be("BAUXITE");
+        need.UnitsNeeded.Should().Be(100);
+        need.UnitsDelivered.Should().Be(30);
+        need.PurposeDescription.Should().Be("needed for Jump Gate");
+        need.AssignedShips.Should().ContainSingle().Which.Should().Be("X1-TD7-1");
+    }
+
+    [Fact]
+    public async Task GetAssignments_MapsAllActiveShipGoalsToDto()
+    {
+        var fleetGoalId = Guid.NewGuid();
+        var assignedAt = new DateTimeOffset(2024, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        _factory.FleetStatusQueryService
+            .GetAssignmentsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new ShipAssignmentSnapshot(
+                    "X1-TD7-2",
+                    ShipGoalKind.MineResource,
+                    "Mining BAUXITE at X1-TD7-A3",
+                    assignedAt,
+                    SourceWaypoint: "X1-TD7-A3",
+                    FleetGoalId: fleetGoalId,
+                    FleetGoalDescription: "Supply Jump Gate at X1-TD7-JG"),
+                new ShipAssignmentSnapshot(
+                    "X1-TD7-3",
+                    ShipGoalKind.Idle,
+                    "Idle",
+                    null),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/assignments");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var assignments = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipAssignmentDto>>();
+        assignments.Should().HaveCount(2);
+
+        var miner = assignments!.Single(a => a.ShipSymbol == "X1-TD7-2");
+        miner.GoalKind.Should().Be("MineResource");
+        miner.GoalDescription.Should().Be("Mining BAUXITE at X1-TD7-A3");
+        miner.SourceWaypoint.Should().Be("X1-TD7-A3");
+        miner.FleetGoalId.Should().Be(fleetGoalId);
+        miner.FleetGoalDescription.Should().Be("Supply Jump Gate at X1-TD7-JG");
+        miner.AssignedAt.Should().Be(assignedAt);
+
+        var idleShip = assignments.Single(a => a.ShipSymbol == "X1-TD7-3");
+        idleShip.GoalKind.Should().Be("Idle");
+        idleShip.AssignedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetActivity_ReturnsSnapshotPerShipWithCorrectActivityDescription()
+    {
+        var arrival = new DateTimeOffset(2024, 6, 1, 14, 23, 0, TimeSpan.Zero);
+        _factory.FleetStatusQueryService
+            .GetShipActivitiesAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new ShipActivitySnapshot(
+                    "X1-TD7-4",
+                    ShipLocalStatus.InTransit,
+                    "Moving to X1-TD7-A3 (arrives 14:23 UTC)",
+                    10, 40, 300, 400, false,
+                    DestinationWaypoint: "X1-TD7-A3",
+                    EstimatedArrival: arrival),
+                new ShipActivitySnapshot(
+                    "X1-TD7-5",
+                    ShipLocalStatus.Docked,
+                    "Docked at X1-TEST-A1",
+                    0, 40, 400, 400, false,
+                    CurrentWaypoint: "X1-TEST-A1"),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var activities = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipActivityDto>>();
+        activities.Should().HaveCount(2);
+
+        var inTransit = activities!.Single(a => a.ShipSymbol == "X1-TD7-4");
+        inTransit.LocalStatus.Should().Be("InTransit");
+        inTransit.ActivityDescription.Should().Be("Moving to X1-TD7-A3 (arrives 14:23 UTC)");
+        inTransit.DestinationWaypoint.Should().Be("X1-TD7-A3");
+        inTransit.EstimatedArrival.Should().Be(arrival);
+        inTransit.CargoUsed.Should().Be(10);
+        inTransit.FuelCurrent.Should().Be(300);
+
+        var docked = activities.Single(a => a.ShipSymbol == "X1-TD7-5");
+        docked.LocalStatus.Should().Be("Docked");
+        docked.ActivityDescription.Should().Be("Docked at X1-TEST-A1");
+        docked.CurrentWaypoint.Should().Be("X1-TEST-A1");
+    }
+
+    [Fact]
+    public async Task GetGoalChains_ResponseHasCacheControlHeader()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/goal-chains");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Headers.CacheControl.Should().NotBeNull();
+        response.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task GetActivityByShip_WithUnknownSymbol_HasNoCacheControlHeader()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/NO-SUCH-SHIP");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        // 404 responses must not carry a Cache-Control header (per Phase 16c spec)
+        response.Headers.CacheControl.Should().BeNull();
     }
 }
 
