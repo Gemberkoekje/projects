@@ -1183,7 +1183,7 @@ Deliverables:
 
 - API responses are stable, versioning-friendly JSON shapes decoupled from internal domain types.
 
-#### Phase 16c: Caching and freshness
+#### Phase 16c: Caching and freshness ✅
 
 Tasks:
 
@@ -1191,6 +1191,16 @@ Tasks:
   dashboard polling every second does not trigger N database reads per request.
 - Add a `Cache-Control: max-age=5` response header so clients can respect the TTL without
   explicitly polling faster than the data changes.
+
+Implementation notes:
+- Added `CachingFleetStatusQueryService` decorator in `SpaceTraders.Application/Services/` that
+  wraps the concrete `FleetStatusQueryService` with `IMemoryCache` (5-second absolute TTL per
+  cache key). Cache keys: `fleet:goal-chains`, `fleet:assignments`, `fleet:activities`,
+  `fleet:activity:{shipSymbol}`.
+- Updated `DependencyInjection.cs` to call `AddMemoryCache()`, register `FleetStatusQueryService`
+  as the concrete type, and resolve `IFleetStatusQueryService` as `CachingFleetStatusQueryService`.
+- Updated `FleetStatusEndpoints.cs` to inject `HttpContext` and set
+  `Cache-Control: public, max-age=5` on every successful response (404 responses omit the header).
 
 Deliverables:
 

@@ -56,7 +56,13 @@ public static class DependencyInjection
         services.AddScoped<Orchestration.IFleetOrchestrator, Orchestration.FleetOrchestrator>();
 
         // Phase 15a/15b: observability read-model (FleetStatusQueryService is the concrete implementation from Phase 15b).
-        services.AddScoped<IFleetStatusQueryService, FleetStatusQueryService>();
+        // Phase 16c: wrap with a short-lived in-memory cache so dashboard polling does not overload the database.
+        services.AddMemoryCache();
+        services.AddScoped<FleetStatusQueryService>();
+        services.AddScoped<IFleetStatusQueryService>(sp =>
+            new CachingFleetStatusQueryService(
+                sp.GetRequiredService<FleetStatusQueryService>(),
+                sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
