@@ -172,6 +172,8 @@ public sealed class FleetOrchestrator(
                 => new AssignShipToGoalCommand(ship.Symbol, goal),
             FleetGoalKind.MarketCoverage when !string.IsNullOrWhiteSpace(goal.OriginWaypoint)
                 => new AssignShipToGoalCommand(ship.Symbol, goal),
+            FleetGoalKind.MarketScouting when !string.IsNullOrWhiteSpace(goal.OriginWaypoint)
+                => new AssignShipToGoalCommand(ship.Symbol, goal),
             _ => null,
         };
     }

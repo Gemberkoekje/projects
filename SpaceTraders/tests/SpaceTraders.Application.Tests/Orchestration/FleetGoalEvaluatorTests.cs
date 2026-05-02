@@ -359,6 +359,55 @@ public sealed class FleetGoalEvaluatorTests
         goals.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_SkipsWhenBudgetInsufficient()
+    {
+        // Budget returns CanAfford=false → fleet expansion evaluator produces no goals.
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(2, 1, 1, 0, 0, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(false, 50_000, 100_000, 0,
+                Reason: "Proposed cost exceeds spendable credits"));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 50_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MarketCoverageGoalEvaluator_AllMarketsCovered_ProducesNoGoal()
+    {
+        // All market waypoints already have active MarketProbe assignments → evaluator returns empty.
+        var ships = Substitute.For<IShipRepository>();
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("S1", "X1-AB", "X1-AB-1", "DOCKED", "CRUISE", 100, 100),
+        ]);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
+            new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+            new WaypointCacheModel("X1-AB-MKT-2", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+        ]);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        var now = DateTimeOffset.UtcNow;
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipAssignmentDto("PROBE-1", "MarketProbe", "X1-AB-MKT-1", null, null, null, 0, now, null),
+            new ShipAssignmentDto("PROBE-2", "MarketProbe", "X1-AB-MKT-2", null, null, null, 0, now, null),
+        ]);
+
+        var evaluator = new MarketCoverageGoalEvaluator(ships, waypoints, assignments);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().BeEmpty();
+    }
+
     // ────────────────────────────────────────────────────────────────────────────
     // MarketScoutingGoalEvaluator
     // ────────────────────────────────────────────────────────────────────────────
