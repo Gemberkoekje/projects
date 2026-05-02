@@ -31,58 +31,58 @@ public sealed class DeliverCargoGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            if (!atDest)
+            if (atDest)
             {
-                await dockedCommands.OrbitAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Orbiting to navigate to delivery waypoint.");
+                return await DeliverOrCompleteAsync(ship, deliverGoal, ct);
             }
 
-            // At delivery waypoint: deliver.
-            var cargoUnits = ship.CargoInventory?
-                .FirstOrDefault(c => c.Symbol.Equals(deliverGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
-                .Units ?? 0;
-
-            if (cargoUnits <= 0)
-            {
-                return GoalExecutionResult.Completed("No cargo to deliver; delivery complete.");
-            }
-
-            await dockedCommands.DeliverContractAsync(
-                deliverGoal.ContractId,
-                ship.Symbol,
-                deliverGoal.TradeSymbol,
-                cargoUnits,
-                deliverGoal.DeliveryWaypointSymbol,
-                ct);
-            return GoalExecutionResult.Progressing($"Delivering {cargoUnits}x {deliverGoal.TradeSymbol}.");
+            await dockedCommands.OrbitAsync(ship.Symbol, ct);
         }
-
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         if (atDest)
         {
             await inOrbitCommands.DockAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("At delivery waypoint; docking.");
+            return await DeliverOrCompleteAsync(ship, deliverGoal, ct);
         }
 
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, deliverGoal.DeliveryWaypointSymbol, ct);
         return GoalExecutionResult.Progressing($"Navigating to delivery waypoint {deliverGoal.DeliveryWaypointSymbol}.");
+    }
+
+    private async Task<GoalExecutionResult> DeliverOrCompleteAsync(ShipModel ship, DeliverCargoGoal deliverGoal, CancellationToken ct)
+    {
+        var cargoUnits = ship.CargoInventory?
+            .FirstOrDefault(c => c.Symbol.Equals(deliverGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase))?
+            .Units ?? 0;
+
+        if (cargoUnits <= 0)
+        {
+            return GoalExecutionResult.Completed("No cargo to deliver; delivery complete.");
+        }
+
+        await dockedCommands.DeliverContractAsync(
+            deliverGoal.ContractId,
+            ship.Symbol,
+            deliverGoal.TradeSymbol,
+            cargoUnits,
+            deliverGoal.DeliveryWaypointSymbol,
+            ct);
+        return GoalExecutionResult.Progressing($"Delivering {cargoUnits}x {deliverGoal.TradeSymbol}.");
     }
 }

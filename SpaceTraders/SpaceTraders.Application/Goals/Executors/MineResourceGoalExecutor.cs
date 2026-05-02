@@ -42,14 +42,65 @@ public sealed class MineResourceGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            return await PlanDockedAsync(ship, mineGoal, ctx, ct);
-        }
+            // 1. Deliver contract cargo at the current docked waypoint.
+            var deliverDecision = TryContractDelivery(ship, ctx);
+            if (deliverDecision is not null)
+            {
+                await dockedCommands.DeliverContractAsync(
+                    deliverDecision.Value.ContractId,
+                    ship.Symbol,
+                    deliverDecision.Value.TradeSymbol,
+                    deliverDecision.Value.Units,
+                    ship.WaypointSymbol ?? string.Empty,
+                    ct);
+                return GoalExecutionResult.Progressing($"Delivering {deliverDecision.Value.Units}x {deliverDecision.Value.TradeSymbol} for contract.");
+            }
 
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+            // 2. Sell eligible non-protected cargo.
+            var sellDecision = TrySellCargo(ship, ctx);
+            if (sellDecision is not null)
+            {
+                await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
+                return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
+            }
+
+            // 3. Jettison low-value cargo when full.
+            var jettisonDecision = TryJettisonCargo(ship, ctx);
+            if (jettisonDecision is not null)
+            {
+                await bus.InvokeAsync(new JettisonCargoCommand(ship.Symbol, jettisonDecision.Value.TradeSymbol, jettisonDecision.Value.Units), ct);
+                return GoalExecutionResult.Progressing($"Jettisoning {jettisonDecision.Value.Units}x {jettisonDecision.Value.TradeSymbol}.");
+            }
+
+            // 4. Refuel from hydrocarbon cargo if needed.
+            if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity)
+            {
+                var hydroUnits = ship.CargoInventory?
+                    .FirstOrDefault(c => c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase))?
+                    .Units ?? 0;
+                if (hydroUnits > ctx.MiningReserveHydrocarbonUnits)
+                {
+                    await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: true, ct);
+                    return GoalExecutionResult.Progressing("Refueling from hydrocarbon cargo.");
+                }
+            }
+
+            // 5. Refuel from market if needed.
+            if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
+            {
+                await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
+                return GoalExecutionResult.Progressing("Refueling at market.");
+            }
+
+            // 6. Orbit and continue.
+            await dockedCommands.OrbitAsync(ship.Symbol, ct);
+        }
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         var atSource = string.Equals(ship.WaypointSymbol, mineGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase);
 
         if (atSource)
@@ -58,63 +109,6 @@ public sealed class MineResourceGoalExecutor(
         }
 
         return await PlanNavigatingToSourceAsync(ship, mineGoal, ctx, ct);
-    }
-
-    private async Task<GoalExecutionResult> PlanDockedAsync(ShipModel ship, MineResourceGoal goal, ShipGoalContext ctx, CancellationToken ct)
-    {
-        // 1. Deliver contract cargo at the current docked waypoint.
-        var deliverDecision = TryContractDelivery(ship, ctx);
-        if (deliverDecision is not null)
-        {
-            await dockedCommands.DeliverContractAsync(
-                deliverDecision.Value.ContractId,
-                ship.Symbol,
-                deliverDecision.Value.TradeSymbol,
-                deliverDecision.Value.Units,
-                ship.WaypointSymbol ?? string.Empty,
-                ct);
-            return GoalExecutionResult.Progressing($"Delivering {deliverDecision.Value.Units}x {deliverDecision.Value.TradeSymbol} for contract.");
-        }
-
-        // 2. Sell eligible non-protected cargo.
-        var sellDecision = TrySellCargo(ship, ctx);
-        if (sellDecision is not null)
-        {
-            await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
-            return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
-        }
-
-        // 3. Jettison low-value cargo when full.
-        var jettisonDecision = TryJettisonCargo(ship, ctx);
-        if (jettisonDecision is not null)
-        {
-            await bus.InvokeAsync(new JettisonCargoCommand(ship.Symbol, jettisonDecision.Value.TradeSymbol, jettisonDecision.Value.Units), ct);
-            return GoalExecutionResult.Progressing($"Jettisoning {jettisonDecision.Value.Units}x {jettisonDecision.Value.TradeSymbol}.");
-        }
-
-        // 4. Refuel from hydrocarbon cargo if needed.
-        if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity)
-        {
-            var hydroUnits = ship.CargoInventory?
-                .FirstOrDefault(c => c.Symbol.Equals("HYDROCARBON", StringComparison.OrdinalIgnoreCase))?
-                .Units ?? 0;
-            if (hydroUnits > ctx.MiningReserveHydrocarbonUnits)
-            {
-                await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: true, ct);
-                return GoalExecutionResult.Progressing("Refueling from hydrocarbon cargo.");
-            }
-        }
-
-        // 5. Refuel from market if needed.
-        if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
-        {
-            await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
-            return GoalExecutionResult.Progressing("Refueling at market.");
-        }
-
-        // 6. Orbit to continue the cycle.
-        await dockedCommands.OrbitAsync(ship.Symbol, ct);
-        return GoalExecutionResult.Progressing("Orbiting to continue mining cycle.");
     }
 
     private async Task<GoalExecutionResult> PlanAtSourceAsync(ShipModel ship, MineResourceGoal goal, ShipGoalContext ctx, ShipCapabilities caps, CancellationToken ct)
@@ -162,7 +156,6 @@ public sealed class MineResourceGoalExecutor(
                 if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
                 {
                     await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-                    return GoalExecutionResult.Progressing("Critically low fuel; switching to DRIFT.");
                 }
 
                 if (string.Equals(ship.WaypointSymbol, ctx.FuelMarketWaypoint, StringComparison.OrdinalIgnoreCase))
@@ -180,16 +173,13 @@ public sealed class MineResourceGoalExecutor(
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        // Patch flight mode if needed.
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
+            // Patch flight mode if needed.
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, goal.SourceWaypointSymbol, ct);

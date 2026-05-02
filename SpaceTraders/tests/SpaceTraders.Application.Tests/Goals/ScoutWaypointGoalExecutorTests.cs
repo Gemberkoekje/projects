@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
@@ -61,12 +62,14 @@ public sealed class ScoutWaypointGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_InOrbit_AtTarget_Docks()
+    public async Task ExecuteStepAsync_InOrbit_AtTarget_DocksRefreshesAndCompletes()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-TARGET"), Goal("X1-AB-TARGET"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await _waypointVisit.Received(1).MarkVisitedAsync("X1-AB-TARGET", Arg.Any<CancellationToken>());
+        await _marketRefresh.Received(1).RefreshIfApplicableAsync("X1-AB-TARGET", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -91,11 +94,12 @@ public sealed class ScoutWaypointGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_NoFuelTank_SwitchesToDrift()
+    public async Task ExecuteStepAsync_NoFuelTank_PatchesDriftAndNavigates()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", fuelCap: 0), Goal("X1-AB-TARGET"), new ShipGoalContext(), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        result.Reason.Should().Contain("DRIFT");
+        await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
+        await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

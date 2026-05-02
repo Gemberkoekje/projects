@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
@@ -94,13 +95,28 @@ public sealed class SupplyConstructionGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_Docked_AtSite_Orbits()
+    public async Task ExecuteStepAsync_Docked_AtSite_NoCargo_OrbitsAndCompletes()
     {
         var ship = Ship("X1-AB-SITE", "DOCKED");
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
 
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_Docked_AtSite_WithCargo_OrbitsAndSupplies()
+    {
+        var inventory = new List<CargoItemModel> { new("IRON_ORE", 20) };
+        var ship = Ship("X1-AB-SITE", "DOCKED", inventory);
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
+
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await _inOrbit.Received(1).SupplyConstructionAsync(
+            "SHIP-1", "X1-AB", "X1-AB-SITE", "IRON_ORE", 20,
+            Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
