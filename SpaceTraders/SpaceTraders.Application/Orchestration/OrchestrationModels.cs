@@ -37,6 +37,21 @@ public sealed record FleetGoal
 
     public long EstimatedCost { get; init; }
 
+    /// <summary>
+    /// For <see cref="FleetGoalKind.FleetExpansion"/> goals: the ship type to purchase (e.g. "SHIP_MINING_DRONE").
+    /// </summary>
+    public string? ExpansionShipType { get; init; }
+
+    /// <summary>
+    /// For <see cref="FleetGoalKind.FleetExpansion"/> goals: the waypoint symbol of the shipyard where the ship will be purchased.
+    /// </summary>
+    public string? ExpansionShipyardWaypoint { get; init; }
+
+    /// <summary>
+    /// For <see cref="FleetGoalKind.FleetExpansion"/> goals: the goal that the newly-purchased ship should immediately be assigned to.
+    /// </summary>
+    public FleetGoal? ExpansionTargetGoal { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public FleetGoal(
         FleetGoalKind Kind,
@@ -48,7 +63,10 @@ public sealed record FleetGoal
         string? DestinationWaypoint = null,
         int RemainingUnits = 0,
         DateTimeOffset? Deadline = null,
-        long EstimatedCost = 0)
+        long EstimatedCost = 0,
+        string? ExpansionShipType = null,
+        string? ExpansionShipyardWaypoint = null,
+        FleetGoal? ExpansionTargetGoal = null)
     {
         this.Kind = Kind;
         this.Description = Description;
@@ -60,6 +78,9 @@ public sealed record FleetGoal
         this.RemainingUnits = RemainingUnits;
         this.Deadline = Deadline;
         this.EstimatedCost = EstimatedCost;
+        this.ExpansionShipType = ExpansionShipType;
+        this.ExpansionShipyardWaypoint = ExpansionShipyardWaypoint;
+        this.ExpansionTargetGoal = ExpansionTargetGoal;
     }
 }
 

@@ -106,8 +106,9 @@ public sealed class FleetGoalEvaluatorTests
         var settings = Substitute.For<ISettingsRepository>();
         var agents = Substitute.For<IAgentRepository>();
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 1_000_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
 
-        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents);
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
         var goals = await evaluator.EvaluateAsync(CancellationToken.None);
 
         goals.Should().BeEmpty();
@@ -117,6 +118,7 @@ public sealed class FleetGoalEvaluatorTests
     public async Task FleetExpansionGoalEvaluator_EmitsGoalWhenAffordableAndNoIdle()
     {
         var capacity = Substitute.For<IFleetCapacityEstimator>();
+        // 1 mining, 1 hauling, 0 scouting → scouting bottleneck → picks SHIP_PROBE
         capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
             new FleetCapacityEstimate(2, 1, 1, 0, 0, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
         var budget = Substitute.For<IBudgetPolicy>();
@@ -126,13 +128,17 @@ public sealed class FleetGoalEvaluatorTests
         settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
         var agents = Substitute.For<IAgentRepository>();
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_PROBE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
 
-        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents);
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
         var goals = await evaluator.EvaluateAsync(CancellationToken.None);
 
         goals.Should().HaveCount(1);
         goals[0].Kind.Should().Be(FleetGoalKind.FleetExpansion);
         goals[0].EstimatedCost.Should().Be(400_000);
+        goals[0].ExpansionShipType.Should().Be("SHIP_PROBE");
+        goals[0].ExpansionShipyardWaypoint.Should().Be("X1-AB-SHIPYARD");
     }
 
     [Fact]
@@ -144,8 +150,128 @@ public sealed class FleetGoalEvaluatorTests
         settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(2);
         var agents = Substitute.For<IAgentRepository>();
         agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
 
-        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents);
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_BottleneckExtraction_SelectsMiningDrone()
+    {
+        // 0 mining, 1 hauling, 1 scouting, 0 idle → mining bottleneck → SHIP_MINING_DRONE
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(2, 0, 1, 0, 1, IdleShips: 0, TotalCargoCapacity: 40, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].ExpansionShipType.Should().Be("SHIP_MINING_DRONE");
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_BottleneckCargo_SelectsLightHauler()
+    {
+        // 2 mining, 0 hauling, 1 scouting, 0 idle → cargo bottleneck → SHIP_LIGHT_HAULER
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(3, 2, 0, 0, 1, IdleShips: 0, TotalCargoCapacity: 40, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 3));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_LIGHT_HAULER", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].ExpansionShipType.Should().Be("SHIP_LIGHT_HAULER");
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_BottleneckMarketCoverage_SelectsProbe()
+    {
+        // 1 mining, 1 hauling, 0 scouting, 0 idle → market coverage bottleneck → SHIP_PROBE
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(2, 1, 1, 0, 0, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_PROBE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].ExpansionShipType.Should().Be("SHIP_PROBE");
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_FallsBackToSettings_WhenNoBottleneck()
+    {
+        // 1 mining, 1 hauling, 1 scouting, 0 idle → no specific bottleneck → falls back to settings
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(3, 1, 1, 0, 1, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        settings.GetAsync<string>("FleetExpansion.PreferredShipType", Arg.Any<CancellationToken>()).Returns("SHIP_MINING_DRONE");
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 3));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_MINING_DRONE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].ExpansionShipType.Should().Be("SHIP_MINING_DRONE");
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_SkipsWhenNoShipyardFound()
+    {
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(2, 1, 1, 0, 0, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((string?)null);
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
         var goals = await evaluator.EvaluateAsync(CancellationToken.None);
 
         goals.Should().BeEmpty();

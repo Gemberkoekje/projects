@@ -170,8 +170,14 @@ public sealed class FleetExpansionGoalEvaluator(
     IFleetCapacityEstimator capacity,
     IBudgetPolicy budget,
     ISettingsRepository settings,
-    IAgentRepository agents) : IFleetGoalEvaluator
+    IAgentRepository agents,
+    IShipyardRepository shipyards) : IFleetGoalEvaluator
 {
+    // Ship types ordered by preference for each role
+    private static readonly string[] MiningShipTypes = ["SHIP_MINING_DRONE", "SHIP_ORE_HOUND"];
+    private static readonly string[] HaulingShipTypes = ["SHIP_LIGHT_HAULER", "SHIP_HEAVY_FREIGHTER"];
+    private static readonly string[] ScoutingShipTypes = ["SHIP_PROBE", "SHIP_SATELLITE"];
+
     public async Task<IReadOnlyList<FleetGoal>> EvaluateAsync(CancellationToken cancellationToken = default)
     {
         var agent = await agents.GetAsync(cancellationToken);
@@ -199,10 +205,60 @@ public sealed class FleetExpansionGoalEvaluator(
             return [];
         }
 
+        var (shipType, bottleneckKind) = SelectShipTypeForBottleneck(estimate);
+        if (shipType is null)
+        {
+            shipType = await settings.GetAsync<string>("FleetExpansion.PreferredShipType", cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(shipType))
+        {
+            return [];
+        }
+
+        var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(shipType, cancellationToken);
+        if (string.IsNullOrWhiteSpace(shipyardWaypoint))
+        {
+            return [];
+        }
+
+        var description = bottleneckKind is not null
+            ? $"Expand fleet: bottleneck is {bottleneckKind}; purchasing {shipType} at {shipyardWaypoint}."
+            : $"Expand fleet: no idle ships; purchasing {shipType} at {shipyardWaypoint}.";
+
         return [new FleetGoal(
             Kind: FleetGoalKind.FleetExpansion,
-            Description: "Expand fleet: no idle ships, spendable credits available.",
+            Description: description,
             Priority: 30,
-            EstimatedCost: decision.SpendableCredits)];
+            EstimatedCost: decision.SpendableCredits,
+            ExpansionShipType: shipType,
+            ExpansionShipyardWaypoint: shipyardWaypoint)];
+    }
+
+    /// <summary>
+    /// Determines which ship type best addresses the current fleet bottleneck.
+    /// Returns (shipType, bottleneckKind) or (null, null) when no specific bottleneck is detected.
+    /// </summary>
+    private static (string? ShipType, string? BottleneckKind) SelectShipTypeForBottleneck(FleetCapacityEstimate estimate)
+    {
+        // Prefer scouting ship when there are no scouts at all
+        if (estimate.ScoutingShips == 0 && estimate.TotalShips > 0)
+        {
+            return (ScoutingShipTypes[0], "MarketCoverage");
+        }
+
+        // Mining bottleneck: more haulers than miners, or no miners at all
+        if (estimate.MiningShips == 0 || estimate.MiningShips < estimate.HaulingShips)
+        {
+            return (MiningShipTypes[0], "Extraction");
+        }
+
+        // Hauling bottleneck: miners outnumber haulers by more than 1:1
+        if (estimate.HaulingShips < estimate.MiningShips)
+        {
+            return (HaulingShipTypes[0], "Cargo");
+        }
+
+        return (null, null);
     }
 }

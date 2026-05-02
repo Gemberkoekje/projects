@@ -147,29 +147,44 @@ public sealed class AssignShipToGoalCommandHandler(
         AssignShipToGoalCommand command,
         CancellationToken cancellationToken)
     {
-        var preferredShipType = await settings.GetAsync<string>("FleetExpansion.PreferredShipType", cancellationToken);
-        if (string.IsNullOrWhiteSpace(preferredShipType))
+        var shipType = command.Goal.ExpansionShipType;
+        var shipyardWaypoint = command.Goal.ExpansionShipyardWaypoint;
+
+        // Fall back to settings if the evaluator did not supply explicit expansion info.
+        if (string.IsNullOrWhiteSpace(shipType))
+        {
+            shipType = await settings.GetAsync<string>("FleetExpansion.PreferredShipType", cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(shipType))
         {
             logger.LogWarning(
                 "AssignShipToGoalCommandHandler: FleetExpansion goal has no preferred ship type configured; skipping.");
             return;
         }
 
-        var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(preferredShipType, cancellationToken);
+        if (string.IsNullOrWhiteSpace(shipyardWaypoint))
+        {
+            shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(shipType, cancellationToken);
+        }
+
         if (string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
             logger.LogWarning(
                 "AssignShipToGoalCommandHandler: no known shipyard for type {ShipType}; cannot expand fleet.",
-                preferredShipType);
+                shipType);
             return;
         }
 
         logger.LogInformation(
             "AssignShipToGoalCommandHandler: FleetExpansion — purchasing {ShipType} at {Shipyard}.",
-            preferredShipType,
+            shipType,
             shipyardWaypoint);
 
-        await bus.SendAsync(new PurchaseShipCommand(preferredShipType, shipyardWaypoint));
+        await bus.SendAsync(new PurchaseShipCommand(
+            shipType,
+            shipyardWaypoint,
+            TargetGoal: command.Goal.ExpansionTargetGoal));
     }
 
     private async Task ActivateGoalAsync(
