@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { apiFetch } from '@/lib/api-fetch'
 import type {
   ShipDto,
@@ -144,8 +144,12 @@ export default function ShipDetailPage() {
   const activity = activityQ.data ?? []
   const shipActivity = shipActivityQ.data ?? null
   const shipAssignment = assignmentsQ.data?.find(a => a.shipSymbol === symbol) ?? null
-  const servingChains = (goalChainsQ.data ?? []).filter(c =>
-    c.resourceNeeds.some(n => n.assignedShips.includes(symbol ?? '')),
+  const servingChains = useMemo(
+    () =>
+      (goalChainsQ.data ?? []).filter(c =>
+        c.resourceNeeds.some(n => n.assignedShips.includes(symbol ?? '')),
+      ),
+    [goalChainsQ.data, symbol],
   )
   const goalHistory = goalHistoryQ.data ?? []
 
