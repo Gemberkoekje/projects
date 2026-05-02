@@ -78,13 +78,14 @@ public sealed class FleetOrchestratorTests
     [Fact]
     public async Task EvaluateAndAssignAsync_PrefersHigherPriorityGoal()
     {
+        // Goals with lower priority numbers are assigned first (ascending order).
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
         var assignments = EmptyAssignments();
 
-        var contract = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
-        var market = new FleetGoal(FleetGoalKind.MarketCoverage, "M", 40, OriginWaypoint: "X1-MKT");
+        var contract = new FleetGoal(FleetGoalKind.Contract, "C", FleetGoalPriority.Contract, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
+        var market = new FleetGoal(FleetGoalKind.MarketCoverage, "M", FleetGoalPriority.MarketCoverage, OriginWaypoint: "X1-MKT");
 
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(market), EvaluatorReturning(contract)],
@@ -99,6 +100,48 @@ public sealed class FleetOrchestratorTests
         await bus.Received(1).SendAsync(
             Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.Contract),
             Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task EvaluateAndAssignAsync_AssignsHigherPriorityGoalFirst_WhenMultipleIdleShipsAvailable()
+    {
+        // With two idle ships and two goals of different priorities, each ship
+        // should be assigned to the goal with the lower priority number first.
+        var bus = Substitute.For<IMessageBus>();
+        var ships = ShipsWith(
+            new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30),
+            new ShipModel("S2", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
+        var assignments = EmptyAssignments();
+
+        var highPriority = new FleetGoal(FleetGoalKind.Contract, "High", FleetGoalPriority.Contract, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
+        var lowPriority = new FleetGoal(FleetGoalKind.MarketCoverage, "Low", FleetGoalPriority.MarketCoverage, OriginWaypoint: "X1-MKT");
+
+        var orchestrator = new FleetOrchestrator(
+            [EvaluatorReturning(lowPriority, highPriority)],
+            ships,
+            assignments,
+            EmptyFleetGoalRepository(),
+            bus,
+            NullLogger<FleetOrchestrator>.Instance);
+
+        await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
+
+        // Both goals should be assigned (two ships available).
+        await bus.Received(1).SendAsync(
+            Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.Contract),
+            Arg.Any<DeliveryOptions>());
+        await bus.Received(1).SendAsync(
+            Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.MarketCoverage),
+            Arg.Any<DeliveryOptions>());
+
+        // Verify the high-priority goal (Contract, lower number) was assigned before the low-priority one.
+        var calls = bus.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == nameof(IMessageBus.SendAsync))
+            .Select(c => c.GetArguments()[0])
+            .OfType<AssignShipToGoalCommand>()
+            .ToList();
+        calls[0].Goal.Kind.Should().Be(FleetGoalKind.Contract);
+        calls[1].Goal.Kind.Should().Be(FleetGoalKind.MarketCoverage);
     }
 
     [Fact]

@@ -62,7 +62,7 @@ public sealed class FleetOrchestrator(
         }
 
         var orderedGoals = goals
-            .OrderByDescending(g => g.Priority)
+            .OrderBy(g => g.Priority)
             .ThenBy(g => g.Deadline ?? DateTimeOffset.MaxValue)
             .ToList();
 
