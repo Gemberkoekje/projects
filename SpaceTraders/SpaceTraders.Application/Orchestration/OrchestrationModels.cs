@@ -2,7 +2,7 @@ namespace SpaceTraders.Application.Orchestration;
 
 /// <summary>
 /// Well-known default priority values for <see cref="FleetGoal"/> instances produced by fleet goal evaluators.
-/// The orchestrator processes goals in descending priority order, so higher values are handled first.
+/// The orchestrator processes goals in ascending priority order, so lower values are handled first.
 /// </summary>
 public static class FleetGoalPriority
 {

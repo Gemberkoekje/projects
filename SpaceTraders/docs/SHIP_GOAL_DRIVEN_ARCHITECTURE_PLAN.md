@@ -607,7 +607,7 @@ Deliverables:
 - Active fleet goals survive a process restart.
 - Phase 15 read models can query `IFleetGoalRepository` instead of reading in-memory state.
 
-#### Phase 11f: Priority-sorted assignment in `FleetOrchestrator`
+#### Phase 11f: Priority-sorted assignment in `FleetOrchestrator` ✅
 
 Goal: the orchestrator processes its list of active fleet goals in priority order and assigns idle
 ships to the highest-priority unfulfilled goal.
