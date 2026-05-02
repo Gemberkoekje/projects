@@ -60,6 +60,10 @@ public sealed class AssignShipToGoalCommandHandler(
                 await HandleMarketCoverageAsync(command, cancellationToken);
                 break;
 
+            case FleetGoalKind.MarketScouting:
+                await HandleMarketScoutingAsync(command, cancellationToken);
+                break;
+
             case FleetGoalKind.FleetExpansion:
                 await HandleFleetExpansionAsync(command, cancellationToken);
                 break;
@@ -120,6 +124,25 @@ public sealed class AssignShipToGoalCommandHandler(
                 command.Goal.TradeSymbol);
             return;
         }
+
+        await ActivateGoalAsync(command.ShipSymbol, shipGoal, cancellationToken);
+    }
+
+    private async Task HandleMarketScoutingAsync(
+        AssignShipToGoalCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.Goal.OriginWaypoint))
+        {
+            logger.LogWarning(
+                "AssignShipToGoalCommandHandler: MarketScouting goal for ship {Ship} has no OriginWaypoint; skipping.",
+                command.ShipSymbol);
+            return;
+        }
+
+        var shipGoal = await assignmentResolver.ResolveMarketCoverageAsync(
+            command.Goal.OriginWaypoint,
+            cancellationToken);
 
         await ActivateGoalAsync(command.ShipSymbol, shipGoal, cancellationToken);
     }

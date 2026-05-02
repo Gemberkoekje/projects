@@ -24,4 +24,10 @@ public interface IShipGoalRepository
     /// No-op if the ship has no active goal or if the active goal id does not match.
     /// </summary>
     Task UpdateGoalStatusAsync(string shipSymbol, Guid goalId, GoalStatus status, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the set of waypoint symbols currently targeted by active <see cref="ScoutWaypointGoal"/> goals
+    /// across all ships.
+    /// </summary>
+    Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default);
 }

@@ -630,7 +630,7 @@ Deliverables:
 - Ships are always assigned to the highest-priority unmet fleet goal first.
 - Lower-priority goals are not starved indefinitely when no ship is available for the top goal.
 
-#### Phase 11g: `MarketScoutingGoalEvaluator`
+#### Phase 11g: `MarketScoutingGoalEvaluator` ✅
 
 Goal: automatically produce `MarketScouting` fleet goals (priority 10) for every market waypoint
 that has no recent price data, so early-game information gathering is handled automatically.

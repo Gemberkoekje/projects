@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.ConstructionGoalEvaluator>();
         services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketCoverageGoalEvaluator>();
         services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.FleetExpansionGoalEvaluator>();
+        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketScoutingGoalEvaluator>();
         services.AddScoped<Orchestration.IFleetOrchestrator, Orchestration.FleetOrchestrator>();
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();

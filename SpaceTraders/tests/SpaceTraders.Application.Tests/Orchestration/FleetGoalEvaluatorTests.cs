@@ -358,4 +358,76 @@ public sealed class FleetGoalEvaluatorTests
 
         goals.Should().BeEmpty();
     }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // MarketScoutingGoalEvaluator
+    // ────────────────────────────────────────────────────────────────────────────
+
+    private static (IWaypointRepository waypoints, IMarketRepository markets, IShipGoalRepository shipGoals)
+        MakeMarketScoutingDeps()
+    {
+        return (
+            Substitute.For<IWaypointRepository>(),
+            Substitute.For<IMarketRepository>(),
+            Substitute.For<IShipGoalRepository>());
+    }
+
+    [Fact]
+    public async Task MarketScoutingGoalEvaluator_MarketWithNoCachedData_ProducesGoal()
+    {
+        var (waypoints, markets, shipGoals) = MakeMarketScoutingDeps();
+        waypoints.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>()).Returns(["X1-AB"]);
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
+            new WaypointCacheModel("X1-AB-MKT", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+        ]);
+        markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns([]);
+        shipGoals.GetActiveScoutTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        var evaluator = new MarketScoutingGoalEvaluator(waypoints, markets, shipGoals);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].Kind.Should().Be(FleetGoalKind.MarketScouting);
+        goals[0].OriginWaypoint.Should().Be("X1-AB-MKT");
+        goals[0].Priority.Should().Be(FleetGoalPriority.MarketScouting);
+    }
+
+    [Fact]
+    public async Task MarketScoutingGoalEvaluator_MarketWithRecentData_ProducesNoGoal()
+    {
+        var (waypoints, markets, shipGoals) = MakeMarketScoutingDeps();
+        waypoints.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>()).Returns(["X1-AB"]);
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
+            new WaypointCacheModel("X1-AB-MKT", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+        ]);
+        markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns([
+            new MarketFreshnessRecord("X1-AB-MKT", "X1-AB", DateTimeOffset.UtcNow.AddSeconds(-30)),
+        ]);
+        shipGoals.GetActiveScoutTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        var evaluator = new MarketScoutingGoalEvaluator(waypoints, markets, shipGoals);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MarketScoutingGoalEvaluator_MarketAlreadyHasScout_ProducesNoGoal()
+    {
+        var (waypoints, markets, shipGoals) = MakeMarketScoutingDeps();
+        waypoints.GetVisitedSystemSymbolsAsync(Arg.Any<CancellationToken>()).Returns(["X1-AB"]);
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
+            new WaypointCacheModel("X1-AB-MKT", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+        ]);
+        markets.GetAllFreshnessAsync(Arg.Any<CancellationToken>()).Returns([]);
+        shipGoals.GetActiveScoutTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<string>(["X1-AB-MKT"], StringComparer.OrdinalIgnoreCase));
+
+        var evaluator = new MarketScoutingGoalEvaluator(waypoints, markets, shipGoals);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().BeEmpty();
+    }
 }

@@ -262,3 +262,77 @@ public sealed class FleetExpansionGoalEvaluator(
         return (null, null);
     }
 }
+
+/// <summary>
+/// Phase 11g: produces <see cref="FleetGoalKind.MarketScouting"/> goals (priority 10) for every
+/// marketplace waypoint whose price data is absent or older than a configurable threshold, so early-game
+/// information gathering is handled automatically.
+/// </summary>
+public sealed class MarketScoutingGoalEvaluator(
+    IWaypointRepository waypointRepository,
+    IMarketRepository marketRepository,
+    IShipGoalRepository shipGoalRepository) : IFleetGoalEvaluator
+{
+    /// <summary>Default staleness threshold: 3 minutes ≈ 1 SpaceTraders game day.</summary>
+    private static readonly TimeSpan DefaultStalenessThreshold = TimeSpan.FromMinutes(3);
+
+    public async Task<IReadOnlyList<FleetGoal>> EvaluateAsync(CancellationToken cancellationToken = default)
+    {
+        var systems = await waypointRepository.GetVisitedSystemSymbolsAsync(cancellationToken);
+        if (systems.Count == 0)
+        {
+            return [];
+        }
+
+        var marketWaypoints = new List<string>();
+        foreach (var system in systems)
+        {
+            var waypoints = await waypointRepository.GetBySystemAsync(system, cancellationToken);
+            foreach (var w in waypoints.Where(w => w.HasMarket))
+            {
+                marketWaypoints.Add(w.Symbol);
+            }
+        }
+
+        if (marketWaypoints.Count == 0)
+        {
+            return [];
+        }
+
+        var freshnessRecords = await marketRepository.GetAllFreshnessAsync(cancellationToken);
+        var freshnessByWaypoint = freshnessRecords.ToDictionary(
+            r => r.WaypointSymbol,
+            r => r.LastObservedAt,
+            StringComparer.OrdinalIgnoreCase);
+
+        var activeScoutTargets = await shipGoalRepository.GetActiveScoutTargetsAsync(cancellationToken);
+
+        var now = TimeProvider.System.GetUtcNow();
+        var threshold = DefaultStalenessThreshold;
+
+        var goals = new List<FleetGoal>();
+        foreach (var waypointSymbol in marketWaypoints)
+        {
+            if (activeScoutTargets.Contains(waypointSymbol))
+            {
+                continue;
+            }
+
+            var isStale = !freshnessByWaypoint.TryGetValue(waypointSymbol, out var lastObserved)
+                || (now - lastObserved) > threshold;
+
+            if (!isStale)
+            {
+                continue;
+            }
+
+            goals.Add(new FleetGoal(
+                Kind: FleetGoalKind.MarketScouting,
+                Description: $"Scout market at {waypointSymbol} to refresh price data.",
+                Priority: FleetGoalPriority.MarketScouting,
+                OriginWaypoint: waypointSymbol));
+        }
+
+        return goals;
+    }
+}
