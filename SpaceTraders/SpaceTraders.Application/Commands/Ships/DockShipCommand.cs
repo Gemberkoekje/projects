@@ -6,7 +6,6 @@ using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
-
 namespace SpaceTraders.Application.Commands.Ships;
 
 public sealed record DockShipCommand

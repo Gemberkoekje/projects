@@ -6,7 +6,6 @@ namespace SpaceTraders.Domain.Events.Ships;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <summary>
 /// Unlike the legacy chain-of-command events (now deleted), this event is intentionally <b>not</b> derived from
 /// <see cref="ChainOfCommandEvent"/>. The ship automation architecture plan
 /// removes inheritance-based routing: all state-change events now publish this explicit
