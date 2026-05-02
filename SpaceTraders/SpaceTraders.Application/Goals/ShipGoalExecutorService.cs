@@ -131,8 +131,8 @@ public sealed class ShipGoalExecutorService(
 
             case GoalExecutionOutcome.Progressing:
                 // Publish immediate follow-up tick so the next step runs.
-                // Command handlers for navigate/dock/orbit also publish ticks; duplicate ticks are
-                // handled idempotently by the executor on the next invocation.
+                // Phase 13c: orbit and dock are now invoked inline (InvokeAsync + SuppressContinuationTick=true)
+                // by the executor, so their command handlers no longer publish spurious ticks here.
                 await bus.PublishAsync(new ShipAutomationTickEvent(
                     ship.Symbol, "GoalStep", now, Guid.NewGuid(), Guid.Empty));
                 break;

@@ -792,7 +792,7 @@ Deliverables:
 
 - ✅ No event or handler class exists for any instant (synchronous-return) ship action.
 
-#### Phase 13c: Update goal executors to use direct sequential logic
+#### Phase 13c: Update goal executors to use direct sequential logic ✅
 
 Tasks:
 
@@ -801,6 +801,19 @@ Tasks:
   `ExecuteStepAsync` invocation.
   - Example: after `OrbitAsync()` succeeds, call the next action in the same method rather than
     publishing an event and returning.
+
+Implementation notes:
+
+- `DockedCommandAcceptor.OrbitAsync` changed from `bus.SendAsync` (fire-and-forget) to
+  `bus.InvokeAsync` (inline synchronous execution), so orbit actually completes before the
+  executor falls through to the next step.
+- `InOrbitCommandAcceptor.DockAsync` similarly changed to `bus.InvokeAsync`.
+- A `SuppressContinuationTick` flag added to `OrbitShipCommand` and `DockShipCommand`; the
+  executor-facing acceptors set it to `true` so that the command handlers do not publish a
+  spurious `ShipAutomationTickEvent` after inline execution (the executor service already
+  publishes a `GoalStep` tick on `Progressing`). Standalone callers (control endpoints,
+  navigate error-recovery) leave the flag at its default `false` and continue to receive the
+  tick as before.
 
 Deliverables:
 
