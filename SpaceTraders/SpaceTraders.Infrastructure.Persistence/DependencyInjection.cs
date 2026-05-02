@@ -70,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
         services.AddScoped<IRunRepository, RunRepository>();
         services.AddScoped<IShipGoalRepository, ShipGoalRepository>();
+        services.AddScoped<IFleetGoalRepository, FleetGoalRepository>();
 
         return services;
     }

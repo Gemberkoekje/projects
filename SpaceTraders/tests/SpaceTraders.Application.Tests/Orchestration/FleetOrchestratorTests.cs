@@ -12,6 +12,13 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 
 public sealed class FleetOrchestratorTests
 {
+    private static IFleetGoalRepository EmptyFleetGoalRepository()
+    {
+        var repo = Substitute.For<IFleetGoalRepository>();
+        repo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        return repo;
+    }
+
     private static IShipAssignmentRepository EmptyAssignments()
     {
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -52,6 +59,7 @@ public sealed class FleetOrchestratorTests
             [EvaluatorReturning(contractGoal)],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -82,6 +90,7 @@ public sealed class FleetOrchestratorTests
             [EvaluatorReturning(market), EvaluatorReturning(contract)],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -109,6 +118,7 @@ public sealed class FleetOrchestratorTests
             [EvaluatorReturning(goal)],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -130,6 +140,7 @@ public sealed class FleetOrchestratorTests
             [EvaluatorReturning(goal)],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -156,6 +167,7 @@ public sealed class FleetOrchestratorTests
             [EvaluatorReturning(goal)],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 

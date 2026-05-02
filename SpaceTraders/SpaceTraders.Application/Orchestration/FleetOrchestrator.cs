@@ -21,6 +21,7 @@ public sealed class FleetOrchestrator(
     IEnumerable<IFleetGoalEvaluator> evaluators,
     IShipRepository ships,
     IShipAssignmentRepository assignments,
+    IFleetGoalRepository fleetGoals,
     IMessageBus bus,
     ILogger<FleetOrchestrator> logger) : IFleetOrchestrator
 {
@@ -28,11 +29,30 @@ public sealed class FleetOrchestrator(
 
     public async Task EvaluateAndAssignAsync(CancellationToken cancellationToken = default)
     {
-        var goals = new List<FleetGoal>();
+        // Load persisted active goals as the starting set.
+        var persistedGoals = await fleetGoals.GetActiveAsync(cancellationToken);
+        var persistedByKey = persistedGoals
+            .ToDictionary(ComputeNaturalKey, g => g, StringComparer.OrdinalIgnoreCase);
+
+        // Run evaluators and merge with persisted goals.
+        var goals = new List<FleetGoal>(persistedGoals);
         foreach (var evaluator in evaluators)
         {
             var produced = await evaluator.EvaluateAsync(cancellationToken);
-            goals.AddRange(produced);
+            foreach (var goal in produced)
+            {
+                var key = ComputeNaturalKey(goal);
+                if (persistedByKey.ContainsKey(key))
+                {
+                    // Already persisted; do not duplicate.
+                    continue;
+                }
+
+                // New goal: persist it and add to the working set.
+                await fleetGoals.UpsertAsync(goal, cancellationToken);
+                goals.Add(goal);
+                persistedByKey[key] = goal;
+            }
         }
 
         if (goals.Count == 0)
@@ -111,6 +131,23 @@ public sealed class FleetOrchestrator(
             idleShips.Remove(ship);
         }
     }
+
+    /// <summary>
+    /// Computes a logical identity key for a fleet goal, used to detect duplicates
+    /// between evaluator-produced goals and already-persisted goals.
+    /// </summary>
+    internal static string ComputeNaturalKey(FleetGoal goal) => goal.Kind switch
+    {
+        FleetGoalKind.Contract =>
+            $"Contract|{goal.ContractId}|{goal.TradeSymbol}",
+        FleetGoalKind.Construction =>
+            $"Construction|{goal.DestinationWaypoint}|{goal.TradeSymbol}",
+        FleetGoalKind.MarketCoverage =>
+            $"MarketCoverage|{goal.OriginWaypoint}",
+        FleetGoalKind.FleetExpansion =>
+            $"FleetExpansion|{goal.ExpansionShipType}|{goal.ExpansionShipyardWaypoint}",
+        _ => $"{goal.Kind}|{goal.Description}",
+    };
 
     private static ShipModel? SelectShipForGoal(FleetGoal goal, IReadOnlyList<ShipModel> idleShips)
     {

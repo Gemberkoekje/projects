@@ -30,6 +30,12 @@ public enum FleetGoalKind
 /// </summary>
 public sealed record FleetGoal
 {
+    /// <summary>
+    /// Stable identifier used to persist this goal in the <c>fleet_goals</c> table.
+    /// Defaults to a new <see cref="Guid"/> so each freshly-produced goal has a unique identity.
+    /// </summary>
+    public Guid Id { get; init; } = Guid.NewGuid();
+
     public required FleetGoalKind Kind { get; init; }
 
     public required string Description { get; init; }
