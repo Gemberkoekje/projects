@@ -1,4 +1,3 @@
-using FluentAssertions;
 using NSubstitute;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Domain.Events.Ships;
@@ -8,8 +7,12 @@ namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 
 public sealed class ShipInTransitEventHandlerTests
 {
+    /// <summary>
+    /// Phase 14c: ShipInTransitEventHandler is now a no-op; it no longer schedules ticks.
+    /// The ShipEventScheduler handles arrival scheduling via ShipArrivedEvent instead.
+    /// </summary>
     [Fact]
-    public async Task Handle_SchedulesArrivalTick_WhenArrivalIsInFuture()
+    public async Task Handle_DoesNotScheduleAnyTick_WhenArrivalIsInFuture()
     {
         var bus = Substitute.For<IMessageBus>();
         var handler = new ShipInTransitEventHandler();
@@ -24,15 +27,13 @@ public sealed class ShipInTransitEventHandlerTests
             Guid.Empty,
             now);
 
-        await handler.Handle(@event, bus, CancellationToken.None);
+        await handler.Handle(@event, CancellationToken.None);
 
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == @event.ShipSymbol && e.Reason == "Arrived"),
-            Arg.Is<DeliveryOptions>(o => o != null && o.ScheduledTime != null));
+        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task Handle_PublishesArrivalTickImmediately_WhenArrivalIsDue()
+    public async Task Handle_DoesNotScheduleAnyTick_WhenArrivalIsDue()
     {
         var bus = Substitute.For<IMessageBus>();
         var handler = new ShipInTransitEventHandler();
@@ -47,14 +48,8 @@ public sealed class ShipInTransitEventHandlerTests
             Guid.Empty,
             now.AddMinutes(-2));
 
-        await handler.Handle(@event, bus, CancellationToken.None);
+        await handler.Handle(@event, CancellationToken.None);
 
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e =>
-                e.ShipSymbol == @event.ShipSymbol &&
-                e.Reason == "Arrived" &&
-                e.CorrelationId == @event.CorrelationId &&
-                e.CausationId == @event.EventId),
-            Arg.Any<DeliveryOptions>());
+        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
     }
 }

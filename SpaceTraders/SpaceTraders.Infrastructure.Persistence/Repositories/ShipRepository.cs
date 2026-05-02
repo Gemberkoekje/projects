@@ -132,6 +132,17 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task UpdateCooldownAsync(string symbol, DateTimeOffset? cooldownExpiresAt, CancellationToken cancellationToken = default)
+    {
+        var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);
+        if (entity is null) return;
+
+        entity.CooldownExpiresAt = cooldownExpiresAt;
+        entity.LastSyncedAt = TimeProvider.System.GetUtcNow();
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task UpdateFuelAsync(string symbol, FuelModel fuel, CancellationToken cancellationToken = default)
     {
         var entity = await db.Ships.FindAsync([db.AgentToken, symbol], cancellationToken);

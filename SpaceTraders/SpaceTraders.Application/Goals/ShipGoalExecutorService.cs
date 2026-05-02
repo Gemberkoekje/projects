@@ -17,6 +17,8 @@ namespace SpaceTraders.Application.Goals;
 /// <see cref="IShipGoalExecutor"/>, and handles the <see cref="GoalExecutionResult"/> lifecycle.
 /// Phase 12a: planner fallback removed; ships without an active goal are treated as idle.
 /// Phase 12b: capability checks delegated to <see cref="IShipCapabilityRegistry"/>.
+/// Phase 14c: <see cref="IShipEventScheduler"/> replaces <c>bus.ScheduleAsync</c> for arrival
+/// and cooldown wake-ups; completed and blocked goals cancel pending scheduled events.
 /// </summary>
 public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
@@ -32,6 +34,7 @@ public sealed class ShipGoalExecutorService(
     ISettingsRepository settings,
     IAssignmentResolver assignmentResolver,
     IShipCapabilityRegistry capabilityRegistry,
+    IShipEventScheduler scheduler,
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
@@ -90,6 +93,8 @@ public sealed class ShipGoalExecutorService(
         switch (result.Outcome)
         {
             case GoalExecutionOutcome.Completed:
+                // Phase 14c: cancel any pending scheduled event before goal is cleared.
+                await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
                 await bus.PublishAsync(new GoalCompletedEvent(
                     ship.Symbol, goal.GoalId, goal.Kind, Guid.NewGuid(), Guid.Empty, now));
                 await goals.ClearActiveGoalAsync(ship.Symbol, ct);
@@ -101,6 +106,8 @@ public sealed class ShipGoalExecutorService(
                 break;
 
             case GoalExecutionOutcome.Blocked:
+                // Phase 14c: cancel any pending scheduled event before goal is cleared.
+                await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
                 await bus.PublishAsync(new GoalBlockedEvent(
                     ship.Symbol, goal.GoalId, goal.Kind, result.Reason, Guid.NewGuid(), Guid.Empty, now));
                 await goals.ClearActiveGoalAsync(ship.Symbol, ct);
@@ -112,21 +119,16 @@ public sealed class ShipGoalExecutorService(
                 break;
 
             case GoalExecutionOutcome.WaitingForCooldown when result.CooldownExpiresAt.HasValue:
-                var cooldownTick = new ShipAutomationTickEvent(
-                    ship.Symbol,
-                    "CooldownExpired",
-                    result.CooldownExpiresAt.Value,
-                    Guid.NewGuid(),
-                    Guid.Empty);
-                await bus.ScheduleAsync(cooldownTick, result.CooldownExpiresAt.Value);
+                // Phase 14c: use the persistent scheduler instead of bus.ScheduleAsync.
+                // The command handler (extract/siphon/survey) already called ScheduleCooldownExpiryAsync,
+                // but we upsert here to ensure recovery works correctly after a process restart.
+                await scheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, result.CooldownExpiresAt.Value, ct);
                 break;
 
             case GoalExecutionOutcome.WaitingForCooldown:
-                // Cooldown without known expiry: schedule a short retry tick.
+                // Cooldown without known expiry: schedule with a short fallback delay.
                 var retryAt = now.AddSeconds(CooldownRetrySeconds);
-                var retryTick = new ShipAutomationTickEvent(
-                    ship.Symbol, "CooldownRetry", retryAt, Guid.NewGuid(), Guid.Empty);
-                await bus.ScheduleAsync(retryTick, retryAt);
+                await scheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, retryAt, ct);
                 break;
 
             case GoalExecutionOutcome.Progressing:
@@ -138,7 +140,13 @@ public sealed class ShipGoalExecutorService(
                 break;
 
             case GoalExecutionOutcome.WaitingForArrival:
-                // ShipInTransitEventHandler schedules the next tick at arrival time.
+                // Phase 14c: use the persistent scheduler instead of ShipInTransitEventHandler.
+                // The navigate command handler already called ScheduleArrivalAsync, but we upsert
+                // here using ship.ArrivesAt to cover recovery scenarios after a process restart.
+                if (ship.ArrivesAt.HasValue)
+                {
+                    await scheduler.ScheduleArrivalAsync(ship.Symbol, goal.GoalId, ship.ArrivesAt.Value, ct);
+                }
                 break;
         }
     }

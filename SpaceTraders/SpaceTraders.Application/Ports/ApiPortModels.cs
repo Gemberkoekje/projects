@@ -192,13 +192,17 @@ public sealed record ExtractionActionResult
 
     public required int CooldownSeconds { get; init; }
 
+    /// <summary>The UTC time at which the extraction cooldown expires, as returned by the API.</summary>
+    public DateTimeOffset? CooldownExpiresAt { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public ExtractionActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds)
+    public ExtractionActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds, DateTimeOffset? CooldownExpiresAt = null)
     {
         this.YieldSymbol = YieldSymbol;
         this.YieldUnits = YieldUnits;
         this.Cargo = Cargo;
         this.CooldownSeconds = CooldownSeconds;
+        this.CooldownExpiresAt = CooldownExpiresAt;
     }
 }
 
@@ -885,11 +889,15 @@ public sealed record SurveyActionResult
 
     public required int CooldownSeconds { get; init; }
 
+    /// <summary>The UTC time at which the survey cooldown expires, as returned by the API.</summary>
+    public DateTimeOffset? CooldownExpiresAt { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public SurveyActionResult(IReadOnlyList<SurveyModel> Surveys, int CooldownSeconds)
+    public SurveyActionResult(IReadOnlyList<SurveyModel> Surveys, int CooldownSeconds, DateTimeOffset? CooldownExpiresAt = null)
     {
         this.Surveys = Surveys;
         this.CooldownSeconds = CooldownSeconds;
+        this.CooldownExpiresAt = CooldownExpiresAt;
     }
 }
 
@@ -903,13 +911,17 @@ public sealed record SiphonActionResult
 
     public required int CooldownSeconds { get; init; }
 
+    /// <summary>The UTC time at which the siphon cooldown expires, as returned by the API.</summary>
+    public DateTimeOffset? CooldownExpiresAt { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public SiphonActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds)
+    public SiphonActionResult(string YieldSymbol, int YieldUnits, CargoModel Cargo, int CooldownSeconds, DateTimeOffset? CooldownExpiresAt = null)
     {
         this.YieldSymbol = YieldSymbol;
         this.YieldUnits = YieldUnits;
         this.Cargo = Cargo;
         this.CooldownSeconds = CooldownSeconds;
+        this.CooldownExpiresAt = CooldownExpiresAt;
     }
 }
 

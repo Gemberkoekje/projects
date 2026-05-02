@@ -18,6 +18,8 @@ public interface IShipRepository
 
     Task UpdateCargoAsync(string symbol, CargoModel cargo, CancellationToken cancellationToken = default);
 
+    Task UpdateCooldownAsync(string symbol, DateTimeOffset? cooldownExpiresAt, CancellationToken cancellationToken = default);
+
     Task UpdateFuelAsync(string symbol, FuelModel fuel, CancellationToken cancellationToken = default);
 
     Task RemoveAsync(string symbol, CancellationToken cancellationToken = default);

@@ -106,7 +106,8 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             result.Extraction.Yield.Symbol,
             result.Extraction.Yield.Units,
             MapCargo(result.Cargo),
-            result.Cooldown.TotalSeconds);
+            result.Cooldown.TotalSeconds,
+            result.Cooldown.Expiration);
     }
 
     public async Task<PurchaseShipActionResult> PurchaseShipAsync(string shipType, string waypointSymbol, CancellationToken cancellationToken = default)
@@ -249,7 +250,7 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             s.Deposits.Select(d => new SurveyDepositModel(d.Symbol)).ToList(),
             s.Expiration,
             s.Size)).ToList();
-        return new SurveyActionResult(surveys, result.Cooldown.TotalSeconds);
+        return new SurveyActionResult(surveys, result.Cooldown.TotalSeconds, result.Cooldown.Expiration);
     }
 
     public async Task<ExtractionActionResult> ExtractWithSurveyAsync(string shipSymbol, SurveyModel survey, CancellationToken cancellationToken = default)
@@ -267,7 +268,8 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             result.Extraction.Yield.Symbol,
             result.Extraction.Yield.Units,
             MapCargo(result.Cargo),
-            result.Cooldown.TotalSeconds);
+            result.Cooldown.TotalSeconds,
+            result.Cooldown.Expiration);
     }
 
     public async Task<SiphonActionResult> SiphonResourcesAsync(string shipSymbol, CancellationToken cancellationToken = default)
@@ -277,7 +279,8 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             result.Siphon.Yield.Symbol,
             result.Siphon.Yield.Units,
             MapCargo(result.Cargo),
-            result.Cooldown.TotalSeconds);
+            result.Cooldown.TotalSeconds,
+            result.Cooldown.Expiration);
     }
 
     public async Task<WarpActionResult> WarpShipAsync(string shipSymbol, string waypointSymbol, CancellationToken cancellationToken = default)

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
@@ -16,6 +17,8 @@ public sealed class ExtractResourcesHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var surveys = Substitute.For<ISurveyRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -24,7 +27,7 @@ public sealed class ExtractResourcesHandlerTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100));
 
-        var handler = new ExtractResourcesHandler(port, ships, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
+        var handler = new ExtractResourcesHandler(port, ships, goals, scheduler, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
@@ -35,6 +38,8 @@ public sealed class ExtractResourcesHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var surveys = Substitute.For<ISurveyRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -49,7 +54,7 @@ public sealed class ExtractResourcesHandlerTests
         port.ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 60), 60));
 
-        var handler = new ExtractResourcesHandler(port, ships, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
+        var handler = new ExtractResourcesHandler(port, ships, goals, scheduler, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>());
@@ -60,6 +65,8 @@ public sealed class ExtractResourcesHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var surveys = Substitute.For<ISurveyRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -77,7 +84,7 @@ public sealed class ExtractResourcesHandlerTests
         port.ExtractWithSurveyAsync("SHIP-1", survey, Arg.Any<CancellationToken>())
             .Returns(new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 60), 60));
 
-        var handler = new ExtractResourcesHandler(port, ships, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
+        var handler = new ExtractResourcesHandler(port, ships, goals, scheduler, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
         await handler.Handle(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         await port.Received(1).ExtractWithSurveyAsync("SHIP-1", survey, Arg.Any<CancellationToken>());
