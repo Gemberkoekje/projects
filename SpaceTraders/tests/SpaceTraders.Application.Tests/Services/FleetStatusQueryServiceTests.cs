@@ -107,13 +107,19 @@ public sealed class FleetStatusQueryServiceTests
         IShipAssignmentRepository? assignmentRepo = null,
         IContractRepository? contractRepo = null,
         IConstructionRepository? constructionRepo = null)
-        => new(
+    {
+        var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
+        historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+        return new(
             goalRepo ?? GoalRepo(),
             shipRepo ?? NoShips(),
             shipGoalRepo ?? NoShipGoals(),
             assignmentRepo ?? NoAssignments(),
             contractRepo ?? NoContracts(),
-            constructionRepo ?? NoConstruction());
+            constructionRepo ?? NoConstruction(),
+            historyRepo);
+    }
 
     // -----------------------------------------------------------------------
     // Tests
@@ -383,13 +389,18 @@ public sealed class FleetStatusQueryServiceAssignmentTests
         assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
         assignments.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipAssignmentDto?)null);
 
+        var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
+        historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
         return new(
             goalRepo ?? GoalRepo(),
             shipRepo ?? ShipsWith(),
             shipGoalRepo ?? Substitute.For<IShipGoalRepository>(),
             assignmentRepo ?? assignments,
             contractRepo ?? contracts,
-            constructionRepo ?? constructions);
+            constructionRepo ?? constructions,
+            historyRepo);
     }
 
     [Fact]
@@ -532,7 +543,11 @@ public sealed class FleetStatusQueryServiceActivityTests
         var defaultGoalRepo = Substitute.For<IShipGoalRepository>();
         defaultGoalRepo.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
 
-        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions);
+        var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
+        historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions, historyRepo);
     }
 
     [Fact]

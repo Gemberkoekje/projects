@@ -1385,7 +1385,7 @@ Deliverables:
 
 - Goal history is persisted per ship and queryable.
 
-#### Phase 17f: Ship goal history API endpoint
+#### Phase 17f: Ship goal history API endpoint ✅
 
 Tasks:
 

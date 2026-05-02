@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Orchestration;
 
 namespace SpaceTraders.Application.Interfaces;
@@ -35,4 +36,11 @@ public interface IFleetStatusQueryService
     /// </summary>
     /// <remarks>Phase 15e: introduced as part of the observability read-model layer.</remarks>
     Task<ShipActivitySnapshot?> GetShipActivityAsync(string shipSymbol, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the most recent <paramref name="limit"/> history entries for the ship identified by
+    /// <paramref name="shipSymbol"/>, newest first. Returns <c>null</c> if no such ship is known.
+    /// </summary>
+    /// <remarks>Phase 17f: introduced as part of the fleet dashboard implementation.</remarks>
+    Task<IReadOnlyList<ShipGoalHistoryEntry>?> GetShipGoalHistoryAsync(string shipSymbol, int limit, CancellationToken ct = default);
 }
