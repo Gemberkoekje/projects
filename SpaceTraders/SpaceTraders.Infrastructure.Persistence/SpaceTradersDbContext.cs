@@ -60,6 +60,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<ShipTaskRecord> ShipTaskRecords => Set<ShipTaskRecord>();
 
+    public DbSet<FleetGoalRecord> FleetGoals => Set<FleetGoalRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -362,6 +364,19 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.TaskKind).HasMaxLength(100).IsRequired();
             entity.Property(x => x.TargetWaypoint).HasMaxLength(100);
             entity.HasIndex(x => new { x.AgentToken, x.ShipSymbol, x.StartedAt });
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<FleetGoalRecord>(entity =>
+        {
+            entity.ToTable("fleet_goals");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.Kind).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).IsRequired();
+            entity.Property(x => x.PayloadJson).IsRequired();
+            entity.HasIndex(x => new { x.AgentToken, x.CompletedAt });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
     }

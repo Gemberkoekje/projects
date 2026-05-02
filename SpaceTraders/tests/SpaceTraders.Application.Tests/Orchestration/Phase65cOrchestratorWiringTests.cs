@@ -28,6 +28,12 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 /// </summary>
 public sealed class Phase65cOrchestratorWiringTests
 {
+    private static IFleetGoalRepository EmptyFleetGoalRepository()
+    {
+        var repo = Substitute.For<IFleetGoalRepository>();
+        repo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        return repo;
+    }
 
     [Fact]
     public async Task Orchestrator_WhenIdleShipAndContractGoal_EmitsAssignShipToGoalCommandOnly()
@@ -56,6 +62,7 @@ public sealed class Phase65cOrchestratorWiringTests
             [evaluator],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -104,6 +111,7 @@ public sealed class Phase65cOrchestratorWiringTests
             [evaluator],
             ships,
             assignments,
+            EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 

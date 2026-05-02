@@ -67,6 +67,7 @@ public sealed class BaselineAutomationIntegrationTests
             new[] { CreateEvaluator(goal) },
             ships,
             assignments,
+            CreateEmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
 
@@ -297,6 +298,13 @@ public sealed class BaselineAutomationIntegrationTests
         var evaluator = Substitute.For<IFleetGoalEvaluator>();
         evaluator.EvaluateAsync(Arg.Any<CancellationToken>()).Returns(goals);
         return evaluator;
+    }
+
+    private static IFleetGoalRepository CreateEmptyFleetGoalRepository()
+    {
+        var repo = Substitute.For<IFleetGoalRepository>();
+        repo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        return repo;
     }
 
     private static IShipRepository CreateShipRepository(IReadOnlyList<ShipModel> fleet)

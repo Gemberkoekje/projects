@@ -570,7 +570,7 @@ Deliverables:
 
 - `FleetGoal` carries a priority and every evaluator populates it with a well-known default.
 
-#### Phase 11e: Fleet goal persistence (`fleet_goals` table)
+#### Phase 11e: Fleet goal persistence (`fleet_goals` table) ✅
 
 Goal: persist the active fleet goals so they survive restarts and are available to the dashboard
 read models in Phase 15 without reading in-memory orchestrator state.
