@@ -1307,7 +1307,7 @@ Deliverables:
 - The orchestrator's current intent is visible at a glance, including how far along each resource
   need is and which ships are covering it.
 
-#### Phase 17c: Ship assignments panel
+#### Phase 17c: Ship assignments panel ✅
 
 Tasks:
 
@@ -1327,7 +1327,7 @@ Deliverables:
 
 - All ship assignments are visible in a single table with context about why each ship has its goal.
 
-#### Phase 17d: Ship activity panel
+#### Phase 17d: Ship activity panel ✅
 
 Tasks:
 

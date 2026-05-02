@@ -2,9 +2,12 @@
  * OrchestrationPage – Fleet orchestration dashboard.
  * Phase 17a: placeholder page with three vertically-stacked section stubs.
  * Phase 17b: Goal Chains panel implemented via GoalChainPanel.
- * Panels for 17c–17d will be filled in by subsequent phases.
+ * Phase 17c: Assignments panel implemented via AssignmentsPanel.
+ * Phase 17d: Activity panel implemented via ActivityPanel.
  */
 import GoalChainPanel from '@/components/GoalChainPanel'
+import AssignmentsPanel from '@/components/AssignmentsPanel'
+import ActivityPanel from '@/components/ActivityPanel'
 
 export default function OrchestrationPage() {
   return (
@@ -24,7 +27,7 @@ export default function OrchestrationPage() {
         <h2 id="assignments-heading" className="mb-3 text-lg font-medium">
           Assignments
         </h2>
-        <p className="text-sm text-muted-foreground">Coming soon.</p>
+        <AssignmentsPanel />
       </section>
 
       {/* Phase 17d: Activity panel */}
@@ -32,7 +35,7 @@ export default function OrchestrationPage() {
         <h2 id="activity-heading" className="mb-3 text-lg font-medium">
           Activity
         </h2>
-        <p className="text-sm text-muted-foreground">Coming soon.</p>
+        <ActivityPanel />
       </section>
     </div>
   )
