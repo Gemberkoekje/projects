@@ -35,6 +35,9 @@ public sealed class ShipGoalExecutorService(
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
+    /// <summary>Fallback retry delay when a cooldown expiry time is unavailable.</summary>
+    private const int CooldownRetrySeconds = 70;
+
     public async Task<GoalExecutionResult?> ExecuteAsync(string shipSymbol, CancellationToken ct)
     {
         var ship = await ships.FindAsync(shipSymbol, ct);
@@ -121,7 +124,7 @@ public sealed class ShipGoalExecutorService(
 
             case GoalExecutionOutcome.WaitingForCooldown:
                 // Cooldown without known expiry: schedule a short retry tick.
-                var retryAt = now.AddSeconds(70);
+                var retryAt = now.AddSeconds(CooldownRetrySeconds);
                 var retryTick = new ShipAutomationTickEvent(
                     ship.Symbol, "CooldownRetry", retryAt, Guid.NewGuid(), Guid.Empty);
                 await bus.ScheduleAsync(retryTick, retryAt);
