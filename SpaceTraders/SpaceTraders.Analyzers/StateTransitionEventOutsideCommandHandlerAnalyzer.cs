@@ -24,12 +24,11 @@ public sealed class StateTransitionEventOutsideCommandHandlerAnalyzer : Diagnost
     /// <summary>
     /// The flat list of state-transition events that may only be constructed inside command handlers or test code.
     /// Phase 7g: updated from the old chain-routing set to the full set of plain factual ship state events.
+    /// Phase 13b: ShipDockedEvent and ShipInOrbitEvent removed (deleted as Tier 3 events).
     /// </summary>
     private static readonly ImmutableHashSet<string> StateTransitionEvents =
         ImmutableHashSet.Create(
             StringComparer.Ordinal,
-            "ShipDockedEvent",
-            "ShipInOrbitEvent",
             "ShipInTransitEvent",
             "ShipStateMismatchEvent");
 

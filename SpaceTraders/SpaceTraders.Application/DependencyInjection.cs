@@ -42,7 +42,6 @@ public static class DependencyInjection
 
         services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
         services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
-        services.AddScoped<IInTransitCommandAcceptor, InTransitCommandAcceptor>();
 
         // Phase 6: orchestrator goal evaluation. The orchestrator owns strategic goals,
         // capacity estimation, and budget policy. It assigns work to ships via

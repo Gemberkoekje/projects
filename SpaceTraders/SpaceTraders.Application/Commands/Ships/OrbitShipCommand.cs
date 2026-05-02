@@ -62,15 +62,7 @@ public sealed class OrbitShipHandler(
 
         if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
         {
-            await bus.PublishAsync(new ShipInOrbitEvent(
-                command.ShipSymbol,
-                nav.SystemSymbol,
-                nav.WaypointSymbol,
-                Guid.Empty,
-                Guid.Empty,
-                publishedAt));
-
-            // Phase 7c: publish ShipInOrbitEvent + explicit automation tick (ShipUndockedEvent deleted).
+            // Phase 13b: ShipInOrbitEvent deleted (Tier 3); publish only the automation tick.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 command.ShipSymbol,
                 "Undocked",

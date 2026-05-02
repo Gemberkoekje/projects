@@ -70,15 +70,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             cancellationToken: cancellationToken);
     }
 
-    public async Task Handle(ShipDockedEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipDockedEvent),
-            $"Ship {@event.ShipSymbol} docked at {@event.WaypointSymbol}.",
-            cancellationToken: cancellationToken);
-    }
-
     public async Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
     {
         await activityLog.AppendAsync(
@@ -94,15 +85,6 @@ public sealed class LogActivityHandler(IActivityLogRepository activityLog)
             @event.ShipSymbol,
             nameof(ShipStateMismatchEvent),
             $"Ship {@event.ShipSymbol} state mismatch in {@event.CommandName}: expected {@event.RequiredState}, was {@event.ActualState}. {@event.Reason}",
-            cancellationToken: cancellationToken);
-    }
-
-    public async Task Handle(ShipInOrbitEvent @event, CancellationToken cancellationToken)
-    {
-        await activityLog.AppendAsync(
-            @event.ShipSymbol,
-            nameof(ShipInOrbitEvent),
-            $"Ship {@event.ShipSymbol} entered orbit at {@event.WaypointSymbol}.",
             cancellationToken: cancellationToken);
     }
 
