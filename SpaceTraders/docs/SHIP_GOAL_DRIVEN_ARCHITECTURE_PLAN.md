@@ -753,14 +753,27 @@ their handler classes are deleted. Tier 3 events are deleted entirely.
 
 Tasks:
 
-- Review every domain event under `SpaceTraders.Domain/Events/Ships` and classify each as
+- ✅ Review every domain event under `SpaceTraders.Domain/Events/Ships` and classify each as
   Tier 1, Tier 2, or Tier 3 using the Event Taxonomy defined in this document.
-- Produce an audit table (can be a code review comment or a temporary note) listing each event,
+- ✅ Produce an audit table (can be a code review comment or a temporary note) listing each event,
   its tier, and the reason for the classification.
+
+**Audit table — `SpaceTraders.Domain/Events/Ships`**
+
+| Event | Tier | Reason |
+|---|---|---|
+| `ShipAutomationTickEvent` | 1 | Primary driver: `ShipAutomationTickEventHandler` must react to run goal execution. Scheduled by arrival/cooldown; published immediately after instant commands. |
+| `ShipInTransitEvent` | 1 | `ShipInTransitEventHandler` schedules a future `ShipAutomationTickEvent` at the ship's arrival time. Without this handler the ship would never resume after a navigation command. |
+| `GoalCompletedEvent` | 1 | Per taxonomy: the orchestrator reacts to re-evaluate fleet needs and assign a new goal. (Handler to be wired in a later phase.) |
+| `GoalBlockedEvent` | 1 | Per taxonomy: the orchestrator reacts by reassigning the ship or purchasing missing equipment. (Handler to be wired in a later phase.) |
+| `ShipDockedEvent` | 3 | Published by `DockShipCommand` on a successful dock. Docking is an instant (synchronous-return) API call; the command already publishes `ShipAutomationTickEvent` for continuation. The only consumers are `LogActivityHandler` (logging only) and legacy chain-of-command infrastructure — no meaningful control-flow handler remains. Candidate for deletion in Phase 13b. |
+| `ShipInOrbitEvent` | 3 | Published by `OrbitShipCommand` on a successful orbit. Orbiting is instant; the command already publishes `ShipAutomationTickEvent`. Consumed only by `LogActivityHandler` (logging) and the now-vestigial `InTransitCommandAcceptor.PublishInOrbitAsync` indirection. No control-flow handler advances state from this event. Candidate for deletion in Phase 13b. |
+| `ConstructionSuppliedEvent` | 2 | Per taxonomy: informative outcome event. Published by `SupplyConstructionCommand` for observability (dashboards, audit logs). No control-flow handler should exist. |
+| `ShipStateMismatchEvent` | 2 | Published when a state precondition fails on a command (e.g. ship not in orbit when extract is attempted). Consumed only by `LogActivityHandler` for alert logging. Informative; no control-flow action. |
 
 Deliverables:
 
-- Clear Tier classification for every existing domain ship event before any deletions begin.
+- ✅ Clear Tier classification for every existing domain ship event before any deletions begin.
 
 #### Phase 13b: Delete Tier 3 events and handlers
 
