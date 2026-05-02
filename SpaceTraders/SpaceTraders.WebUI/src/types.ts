@@ -316,3 +316,47 @@ export interface SystemMapResponseDto {
   system: SystemDto
   waypoints: WaypointDto[]
 }
+
+// --- Phase 17a: Fleet orchestration dashboard DTOs ---
+
+export interface ResourceNeedEntryDto {
+  tradeSymbol: string
+  unitsNeeded: number
+  unitsDelivered: number
+  purposeDescription: string
+  assignedShips: string[]
+}
+
+export interface OrchestratorGoalChainDto {
+  fleetGoalId: string
+  fleetGoalKind: string
+  priority: number
+  fleetGoalDescription: string
+  resourceNeeds: ResourceNeedEntryDto[]
+}
+
+export interface ShipAssignmentDto {
+  shipSymbol: string
+  goalKind: string
+  goalDescription: string
+  sourceWaypoint: string | null
+  destinationWaypoint: string | null
+  fleetGoalId: string | null
+  fleetGoalDescription: string | null
+  assignedAt: string | null
+}
+
+export interface ShipActivityDto {
+  shipSymbol: string
+  localStatus: string
+  currentWaypoint: string | null
+  destinationWaypoint: string | null
+  estimatedArrival: string | null
+  onCooldown: boolean
+  cooldownExpiresAt: string | null
+  cargoUsed: number
+  cargoCapacity: number
+  fuelCurrent: number
+  fuelCapacity: number
+  activityDescription: string
+}

@@ -9,6 +9,7 @@ import {
   Rocket,
   Settings,
   ShoppingCart,
+  Target,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
@@ -24,6 +25,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { path: '/', label: 'Overview', Icon: LayoutDashboard },
   { path: '/fleet', label: 'Fleet', Icon: Rocket },
+  { path: '/orchestration', label: 'Orchestration', Icon: Target },
   { path: '/finance', label: 'Finance', Icon: TrendingUp },
   { path: '/markets', label: 'Markets', Icon: ShoppingCart },
   { path: '/runs', label: 'Runs', Icon: PlayCircle },
