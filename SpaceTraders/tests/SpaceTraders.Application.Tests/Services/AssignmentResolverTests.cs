@@ -344,4 +344,53 @@ public sealed class AssignmentResolverTests
         result.Should().NotBeNull();
         result!.GoalId.Should().NotBe(Guid.Empty);
     }
+
+    // -------------------------------------------------------------------------
+    // ResolveMarketCoverageAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ResolveMarketCoverageAsync_WhenNoSnapshot_ReturnsScoutWaypointGoal()
+    {
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+        markets.FindSnapshotByWaypointAsync("X1-AB-UNKNOWN", Arg.Any<CancellationToken>())
+            .Returns((MarketSnapshot?)null);
+
+        var resolver = Build(waypoints, markets);
+        var result = await resolver.ResolveMarketCoverageAsync("X1-AB-UNKNOWN");
+
+        result.Should().BeOfType<ScoutWaypointGoal>()
+            .Which.TargetWaypointSymbol.Should().Be("X1-AB-UNKNOWN");
+    }
+
+    [Fact]
+    public async Task ResolveMarketCoverageAsync_WhenSnapshotExists_ReturnsPatrolMarketGoal()
+    {
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+        var snapshot = MakeMarketSnapshot("X1-AB-MKT", "X1-AB");
+        markets.FindSnapshotByWaypointAsync("X1-AB-MKT", Arg.Any<CancellationToken>())
+            .Returns(snapshot);
+
+        var resolver = Build(waypoints, markets);
+        var result = await resolver.ResolveMarketCoverageAsync("X1-AB-MKT");
+
+        result.Should().BeOfType<PatrolMarketGoal>()
+            .Which.TargetWaypointSymbol.Should().Be("X1-AB-MKT");
+    }
+
+    [Fact]
+    public async Task ResolveMarketCoverageAsync_GoalIdIsAssigned()
+    {
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var markets = Substitute.For<IMarketRepository>();
+        markets.FindSnapshotByWaypointAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((MarketSnapshot?)null);
+
+        var resolver = Build(waypoints, markets);
+        var result = await resolver.ResolveMarketCoverageAsync("X1-AB-MKT");
+
+        result.GoalId.Should().NotBe(Guid.Empty);
+    }
 }
