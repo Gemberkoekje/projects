@@ -1399,7 +1399,7 @@ Deliverables:
 
 - Goal history is accessible over HTTP.
 
-#### Phase 17g: Extend the existing ship detail page with goal data
+#### Phase 17g: Extend the existing ship detail page with goal data ✅
 
 The single-ship detail page already exists at `/fleet/:symbol` (`ShipDetailPage.tsx`). Extend it
 rather than creating a new page.

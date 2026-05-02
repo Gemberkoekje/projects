@@ -1,7 +1,17 @@
 import { useParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect, useMemo } from 'react'
 import { apiFetch } from '@/lib/api-fetch'
-import type { ShipDto, ShipTaskRecordDto, ActivityLogDto, ShipStatsResponse } from '@/types'
+import type {
+  ShipDto,
+  ShipTaskRecordDto,
+  ActivityLogDto,
+  ShipStatsResponse,
+  ShipActivityDto,
+  ShipAssignmentDto,
+  OrchestratorGoalChainDto,
+  ShipGoalHistoryDto,
+} from '@/types'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +63,25 @@ function ProgressBar({ value, max, label }: { value: number; max: number; label:
   )
 }
 
+function formatCountdown(iso: string) {
+  const ms = new Date(iso).getTime() - Date.now()
+  if (ms <= 0) return 'Arrived'
+  const m = Math.floor(ms / 60_000)
+  const s = Math.floor((ms % 60_000) / 1_000)
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function Countdown({ iso }: { iso: string }) {
+  const [label, setLabel] = useState(() => formatCountdown(iso))
+  useEffect(() => {
+    setLabel(formatCountdown(iso))
+    const id = setInterval(() => setLabel(formatCountdown(iso)), 1_000)
+    return () => clearInterval(id)
+  }, [iso])
+  return <span className="text-xs text-status-yellow tabular-nums">{label}</span>
+}
+
 export default function ShipDetailPage() {
   const { symbol } = useParams<{ symbol: string }>()
 
@@ -83,10 +112,46 @@ export default function ShipDetailPage() {
     refetchInterval: 30_000,
   })
 
+  const shipActivityQ = useQuery<ShipActivityDto>({
+    queryKey: ['fleet-activity', symbol],
+    queryFn: () => apiFetch(`/fleet/activity/${encodeURIComponent(symbol ?? '')}`),
+    enabled: Boolean(symbol),
+    refetchInterval: 5_000,
+  })
+
+  const assignmentsQ = useQuery<ShipAssignmentDto[]>({
+    queryKey: ['fleet-assignments'],
+    queryFn: () => apiFetch('/fleet/assignments'),
+    refetchInterval: 10_000,
+  })
+
+  const goalChainsQ = useQuery<OrchestratorGoalChainDto[]>({
+    queryKey: ['fleet-goal-chains'],
+    queryFn: () => apiFetch('/fleet/goal-chains'),
+    refetchInterval: 10_000,
+  })
+
+  const goalHistoryQ = useQuery<ShipGoalHistoryDto[]>({
+    queryKey: ['fleet-goal-history', symbol],
+    queryFn: () => apiFetch(`/fleet/activity/${encodeURIComponent(symbol ?? '')}/history?limit=20`),
+    enabled: Boolean(symbol),
+    refetchInterval: 30_000,
+  })
+
   const ship = shipsQ.data?.find(s => s.symbol === symbol)
   const timeline = timelineQ.data ?? []
   const summary = statsQ.data?.summary ?? []
   const activity = activityQ.data ?? []
+  const shipActivity = shipActivityQ.data ?? null
+  const shipAssignment = assignmentsQ.data?.find(a => a.shipSymbol === symbol) ?? null
+  const servingChains = useMemo(
+    () =>
+      (goalChainsQ.data ?? []).filter(c =>
+        c.resourceNeeds.some(n => n.assignedShips.includes(symbol ?? '')),
+      ),
+    [goalChainsQ.data, symbol],
+  )
+  const goalHistory = goalHistoryQ.data ?? []
 
   const income = summary
     .filter(s => s.totalAmount > 0)
@@ -150,6 +215,108 @@ export default function ShipDetailPage() {
           </p>
         )}
       </div>
+
+      {/* Live Activity */}
+      {shipActivity && (
+        <section aria-label="Live activity">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Live Activity
+          </h2>
+          <div className="rounded-lg border border-border bg-background p-4 flex flex-col gap-2 max-w-2xl">
+            <p className="text-sm leading-snug">{shipActivity.activityDescription}</p>
+            {(shipActivity.estimatedArrival || shipActivity.cooldownExpiresAt) && (
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground">
+                  {shipActivity.estimatedArrival ? 'ETA' : 'Cooldown'}:
+                </span>
+                <Countdown iso={(shipActivity.estimatedArrival ?? shipActivity.cooldownExpiresAt)!} />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Assignment */}
+      {shipAssignment && (
+        <section aria-label="Assignment">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Assignment
+          </h2>
+          <div className="rounded-lg border border-border bg-background p-4 flex flex-col gap-1 max-w-2xl text-sm">
+            <div className="flex items-center gap-2">
+              <span className="inline-block rounded-full bg-primary/15 text-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
+                {shipAssignment.goalKind}
+              </span>
+              <span className="text-muted-foreground">{shipAssignment.goalDescription}</span>
+            </div>
+            <div className="flex flex-wrap gap-4 mt-1 text-xs text-muted-foreground">
+              <span>
+                Source: <span className="font-mono">{shipAssignment.sourceWaypoint ?? '—'}</span>
+              </span>
+              <span>
+                Destination: <span className="font-mono">{shipAssignment.destinationWaypoint ?? '—'}</span>
+              </span>
+            </div>
+            {shipAssignment.fleetGoalDescription && (
+              <div className="mt-1 text-xs">
+                Serving:{' '}
+                <Link
+                  to="/orchestration"
+                  className="text-primary hover:underline"
+                >
+                  {shipAssignment.fleetGoalDescription}
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Serving goal chains */}
+      {servingChains.length > 0 && (
+        <section aria-label="Serving fleet goals">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Serving Fleet Goals
+          </h2>
+          <div className="flex flex-col gap-2 max-w-2xl">
+            {servingChains.map(chain => (
+              <div key={chain.fleetGoalId} className="rounded-lg border border-border bg-background p-4 flex flex-col gap-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block rounded-full bg-primary/15 text-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
+                    {chain.fleetGoalKind}
+                  </span>
+                  <span className="font-medium">{chain.fleetGoalDescription}</span>
+                </div>
+                {chain.resourceNeeds
+                  .filter(n => n.assignedShips.includes(symbol ?? ''))
+                  .map((need, idx) => {
+                    const pct = need.unitsNeeded > 0
+                      ? Math.round((need.unitsDelivered / need.unitsNeeded) * 100)
+                      : 0
+                    return (
+                      <div key={idx} className="mt-1 flex flex-col gap-1 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-semibold">
+                            {need.tradeSymbol}
+                          </span>
+                          <span className="text-muted-foreground tabular-nums">
+                            {need.unitsDelivered}/{need.unitsNeeded} ({pct}%)
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Fuel & Cargo bars */}
       {ship && (
@@ -273,6 +440,55 @@ export default function ShipDetailPage() {
               </span>
             </li>
           ))}
+        </ol>
+      </section>
+
+      {/* Goal history */}
+      <section aria-label="Goal history">
+        <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+          Goal History
+        </h2>
+        {goalHistoryQ.isLoading && (
+          <p className="text-muted-foreground text-sm">Loading goal history…</p>
+        )}
+        {goalHistory.length === 0 && !goalHistoryQ.isLoading && (
+          <p className="text-muted-foreground text-sm">No goal history available.</p>
+        )}
+        <ol className="flex flex-col gap-1">
+          {goalHistory.map(entry => {
+            const completed = entry.outcome === 'Completed'
+            return (
+              <li
+                key={entry.id}
+                className="flex gap-3 text-sm border-b border-border/50 py-1.5 last:border-0 items-start"
+              >
+                <span className="text-muted-foreground text-xs tabular-nums shrink-0 pt-0.5">
+                  {formatTs(entry.startedAt)}
+                </span>
+                <div className="flex flex-col gap-0.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-xs font-medium',
+                        completed
+                          ? 'bg-status-green/15 text-status-green'
+                          : 'bg-destructive/15 text-destructive',
+                      )}
+                    >
+                      {entry.outcome}
+                    </span>
+                    <span className="font-medium">{entry.goalKind}</span>
+                  </div>
+                  {entry.reason && (
+                    <span className="text-xs text-muted-foreground">{entry.reason}</span>
+                  )}
+                </div>
+                <span className="ml-auto text-xs text-muted-foreground tabular-nums shrink-0">
+                  {formatDuration(entry.startedAt, entry.endedAt)}
+                </span>
+              </li>
+            )
+          })}
         </ol>
       </section>
     </div>
