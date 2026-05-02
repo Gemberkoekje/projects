@@ -62,6 +62,8 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<FleetGoalRecord> FleetGoals => Set<FleetGoalRecord>();
 
+    public DbSet<ScheduledShipEvent> ScheduledShipEvents => Set<ScheduledShipEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<StoredCredential>(entity =>
@@ -378,6 +380,14 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.PayloadJson).IsRequired();
             entity.HasIndex(x => new { x.AgentToken, x.CompletedAt });
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<ScheduledShipEvent>(entity =>
+        {
+            entity.ToTable("scheduled_ship_events");
+            entity.HasKey(x => new { x.ShipSymbol, x.GoalId });
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100);
+            entity.Property(x => x.EventKind).HasMaxLength(30).IsRequired();
         });
     }
 }

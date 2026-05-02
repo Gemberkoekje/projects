@@ -866,7 +866,7 @@ Deliverables:
 Goal: implement the mechanism that delivers `ShipArrivedEvent` and `ShipCooldownExpiredEvent` at
 the correct future moment, replacing the polling tick loop for in-transit and cooling-down ships.
 
-#### Phase 14a: `IShipEventScheduler` interface and database schema
+#### Phase 14a: `IShipEventScheduler` interface and database schema ✅
 
 Tasks:
 

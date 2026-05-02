@@ -248,6 +248,19 @@ public static class SpaceTradersDatabaseInitializer
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalStatus\" integer NULL;",
                 cancellationToken);
+
+            // Phase 14a: scheduled ship events table
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS scheduled_ship_events (
+                    "ShipSymbol"  character varying(100) NOT NULL,
+                    "GoalId"      uuid                   NOT NULL,
+                    "EventKind"   character varying(30)  NOT NULL,
+                    "TriggerAt"   timestamp with time zone NOT NULL,
+                    CONSTRAINT "PK_scheduled_ship_events" PRIMARY KEY ("ShipSymbol", "GoalId")
+                );
+                """,
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))
