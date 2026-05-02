@@ -15,6 +15,7 @@ import ActivityPage from '@/pages/ActivityPage'
 import SnapshotsPage from '@/pages/SnapshotsPage'
 import HealthPage from '@/pages/HealthPage'
 import SettingsPage from '@/pages/SettingsPage'
+import OrchestrationPage from '@/pages/OrchestrationPage'
 
 export function AppShell() {
   return (
@@ -40,6 +41,7 @@ export function AppShell() {
             <Route path="/snapshots" element={<SnapshotsPage />} />
             <Route path="/health" element={<HealthPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/orchestration" element={<OrchestrationPage />} />
           </Routes>
         </main>
       </div>

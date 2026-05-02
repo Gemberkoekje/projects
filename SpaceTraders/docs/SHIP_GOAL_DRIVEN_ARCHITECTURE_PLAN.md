@@ -1248,7 +1248,7 @@ Vite + TypeScript, TanStack Query, Tailwind CSS, Lucide icons) that visualises w
 is working towards, which ship is assigned to what, and what every ship is currently doing. The
 dashboard refreshes automatically and requires no back-end change to show new data.
 
-#### Phase 17a: Add `/orchestration` route and page to the existing WebUI
+#### Phase 17a: Add `/orchestration` route and page to the existing WebUI ✅
 
 Tasks:
 
@@ -1266,6 +1266,16 @@ Tasks:
   - `ShipAssignmentDto` (maps `ShipAssignmentSnapshot`)
   - `ShipActivityDto` (maps `ShipActivitySnapshot`)
 - All API calls use the existing `apiFetch` helper from `src/lib/api-fetch.ts`.
+
+Implementation notes:
+- Added `OrchestrationPage.tsx` with three `<section>` elements (Goal Chains, Assignments,
+  Activity) rendered as placeholder stubs; each section carries an `aria-labelledby` heading.
+- Registered `<Route path="/orchestration" element={<OrchestrationPage />} />` in `AppShell.tsx`.
+- Added `Target` icon import to `Sidebar.tsx` and inserted an `{ path: '/orchestration', label:
+  'Orchestration', Icon: Target }` entry immediately after the Fleet entry.
+- Added `ResourceNeedEntryDto`, `OrchestratorGoalChainDto`, `ShipAssignmentDto`, and
+  `ShipActivityDto` interfaces to `src/types.ts`; all field names are camelCase matching the API
+  wire format; date fields are `string | null`.
 
 Deliverables:
 
