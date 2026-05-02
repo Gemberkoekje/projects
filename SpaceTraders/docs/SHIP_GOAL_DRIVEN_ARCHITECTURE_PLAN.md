@@ -745,6 +745,285 @@ Deliverables:
 - A ship resumes goal execution at its estimated arrival time or cooldown expiry, even after a
   process restart.
 
+### Phase 15: Observability read models
+
+Goal: introduce lightweight, point-in-time read models that capture what the orchestrator is working
+towards, what every ship is assigned to, and what every ship is currently doing. These models are
+the foundation for the API endpoints and dashboard in Phases 16 and 17.
+
+#### Phase 15a: `OrchestratorGoalChain`
+
+Tasks:
+
+- Add `OrchestratorGoalChain` record to `SpaceTraders.Application/Orchestration/ObservabilityModels.cs`:
+  ```
+  OrchestratorGoalChain:
+    - fleetGoalKind          FleetGoalKind       // Contract | Construction | MarketCoverage | FleetExpansion
+    - fleetGoalDescription   string              // human-readable top-level goal, e.g. "Supply Jump Gate at X1-TD7-JG"
+    - resourceNeeds          ResourceNeedEntry[] // one per trade symbol required
+  
+  ResourceNeedEntry:
+    - tradeSymbol            string              // "BAUXITE"
+    - unitsNeeded            int                 // 500
+    - unitsDelivered         int                 // 120
+    - purposeDescription     string              // "needed for FRAME_DRONE × 2 to build Jump Gate"
+    - assignedShips          string[]            // ship symbols currently assigned to produce this resource
+  ```
+- Add `IFleetStatusQueryService` to `SpaceTraders.Application/Interfaces`:
+  ```csharp
+  Task<IReadOnlyList<OrchestratorGoalChain>> GetGoalChainsAsync(CancellationToken ct);
+  ```
+- Implement `FleetStatusQueryService` in `SpaceTraders.Application/Services` that:
+  - Reads active `FleetGoal` records from the orchestrator's in-memory state (or a persisted snapshot).
+  - For each `Contract`/`Construction` goal, expands the resource needs with delivery progress.
+  - Joins with `IShipGoalRepository` to populate `assignedShips`.
+- Add unit tests covering: single construction goal with two resource needs, contract goal with
+  partial delivery, and a goal with no assigned ships yet.
+
+Deliverables:
+
+- A single query returns the complete orchestrator intent as a structured, human-readable tree.
+
+#### Phase 15b: `ShipAssignmentSnapshot`
+
+Tasks:
+
+- Add `ShipAssignmentSnapshot` record:
+  ```
+  ShipAssignmentSnapshot:
+    - shipSymbol             string              // "X1-TD7-1"
+    - goalKind               ShipGoalKind        // MineResource | SellCargo | Idle | …
+    - goalDescription        string              // "Mining BAUXITE at X1-TD7-A3"
+    - sourceWaypoint         string?             // waypoint the ship is extracting/siphoning from
+    - destinationWaypoint    string?             // waypoint the ship is heading to for sell/delivery
+    - fleetGoalDescription   string?             // the top-level orchestrator goal this serves,
+                                                 //   e.g. "Supply Jump Gate at X1-TD7-JG"
+    - assignedAt             DateTimeOffset
+  ```
+- Add `Task<IReadOnlyList<ShipAssignmentSnapshot>> GetAssignmentsAsync(CancellationToken ct)` to
+  `IFleetStatusQueryService`.
+- Implement the method by joining `IShipGoalRepository` active goals with the orchestrator's
+  `FleetGoal` context to populate `fleetGoalDescription`.
+- Add unit tests: ship with active mining goal, ship with idle goal, ship with no goal set.
+
+Deliverables:
+
+- Every ship's assignment is queryable with its full context (what, where, why).
+
+#### Phase 15c: `ShipActivitySnapshot`
+
+Tasks:
+
+- Add `ShipActivitySnapshot` record:
+  ```
+  ShipActivitySnapshot:
+    - shipSymbol             string              // "X1-TD7-1"
+    - localStatus            ShipLocalStatus     // InOrbit | Docked | InTransit
+    - currentWaypoint        string?             // waypoint the ship is at (null if in transit)
+    - destinationWaypoint    string?             // destination when InTransit
+    - estimatedArrival       DateTimeOffset?     // from scheduled arrival event, if applicable
+    - onCooldown             bool
+    - cooldownExpiresAt      DateTimeOffset?
+    - cargoUsed              int
+    - cargoCapacity          int
+    - fuelCurrent            int
+    - fuelCapacity           int
+    - activityDescription    string              // plain-English summary, e.g.
+                                                 //   "Moving to X1-TD7-A3 (arrives 14:23 UTC)"
+                                                 //   "Extracting BAUXITE (cooldown 38 s)"
+                                                 //   "Docked at X1-TD7-M12, selling cargo"
+  ```
+- Add `Task<IReadOnlyList<ShipActivitySnapshot>> GetShipActivitiesAsync(CancellationToken ct)` to
+  `IFleetStatusQueryService`.
+- Derive `activityDescription` from `localStatus`, `destinationWaypoint`, `estimatedArrival`,
+  `onCooldown`, and the active goal kind using a small private factory method.
+- Expose a single-ship variant: `Task<ShipActivitySnapshot?> GetShipActivityAsync(string shipSymbol, CancellationToken ct)`.
+- Add unit tests for each `activityDescription` scenario.
+
+Deliverables:
+
+- Every ship's current state is queryable as a structured snapshot with a human-readable summary.
+
+---
+
+### Phase 16: Fleet status API endpoints
+
+Goal: expose the three read models from Phase 15 as HTTP endpoints so that any client (a browser
+dashboard, monitoring tool, or integration test) can poll the current fleet state.
+
+#### Phase 16a: Controller and route definitions
+
+Tasks:
+
+- Add `FleetStatusController` to `SpaceTraders.Api/Controllers` with three GET endpoints:
+  - `GET /api/fleet/goal-chains` → returns `IReadOnlyList<OrchestratorGoalChain>` as JSON.
+  - `GET /api/fleet/assignments` → returns `IReadOnlyList<ShipAssignmentSnapshot>` as JSON.
+  - `GET /api/fleet/activity` → returns `IReadOnlyList<ShipActivitySnapshot>` as JSON.
+  - `GET /api/fleet/activity/{shipSymbol}` → returns `ShipActivitySnapshot?` for a single ship.
+- All endpoints are read-only (`[HttpGet]`), require no request body, and return `200 OK` with
+  JSON or `404 Not Found` for the single-ship variant when the symbol is unknown.
+- Wire `IFleetStatusQueryService` into the controller via constructor injection.
+
+Deliverables:
+
+- Fleet status, assignment, and activity data is accessible over HTTP.
+
+#### Phase 16b: Response DTO mapping
+
+Tasks:
+
+- Add `FleetGoalChainDto`, `ShipAssignmentDto`, and `ShipActivityDto` records in
+  `SpaceTraders.Api/Dtos` that are the JSON-serializable shapes (camelCase property names, no
+  domain enums directly on the wire — map to strings).
+- Add `FleetStatusMapper` (static helper or AutoMapper profile) that converts domain read models to
+  DTOs.
+- Ensure `estimatedArrival` and `cooldownExpiresAt` are serialized as ISO 8601 strings.
+
+Deliverables:
+
+- API responses are stable, versioning-friendly JSON shapes decoupled from internal domain types.
+
+#### Phase 16c: Caching and freshness
+
+Tasks:
+
+- Wrap `IFleetStatusQueryService` calls in a short-lived in-memory cache (5-second TTL) so that a
+  dashboard polling every second does not trigger N database reads per request.
+- Add a `Cache-Control: max-age=5` response header so clients can respect the TTL without
+  explicitly polling faster than the data changes.
+
+Deliverables:
+
+- Fleet status endpoints are safe to poll at dashboard refresh rates without overloading the
+  database.
+
+#### Phase 16d: API endpoint tests
+
+Tasks:
+
+- Add integration-style controller tests:
+  - `GetGoalChains` returns the correct chain count and resource need entries.
+  - `GetAssignments` maps all active ship goals to DTOs correctly.
+  - `GetActivity` returns a snapshot per ship with correct `activityDescription`.
+  - `GetActivity/{shipSymbol}` returns `404` for an unknown symbol.
+
+Deliverables:
+
+- All four endpoints have request/response-level test coverage.
+
+---
+
+### Phase 17: Front-end fleet dashboard
+
+Goal: build a single-page dashboard that visualises what the orchestrator is working towards, which
+ship is assigned to what, and what every ship is currently doing. The dashboard refreshes
+automatically and requires no back-end change to show new data.
+
+#### Phase 17a: Project scaffold
+
+Tasks:
+
+- Add a `SpaceTraders.Dashboard` project (Blazor WebAssembly or a lightweight Vite + TypeScript SPA,
+  depending on the existing front-end stack) under the solution root.
+- Configure it to proxy `/api/*` requests to the back-end during development.
+- Add three top-level pages / route components:
+  - `/` → redirect to `/dashboard`
+  - `/dashboard` → combined fleet overview (all three panels on one page)
+  - `/ships/{symbol}` → detail view for a single ship
+
+Deliverables:
+
+- Project scaffolds and compiles with a placeholder "Fleet Dashboard" heading rendered in the browser.
+
+#### Phase 17b: Orchestrator goal chain panel
+
+Tasks:
+
+- Add a `GoalChainPanel` component that fetches `GET /api/fleet/goal-chains` every 10 seconds.
+- Render each `OrchestratorGoalChain` as a collapsible card with:
+  - Header: top-level goal kind badge + `fleetGoalDescription`
+    (e.g. **[CONSTRUCTION]** Supply Jump Gate at X1-TD7-JG).
+  - Body: one row per `ResourceNeedEntry` showing:
+    - Trade symbol chip (e.g. **BAUXITE**).
+    - Progress bar: `unitsDelivered / unitsNeeded`.
+    - `purposeDescription` tooltip (e.g. "needed for FRAME_DRONE × 2").
+    - Assigned ships as clickable chips that deep-link to `/ships/{symbol}`.
+- Show a "No active goals" placeholder when the list is empty.
+
+Deliverables:
+
+- The orchestrator's current intent is visible at a glance, including how far along each resource
+  need is and which ships are covering it.
+
+#### Phase 17c: Ship assignments panel
+
+Tasks:
+
+- Add a `AssignmentsPanel` component that fetches `GET /api/fleet/assignments` every 10 seconds.
+- Render a sortable table with columns:
+  | Ship | Goal | Source | Destination | Serving |
+  |---|---|---|---|---|
+  | X1-TD7-1 | Mine BAUXITE | X1-TD7-A3 | — | Supply Jump Gate at X1-TD7-JG |
+- Highlight ships whose goal is `Idle` in a muted style.
+- `Ship` column links to `/ships/{symbol}`.
+- Allow filtering by goal kind (Mine / Siphon / Sell / Scout / Idle / …) via a dropdown.
+
+Deliverables:
+
+- All ship assignments are visible in a single table with context about why each ship has its goal.
+
+#### Phase 17d: Ship activity panel
+
+Tasks:
+
+- Add a `ActivityPanel` component that fetches `GET /api/fleet/activity` every 5 seconds.
+- Render a card per ship showing:
+  - Ship symbol and a status badge (IN_TRANSIT / IN_ORBIT / DOCKED) with colour coding.
+  - `activityDescription` as the primary text line
+    (e.g. "Moving to X1-TD7-A3 · arrives 14:23 UTC").
+  - Cargo fill bar: `cargoUsed / cargoCapacity`.
+  - Fuel fill bar: `fuelCurrent / fuelCapacity`.
+  - A countdown timer for `estimatedArrival` or `cooldownExpiresAt` when applicable, ticking
+    down in the browser without additional API calls.
+- Clicking a card navigates to `/ships/{symbol}`.
+
+Deliverables:
+
+- Real-time (5-second cadence) visibility into what every ship is physically doing right now.
+
+#### Phase 17e: Single-ship detail page
+
+Tasks:
+
+- Add a `/ships/{symbol}` page that combines:
+  - Live `ShipActivitySnapshot` (auto-refresh every 5 s).
+  - The ship's current `ShipAssignmentSnapshot`.
+  - The `OrchestratorGoalChain` entry(ies) that reference this ship.
+  - A read-only log of the last N `GoalCompletedEvent` / `GoalBlockedEvent` records for the ship
+    (requires a small `GET /api/fleet/activity/{shipSymbol}/history` endpoint and a matching
+    query in `FleetStatusQueryService` that reads from a persisted event log table).
+
+Deliverables:
+
+- Operators can drill into any individual ship to see its current state, its assignment context,
+  and a short history of recently completed or blocked goals.
+
+#### Phase 17f: Front-end tests
+
+Tasks:
+
+- Add component tests (Vitest + Testing Library, or bUnit for Blazor) for:
+  - `GoalChainPanel` renders the correct number of goal cards and progress bars from mock API data.
+  - `AssignmentsPanel` renders all rows, sorts correctly, and filters by goal kind.
+  - `ActivityPanel` renders status badges, fill bars, and countdown timers from mock data.
+  - The countdown timer counts down in the browser and does not trigger extra API calls.
+- Add an end-to-end smoke test (Playwright) that loads `/dashboard` against the running back-end
+  and asserts that all three panels contain at least one entry.
+
+Deliverables:
+
+- Dashboard components have unit-level test coverage and a smoke end-to-end test.
+
 ---
 
 ## Comparison: Before and After
