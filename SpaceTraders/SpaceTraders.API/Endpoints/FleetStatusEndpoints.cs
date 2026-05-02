@@ -60,6 +60,21 @@ public static class FleetStatusEndpoints
             return Results.Ok(FleetStatusMapper.ToDto(activity));
         });
 
+        group.MapGet("/activity/{shipSymbol}/history", async (
+            string shipSymbol,
+            IFleetStatusQueryService fleetStatus,
+            int limit = 20,
+            CancellationToken ct = default) =>
+        {
+            var history = await fleetStatus.GetShipGoalHistoryAsync(shipSymbol, limit, ct);
+            if (history is null)
+            {
+                return Results.NotFound();
+            }
+
+            return Results.Ok(history.Select(FleetStatusMapper.ToDto).ToList());
+        });
+
         return app;
     }
 }

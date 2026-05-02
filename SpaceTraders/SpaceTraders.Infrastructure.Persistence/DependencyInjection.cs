@@ -72,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IRunRepository, RunRepository>();
         services.AddScoped<IShipGoalRepository, ShipGoalRepository>();
         services.AddScoped<IFleetGoalRepository, FleetGoalRepository>();
+        services.AddScoped<IShipGoalHistoryRepository, ShipGoalHistoryRepository>();
 
         // Phase 14b: scheduler fires ShipArrivedEvent / ShipCooldownExpiredEvent at the correct time.
         services.AddSingleton<ShipEventScheduler>();

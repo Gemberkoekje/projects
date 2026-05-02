@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Orchestration;
 
 namespace SpaceTraders.API.Dtos;
@@ -60,5 +61,17 @@ public static class FleetStatusMapper
             FuelCurrent = snapshot.FuelCurrent,
             FuelCapacity = snapshot.FuelCapacity,
             ActivityDescription = snapshot.ActivityDescription,
+        };
+
+    /// <summary>Maps a <see cref="ShipGoalHistoryEntry"/> to a <see cref="ShipGoalHistoryDto"/>.</summary>
+    public static ShipGoalHistoryDto ToDto(ShipGoalHistoryEntry entry) =>
+        new()
+        {
+            Id = entry.Id,
+            GoalKind = entry.GoalKind,
+            Outcome = entry.Outcome,
+            Reason = entry.Reason,
+            StartedAt = entry.StartedAt,
+            EndedAt = entry.EndedAt,
         };
 }

@@ -479,6 +479,30 @@ public static class SpaceTradersDatabaseInitializer
             END $$;
             """,
             cancellationToken);
+
+        // Phase 17e: ship goal history table
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS ship_goal_history (
+                "Id"          uuid        NOT NULL,
+                "AgentToken"  character varying(1024) NOT NULL DEFAULT '',
+                "ShipSymbol"  character varying(100) NOT NULL,
+                "GoalKind"    character varying(100) NOT NULL,
+                "GoalId"      uuid        NOT NULL,
+                "Outcome"     character varying(50)  NOT NULL,
+                "Reason"      text,
+                "StartedAt"   timestamp with time zone NOT NULL,
+                "EndedAt"     timestamp with time zone NOT NULL,
+                CONSTRAINT pk_ship_goal_history PRIMARY KEY ("Id")
+            );
+            """,
+            cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE INDEX IF NOT EXISTS idx_ship_goal_history_agent_ship_ended
+                ON ship_goal_history ("AgentToken", "ShipSymbol", "EndedAt" DESC);
+            """,
+            cancellationToken);
     }
 
     private static Task EnsureCompositePrimaryKeyAsync(

@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Orchestration;
 
@@ -21,4 +22,10 @@ internal sealed class StubFleetStatusQueryService : IFleetStatusQueryService
 
     public Task<ShipActivitySnapshot?> GetShipActivityAsync(string shipSymbol, CancellationToken ct = default)
         => Task.FromResult<ShipActivitySnapshot?>(null);
+
+    public Task<IReadOnlyList<ShipGoalHistoryEntry>?> GetShipGoalHistoryAsync(
+        string shipSymbol,
+        int limit,
+        CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ShipGoalHistoryEntry>?>(null);
 }

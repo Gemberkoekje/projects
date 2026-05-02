@@ -63,6 +63,29 @@ public sealed record ShipAssignmentDto
 }
 
 /// <summary>
+/// JSON-serializable DTO for a single completed or blocked goal in the per-ship goal history.
+/// </summary>
+/// <remarks>Phase 17f: introduced as part of the fleet dashboard implementation.</remarks>
+public sealed record ShipGoalHistoryDto
+{
+    public required Guid Id { get; init; }
+
+    public required string GoalKind { get; init; }
+
+    /// <summary>'Completed' or 'Blocked'.</summary>
+    public required string Outcome { get; init; }
+
+    /// <summary>Blocking reason when <see cref="Outcome"/> is 'Blocked'; <c>null</c> otherwise.</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>ISO 8601 timestamp of when the goal started.</summary>
+    public required DateTimeOffset StartedAt { get; init; }
+
+    /// <summary>ISO 8601 timestamp of when the goal ended.</summary>
+    public required DateTimeOffset EndedAt { get; init; }
+}
+
+/// <summary>
 /// JSON-serializable DTO for a ship's live activity snapshot.
 /// Enum fields are mapped to strings; <see cref="EstimatedArrival"/> and
 /// <see cref="CooldownExpiresAt"/> are ISO 8601.

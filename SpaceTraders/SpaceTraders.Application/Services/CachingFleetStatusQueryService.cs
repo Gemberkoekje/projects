@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Orchestration;
 
@@ -51,4 +52,11 @@ internal sealed class CachingFleetStatusQueryService(
             entry.AbsoluteExpirationRelativeToNow = Ttl;
             return inner.GetShipActivityAsync(shipSymbol, ct);
         });
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<ShipGoalHistoryEntry>?> GetShipGoalHistoryAsync(
+        string shipSymbol,
+        int limit,
+        CancellationToken ct = default)
+        => inner.GetShipGoalHistoryAsync(shipSymbol, limit, ct);
 }

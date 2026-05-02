@@ -505,6 +505,62 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         // 404 responses must not carry a Cache-Control header (per Phase 16c spec)
         response.Headers.CacheControl.Should().BeNull();
     }
+
+    // ── Phase 17f: Ship goal history endpoint ─────────────────────────────────
+
+    [Fact]
+    public async Task FleetGoalHistory_WithUnknownSymbol_Returns404()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/UNKNOWN-SHIP/history");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task FleetGoalHistory_WithKnownSymbol_ReturnsCorrectEntries()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var goalId = Guid.NewGuid();
+        var entryId = Guid.NewGuid();
+        _factory.FleetStatusQueryService
+            .GetShipGoalHistoryAsync("X1-HIST-1", 20, Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new Application.DTOs.ShipGoalHistoryEntry
+                {
+                    Id = entryId,
+                    ShipSymbol = "X1-HIST-1",
+                    GoalKind = "MineResource",
+                    GoalId = goalId,
+                    Outcome = "Completed",
+                    Reason = null,
+                    StartedAt = now.AddMinutes(-5),
+                    EndedAt = now,
+                },
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/X1-HIST-1/history");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var entries = await response.Content.ReadFromJsonAsync<List<ApiDtos.ShipGoalHistoryDto>>();
+        entries.Should().HaveCount(1);
+        entries![0].Id.Should().Be(entryId);
+        entries[0].GoalKind.Should().Be("MineResource");
+        entries[0].Outcome.Should().Be("Completed");
+        entries[0].Reason.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task FleetGoalHistory_WithKnownSymbol_LimitQueryParam_PassedThrough()
+    {
+        _factory.FleetStatusQueryService
+            .GetShipGoalHistoryAsync("X1-HIST-2", 5, Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Application.DTOs.ShipGoalHistoryEntry>());
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/X1-HIST-2/history?limit=5");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await _factory.FleetStatusQueryService.Received(1).GetShipGoalHistoryAsync("X1-HIST-2", 5, Arg.Any<CancellationToken>());
+    }
 }
 
 /// <summary>
@@ -608,6 +664,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .Returns(Array.Empty<ShipActivitySnapshot>());
         FleetStatusQueryService.GetShipActivityAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns((ShipActivitySnapshot?)null);
+        FleetStatusQueryService.GetShipGoalHistoryAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns((IReadOnlyList<Application.DTOs.ShipGoalHistoryEntry>?)null);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -19,7 +20,8 @@ internal sealed class FleetStatusQueryService(
     IShipGoalRepository shipGoals,
     IShipAssignmentRepository shipAssignments,
     IContractRepository contracts,
-    IConstructionRepository constructions) : IFleetStatusQueryService
+    IConstructionRepository constructions,
+    IShipGoalHistoryRepository goalHistory) : IFleetStatusQueryService
 {
     public async Task<IReadOnlyList<OrchestratorGoalChain>> GetGoalChainsAsync(CancellationToken ct = default)
     {
@@ -436,5 +438,20 @@ internal sealed class FleetStatusQueryService(
             DestinationWaypoint: isInTransit ? ship.DestWaypointSymbol : null,
             EstimatedArrival: isInTransit ? ship.ArrivesAt : null,
             CooldownExpiresAt: onCooldown ? ship.CooldownExpiresAt : null);
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ShipGoalHistoryEntry>?> GetShipGoalHistoryAsync(
+        string shipSymbol,
+        int limit,
+        CancellationToken ct = default)
+    {
+        var ship = await ships.FindAsync(shipSymbol, ct);
+        if (ship is null)
+        {
+            return null;
+        }
+
+        return await goalHistory.GetRecentAsync(shipSymbol, limit, ct);
     }
 }

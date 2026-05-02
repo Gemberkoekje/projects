@@ -398,3 +398,29 @@ public sealed record RunKpisDto
     /// <summary>Absolute fuel spend divided by total income (0–1 ratio).</summary>
     public double? FuelCostPerCreditEarned { get; init; }
 }
+
+
+/// <summary>
+/// A single completed or blocked goal entry in the per-ship goal history log.
+/// </summary>
+/// <remarks>Phase 17e: introduced as part of the fleet dashboard implementation.</remarks>
+public sealed record ShipGoalHistoryEntry
+{
+    public required Guid Id { get; init; }
+
+    public required string ShipSymbol { get; init; }
+
+    public required string GoalKind { get; init; }
+
+    public required Guid GoalId { get; init; }
+
+    /// <summary>'Completed' or 'Blocked'.</summary>
+    public required string Outcome { get; init; }
+
+    /// <summary>Blocking reason when <see cref="Outcome"/> is 'Blocked'; <c>null</c> otherwise.</summary>
+    public string? Reason { get; init; }
+
+    public required DateTimeOffset StartedAt { get; init; }
+
+    public required DateTimeOffset EndedAt { get; init; }
+}

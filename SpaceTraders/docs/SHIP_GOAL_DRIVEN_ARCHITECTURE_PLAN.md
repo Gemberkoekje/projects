@@ -1351,7 +1351,7 @@ Deliverables:
 
 - Real-time (5-second cadence) visibility into what every ship is physically doing right now.
 
-#### Phase 17e: Ship goal history persistence
+#### Phase 17e: Ship goal history persistence ✅
 
 Goal: persist a short history of completed and blocked goals per ship so the detail page can show
 what a ship has been doing recently.
@@ -1385,7 +1385,7 @@ Deliverables:
 
 - Goal history is persisted per ship and queryable.
 
-#### Phase 17f: Ship goal history API endpoint
+#### Phase 17f: Ship goal history API endpoint ✅
 
 Tasks:
 
