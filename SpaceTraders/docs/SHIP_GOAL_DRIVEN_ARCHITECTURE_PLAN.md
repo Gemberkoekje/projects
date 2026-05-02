@@ -891,7 +891,7 @@ Deliverables:
 
 - Interface and database schema exist; no implementation yet.
 
-#### Phase 14b: `ShipEventScheduler` implementation
+#### Phase 14b: `ShipEventScheduler` implementation ✅
 
 Tasks:
 

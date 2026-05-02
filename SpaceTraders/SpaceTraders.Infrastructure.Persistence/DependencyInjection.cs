@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Services;
@@ -71,6 +72,11 @@ public static class DependencyInjection
         services.AddScoped<IRunRepository, RunRepository>();
         services.AddScoped<IShipGoalRepository, ShipGoalRepository>();
         services.AddScoped<IFleetGoalRepository, FleetGoalRepository>();
+
+        // Phase 14b: scheduler fires ShipArrivedEvent / ShipCooldownExpiredEvent at the correct time.
+        services.AddSingleton<ShipEventScheduler>();
+        services.AddSingleton<IShipEventScheduler>(sp => sp.GetRequiredService<ShipEventScheduler>());
+        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ShipEventScheduler>());
 
         return services;
     }
