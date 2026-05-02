@@ -721,13 +721,13 @@ Deliverables:
 
 Tasks:
 
-- Update `FleetCapacityEstimator` to use `IShipCapabilityRegistry` for role classification instead
+- ✅ Update `FleetCapacityEstimator` to use `IShipCapabilityRegistry` for role classification instead
   of the current assignment-type inference.
-- Ensure the estimator still produces the same effective mining-rate and haul-capacity metrics.
+- ✅ Ensure the estimator still produces the same effective mining-rate and haul-capacity metrics.
 
 Deliverables:
 
-- `FleetCapacityEstimator` no longer infers ship roles from assignment type; it reads capabilities
+- ✅ `FleetCapacityEstimator` no longer infers ship roles from assignment type; it reads capabilities
   from the registry.
 
 #### Phase 12d: Capability registry tests
