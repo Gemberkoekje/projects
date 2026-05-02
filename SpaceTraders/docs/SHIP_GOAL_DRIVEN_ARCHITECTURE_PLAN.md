@@ -13,7 +13,7 @@ responsibility up into the assignment layer, so the three layers become:
 
 | Layer | Responsibility | Questions it answers |
 |---|---|---|
-| **Orchestrator** | Strategic resource needs, fleet capacity, purchase decisions | What do we need? Can the current fleet deliver it? |
+| **Orchestrator** | Strategic fleet needs (resource production, market coverage, fleet expansion), fleet capacity, purchase decisions | What do we need? Who is missing? Can the current fleet deliver it? |
 | **Assignment resolver** | Spatial translation of abstract needs into concrete waypoints | Where is the nearest bauxite asteroid? Which market buys iron ore closest to the ship? |
 | **Ship goal executor** | Autonomous execution of a goal from any starting state | Am I docked? Do I have fuel? Do I have a mining laser? Navigate, extract, navigate, sell. |
 
@@ -199,9 +199,32 @@ The resolver does not instruct the ship on how to get there. The ship goal execu
 
 ## Orchestrator Evolution
 
-The orchestrator works entirely in terms of **resource production goals**, not waypoints or routes.
+The orchestrator works in terms of **strategic fleet goals** (`FleetGoal`), not waypoints or routes.
+Strategic goals are wider than resource allocation alone; the four goal kinds are:
 
-### Resource production goal
+| `FleetGoalKind` | What it represents |
+|---|---|
+| `Contract` | Deliver N units of a trade symbol to a destination by a deadline |
+| `Construction` | Supply N units of a trade symbol to a construction site |
+| `MarketCoverage` | Station a probe or patrol ship at an uncovered market waypoint |
+| `FleetExpansion` | Purchase a new ship because all ships are busy and the budget allows |
+
+### Two-level goal model
+
+The orchestrator operates at two levels:
+
+**Level 1 — Strategic fleet goals (`FleetGoal`)**: produced by the `IFleetGoalEvaluator` implementations.
+These describe *what* the fleet is trying to achieve; they carry no waypoint information.
+
+**Level 2 — Resource production goals (`ResourceProductionGoal`)**: an intermediate translation step used
+only for `Contract` and `Construction` goals. The orchestrator converts a `Contract`/`Construction`
+`FleetGoal` into a `ResourceProductionGoal` and passes it to the assignment resolver.
+
+`MarketCoverage` and `FleetExpansion` goals do **not** go through `ResourceProductionGoal`; they are
+translated directly by the assignment resolver into ship goals (`ScoutWaypoint`/`PatrolMarket`) or a
+`PurchaseShipCommand` respectively.
+
+### Resource production goal (Contract / Construction only)
 
 ```
 ResourceProductionGoal:
@@ -235,7 +258,7 @@ The orchestrator currently marks fleet expansion as advisory. This plan makes it
 
 ```text
 Fleet expansion decision flow:
-1. Identify the bottleneck resource goal that cannot be met.
+1. Identify the bottleneck goal that cannot be met (resource, coverage, or otherwise).
 2. Determine the ship type that would relieve the bottleneck
    (mining drone for extraction, light hauler for cargo, satellite for market coverage).
 3. Query the shipyard repository for the cheapest eligible ship in a reachable system.
@@ -249,9 +272,13 @@ Fleet expansion decision flow:
 The current `FleetOrchestrator.BuildAssignment` passes waypoints like `OriginWaypoint: ship.WaypointSymbol`
 and `DestWaypoint: goal.DestinationWaypoint` directly into `AssignShipCommand`. Under the new model:
 
-- The orchestrator emits a `ResourceProductionGoal` and a ship symbol.
-- The assignment resolver converts that into a concrete ship goal (with waypoints).
-- The ship goal executor runs the goal.
+- For `Contract`/`Construction` goals: the orchestrator emits a `ResourceProductionGoal` and a ship symbol;
+  the assignment resolver converts that into a concrete ship goal (with waypoints).
+- For `MarketCoverage` goals: the orchestrator emits the `FleetGoal` with the uncovered market waypoint;
+  the assignment resolver creates a `ScoutWaypoint` or `PatrolMarket` ship goal directly.
+- For `FleetExpansion` goals: the orchestrator emits a `PurchaseShipCommand`; no assignment resolver step
+  is needed until after the ship is purchased.
+- The ship goal executor runs the resulting concrete goal.
 
 This is a significant change to `FleetOrchestrator`, `AssignShipCommand`, and their handling path.
 
@@ -263,13 +290,27 @@ This is a significant change to `FleetOrchestrator`, `AssignShipCommand`, and th
 GameLoopService tick
         ↓
 FleetOrchestrator.EvaluateAndAssignAsync()
-  - Aggregates ResourceProductionGoals from goal evaluators
-  - For each unmet goal, find or purchase a ship
-  - Emit AssignShipToGoalCommand(shipSymbol, resourceProductionGoal)
-        ↓
-AssignmentResolver.ResolveAsync(ship, resourceProductionGoal)
-  - Loads waypoint, market, and system data
-  - Returns a ShipGoal with concrete waypoint(s)
+  - Aggregates FleetGoals from goal evaluators (Contract, Construction, MarketCoverage, FleetExpansion)
+  - For each unmet goal, finds an idle ship or triggers fleet expansion
+  - Dispatches by goal kind:
+
+  ┌─ Contract / Construction goal
+  │   → AssignShipToGoalCommand(shipSymbol, ResourceProductionGoal)
+  │          ↓
+  │   AssignmentResolver.ResolveAsync(ship, resourceProductionGoal)
+  │     - Loads waypoint, market, and system data
+  │     - Returns a ShipGoal with concrete waypoint(s)
+  │
+  ├─ MarketCoverage goal
+  │   → AssignShipToGoalCommand(shipSymbol, FleetGoal { Kind = MarketCoverage })
+  │          ↓
+  │   AssignmentResolver creates ScoutWaypoint or PatrolMarket ShipGoal directly
+  │
+  └─ FleetExpansion goal
+      → PurchaseShipCommand(shipyardWaypoint, shipType)
+             ↓
+        After purchase: AssignShipToGoalCommand for the new ship
+
         ↓
 ShipGoalRepository.SetActiveGoal(shipSymbol, shipGoal)
   - Persists the active goal for the ship
@@ -392,33 +433,45 @@ Deliverables:
 - ✅ Ships execute goals autonomously through any starting state.
 - ✅ Old planner infrastructure is deprecated and can be removed in Phase 12.
 
-### Phase 11: Orchestrator evolution to resource production goals
+### Phase 11: Orchestrator evolution to fleet goal dispatch
 
-Goal: the orchestrator works in terms of `ResourceProductionGoal` and delegates spatial decisions
-entirely to the assignment resolver.
+Goal: the orchestrator works in terms of all `FleetGoalKind` values and delegates spatial decisions
+entirely to the assignment resolver. `Contract` and `Construction` goals are translated via
+`ResourceProductionGoal`; `MarketCoverage` and `FleetExpansion` goals are dispatched directly.
 
 Tasks:
 
-- Replace `AssignShipCommand` with `AssignShipToGoalCommand(shipSymbol, ResourceProductionGoal)`.
-  - Handler calls `IAssignmentResolver.ResolveAsync(...)` then `IShipGoalRepository.SetActiveGoal(...)`.
-  - Publishing the new assignment publishes `ShipAutomationTickEvent` for first-step execution.
+- Replace `AssignShipCommand` with `AssignShipToGoalCommand(shipSymbol, FleetGoal)`.
+  - Handler inspects the `FleetGoalKind`:
+    - `Contract` / `Construction` → calls `IAssignmentResolver.ResolveAsync(ship, ResourceProductionGoal)`
+      to obtain a concrete `ShipGoal` with waypoints.
+    - `MarketCoverage` → calls `IAssignmentResolver` to produce a `ScoutWaypoint` or `PatrolMarket`
+      `ShipGoal` for the uncovered market waypoint carried in the `FleetGoal`.
+    - `FleetExpansion` → emits `PurchaseShipCommand`; after purchase, emits `AssignShipToGoalCommand`
+      for the new ship.
+  - In all cases, ends by calling `IShipGoalRepository.SetActiveGoal(...)` and publishing
+    `ShipAutomationTickEvent` for first-step execution.
 - Update `FleetOrchestrator.BuildAssignment` to emit `AssignShipToGoalCommand` instead of the
   current `AssignShipCommand` with hardcoded waypoint fields.
-- Update all `IFleetGoalEvaluator` implementations to produce `ResourceProductionGoal` rather than
-  `FleetGoal` with origin/destination waypoints.
-- Remove waypoint fields from `FleetGoal` (origin/destination); those now belong to the assignment
-  resolver output.
+- Keep all `IFleetGoalEvaluator` implementations producing `FleetGoal`; do not change evaluators
+  to produce `ResourceProductionGoal` — that conversion happens inside the command handler, not in
+  the evaluator.
+- Remove waypoint fields from `FleetGoal` (origin/destination) only for goal kinds where they are
+  not needed (`Contract`, `Construction`); keep `OriginWaypoint` for `MarketCoverage` because it
+  identifies the market to cover, and remove it once the resolver consumes it.
 - Implement actionable fleet expansion (completing the advisory-only model from Phase 6):
   - Add `PurchaseShipCommand` handler that calls the shipyard API and assigns the new ship.
-  - Add `FleetExpansionGoalEvaluator` logic to emit a purchasable `FleetExpansionGoal` when the
-    bottleneck is confirmed and budget allows.
+  - Update `FleetExpansionGoalEvaluator` to identify the bottleneck goal kind (not just resource
+    goals) and select the appropriate ship type to relieve it.
   - After purchase, immediately trigger `AssignShipToGoalCommand` for the new ship.
 - Update orchestrator tests for the new goal shape and fleet-expansion purchase path.
 
 Deliverables:
 
-- The orchestrator no longer contains waypoint strings; all spatial decisions are in the assignment
-  resolver.
+- The orchestrator dispatches all four `FleetGoalKind` values; no waypoint strings appear in
+  `FleetOrchestrator` itself.
+- `Contract` and `Construction` goals are resolved via `ResourceProductionGoal`; `MarketCoverage`
+  and `FleetExpansion` goals are dispatched directly to ship goals or purchase commands.
 - Fleet expansion purchases ships when the bottleneck requires it and budget allows.
 
 ### Phase 12: Cleanup and capability registry
@@ -596,16 +649,21 @@ For each goal executor, test the full status × state matrix:
 
 ### Orchestrator tests
 
-- Resource need covered by current fleet → no new assignment
-- Resource need with idle miner → assign idle miner
-- Resource need with no idle suitable ship → fleet expansion goal emitted
-- Fleet expansion approved by budget → purchase command emitted
-- Fleet expansion blocked by budget → no purchase
+- Contract / Construction resource need covered by current fleet → no new assignment
+- Contract / Construction resource need with idle miner → assign idle miner
+- Contract / Construction resource need with no idle suitable ship → fleet expansion goal emitted
+- MarketCoverage goal: uncovered market → scout or patrol ship assigned
+- MarketCoverage goal: all markets covered → no goal emitted
+- FleetExpansion approved by budget → purchase command emitted; new ship assigned to bottleneck goal
+- FleetExpansion blocked by budget → no purchase
+- FleetExpansion blocked by max-ship cap → no purchase
 
 ### Integration-style tests
 
-- Full assignment-to-goal-to-completion flow: orchestrator assigns resource goal, resolver selects
-  waypoint, executor steps through to completion, `GoalCompletedEvent` published.
+- Full assignment-to-goal-to-completion flow (Contract): orchestrator assigns resource goal, resolver
+  selects waypoint, executor steps through to completion, `GoalCompletedEvent` published.
+- Full assignment-to-goal-to-completion flow (MarketCoverage): orchestrator assigns market probe
+  goal, resolver produces `PatrolMarket` ship goal, executor parks at the market.
 - Blocked goal: executor detects missing capability, `GoalBlockedEvent` published, ship becomes
   idle, orchestrator re-evaluates on next tick.
 
@@ -615,8 +673,13 @@ For each goal executor, test the full status × state matrix:
 
 - A ship given a `MineResource` goal reaches the source, extracts, and sells without any
   external coordination after goal assignment.
+- A ship given a `PatrolMarket` or `ScoutWaypoint` goal reaches and monitors the target market
+  without any external coordination after goal assignment.
 - The orchestrator never contains a waypoint symbol; all waypoints are resolved by the
   assignment resolver.
+- All four `FleetGoalKind` values are handled: `Contract` and `Construction` via
+  `ResourceProductionGoal`, `MarketCoverage` directly to a scout/patrol ship goal, and
+  `FleetExpansion` via a purchase command.
 - Capability mismatches are surfaced as `GoalBlockedEvent` within one execution step.
 - Fleet expansion transitions from advisory to actionable: a purchase command is emitted and the
   new ship is assigned immediately.
