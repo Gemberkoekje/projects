@@ -166,6 +166,7 @@ app.MapMarketsEndpoints();
 app.MapUniverseEndpoints();
 app.MapShipsReadEndpoints();
 app.MapContractsReadEndpoints();
+app.MapFleetStatusEndpoints();
 app.MapHealthExtendedEndpoints();
 app.MapHub<DashboardHub>("/hubs/dashboard");
 

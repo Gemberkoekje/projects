@@ -11,6 +11,7 @@ using NSubstitute;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
@@ -311,6 +312,52 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/top-trade-routes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    // ── Phase 16a: Fleet status endpoints ────────────────────────────────────
+
+    [Fact]
+    public async Task FleetGoalChains_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/goal-chains");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task FleetAssignments_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/assignments");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task FleetActivity_WithValidApiKey_Returns200()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task FleetActivityByShip_WithUnknownSymbol_Returns404()
+    {
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/UNKNOWN-SHIP");
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task FleetActivityByShip_WithKnownSymbol_Returns200()
+    {
+        _factory.FleetStatusQueryService
+            .GetShipActivityAsync("X1-TEST-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipActivitySnapshot(
+                "X1-TEST-1",
+                Domain.Enums.ShipLocalStatus.Docked,
+                "Docked at X1-TEST-A1",
+                0, 40, 400, 400, false,
+                CurrentWaypoint: "X1-TEST-A1"));
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/activity/X1-TEST-1");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 }
 
 /// <summary>
@@ -363,6 +410,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public IMarketRepository MarketRepository { get; } = Substitute.For<IMarketRepository>();
 
+    public IFleetStatusQueryService FleetStatusQueryService { get; } = Substitute.For<IFleetStatusQueryService>();
+
     public SpaceTradersApiFactory()
     {
         // Default stub responses
@@ -404,6 +453,14 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .Returns(Array.Empty<Application.Interfaces.MarketSnapshot>());
         MarketRepository.GetAllFreshnessAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Application.Interfaces.Repositories.MarketFreshnessRecord>());
+        FleetStatusQueryService.GetGoalChainsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<OrchestratorGoalChain>());
+        FleetStatusQueryService.GetAssignmentsAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ShipAssignmentSnapshot>());
+        FleetStatusQueryService.GetShipActivitiesAsync(Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<ShipActivitySnapshot>());
+        FleetStatusQueryService.GetShipActivityAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((ShipActivitySnapshot?)null);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -485,6 +542,10 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IMarketRepository>();
             services.AddScoped(_ => MarketRepository);
+
+            // ── Fleet status (Phase 16a) ─────────────────────────────────────
+            services.RemoveAll<IFleetStatusQueryService>();
+            services.AddScoped(_ => FleetStatusQueryService);
 
             // ── SpaceTraders API client / port ────────────────────────────────
             services.RemoveAll<ISpaceTradersApiClient>();
