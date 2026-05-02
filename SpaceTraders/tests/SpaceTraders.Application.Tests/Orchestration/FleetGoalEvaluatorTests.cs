@@ -178,7 +178,6 @@ public sealed class FleetGoalEvaluatorTests
         goals[0].Priority.Should().Be(FleetGoalPriority.FleetExpansion);
     }
 
-
     [Fact]
     public async Task FleetExpansionGoalEvaluator_SkipsWhenIdleShipsExist()
     {
