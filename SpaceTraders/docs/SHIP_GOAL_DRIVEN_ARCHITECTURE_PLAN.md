@@ -1282,7 +1282,7 @@ Deliverables:
 - The `/orchestration` page is reachable from the sidebar and renders a placeholder heading.
 - Three DTO interfaces exist in `types.ts` and compile without errors.
 
-#### Phase 17b: Orchestrator goal chain panel
+#### Phase 17b: Orchestrator goal chain panel ✅
 
 Tasks:
 

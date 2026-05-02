@@ -2069,3 +2069,84 @@ describe('OverviewPage — anomalies and decision candidates', () => {
     expect(screen.getByText('FUEL')).toBeInTheDocument()
   })
 })
+
+// ─── GoalChainPanel ───────────────────────────────────────────────────────────
+
+import GoalChainPanel from '../components/GoalChainPanel'
+
+describe('GoalChainPanel', () => {
+  it('shows "No active goals." when the list is empty', async () => {
+    mockApiFetch.mockResolvedValue([])
+    render(
+      <Wrapper>
+        <GoalChainPanel />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('No active goals.')).toBeInTheDocument(),
+    )
+  })
+
+  it('renders goal chains sorted by priority', async () => {
+    mockApiFetch.mockResolvedValue([
+      {
+        fleetGoalId: 'g2',
+        fleetGoalKind: 'TRADE',
+        priority: 2,
+        fleetGoalDescription: 'Trade iron ore',
+        resourceNeeds: [],
+      },
+      {
+        fleetGoalId: 'g1',
+        fleetGoalKind: 'CONSTRUCTION',
+        priority: 1,
+        fleetGoalDescription: 'Supply Jump Gate at X1-TD7-JG',
+        resourceNeeds: [],
+      },
+    ])
+    render(
+      <Wrapper>
+        <GoalChainPanel />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('Supply Jump Gate at X1-TD7-JG')).toBeInTheDocument(),
+    )
+    const summaries = screen.getAllByRole('group')
+    // Priority 1 card should appear before priority 2
+    const text = document.body.textContent ?? ''
+    expect(text.indexOf('Supply Jump Gate')).toBeLessThan(text.indexOf('Trade iron ore'))
+  })
+
+  it('renders resource needs with progress bar and assigned ship links', async () => {
+    mockApiFetch.mockResolvedValue([
+      {
+        fleetGoalId: 'g1',
+        fleetGoalKind: 'CONSTRUCTION',
+        priority: 1,
+        fleetGoalDescription: 'Supply Jump Gate',
+        resourceNeeds: [
+          {
+            tradeSymbol: 'BAUXITE',
+            unitsNeeded: 100,
+            unitsDelivered: 40,
+            purposeDescription: 'For the gate',
+            assignedShips: ['X1-TD7-1'],
+          },
+        ],
+      },
+    ])
+    render(
+      <Wrapper>
+        <GoalChainPanel />
+      </Wrapper>,
+    )
+    await waitFor(() =>
+      expect(screen.getByText('BAUXITE')).toBeInTheDocument(),
+    )
+    expect(screen.getByText('40/100')).toBeInTheDocument()
+    expect(screen.getByText('For the gate')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'X1-TD7-1' })
+    expect(link).toHaveAttribute('href', '/fleet/X1-TD7-1')
+  })
+})
