@@ -51,12 +51,36 @@ Trading alone may not generate credits fast enough. Mining raw materials and sup
 
 Mining is not strictly required but it helps close the credit gap when market prices are recovering.
 
+### Supply chain priming — prime the full transitive closure
+
+When stimulating supply to produce jump gate construction materials (e.g. `FAB_MAT`, `ADVANCED_CIRCUIT`), do **not** limit your attention to the direct inputs of those top-level materials. The entire transitive closure of the supply chain benefits from being kept healthy:
+
+- `FAB_MAT` requires upstream goods (e.g. `IRON`, `ALUMINUM`), which in turn depend on their own raw-material imports.
+- `ADVANCED_CIRCUIT` requires `MICROPROCESSORS` or `ELECTRONICS`, which require `SILICON_CRYSTALS`, `COPPER` etc.
+- A bottleneck anywhere in the chain will eventually restrict the goods at the top.
+
+**Supply level target:** you do not need to push every node to `ABUNDANT`. The goal is to keep every market in the chain **above `LIMITED`**. The relevant supply levels in ascending order are:
+
+```
+SCARCE → LIMITED → MODERATE → HIGH → ABUNDANT
+```
+
+A good in `LIMITED` or `SCARCE` is being consumed faster than it is produced; supplying it will unblock the downstream chain. Once a market is at `MODERATE` or above it can sustain itself for a few cycles without intervention.
+
+**Practical priming checklist:**
+
+1. Start with the jump gate construction requirements and look up which goods each required material imports.
+2. Follow each import one level deeper — what does *that* market import? Repeat until you reach raw ores / gases with no production inputs.
+3. For every node in that tree that is currently at `LIMITED` or `SCARCE`, assign a mining or trading ship to supply it.
+4. Prioritise the deepest bottlenecks first: a `SCARCE` raw material will cascade shortages up the entire chain.
+5. Once a market recovers to `MODERATE` or above, deprioritise it and redirect effort to the next bottleneck.
+
 ### Recommended mining approach
 
 1. Identify the nearest asteroid cluster with `MINERAL_DEPOSITS` or `COMMON_METAL_DEPOSITS`
 2. Mine until cargo is full
 3. Sell at a marketplace that imports ores or accepts exchange goods
-4. Prioritise selling goods that are also market precursors for fab mats to double the benefit
+4. Prioritise selling goods that are also market precursors for jump gate materials — the deeper in the chain the better
 
 ---
 
@@ -108,6 +132,9 @@ Use this as a run-time checklist each reset:
 - [ ] Set target buy price at ≤ 2 500 cr/unit for fab mats
 - [ ] Ring-fence advanced circuit stockpile — no market sales until gate is done
 - [ ] Start a mining loop to supplement income and stimulate markets
+- [ ] Map the full transitive supply chain for each construction material (follow imports recursively to raw inputs)
+- [ ] Identify every node in that chain at `LIMITED` or `SCARCE` supply and prioritise supplying those first
+- [ ] Re-check supply levels each cycle; deprioritise recovered markets and redirect effort to remaining bottlenecks
 - [ ] Remove or relax the 30 % hourly budget cap on construction purchases
 - [ ] Buy fab mats in single max-quantity transactions (up to 60 units) when price is right
 - [ ] Wait for price recovery between buy cycles
