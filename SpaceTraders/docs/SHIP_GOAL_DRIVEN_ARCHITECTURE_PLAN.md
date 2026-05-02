@@ -31,6 +31,44 @@ responsibility up into the assignment layer, so the three layers become:
 
 ---
 
+## Event Taxonomy
+
+Every domain event is classified into one of three tiers. The tier determines whether an event
+handler must exist, may exist, or must not exist.
+
+### Tier 1 — Reactive (event handlers must exist and act)
+
+| Event | Who handles it | Why |
+|---|---|---|
+| `ShipArrivedEvent` | `ShipGoalExecutorService` | Scheduled at the estimated arrival time; re-activates the ship to continue goal execution |
+| `ShipCooldownExpiredEvent` | `ShipGoalExecutorService` | Scheduled at `cooldown.expiration`; re-activates the ship after a mining/siphon/survey cooldown |
+| `CreditsChangedEvent` | Orchestrator / `IBudgetPolicy` | Fleet expansion or purchase decisions may need to change |
+| `MarketPriceChangedEvent` | Assignment resolver cache invalidation; Orchestrator re-evaluate | Sell route or supply choice may be suboptimal now |
+| `GoalCompletedEvent` | Orchestrator | Ship is idle; re-evaluate fleet needs and assign a new goal |
+| `GoalBlockedEvent` | Orchestrator | Ship cannot proceed; may require equipment purchase or reassignment |
+
+### Tier 2 — Informative (published for observability; no handlers)
+
+`ResourceExtractedEvent`, `CargoSoldEvent`, `ContractDeliveredEvent`, `ConstructionSuppliedEvent`,
+`ShipPurchasedEvent`, and similar outcome events. These are useful for dashboards, audit logs, and
+integration tests but must **never** gate the control flow. The event is published but no handler
+class exists for it.
+
+### Tier 3 — Removed / replaced by direct return
+
+`ShipDockedEvent`, `ShipOrbitedEvent`, `ShipUndockedEvent`, and any event whose sole consumer was
+a handler that immediately issued the next API call. Docking, orbiting, and undocking are instant,
+synchronous API calls; the executor continues on the successful return value without scheduling any
+event.
+
+### Guiding rule
+
+> An event handler re-activates a ship **only** when the ship cannot know when to resume without
+> external information — i.e. a future arrival time or a cooldown expiry. All other sequencing is
+> internal to the goal executor.
+
+---
+
 ## Ship Goals
 
 A goal represents a complete, self-contained objective for a single ship. The ship executor for each goal
@@ -401,6 +439,87 @@ Deliverables:
 
 - Planner layer removed; goal executor layer is the only automation path.
 - Ship capability is derived from game data, not from assignment type.
+
+### Phase 13: Event rationalization
+
+Goal: remove all event handlers that exist only to advance a ship from one instant API call to the
+next. Only Tier 1 reactive events retain handlers. Tier 2 events are kept as published signals but
+their handler classes are deleted. Tier 3 events are deleted entirely.
+
+Tasks:
+
+- Audit every domain event under `SpaceTraders.Domain/Events/Ships` and classify it using the
+  Event Taxonomy above (Tier 1 / 2 / 3).
+- Delete `ShipDockedEvent`, `ShipOrbitedEvent`, `ShipUndockedEvent` and any other event whose
+  sole consumer is a handler that immediately issues the next API call.
+- Delete corresponding event handler classes in `SpaceTraders.Application/EventHandlers/Ships`.
+- In every goal executor, replace the removed event-driven transitions with direct sequential
+  logic: after `OrbitAsync()` succeeds, call the next action in the same `ExecuteStepAsync`
+  invocation rather than publishing an event and returning.
+- Retain `GoalCompletedEvent`, `GoalBlockedEvent`, `CreditsChangedEvent`, and
+  `MarketPriceChangedEvent` with their handlers unchanged.
+- Convert Tier 2 events: keep the `IEventPublisher.Publish` call for observability but delete the
+  handler class.
+- Update integration and unit tests: tests that asserted an intermediate event was published for
+  an instant action should instead assert the final outcome (e.g. ship is in orbit, the correct
+  API was called).
+
+Deliverables:
+
+- No event handler class exists for any instant (synchronous-return) ship action.
+- `ShipGoalExecutorService` communicates with the orchestrator only via `GoalCompletedEvent` and
+  `GoalBlockedEvent`.
+- The total number of event handler classes is substantially reduced.
+
+### Phase 14: Scheduled future events (arrival and cooldown)
+
+Goal: implement the mechanism that delivers `ShipArrivedEvent` and `ShipCooldownExpiredEvent` at
+the correct future moment, replacing the polling tick loop for in-transit and cooling-down ships.
+
+Tasks:
+
+- Add `IShipEventScheduler` to `SpaceTraders.Application/Interfaces`:
+  ```csharp
+  Task ScheduleArrivalAsync(string shipSymbol, Guid goalId, DateTimeOffset arrivalTime, CancellationToken ct);
+  Task ScheduleCooldownExpiryAsync(string shipSymbol, Guid goalId, DateTimeOffset expiresAt, CancellationToken ct);
+  Task CancelScheduledAsync(string shipSymbol, Guid goalId, CancellationToken ct);
+  ```
+- Implement `ShipEventScheduler` as an `IHostedService` backed by an in-memory priority queue
+  (ordered by trigger time). On startup, reload all pending rows from the `scheduled_ship_events`
+  table so scheduled events survive a process restart. Schema:
+  ```sql
+  scheduled_ship_events (
+      ship_symbol  TEXT        NOT NULL,
+      goal_id      UUID        NOT NULL,
+      event_kind   TEXT        NOT NULL,  -- 'Arrival' | 'CooldownExpiry'
+      trigger_at   TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (ship_symbol, goal_id)
+  )
+  ```
+- In every goal executor that issues a `Navigate` API call: after a successful response, call
+  `IShipEventScheduler.ScheduleArrivalAsync(ship.Symbol, goal.GoalId, nav.Route.Arrival)` and
+  return `GoalExecutionResult.Waiting`. Do **not** publish `ShipAutomationTickEvent`.
+- In goal executors that issue `Extract`, `Siphon`, or `Survey` API calls: after a successful
+  response containing a cooldown, call
+  `IShipEventScheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, cooldown.Expiration)`
+  and return `GoalExecutionResult.Waiting`.
+- Add `ShipArrivedEventHandler` and `ShipCooldownExpiredEventHandler`: each verifies that the
+  `GoalId` in the event still matches the ship's currently active goal (stale wake-ups are silently
+  ignored), then publishes `ShipAutomationTickEvent` to resume execution.
+- In the `GoalCompletedEvent` and `GoalBlockedEvent` handlers, call
+  `IShipEventScheduler.CancelScheduledAsync` to prevent ghost wake-ups after goal reassignment.
+- Add unit tests for `ShipEventScheduler`:
+  - Event fires at the correct time.
+  - Persisted schedule is reloaded and fires correctly after a simulated restart.
+  - Cancellation before trigger time prevents the event from firing.
+  - A `GoalId` mismatch in the handler is silently ignored (no exception, no action).
+
+Deliverables:
+
+- Ships in transit or on cooldown consume no CPU and produce no wasted tick-loop iterations.
+- A ship resumes goal execution at its estimated arrival time or cooldown expiry, even after a
+  process restart.
+- No `ShipAutomationTickEvent` is published for a ship that is in transit or on cooldown.
 
 ---
 
