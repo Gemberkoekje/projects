@@ -525,7 +525,7 @@ Deliverables:
 - `FleetOrchestrator` no longer references waypoint symbols directly. ✅
 - All `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`. ✅
 
-#### Phase 11c: Actionable fleet expansion
+#### Phase 11c: Actionable fleet expansion ✅
 
 Tasks:
 

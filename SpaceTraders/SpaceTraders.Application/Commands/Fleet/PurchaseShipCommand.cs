@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
@@ -19,17 +20,25 @@ public sealed record PurchaseShipCommand
 
     public string TargetOriginWaypoint { get; init; } = string.Empty;
 
+    /// <summary>
+    /// When set, the handler will emit an <see cref="AssignShipToGoalCommand"/> with this goal
+    /// for the newly-purchased ship immediately after purchase.
+    /// </summary>
+    public FleetGoal? TargetGoal { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public PurchaseShipCommand(
         string ShipType,
         string ShipyardWaypoint,
         string TargetAssignmentType = "",
-        string TargetOriginWaypoint = "")
+        string TargetOriginWaypoint = "",
+        FleetGoal? TargetGoal = null)
     {
         this.ShipType = ShipType;
         this.ShipyardWaypoint = ShipyardWaypoint;
         this.TargetAssignmentType = TargetAssignmentType;
         this.TargetOriginWaypoint = TargetOriginWaypoint;
+        this.TargetGoal = TargetGoal;
     }
 }
 
@@ -112,6 +121,15 @@ public sealed class PurchaseShipHandler(
                 OriginWaypoint: string.IsNullOrWhiteSpace(command.TargetOriginWaypoint) ? null : command.TargetOriginWaypoint,
                 SystemSymbol: result.ShipNav.SystemSymbol,
                 WaypointSymbol: result.ShipNav.WaypointSymbol));
+        }
+
+        if (command.TargetGoal is not null)
+        {
+            logger.LogInformation(
+                "PurchaseShipHandler: assigning new ship {Symbol} to goal {GoalKind}.",
+                result.ShipSymbol,
+                command.TargetGoal.Kind);
+            await bus.SendAsync(new AssignShipToGoalCommand(result.ShipSymbol, command.TargetGoal));
         }
 
         if (Enum.TryParse<ShipType>(command.ShipType, true, out var shipTypeEnum))
