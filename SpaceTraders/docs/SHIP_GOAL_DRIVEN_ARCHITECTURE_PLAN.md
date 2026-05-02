@@ -1207,7 +1207,7 @@ Deliverables:
 - Fleet status endpoints are safe to poll at dashboard refresh rates without overloading the
   database.
 
-#### Phase 16d: API endpoint tests
+#### Phase 16d: API endpoint tests ✅
 
 Tasks:
 
@@ -1216,6 +1216,24 @@ Tasks:
   - `GetAssignments` maps all active ship goals to DTOs correctly.
   - `GetActivity` returns a snapshot per ship with correct `activityDescription`.
   - `GetActivity/{shipSymbol}` returns `404` for an unknown symbol.
+
+Implementation notes:
+- Added four content-level tests to `ApiIntegrationTests.cs` in the Phase 16d section:
+  - `GetGoalChains_ReturnsCorrectChainCountAndResourceNeeds`: configures mock to return one
+    `OrchestratorGoalChain` with a `ResourceNeedEntry`, deserializes `FleetGoalChainDto` from
+    the response and asserts all fields including the resource need array.
+  - `GetAssignments_MapsAllActiveShipGoalsToDto`: configures mock with a mining ship and an idle
+    ship, deserializes `ShipAssignmentDto` list and asserts `GoalKind` is the string name of the
+    enum, waypoints, and `FleetGoalId` round-trip correctly.
+  - `GetActivity_ReturnsSnapshotPerShipWithCorrectActivityDescription`: configures mock with an
+    in-transit and a docked ship, asserts `LocalStatus` string conversion, `ActivityDescription`,
+    navigation waypoints, and numeric fields.
+  - `GetGoalChains_ResponseHasCacheControlHeader`: verifies `Cache-Control: public, max-age=5` is
+    present on successful responses (Phase 16c behaviour exercised at the HTTP level).
+  - `GetActivityByShip_WithUnknownSymbol_HasNoCacheControlHeader`: verifies that 404 responses
+    omit the `Cache-Control` header, as specified in Phase 16c.
+- Added `using ApiDtos = SpaceTraders.API.Dtos;` alias to resolve the `ShipAssignmentDto`
+  ambiguity between `SpaceTraders.Application.DTOs` and `SpaceTraders.API.Dtos`.
 
 Deliverables:
 
