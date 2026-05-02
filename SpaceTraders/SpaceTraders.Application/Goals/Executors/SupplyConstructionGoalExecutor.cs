@@ -65,7 +65,7 @@ public sealed class SupplyConstructionGoalExecutor(
                 Guid.NewGuid(),
                 Guid.NewGuid(),
                 ct);
-            return GoalExecutionResult.Progressing($"Supplying {cargoUnits}x {supplyGoal.TradeSymbol} to construction site.");
+            return GoalExecutionResult.Completed($"Supplied {cargoUnits}x {supplyGoal.TradeSymbol} to construction site.");
         }
 
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
@@ -80,6 +80,6 @@ public sealed class SupplyConstructionGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, supplyGoal.ConstructionSiteWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to construction site {supplyGoal.ConstructionSiteWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to construction site {supplyGoal.ConstructionSiteWaypointSymbol}.");
     }
 }

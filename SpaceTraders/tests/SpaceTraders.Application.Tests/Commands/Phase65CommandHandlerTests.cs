@@ -19,16 +19,16 @@ namespace SpaceTraders.Application.Tests.Commands;
 /// - Each ship-owned command exposes <c>ExecuteAsync</c> returning a
 ///   <see cref="ShipCommandResult"/> that reflects whether the API call was issued
 ///   and the resulting (or current) <see cref="ShipLocalStatus"/>.
-/// - Whenever a command rejects with <see cref="ShipStateMismatchEvent"/>, it must
-///   also publish a <see cref="ShipAutomationTickEvent"/> so the planner reasserts
-///   the next valid action without depending on the chain-of-command fallback.
+/// - Whenever a command rejects with <see cref="ShipStateMismatchEvent"/>, it must NOT
+///   publish a <see cref="ShipAutomationTickEvent"/>; the orchestrator will reassert
+///   on the next tick.
 /// </summary>
 public sealed class Phase65CommandHandlerTests
 {
     // ---------------- Phase 6.5e: tick is published alongside mismatch ----------------
 
     [Fact]
-    public async Task DockShip_WhenNotInOrbit_AlsoPublishesAutomationTick()
+    public async Task DockShip_WhenNotInOrbit_PublishesMismatchEvent()
     {
         var (port, ships, bus) = MoveCtx();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -38,13 +38,10 @@ public sealed class Phase65CommandHandlerTests
         await handler.Handle(new DockShipCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason.Contains("DockShipCommand")),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task OrbitShip_WhenNotDocked_AlsoPublishesAutomationTick()
+    public async Task OrbitShip_WhenNotDocked_PublishesMismatchEvent()
     {
         var (port, ships, bus) = MoveCtx();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -54,13 +51,10 @@ public sealed class Phase65CommandHandlerTests
         await handler.Handle(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason.Contains("OrbitShipCommand")),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task NavigateShip_WhenDocked_AlsoPublishesAutomationTick()
+    public async Task NavigateShip_WhenDocked_PublishesMismatchEvent()
     {
         var (port, ships, bus) = MoveCtx();
         var goals = Substitute.For<IShipGoalRepository>();
@@ -72,13 +66,10 @@ public sealed class Phase65CommandHandlerTests
         await handler.Handle(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason.Contains("NavigateShipCommand")),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task SellCargo_WhenNotDocked_AlsoPublishesAutomationTick()
+    public async Task SellCargo_WhenNotDocked_PublishesMismatchEvent()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -93,9 +84,6 @@ public sealed class Phase65CommandHandlerTests
         await handler.Handle(new SellCargoCommand("SHIP-1", "IRON_ORE", 10), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason.Contains("SellCargoCommand")),
-            Arg.Any<DeliveryOptions>());
     }
 
     // ---------------- Phase 6.5a: accepted / rejected results ----------------
@@ -130,7 +118,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task ExtractResources_WhenDocked_ReturnsRejectedResult_AndPublishesTick()
+    public async Task ExtractResources_WhenDocked_ReturnsRejectedResult_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -150,7 +138,6 @@ public sealed class Phase65CommandHandlerTests
         result.Accepted.Should().BeFalse();
         result.Status.Should().Be(ShipLocalStatus.Docked);
         await port.DidNotReceive().ExtractResourcesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -175,7 +162,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task Survey_WhenDocked_ReturnsRejected_AndPublishesTick()
+    public async Task Survey_WhenDocked_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -191,7 +178,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().SurveyAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -219,7 +205,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task Refuel_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task Refuel_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -235,7 +221,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().RefuelShipAsync(Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -263,7 +248,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task BuyCargo_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task BuyCargo_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -279,7 +264,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().BuyCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -306,7 +290,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task Repair_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task Repair_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -321,7 +305,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().RepairShipAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -347,7 +330,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task Scrap_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task Scrap_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -363,7 +346,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().ScrapShipAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -386,7 +368,7 @@ public sealed class Phase65CommandHandlerTests
     }
 
     [Fact]
-    public async Task JettisonCargo_WhenInTransit_ReturnsRejected_AndPublishesTick()
+    public async Task JettisonCargo_WhenInTransit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -400,11 +382,10 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().JettisonCargoAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task SupplyConstruction_WhenDocked_ReturnsRejected_AndPublishesTick()
+    public async Task SupplyConstruction_WhenDocked_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var constructions = Substitute.For<IConstructionRepository>();
@@ -422,11 +403,10 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().SupplyConstructionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task InstallModule_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task InstallModule_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -442,11 +422,10 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().InstallModuleAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task RemoveModule_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task RemoveModule_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -462,11 +441,10 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().RemoveModuleAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task RemoveMount_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task RemoveMount_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -482,11 +460,10 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().RemoveMountAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task DeliverContract_WhenInOrbit_ReturnsRejected_AndPublishesTick()
+    public async Task DeliverContract_WhenInOrbit_ReturnsRejected_AndPublishesMismatch()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var contracts = Substitute.For<IContractRepository>();
@@ -501,7 +478,6 @@ public sealed class Phase65CommandHandlerTests
 
         result.Accepted.Should().BeFalse();
         await port.DidNotReceive().DeliverContractAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
-        await bus.Received(1).PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]

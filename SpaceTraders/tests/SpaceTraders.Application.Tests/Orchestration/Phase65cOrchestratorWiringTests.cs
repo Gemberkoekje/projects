@@ -3,12 +3,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Goals;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -23,8 +22,8 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 /// Remaining tests verify that:
 ///   1. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipToGoalCommand"/> and never issues
 ///      low-level Dock/Orbit/Navigate commands directly.
-///   2. After the orchestrator assigns a ship, a subsequent <see cref="ShipAutomationTickEvent"/>
-///      causes the goal executor service to be invoked exactly once.
+///   2. After the orchestrator assigns a ship, the goal executor service is invoked directly
+///      (no synthetic tick event).
 ///   3. Fleet expansion is dispatched via <see cref="AssignShipToGoalCommand"/>; the handler
 ///      handles purchasing.
 /// </summary>
@@ -132,33 +131,43 @@ public sealed class Phase65cOrchestratorWiringTests
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
-    // End-to-end: orchestrator assigns → ShipAutomationTickEvent → goal executor runs
+    // End-to-end: orchestrator assigns → goal executor runs directly
     // ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task AfterOrchestratorAssigns_ShipAutomationTickEvent_InvokesGoalExecutorServiceOnce()
+    public async Task AfterOrchestratorAssigns_AssignShipToGoalCommandHandler_InvokesGoalExecutorServiceOnce()
     {
-        // Arrange: goal executor service that records calls
+        // Arrange
         var goalExecutorService = Substitute.For<IShipGoalExecutorService>();
         goalExecutorService.ExecuteAsync("HAULER-1", Arg.Any<CancellationToken>())
             .Returns((GoalExecutionResult?)null);
 
-        var tickHandler = new ShipAutomationTickEventHandler(
-            goalExecutorService,
-            NullLogger<ShipAutomationTickEventHandler>.Instance);
+        var ships = Substitute.For<IShipRepository>();
+        ships.FindAsync("HAULER-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("HAULER-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 60));
 
-        // Act: simulate what happens after the orchestrator sends AssignShipToGoalCommand and
-        // the next automation tick fires for the ship.
-        var tick = new ShipAutomationTickEvent(
-            "HAULER-1",
-            "Assigned",
-            DateTimeOffset.UtcNow,
-            Guid.NewGuid(),
-            Guid.Empty);
+        var goals = Substitute.For<IShipGoalRepository>();
+        var resolver = Substitute.For<IAssignmentResolver>();
+        var resolvedGoal = new MineResourceGoal { TradeSymbol = "IRON_ORE", SourceWaypointSymbol = "X1-A-AST" };
+        resolver.ResolveAsync(Arg.Any<ShipModel>(), Arg.Any<ResourceProductionGoal>(), Arg.Any<CancellationToken>())
+            .Returns(resolvedGoal);
 
-        await tickHandler.Handle(tick, CancellationToken.None);
+        var settings = Substitute.For<ISettingsRepository>();
+        var shipyards = Substitute.For<IShipyardRepository>();
+        var bus = Substitute.For<IMessageBus>();
 
-        // Assert: goal executor service was invoked exactly once.
+        var handler = new AssignShipToGoalCommandHandler(
+            ships, goals, resolver, settings, shipyards, bus, goalExecutorService,
+            NullLogger<AssignShipToGoalCommandHandler>.Instance);
+
+        var command = new AssignShipToGoalCommand("HAULER-1", new FleetGoal(
+            FleetGoalKind.Contract, "Deliver ore", 100,
+            ContractId: "c1", TradeSymbol: "IRON_ORE", RemainingUnits: 10));
+
+        // Act
+        await handler.Handle(command, CancellationToken.None);
+
+        // Assert: goal executor service was invoked exactly once — no tick event.
         await goalExecutorService.Received(1).ExecuteAsync("HAULER-1", Arg.Any<CancellationToken>());
     }
 }

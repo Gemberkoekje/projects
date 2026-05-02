@@ -53,7 +53,6 @@ public sealed class MineResourceGoalExecutor(
                     deliverDecision.Value.Units,
                     ship.WaypointSymbol ?? string.Empty,
                     ct);
-                return GoalExecutionResult.Progressing($"Delivering {deliverDecision.Value.Units}x {deliverDecision.Value.TradeSymbol} for contract.");
             }
 
             // 2. Sell eligible non-protected cargo.
@@ -61,7 +60,6 @@ public sealed class MineResourceGoalExecutor(
             if (sellDecision is not null)
             {
                 await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
-                return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
             }
 
             // 3. Jettison low-value cargo when full.
@@ -69,7 +67,6 @@ public sealed class MineResourceGoalExecutor(
             if (jettisonDecision is not null)
             {
                 await bus.InvokeAsync(new JettisonCargoCommand(ship.Symbol, jettisonDecision.Value.TradeSymbol, jettisonDecision.Value.Units), ct);
-                return GoalExecutionResult.Progressing($"Jettisoning {jettisonDecision.Value.Units}x {jettisonDecision.Value.TradeSymbol}.");
             }
 
             // 4. Refuel from hydrocarbon cargo if needed.
@@ -81,7 +78,6 @@ public sealed class MineResourceGoalExecutor(
                 if (hydroUnits > ctx.MiningReserveHydrocarbonUnits)
                 {
                     await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: true, ct);
-                    return GoalExecutionResult.Progressing("Refueling from hydrocarbon cargo.");
                 }
             }
 
@@ -89,7 +85,6 @@ public sealed class MineResourceGoalExecutor(
             if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
             {
                 await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
-                return GoalExecutionResult.Progressing("Refueling at market.");
             }
 
             // 6. Orbit and continue.
@@ -130,19 +125,19 @@ public sealed class MineResourceGoalExecutor(
             }
 
             await inOrbitCommands.NavigateAsync(ship.Symbol, sellMarket, ct);
-            return GoalExecutionResult.Progressing($"Cargo full; navigating to sell at {sellMarket}.");
+            return GoalExecutionResult.WaitingForArrival($"Cargo full; navigating to sell at {sellMarket}.");
         }
 
         // Survey if needed.
         if (caps.CanSurvey && ctx.ActiveSurveyCount == 0)
         {
             await inOrbitCommands.SurveyAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("Surveying before extraction.");
+            return GoalExecutionResult.WaitingForCooldown("Surveying before extraction.");
         }
 
         // Extract.
         await inOrbitCommands.ExtractAsync(ship.Symbol, ct);
-        return GoalExecutionResult.Progressing("Extracting resources.");
+        return GoalExecutionResult.WaitingForCooldown("Extracting resources.");
     }
 
     private async Task<GoalExecutionResult> PlanNavigatingToSourceAsync(ShipModel ship, MineResourceGoal goal, ShipGoalContext ctx, CancellationToken ct)
@@ -160,12 +155,14 @@ public sealed class MineResourceGoalExecutor(
 
                 if (string.Equals(ship.WaypointSymbol, ctx.FuelMarketWaypoint, StringComparison.OrdinalIgnoreCase))
                 {
+                    // Already at fuel market in orbit — dock and navigate to source on next execution.
+                    // Dock is instant; the orchestrator will re-evaluate after docking is complete.
                     await inOrbitCommands.DockAsync(ship.Symbol, ct);
-                    return GoalExecutionResult.Progressing("At fuel market; docking to refuel.");
+                    return GoalExecutionResult.WaitingForArrival("At fuel market; docked to refuel.");
                 }
 
                 await inOrbitCommands.NavigateAsync(ship.Symbol, ctx.FuelMarketWaypoint, ct);
-                return GoalExecutionResult.Progressing("Critically low fuel; navigating to fuel market.");
+                return GoalExecutionResult.WaitingForArrival("Critically low fuel; navigating to fuel market.");
             }
         }
 
@@ -183,7 +180,7 @@ public sealed class MineResourceGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, goal.SourceWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to source {goal.SourceWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to source {goal.SourceWaypointSymbol}.");
     }
 
     private static (string ContractId, string TradeSymbol, int Units)? TryContractDelivery(ShipModel ship, ShipGoalContext ctx)

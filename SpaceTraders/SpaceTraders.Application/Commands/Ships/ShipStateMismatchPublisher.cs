@@ -4,9 +4,9 @@ using Wolverine;
 namespace SpaceTraders.Application.Commands.Ships;
 
 /// <summary>
-/// Phase 6.5e helper: publishes a <see cref="ShipStateMismatchEvent"/> together with
-/// a <see cref="ShipAutomationTickEvent"/> so the planner can reassert the next valid
-/// action without depending on the chain-of-command fallback handler.
+/// Helper: publishes a <see cref="ShipStateMismatchEvent"/> for diagnostics when a command
+/// is issued in an invalid ship state. The mismatch event is logged and can be used to
+/// detect bugs; the ship will be re-evaluated on the next orchestrator tick.
 /// </summary>
 internal static class ShipStateMismatchPublisher
 {
@@ -29,13 +29,5 @@ internal static class ShipStateMismatchPublisher
             Guid.Empty,
             Guid.Empty,
             now));
-
-        // Phase 6.5e: ensure planner recovery does not depend on the chain fallback handler.
-        await bus.PublishAsync(new ShipAutomationTickEvent(
-            shipSymbol,
-            $"StateMismatch:{commandName}",
-            now,
-            Guid.NewGuid(),
-            Guid.Empty));
     }
 }

@@ -169,9 +169,9 @@ public sealed class ShipGoalExecutorServiceTests
 
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "GoalStep"),
-            Arg.Any<DeliveryOptions>());
+        // Phase 13c+: Progressing outcome does NOT publish an immediate tick.
+        // Next tick should come from arrival event (scheduled by navigate command),
+        // cooldown expiry (scheduled by action commands), or external stimuli (market changes).
 
         // No orchestrator events should be published for a progressing step.
         await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
@@ -194,9 +194,6 @@ public sealed class ShipGoalExecutorServiceTests
             Arg.Any<Guid>(),
             expiresAt,
             Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.Reason == "CooldownExpired"),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -214,9 +211,6 @@ public sealed class ShipGoalExecutorServiceTests
             Arg.Any<Guid>(),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.Reason == "CooldownRetry"),
-            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -237,7 +231,6 @@ public sealed class ShipGoalExecutorServiceTests
             Arg.Any<Guid>(),
             arrival,
             Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     // ──────────────────────────────────────────────────────────────────────────────

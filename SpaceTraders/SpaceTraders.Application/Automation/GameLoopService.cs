@@ -1,12 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.ValueObjects;
 
 namespace SpaceTraders.Application.Automation;
@@ -16,7 +16,7 @@ namespace SpaceTraders.Application.Automation;
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
 ///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and publishes <see cref="ShipAutomationTickEvent"/> for arrival processing.
+///    updates their nav state in the DB, and calls <see cref="IShipGoalExecutorService"/> directly to resume goal execution.
 ///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
@@ -67,14 +67,14 @@ public sealed class GameLoopService(
         // automation ticks run, so every planner invocation executes an already-assigned role.
         await orchestrator.EvaluateAndAssignAsync(cancellationToken);
 
-        await ApplyDeadReckoningAsync(ships, bus, cancellationToken);
+        await ApplyDeadReckoningAsync(ships, scope, cancellationToken);
         await CheckFuelAsync(ships, bus, cancellationToken);
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
     }
 
     private async Task ApplyDeadReckoningAsync(
         IShipRepository ships,
-        Wolverine.IMessageBus bus,
+        IServiceScope scope,
         CancellationToken cancellationToken)
     {
         var transitShips = await ships.GetInTransitAsync(cancellationToken);
@@ -97,17 +97,15 @@ public sealed class GameLoopService(
 
             if (arrivedWaypoint is not null)
             {
-                var now = TimeProvider.System.GetUtcNow();
+                var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
+                var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
 
-                // Phase 7c: ShipArrivedEvent deleted; arrival is signalled by ShipAutomationTickEvent only.
-                await bus.PublishAsync(new ShipAutomationTickEvent(
+                logger.LogInformation(
+                    "Ship {Symbol} arrived at {Waypoint} (dead-reckoning); executed goal step (outcome={Outcome}, reason={Reason}).",
                     ship.Symbol,
-                    "Arrived",
-                    now,
-                    Guid.NewGuid(),
-                    Guid.Empty));
-
-                logger.LogInformation("Ship {Symbol} arrived at {Waypoint} (dead-reckoning); emitting ShipAutomationTickEvent.", ship.Symbol, arrivedWaypoint);
+                    arrivedWaypoint,
+                    result?.Outcome,
+                    result?.Reason);
             }
         }
     }

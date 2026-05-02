@@ -62,7 +62,7 @@ public sealed class SellCargoGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, sellGoal.DestinationWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to sell destination {sellGoal.DestinationWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to sell destination {sellGoal.DestinationWaypointSymbol}.");
     }
 
     private async Task<GoalExecutionResult> SellOrCompleteAsync(ShipModel ship, SellCargoGoal sellGoal, ShipGoalContext ctx, CancellationToken ct)
@@ -80,7 +80,6 @@ public sealed class SellCargoGoalExecutor(
                 if (sellPrice > 0)
                 {
                     await dockedCommands.SellCargoAsync(ship.Symbol, cargo.Symbol, cargo.Units, ct);
-                    return GoalExecutionResult.Progressing($"Selling {cargo.Units}x {cargo.Symbol}.");
                 }
             }
         }

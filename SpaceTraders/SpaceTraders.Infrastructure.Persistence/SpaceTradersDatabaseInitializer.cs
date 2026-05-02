@@ -235,6 +235,26 @@ public static class SpaceTradersDatabaseInitializer
                 "CREATE INDEX IF NOT EXISTS idx_ship_task_records_agent_ship_started ON ship_task_records (\"AgentToken\", \"ShipSymbol\", \"StartedAt\");",
                 cancellationToken);
 
+            // Phase 11e: fleet goals table
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS fleet_goals (
+                    "Id"          uuid        NOT NULL,
+                    "AgentToken"  character varying(1024) NOT NULL DEFAULT '',
+                    "Kind"        character varying(100)  NOT NULL DEFAULT '',
+                    "Priority"    integer                NOT NULL DEFAULT 0,
+                    "Description" text                   NOT NULL DEFAULT '',
+                    "PayloadJson" text                   NOT NULL DEFAULT '',
+                    "CreatedAt"   timestamp with time zone NOT NULL DEFAULT now(),
+                    "CompletedAt" timestamp with time zone NULL,
+                    CONSTRAINT pk_fleet_goals PRIMARY KEY ("Id")
+                );
+                """,
+                cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_fleet_goals_agent_completed ON fleet_goals (\"AgentToken\", \"CompletedAt\");",
+                cancellationToken);
+
             // Phase 8: ship goal model columns
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalId\" uuid NULL;",

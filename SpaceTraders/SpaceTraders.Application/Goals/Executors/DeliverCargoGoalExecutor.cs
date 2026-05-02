@@ -62,7 +62,7 @@ public sealed class DeliverCargoGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, deliverGoal.DeliveryWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to delivery waypoint {deliverGoal.DeliveryWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to delivery waypoint {deliverGoal.DeliveryWaypointSymbol}.");
     }
 
     private async Task<GoalExecutionResult> DeliverOrCompleteAsync(ShipModel ship, DeliverCargoGoal deliverGoal, CancellationToken ct)
@@ -83,6 +83,6 @@ public sealed class DeliverCargoGoalExecutor(
             cargoUnits,
             deliverGoal.DeliveryWaypointSymbol,
             ct);
-        return GoalExecutionResult.Progressing($"Delivering {cargoUnits}x {deliverGoal.TradeSymbol}.");
+        return GoalExecutionResult.Completed($"Delivered {cargoUnits}x {deliverGoal.TradeSymbol}.");
     }
 }

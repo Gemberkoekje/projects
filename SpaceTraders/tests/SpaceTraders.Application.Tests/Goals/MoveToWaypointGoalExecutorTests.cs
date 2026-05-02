@@ -54,7 +54,7 @@ public sealed class MoveToWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "DOCKED"), Goal(), Ctx(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -71,7 +71,7 @@ public sealed class MoveToWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1"), Goal("X1-AB-WP2"), Ctx(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-WP2", Arg.Any<CancellationToken>());
     }
 
@@ -80,7 +80,7 @@ public sealed class MoveToWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "IN_ORBIT", "CRUISE", 0, 0), Goal(), Ctx(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
@@ -90,7 +90,7 @@ public sealed class MoveToWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "IN_ORBIT", "CRUISE"), Goal(), Ctx(recommended: "BURN"), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "BURN"), Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

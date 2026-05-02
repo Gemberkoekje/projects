@@ -1,22 +1,22 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
-using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
-/// Phase 14d: handles <see cref="ShipCooldownExpiredEvent"/> fired by <c>ShipEventScheduler</c>.
+/// Handles <see cref="ShipCooldownExpiredEvent"/> fired by <c>ShipEventScheduler</c>.
 /// Verifies that the <see cref="ShipCooldownExpiredEvent.GoalId"/> still matches the ship's active
 /// goal (stale wake-ups are silently ignored), clears the persisted cooldown timestamp, then
-/// publishes a <see cref="ShipAutomationTickEvent"/> to resume goal execution.
+/// calls the goal executor directly.
 /// </summary>
 public sealed class ShipCooldownExpiredEventHandler(
     IShipGoalRepository goals,
     IShipRepository ships,
     ILogger<ShipCooldownExpiredEventHandler> logger)
 {
-    public async Task Handle(ShipCooldownExpiredEvent @event, IMessageBus bus, CancellationToken cancellationToken)
+    public async Task Handle(ShipCooldownExpiredEvent @event, IShipGoalExecutorService goalExecutor, CancellationToken cancellationToken)
     {
         var activeGoal = await goals.GetActiveGoalAsync(@event.ShipSymbol, cancellationToken);
 
@@ -37,11 +37,15 @@ public sealed class ShipCooldownExpiredEventHandler(
             "ShipCooldownExpiredEventHandler: ship {Ship} cooldown expired; resuming goal execution.",
             @event.ShipSymbol);
 
-        await bus.PublishAsync(new ShipAutomationTickEvent(
-            @event.ShipSymbol,
-            "CooldownExpired",
-            @event.OccurredAt,
-            @event.EventId,
-            Guid.Empty));
+        var result = await goalExecutor.ExecuteAsync(@event.ShipSymbol, cancellationToken);
+
+        if (result is not null)
+        {
+            logger.LogInformation(
+                "ShipCooldownExpiredEventHandler: ship {Ship} resumed after cooldown; outcome={Outcome} reason={Reason}",
+                @event.ShipSymbol,
+                result.Outcome,
+                result.Reason);
+        }
     }
 }

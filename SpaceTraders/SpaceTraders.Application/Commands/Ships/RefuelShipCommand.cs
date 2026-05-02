@@ -111,16 +111,7 @@ public sealed class RefuelShipHandler(
             result.AgentCredits,
             ship.WaypointSymbol ?? string.Empty));
 
-        // Phase 7b: ShipRefueledEvent deleted; publish ShipAutomationTickEvent so the planner
-        // re-evaluates the ship with its updated fuel state immediately.
-        await bus.PublishAsync(new ShipAutomationTickEvent(
-            command.ShipSymbol,
-            "Refueled",
-            nowRefueled,
-            Guid.Empty,
-            Guid.Empty));
-
-        logger.LogInformation("Ship {Symbol} refuelled ({Mode}). Fuel: {Current}/{Capacity}. Cost: {Cost} credits.",
+        logger.LogInformation(
             command.ShipSymbol,
             command.FromCargo ? "from cargo" : "market",
             result.Fuel.Current,

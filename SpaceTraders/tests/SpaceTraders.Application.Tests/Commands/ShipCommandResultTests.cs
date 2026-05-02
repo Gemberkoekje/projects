@@ -141,28 +141,7 @@ public sealed class ShipCommandResultTests
     }
 
     [Fact]
-    public async Task DockShip_WhenAccepted_PublishesShipAutomationTickEvent()
-    {
-        var port = Substitute.For<ISpaceTradersPort>();
-        var ships = Substitute.For<IShipRepository>();
-        var bus = Substitute.For<IMessageBus>();
-
-        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
-
-        port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new NavModel("DOCKED", "X1-AB", "X1-AB-001", "CRUISE", null, null));
-
-        var handler = new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance);
-        await handler.ExecuteAsync(new DockShipCommand("SHIP-1"), CancellationToken.None);
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "Docked"),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task OrbitShip_WhenAccepted_PublishesShipAutomationTickEvent()
+    public async Task OrbitShip_WhenAccepted_DoesNotPublishShipAutomationTickEvent()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -176,19 +155,10 @@ public sealed class ShipCommandResultTests
 
         var handler = new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance);
         await handler.ExecuteAsync(new OrbitShipCommand("SHIP-1"), CancellationToken.None);
-
-        await bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "Undocked"),
-            Arg.Any<DeliveryOptions>());
     }
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Phase 13c: SuppressContinuationTick — goal executors suppress the tick when they
-    // invoke Dock/Orbit inline so that ShipGoalExecutorService publishes its own GoalStep tick.
-    // ──────────────────────────────────────────────────────────────────────────────
-
     [Fact]
-    public async Task DockShip_WhenAccepted_AndSuppressContinuationTickIsTrue_DoesNotPublishTick()
+    public async Task DockShip_WhenAccepted_DoesNotPublishShipAutomationTickEvent()
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
@@ -196,30 +166,11 @@ public sealed class ShipCommandResultTests
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100));
+
         port.DockShipAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new NavModel("DOCKED", "X1-AB", "X1-AB-001", "CRUISE", null, null));
 
         var handler = new DockShipHandler(port, ships, bus, NullLogger<DockShipHandler>.Instance);
-        await handler.ExecuteAsync(new DockShipCommand("SHIP-1") { SuppressContinuationTick = true }, CancellationToken.None);
-
-        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task OrbitShip_WhenAccepted_AndSuppressContinuationTickIsTrue_DoesNotPublishTick()
-    {
-        var port = Substitute.For<ISpaceTradersPort>();
-        var ships = Substitute.For<IShipRepository>();
-        var bus = Substitute.For<IMessageBus>();
-
-        ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100));
-        port.OrbitShipAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(new NavModel("IN_ORBIT", "X1-AB", "X1-AB-001", "CRUISE", null, null));
-
-        var handler = new OrbitShipHandler(port, ships, bus, NullLogger<OrbitShipHandler>.Instance);
-        await handler.ExecuteAsync(new OrbitShipCommand("SHIP-1") { SuppressContinuationTick = true }, CancellationToken.None);
-
-        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
+        await handler.ExecuteAsync(new DockShipCommand("SHIP-1"), CancellationToken.None);
     }
 }

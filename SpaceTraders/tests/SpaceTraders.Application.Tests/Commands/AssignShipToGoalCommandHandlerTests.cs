@@ -2,11 +2,11 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Fleet;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -24,9 +24,10 @@ public sealed class AssignShipToGoalCommandHandlerTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
 
     private AssignShipToGoalCommandHandler CreateHandler() =>
-        new(_ships, _goals, _resolver, _settings, _shipyards, _bus,
+        new(_ships, _goals, _resolver, _settings, _shipyards, _bus, _goalExecutor,
             NullLogger<AssignShipToGoalCommandHandler>.Instance);
 
     private static ShipModel MakeShip(string symbol = "SHIP-1") =>
@@ -58,9 +59,7 @@ public sealed class AssignShipToGoalCommandHandlerTests
         await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
 
         await _goals.Received(1).SetActiveGoalAsync("SHIP-1", resolvedGoal, Arg.Any<CancellationToken>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "GoalAssigned"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -106,7 +105,6 @@ public sealed class AssignShipToGoalCommandHandlerTests
         await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
 
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -166,9 +164,7 @@ public sealed class AssignShipToGoalCommandHandlerTests
             Arg.Any<CancellationToken>());
 
         await _goals.Received(1).SetActiveGoalAsync("SHIP-1", resolvedGoal, Arg.Any<CancellationToken>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     // ────────────────────────────────────────────────────────────────────────────
@@ -193,9 +189,7 @@ public sealed class AssignShipToGoalCommandHandlerTests
 
         await _resolver.Received(1).ResolveMarketCoverageAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync("SHIP-1", patrolGoal, Arg.Any<CancellationToken>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "GoalAssigned"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -206,7 +200,6 @@ public sealed class AssignShipToGoalCommandHandlerTests
         await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
 
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -323,9 +316,7 @@ public sealed class AssignShipToGoalCommandHandlerTests
 
         await _resolver.Received(1).ResolveMarketCoverageAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync("SHIP-1", scoutGoal, Arg.Any<CancellationToken>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "GoalAssigned"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -336,6 +327,5 @@ public sealed class AssignShipToGoalCommandHandlerTests
         await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
 
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 }

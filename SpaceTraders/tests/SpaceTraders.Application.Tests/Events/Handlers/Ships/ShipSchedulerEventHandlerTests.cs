@@ -2,27 +2,27 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
-using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 
 /// <summary>
-/// Phase 14e: unit tests for <see cref="ShipArrivedEventHandler"/> and
+/// Unit tests for <see cref="ShipArrivedEventHandler"/> and
 /// <see cref="ShipCooldownExpiredEventHandler"/>.
 /// </summary>
 public sealed class ShipArrivedEventHandlerTests
 {
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
-    private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
 
     private ShipArrivedEventHandler CreateHandler() =>
         new(_goals, NullLogger<ShipArrivedEventHandler>.Instance);
 
     [Fact]
-    public async Task Handle_WhenGoalIdMatches_PublishesAutomationTick()
+    public async Task Handle_WhenGoalIdMatches_CallsGoalExecutor()
     {
         var goalId = Guid.NewGuid();
         _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -30,13 +30,9 @@ public sealed class ShipArrivedEventHandlerTests
 
         var @event = new ShipArrivedEvent("SHIP-1", goalId, DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason == "Arrived"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -49,9 +45,9 @@ public sealed class ShipArrivedEventHandlerTests
 
         var @event = new ShipArrivedEvent("SHIP-1", staleGoalId, DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -62,9 +58,9 @@ public sealed class ShipArrivedEventHandlerTests
 
         var @event = new ShipArrivedEvent("SHIP-1", Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }
 
@@ -72,13 +68,13 @@ public sealed class ShipCooldownExpiredEventHandlerTests
 {
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
-    private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IShipGoalExecutorService _goalExecutor = Substitute.For<IShipGoalExecutorService>();
 
     private ShipCooldownExpiredEventHandler CreateHandler() =>
         new(_goals, _ships, NullLogger<ShipCooldownExpiredEventHandler>.Instance);
 
     [Fact]
-    public async Task Handle_WhenGoalIdMatches_ClearsCooldownAndPublishesTick()
+    public async Task Handle_WhenGoalIdMatches_ClearsCooldownAndCallsGoalExecutor()
     {
         var goalId = Guid.NewGuid();
         _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -86,14 +82,10 @@ public sealed class ShipCooldownExpiredEventHandlerTests
 
         var @event = new ShipCooldownExpiredEvent("SHIP-1", goalId, DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
         await _ships.Received(1).UpdateCooldownAsync("SHIP-1", null, Arg.Any<CancellationToken>());
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.Reason == "CooldownExpired"),
-            Arg.Any<DeliveryOptions>());
+        await _goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -106,10 +98,10 @@ public sealed class ShipCooldownExpiredEventHandlerTests
 
         var @event = new ShipCooldownExpiredEvent("SHIP-1", staleGoalId, DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
         await _ships.DidNotReceive().UpdateCooldownAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -120,9 +112,9 @@ public sealed class ShipCooldownExpiredEventHandlerTests
 
         var @event = new ShipCooldownExpiredEvent("SHIP-1", Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-        await CreateHandler().Handle(@event, _bus, CancellationToken.None);
+        await CreateHandler().Handle(@event, _goalExecutor, CancellationToken.None);
 
         await _ships.DidNotReceive().UpdateCooldownAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset?>(), Arg.Any<CancellationToken>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await _goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

@@ -82,7 +82,7 @@ public sealed class SiphonResourceGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship(cargo: 5, capacity: 40), Goal(), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForCooldown);
         await _inOrbit.Received(1).SiphonAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -93,7 +93,7 @@ public sealed class SiphonResourceGoalExecutorTests
         var ctx = new ShipGoalContext { NearestSellMarket = "X1-AB-MKT" };
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), ctx, CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-MKT", Arg.Any<CancellationToken>());
     }
 
@@ -111,7 +111,7 @@ public sealed class SiphonResourceGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP9"), Goal("X1-AB-GAS"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-GAS", Arg.Any<CancellationToken>());
     }
 
@@ -126,7 +126,7 @@ public sealed class SiphonResourceGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-GAS"), ctx, CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).SellCargoAsync("SHIP-1", "HYDROCARBON", 10, Arg.Any<CancellationToken>());
     }
 }

@@ -57,7 +57,7 @@ public sealed class PatrolMarketGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1"), Goal("X1-AB-MKT"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-MKT", Arg.Any<CancellationToken>());
     }
 
@@ -66,7 +66,7 @@ public sealed class PatrolMarketGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-MKT"), Goal("X1-AB-MKT"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForCooldown);
         await _inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
         await _waypointVisit.Received(1).MarkVisitedAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _marketRefresh.Received(1).RefreshIfApplicableAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
@@ -79,8 +79,8 @@ public sealed class PatrolMarketGoalExecutorTests
         var ship = Ship("X1-AB-MKT", "DOCKED");
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-MKT"), new ShipGoalContext(), CancellationToken.None);
 
-        // Patrol never completes; it keeps looping.
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        // Patrol never completes; it schedules the next cycle via cooldown.
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForCooldown);
         await _waypointVisit.Received(1).MarkVisitedAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _marketRefresh.Received(1).RefreshIfApplicableAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
@@ -91,7 +91,7 @@ public sealed class PatrolMarketGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "DOCKED"), Goal("X1-AB-MKT"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -100,7 +100,7 @@ public sealed class PatrolMarketGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", fuelCap: 0), Goal("X1-AB-MKT"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

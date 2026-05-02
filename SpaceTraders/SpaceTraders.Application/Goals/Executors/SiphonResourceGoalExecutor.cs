@@ -45,13 +45,11 @@ public sealed class SiphonResourceGoalExecutor(
             if (sellDecision is not null)
             {
                 await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
-                return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
             }
 
             if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
             {
                 await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
-                return GoalExecutionResult.Progressing("Refueling at market.");
             }
 
             await dockedCommands.OrbitAsync(ship.Symbol, ct);
@@ -84,11 +82,11 @@ public sealed class SiphonResourceGoalExecutor(
                 return GoalExecutionResult.Blocked("Cargo is full and no sell market is known.");
             }
             await inOrbitCommands.NavigateAsync(ship.Symbol, sellMarket, ct);
-            return GoalExecutionResult.Progressing($"Cargo full; navigating to sell at {sellMarket}.");
+            return GoalExecutionResult.WaitingForArrival($"Cargo full; navigating to sell at {sellMarket}.");
         }
 
         await inOrbitCommands.SiphonAsync(ship.Symbol, ct);
-        return GoalExecutionResult.Progressing("Siphoning gas resources.");
+        return GoalExecutionResult.WaitingForCooldown("Siphoning gas resources.");
     }
 
     private async Task<GoalExecutionResult> PlanNavigatingToSourceAsync(ShipModel ship, SiphonResourceGoal goal, ShipGoalContext ctx, CancellationToken ct)
@@ -103,7 +101,7 @@ public sealed class SiphonResourceGoalExecutor(
                     await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
                 }
                 await inOrbitCommands.NavigateAsync(ship.Symbol, ctx.FuelMarketWaypoint, ct);
-                return GoalExecutionResult.Progressing("Critically low fuel; navigating to fuel market.");
+                return GoalExecutionResult.WaitingForArrival("Critically low fuel; navigating to fuel market.");
             }
         }
 
@@ -119,7 +117,7 @@ public sealed class SiphonResourceGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, goal.SourceWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to source {goal.SourceWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to source {goal.SourceWaypointSymbol}.");
     }
 
     private static (string TradeSymbol, int Units)? TrySellCargo(ShipModel ship, ShipGoalContext ctx)

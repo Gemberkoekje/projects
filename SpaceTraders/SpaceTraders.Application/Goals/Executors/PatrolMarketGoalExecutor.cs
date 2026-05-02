@@ -11,7 +11,8 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Phase 10: executor for <see cref="PatrolMarketGoal"/>.
 /// Continuously visits the target market waypoint to keep its data fresh.
-/// Never completes; the orchestrator must replace the goal to stop patrolling.
+/// After each refresh cycle, schedules a cooldown wake-up so the patrol repeats
+/// at a fixed interval. The orchestrator must replace the goal to stop patrolling.
 /// </summary>
 public sealed class PatrolMarketGoalExecutor(
     IInOrbitCommandAcceptor inOrbitCommands,
@@ -21,6 +22,8 @@ public sealed class PatrolMarketGoalExecutor(
     IShipyardRefreshService shipyardRefresh,
     IMessageBus bus) : IShipGoalExecutor
 {
+    private static readonly TimeSpan PatrolInterval = TimeSpan.FromMinutes(5);
+
     public bool CanExecute(ShipGoal goal) => goal is PatrolMarketGoal;
 
     public async Task<GoalExecutionResult> ExecuteStepAsync(ShipModel ship, ShipGoal goal, ShipGoalContext ctx, CancellationToken ct)
@@ -42,7 +45,9 @@ public sealed class PatrolMarketGoalExecutor(
                 await marketRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
                 await shipyardRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
                 await dockedCommands.OrbitAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Market data refreshed; orbiting to continue patrol.");
+                return GoalExecutionResult.WaitingForCooldown(
+                    "Market data refreshed; waiting before next patrol cycle.",
+                    TimeProvider.System.GetUtcNow().Add(PatrolInterval));
             }
 
             await dockedCommands.OrbitAsync(ship.Symbol, ct);
@@ -60,7 +65,9 @@ public sealed class PatrolMarketGoalExecutor(
             await marketRefresh.RefreshIfApplicableAsync(patrolGoal.TargetWaypointSymbol, ct);
             await shipyardRefresh.RefreshIfApplicableAsync(patrolGoal.TargetWaypointSymbol, ct);
             await dockedCommands.OrbitAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("Market data refreshed; orbiting to continue patrol.");
+            return GoalExecutionResult.WaitingForCooldown(
+                "Market data refreshed; waiting before next patrol cycle.",
+                TimeProvider.System.GetUtcNow().Add(PatrolInterval));
         }
 
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
@@ -75,6 +82,6 @@ public sealed class PatrolMarketGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, patrolGoal.TargetWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to patrol target {patrolGoal.TargetWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to patrol target {patrolGoal.TargetWaypointSymbol}.");
     }
 }

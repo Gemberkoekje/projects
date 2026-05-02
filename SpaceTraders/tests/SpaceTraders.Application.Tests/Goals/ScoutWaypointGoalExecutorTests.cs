@@ -57,7 +57,7 @@ public sealed class ScoutWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1"), Goal("X1-AB-TARGET"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-TARGET", Arg.Any<CancellationToken>());
     }
 
@@ -89,7 +89,7 @@ public sealed class ScoutWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "DOCKED"), Goal("X1-AB-TARGET"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -98,7 +98,7 @@ public sealed class ScoutWaypointGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", fuelCap: 0), Goal("X1-AB-TARGET"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

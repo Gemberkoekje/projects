@@ -1,10 +1,9 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Sync;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
-using SpaceTraders.Infrastructure.Persistence;
 using Wolverine;
 
 namespace SpaceTraders.API.Services;
@@ -17,12 +16,10 @@ namespace SpaceTraders.API.Services;
 /// actual SpaceTraders API state before emitting recovery events.
 ///
 /// For each ship:
-///  - Ship.ArrivesAt has elapsed  → update nav to IN_ORBIT and emit <see cref="ShipInTransitEvent"/> with arrival time = now
-///                                   so the chain immediately routes to in-orbit/undocked.
-///  - Ship.ArrivesAt is in the future → emit <see cref="ShipInTransitEvent"/> with the real future arrival time
-///                                       so <see cref="ShipInTransitEventHandler"/> schedules the in-orbit event.
-///  - Ship is docked               → emit <see cref="ShipAutomationTickEvent"/> to resume the docked chain.
-///  - Ship is in orbit             → emit <see cref="ShipAutomationTickEvent"/> to resume the in-orbit/undocked chain.
+///  - Ship.ArrivesAt has elapsed  → update nav to IN_ORBIT and emit <see cref="ShipInTransitEvent"/> with arrival time = now,
+///                                   then execute goal step directly.
+///  - Ship.ArrivesAt is in the future → emit <see cref="ShipInTransitEvent"/> and schedule arrival via <see cref="IShipEventScheduler"/>.
+///  - Ship is docked or in orbit  → execute goal step directly.
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
@@ -48,12 +45,14 @@ public sealed class StartupRecoveryService(
             return;
         }
 
+        var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
+
         var fleet = await ships.GetAllAsync(cancellationToken);
         logger.LogInformation("StartupRecovery: recovering {Count} ship(s).", fleet.Count);
 
         foreach (var ship in fleet)
         {
-            await RecoverShipAsync(ship, ships, bus, now, cancellationToken);
+            await RecoverShipAsync(ship, ships, bus, goalExecutor, now, cancellationToken);
         }
     }
 
@@ -64,6 +63,7 @@ public sealed class StartupRecoveryService(
         Application.Ports.ShipModel ship,
         IShipRepository ships,
         IMessageBus bus,
+        IShipGoalExecutorService goalExecutor,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -85,17 +85,10 @@ public sealed class StartupRecoveryService(
 
             await bus.PublishAsync(transitEvent);
 
-            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
-            await bus.PublishAsync(new ShipAutomationTickEvent(
-                ship.Symbol,
-                "StartupRecovery: Arrived",
-                now,
-                transitEvent.CorrelationId,
-                transitEvent.EventId));
-
+            var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} arrived at {Waypoint}; emitting ShipInTransitEvent (arrival elapsed).",
-                ship.Symbol, arrivedWaypoint);
+                "StartupRecovery: Ship {Symbol} arrived at {Waypoint}; executed goal step (outcome={Outcome}).",
+                ship.Symbol, arrivedWaypoint, result?.Outcome);
         }
         else if (ship.ArrivesAt.HasValue)
         {
@@ -112,49 +105,16 @@ public sealed class StartupRecoveryService(
 
             await bus.PublishAsync(transitEvent);
 
-            // Phase 5b: schedule an explicit automation tick for the future arrival time.
-            await bus.ScheduleAsync(
-                new ShipAutomationTickEvent(
-                    ship.Symbol,
-                    "StartupRecovery: Arriving",
-                    ship.ArrivesAt.Value,
-                    transitEvent.CorrelationId,
-                    transitEvent.EventId),
-                ship.ArrivesAt.Value);
-
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule in-orbit event.",
+                "StartupRecovery: Ship {Symbol} still in transit (arrives at {ArrivesAt}); emitting ShipInTransitEvent to schedule arrival.",
                 ship.Symbol, ship.ArrivesAt.Value);
         }
-        else if (ship.LocalStatus == ShipLocalStatus.Docked)
+        else if (ship.LocalStatus == ShipLocalStatus.Docked || ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
-            var correlationId = Guid.NewGuid();
-            // Phase 13b: ShipDockedEvent deleted (Tier 3); emit automation tick directly.
-            await bus.PublishAsync(new ShipAutomationTickEvent(
-                ship.Symbol,
-                "StartupRecovery: Docked",
-                now,
-                correlationId,
-                Guid.Empty));
-
+            var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} is docked; emitting ShipAutomationTickEvent.",
-                ship.Symbol);
-        }
-        else if (ship.LocalStatus == ShipLocalStatus.InOrbit)
-        {
-            var correlationId = Guid.NewGuid();
-            // Phase 13b: ShipInOrbitEvent deleted (Tier 3); emit automation tick directly.
-            await bus.PublishAsync(new ShipAutomationTickEvent(
-                ship.Symbol,
-                "StartupRecovery: InOrbit",
-                now,
-                correlationId,
-                Guid.Empty));
-
-            logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} is in orbit; emitting ShipAutomationTickEvent.",
-                ship.Symbol);
+                "StartupRecovery: Ship {Symbol} is {Status}; executed goal step (outcome={Outcome}).",
+                ship.Symbol, ship.LocalStatus, result?.Outcome);
         }
         else
         {

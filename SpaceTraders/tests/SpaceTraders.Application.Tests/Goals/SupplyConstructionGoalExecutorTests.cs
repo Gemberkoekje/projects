@@ -67,7 +67,7 @@ public sealed class SupplyConstructionGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1"), Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-SITE", Arg.Any<CancellationToken>());
     }
 
@@ -79,7 +79,7 @@ public sealed class SupplyConstructionGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _inOrbit.Received(1).SupplyConstructionAsync(
             "SHIP-1", "X1-AB", "X1-AB-SITE", "IRON_ORE", 20,
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
@@ -112,7 +112,7 @@ public sealed class SupplyConstructionGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).SupplyConstructionAsync(
             "SHIP-1", "X1-AB", "X1-AB-SITE", "IRON_ORE", 20,
@@ -124,7 +124,7 @@ public sealed class SupplyConstructionGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "DOCKED"), Goal("X1-AB-SITE"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 }

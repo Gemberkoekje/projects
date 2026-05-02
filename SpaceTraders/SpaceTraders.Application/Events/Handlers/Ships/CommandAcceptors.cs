@@ -57,7 +57,7 @@ public interface IInOrbitCommandAcceptor
 public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAcceptor
 {
     public Task OrbitAsync(string shipSymbol, CancellationToken cancellationToken)
-        => bus.InvokeAsync(new OrbitShipCommand(shipSymbol) { SuppressContinuationTick = true }, cancellationToken);
+        => bus.InvokeAsync(new OrbitShipCommand(shipSymbol), cancellationToken);
 
     public Task BuyCargoAsync(string shipSymbol, string tradeSymbol, int units, CancellationToken cancellationToken)
         => bus.SendAsync(new BuyCargoCommand(shipSymbol, tradeSymbol, units)).AsTask();
@@ -93,7 +93,7 @@ public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAccep
 public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcceptor
 {
     public Task DockAsync(string shipSymbol, CancellationToken cancellationToken)
-        => bus.InvokeAsync(new DockShipCommand(shipSymbol) { SuppressContinuationTick = true }, cancellationToken);
+        => bus.InvokeAsync(new DockShipCommand(shipSymbol), cancellationToken);
 
     public Task NavigateAsync(string shipSymbol, string destinationWaypoint, CancellationToken cancellationToken)
         => bus.SendAsync(new NavigateShipCommand(shipSymbol, destinationWaypoint)).AsTask();

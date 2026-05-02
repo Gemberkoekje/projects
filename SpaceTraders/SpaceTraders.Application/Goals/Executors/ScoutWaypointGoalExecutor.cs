@@ -73,6 +73,6 @@ public sealed class ScoutWaypointGoalExecutor(
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, scoutGoal.TargetWaypointSymbol, ct);
-        return GoalExecutionResult.Progressing($"Navigating to scout target {scoutGoal.TargetWaypointSymbol}.");
+        return GoalExecutionResult.WaitingForArrival($"Navigating to scout target {scoutGoal.TargetWaypointSymbol}.");
     }
 }

@@ -1,11 +1,9 @@
-using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.API.Services;
-using SpaceTraders.Application.Events.Handlers;
-using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Sync;
@@ -20,13 +18,15 @@ public sealed class StartupRecoveryServiceTests
         ISpaceTradersPort port,
         IShipRepository ships,
         ISettingsRepository settings,
-        IMessageBus bus)
+        IMessageBus bus,
+        IShipGoalExecutorService goalExecutor)
     {
         var services = new ServiceCollection();
         services.AddSingleton(port);
         services.AddSingleton(ships);
         services.AddSingleton(settings);
         services.AddSingleton(bus);
+        services.AddSingleton(goalExecutor);
         services.AddSingleton<ILogger<SyncAllShipsHandler>>(NullLogger<SyncAllShipsHandler>.Instance);
         services.AddSingleton<SyncAllShipsHandler>();
         return services.BuildServiceProvider();
@@ -35,16 +35,7 @@ public sealed class StartupRecoveryServiceTests
     [Fact]
     public async Task StartAsync_WhenAutomationDisabled_SkipsRecoveryEmission()
     {
-        var syncedShip = new ShipModel(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-DOCK",
-            "DOCKED",
-            "CRUISE",
-            100,
-            100,
-            null,
-            null);
+        var syncedShip = new ShipModel("SHIP-1", "X1-AB", "X1-AB-DOCK", "DOCKED", "CRUISE", 100, 100, null, null);
 
         var port = Substitute.For<ISpaceTradersPort>();
         port.GetMyShipsAsync(1, 20, Arg.Any<CancellationToken>())
@@ -54,23 +45,23 @@ public sealed class StartupRecoveryServiceTests
         ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([syncedShip]);
 
         var settings = Substitute.For<ISettingsRepository>();
-        settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>())
-            .Returns(false);
+        settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>()).Returns(false);
 
         var bus = Substitute.For<IMessageBus>();
+        var goalExecutor = Substitute.For<IShipGoalExecutorService>();
 
-        using var provider = BuildProvider(port, ships, settings, bus);
+        using var provider = BuildProvider(port, ships, settings, bus, goalExecutor);
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
         var service = new StartupRecoveryService(scopeFactory, NullLogger<StartupRecoveryService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
 
         await bus.DidNotReceive().PublishAsync(Arg.Any<ShipInTransitEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
+        await goalExecutor.DidNotReceive().ExecuteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task StartAsync_WhenAutomationEnabled_EmitsRecoveryEvents()
+    public async Task StartAsync_WhenAutomationEnabled_ExecutesGoalForDockedAndInOrbitShips()
     {
         var docked = new ShipModel("SHIP-1", "X1-AB", "X1-AB-DOCK", "DOCKED", "CRUISE", 100, 100, null, null);
         var inOrbit = new ShipModel("SHIP-2", "X1-AB", "X1-AB-ORBIT", "IN_ORBIT", "CRUISE", 100, 100, null, null);
@@ -83,22 +74,18 @@ public sealed class StartupRecoveryServiceTests
         ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([docked, inOrbit]);
 
         var settings = Substitute.For<ISettingsRepository>();
-        settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>())
-            .Returns(true);
+        settings.GetAsync<bool>("Automation.Enabled", Arg.Any<CancellationToken>()).Returns(true);
 
         var bus = Substitute.For<IMessageBus>();
+        var goalExecutor = Substitute.For<IShipGoalExecutorService>();
 
-        using var provider = BuildProvider(port, ships, settings, bus);
+        using var provider = BuildProvider(port, ships, settings, bus, goalExecutor);
         var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
         var service = new StartupRecoveryService(scopeFactory, NullLogger<StartupRecoveryService>.Instance);
 
         await service.StartAsync(CancellationToken.None);
 
-        await bus.Received().PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1"),
-            Arg.Any<DeliveryOptions>());
-        await bus.Received().PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-2"),
-            Arg.Any<DeliveryOptions>());
+        await goalExecutor.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await goalExecutor.Received(1).ExecuteAsync("SHIP-2", Arg.Any<CancellationToken>());
     }
 }

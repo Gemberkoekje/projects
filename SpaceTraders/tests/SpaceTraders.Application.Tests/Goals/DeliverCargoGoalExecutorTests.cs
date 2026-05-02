@@ -57,7 +57,7 @@ public sealed class DeliverCargoGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1"), Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-DEST", Arg.Any<CancellationToken>());
     }
 
@@ -78,7 +78,7 @@ public sealed class DeliverCargoGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
         await _docked.Received(1).DeliverContractAsync(
             "CONTRACT-1", "SHIP-1", "IRON_ORE", 15, "X1-AB-DEST", Arg.Any<CancellationToken>());
@@ -92,7 +92,7 @@ public sealed class DeliverCargoGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
         await _docked.Received(1).DeliverContractAsync(
             "CONTRACT-1", "SHIP-1", "IRON_ORE", 15, "X1-AB-DEST", Arg.Any<CancellationToken>());
     }
@@ -111,7 +111,7 @@ public sealed class DeliverCargoGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP9", "DOCKED"), Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).OrbitAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -120,7 +120,7 @@ public sealed class DeliverCargoGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", fuelCap: 0), Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

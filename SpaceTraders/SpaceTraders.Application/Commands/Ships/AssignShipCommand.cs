@@ -100,17 +100,5 @@ public sealed class AssignShipHandler(
             nameof(AssignShipCommand),
             command.ShipSymbol,
             command.AssignmentType);
-
-        var correlationId = command.CorrelationId == Guid.Empty ? Guid.NewGuid() : command.CorrelationId;
-        var causationId = command.CausationId;
-
-        // Phase 7b: ShipAssignmentTypeSetEvent deleted; publish a ShipAutomationTickEvent so
-        // the planner re-evaluates the ship with its new assignment immediately.
-        await bus.PublishAsync(new ShipAutomationTickEvent(
-            command.ShipSymbol,
-            $"Assigned:{command.AssignmentType}",
-            now,
-            correlationId,
-            causationId));
     }
 }

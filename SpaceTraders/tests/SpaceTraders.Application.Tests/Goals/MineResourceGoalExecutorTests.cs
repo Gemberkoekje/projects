@@ -87,7 +87,7 @@ public sealed class MineResourceGoalExecutorTests
         var ship = Ship(cargo: 40, capacity: 40);
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), Ctx(nearestSell: "X1-AB-MKT"), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-MKT", Arg.Any<CancellationToken>());
     }
 
@@ -105,7 +105,7 @@ public sealed class MineResourceGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship(cargo: 5, capacity: 40), Goal(), Ctx(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForCooldown);
         await _inOrbit.Received(1).ExtractAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
@@ -114,7 +114,7 @@ public sealed class MineResourceGoalExecutorTests
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP9"), Goal("X1-AB-AST"), Ctx(), CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _inOrbit.Received(1).NavigateAsync("SHIP-1", "X1-AB-AST", Arg.Any<CancellationToken>());
     }
 
@@ -129,7 +129,7 @@ public sealed class MineResourceGoalExecutorTests
 
         var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-AST"), ctx, CancellationToken.None);
 
-        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _docked.Received(1).SellCargoAsync("SHIP-1", "IRON_ORE", 10, Arg.Any<CancellationToken>());
     }
 }

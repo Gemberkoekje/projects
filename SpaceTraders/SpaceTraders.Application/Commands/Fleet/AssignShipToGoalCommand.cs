@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Fleet;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -40,6 +40,7 @@ public sealed class AssignShipToGoalCommandHandler(
     ISettingsRepository settings,
     IShipyardRepository shipyards,
     IMessageBus bus,
+    IShipGoalExecutorService goalExecutor,
     ILogger<AssignShipToGoalCommandHandler> logger)
 {
     public async Task Handle(AssignShipToGoalCommand command, CancellationToken cancellationToken)
@@ -217,18 +218,12 @@ public sealed class AssignShipToGoalCommandHandler(
     {
         await goalRepository.SetActiveGoalAsync(shipSymbol, shipGoal, cancellationToken);
 
-        var now = TimeProvider.System.GetUtcNow();
-        await bus.PublishAsync(new ShipAutomationTickEvent(
-            shipSymbol,
-            "GoalAssigned",
-            now,
-            Guid.NewGuid(),
-            Guid.Empty));
-
         logger.LogInformation(
-            "AssignShipToGoalCommandHandler: ship {Ship} active goal set to {GoalKind} (id={GoalId}).",
+            "AssignShipToGoalCommandHandler: ship {Ship} active goal set to {GoalKind} (id={GoalId}); executing first step.",
             shipSymbol,
             shipGoal.Kind,
             shipGoal.GoalId);
+
+        await goalExecutor.ExecuteAsync(shipSymbol, cancellationToken);
     }
 }

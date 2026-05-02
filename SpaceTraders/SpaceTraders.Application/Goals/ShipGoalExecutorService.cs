@@ -158,11 +158,14 @@ public sealed class ShipGoalExecutorService(
                 break;
 
             case GoalExecutionOutcome.Progressing:
-                // Publish immediate follow-up tick so the next step runs.
-                // Phase 13c: orbit and dock are now invoked inline (InvokeAsync + SuppressContinuationTick=true)
-                // by the executor, so their command handlers no longer publish spurious ticks here.
-                await bus.PublishAsync(new ShipAutomationTickEvent(
-                    ship.Symbol, "GoalStep", now, Guid.NewGuid(), Guid.Empty));
+                // Phase 13c+: Do NOT publish an immediate follow-up tick.
+                // The executor has issued a command (navigate, extract, etc.) that will complete
+                // asynchronously. The next tick should come from:
+                // - Ship arrival event (scheduled by navigate command)
+                // - Cooldown expiry event (scheduled by action commands)
+                // - External stimuli (market price change, etc.)
+                // Publishing an immediate tick here creates a cascade of rapid re-evaluations
+                // where the ship keeps re-entering this same executor step repeatedly.
                 break;
 
             case GoalExecutionOutcome.WaitingForArrival:
