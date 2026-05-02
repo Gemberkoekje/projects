@@ -11,6 +11,13 @@ public sealed record OrbitShipCommand
 {
     public required string ShipSymbol { get; init; }
 
+    /// <summary>
+    /// Phase 13c: when true, the command handler skips publishing the continuation
+    /// <see cref="ShipAutomationTickEvent"/> after a successful orbit. Set to true by
+    /// goal executors that invoke orbit inline and handle continuation themselves.
+    /// </summary>
+    public bool SuppressContinuationTick { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public OrbitShipCommand(string ShipSymbol)
     {
@@ -60,9 +67,11 @@ public sealed class OrbitShipHandler(
 
         var publishedAt = TimeProvider.System.GetUtcNow();
 
-        if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
+        if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol) && !command.SuppressContinuationTick)
         {
             // Phase 13b: ShipInOrbitEvent deleted (Tier 3); publish only the automation tick.
+            // Phase 13c: suppressed when called inline from a goal executor (SuppressContinuationTick=true)
+            // because the executor continues directly and ShipGoalExecutorService publishes its own GoalStep tick.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 command.ShipSymbol,
                 "Undocked",

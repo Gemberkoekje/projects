@@ -5,7 +5,9 @@ using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Commands;
@@ -23,6 +25,10 @@ public sealed class FleetExpansionDecisionHandlerTests
         settings.GetAsync<string>("FleetExpansion.PreferredShipType", Arg.Any<CancellationToken>()).Returns(shipType);
         return settings;
     }
+
+    /// <summary>Phase 13d: fleet expansion is now triggered by GoalCompletedEvent (Tier 1).</summary>
+    private static GoalCompletedEvent MakeGoalCompleted() =>
+        new("SHIP-1", Guid.NewGuid(), ShipGoalKind.SellCargo, Guid.Empty, Guid.Empty, DateTimeOffset.UtcNow);
 
     [Fact]
     public async Task Handle_IssuesPurchaseCommand_WhenConditionsMet()
@@ -51,9 +57,7 @@ public sealed class FleetExpansionDecisionHandlerTests
         var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
-        await handler.Handle(
-            new ShipCargoSoldEvent("SHIP-1", new("IRON_ORE"), 10, 50_000, 500_000),
-            CancellationToken.None);
+        await handler.Handle(MakeGoalCompleted(), CancellationToken.None);
 
         await bus.Received(1).SendAsync(
             Arg.Is<PurchaseShipCommand>(c => c.ShipType == "SHIP_PROBE" && c.ShipyardWaypoint == "X1-AB-SHIPYARD" && c.TargetAssignmentType == "MarketProbe" && c.TargetOriginWaypoint == "X1-AB-MKT-1"),
@@ -76,9 +80,7 @@ public sealed class FleetExpansionDecisionHandlerTests
         var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
-        await handler.Handle(
-            new ShipCargoSoldEvent("SHIP-1", new("IRON_ORE"), 10, 50_000, 500_000),
-            CancellationToken.None);
+        await handler.Handle(MakeGoalCompleted(), CancellationToken.None);
 
         await bus.DidNotReceive().SendAsync(Arg.Any<PurchaseShipCommand>(), Arg.Any<DeliveryOptions>());
     }
@@ -99,9 +101,7 @@ public sealed class FleetExpansionDecisionHandlerTests
         var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
-        await handler.Handle(
-            new ShipCargoSoldEvent("SHIP-1", new("IRON_ORE"), 10, 50_000, 100_000),
-            CancellationToken.None);
+        await handler.Handle(MakeGoalCompleted(), CancellationToken.None);
 
         await bus.DidNotReceive().SendAsync(Arg.Any<PurchaseShipCommand>(), Arg.Any<DeliveryOptions>());
     }
@@ -133,9 +133,7 @@ public sealed class FleetExpansionDecisionHandlerTests
         var handler = new FleetExpansionDecisionHandler(agents, ships, waypoints, assignments, shipyards, settings, bus,
             NullLogger<FleetExpansionDecisionHandler>.Instance);
 
-        await handler.Handle(
-            new ShipCargoSoldEvent("SHIP-1", new("IRON_ORE"), 10, 50_000, 500_000),
-            CancellationToken.None);
+        await handler.Handle(MakeGoalCompleted(), CancellationToken.None);
 
         await bus.DidNotReceive().SendAsync(Arg.Any<PurchaseShipCommand>(), Arg.Any<DeliveryOptions>());
     }

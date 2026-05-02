@@ -12,6 +12,13 @@ public sealed record DockShipCommand
 {
     public required string ShipSymbol { get; init; }
 
+    /// <summary>
+    /// Phase 13c: when true, the command handler skips publishing the continuation
+    /// <see cref="ShipAutomationTickEvent"/> after a successful dock. Set to true by
+    /// goal executors that invoke dock inline and handle continuation themselves.
+    /// </summary>
+    public bool SuppressContinuationTick { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public DockShipCommand(string ShipSymbol)
     {
@@ -61,9 +68,11 @@ public sealed class DockShipHandler(
 
         var publishedAt = TimeProvider.System.GetUtcNow();
 
-        if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
+        if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol) && !command.SuppressContinuationTick)
         {
             // Phase 13b: ShipDockedEvent deleted (Tier 3); publish only the automation tick.
+            // Phase 13c: suppressed when called inline from a goal executor (SuppressContinuationTick=true)
+            // because the executor continues directly and ShipGoalExecutorService publishes its own GoalStep tick.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 command.ShipSymbol,
                 "Docked",

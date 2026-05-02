@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events;
+using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.EventHandlers;
@@ -18,7 +19,11 @@ public sealed class FleetExpansionDecisionHandler(
 {
     private const string MarketProbeAssignmentType = "MarketProbe";
 
-    public async Task Handle(ShipCargoSoldEvent @event, CancellationToken cancellationToken)
+    /// <summary>
+    /// Phase 13d: fleet expansion is now triggered by the Tier 1 <see cref="GoalCompletedEvent"/>
+    /// instead of the Tier 2 <see cref="ShipCargoSoldEvent"/>.
+    /// </summary>
+    public async Task Handle(GoalCompletedEvent @event, CancellationToken cancellationToken)
         => await EvaluateExpansionAsync(cancellationToken);
 
     public async Task Handle(ContractFulfilledEvent @event, CancellationToken cancellationToken)

@@ -792,7 +792,7 @@ Deliverables:
 
 - ✅ No event or handler class exists for any instant (synchronous-return) ship action.
 
-#### Phase 13c: Update goal executors to use direct sequential logic
+#### Phase 13c: Update goal executors to use direct sequential logic ✅
 
 Tasks:
 
@@ -802,12 +802,25 @@ Tasks:
   - Example: after `OrbitAsync()` succeeds, call the next action in the same method rather than
     publishing an event and returning.
 
+Implementation notes:
+
+- `DockedCommandAcceptor.OrbitAsync` changed from `bus.SendAsync` (fire-and-forget) to
+  `bus.InvokeAsync` (inline synchronous execution), so orbit actually completes before the
+  executor falls through to the next step.
+- `InOrbitCommandAcceptor.DockAsync` similarly changed to `bus.InvokeAsync`.
+- A `SuppressContinuationTick` flag added to `OrbitShipCommand` and `DockShipCommand`; the
+  executor-facing acceptors set it to `true` so that the command handlers do not publish a
+  spurious `ShipAutomationTickEvent` after inline execution (the executor service already
+  publishes a `GoalStep` tick on `Progressing`). Standalone callers (control endpoints,
+  navigate error-recovery) leave the flag at its default `false` and continue to receive the
+  tick as before.
+
 Deliverables:
 
 - ✅ Goal executors contain no publish calls for instant ship actions; all instant-action sequencing
   is internal to `ExecuteStepAsync`.
 
-#### Phase 13d: Convert Tier 2 events
+#### Phase 13d: Convert Tier 2 events ✅
 
 Tasks:
 
@@ -816,10 +829,21 @@ Tasks:
   - Keep the `IEventPublisher.Publish` call in the goal executor or command handler for observability.
   - Delete the handler class that previously reacted to the event.
 
+Implementation notes:
+
+- `FleetExpansionDecisionHandler.Handle(ShipCargoSoldEvent)` was the only control-flow handler
+  reacting to a Tier 2 event. It was removed and replaced with `Handle(GoalCompletedEvent)` so
+  fleet expansion evaluation is now triggered by the Tier 1 goal lifecycle event instead.
+- Observability-only handlers (`LogActivityHandler`, `LedgerEntryHandler`) for Tier 2 events are
+  intentionally kept — they write to the activity log and financial ledger for dashboards/audit
+  trails without gating any control flow.
+- `FleetExpansionDecisionHandler.Handle(ContractFulfilledEvent)` is retained as `ContractFulfilledEvent`
+  was not in the Tier 2 classification scope for this phase.
+
 Deliverables:
 
-- Tier 2 events are published for observability (dashboards, integration tests) but no handler
-  class reacts to them.
+- ✅ Tier 2 events are published for observability (dashboards, integration tests) but no
+  control-flow handler class reacts to them.
 
 #### Phase 13e: Update tests
 
