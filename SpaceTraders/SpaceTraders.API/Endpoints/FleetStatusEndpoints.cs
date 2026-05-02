@@ -1,9 +1,10 @@
+using SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Interfaces;
 
 namespace SpaceTraders.API.Endpoints;
 
 /// <summary>Maps read-only fleet status endpoints backed by <see cref="IFleetStatusQueryService"/>.</summary>
-/// <remarks>Phase 16a: controller and route definitions.</remarks>
+/// <remarks>Phase 16a: controller and route definitions. Phase 16b: responses mapped to stable DTOs.</remarks>
 public static class FleetStatusEndpoints
 {
     /// <summary>Registers the fleet status route group on the given <paramref name="app"/>.</summary>
@@ -16,7 +17,7 @@ public static class FleetStatusEndpoints
             CancellationToken ct) =>
         {
             var chains = await fleetStatus.GetGoalChainsAsync(ct);
-            return Results.Ok(chains);
+            return Results.Ok(chains.Select(FleetStatusMapper.ToDto).ToList());
         });
 
         group.MapGet("/assignments", async (
@@ -24,7 +25,7 @@ public static class FleetStatusEndpoints
             CancellationToken ct) =>
         {
             var assignments = await fleetStatus.GetAssignmentsAsync(ct);
-            return Results.Ok(assignments);
+            return Results.Ok(assignments.Select(FleetStatusMapper.ToDto).ToList());
         });
 
         group.MapGet("/activity", async (
@@ -32,7 +33,7 @@ public static class FleetStatusEndpoints
             CancellationToken ct) =>
         {
             var activities = await fleetStatus.GetShipActivitiesAsync(ct);
-            return Results.Ok(activities);
+            return Results.Ok(activities.Select(FleetStatusMapper.ToDto).ToList());
         });
 
         group.MapGet("/activity/{shipSymbol}", async (
@@ -41,7 +42,7 @@ public static class FleetStatusEndpoints
             CancellationToken ct) =>
         {
             var activity = await fleetStatus.GetShipActivityAsync(shipSymbol, ct);
-            return activity is null ? Results.NotFound() : Results.Ok(activity);
+            return activity is null ? Results.NotFound() : Results.Ok(FleetStatusMapper.ToDto(activity));
         });
 
         return app;

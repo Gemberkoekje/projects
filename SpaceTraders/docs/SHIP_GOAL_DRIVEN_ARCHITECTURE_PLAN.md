@@ -1158,7 +1158,7 @@ Deliverables:
 
 - Fleet status, assignment, and activity data is accessible over HTTP.
 
-#### Phase 16b: Response DTO mapping
+#### Phase 16b: Response DTO mapping ✅
 
 Tasks:
 
@@ -1168,6 +1168,16 @@ Tasks:
 - Add `FleetStatusMapper` (static helper or AutoMapper profile) that converts domain read models to
   DTOs.
 - Ensure `estimatedArrival` and `cooldownExpiresAt` are serialized as ISO 8601 strings.
+
+Implementation notes:
+- Added `SpaceTraders.API/Dtos/FleetStatusDtos.cs` with `FleetGoalChainDto`, `ResourceNeedEntryDto`,
+  `ShipAssignmentDto`, and `ShipActivityDto` records. All enum properties are `string`; all
+  `DateTimeOffset?` fields are serialized as ISO 8601 by ASP.NET Core's default System.Text.Json
+  serializer.
+- Added `SpaceTraders.API/Dtos/FleetStatusMapper.cs` as a static helper with `ToDto` overloads for
+  each domain read-model type.
+- Updated `FleetStatusEndpoints.cs` to project domain models through `FleetStatusMapper` before
+  returning `Results.Ok(...)`.
 
 Deliverables:
 
