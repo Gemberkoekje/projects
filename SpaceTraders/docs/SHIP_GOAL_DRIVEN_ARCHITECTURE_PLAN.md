@@ -439,62 +439,140 @@ Goal: the orchestrator works in terms of all `FleetGoalKind` values and delegate
 entirely to the assignment resolver. `Contract` and `Construction` goals are translated via
 `ResourceProductionGoal`; `MarketCoverage` and `FleetExpansion` goals are dispatched directly.
 
+#### Phase 11a: `AssignShipToGoalCommand` and its handler
+
 Tasks:
 
-- Replace `AssignShipCommand` with `AssignShipToGoalCommand(shipSymbol, FleetGoal)`.
-  - Handler inspects the `FleetGoalKind`:
-    - `Contract` / `Construction` → calls `IAssignmentResolver.ResolveAsync(ship, ResourceProductionGoal)`
-      to obtain a concrete `ShipGoal` with waypoints.
-    - `MarketCoverage` → calls `IAssignmentResolver` to produce a `ScoutWaypoint` or `PatrolMarket`
-      `ShipGoal` for the uncovered market waypoint carried in the `FleetGoal`.
-    - `FleetExpansion` → emits `PurchaseShipCommand`; after purchase, emits `AssignShipToGoalCommand`
-      for the new ship.
-  - In all cases, ends by calling `IShipGoalRepository.SetActiveGoal(...)` and publishing
-    `ShipAutomationTickEvent` for first-step execution.
+- Add `AssignShipToGoalCommand(shipSymbol, FleetGoal)` record to `SpaceTraders.Application/Commands`.
+- Add `AssignShipToGoalCommandHandler` that inspects `FleetGoalKind` and dispatches:
+  - `Contract` / `Construction` → calls `IAssignmentResolver.ResolveAsync(ship, ResourceProductionGoal)`
+    to obtain a concrete `ShipGoal` with waypoints.
+  - `MarketCoverage` → calls `IAssignmentResolver` to produce a `ScoutWaypoint` or `PatrolMarket`
+    `ShipGoal` for the uncovered market waypoint carried in the `FleetGoal`.
+  - `FleetExpansion` → emits `PurchaseShipCommand`; after purchase, emits `AssignShipToGoalCommand`
+    for the new ship.
+- In all cases, the handler ends by calling `IShipGoalRepository.SetActiveGoal(...)` and publishing
+  `ShipAutomationTickEvent` for first-step execution.
+- Add unit tests for `AssignShipToGoalCommandHandler` covering each `FleetGoalKind` branch.
+
+Deliverables:
+
+- `AssignShipToGoalCommand` exists and its handler routes each goal kind to the correct resolver path.
+
+#### Phase 11b: Update `FleetOrchestrator` to emit `AssignShipToGoalCommand`
+
+Tasks:
+
 - Update `FleetOrchestrator.BuildAssignment` to emit `AssignShipToGoalCommand` instead of the
   current `AssignShipCommand` with hardcoded waypoint fields.
 - Keep all `IFleetGoalEvaluator` implementations producing `FleetGoal`; do not change evaluators
   to produce `ResourceProductionGoal` — that conversion happens inside the command handler, not in
   the evaluator.
-- Remove waypoint fields from `FleetGoal` (origin/destination) only for goal kinds where they are
-  not needed (`Contract`, `Construction`); keep `OriginWaypoint` for `MarketCoverage` because it
-  identifies the market to cover, and remove it once the resolver consumes it.
-- Implement actionable fleet expansion (completing the advisory-only model from Phase 6):
-  - Add `PurchaseShipCommand` handler that calls the shipyard API and assigns the new ship.
-  - Update `FleetExpansionGoalEvaluator` to identify the bottleneck goal kind (not just resource
-    goals) and select the appropriate ship type to relieve it.
-  - After purchase, immediately trigger `AssignShipToGoalCommand` for the new ship.
-- Update orchestrator tests for the new goal shape and fleet-expansion purchase path.
+- Remove waypoint fields (`OriginWaypoint`, `DestinationWaypoint`) from `FleetGoal` for goal kinds
+  where they are not needed (`Contract`, `Construction`); keep `OriginWaypoint` for `MarketCoverage`
+  because it identifies the market to cover.
+- Update orchestrator unit tests for the updated goal shape.
 
 Deliverables:
 
-- The orchestrator dispatches all four `FleetGoalKind` values; no waypoint strings appear in
-  `FleetOrchestrator` itself.
-- `Contract` and `Construction` goals are resolved via `ResourceProductionGoal`; `MarketCoverage`
-  and `FleetExpansion` goals are dispatched directly to ship goals or purchase commands.
-- Fleet expansion purchases ships when the bottleneck requires it and budget allows.
+- `FleetOrchestrator` no longer references waypoint symbols directly.
+- All four `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`.
+
+#### Phase 11c: Actionable fleet expansion
+
+Tasks:
+
+- Add `PurchaseShipCommand(shipyardWaypoint, shipType)` record and its handler that:
+  - Calls the shipyard API to purchase the ship.
+  - Immediately emits `AssignShipToGoalCommand` for the newly purchased ship.
+- Update `FleetExpansionGoalEvaluator` to:
+  - Identify the bottleneck goal kind (not just resource goals) and select the appropriate ship type
+    to relieve it (mining drone for extraction, light hauler for cargo, satellite for market coverage).
+  - Query `IShipyardRepository` for the cheapest eligible ship in a reachable system.
+  - Check `IBudgetPolicy` before emitting `FleetExpansion` goal.
+- Add unit tests for the purchase command handler and the updated evaluator.
+
+Deliverables:
+
+- Fleet expansion transitions from advisory to actionable: a purchase command is emitted and the
+  new ship is immediately assigned to the bottleneck goal.
+
+#### Phase 11d: Orchestrator integration tests
+
+Tasks:
+
+- Add or update orchestrator integration-style tests covering:
+  - `Contract` / `Construction` resource need covered by current fleet → no new assignment.
+  - `Contract` / `Construction` resource need with idle miner → idle miner assigned.
+  - `Contract` / `Construction` resource need with no idle suitable ship → fleet expansion goal emitted.
+  - `MarketCoverage` goal: uncovered market → scout or patrol ship assigned.
+  - `MarketCoverage` goal: all markets covered → no goal emitted.
+  - `FleetExpansion` approved by budget → purchase command emitted; new ship assigned to bottleneck goal.
+  - `FleetExpansion` blocked by budget → no purchase.
+  - `FleetExpansion` blocked by max-ship cap → no purchase.
+
+Deliverables:
+
+- Full orchestrator coverage for all four `FleetGoalKind` values and the fleet-expansion purchase path.
 
 ### Phase 12: Cleanup and capability registry
 
 Goal: remove deprecated planner infrastructure and add first-class capability tracking.
 
+#### Phase 12a: Delete deprecated planner infrastructure
+
 Tasks:
 
 - Delete `IShipPlanner`, `ShipPlannerDecision`, `ShipPlannerCommandKind`, `ShipPlannerContext`,
   `ShipPlannerService`, and all concrete `*ShipPlanner.cs` files.
-- Remove `ShipPlannerDecision`-related DI registrations.
-- Add a `ShipCapabilityRegistry` that classifies ships by capabilities derived from their cached
-  mounts and frame:
-  - `CanMine`, `CanSiphon`, `CanSurvey`, `HasCargo`, `HasFuelTank`, `CanRepair`.
-  - Used by the orchestrator to select the right ship type for each goal.
-  - Used by goal executors during capability validation.
-- Update `FleetCapacityEstimator` to use `ShipCapabilityRegistry` instead of assignment-type inference.
-- Add a `ShipCapabilityRegistryTests` suite.
+- Remove all `ShipPlannerDecision`-related DI registrations from the composition root.
+- Verify that no compilation errors remain after removal (the goal executor layer must already
+  cover all ship types that had a planner).
 
 Deliverables:
 
-- Planner layer removed; goal executor layer is the only automation path.
-- Ship capability is derived from game data, not from assignment type.
+- Planner layer removed; the codebase compiles cleanly without any planner types.
+
+#### Phase 12b: Add `ShipCapabilityRegistry`
+
+Tasks:
+
+- Add a `ShipCapabilityRegistry` service to `SpaceTraders.Application/Services` that classifies
+  ships by capabilities derived from their cached mounts and frame:
+  - `CanMine`, `CanSiphon`, `CanSurvey`, `HasCargo`, `HasFuelTank`, `CanRepair`.
+- Expose the registry via `IShipCapabilityRegistry` in `SpaceTraders.Application/Interfaces`.
+- Update goal executors to delegate capability validation to `IShipCapabilityRegistry` instead of
+  inspecting `ShipModel.Mounts` directly.
+
+Deliverables:
+
+- Ship capability is derived from game data through a single registry rather than duplicated checks.
+
+#### Phase 12c: Update `FleetCapacityEstimator`
+
+Tasks:
+
+- Update `FleetCapacityEstimator` to use `IShipCapabilityRegistry` for role classification instead
+  of the current assignment-type inference.
+- Ensure the estimator still produces the same effective mining-rate and haul-capacity metrics.
+
+Deliverables:
+
+- `FleetCapacityEstimator` no longer infers ship roles from assignment type; it reads capabilities
+  from the registry.
+
+#### Phase 12d: Capability registry tests
+
+Tasks:
+
+- Add a `ShipCapabilityRegistryTests` suite covering:
+  - Each capability flag is correctly set for ships with the relevant mount or frame.
+  - Ships missing a mount or frame have the corresponding flag as `false`.
+  - A ship with multiple relevant mounts has all corresponding flags set.
+
+Deliverables:
+
+- Full unit test coverage for `ShipCapabilityRegistry`.
 
 ### Phase 13: Event rationalization
 
@@ -502,27 +580,73 @@ Goal: remove all event handlers that exist only to advance a ship from one insta
 next. Only Tier 1 reactive events retain handlers. Tier 2 events are kept as published signals but
 their handler classes are deleted. Tier 3 events are deleted entirely.
 
+#### Phase 13a: Audit and classify all domain events
+
 Tasks:
 
-- Audit every domain event under `SpaceTraders.Domain/Events/Ships` and classify it using the
-  Event Taxonomy above (Tier 1 / 2 / 3).
-- Delete `ShipDockedEvent`, `ShipOrbitedEvent`, `ShipUndockedEvent` and any other event whose
-  sole consumer is a handler that immediately issues the next API call.
-- Delete corresponding event handler classes in `SpaceTraders.Application/EventHandlers/Ships`.
-- In every goal executor, replace the removed event-driven transitions with direct sequential
-  logic: after `OrbitAsync()` succeeds, call the next action in the same `ExecuteStepAsync`
-  invocation rather than publishing an event and returning.
-- Retain `GoalCompletedEvent`, `GoalBlockedEvent`, `CreditsChangedEvent`, and
-  `MarketPriceChangedEvent` with their handlers unchanged.
-- Convert Tier 2 events: keep the `IEventPublisher.Publish` call for observability but delete the
-  handler class.
-- Update integration and unit tests: tests that asserted an intermediate event was published for
-  an instant action should instead assert the final outcome (e.g. ship is in orbit, the correct
-  API was called).
+- Review every domain event under `SpaceTraders.Domain/Events/Ships` and classify each as
+  Tier 1, Tier 2, or Tier 3 using the Event Taxonomy defined in this document.
+- Produce an audit table (can be a code review comment or a temporary note) listing each event,
+  its tier, and the reason for the classification.
 
 Deliverables:
 
-- No event handler class exists for any instant (synchronous-return) ship action.
+- Clear Tier classification for every existing domain ship event before any deletions begin.
+
+#### Phase 13b: Delete Tier 3 events and handlers
+
+Tasks:
+
+- Delete `ShipDockedEvent`, `ShipOrbitedEvent`, `ShipUndockedEvent`, and any other event whose
+  sole consumer is a handler that immediately issues the next API call.
+- Delete the corresponding event handler classes in `SpaceTraders.Application/EventHandlers/Ships`.
+- Ensure the codebase compiles after removal.
+
+Deliverables:
+
+- No event or handler class exists for any instant (synchronous-return) ship action.
+
+#### Phase 13c: Update goal executors to use direct sequential logic
+
+Tasks:
+
+- In every goal executor that previously relied on a now-deleted Tier 3 event to advance to the
+  next step: replace the publish-and-return pattern with direct sequential logic within the same
+  `ExecuteStepAsync` invocation.
+  - Example: after `OrbitAsync()` succeeds, call the next action in the same method rather than
+    publishing an event and returning.
+
+Deliverables:
+
+- Goal executors contain no publish calls for instant ship actions; all instant-action sequencing
+  is internal to `ExecuteStepAsync`.
+
+#### Phase 13d: Convert Tier 2 events
+
+Tasks:
+
+- For each Tier 2 event (e.g. `ResourceExtractedEvent`, `CargoSoldEvent`, `ContractDeliveredEvent`,
+  `ConstructionSuppliedEvent`, `ShipPurchasedEvent`):
+  - Keep the `IEventPublisher.Publish` call in the goal executor or command handler for observability.
+  - Delete the handler class that previously reacted to the event.
+
+Deliverables:
+
+- Tier 2 events are published for observability (dashboards, integration tests) but no handler
+  class reacts to them.
+
+#### Phase 13e: Update tests
+
+Tasks:
+
+- Update unit and integration tests that previously asserted an intermediate Tier 3 event was
+  published for an instant action; replace those assertions with assertions on the final outcome
+  (e.g. ship is in orbit, the correct API was called, correct `GoalExecutionResult` was returned).
+- Verify that tests for Tier 1 and Tier 2 events are unaffected.
+
+Deliverables:
+
+- Test suite passes with no references to deleted events.
 - `ShipGoalExecutorService` communicates with the orchestrator only via `GoalCompletedEvent` and
   `GoalBlockedEvent`.
 - The total number of event handler classes is substantially reduced.
@@ -532,6 +656,8 @@ Deliverables:
 Goal: implement the mechanism that delivers `ShipArrivedEvent` and `ShipCooldownExpiredEvent` at
 the correct future moment, replacing the polling tick loop for in-transit and cooling-down ships.
 
+#### Phase 14a: `IShipEventScheduler` interface and database schema
+
 Tasks:
 
 - Add `IShipEventScheduler` to `SpaceTraders.Application/Interfaces`:
@@ -540,9 +666,7 @@ Tasks:
   Task ScheduleCooldownExpiryAsync(string shipSymbol, Guid goalId, DateTimeOffset expiresAt, CancellationToken ct);
   Task CancelScheduledAsync(string shipSymbol, Guid goalId, CancellationToken ct);
   ```
-- Implement `ShipEventScheduler` as an `IHostedService` backed by an in-memory priority queue
-  (ordered by trigger time). On startup, reload all pending rows from the `scheduled_ship_events`
-  table so scheduled events survive a process restart. Schema:
+- Add the `scheduled_ship_events` table migration:
   ```sql
   scheduled_ship_events (
       ship_symbol  TEXT        NOT NULL,
@@ -552,6 +676,30 @@ Tasks:
       PRIMARY KEY (ship_symbol, goal_id)
   )
   ```
+
+Deliverables:
+
+- Interface and database schema exist; no implementation yet.
+
+#### Phase 14b: `ShipEventScheduler` implementation
+
+Tasks:
+
+- Implement `ShipEventScheduler` as an `IHostedService` in `SpaceTraders.Infrastructure` backed by
+  an in-memory priority queue ordered by trigger time.
+- On startup, reload all pending rows from the `scheduled_ship_events` table so scheduled events
+  survive a process restart.
+- When a trigger time is reached, publish the corresponding `ShipArrivedEvent` or
+  `ShipCooldownExpiredEvent` and delete the row from the database.
+
+Deliverables:
+
+- Scheduler fires events at the correct time and reloads pending events after a restart.
+
+#### Phase 14c: Update goal executors to use the scheduler
+
+Tasks:
+
 - In every goal executor that issues a `Navigate` API call: after a successful response, call
   `IShipEventScheduler.ScheduleArrivalAsync(ship.Symbol, goal.GoalId, nav.Route.Arrival)` and
   return `GoalExecutionResult.Waiting`. Do **not** publish `ShipAutomationTickEvent`.
@@ -559,11 +707,33 @@ Tasks:
   response containing a cooldown, call
   `IShipEventScheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, cooldown.Expiration)`
   and return `GoalExecutionResult.Waiting`.
-- Add `ShipArrivedEventHandler` and `ShipCooldownExpiredEventHandler`: each verifies that the
-  `GoalId` in the event still matches the ship's currently active goal (stale wake-ups are silently
-  ignored), then publishes `ShipAutomationTickEvent` to resume execution.
-- In the `GoalCompletedEvent` and `GoalBlockedEvent` handlers, call
+
+Deliverables:
+
+- No `ShipAutomationTickEvent` is published for a ship that is in transit or on cooldown.
+- Ships in transit or on cooldown consume no CPU and produce no wasted tick-loop iterations.
+
+#### Phase 14d: Arrival and cooldown event handlers
+
+Tasks:
+
+- Add `ShipArrivedEventHandler`: verifies that the `GoalId` in the event still matches the ship's
+  currently active goal (stale wake-ups are silently ignored), then publishes
+  `ShipAutomationTickEvent` to resume execution.
+- Add `ShipCooldownExpiredEventHandler`: same stale-wake-up guard, then publishes
+  `ShipAutomationTickEvent`.
+- In `GoalCompletedEvent` and `GoalBlockedEvent` handlers, call
   `IShipEventScheduler.CancelScheduledAsync` to prevent ghost wake-ups after goal reassignment.
+
+Deliverables:
+
+- Ships resume goal execution at their estimated arrival time or cooldown expiry.
+- Goal completion and blockage cancel any pending scheduled event for the ship.
+
+#### Phase 14e: Scheduler unit tests
+
+Tasks:
+
 - Add unit tests for `ShipEventScheduler`:
   - Event fires at the correct time.
   - Persisted schedule is reloaded and fires correctly after a simulated restart.
@@ -572,10 +742,8 @@ Tasks:
 
 Deliverables:
 
-- Ships in transit or on cooldown consume no CPU and produce no wasted tick-loop iterations.
 - A ship resumes goal execution at its estimated arrival time or cooldown expiry, even after a
   process restart.
-- No `ShipAutomationTickEvent` is published for a ship that is in transit or on cooldown.
 
 ---
 
