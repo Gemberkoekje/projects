@@ -6,8 +6,7 @@ namespace SpaceTraders.Domain.Events.Ships;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Unlike the legacy chain-of-command events (e.g. <see cref="ShipInOrbitEvent"/>,
-/// <see cref="ShipDockedEvent"/>), this event is intentionally <b>not</b> derived from
+/// Unlike the legacy chain-of-command events (now deleted), this event is intentionally <b>not</b> derived from
 /// <see cref="ChainOfCommandEvent"/>. The ship automation architecture plan
 /// removes inheritance-based routing: all state-change events now publish this explicit
 /// automation tick which is routed to a single ship automation handler.

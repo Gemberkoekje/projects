@@ -6,52 +6,6 @@ namespace SpaceTraders.Domain.Tests.Events;
 public sealed class ShipEventsTests
 {
     [Fact]
-    public void ShipDockedEvent_PreservesProvidedCorrelationAndPayload()
-    {
-        var correlationId = Guid.NewGuid();
-        var causationId = Guid.NewGuid();
-        var occurredAt = DateTimeOffset.UtcNow;
-
-        var @event = new ShipDockedEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-001",
-            correlationId,
-            causationId,
-            occurredAt);
-
-        @event.CorrelationId.Should().Be(correlationId);
-        @event.CausationId.Should().Be(causationId);
-        @event.OccurredAt.Should().Be(occurredAt);
-        @event.ShipSymbol.Should().Be("SHIP-1");
-        @event.SystemSymbol.Should().Be("X1-AB");
-        @event.WaypointSymbol.Should().Be("X1-AB-001");
-    }
-
-    [Fact]
-    public void ShipInOrbitEvent_PreservesProvidedCorrelationAndPayload()
-    {
-        var correlationId = Guid.NewGuid();
-        var causationId = Guid.NewGuid();
-        var occurredAt = DateTimeOffset.UtcNow;
-
-        var @event = new ShipInOrbitEvent(
-            "SHIP-1",
-            "X1-AB",
-            "X1-AB-001",
-            correlationId,
-            causationId,
-            occurredAt);
-
-        @event.CorrelationId.Should().Be(correlationId);
-        @event.CausationId.Should().Be(causationId);
-        @event.OccurredAt.Should().Be(occurredAt);
-        @event.ShipSymbol.Should().Be("SHIP-1");
-        @event.SystemSymbol.Should().Be("X1-AB");
-        @event.WaypointSymbol.Should().Be("X1-AB-001");
-    }
-
-    [Fact]
     public void ShipInTransitEvent_PreservesProvidedCorrelationAndPayload()
     {
         var correlationId = Guid.NewGuid();

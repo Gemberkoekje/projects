@@ -21,8 +21,8 @@ namespace SpaceTraders.API.Services;
 ///                                   so the chain immediately routes to in-orbit/undocked.
 ///  - Ship.ArrivesAt is in the future → emit <see cref="ShipInTransitEvent"/> with the real future arrival time
 ///                                       so <see cref="ShipInTransitEventHandler"/> schedules the in-orbit event.
-///  - Ship is docked               → emit <see cref="ShipDockedEvent"/> to resume the docked chain.
-///  - Ship is in orbit             → emit <see cref="ShipInOrbitEvent"/> to resume the in-orbit/undocked chain.
+///  - Ship is docked               → emit <see cref="ShipAutomationTickEvent"/> to resume the docked chain.
+///  - Ship is in orbit             → emit <see cref="ShipAutomationTickEvent"/> to resume the in-orbit/undocked chain.
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
@@ -128,50 +128,32 @@ public sealed class StartupRecoveryService(
         }
         else if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            var dockedEvent = new ShipDockedEvent(
-                ship.Symbol,
-                ship.SystemSymbol ?? string.Empty,
-                ship.WaypointSymbol ?? string.Empty,
-                Guid.NewGuid(),
-                Guid.Empty,
-                now);
-
-            await bus.PublishAsync(dockedEvent);
-
-            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+            var correlationId = Guid.NewGuid();
+            // Phase 13b: ShipDockedEvent deleted (Tier 3); emit automation tick directly.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 ship.Symbol,
                 "StartupRecovery: Docked",
                 now,
-                dockedEvent.CorrelationId,
-                dockedEvent.EventId));
+                correlationId,
+                Guid.Empty));
 
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} is docked; emitting ShipDockedEvent.",
+                "StartupRecovery: Ship {Symbol} is docked; emitting ShipAutomationTickEvent.",
                 ship.Symbol);
         }
         else if (ship.LocalStatus == ShipLocalStatus.InOrbit)
         {
-            var orbitEvent = new ShipInOrbitEvent(
-                ship.Symbol,
-                ship.SystemSymbol ?? string.Empty,
-                ship.WaypointSymbol ?? string.Empty,
-                Guid.NewGuid(),
-                Guid.Empty,
-                now);
-
-            await bus.PublishAsync(orbitEvent);
-
-            // Phase 5b: explicit automation tick replaces chain-routed inheritance dispatch.
+            var correlationId = Guid.NewGuid();
+            // Phase 13b: ShipInOrbitEvent deleted (Tier 3); emit automation tick directly.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 ship.Symbol,
                 "StartupRecovery: InOrbit",
                 now,
-                orbitEvent.CorrelationId,
-                orbitEvent.EventId));
+                correlationId,
+                Guid.Empty));
 
             logger.LogInformation(
-                "StartupRecovery: Ship {Symbol} is in orbit; emitting ShipInOrbitEvent.",
+                "StartupRecovery: Ship {Symbol} is in orbit; emitting ShipAutomationTickEvent.",
                 ship.Symbol);
         }
         else

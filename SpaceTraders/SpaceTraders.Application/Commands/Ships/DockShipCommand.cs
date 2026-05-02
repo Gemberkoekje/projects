@@ -63,16 +63,7 @@ public sealed class DockShipHandler(
 
         if (!string.IsNullOrWhiteSpace(nav.WaypointSymbol))
         {
-            await bus.PublishAsync(new ShipDockedEvent(
-                command.ShipSymbol,
-                nav.SystemSymbol,
-                nav.WaypointSymbol,
-                Guid.Empty,
-                Guid.Empty,
-                publishedAt));
-
-            // Phase 5b: explicit automation tick so the planner-driven flow runs without
-            // depending on chain-of-command inheritance routing.
+            // Phase 13b: ShipDockedEvent deleted (Tier 3); publish only the automation tick.
             await bus.PublishAsync(new ShipAutomationTickEvent(
                 command.ShipSymbol,
                 "Docked",

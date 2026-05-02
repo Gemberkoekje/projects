@@ -775,18 +775,22 @@ Deliverables:
 
 - ✅ Clear Tier classification for every existing domain ship event before any deletions begin.
 
-#### Phase 13b: Delete Tier 3 events and handlers
+#### Phase 13b: Delete Tier 3 events and handlers ✅
 
 Tasks:
 
-- Delete `ShipDockedEvent`, `ShipOrbitedEvent`, `ShipUndockedEvent`, and any other event whose
+- ✅ Delete `ShipDockedEvent`, `ShipInOrbitEvent`, and any other event whose
   sole consumer is a handler that immediately issues the next API call.
-- Delete the corresponding event handler classes in `SpaceTraders.Application/EventHandlers/Ships`.
-- Ensure the codebase compiles after removal.
+- ✅ Delete the corresponding handler methods in `LogActivityHandler` and remove the vestigial
+  `IInTransitCommandAcceptor` / `InTransitCommandAcceptor` indirection.
+- ✅ Update `DockShipCommand` and `OrbitShipCommand` to publish only `ShipAutomationTickEvent`.
+- ✅ Update `StartupRecoveryService` to emit `ShipAutomationTickEvent` directly for docked/orbit recovery.
+- ✅ Remove deleted events from `StateTransitionEventOutsideCommandHandlerAnalyzer`.
+- ✅ Ensure the codebase compiles after removal.
 
 Deliverables:
 
-- No event or handler class exists for any instant (synchronous-return) ship action.
+- ✅ No event or handler class exists for any instant (synchronous-return) ship action.
 
 #### Phase 13c: Update goal executors to use direct sequential logic
 

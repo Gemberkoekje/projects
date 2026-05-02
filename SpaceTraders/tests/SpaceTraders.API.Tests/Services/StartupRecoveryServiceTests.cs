@@ -66,8 +66,7 @@ public sealed class StartupRecoveryServiceTests
         await service.StartAsync(CancellationToken.None);
 
         await bus.DidNotReceive().PublishAsync(Arg.Any<ShipInTransitEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipDockedEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipInOrbitEvent>(), Arg.Any<DeliveryOptions>());
+        await bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -95,7 +94,11 @@ public sealed class StartupRecoveryServiceTests
 
         await service.StartAsync(CancellationToken.None);
 
-        await bus.Received().PublishAsync(Arg.Any<ShipDockedEvent>(), Arg.Any<DeliveryOptions>());
-        await bus.Received().PublishAsync(Arg.Any<ShipInOrbitEvent>(), Arg.Any<DeliveryOptions>());
+        await bus.Received().PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1"),
+            Arg.Any<DeliveryOptions>());
+        await bus.Received().PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-2"),
+            Arg.Any<DeliveryOptions>());
     }
 }

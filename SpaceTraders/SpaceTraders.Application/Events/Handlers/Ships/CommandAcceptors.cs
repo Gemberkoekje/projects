@@ -1,6 +1,5 @@
 using SpaceTraders.Application.Commands.Contracts;
 using SpaceTraders.Application.Commands.Ships;
-using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -53,11 +52,6 @@ public interface IInOrbitCommandAcceptor
         Guid correlationId,
         Guid causationId,
         CancellationToken cancellationToken);
-}
-
-public interface IInTransitCommandAcceptor
-{
-    Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken);
 }
 
 public sealed class DockedCommandAcceptor(IMessageBus bus) : IDockedCommandAcceptor
@@ -130,10 +124,4 @@ public sealed class InOrbitCommandAcceptor(IMessageBus bus) : IInOrbitCommandAcc
             units,
             correlationId,
             causationId)).AsTask();
-}
-
-public sealed class InTransitCommandAcceptor(IMessageBus bus) : IInTransitCommandAcceptor
-{
-    public Task PublishInOrbitAsync(ShipInOrbitEvent inOrbitEvent, CancellationToken cancellationToken)
-        => bus.PublishAsync(inOrbitEvent).AsTask();
 }
