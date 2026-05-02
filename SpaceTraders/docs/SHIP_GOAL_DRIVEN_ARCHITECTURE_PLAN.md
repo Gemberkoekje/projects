@@ -26,8 +26,9 @@ responsibility up into the assignment layer, so the three layers become:
 3. A ship validates its own capabilities before reporting a goal as executable.
 4. The assignment resolver owns all spatial decisions: which waypoint, which market, which route.
 5. The orchestrator owns resource need definitions and fleet-level decisions; it never references waypoints directly.
-6. One orchestrator evaluation produces at most one assignment change per ship.
-7. Capability mismatches (no mining laser, no cargo space) are reported as goal errors, not silent loops.
+6. The orchestrator maintains **multiple simultaneous fleet goals**, each with a priority. Ships are always assigned to the highest-priority unmet goal first.
+7. One orchestrator evaluation produces at most one assignment change per ship.
+8. Capability mismatches (no mining laser, no cargo space) are reported as goal errors, not silent loops.
 
 ---
 
@@ -200,29 +201,64 @@ The resolver does not instruct the ship on how to get there. The ship goal execu
 ## Orchestrator Evolution
 
 The orchestrator works in terms of **strategic fleet goals** (`FleetGoal`), not waypoints or routes.
-Strategic goals are wider than resource allocation alone; the four goal kinds are:
+The orchestrator maintains a **prioritised list of active fleet goals** simultaneously — there is always
+more than one goal in flight (scout markets AND fulfil the contract AND build the jump gate). Each goal
+has an integer priority; the orchestrator assigns idle ships to the highest-priority unmet goal first.
+
+Strategic goals are wider than resource allocation alone; the five goal kinds are:
 
 | `FleetGoalKind` | What it represents |
 |---|---|
+| `MarketScouting` | Dispatch a probe to each waypoint that has a market but no recent price data; highest priority at game start |
 | `Contract` | Deliver N units of a trade symbol to a destination by a deadline |
 | `Construction` | Supply N units of a trade symbol to a construction site |
-| `MarketCoverage` | Station a probe or patrol ship at an uncovered market waypoint |
+| `MarketCoverage` | Station a probe or patrol ship permanently at an uncovered market waypoint |
 | `FleetExpansion` | Purchase a new ship because all ships are busy and the budget allows |
+
+### Goal priority model
+
+Every `FleetGoal` carries a `priority` integer (lower number = higher priority). The default
+ordering produced by the evaluators is:
+
+| Priority | `FleetGoalKind` | Rationale |
+|---|---|---|
+| 10 | `MarketScouting` | Market data is a prerequisite for every other decision; gather it first |
+| 20 | `Contract` | Contracts have deadlines and are the primary source of early-game credits |
+| 30 | `Construction` | Long-term infrastructure goal; no hard deadline but strategically important |
+| 40 | `MarketCoverage` | Permanent market surveillance; nice-to-have after core needs are covered |
+| 50 | `FleetExpansion` | Only useful once the fleet is a proven bottleneck |
+
+The `priority` field is a plain `int`, not an enum, so goals of the same kind can be further ordered
+(e.g. two contracts with different deadlines can have priorities 20 and 21). A future admin endpoint
+may allow manual priority overrides.
+
+### `FleetGoal` shape
+
+```
+FleetGoal:
+  - id            Guid
+  - kind          FleetGoalKind
+  - priority      int
+  - description   string        // human-readable, e.g. "Scout X1-TD7-M12 market prices"
+  - createdAt     DateTimeOffset
+  - payload       (kind-specific, see below)
+```
 
 ### Two-level goal model
 
 The orchestrator operates at two levels:
 
-**Level 1 — Strategic fleet goals (`FleetGoal`)**: produced by the `IFleetGoalEvaluator` implementations.
-These describe *what* the fleet is trying to achieve; they carry no waypoint information.
+**Level 1 — Strategic fleet goals (`FleetGoal`)**: produced by the `IFleetGoalEvaluator` implementations
+and stored in the `fleet_goals` table. These describe *what* the fleet is trying to achieve; they carry
+no waypoint information (except `MarketCoverage` and `MarketScouting` which carry the target market waypoint).
 
 **Level 2 — Resource production goals (`ResourceProductionGoal`)**: an intermediate translation step used
 only for `Contract` and `Construction` goals. The orchestrator converts a `Contract`/`Construction`
 `FleetGoal` into a `ResourceProductionGoal` and passes it to the assignment resolver.
 
-`MarketCoverage` and `FleetExpansion` goals do **not** go through `ResourceProductionGoal`; they are
-translated directly by the assignment resolver into ship goals (`ScoutWaypoint`/`PatrolMarket`) or a
-`PurchaseShipCommand` respectively.
+`MarketScouting`, `MarketCoverage` and `FleetExpansion` goals do **not** go through
+`ResourceProductionGoal`; they are translated directly by the assignment resolver into ship goals
+(`ScoutWaypoint`/`PatrolMarket`) or a `PurchaseShipCommand` respectively.
 
 ### Resource production goal (Contract / Construction only)
 
@@ -274,6 +310,8 @@ and `DestWaypoint: goal.DestinationWaypoint` directly into `AssignShipCommand`. 
 
 - For `Contract`/`Construction` goals: the orchestrator emits a `ResourceProductionGoal` and a ship symbol;
   the assignment resolver converts that into a concrete ship goal (with waypoints).
+- For `MarketScouting` goals: the orchestrator emits the `FleetGoal` with the target market waypoint;
+  the assignment resolver creates a `ScoutWaypoint` ship goal.
 - For `MarketCoverage` goals: the orchestrator emits the `FleetGoal` with the uncovered market waypoint;
   the assignment resolver creates a `ScoutWaypoint` or `PatrolMarket` ship goal directly.
 - For `FleetExpansion` goals: the orchestrator emits a `PurchaseShipCommand`; no assignment resolver step
@@ -290,23 +328,29 @@ This is a significant change to `FleetOrchestrator`, `AssignShipCommand`, and th
 GameLoopService tick
         ↓
 FleetOrchestrator.EvaluateAndAssignAsync()
-  - Aggregates FleetGoals from goal evaluators (Contract, Construction, MarketCoverage, FleetExpansion)
-  - For each unmet goal, finds an idle ship or triggers fleet expansion
-  - Dispatches by goal kind:
+  - Each IFleetGoalEvaluator produces FleetGoal records with default priorities
+  - Merge with persisted goals in fleet_goals table (evaluators may update existing goals)
+  - Sort all active FleetGoals by priority ascending (10 = MarketScouting first, 50 = FleetExpansion last)
+  - For each goal in priority order, find an idle ship capable of contributing:
 
-  ┌─ Contract / Construction goal
+  ┌─ MarketScouting goal (priority 10)
+  │   → AssignShipToGoalCommand(shipSymbol, FleetGoal { Kind = MarketScouting })
+  │          ↓
+  │   AssignmentResolver creates ScoutWaypoint ShipGoal for the unvisited market waypoint
+  │
+  ├─ Contract / Construction goal (priority 20–30)
   │   → AssignShipToGoalCommand(shipSymbol, ResourceProductionGoal)
   │          ↓
   │   AssignmentResolver.ResolveAsync(ship, resourceProductionGoal)
   │     - Loads waypoint, market, and system data
   │     - Returns a ShipGoal with concrete waypoint(s)
   │
-  ├─ MarketCoverage goal
+  ├─ MarketCoverage goal (priority 40)
   │   → AssignShipToGoalCommand(shipSymbol, FleetGoal { Kind = MarketCoverage })
   │          ↓
   │   AssignmentResolver creates ScoutWaypoint or PatrolMarket ShipGoal directly
   │
-  └─ FleetExpansion goal
+  └─ FleetExpansion goal (priority 50)
       → PurchaseShipCommand(shipyardWaypoint, shipType)
              ↓
         After purchase: AssignShipToGoalCommand for the new ship
@@ -469,14 +513,14 @@ Tasks:
   to produce `ResourceProductionGoal` — that conversion happens inside the command handler, not in
   the evaluator.
 - Remove waypoint fields (`OriginWaypoint`, `DestinationWaypoint`) from `FleetGoal` for goal kinds
-  where they are not needed (`Contract`, `Construction`); keep `OriginWaypoint` for `MarketCoverage`
-  because it identifies the market to cover.
+  where they are not needed (`Contract`, `Construction`); keep a target waypoint field for
+  `MarketCoverage` and `MarketScouting` because it identifies the market to cover.
 - Update orchestrator unit tests for the updated goal shape.
 
 Deliverables:
 
 - `FleetOrchestrator` no longer references waypoint symbols directly.
-- All four `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`.
+- All `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`.
 
 #### Phase 11c: Actionable fleet expansion
 
@@ -497,11 +541,128 @@ Deliverables:
 - Fleet expansion transitions from advisory to actionable: a purchase command is emitted and the
   new ship is immediately assigned to the bottleneck goal.
 
-#### Phase 11d: Orchestrator integration tests
+#### Phase 11d: `FleetGoal` priority field
+
+Goal: add the `priority` field to `FleetGoal` and ensure every evaluator sets a sensible default.
+
+Tasks:
+
+- Add `int Priority` to the `FleetGoal` record in `SpaceTraders.Domain` (or wherever it lives).
+- Set default priority constants in a `FleetGoalPriority` static class:
+  ```csharp
+  public static class FleetGoalPriority
+  {
+      public const int MarketScouting  = 10;
+      public const int Contract        = 20;
+      public const int Construction    = 30;
+      public const int MarketCoverage  = 40;
+      public const int FleetExpansion  = 50;
+  }
+  ```
+- Update every existing `IFleetGoalEvaluator` to set the appropriate default priority from
+  `FleetGoalPriority` when constructing a `FleetGoal`.
+- Add unit tests confirming each evaluator emits the correct default priority.
+
+Deliverables:
+
+- `FleetGoal` carries a priority and every evaluator populates it with a well-known default.
+
+#### Phase 11e: Fleet goal persistence (`fleet_goals` table)
+
+Goal: persist the active fleet goals so they survive restarts and are available to the dashboard
+read models in Phase 15 without reading in-memory orchestrator state.
+
+Tasks:
+
+- Add the `fleet_goals` table migration:
+  ```sql
+  fleet_goals (
+      id           UUID        NOT NULL PRIMARY KEY,
+      kind         TEXT        NOT NULL,
+      priority     INT         NOT NULL,
+      description  TEXT        NOT NULL,
+      payload_json TEXT        NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL,
+      completed_at TIMESTAMPTZ
+  )
+  ```
+- Add `IFleetGoalRepository` to `SpaceTraders.Application/Interfaces/Repositories`:
+  ```csharp
+  Task UpsertAsync(FleetGoal goal, CancellationToken ct);
+  Task MarkCompletedAsync(Guid goalId, CancellationToken ct);
+  Task<IReadOnlyList<FleetGoal>> GetActiveAsync(CancellationToken ct);
+  ```
+- Implement `FleetGoalRepository` in `SpaceTraders.Infrastructure.Persistence`.
+- Update `FleetOrchestrator.EvaluateAndAssignAsync` to call `IFleetGoalRepository.GetActiveAsync`
+  as the starting set of goals and upsert any new goals produced by evaluators.
+- Mark a fleet goal completed when all of its `GoalCompletedEvent` children are received (e.g.
+  all resource needs for a construction goal are satisfied).
+- Add unit tests for repository roundtrip and completion marking.
+
+Deliverables:
+
+- Active fleet goals survive a process restart.
+- Phase 15 read models can query `IFleetGoalRepository` instead of reading in-memory state.
+
+#### Phase 11f: Priority-sorted assignment in `FleetOrchestrator`
+
+Goal: the orchestrator processes its list of active fleet goals in priority order and assigns idle
+ships to the highest-priority unfulfilled goal.
+
+Tasks:
+
+- In `FleetOrchestrator.EvaluateAndAssignAsync`, after loading active goals from
+  `IFleetGoalRepository`, sort them by `Priority` ascending before evaluating assignments.
+- For each goal (highest priority first), find an idle ship capable of contributing to that goal:
+  - If an idle capable ship exists: emit `AssignShipToGoalCommand`.
+  - If no idle capable ship exists but `FleetExpansion` is permitted: emit the expansion goal (at
+    its own priority level so it does not preempt an already-running expansion).
+  - If no ship is available: skip to the next goal (do not block lower-priority goals indefinitely).
+- One orchestrator evaluation produces at most one new assignment per ship (existing guiding principle).
+- Update orchestrator unit tests to verify that a higher-priority goal is assigned before a
+  lower-priority goal when both have idle ships available.
+
+Deliverables:
+
+- Ships are always assigned to the highest-priority unmet fleet goal first.
+- Lower-priority goals are not starved indefinitely when no ship is available for the top goal.
+
+#### Phase 11g: `MarketScoutingGoalEvaluator`
+
+Goal: automatically produce `MarketScouting` fleet goals (priority 10) for every market waypoint
+that has no recent price data, so early-game information gathering is handled automatically.
+
+Tasks:
+
+- Add `MarketScouting` to the `FleetGoalKind` enum in `SpaceTraders.Domain`.
+- Update `AssignShipToGoalCommandHandler` to handle `MarketScouting` the same way as `MarketCoverage`
+  (calls `IAssignmentResolver` to produce a `ScoutWaypoint` ship goal for the target waypoint).
+- Add `MarketScoutingGoalEvaluator` implementing `IFleetGoalEvaluator`:
+  - Query `IWaypointRepository` for all waypoints with the `MARKETPLACE` trait.
+  - Query `IMarketRepository` to find which markets have no cached price data or have data older
+    than a configurable threshold (default: 1 game day).
+  - For each stale or uncached market: produce a `MarketScouting` `FleetGoal` with priority 10
+    and `payload = { targetWaypointSymbol }`.
+  - Do not produce a goal for a market that already has a ship assigned to scout it (check
+    `IShipGoalRepository` for active `ScoutWaypoint` goals targeting that waypoint).
+- Register `MarketScoutingGoalEvaluator` in the DI composition root.
+- Add unit tests covering:
+  - Market with no cached data → goal produced.
+  - Market with recent data → no goal produced.
+  - Market already has a scout assigned → no duplicate goal produced.
+
+Deliverables:
+
+- At game start (and whenever market data goes stale) the orchestrator automatically queues
+  `MarketScouting` goals at highest priority, ensuring ships are sent to gather market prices
+  before committing to resource production or construction goals.
+
+#### Phase 11h: Orchestrator integration tests
 
 Tasks:
 
 - Add or update orchestrator integration-style tests covering:
+  - `MarketScouting` goal produced for uncached market → scout assigned; market with fresh data → no goal.
   - `Contract` / `Construction` resource need covered by current fleet → no new assignment.
   - `Contract` / `Construction` resource need with idle miner → idle miner assigned.
   - `Contract` / `Construction` resource need with no idle suitable ship → fleet expansion goal emitted.
@@ -510,10 +671,12 @@ Tasks:
   - `FleetExpansion` approved by budget → purchase command emitted; new ship assigned to bottleneck goal.
   - `FleetExpansion` blocked by budget → no purchase.
   - `FleetExpansion` blocked by max-ship cap → no purchase.
+  - Two goals with different priorities, one idle ship → ship assigned to higher-priority goal.
 
 Deliverables:
 
-- Full orchestrator coverage for all four `FleetGoalKind` values and the fleet-expansion purchase path.
+- Full orchestrator coverage for all five `FleetGoalKind` values, priority ordering, and the
+  fleet-expansion purchase path.
 
 ### Phase 12: Cleanup and capability registry
 
@@ -745,6 +908,396 @@ Deliverables:
 - A ship resumes goal execution at its estimated arrival time or cooldown expiry, even after a
   process restart.
 
+### Phase 15: Observability read models
+
+Goal: introduce lightweight, point-in-time read models that capture what the orchestrator is working
+towards, what every ship is assigned to, and what every ship is currently doing. These models are
+the foundation for the API endpoints and dashboard in Phases 16 and 17.
+
+Each sub-phase defines one record and one query method, then implements and tests it independently.
+
+#### Phase 15a: Define `OrchestratorGoalChain` record and `IFleetStatusQueryService` interface
+
+Tasks:
+
+- Add `ObservabilityModels.cs` to `SpaceTraders.Application/Orchestration` containing:
+  ```
+  OrchestratorGoalChain:
+    - fleetGoalId            Guid
+    - fleetGoalKind          FleetGoalKind
+    - priority               int
+    - fleetGoalDescription   string              // e.g. "Supply Jump Gate at X1-TD7-JG"
+    - resourceNeeds          ResourceNeedEntry[]
+
+  ResourceNeedEntry:
+    - tradeSymbol            string              // "BAUXITE"
+    - unitsNeeded            int                 // 500
+    - unitsDelivered         int                 // 120
+    - purposeDescription     string              // "needed for FRAME_DRONE × 2 to build Jump Gate"
+    - assignedShips          string[]            // ship symbols currently assigned
+  ```
+- Add `IFleetStatusQueryService` to `SpaceTraders.Application/Interfaces` with a single method:
+  ```csharp
+  Task<IReadOnlyList<OrchestratorGoalChain>> GetGoalChainsAsync(CancellationToken ct);
+  ```
+- Register `IFleetStatusQueryService` in the DI composition root with a stub implementation
+  that returns an empty list (concrete implementation comes in Phase 15b).
+
+Deliverables:
+
+- `OrchestratorGoalChain`, `ResourceNeedEntry`, and `IFleetStatusQueryService` exist and compile.
+- DI wiring is in place; the application starts with the stub.
+
+#### Phase 15b: Implement `GetGoalChainsAsync` and unit tests
+
+Tasks:
+
+- Add `FleetStatusQueryService` in `SpaceTraders.Application/Services` implementing
+  `IFleetStatusQueryService`:
+  - Call `IFleetGoalRepository.GetActiveAsync()` to load active fleet goals (sorted by priority).
+  - For each `Contract`/`Construction` goal: expand resource needs from the goal payload and join
+    with `IShipGoalRepository` to populate `assignedShips` and `unitsDelivered`.
+  - For `MarketScouting`, `MarketCoverage`, and `FleetExpansion` goals: return an empty
+    `resourceNeeds` array (these goals have no sub-resources to track).
+- Replace the stub registration with `FleetStatusQueryService`.
+- Add unit tests covering:
+  - Single construction goal with two resource needs and partial delivery.
+  - Contract goal with all delivery complete (still active until accepted).
+  - Goal with no assigned ships yet.
+  - Mixed list: one contract + one market scouting goal, sorted by priority ascending.
+
+Deliverables:
+
+- `GetGoalChainsAsync` returns the full orchestrator intent tree with delivery progress and assigned ships.
+
+#### Phase 15c: Define `ShipAssignmentSnapshot` record and extend `IFleetStatusQueryService`
+
+Tasks:
+
+- Add `ShipAssignmentSnapshot` to `ObservabilityModels.cs`:
+  ```
+  ShipAssignmentSnapshot:
+    - shipSymbol             string              // "X1-TD7-1"
+    - goalKind               ShipGoalKind        // MineResource | SellCargo | Idle | …
+    - goalDescription        string              // "Mining BAUXITE at X1-TD7-A3"
+    - sourceWaypoint         string?
+    - destinationWaypoint    string?
+    - fleetGoalId            Guid?               // which fleet goal this ship is serving
+    - fleetGoalDescription   string?             // e.g. "Supply Jump Gate at X1-TD7-JG"
+    - assignedAt             DateTimeOffset
+  ```
+- Extend `IFleetStatusQueryService`:
+  ```csharp
+  Task<IReadOnlyList<ShipAssignmentSnapshot>> GetAssignmentsAsync(CancellationToken ct);
+  ```
+- Add a stub implementation in `FleetStatusQueryService` that returns an empty list.
+
+Deliverables:
+
+- `ShipAssignmentSnapshot` and `GetAssignmentsAsync` exist and compile.
+
+#### Phase 15d: Implement `GetAssignmentsAsync` and unit tests
+
+Tasks:
+
+- Implement `FleetStatusQueryService.GetAssignmentsAsync`:
+  - Load all ships from `IShipRepository`.
+  - For each ship, read its active `ShipGoal` from `IShipGoalRepository` (may be null / Idle).
+  - Join with `IFleetGoalRepository` to look up which `FleetGoal` the ship is serving
+    (match on `GoalId` carried in the ship goal payload).
+  - Derive `goalDescription` from goal kind and waypoints (e.g. `"Mining BAUXITE at X1-TD7-A3"`).
+- Add unit tests covering:
+  - Ship with active `MineResource` goal linked to a construction fleet goal.
+  - Ship with `Idle` goal (no fleet goal link).
+  - Ship with no goal set (treat as Idle).
+  - Multiple ships, different goal kinds.
+
+Deliverables:
+
+- Every ship's assignment is queryable with the fleet goal it serves.
+
+#### Phase 15e: Define `ShipActivitySnapshot` record and extend `IFleetStatusQueryService`
+
+Tasks:
+
+- Add `ShipActivitySnapshot` to `ObservabilityModels.cs`:
+  ```
+  ShipActivitySnapshot:
+    - shipSymbol             string
+    - localStatus            ShipLocalStatus     // InOrbit | Docked | InTransit
+    - currentWaypoint        string?             // null when InTransit
+    - destinationWaypoint    string?             // set when InTransit
+    - estimatedArrival       DateTimeOffset?
+    - onCooldown             bool
+    - cooldownExpiresAt      DateTimeOffset?
+    - cargoUsed              int
+    - cargoCapacity          int
+    - fuelCurrent            int
+    - fuelCapacity           int
+    - activityDescription    string              // e.g. "Moving to X1-TD7-A3 (arrives 14:23 UTC)"
+  ```
+- Extend `IFleetStatusQueryService`:
+  ```csharp
+  Task<IReadOnlyList<ShipActivitySnapshot>> GetShipActivitiesAsync(CancellationToken ct);
+  Task<ShipActivitySnapshot?> GetShipActivityAsync(string shipSymbol, CancellationToken ct);
+  ```
+- Add stub implementations that return empty list / null.
+
+Deliverables:
+
+- `ShipActivitySnapshot` and both activity query methods exist and compile.
+
+#### Phase 15f: Implement activity snapshots and unit tests
+
+Tasks:
+
+- Implement `FleetStatusQueryService.GetShipActivitiesAsync` and `GetShipActivityAsync`:
+  - Load ship state from `IShipRepository` (status, nav, cargo, fuel).
+  - Load scheduled event from `IShipEventScheduler` (arrival time or cooldown expiry).
+  - Derive `activityDescription` using a private static factory:
+    - `InTransit` → `"Moving to {dest} (arrives {time})"`
+    - `InOrbit` at source, on cooldown → `"Extracting {symbol} (cooldown {N} s)"`
+    - `InOrbit` at source, ready → `"In orbit at {waypoint}, ready to extract"`
+    - `Docked`, selling → `"Docked at {waypoint}, selling cargo"`
+    - `Idle` → `"Idle at {waypoint}"`
+- Add unit tests for each `activityDescription` branch.
+- Add a unit test confirming `GetShipActivityAsync` returns `null` for an unknown symbol.
+
+Deliverables:
+
+- Every ship's live state is queryable as a structured snapshot with a human-readable summary.
+
+---
+
+### Phase 16: Fleet status API endpoints
+
+Goal: expose the three read models from Phase 15 as HTTP endpoints so that any client (a browser
+dashboard, monitoring tool, or integration test) can poll the current fleet state.
+
+#### Phase 16a: Controller and route definitions
+
+Tasks:
+
+- Add `FleetStatusController` to `SpaceTraders.Api/Controllers` with three GET endpoints:
+  - `GET /api/fleet/goal-chains` → returns `IReadOnlyList<OrchestratorGoalChain>` as JSON.
+  - `GET /api/fleet/assignments` → returns `IReadOnlyList<ShipAssignmentSnapshot>` as JSON.
+  - `GET /api/fleet/activity` → returns `IReadOnlyList<ShipActivitySnapshot>` as JSON.
+  - `GET /api/fleet/activity/{shipSymbol}` → returns `ShipActivitySnapshot?` for a single ship.
+- All endpoints are read-only (`[HttpGet]`), require no request body, and return `200 OK` with
+  JSON or `404 Not Found` for the single-ship variant when the symbol is unknown.
+- Wire `IFleetStatusQueryService` into the controller via constructor injection.
+
+Deliverables:
+
+- Fleet status, assignment, and activity data is accessible over HTTP.
+
+#### Phase 16b: Response DTO mapping
+
+Tasks:
+
+- Add `FleetGoalChainDto`, `ShipAssignmentDto`, and `ShipActivityDto` records in
+  `SpaceTraders.Api/Dtos` that are the JSON-serializable shapes (camelCase property names, no
+  domain enums directly on the wire — map to strings).
+- Add `FleetStatusMapper` (static helper or AutoMapper profile) that converts domain read models to
+  DTOs.
+- Ensure `estimatedArrival` and `cooldownExpiresAt` are serialized as ISO 8601 strings.
+
+Deliverables:
+
+- API responses are stable, versioning-friendly JSON shapes decoupled from internal domain types.
+
+#### Phase 16c: Caching and freshness
+
+Tasks:
+
+- Wrap `IFleetStatusQueryService` calls in a short-lived in-memory cache (5-second TTL) so that a
+  dashboard polling every second does not trigger N database reads per request.
+- Add a `Cache-Control: max-age=5` response header so clients can respect the TTL without
+  explicitly polling faster than the data changes.
+
+Deliverables:
+
+- Fleet status endpoints are safe to poll at dashboard refresh rates without overloading the
+  database.
+
+#### Phase 16d: API endpoint tests
+
+Tasks:
+
+- Add integration-style controller tests:
+  - `GetGoalChains` returns the correct chain count and resource need entries.
+  - `GetAssignments` maps all active ship goals to DTOs correctly.
+  - `GetActivity` returns a snapshot per ship with correct `activityDescription`.
+  - `GetActivity/{shipSymbol}` returns `404` for an unknown symbol.
+
+Deliverables:
+
+- All four endpoints have request/response-level test coverage.
+
+---
+
+### Phase 17: Front-end fleet dashboard
+
+Goal: build a single-page dashboard that visualises what the orchestrator is working towards, which
+ship is assigned to what, and what every ship is currently doing. The dashboard refreshes
+automatically and requires no back-end change to show new data.
+
+#### Phase 17a: Project scaffold
+
+Tasks:
+
+- Add a `SpaceTraders.Dashboard` project (Blazor WebAssembly or a lightweight Vite + TypeScript SPA,
+  depending on the existing front-end stack) under the solution root.
+- Configure it to proxy `/api/*` requests to the back-end during development.
+- Add three top-level pages / route components:
+  - `/` → redirect to `/dashboard`
+  - `/dashboard` → combined fleet overview (all three panels on one page)
+  - `/ships/{symbol}` → detail view for a single ship
+
+Deliverables:
+
+- Project scaffolds and compiles with a placeholder "Fleet Dashboard" heading rendered in the browser.
+
+#### Phase 17b: Orchestrator goal chain panel
+
+Tasks:
+
+- Add a `GoalChainPanel` component that fetches `GET /api/fleet/goal-chains` every 10 seconds.
+- Render each `OrchestratorGoalChain` as a collapsible card with:
+  - Header: top-level goal kind badge + `fleetGoalDescription`
+    (e.g. **[CONSTRUCTION]** Supply Jump Gate at X1-TD7-JG).
+  - Body: one row per `ResourceNeedEntry` showing:
+    - Trade symbol chip (e.g. **BAUXITE**).
+    - Progress bar: `unitsDelivered / unitsNeeded`.
+    - `purposeDescription` tooltip (e.g. "needed for FRAME_DRONE × 2").
+    - Assigned ships as clickable chips that deep-link to `/ships/{symbol}`.
+- Show a "No active goals" placeholder when the list is empty.
+
+Deliverables:
+
+- The orchestrator's current intent is visible at a glance, including how far along each resource
+  need is and which ships are covering it.
+
+#### Phase 17c: Ship assignments panel
+
+Tasks:
+
+- Add a `AssignmentsPanel` component that fetches `GET /api/fleet/assignments` every 10 seconds.
+- Render a sortable table with columns:
+  | Ship | Goal | Source | Destination | Serving |
+  |---|---|---|---|---|
+  | X1-TD7-1 | Mine BAUXITE | X1-TD7-A3 | — | Supply Jump Gate at X1-TD7-JG |
+- Highlight ships whose goal is `Idle` in a muted style.
+- `Ship` column links to `/ships/{symbol}`.
+- Allow filtering by goal kind (Mine / Siphon / Sell / Scout / Idle / …) via a dropdown.
+
+Deliverables:
+
+- All ship assignments are visible in a single table with context about why each ship has its goal.
+
+#### Phase 17d: Ship activity panel
+
+Tasks:
+
+- Add a `ActivityPanel` component that fetches `GET /api/fleet/activity` every 5 seconds.
+- Render a card per ship showing:
+  - Ship symbol and a status badge (IN_TRANSIT / IN_ORBIT / DOCKED) with colour coding.
+  - `activityDescription` as the primary text line
+    (e.g. "Moving to X1-TD7-A3 · arrives 14:23 UTC").
+  - Cargo fill bar: `cargoUsed / cargoCapacity`.
+  - Fuel fill bar: `fuelCurrent / fuelCapacity`.
+  - A countdown timer for `estimatedArrival` or `cooldownExpiresAt` when applicable, ticking
+    down in the browser without additional API calls.
+- Clicking a card navigates to `/ships/{symbol}`.
+
+Deliverables:
+
+- Real-time (5-second cadence) visibility into what every ship is physically doing right now.
+
+#### Phase 17e: Ship goal history persistence
+
+Goal: persist a short history of completed and blocked goals per ship so the detail page can show
+what a ship has been doing recently.
+
+Tasks:
+
+- Add `ship_goal_history` table migration:
+  ```sql
+  ship_goal_history (
+      id            UUID        NOT NULL PRIMARY KEY,
+      ship_symbol   TEXT        NOT NULL,
+      goal_kind     TEXT        NOT NULL,
+      goal_id       UUID        NOT NULL,
+      outcome       TEXT        NOT NULL,  -- 'Completed' | 'Blocked'
+      reason        TEXT,                  -- blocking reason if outcome = 'Blocked'
+      started_at    TIMESTAMPTZ NOT NULL,
+      ended_at      TIMESTAMPTZ NOT NULL
+  )
+  ```
+- Add `IShipGoalHistoryRepository` to `SpaceTraders.Application/Interfaces/Repositories`:
+  ```csharp
+  Task AppendAsync(ShipGoalHistoryEntry entry, CancellationToken ct);
+  Task<IReadOnlyList<ShipGoalHistoryEntry>> GetRecentAsync(string shipSymbol, int limit, CancellationToken ct);
+  ```
+- Implement `ShipGoalHistoryRepository` in `SpaceTraders.Infrastructure.Persistence`.
+- Update `ShipGoalExecutorService` to write a history entry when it publishes `GoalCompletedEvent`
+  or `GoalBlockedEvent`.
+- Add unit tests for repository roundtrip and that the executor writes entries on completion and blockage.
+
+Deliverables:
+
+- Goal history is persisted per ship and queryable.
+
+#### Phase 17f: Ship goal history API endpoint
+
+Tasks:
+
+- Add `GET /api/fleet/activity/{shipSymbol}/history?limit=20` to `FleetStatusController`.
+- Add `ShipGoalHistoryDto` record in `SpaceTraders.Api/Dtos` and update `FleetStatusMapper`.
+- Add `Task<IReadOnlyList<ShipGoalHistoryEntry>> GetShipGoalHistoryAsync(string shipSymbol, int limit, CancellationToken ct)`
+  to `IFleetStatusQueryService` and implement it via `IShipGoalHistoryRepository`.
+- Add controller test: returns the correct number of entries, `404` for unknown symbol.
+
+Deliverables:
+
+- Goal history is accessible over HTTP.
+
+#### Phase 17g: Single-ship detail page
+
+Tasks:
+
+- Add a `/ships/{symbol}` page that combines:
+  - Live `ShipActivitySnapshot` (auto-refresh every 5 s, from `GET /api/fleet/activity/{symbol}`).
+  - The ship's current `ShipAssignmentSnapshot` (from `GET /api/fleet/assignments`, filtered client-side).
+  - The `OrchestratorGoalChain` entry(ies) that reference this ship (from `GET /api/fleet/goal-chains`,
+    filtered client-side).
+  - A read-only list of the last 20 goal history entries (from `GET /api/fleet/activity/{symbol}/history`).
+- Render history as a timeline: outcome badge (Completed / Blocked), goal kind, duration.
+
+Deliverables:
+
+- Operators can drill into any individual ship to see its current state, assignment context, and
+  a short history of recently completed or blocked goals.
+
+#### Phase 17h: Front-end tests
+
+Tasks:
+
+- Add component tests (Vitest + Testing Library, or bUnit for Blazor) for:
+  - `GoalChainPanel` renders the correct number of goal cards, priority order, and progress bars
+    from mock API data.
+  - `AssignmentsPanel` renders all rows, sorts correctly, and filters by goal kind.
+  - `ActivityPanel` renders status badges, fill bars, and countdown timers from mock data.
+  - The countdown timer counts down in the browser and does not trigger extra API calls.
+  - Single-ship detail page renders all four sections (activity, assignment, goal chain, history)
+    from mock API data.
+- Add an end-to-end smoke test (Playwright) that loads `/dashboard` against the running back-end
+  and asserts that all three panels contain at least one entry.
+
+Deliverables:
+
+- Dashboard components have unit-level test coverage and a smoke end-to-end test.
+
 ---
 
 ## Comparison: Before and After
@@ -817,6 +1370,9 @@ For each goal executor, test the full status × state matrix:
 
 ### Orchestrator tests
 
+- `MarketScouting` goal produced for market with no cached data → scout assigned
+- `MarketScouting` goal NOT produced when market has fresh data
+- `MarketScouting` goal NOT produced when a scout is already assigned to that market
 - Contract / Construction resource need covered by current fleet → no new assignment
 - Contract / Construction resource need with idle miner → assign idle miner
 - Contract / Construction resource need with no idle suitable ship → fleet expansion goal emitted
@@ -825,6 +1381,7 @@ For each goal executor, test the full status × state matrix:
 - FleetExpansion approved by budget → purchase command emitted; new ship assigned to bottleneck goal
 - FleetExpansion blocked by budget → no purchase
 - FleetExpansion blocked by max-ship cap → no purchase
+- Two goals with different priorities, one idle ship → ship assigned to higher-priority goal
 
 ### Integration-style tests
 
@@ -843,11 +1400,16 @@ For each goal executor, test the full status × state matrix:
   external coordination after goal assignment.
 - A ship given a `PatrolMarket` or `ScoutWaypoint` goal reaches and monitors the target market
   without any external coordination after goal assignment.
+- The orchestrator maintains a **prioritised list of multiple simultaneous fleet goals** and assigns
+  idle ships to the highest-priority unmet goal first.
+- At game start, `MarketScouting` goals (priority 10) are automatically produced for every market
+  without fresh price data and resolved before any resource production goals are actioned.
 - The orchestrator never contains a waypoint symbol; all waypoints are resolved by the
   assignment resolver.
-- All four `FleetGoalKind` values are handled: `Contract` and `Construction` via
-  `ResourceProductionGoal`, `MarketCoverage` directly to a scout/patrol ship goal, and
-  `FleetExpansion` via a purchase command.
+- All five `FleetGoalKind` values are handled: `MarketScouting` and `MarketCoverage` to scout/patrol
+  ship goals, `Contract` and `Construction` via `ResourceProductionGoal`, and `FleetExpansion` via
+  a purchase command.
+- Fleet goals are persisted in the `fleet_goals` table and survive a process restart.
 - Capability mismatches are surfaced as `GoalBlockedEvent` within one execution step.
 - Fleet expansion transitions from advisory to actionable: a purchase command is emitted and the
   new ship is assigned immediately.
