@@ -820,7 +820,7 @@ Deliverables:
 - ✅ Goal executors contain no publish calls for instant ship actions; all instant-action sequencing
   is internal to `ExecuteStepAsync`.
 
-#### Phase 13d: Convert Tier 2 events
+#### Phase 13d: Convert Tier 2 events ✅
 
 Tasks:
 
@@ -829,10 +829,21 @@ Tasks:
   - Keep the `IEventPublisher.Publish` call in the goal executor or command handler for observability.
   - Delete the handler class that previously reacted to the event.
 
+Implementation notes:
+
+- `FleetExpansionDecisionHandler.Handle(ShipCargoSoldEvent)` was the only control-flow handler
+  reacting to a Tier 2 event. It was removed and replaced with `Handle(GoalCompletedEvent)` so
+  fleet expansion evaluation is now triggered by the Tier 1 goal lifecycle event instead.
+- Observability-only handlers (`LogActivityHandler`, `LedgerEntryHandler`) for Tier 2 events are
+  intentionally kept — they write to the activity log and financial ledger for dashboards/audit
+  trails without gating any control flow.
+- `FleetExpansionDecisionHandler.Handle(ContractFulfilledEvent)` is retained as `ContractFulfilledEvent`
+  was not in the Tier 2 classification scope for this phase.
+
 Deliverables:
 
-- Tier 2 events are published for observability (dashboards, integration tests) but no handler
-  class reacts to them.
+- ✅ Tier 2 events are published for observability (dashboards, integration tests) but no
+  control-flow handler class reacts to them.
 
 #### Phase 13e: Update tests
 
