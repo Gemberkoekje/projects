@@ -1,7 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -46,7 +46,6 @@ public sealed class FleetOrchestratorTests
             Priority: 100,
             ContractId: "c1",
             TradeSymbol: "IRON_ORE",
-            DestinationWaypoint: "X1-DEST",
             RemainingUnits: 50);
 
         var orchestrator = new FleetOrchestrator(
@@ -59,13 +58,12 @@ public sealed class FleetOrchestratorTests
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<AssignShipCommand>(c =>
+            Arg.Is<AssignShipToGoalCommand>(c =>
                 c.ShipSymbol == "HAULER-1" &&
-                c.AssignmentType == "Contract" &&
-                c.ContractId == "c1" &&
-                c.DestWaypoint == "X1-DEST" &&
-                c.CargoSymbol == "IRON_ORE" &&
-                c.RequiredUnits == 50),
+                c.Goal.Kind == FleetGoalKind.Contract &&
+                c.Goal.ContractId == "c1" &&
+                c.Goal.TradeSymbol == "IRON_ORE" &&
+                c.Goal.RemainingUnits == 50),
             Arg.Any<DeliveryOptions>());
     }
 
@@ -77,7 +75,7 @@ public sealed class FleetOrchestratorTests
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
         var assignments = EmptyAssignments();
 
-        var contract = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", DestinationWaypoint: "X1-D", RemainingUnits: 1);
+        var contract = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
         var market = new FleetGoal(FleetGoalKind.MarketCoverage, "M", 40, OriginWaypoint: "X1-MKT");
 
         var orchestrator = new FleetOrchestrator(
@@ -90,7 +88,7 @@ public sealed class FleetOrchestratorTests
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<AssignShipCommand>(c => c.AssignmentType == "Contract"),
+            Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.Contract),
             Arg.Any<DeliveryOptions>());
     }
 
@@ -105,7 +103,7 @@ public sealed class FleetOrchestratorTests
             new ShipAssignmentDto("BUSY-1", "Trade", null, null, null, null, 0, DateTimeOffset.UtcNow, null),
         ]);
 
-        var goal = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", DestinationWaypoint: "X1-D", RemainingUnits: 5);
+        var goal = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 5);
 
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
@@ -116,7 +114,7 @@ public sealed class FleetOrchestratorTests
 
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
-        await bus.DidNotReceive().SendAsync(Arg.Any<AssignShipCommand>(), Arg.Any<DeliveryOptions>());
+        await bus.DidNotReceive().SendAsync(Arg.Any<AssignShipToGoalCommand>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
@@ -138,15 +136,15 @@ public sealed class FleetOrchestratorTests
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<AssignShipCommand>(c =>
+            Arg.Is<AssignShipToGoalCommand>(c =>
                 c.ShipSymbol == "PROBE-1" &&
-                c.AssignmentType == "MarketProbe" &&
-                c.OriginWaypoint == "X1-MKT-1"),
+                c.Goal.Kind == FleetGoalKind.MarketCoverage &&
+                c.Goal.OriginWaypoint == "X1-MKT-1"),
             Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task EvaluateAndAssignAsync_FleetExpansionGoal_DoesNotIssueAssignShipCommand()
+    public async Task EvaluateAndAssignAsync_FleetExpansionGoal_EmitsAssignShipToGoalCommand()
     {
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
@@ -163,6 +161,9 @@ public sealed class FleetOrchestratorTests
 
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
-        await bus.DidNotReceive().SendAsync(Arg.Any<AssignShipCommand>(), Arg.Any<DeliveryOptions>());
+        // FleetExpansion is dispatched via AssignShipToGoalCommand; the handler handles purchasing.
+        await bus.Received(1).SendAsync(
+            Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.FleetExpansion),
+            Arg.Any<DeliveryOptions>());
     }
 }

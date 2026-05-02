@@ -506,7 +506,7 @@ Deliverables:
 
 - ✅ `AssignShipToGoalCommand` exists and its handler routes each goal kind to the correct resolver path.
 
-#### Phase 11b: Update `FleetOrchestrator` to emit `AssignShipToGoalCommand`
+#### Phase 11b: Update `FleetOrchestrator` to emit `AssignShipToGoalCommand` ✅
 
 Tasks:
 
@@ -522,8 +522,8 @@ Tasks:
 
 Deliverables:
 
-- `FleetOrchestrator` no longer references waypoint symbols directly.
-- All `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`.
+- `FleetOrchestrator` no longer references waypoint symbols directly. ✅
+- All `FleetGoalKind` values are dispatched via `AssignShipToGoalCommand`. ✅
 
 #### Phase 11c: Actionable fleet expansion
 

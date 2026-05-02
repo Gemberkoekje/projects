@@ -73,10 +73,10 @@ public sealed class BaselineAutomationIntegrationTests
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<AssignShipCommand>(command =>
+            Arg.Is<AssignShipToGoalCommand>(command =>
                 command.ShipSymbol == CommandShipSymbol
-                && command.AssignmentType == "MarketProbe"
-                && command.OriginWaypoint == "X1-BQ60-A1"),
+                && command.Goal.Kind == FleetGoalKind.MarketCoverage
+                && command.Goal.OriginWaypoint == "X1-BQ60-A1"),
             Arg.Any<DeliveryOptions>());
     }
 

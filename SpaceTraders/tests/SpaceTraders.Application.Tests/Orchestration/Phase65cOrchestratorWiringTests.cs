@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
+using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -15,19 +16,21 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 /// <summary>
 /// Phase 6.5c integration-style tests.
 /// Phase 7b: ShipDockedIdleEventHandler tests removed (handler deleted).
+/// Phase 11b: orchestrator now emits <see cref="AssignShipToGoalCommand"/> instead of
+///   <see cref="AssignShipCommand"/>; fleet expansion is dispatched via the same command.
 /// Remaining tests verify that:
-///   1. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipCommand"/> and never issues
+///   1. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipToGoalCommand"/> and never issues
 ///      low-level Dock/Orbit/Navigate commands directly.
 ///   2. After the orchestrator assigns a ship, a subsequent <see cref="ShipAutomationTickEvent"/>
 ///      causes the planner to execute exactly one command.
-///   3. Fleet expansion is treated as an advisory goal only; purchasing ships is out of scope
-///      for the orchestrator.
+///   3. Fleet expansion is dispatched via <see cref="AssignShipToGoalCommand"/>; the handler
+///      handles purchasing.
 /// </summary>
 public sealed class Phase65cOrchestratorWiringTests
 {
 
     [Fact]
-    public async Task Orchestrator_WhenIdleShipAndContractGoal_EmitsAssignShipCommandOnly()
+    public async Task Orchestrator_WhenIdleShipAndContractGoal_EmitsAssignShipToGoalCommandOnly()
     {
         var bus = Substitute.For<IMessageBus>();
 
@@ -44,7 +47,6 @@ public sealed class Phase65cOrchestratorWiringTests
             Priority: 100,
             ContractId: "c1",
             TradeSymbol: "IRON_ORE",
-            DestinationWaypoint: "X1-DEST",
             RemainingUnits: 10);
 
         var evaluator = Substitute.For<IFleetGoalEvaluator>();
@@ -59,12 +61,12 @@ public sealed class Phase65cOrchestratorWiringTests
 
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
-        // Orchestrator must emit AssignShipCommand — never low-level navigation commands.
+        // Orchestrator must emit AssignShipToGoalCommand — never low-level navigation commands.
         await bus.Received(1).SendAsync(
-            Arg.Is<AssignShipCommand>(c =>
+            Arg.Is<AssignShipToGoalCommand>(c =>
                 c.ShipSymbol == "HAULER-1" &&
-                c.AssignmentType == "Contract" &&
-                c.ContractId == "c1"),
+                c.Goal.Kind == FleetGoalKind.Contract &&
+                c.Goal.ContractId == "c1"),
             Arg.Any<DeliveryOptions>());
 
         // Verify no Dock / Orbit / Navigate commands were issued by the orchestrator.
@@ -74,11 +76,11 @@ public sealed class Phase65cOrchestratorWiringTests
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
-    // Fleet expansion — advisory goal only; no purchase-ship command issued
+    // Fleet expansion — dispatched via AssignShipToGoalCommand; handler does purchasing
     // ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Orchestrator_FleetExpansionGoal_IsAdvisoryOnly_NoPurchaseOrNavigationCommand()
+    public async Task Orchestrator_FleetExpansionGoal_EmitsAssignShipToGoalCommand_NoPurchaseOrNavigationCommand()
     {
         var bus = Substitute.For<IMessageBus>();
 
@@ -107,9 +109,15 @@ public sealed class Phase65cOrchestratorWiringTests
 
         await orchestrator.EvaluateAndAssignAsync(CancellationToken.None);
 
-        // Fleet expansion is advisory: no command of any kind should be sent.
-        await bus.DidNotReceive().SendAsync(Arg.Any<AssignShipCommand>(), Arg.Any<DeliveryOptions>());
-        await bus.DidNotReceive().SendAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        // Fleet expansion is dispatched via AssignShipToGoalCommand; the handler handles purchasing.
+        await bus.Received(1).SendAsync(
+            Arg.Is<AssignShipToGoalCommand>(c => c.Goal.Kind == FleetGoalKind.FleetExpansion),
+            Arg.Any<DeliveryOptions>());
+
+        // Verify no low-level navigation commands were issued by the orchestrator.
+        await bus.DidNotReceive().SendAsync(Arg.Is<DockShipCommand>(c => c != null), Arg.Any<DeliveryOptions>());
+        await bus.DidNotReceive().SendAsync(Arg.Is<OrbitShipCommand>(c => c != null), Arg.Any<DeliveryOptions>());
+        await bus.DidNotReceive().SendAsync(Arg.Is<NavigateShipCommand>(c => c != null), Arg.Any<DeliveryOptions>());
     }
 
     // ──────────────────────────────────────────────────────────────────────────────

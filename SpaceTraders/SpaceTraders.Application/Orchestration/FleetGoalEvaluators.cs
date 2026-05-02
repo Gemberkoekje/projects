@@ -41,7 +41,6 @@ public sealed class ContractGoalEvaluator(IContractRepository contracts) : IFlee
                     Priority: 100,
                     ContractId: contract.Id,
                     TradeSymbol: deliverable.TradeSymbol,
-                    DestinationWaypoint: deliverable.DestinationSymbol,
                     RemainingUnits: remaining,
                     Deadline: contract.TermsDeadline ?? contract.Expiration));
             }
