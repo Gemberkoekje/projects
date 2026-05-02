@@ -31,60 +31,60 @@ public sealed class SellCargoGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            if (!atDest)
+            if (atDest)
             {
-                await dockedCommands.OrbitAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Orbiting to navigate to sell destination.");
+                return await SellOrCompleteAsync(ship, sellGoal, ctx, ct);
             }
 
-            // At destination: sell the next unsold trade good.
-            if (ship.CargoInventory is not null)
-            {
-                foreach (var symbol in sellGoal.TradeSymbols)
-                {
-                    var cargo = ship.CargoInventory.FirstOrDefault(c =>
-                        c.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase) && c.Units > 0);
-                    if (cargo is null) continue;
-
-                    var sellPrice = ctx.CurrentMarketSnapshot?.TradeGoods
-                        .FirstOrDefault(g => g.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0;
-                    if (sellPrice > 0)
-                    {
-                        await dockedCommands.SellCargoAsync(ship.Symbol, cargo.Symbol, cargo.Units, ct);
-                        return GoalExecutionResult.Progressing($"Selling {cargo.Units}x {cargo.Symbol}.");
-                    }
-                }
-            }
-
-            return GoalExecutionResult.Completed("All listed cargo has been sold.");
+            await dockedCommands.OrbitAsync(ship.Symbol, ct);
         }
-
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         if (atDest)
         {
             await inOrbitCommands.DockAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("At sell destination; docking.");
+            return await SellOrCompleteAsync(ship, sellGoal, ctx, ct);
         }
 
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, sellGoal.DestinationWaypointSymbol, ct);
         return GoalExecutionResult.Progressing($"Navigating to sell destination {sellGoal.DestinationWaypointSymbol}.");
+    }
+
+    private async Task<GoalExecutionResult> SellOrCompleteAsync(ShipModel ship, SellCargoGoal sellGoal, ShipGoalContext ctx, CancellationToken ct)
+    {
+        if (ship.CargoInventory is not null)
+        {
+            foreach (var symbol in sellGoal.TradeSymbols)
+            {
+                var cargo = ship.CargoInventory.FirstOrDefault(c =>
+                    c.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase) && c.Units > 0);
+                if (cargo is null) continue;
+
+                var sellPrice = ctx.CurrentMarketSnapshot?.TradeGoods
+                    .FirstOrDefault(g => g.Symbol.Equals(symbol, StringComparison.OrdinalIgnoreCase))?.SellPrice ?? 0;
+                if (sellPrice > 0)
+                {
+                    await dockedCommands.SellCargoAsync(ship.Symbol, cargo.Symbol, cargo.Units, ct);
+                    return GoalExecutionResult.Progressing($"Selling {cargo.Units}x {cargo.Symbol}.");
+                }
+            }
+        }
+
+        return GoalExecutionResult.Completed("All listed cargo has been sold.");
     }
 }

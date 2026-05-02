@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
@@ -75,21 +76,22 @@ public sealed class MoveToWaypointGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_NoFuelTank_SwitchesToDrift()
+    public async Task ExecuteStepAsync_NoFuelTank_PatchesDriftAndNavigates()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "IN_ORBIT", "CRUISE", 0, 0), Goal(), Ctx(), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        result.Reason.Should().Contain("DRIFT");
+        await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
+        await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_WrongFlightMode_PatchesBeforeNavigating()
+    public async Task ExecuteStepAsync_WrongFlightMode_PatchesAndNavigates()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", "IN_ORBIT", "CRUISE"), Goal(), Ctx(recommended: "BURN"), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        result.Reason.Should().Contain("BURN");
-        await _inOrbit.DidNotReceive().NavigateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "BURN"), Arg.Any<CancellationToken>());
+        await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

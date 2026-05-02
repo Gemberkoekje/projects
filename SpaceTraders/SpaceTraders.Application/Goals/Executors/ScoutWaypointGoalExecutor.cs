@@ -36,42 +36,40 @@ public sealed class ScoutWaypointGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            if (!atTarget)
+            if (atTarget)
             {
-                await dockedCommands.OrbitAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Orbiting to navigate to scout target.");
+                await waypointVisit.MarkVisitedAsync(ship.WaypointSymbol ?? string.Empty, ct);
+                await marketRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
+                await shipyardRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
+                return GoalExecutionResult.Completed("Scout data refreshed at target waypoint.");
             }
 
-            // At target and docked: refresh data and complete.
-            await waypointVisit.MarkVisitedAsync(ship.WaypointSymbol ?? string.Empty, ct);
-            await marketRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
-            await shipyardRefresh.RefreshIfApplicableAsync(ship.WaypointSymbol ?? string.Empty, ct);
-            return GoalExecutionResult.Completed("Scout data refreshed at target waypoint.");
+            await dockedCommands.OrbitAsync(ship.Symbol, ct);
         }
-
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         if (atTarget)
         {
             await inOrbitCommands.DockAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("At scout target; docking to refresh data.");
+            await waypointVisit.MarkVisitedAsync(scoutGoal.TargetWaypointSymbol, ct);
+            await marketRefresh.RefreshIfApplicableAsync(scoutGoal.TargetWaypointSymbol, ct);
+            await shipyardRefresh.RefreshIfApplicableAsync(scoutGoal.TargetWaypointSymbol, ct);
+            return GoalExecutionResult.Completed("Scout data refreshed at target waypoint.");
         }
 
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, scoutGoal.TargetWaypointSymbol, ct);

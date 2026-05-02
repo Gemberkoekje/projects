@@ -804,7 +804,7 @@ Tasks:
 
 Deliverables:
 
-- Goal executors contain no publish calls for instant ship actions; all instant-action sequencing
+- ✅ Goal executors contain no publish calls for instant ship actions; all instant-action sequencing
   is internal to `ExecuteStepAsync`.
 
 #### Phase 13d: Convert Tier 2 events

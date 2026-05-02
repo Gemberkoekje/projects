@@ -1,5 +1,6 @@
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
@@ -61,12 +62,26 @@ public sealed class DeliverCargoGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_InOrbit_AtDest_Docks()
+    public async Task ExecuteStepAsync_InOrbit_AtDest_NoCargo_DocksAndCompletes()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-DEST"), Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
+        result.Outcome.Should().Be(GoalExecutionOutcome.Completed);
+        await _inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_InOrbit_AtDest_WithCargo_DocksAndDelivers()
+    {
+        var inventory = new List<CargoItemModel> { new("IRON_ORE", 15) };
+        var ship = Ship("X1-AB-DEST", "IN_ORBIT", inventory);
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
+
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
         await _inOrbit.Received(1).DockAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await _docked.Received(1).DeliverContractAsync(
+            "CONTRACT-1", "SHIP-1", "IRON_ORE", 15, "X1-AB-DEST", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -101,11 +116,12 @@ public sealed class DeliverCargoGoalExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteStepAsync_NoFuelTank_SwitchesToDrift()
+    public async Task ExecuteStepAsync_NoFuelTank_PatchesDriftAndNavigates()
     {
         var result = await CreateExecutor().ExecuteStepAsync(Ship("X1-AB-WP1", fuelCap: 0), Goal("X1-AB-DEST"), new ShipGoalContext(), CancellationToken.None);
 
         result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
-        result.Reason.Should().Contain("DRIFT");
+        await _bus.Received(1).InvokeAsync(Arg.Is<PatchShipNavCommand>(c => c.FlightMode == "DRIFT"), Arg.Any<CancellationToken>());
+        await _inOrbit.Received(1).NavigateAsync("SHIP-1", Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

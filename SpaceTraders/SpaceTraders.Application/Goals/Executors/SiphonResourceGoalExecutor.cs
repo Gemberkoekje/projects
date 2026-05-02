@@ -41,37 +41,31 @@ public sealed class SiphonResourceGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            return await PlanDockedAsync(ship, ctx, ct);
-        }
+            var sellDecision = TrySellCargo(ship, ctx);
+            if (sellDecision is not null)
+            {
+                await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
+                return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
+            }
 
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+            if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
+            {
+                await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
+                return GoalExecutionResult.Progressing("Refueling at market.");
+            }
+
+            await dockedCommands.OrbitAsync(ship.Symbol, ct);
+        }
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         var atSource = string.Equals(ship.WaypointSymbol, siphonGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase);
         return atSource
             ? await PlanAtSourceAsync(ship, siphonGoal, ctx, ct)
             : await PlanNavigatingToSourceAsync(ship, siphonGoal, ctx, ct);
-    }
-
-    private async Task<GoalExecutionResult> PlanDockedAsync(ShipModel ship, ShipGoalContext ctx, CancellationToken ct)
-    {
-        var sellDecision = TrySellCargo(ship, ctx);
-        if (sellDecision is not null)
-        {
-            await dockedCommands.SellCargoAsync(ship.Symbol, sellDecision.Value.TradeSymbol, sellDecision.Value.Units, ct);
-            return GoalExecutionResult.Progressing($"Selling {sellDecision.Value.Units}x {sellDecision.Value.TradeSymbol}.");
-        }
-
-        if (ship.FuelCapacity > 0 && ship.FuelCurrent < ship.FuelCapacity && ctx.CurrentWaypointSellsFuel)
-        {
-            await dockedCommands.RefuelAsync(ship.Symbol, fromCargo: false, ct);
-            return GoalExecutionResult.Progressing("Refueling at market.");
-        }
-
-        await dockedCommands.OrbitAsync(ship.Symbol, ct);
-        return GoalExecutionResult.Progressing("Orbiting to continue siphon cycle.");
     }
 
     private async Task<GoalExecutionResult> PlanAtSourceAsync(ShipModel ship, SiphonResourceGoal goal, ShipGoalContext ctx, CancellationToken ct)
@@ -107,7 +101,6 @@ public sealed class SiphonResourceGoalExecutor(
                 if (!string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
                 {
                     await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-                    return GoalExecutionResult.Progressing("Critically low fuel; switching to DRIFT.");
                 }
                 await inOrbitCommands.NavigateAsync(ship.Symbol, ctx.FuelMarketWaypoint, ct);
                 return GoalExecutionResult.Progressing("Critically low fuel; navigating to fuel market.");
@@ -117,15 +110,12 @@ public sealed class SiphonResourceGoalExecutor(
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, goal.SourceWaypointSymbol, ct);

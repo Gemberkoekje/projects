@@ -36,22 +36,14 @@ public sealed class SupplyConstructionGoalExecutor(
 
         if (ship.LocalStatus == ShipLocalStatus.Docked)
         {
-            if (!atSite)
-            {
-                await dockedCommands.OrbitAsync(ship.Symbol, ct);
-                return GoalExecutionResult.Progressing("Orbiting to navigate to construction site.");
-            }
-
-            // At site: orbit to supply (supply requires in-orbit).
             await dockedCommands.OrbitAsync(ship.Symbol, ct);
-            return GoalExecutionResult.Progressing("Orbiting at construction site to supply.");
         }
-
-        if (ship.LocalStatus != ShipLocalStatus.InOrbit)
+        else if (ship.LocalStatus != ShipLocalStatus.InOrbit)
         {
             return GoalExecutionResult.Blocked($"Unexpected ship status: {ship.Status}.");
         }
 
+        // Effectively in orbit now.
         if (atSite)
         {
             var cargoUnits = ship.CargoInventory?
@@ -79,15 +71,12 @@ public sealed class SupplyConstructionGoalExecutor(
         if (ship.FuelCapacity <= 0 && !string.Equals(ship.FlightMode, "DRIFT", StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, "DRIFT"), ct);
-            return GoalExecutionResult.Progressing("No fuel tank; switching to DRIFT.");
         }
-
-        if (ship.FuelCapacity > 0
+        else if (ship.FuelCapacity > 0
             && !string.IsNullOrWhiteSpace(ctx.RecommendedFlightMode)
             && !string.Equals(ship.FlightMode, ctx.RecommendedFlightMode, StringComparison.OrdinalIgnoreCase))
         {
             await bus.InvokeAsync(new PatchShipNavCommand(ship.Symbol, ctx.RecommendedFlightMode), ct);
-            return GoalExecutionResult.Progressing($"Adjusting flight mode to {ctx.RecommendedFlightMode}.");
         }
 
         await inOrbitCommands.NavigateAsync(ship.Symbol, supplyGoal.ConstructionSiteWaypointSymbol, ct);
