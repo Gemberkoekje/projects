@@ -121,6 +121,22 @@ public sealed class AssignmentResolver(
             .First();
     }
 
+    /// <inheritdoc/>
+    public async Task<ShipGoal> ResolveMarketCoverageAsync(
+        string waypointSymbol,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(waypointSymbol);
+
+        var snapshot = await marketRepository.FindSnapshotByWaypointAsync(waypointSymbol, cancellationToken);
+        if (snapshot is null)
+        {
+            return new ScoutWaypointGoal { TargetWaypointSymbol = waypointSymbol };
+        }
+
+        return new PatrolMarketGoal { TargetWaypointSymbol = waypointSymbol };
+    }
+
     private static ShipGoal? ResolveGasSiphon(
         ResourceProductionGoal goal,
         IReadOnlyList<WaypointCacheModel> systemWaypoints,

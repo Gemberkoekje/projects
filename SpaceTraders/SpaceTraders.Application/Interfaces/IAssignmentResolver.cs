@@ -29,4 +29,13 @@ public interface IAssignmentResolver
         ShipModel ship,
         string tradeSymbol,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Resolves a <see cref="ShipGoal"/> for a <see cref="FleetGoalKind.MarketCoverage"/> assignment.
+    /// Returns a <see cref="ScoutWaypointGoal"/> when no cached market snapshot exists for the waypoint,
+    /// or a <see cref="PatrolMarketGoal"/> when the market has already been scouted.
+    /// </summary>
+    Task<ShipGoal> ResolveMarketCoverageAsync(
+        string waypointSymbol,
+        CancellationToken cancellationToken = default);
 }

@@ -483,25 +483,28 @@ Goal: the orchestrator works in terms of all `FleetGoalKind` values and delegate
 entirely to the assignment resolver. `Contract` and `Construction` goals are translated via
 `ResourceProductionGoal`; `MarketCoverage` and `FleetExpansion` goals are dispatched directly.
 
-#### Phase 11a: `AssignShipToGoalCommand` and its handler
+#### Phase 11a: `AssignShipToGoalCommand` and its handler ✅
 
 Tasks:
 
-- Add `AssignShipToGoalCommand(shipSymbol, FleetGoal)` record to `SpaceTraders.Application/Commands`.
-- Add `AssignShipToGoalCommandHandler` that inspects `FleetGoalKind` and dispatches:
+- ✅ Add `AssignShipToGoalCommand(shipSymbol, FleetGoal)` record to `SpaceTraders.Application/Commands/Fleet`.
+- ✅ Add `AssignShipToGoalCommandHandler` that inspects `FleetGoalKind` and dispatches:
   - `Contract` / `Construction` → calls `IAssignmentResolver.ResolveAsync(ship, ResourceProductionGoal)`
     to obtain a concrete `ShipGoal` with waypoints.
-  - `MarketCoverage` → calls `IAssignmentResolver` to produce a `ScoutWaypoint` or `PatrolMarket`
-    `ShipGoal` for the uncovered market waypoint carried in the `FleetGoal`.
+  - `MarketCoverage` → calls `IAssignmentResolver.ResolveMarketCoverageAsync` to produce a
+    `ScoutWaypoint` or `PatrolMarket` `ShipGoal` for the uncovered market waypoint carried in the `FleetGoal`.
   - `FleetExpansion` → emits `PurchaseShipCommand`; after purchase, emits `AssignShipToGoalCommand`
     for the new ship.
-- In all cases, the handler ends by calling `IShipGoalRepository.SetActiveGoal(...)` and publishing
-  `ShipAutomationTickEvent` for first-step execution.
-- Add unit tests for `AssignShipToGoalCommandHandler` covering each `FleetGoalKind` branch.
+- ✅ Add `IAssignmentResolver.ResolveMarketCoverageAsync` method and implementation: returns
+  `ScoutWaypointGoal` when no market snapshot is cached, `PatrolMarketGoal` when the market is known.
+- ✅ In all non-expansion cases, the handler ends by calling `IShipGoalRepository.SetActiveGoalAsync(...)`
+  and publishing `ShipAutomationTickEvent` for first-step execution.
+- ✅ Add unit tests for `AssignShipToGoalCommandHandler` covering each `FleetGoalKind` branch.
+- ✅ Add unit tests for `IAssignmentResolver.ResolveMarketCoverageAsync`. 381 tests pass in total.
 
 Deliverables:
 
-- `AssignShipToGoalCommand` exists and its handler routes each goal kind to the correct resolver path.
+- ✅ `AssignShipToGoalCommand` exists and its handler routes each goal kind to the correct resolver path.
 
 #### Phase 11b: Update `FleetOrchestrator` to emit `AssignShipToGoalCommand`
 
