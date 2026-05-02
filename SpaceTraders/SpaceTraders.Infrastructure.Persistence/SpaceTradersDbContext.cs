@@ -388,6 +388,7 @@ public sealed class SpaceTradersDbContext(
             entity.HasKey(x => new { x.ShipSymbol, x.GoalId });
             entity.Property(x => x.ShipSymbol).HasMaxLength(100);
             entity.Property(x => x.EventKind).HasMaxLength(30).IsRequired();
+            entity.HasIndex(x => x.TriggerAt);
         });
     }
 }

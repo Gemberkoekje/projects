@@ -261,6 +261,9 @@ public static class SpaceTradersDatabaseInitializer
                 );
                 """,
                 cancellationToken);
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS idx_scheduled_ship_events_trigger_at ON scheduled_ship_events (\"TriggerAt\");",
+                cancellationToken);
         }
 
         if (!string.IsNullOrWhiteSpace(dbContext.AgentToken))
