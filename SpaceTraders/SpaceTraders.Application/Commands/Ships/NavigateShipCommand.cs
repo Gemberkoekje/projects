@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Sync;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -25,6 +26,8 @@ public sealed record NavigateShipCommand
 public sealed class NavigateShipHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
+    IShipGoalRepository goals,
+    IShipEventScheduler scheduler,
     IMessageBus bus,
     ILogger<NavigateShipHandler> logger)
 {
@@ -71,16 +74,26 @@ public sealed class NavigateShipHandler(
             var result = await port.NavigateShipAsync(command.ShipSymbol, command.DestinationWaypoint, cancellationToken);
             await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, result.Fuel, cancellationToken);
 
+            var arrivalTime = result.Nav.ArrivesAt ?? nowNavigate;
+
             var inTransitEvent = new ShipInTransitEvent(
                 command.ShipSymbol,
                 ship?.WaypointSymbol ?? result.Nav.WaypointSymbol,
                 command.DestinationWaypoint,
-                result.Nav.ArrivesAt ?? nowNavigate,
+                arrivalTime,
                 Guid.Empty,
                 Guid.Empty,
                 nowNavigate);
 
             await bus.PublishAsync(inTransitEvent);
+
+            // Phase 14c: schedule the arrival event through the persistent scheduler so
+            // no polling tick loop is needed while the ship is in transit.
+            var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
+            if (activeGoal is not null)
+            {
+                await scheduler.ScheduleArrivalAsync(command.ShipSymbol, activeGoal.GoalId, arrivalTime, cancellationToken);
+            }
 
             var destinationSystem = ExtractSystemSymbol(command.DestinationWaypoint);
             await bus.SendAsync(new RefreshSystemDataCommand(destinationSystem));
@@ -98,7 +111,7 @@ public sealed class NavigateShipHandler(
                 ShipLocalStatusMapper.FromApiStatus(result.Nav.Status),
                 result.Nav.SystemSymbol,
                 result.Nav.WaypointSymbol,
-                ArrivesAt: result.Nav.ArrivesAt ?? nowNavigate,
+                ArrivesAt: arrivalTime,
                 FuelCurrent: result.Fuel?.Current ?? ship?.FuelCurrent ?? 0,
                 FuelCapacity: result.Fuel?.Capacity ?? ship?.FuelCapacity ?? 0,
                 CargoCurrent: ship?.CargoCurrent ?? 0,

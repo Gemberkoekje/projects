@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -20,6 +21,8 @@ public sealed record ExtractResourcesCommand
 public sealed class ExtractResourcesHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
+    IShipGoalRepository goals,
+    IShipEventScheduler scheduler,
     IWaypointRepository waypoints,
     ISurveyRepository surveys,
     IShipAssignmentRepository assignments,
@@ -117,14 +120,25 @@ public sealed class ExtractResourcesHandler(
 
         await ships.UpdateCargoAsync(command.ShipSymbol, result.Cargo, cancellationToken);
 
+        // Phase 14c: persist cooldown and schedule the wake-up event via the persistent scheduler.
+        var now = TimeProvider.System.GetUtcNow();
+        var cooldownExpiresAt = result.CooldownExpiresAt ?? now.AddSeconds(result.CooldownSeconds);
+        await ships.UpdateCooldownAsync(command.ShipSymbol, cooldownExpiresAt, cancellationToken);
+
+        var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
+        if (activeGoal is not null)
+        {
+            await scheduler.ScheduleCooldownExpiryAsync(command.ShipSymbol, activeGoal.GoalId, cooldownExpiresAt, cancellationToken);
+        }
+
         logger.LogInformation(
-            "CommandHandler {Handler}: {Command} handled; Ship {Symbol} extracted {Units}x {Good}. Cooldown: {Cooldown}s.",
+            "CommandHandler {Handler}: {Command} handled; Ship {Symbol} extracted {Units}x {Good}. Cooldown expires: {Cooldown}.",
             nameof(ExtractResourcesHandler),
             nameof(ExtractResourcesCommand),
             command.ShipSymbol,
             result.YieldUnits,
             result.YieldSymbol,
-            result.CooldownSeconds);
+            cooldownExpiresAt);
 
         return new ShipCommandResult(
             command.ShipSymbol,

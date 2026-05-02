@@ -4,6 +4,7 @@ using NSubstitute;
 using SpaceTraders.Application.Commands.Contracts;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -62,10 +63,12 @@ public sealed class Phase65CommandHandlerTests
     public async Task NavigateShip_WhenDocked_AlsoPublishesAutomationTick()
     {
         var (port, ships, bus) = MoveCtx();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100));
 
-        var handler = new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance);
+        var handler = new NavigateShipHandler(port, ships, goals, scheduler, bus, NullLogger<NavigateShipHandler>.Instance);
         await handler.Handle(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
 
         await bus.Received(1).PublishAsync(Arg.Any<ShipStateMismatchEvent>(), Arg.Any<DeliveryOptions>());
@@ -102,6 +105,8 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var surveys = Substitute.For<ISurveyRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -116,7 +121,7 @@ public sealed class Phase65CommandHandlerTests
         port.ExtractResourcesAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ExtractionActionResult("IRON_ORE", 10, new CargoModel(10, 60), 60));
 
-        var handler = new ExtractResourcesHandler(port, ships, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
+        var handler = new ExtractResourcesHandler(port, ships, goals, scheduler, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
         var result = await handler.ExecuteAsync(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();
@@ -129,6 +134,8 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var surveys = Substitute.For<ISurveyRepository>();
         var assignments = Substitute.For<IShipAssignmentRepository>();
@@ -137,7 +144,7 @@ public sealed class Phase65CommandHandlerTests
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100));
 
-        var handler = new ExtractResourcesHandler(port, ships, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
+        var handler = new ExtractResourcesHandler(port, ships, goals, scheduler, waypoints, surveys, assignments, bus, NullLogger<ExtractResourcesHandler>.Instance);
         var result = await handler.ExecuteAsync(new ExtractResourcesCommand("SHIP-1"), CancellationToken.None);
 
         result.Accepted.Should().BeFalse();
@@ -151,6 +158,8 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var surveys = Substitute.For<ISurveyRepository>();
         var bus = Substitute.For<IMessageBus>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -158,7 +167,7 @@ public sealed class Phase65CommandHandlerTests
         port.SurveyAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new SurveyActionResult([], 60));
 
-        var handler = new SurveyHandler(port, ships, surveys, bus, NullLogger<SurveyHandler>.Instance);
+        var handler = new SurveyHandler(port, ships, goals, scheduler, surveys, bus, NullLogger<SurveyHandler>.Instance);
         var result = await handler.ExecuteAsync(new SurveyCommand("SHIP-1"), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();
@@ -170,12 +179,14 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var surveys = Substitute.For<ISurveyRepository>();
         var bus = Substitute.For<IMessageBus>();
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 80, 100));
 
-        var handler = new SurveyHandler(port, ships, surveys, bus, NullLogger<SurveyHandler>.Instance);
+        var handler = new SurveyHandler(port, ships, goals, scheduler, surveys, bus, NullLogger<SurveyHandler>.Instance);
         var result = await handler.ExecuteAsync(new SurveyCommand("SHIP-1"), CancellationToken.None);
 
         result.Accepted.Should().BeFalse();
@@ -498,6 +509,8 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var bus = Substitute.For<IMessageBus>();
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -508,7 +521,7 @@ public sealed class Phase65CommandHandlerTests
                 new NavModel("IN_TRANSIT", "X1-CD", "X1-CD-001", "CRUISE", "X1-CD-001", arrival),
                 60));
 
-        var handler = new JumpShipHandler(port, ships, bus, NullLogger<JumpShipHandler>.Instance);
+        var handler = new JumpShipHandler(port, ships, goals, scheduler, bus, NullLogger<JumpShipHandler>.Instance);
         var result = await handler.ExecuteAsync(new JumpShipCommand("SHIP-1", "X1-CD"), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();
@@ -521,6 +534,8 @@ public sealed class Phase65CommandHandlerTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var bus = Substitute.For<IMessageBus>();
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -531,7 +546,7 @@ public sealed class Phase65CommandHandlerTests
                 new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-001", "CRUISE", "X1-CD-001", arrival),
                 new FuelModel(60, 100)));
 
-        var handler = new WarpShipHandler(port, ships, bus, NullLogger<WarpShipHandler>.Instance);
+        var handler = new WarpShipHandler(port, ships, goals, scheduler, bus, NullLogger<WarpShipHandler>.Instance);
         var result = await handler.ExecuteAsync(new WarpShipCommand("SHIP-1", "X1-CD-001"), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();

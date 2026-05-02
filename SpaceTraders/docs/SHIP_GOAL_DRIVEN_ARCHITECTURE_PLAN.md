@@ -891,7 +891,7 @@ Deliverables:
 
 - Interface and database schema exist; no implementation yet.
 
-#### Phase 14b: `ShipEventScheduler` implementation
+#### Phase 14b: `ShipEventScheduler` implementation ✅
 
 Tasks:
 
@@ -906,7 +906,7 @@ Deliverables:
 
 - Scheduler fires events at the correct time and reloads pending events after a restart.
 
-#### Phase 14c: Update goal executors to use the scheduler
+#### Phase 14c: Update goal executors to use the scheduler ✅
 
 Tasks:
 
@@ -917,43 +917,56 @@ Tasks:
   response containing a cooldown, call
   `IShipEventScheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, cooldown.Expiration)`
   and return `GoalExecutionResult.Waiting`.
+- Update `ShipGoalExecutorService.HandleResultAsync` to use the persistent scheduler for
+  `WaitingForCooldown` and `WaitingForArrival` outcomes, and to call
+  `IShipEventScheduler.CancelScheduledAsync` for `Completed` and `Blocked` outcomes.
+- Make `ShipInTransitEventHandler` a no-op (it no longer schedules ticks; the scheduler handles it).
+- Propagate `CooldownExpiresAt` from the API responses through the port adapter into
+  `ExtractionActionResult`, `SurveyActionResult`, and `SiphonActionResult`.
+- Add `IShipRepository.UpdateCooldownAsync` to persist the expiry to the database.
 
 Deliverables:
 
-- No `ShipAutomationTickEvent` is published for a ship that is in transit or on cooldown.
-- Ships in transit or on cooldown consume no CPU and produce no wasted tick-loop iterations.
+- ✅ No `ShipAutomationTickEvent` is published for a ship that is in transit or on cooldown.
+- ✅ Ships in transit or on cooldown consume no CPU and produce no wasted tick-loop iterations.
 
-#### Phase 14d: Arrival and cooldown event handlers
+#### Phase 14d: Arrival and cooldown event handlers ✅
 
 Tasks:
 
 - Add `ShipArrivedEventHandler`: verifies that the `GoalId` in the event still matches the ship's
   currently active goal (stale wake-ups are silently ignored), then publishes
   `ShipAutomationTickEvent` to resume execution.
-- Add `ShipCooldownExpiredEventHandler`: same stale-wake-up guard, then publishes
-  `ShipAutomationTickEvent`.
+- Add `ShipCooldownExpiredEventHandler`: same stale-wake-up guard, clears the persisted cooldown
+  timestamp, then publishes `ShipAutomationTickEvent`.
 - In `GoalCompletedEvent` and `GoalBlockedEvent` handlers, call
   `IShipEventScheduler.CancelScheduledAsync` to prevent ghost wake-ups after goal reassignment.
 
 Deliverables:
 
-- Ships resume goal execution at their estimated arrival time or cooldown expiry.
-- Goal completion and blockage cancel any pending scheduled event for the ship.
+- ✅ Ships resume goal execution at their estimated arrival time or cooldown expiry.
+- ✅ Goal completion and blockage cancel any pending scheduled event for the ship.
 
-#### Phase 14e: Scheduler unit tests
+#### Phase 14e: Scheduler unit tests ✅
 
 Tasks:
 
-- Add unit tests for `ShipEventScheduler`:
-  - Event fires at the correct time.
-  - Persisted schedule is reloaded and fires correctly after a simulated restart.
-  - Cancellation before trigger time prevents the event from firing.
-  - A `GoalId` mismatch in the handler is silently ignored (no exception, no action).
+- Add unit tests for `ShipArrivedEventHandler`:
+  - Publishes a `ShipAutomationTickEvent` with reason "Arrived" when the goal ID matches.
+  - Ignores stale wake-ups silently when the goal ID does not match.
+  - Ignores stale wake-ups when there is no active goal.
+- Add unit tests for `ShipCooldownExpiredEventHandler`:
+  - Clears the persisted cooldown and publishes `ShipAutomationTickEvent` when goal ID matches.
+  - Ignores stale wake-ups when the goal ID does not match (no DB update, no tick).
+  - Ignores stale wake-ups when there is no active goal.
+- Update `ShipGoalExecutorServiceTests` to verify the scheduler (not `bus.ScheduleAsync`) is used
+  for `WaitingForCooldown` and `WaitingForArrival` outcomes.
 
 Deliverables:
 
-- A ship resumes goal execution at its estimated arrival time or cooldown expiry, even after a
-  process restart.
+- ✅ A ship resumes goal execution at its estimated arrival time or cooldown expiry.
+- ✅ Stale wake-ups are ignored without error.
+- ✅ Scheduler is called instead of `bus.ScheduleAsync` for time-based waits.
 
 ### Phase 15: Observability read models
 

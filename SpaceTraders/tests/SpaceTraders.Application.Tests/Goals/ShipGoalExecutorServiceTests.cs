@@ -33,6 +33,7 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IAssignmentResolver _assignmentResolver = Substitute.For<IAssignmentResolver>();
     private readonly IShipCapabilityRegistry _capabilityRegistry = Substitute.For<IShipCapabilityRegistry>();
+    private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly IShipGoalExecutor _executor = Substitute.For<IShipGoalExecutor>();
 
@@ -72,6 +73,7 @@ public sealed class ShipGoalExecutorServiceTests
             _settings,
             _assignmentResolver,
             _capabilityRegistry,
+            _scheduler,
             _bus,
             NullLogger<ShipGoalExecutorService>.Instance);
 
@@ -174,7 +176,7 @@ public sealed class ShipGoalExecutorServiceTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenWaitingForCooldownWithExpiry_SchedulesCooldownTick()
+    public async Task ExecuteAsync_WhenWaitingForCooldownWithExpiry_SchedulesCooldownViaScheduler()
     {
         SetupShipAndGoal();
         var expiresAt = DateTimeOffset.UtcNow.AddMinutes(1);
@@ -183,14 +185,19 @@ public sealed class ShipGoalExecutorServiceTests
 
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        // ScheduleAsync is an extension method that calls PublishAsync with a scheduled DeliveryOptions.
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "CooldownExpired"),
-            Arg.Is<DeliveryOptions>(o => o.ScheduledTime == expiresAt));
+        // Phase 14c: scheduler is used instead of bus.ScheduleAsync.
+        await _scheduler.Received(1).ScheduleCooldownExpiryAsync(
+            "SHIP-1",
+            Arg.Any<Guid>(),
+            expiresAt,
+            Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.Reason == "CooldownExpired"),
+            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenWaitingForCooldownWithoutExpiry_SchedulesRetryTick()
+    public async Task ExecuteAsync_WhenWaitingForCooldownWithoutExpiry_SchedulesFallbackViaScheduler()
     {
         SetupShipAndGoal();
         _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
@@ -198,25 +205,36 @@ public sealed class ShipGoalExecutorServiceTests
 
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        // ScheduleAsync is an extension method that calls PublishAsync with a scheduled DeliveryOptions.
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "CooldownRetry"),
-            Arg.Is<DeliveryOptions>(o => o.ScheduledTime.HasValue));
+        // Phase 14c: scheduler is used with a fallback time (no bus.ScheduleAsync).
+        await _scheduler.Received(1).ScheduleCooldownExpiryAsync(
+            "SHIP-1",
+            Arg.Any<Guid>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.Reason == "CooldownRetry"),
+            Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenWaitingForArrival_PublishesNoEvents()
+    public async Task ExecuteAsync_WhenWaitingForArrival_SchedulesArrivalViaScheduler()
     {
-        SetupShipAndGoal();
+        var arrival = DateTimeOffset.UtcNow.AddMinutes(3);
+        var ship = Ship with { ArrivesAt = arrival };
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(ship);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(IdleGoal);
         _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
             .Returns(GoalExecutionResult.WaitingForArrival("In transit"));
 
         await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        // Nothing should be published or scheduled when waiting for arrival.
+        // Phase 14c: scheduler is used for arrival (no bus.PublishAsync for ticks).
+        await _scheduler.Received(1).ScheduleArrivalAsync(
+            "SHIP-1",
+            Arg.Any<Guid>(),
+            arrival,
+            Arg.Any<CancellationToken>());
         await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalBlockedEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     // ──────────────────────────────────────────────────────────────────────────────

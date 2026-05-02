@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -20,6 +21,8 @@ public sealed record SurveyCommand
 public sealed class SurveyHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
+    IShipGoalRepository goals,
+    IShipEventScheduler scheduler,
     ISurveyRepository surveys,
     IMessageBus bus,
     ILogger<SurveyHandler> logger)
@@ -56,8 +59,19 @@ public sealed class SurveyHandler(
             await surveys.UpsertAsync(command.ShipSymbol, result.Surveys, cancellationToken);
         }
 
-        logger.LogInformation("Ship {Symbol} completed survey. {Count} surveys found, cooldown {Seconds}s.",
-            command.ShipSymbol, result.Surveys.Count, result.CooldownSeconds);
+        // Phase 14c: persist cooldown and schedule the wake-up event via the persistent scheduler.
+        var now = TimeProvider.System.GetUtcNow();
+        var cooldownExpiresAt = result.CooldownExpiresAt ?? now.AddSeconds(result.CooldownSeconds);
+        await ships.UpdateCooldownAsync(command.ShipSymbol, cooldownExpiresAt, cancellationToken);
+
+        var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
+        if (activeGoal is not null)
+        {
+            await scheduler.ScheduleCooldownExpiryAsync(command.ShipSymbol, activeGoal.GoalId, cooldownExpiresAt, cancellationToken);
+        }
+
+        logger.LogInformation("Ship {Symbol} completed survey. {Count} surveys found, cooldown expires {Cooldown}.",
+            command.ShipSymbol, result.Surveys.Count, cooldownExpiresAt);
 
         return new ShipCommandResult(
             command.ShipSymbol,

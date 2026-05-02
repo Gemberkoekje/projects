@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
@@ -97,6 +98,8 @@ public sealed class ShipCommandResultTests
         var arrival = DateTimeOffset.UtcNow.AddMinutes(3);
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var bus = Substitute.For<IMessageBus>();
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
@@ -107,7 +110,7 @@ public sealed class ShipCommandResultTests
                 new NavModel("IN_TRANSIT", "X1-AB", "X1-AB-001", "CRUISE", "X1-AB-002", arrival),
                 new FuelModel(70, 100)));
 
-        var handler = new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance);
+        var handler = new NavigateShipHandler(port, ships, goals, scheduler, bus, NullLogger<NavigateShipHandler>.Instance);
         var result = await handler.ExecuteAsync(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
 
         result.Accepted.Should().BeTrue();
@@ -121,12 +124,14 @@ public sealed class ShipCommandResultTests
     {
         var port = Substitute.For<ISpaceTradersPort>();
         var ships = Substitute.For<IShipRepository>();
+        var goals = Substitute.For<IShipGoalRepository>();
+        var scheduler = Substitute.For<IShipEventScheduler>();
         var bus = Substitute.For<IMessageBus>();
 
         ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
             .Returns(new ShipModel("SHIP-1", "X1-AB", "X1-AB-001", "DOCKED", "CRUISE", 100, 100));
 
-        var handler = new NavigateShipHandler(port, ships, bus, NullLogger<NavigateShipHandler>.Instance);
+        var handler = new NavigateShipHandler(port, ships, goals, scheduler, bus, NullLogger<NavigateShipHandler>.Instance);
         var result = await handler.ExecuteAsync(new NavigateShipCommand("SHIP-1", "X1-AB-002"), CancellationToken.None);
 
         result.Accepted.Should().BeFalse();

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
@@ -25,6 +26,8 @@ public sealed record JumpShipCommand
 public sealed class JumpShipHandler(
     ISpaceTradersPort port,
     IShipRepository ships,
+    IShipGoalRepository goals,
+    IShipEventScheduler scheduler,
     IMessageBus bus,
     IJumpGateCacheService jumpGates,
     ILogger<JumpShipHandler> logger)
@@ -38,9 +41,11 @@ public sealed class JumpShipHandler(
     public JumpShipHandler(
         ISpaceTradersPort port,
         IShipRepository ships,
+        IShipGoalRepository goals,
+        IShipEventScheduler scheduler,
         IMessageBus bus,
         ILogger<JumpShipHandler> logger)
-        : this(port, ships, bus, new NoopJumpGateCacheService(), logger)
+        : this(port, ships, goals, scheduler, bus, new NoopJumpGateCacheService(), logger)
     {
     }
 
@@ -79,16 +84,25 @@ public sealed class JumpShipHandler(
         var result = await port.JumpShipAsync(command.ShipSymbol, command.DestinationSystem, cancellationToken);
         await ships.UpdateNavAsync(command.ShipSymbol, result.Nav, null, cancellationToken);
 
+        var arrivalTime = result.Nav.ArrivesAt ?? nowJump;
+
         var inTransitEvent = new ShipInTransitEvent(
             command.ShipSymbol,
             ship.WaypointSymbol ?? result.Nav.WaypointSymbol,
             result.Nav.DestWaypointSymbol ?? command.DestinationSystem,
-            result.Nav.ArrivesAt ?? nowJump,
+            arrivalTime,
             Guid.Empty,
             Guid.Empty,
             nowJump);
 
         await bus.PublishAsync(inTransitEvent);
+
+        // Phase 14c: schedule the arrival event through the persistent scheduler.
+        var activeGoal = await goals.GetActiveGoalAsync(command.ShipSymbol, cancellationToken);
+        if (activeGoal is not null)
+        {
+            await scheduler.ScheduleArrivalAsync(command.ShipSymbol, activeGoal.GoalId, arrivalTime, cancellationToken);
+        }
 
         logger.LogInformation("Ship {Symbol} jumping to system {System}, cooldown {Seconds}s.",
             command.ShipSymbol, command.DestinationSystem, result.CooldownSeconds);
@@ -98,7 +112,7 @@ public sealed class JumpShipHandler(
             ShipLocalStatusMapper.FromApiStatus(result.Nav.Status),
             result.Nav.SystemSymbol,
             result.Nav.WaypointSymbol,
-            ArrivesAt: result.Nav.ArrivesAt ?? nowJump,
+            ArrivesAt: arrivalTime,
             FuelCurrent: ship.FuelCurrent,
             FuelCapacity: ship.FuelCapacity,
             CargoCurrent: ship.CargoCurrent,

@@ -109,6 +109,20 @@
         "resolved": "1.1.118",
         "contentHash": "Onx6ovGSqXSK07n/0eM3ZusiNdB6cIlJdabQhWGgJp3Vooy9AaLS/tigeybOJAobqbtggTamoWndz72JscZBvw=="
       },
+      "WolverineFx": {
+        "type": "Direct",
+        "requested": "[5.32.1, )",
+        "resolved": "5.32.1",
+        "contentHash": "CbEkXuIap1YlUpTKQJZLr+tVe6bs2ubgkbk2vca/pIYqmShBkZxloEjavYK0LY2LVa/4NE8/GUN37M2B7lqewA==",
+        "dependencies": {
+          "JasperFx": "1.26.0",
+          "JasperFx.Events": "1.29.0",
+          "JasperFx.RuntimeCompiler": "4.4.0",
+          "JasperFx.SourceGeneration": "1.1.0",
+          "NewId": "4.0.1",
+          "Newtonsoft.Json": "13.0.3"
+        }
+      },
       "FastExpressionCompiler": {
         "type": "Transitive",
         "resolved": "5.3.0",
@@ -426,20 +440,6 @@
         "requested": "[5.20.1, )",
         "resolved": "5.20.1",
         "contentHash": "jQeuXgIeXEjFAImajavoxvJNcevO+zyK+9ICGzy0LRe/e1tP4vJUnO4Yrg6rP601wYRnulQs59mQH73TbIZzNg=="
-      },
-      "WolverineFx": {
-        "type": "CentralTransitive",
-        "requested": "[5.32.1, )",
-        "resolved": "5.32.1",
-        "contentHash": "CbEkXuIap1YlUpTKQJZLr+tVe6bs2ubgkbk2vca/pIYqmShBkZxloEjavYK0LY2LVa/4NE8/GUN37M2B7lqewA==",
-        "dependencies": {
-          "JasperFx": "1.26.0",
-          "JasperFx.Events": "1.29.0",
-          "JasperFx.RuntimeCompiler": "4.4.0",
-          "JasperFx.SourceGeneration": "1.1.0",
-          "NewId": "4.0.1",
-          "Newtonsoft.Json": "13.0.3"
-        }
       }
     },
     "net10.0/linux-x64": {},
