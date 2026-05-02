@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using Wolverine;
@@ -9,7 +9,7 @@ namespace SpaceTraders.Application.Orchestration;
 /// <summary>
 /// High-level fleet orchestrator. Aggregates goals from all goal evaluators,
 /// matches idle ships to the highest-priority goals, and emits one
-/// <see cref="AssignShipCommand"/> per ship. The orchestrator never issues
+/// <see cref="AssignShipToGoalCommand"/> per ship. The orchestrator never issues
 /// low-level ship commands (Dock/Orbit/Navigate); ship planners do that.
 /// </summary>
 public interface IFleetOrchestrator
@@ -25,9 +25,6 @@ public sealed class FleetOrchestrator(
     ILogger<FleetOrchestrator> logger) : IFleetOrchestrator
 {
     private const string IdleAssignmentType = "Idle";
-    private const string ContractAssignmentType = "Contract";
-    private const string BuilderAssignmentType = "Builder";
-    private const string MarketProbeAssignmentType = "MarketProbe";
 
     public async Task EvaluateAndAssignAsync(CancellationToken cancellationToken = default)
     {
@@ -62,13 +59,30 @@ public sealed class FleetOrchestrator(
                 || t.Equals(IdleAssignmentType, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
+        // Fleet expansion goals do not consume an idle ship; dispatch them regardless of idle capacity.
+        foreach (var goal in orderedGoals.Where(g => g.Kind == FleetGoalKind.FleetExpansion))
+        {
+            if (fleet.Count == 0)
+            {
+                logger.LogDebug("Orchestrator: no ships in fleet; cannot dispatch fleet expansion goal.");
+                continue;
+            }
+
+            var shipSymbol = fleet[0].Symbol;
+            logger.LogInformation(
+                "Orchestrator: dispatching {GoalKind} goal ({Description}).",
+                goal.Kind,
+                goal.Description);
+            await bus.SendAsync(new AssignShipToGoalCommand(shipSymbol, goal));
+        }
+
         if (idleShips.Count == 0)
         {
             logger.LogDebug("Orchestrator: no idle ships available for {GoalCount} goals.", orderedGoals.Count);
             return;
         }
 
-        foreach (var goal in orderedGoals)
+        foreach (var goal in orderedGoals.Where(g => g.Kind != FleetGoalKind.FleetExpansion))
         {
             if (idleShips.Count == 0)
             {
@@ -107,37 +121,20 @@ public sealed class FleetOrchestrator(
                     ?? idleShips.FirstOrDefault(s => s.CargoCapacity > 0),
             FleetGoalKind.MarketCoverage => idleShips.FirstOrDefault(s => s.FuelCapacity > 0)
                     ?? idleShips.FirstOrDefault(),
-            FleetGoalKind.FleetExpansion => null,
             _ => idleShips.FirstOrDefault(),
         };
     }
 
-    private static AssignShipCommand? BuildAssignment(FleetGoal goal, ShipModel ship)
+    private static AssignShipToGoalCommand? BuildAssignment(FleetGoal goal, ShipModel ship)
     {
         return goal.Kind switch
         {
             FleetGoalKind.Contract when !string.IsNullOrWhiteSpace(goal.ContractId)
-                => new AssignShipCommand(
-                    ship.Symbol,
-                    ContractAssignmentType,
-                    OriginWaypoint: ship.WaypointSymbol,
-                    DestWaypoint: goal.DestinationWaypoint,
-                    CargoSymbol: goal.TradeSymbol,
-                    ContractId: goal.ContractId,
-                    RequiredUnits: goal.RemainingUnits),
+                => new AssignShipToGoalCommand(ship.Symbol, goal),
             FleetGoalKind.Construction when !string.IsNullOrWhiteSpace(goal.DestinationWaypoint)
-                => new AssignShipCommand(
-                    ship.Symbol,
-                    BuilderAssignmentType,
-                    OriginWaypoint: ship.WaypointSymbol,
-                    DestWaypoint: goal.DestinationWaypoint,
-                    CargoSymbol: goal.TradeSymbol,
-                    RequiredUnits: goal.RemainingUnits),
+                => new AssignShipToGoalCommand(ship.Symbol, goal),
             FleetGoalKind.MarketCoverage when !string.IsNullOrWhiteSpace(goal.OriginWaypoint)
-                => new AssignShipCommand(
-                    ship.Symbol,
-                    MarketProbeAssignmentType,
-                    OriginWaypoint: goal.OriginWaypoint),
+                => new AssignShipToGoalCommand(ship.Symbol, goal),
             _ => null,
         };
     }
