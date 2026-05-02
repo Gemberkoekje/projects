@@ -28,12 +28,12 @@ public interface IShipGoalExecutor
 /// <summary>
 /// Orchestrates goal selection, context building, executor dispatch, and goal lifecycle events.
 /// </summary>
-/// <remarks>Phase 10: replaces <c>IShipPlannerService</c> when an active goal is present.</remarks>
+/// <remarks>Phase 10: replaces <c>IShipPlannerService</c>. Phase 12a: planner fallback removed.</remarks>
 public interface IShipGoalExecutorService
 {
     /// <summary>
-    /// Executes the next step for the named ship's active goal. Falls back to the legacy planner
-    /// service when the ship has no active goal (backward-compatibility bridge).
+    /// Executes the next step for the named ship's active goal.
+    /// Returns <c>null</c> when the ship has no active goal.
     /// </summary>
     Task<GoalExecutionResult?> ExecuteAsync(string shipSymbol, CancellationToken ct);
 }
