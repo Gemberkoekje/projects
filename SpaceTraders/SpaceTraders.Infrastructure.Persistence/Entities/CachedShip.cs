@@ -49,6 +49,15 @@ public sealed class CachedShip
 
     public ShipLocalStatus LocalStatus { get; set; }
 
+    // Phase 8: active goal columns
+    public Guid? GoalId { get; set; }
+
+    public string? GoalKind { get; set; }
+
+    public string? GoalPayloadJson { get; set; }
+
+    public int? GoalStatus { get; set; }
+
     [NotMapped]
     public bool IsInTransit => ArrivesAt.HasValue && ArrivesAt.Value > TimeProvider.System.GetUtcNow();
 

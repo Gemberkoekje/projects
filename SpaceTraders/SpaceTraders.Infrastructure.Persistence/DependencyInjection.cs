@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<ILedgerRepository, LedgerRepository>();
         services.AddScoped<IShipTaskRecordRepository, ShipTaskRecordRepository>();
         services.AddScoped<IRunRepository, RunRepository>();
+        services.AddScoped<IShipGoalRepository, ShipGoalRepository>();
 
         return services;
     }
