@@ -1144,40 +1144,54 @@ Deliverables:
 
 ### Phase 17: Front-end fleet dashboard
 
-Goal: build a single-page dashboard that visualises what the orchestrator is working towards, which
-ship is assigned to what, and what every ship is currently doing. The dashboard refreshes
-automatically and requires no back-end change to show new data.
+Goal: add a fleet orchestration dashboard to the existing `SpaceTraders.WebUI` project (React +
+Vite + TypeScript, TanStack Query, Tailwind CSS, Lucide icons) that visualises what the orchestrator
+is working towards, which ship is assigned to what, and what every ship is currently doing. The
+dashboard refreshes automatically and requires no back-end change to show new data.
 
-#### Phase 17a: Project scaffold
+#### Phase 17a: Add `/orchestration` route and page to the existing WebUI
 
 Tasks:
 
-- Add a `SpaceTraders.Dashboard` project (Blazor WebAssembly or a lightweight Vite + TypeScript SPA,
-  depending on the existing front-end stack) under the solution root.
-- Configure it to proxy `/api/*` requests to the back-end during development.
-- Add three top-level pages / route components:
-  - `/` → redirect to `/dashboard`
-  - `/dashboard` → combined fleet overview (all three panels on one page)
-  - `/ships/{symbol}` → detail view for a single ship
+- Create `SpaceTraders.WebUI/src/pages/OrchestrationPage.tsx` with three vertically-stacked
+  sections: Goal Chains, Assignments, and Activity (one section per sub-phase below).
+- Register the route in `AppShell.tsx`:
+  ```tsx
+  <Route path="/orchestration" element={<OrchestrationPage />} />
+  ```
+- Add a sidebar entry in `Sidebar.tsx` using an appropriate Lucide icon (e.g. `Target`) and the
+  label "Orchestration", placed after the existing "Fleet" entry.
+- Add new TypeScript interfaces to `src/types.ts` for the three read-model DTOs that match the
+  JSON shapes defined in Phase 16b:
+  - `OrchestratorGoalChainDto` (maps `OrchestratorGoalChain` + `ResourceNeedEntry`)
+  - `ShipAssignmentDto` (maps `ShipAssignmentSnapshot`)
+  - `ShipActivityDto` (maps `ShipActivitySnapshot`)
+- All API calls use the existing `apiFetch` helper from `src/lib/api-fetch.ts`.
 
 Deliverables:
 
-- Project scaffolds and compiles with a placeholder "Fleet Dashboard" heading rendered in the browser.
+- The `/orchestration` page is reachable from the sidebar and renders a placeholder heading.
+- Three DTO interfaces exist in `types.ts` and compile without errors.
 
 #### Phase 17b: Orchestrator goal chain panel
 
 Tasks:
 
-- Add a `GoalChainPanel` component that fetches `GET /api/fleet/goal-chains` every 10 seconds.
-- Render each `OrchestratorGoalChain` as a collapsible card with:
+- Add a `GoalChainPanel` component in `src/components/` that uses TanStack Query
+  (`useQuery`, `queryKey: ['fleet-goal-chains']`) to fetch `GET /api/fleet/goal-chains` every
+  10 seconds (`refetchInterval: 10_000`).
+- Render each `OrchestratorGoalChainDto` as a collapsible card (`<details>`/`<summary>`) with:
   - Header: top-level goal kind badge + `fleetGoalDescription`
     (e.g. **[CONSTRUCTION]** Supply Jump Gate at X1-TD7-JG).
   - Body: one row per `ResourceNeedEntry` showing:
     - Trade symbol chip (e.g. **BAUXITE**).
-    - Progress bar: `unitsDelivered / unitsNeeded`.
-    - `purposeDescription` tooltip (e.g. "needed for FRAME_DRONE × 2").
-    - Assigned ships as clickable chips that deep-link to `/ships/{symbol}`.
+    - Progress bar: `unitsDelivered / unitsNeeded` (using the same inline progress-bar pattern
+      already used in `OverviewPage.tsx` for contracts).
+    - `purposeDescription` as inline text.
+    - Assigned ships as clickable chips linking to `/fleet/{symbol}`.
+- Sort cards by `priority` ascending (lowest number first) before rendering.
 - Show a "No active goals" placeholder when the list is empty.
+- Add the panel to `OrchestrationPage.tsx`.
 
 Deliverables:
 
@@ -1188,14 +1202,17 @@ Deliverables:
 
 Tasks:
 
-- Add a `AssignmentsPanel` component that fetches `GET /api/fleet/assignments` every 10 seconds.
-- Render a sortable table with columns:
+- Add an `AssignmentsPanel` component in `src/components/` that uses TanStack Query
+  (`queryKey: ['fleet-assignments']`) to fetch `GET /api/fleet/assignments` every 10 seconds.
+- Render a sortable table (client-side sort on column header click) with columns:
   | Ship | Goal | Source | Destination | Serving |
   |---|---|---|---|---|
   | X1-TD7-1 | Mine BAUXITE | X1-TD7-A3 | — | Supply Jump Gate at X1-TD7-JG |
-- Highlight ships whose goal is `Idle` in a muted style.
-- `Ship` column links to `/ships/{symbol}`.
-- Allow filtering by goal kind (Mine / Siphon / Sell / Scout / Idle / …) via a dropdown.
+- Highlight rows where `goalKind === 'Idle'` using the muted text style (`text-muted-foreground`).
+- The Ship column renders a `<Link to={'/fleet/' + shipSymbol}>` (react-router `Link`).
+- Add a goal-kind filter `<select>` above the table using the same styling as the filter controls
+  in `FleetPage.tsx`.
+- Add the panel to `OrchestrationPage.tsx` below the goal chain panel.
 
 Deliverables:
 
@@ -1205,16 +1222,21 @@ Deliverables:
 
 Tasks:
 
-- Add a `ActivityPanel` component that fetches `GET /api/fleet/activity` every 5 seconds.
-- Render a card per ship showing:
-  - Ship symbol and a status badge (IN_TRANSIT / IN_ORBIT / DOCKED) with colour coding.
-  - `activityDescription` as the primary text line
-    (e.g. "Moving to X1-TD7-A3 · arrives 14:23 UTC").
-  - Cargo fill bar: `cargoUsed / cargoCapacity`.
+- Add an `ActivityPanel` component in `src/components/` that uses TanStack Query
+  (`queryKey: ['fleet-activity']`) to fetch `GET /api/fleet/activity` every 5 seconds.
+- Render a card per ship (using the same card style as existing stat cards in `OverviewPage.tsx`)
+  showing:
+  - Ship symbol and a status badge colour-coded the same way as `NavStateBadge` in `FleetPage.tsx`
+    (yellow for IN_TRANSIT, green for IN_ORBIT, muted for DOCKED).
+  - `activityDescription` as the primary text line.
+  - Cargo fill bar: `cargoUsed / cargoCapacity` (reuse the `ProgressBar` helper pattern from
+    `FleetPage.tsx` or `ShipDetailPage.tsx`).
   - Fuel fill bar: `fuelCurrent / fuelCapacity`.
-  - A countdown timer for `estimatedArrival` or `cooldownExpiresAt` when applicable, ticking
-    down in the browser without additional API calls.
-- Clicking a card navigates to `/ships/{symbol}`.
+  - A countdown timer for `estimatedArrival` or `cooldownExpiresAt` when present, implemented
+    with `useState` + `useEffect` + `setInterval` so it ticks down in the browser without
+    additional API calls (same pattern as the ETA formatting in `FleetPage.tsx`).
+- Clicking a card navigates to `/fleet/{symbol}` using react-router `useNavigate`.
+- Add the panel to `OrchestrationPage.tsx` below the assignments panel.
 
 Deliverables:
 
@@ -1268,41 +1290,68 @@ Deliverables:
 
 - Goal history is accessible over HTTP.
 
-#### Phase 17g: Single-ship detail page
+#### Phase 17g: Extend the existing ship detail page with goal data
+
+The single-ship detail page already exists at `/fleet/:symbol` (`ShipDetailPage.tsx`). Extend it
+rather than creating a new page.
 
 Tasks:
 
-- Add a `/ships/{symbol}` page that combines:
-  - Live `ShipActivitySnapshot` (auto-refresh every 5 s, from `GET /api/fleet/activity/{symbol}`).
-  - The ship's current `ShipAssignmentSnapshot` (from `GET /api/fleet/assignments`, filtered client-side).
-  - The `OrchestratorGoalChain` entry(ies) that reference this ship (from `GET /api/fleet/goal-chains`,
-    filtered client-side).
-  - A read-only list of the last 20 goal history entries (from `GET /api/fleet/activity/{symbol}/history`).
-- Render history as a timeline: outcome badge (Completed / Blocked), goal kind, duration.
+- Add a new TanStack Query call in `ShipDetailPage.tsx` for
+  `GET /api/fleet/activity/{symbol}` (`queryKey: ['fleet-activity', symbol]`, refetch every 5 s)
+  to load the `ShipActivityDto` and display `activityDescription` prominently below the header, with
+  cooldown/arrival countdown (same timer pattern as Phase 17d).
+- Add a new query for `GET /api/fleet/assignments` (`queryKey: ['fleet-assignments']`, refetch
+  every 10 s), filter client-side to the current ship symbol, and render the `ShipAssignmentDto`
+  as an "Assignment" section showing goal kind, source waypoint, destination waypoint, and which
+  fleet goal the ship is serving (linking to `/orchestration` for context).
+- Add a new query for `GET /api/fleet/goal-chains` (`queryKey: ['fleet-goal-chains']`, refetch
+  every 10 s), filter client-side to chains that reference the current ship in any
+  `assignedShips` list, and render the matched goal chain(s) as a compact read-only card.
+- Add a new query for `GET /api/fleet/activity/{symbol}/history?limit=20`
+  (`queryKey: ['fleet-goal-history', symbol]`, refetch every 30 s) and render the
+  `ShipGoalHistoryDto` entries as a timeline below the existing "Task Timeline" section:
+  - Outcome badge (green "Completed" / red "Blocked"), goal kind, duration.
+  - Add `ShipGoalHistoryDto` to `src/types.ts`:
+    ```ts
+    export interface ShipGoalHistoryDto {
+      id: string
+      goalKind: string
+      outcome: string        // 'Completed' | 'Blocked'
+      reason: string | null
+      startedAt: string
+      endedAt: string
+    }
+    ```
 
 Deliverables:
 
-- Operators can drill into any individual ship to see its current state, assignment context, and
-  a short history of recently completed or blocked goals.
+- Operators can drill into any individual ship at `/fleet/:symbol` to see its live activity
+  description, current assignment, the fleet goal it serves, and a short history of recently
+  completed or blocked goals.
 
 #### Phase 17h: Front-end tests
 
 Tasks:
 
-- Add component tests (Vitest + Testing Library, or bUnit for Blazor) for:
-  - `GoalChainPanel` renders the correct number of goal cards, priority order, and progress bars
-    from mock API data.
-  - `AssignmentsPanel` renders all rows, sorts correctly, and filters by goal kind.
-  - `ActivityPanel` renders status badges, fill bars, and countdown timers from mock data.
-  - The countdown timer counts down in the browser and does not trigger extra API calls.
-  - Single-ship detail page renders all four sections (activity, assignment, goal chain, history)
-    from mock API data.
-- Add an end-to-end smoke test (Playwright) that loads `/dashboard` against the running back-end
-  and asserts that all three panels contain at least one entry.
+- Add component tests using the existing Vitest + `@testing-library/react` setup
+  (following the pattern in `src/test/pages.test.tsx`) for:
+  - `GoalChainPanel` renders the correct number of goal cards, in priority order, with correct
+    progress bar percentages, from mock API data (`msw` or inline `vi.fn()` stubs).
+  - `AssignmentsPanel` renders all rows, sorts correctly on header click, and filters by goal kind.
+  - `ActivityPanel` renders status badges, fill bars, and countdown text from mock data.
+  - The countdown timer decrements each second via `vi.useFakeTimers()` and does not trigger
+    extra `fetch` calls.
+  - `ShipDetailPage` renders the new "Assignment", "Serving goal", and "Goal History" sections
+    when the relevant queries return data.
+- Add an end-to-end smoke test (Playwright) that navigates to
+  `/spacetraders/dashboard/orchestration` against the running back-end and asserts that all three
+  panels are present in the DOM.
 
 Deliverables:
 
-- Dashboard components have unit-level test coverage and a smoke end-to-end test.
+- New components have unit-level test coverage following the existing Vitest + Testing Library
+  conventions, and a Playwright smoke test covers the new `/orchestration` route.
 
 ---
 
