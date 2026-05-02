@@ -16,6 +16,7 @@ namespace SpaceTraders.Application.Planning;
 /// (or none). All side effects flow through the existing command acceptors so this boundary
 /// can coexist with the chain-of-command handlers during migration.
 /// </summary>
+[Obsolete("Phase 10: use IShipGoalExecutorService instead. Will be removed in Phase 12.")]
 public interface IShipPlannerService
 {
     /// <summary>

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Goals;
+using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Sync;
@@ -71,6 +73,19 @@ public static class DependencyInjection
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
+
+        // Phase 10: goal-driven executors. Registered before ShipGoalExecutorService so DI
+        // injects them as IEnumerable<IShipGoalExecutor> in registration order.
+        services.AddScoped<IShipGoalExecutor, IdleGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, MineResourceGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SiphonResourceGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SellCargoGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, DeliverCargoGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SupplyConstructionGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, ScoutWaypointGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, PatrolMarketGoalExecutor>();
+        services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
 
         // Phase 6.5d: Business-effect chain handler registrations have been removed.
         // ShipAutomationTickEventHandler → ShipPlannerService now covers all docked, in-orbit,

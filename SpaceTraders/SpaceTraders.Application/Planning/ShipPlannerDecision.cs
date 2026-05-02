@@ -5,6 +5,7 @@ namespace SpaceTraders.Application.Planning;
 /// The kind of command a ship planner asks the executor to issue. Each planner decision
 /// emits at most one ship command, satisfying the "one decision -> one command" principle.
 /// </summary>
+[Obsolete("Phase 10: use GoalExecutionOutcome instead. Will be removed in Phase 12.")]
 public enum ShipPlannerCommandKind
 {
     /// <summary>No command should be issued (e.g. ship is in transit, no assignment, etc.).</summary>
@@ -69,6 +70,7 @@ public enum ShipPlannerCommandKind
 /// Phase 3: ship planner boundary.
 /// Represents the single command a ship planner has chosen for a ship at a decision point.
 /// </summary>
+[Obsolete("Phase 10: use GoalExecutionResult instead. Will be removed in Phase 12.")]
 public sealed record ShipPlannerDecision
 {
     public required string ShipSymbol { get; init; }
