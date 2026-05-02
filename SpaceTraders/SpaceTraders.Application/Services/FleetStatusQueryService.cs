@@ -254,7 +254,7 @@ internal sealed class FleetStatusQueryService(
         {
             var goal = await shipGoals.GetActiveGoalAsync(ship.Symbol, ct);
             var assignment = await shipAssignments.FindAsync(ship.Symbol, ct);
-            var assignedAt = assignment?.AssignedAt ?? DateTimeOffset.MinValue;
+            var assignedAt = assignment?.AssignedAt;
 
             var fleetGoal = TryMatchFleetGoal(goal, fleetGoalLookup);
             var snapshot = BuildSnapshot(ship.Symbol, goal, assignedAt, fleetGoal);
@@ -304,7 +304,7 @@ internal sealed class FleetStatusQueryService(
     private static ShipAssignmentSnapshot BuildSnapshot(
         string shipSymbol,
         ShipGoal? shipGoal,
-        DateTimeOffset assignedAt,
+        DateTimeOffset? assignedAt,
         FleetGoal? matchedFleetGoal)
     {
         var (goalKind, description, sourceWaypoint, destinationWaypoint) = shipGoal switch
@@ -381,7 +381,7 @@ internal sealed class FleetStatusQueryService(
         string description;
         if (isInTransit && ship.ArrivesAt.HasValue)
         {
-            var arrivalTime = ship.ArrivesAt.Value.ToString("HH:mm") + " UTC";
+            var arrivalTime = ship.ArrivesAt.Value.ToUniversalTime().ToString("HH:mm 'UTC'");
             description = $"Moving to {ship.DestWaypointSymbol ?? "unknown"} (arrives {arrivalTime})";
         }
         else if (onCooldown)

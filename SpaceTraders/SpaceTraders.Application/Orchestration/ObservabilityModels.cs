@@ -113,15 +113,15 @@ public sealed record ShipAssignmentSnapshot
     /// <summary>Human-readable description of the parent fleet goal, if any.</summary>
     public string? FleetGoalDescription { get; init; }
 
-    /// <summary>When the ship was assigned to its current goal.</summary>
-    public required DateTimeOffset AssignedAt { get; init; }
+    /// <summary>When the ship was assigned to its current goal, or <c>null</c> if not available.</summary>
+    public DateTimeOffset? AssignedAt { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ShipAssignmentSnapshot(
         string ShipSymbol,
         ShipGoalKind GoalKind,
         string GoalDescription,
-        DateTimeOffset AssignedAt,
+        DateTimeOffset? AssignedAt,
         string? SourceWaypoint = null,
         string? DestinationWaypoint = null,
         Guid? FleetGoalId = null,
