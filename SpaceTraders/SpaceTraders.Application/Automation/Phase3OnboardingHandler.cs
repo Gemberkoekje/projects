@@ -5,6 +5,7 @@ using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Commands.Sync;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Sync;
 using Wolverine;
@@ -106,15 +107,17 @@ public sealed class Phase3OnboardingHandler(
             return;
         }
 
-        await bus.InvokeAsync(new Commands.Ships.AssignShipCommand(
-            primaryShip.Symbol,
-            "Contract",
-            DestWaypoint: deliverable.DestinationSymbol,
-            CargoSymbol: deliverable.TradeSymbol,
+        var remaining = Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled);
+        var contractGoal = new FleetGoal(
+            Kind: FleetGoalKind.Contract,
+            Description: $"Deliver {remaining} {deliverable.TradeSymbol} to {deliverable.DestinationSymbol} for contract {starterContract.Id}.",
+            Priority: FleetGoalPriority.Contract,
             ContractId: starterContract.Id,
-            RequiredUnits: Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled),
-            SystemSymbol: primaryShip.SystemSymbol ?? string.Empty,
-            WaypointSymbol: primaryShip.WaypointSymbol ?? string.Empty), cancellationToken);
+            TradeSymbol: deliverable.TradeSymbol,
+            RemainingUnits: remaining,
+            Deadline: starterContract.TermsDeadline ?? starterContract.Expiration);
+
+        await bus.InvokeAsync(new AssignShipToGoalCommand(primaryShip.Symbol, contractGoal), cancellationToken);
 
         logger.LogInformation("Phase 3 onboarding assignment emitted for ship {Ship} and contract {ContractId}.", primaryShip.Symbol, starterContract.Id);
     }

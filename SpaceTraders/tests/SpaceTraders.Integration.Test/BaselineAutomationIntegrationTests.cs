@@ -20,6 +20,7 @@ using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Application.Sync;
+using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Integration.Test;
@@ -61,12 +62,11 @@ public sealed class BaselineAutomationIntegrationTests
         var snapshot = TestSnapshot.Load();
         var bus = Substitute.For<IMessageBus>();
         var ships = CreateShipRepository(snapshot.CreateShipModels());
-        var assignments = CreateAssignmentRepository(Array.Empty<ShipAssignmentDto>());
         var goal = new FleetGoal(FleetGoalKind.MarketCoverage, "Baseline market coverage", 40, OriginWaypoint: "X1-BQ60-A1");
         var orchestrator = new FleetOrchestrator(
             new[] { CreateEvaluator(goal) },
             ships,
-            assignments,
+            CreateEmptyShipGoalRepository(),
             CreateEmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -284,12 +284,12 @@ public sealed class BaselineAutomationIntegrationTests
             Arg.Any<PurchaseShipCommand>(),
             Arg.Any<CancellationToken>());
         await bus.Received().InvokeAsync(
-            Arg.Is<AssignShipCommand>(command =>
+            Arg.Is<AssignShipToGoalCommand>(command =>
                 command.ShipSymbol == CommandShipSymbol
-                && command.AssignmentType == "Contract"
-                && command.DestWaypoint == "X1-BQ60-D47"
-                && command.CargoSymbol == "FOOD"
-                && command.RequiredUnits == 30),
+                && command.Goal.Kind == FleetGoalKind.Contract
+                && command.Goal.ContractId == "contract-1"
+                && command.Goal.TradeSymbol == "FOOD"
+                && command.Goal.RemainingUnits == 30),
             Arg.Any<CancellationToken>());
     }
 
@@ -304,6 +304,13 @@ public sealed class BaselineAutomationIntegrationTests
     {
         var repo = Substitute.For<IFleetGoalRepository>();
         repo.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+        return repo;
+    }
+
+    private static IShipGoalRepository CreateEmptyShipGoalRepository()
+    {
+        var repo = Substitute.For<IShipGoalRepository>();
+        repo.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
         return repo;
     }
 

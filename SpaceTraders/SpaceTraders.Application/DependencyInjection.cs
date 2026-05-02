@@ -36,9 +36,6 @@ public static class DependencyInjection
         services.AddScoped<IAssignmentResolver, AssignmentResolver>();
         services.AddScoped<INavigationPlanningService, NavigationPlanningService>();
         services.AddScoped<IJumpGateCacheService, JumpGateCacheService>();
-        services.AddScoped<IContractObjectivePlanner, ContractObjectivePlanner>();
-        services.AddScoped<IFleetMaintenancePlanner, FleetMaintenancePlanner>();
-        services.AddScoped<IShipAssignmentPlanner, ShipAssignmentPlanner>();
 
         services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
         services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
@@ -83,6 +80,7 @@ public static class DependencyInjection
 
         // Phase 7f: Chain-of-command infrastructure deleted entirely.
         // Phase 12a: Deprecated planner infrastructure deleted.
+        // Phase 18: IContractObjectivePlanner, IFleetMaintenancePlanner, IShipAssignmentPlanner removed from DI.
 
         services.AddScoped<SyncAllShipsHandler>();
 

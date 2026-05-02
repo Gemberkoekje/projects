@@ -16,10 +16,6 @@ public sealed record PurchaseShipCommand
 
     public required string ShipyardWaypoint { get; init; }
 
-    public string TargetAssignmentType { get; init; } = string.Empty;
-
-    public string TargetOriginWaypoint { get; init; } = string.Empty;
-
     /// <summary>
     /// When set, the handler will emit an <see cref="AssignShipToGoalCommand"/> with this goal
     /// for the newly-purchased ship immediately after purchase.
@@ -30,14 +26,10 @@ public sealed record PurchaseShipCommand
     public PurchaseShipCommand(
         string ShipType,
         string ShipyardWaypoint,
-        string TargetAssignmentType = "",
-        string TargetOriginWaypoint = "",
         FleetGoal? TargetGoal = null)
     {
         this.ShipType = ShipType;
         this.ShipyardWaypoint = ShipyardWaypoint;
-        this.TargetAssignmentType = TargetAssignmentType;
-        this.TargetOriginWaypoint = TargetOriginWaypoint;
         this.TargetGoal = TargetGoal;
     }
 }
@@ -112,16 +104,6 @@ public sealed class PurchaseShipHandler(
             result.ShipNav.DestWaypointSymbol);
 
         await ships.UpsertAsync(newShip, cancellationToken);
-
-        if (!string.IsNullOrWhiteSpace(command.TargetAssignmentType))
-        {
-            await bus.SendAsync(new SpaceTraders.Application.Commands.Ships.AssignShipCommand(
-                result.ShipSymbol,
-                command.TargetAssignmentType,
-                OriginWaypoint: string.IsNullOrWhiteSpace(command.TargetOriginWaypoint) ? null : command.TargetOriginWaypoint,
-                SystemSymbol: result.ShipNav.SystemSymbol,
-                WaypointSymbol: result.ShipNav.WaypointSymbol));
-        }
 
         if (command.TargetGoal is not null)
         {

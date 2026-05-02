@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -143,24 +144,22 @@ public sealed class FleetExpansionDecisionHandler(
 
     private async Task<PurchaseShipCommand?> TryBuildMarketProbePurchaseAsync(string marketWaypoint, CancellationToken cancellationToken)
     {
+        var patrolGoal = new FleetGoal(
+            Kind: FleetGoalKind.MarketCoverage,
+            Description: $"Patrol market {marketWaypoint}",
+            Priority: FleetGoalPriority.MarketCoverage,
+            OriginWaypoint: marketWaypoint);
+
         var probeShipyard = await shipyards.FindShipyardForTypeAsync("SHIP_PROBE", cancellationToken);
         if (!string.IsNullOrWhiteSpace(probeShipyard))
         {
-            return new PurchaseShipCommand(
-                "SHIP_PROBE",
-                probeShipyard,
-                TargetAssignmentType: MarketProbeAssignmentType,
-                TargetOriginWaypoint: marketWaypoint);
+            return new PurchaseShipCommand("SHIP_PROBE", probeShipyard, TargetGoal: patrolGoal);
         }
 
         var satelliteShipyard = await shipyards.FindShipyardForTypeAsync("SHIP_SATELLITE", cancellationToken);
         if (!string.IsNullOrWhiteSpace(satelliteShipyard))
         {
-            return new PurchaseShipCommand(
-                "SHIP_SATELLITE",
-                satelliteShipyard,
-                TargetAssignmentType: MarketProbeAssignmentType,
-                TargetOriginWaypoint: marketWaypoint);
+            return new PurchaseShipCommand("SHIP_SATELLITE", satelliteShipyard, TargetGoal: patrolGoal);
         }
 
         return null;

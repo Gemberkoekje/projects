@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Orchestration;
@@ -20,12 +21,11 @@ public interface IFleetOrchestrator
 public sealed class FleetOrchestrator(
     IEnumerable<IFleetGoalEvaluator> evaluators,
     IShipRepository ships,
-    IShipAssignmentRepository assignments,
+    IShipGoalRepository shipGoals,
     IFleetGoalRepository fleetGoals,
     IMessageBus bus,
     ILogger<FleetOrchestrator> logger) : IFleetOrchestrator
 {
-    private const string IdleAssignmentType = "Idle";
 
     public async Task EvaluateAndAssignAsync(CancellationToken cancellationToken = default)
     {
@@ -67,16 +67,20 @@ public sealed class FleetOrchestrator(
             .ToList();
 
         var fleet = await ships.GetAllAsync(cancellationToken);
-        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
-        var assignmentByShip = activeAssignments
-            .Where(a => !a.CompletedAt.HasValue)
-            .GroupBy(a => a.ShipSymbol, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().AssignmentType, StringComparer.OrdinalIgnoreCase);
+
+        // A ship is idle when it has no active goal or its active goal is the IdleGoal sentinel.
+        var shipsWithActiveGoals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ship in fleet)
+        {
+            var activeGoal = await shipGoals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
+            if (activeGoal is not null and not IdleGoal)
+            {
+                shipsWithActiveGoals.Add(ship.Symbol);
+            }
+        }
 
         var idleShips = fleet
-            .Where(s => !assignmentByShip.TryGetValue(s.Symbol, out var t)
-                || string.IsNullOrWhiteSpace(t)
-                || t.Equals(IdleAssignmentType, StringComparison.OrdinalIgnoreCase))
+            .Where(s => !shipsWithActiveGoals.Contains(s.Symbol))
             .ToList();
 
         // Fleet expansion goals do not consume an idle ship; dispatch them regardless of idle capacity.
