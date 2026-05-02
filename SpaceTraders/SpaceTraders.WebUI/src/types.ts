@@ -360,3 +360,12 @@ export interface ShipActivityDto {
   fuelCapacity: number
   activityDescription: string
 }
+
+export interface ShipGoalHistoryDto {
+  id: string
+  goalKind: string
+  outcome: string        // 'Completed' | 'Blocked'
+  reason: string | null
+  startedAt: string
+  endedAt: string
+}
