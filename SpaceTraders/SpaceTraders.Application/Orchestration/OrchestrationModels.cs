@@ -108,6 +108,70 @@ public sealed record FleetCapacityEstimate
 }
 
 /// <summary>
+/// Describes how the output of a <see cref="ResourceProductionGoal"/> will be consumed.
+/// </summary>
+/// <remarks>Phase 9: introduced as part of the goal-driven architecture migration.</remarks>
+public enum ResourceProductionPurpose
+{
+    /// <summary>Resource is needed to fulfil a player contract.</summary>
+    Contract = 0,
+
+    /// <summary>Resource is needed to supply an active construction site.</summary>
+    Construction = 1,
+
+    /// <summary>Resource will be sold on the open market.</summary>
+    Market = 2,
+}
+
+/// <summary>
+/// An abstract resource need used by the fleet orchestrator to assign ships.
+/// The assignment resolver translates this into a concrete <see cref="SpaceTraders.Domain.Goals.ShipGoal"/>
+/// with specific waypoints; the orchestrator never references waypoints directly.
+/// </summary>
+/// <remarks>Phase 9: introduced as part of the goal-driven architecture migration.</remarks>
+public sealed record ResourceProductionGoal
+{
+    /// <summary>The SpaceTraders trade-symbol of the resource to produce (e.g. "BAUXITE").</summary>
+    public required string TradeSymbol { get; init; }
+
+    /// <summary>Number of units that still need to be produced to satisfy the goal.</summary>
+    public required int UnitsNeeded { get; init; }
+
+    /// <summary>Why the resource is being produced; used by the resolver to pick the right goal type.</summary>
+    public required ResourceProductionPurpose PurposeKind { get; init; }
+
+    /// <summary>
+    /// Optional identifier that qualifies the purpose:
+    /// a contract id when <see cref="PurposeKind"/> is <see cref="ResourceProductionPurpose.Contract"/>;
+    /// the construction-site waypoint symbol when it is <see cref="ResourceProductionPurpose.Construction"/>.
+    /// </summary>
+    public string? PurposeId { get; init; }
+
+    /// <summary>Optional deadline by which the units are needed.</summary>
+    public DateTimeOffset? Deadline { get; init; }
+
+    /// <summary>Higher values are processed first by the orchestrator.</summary>
+    public required int Priority { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ResourceProductionGoal(
+        string TradeSymbol,
+        int UnitsNeeded,
+        ResourceProductionPurpose PurposeKind,
+        int Priority,
+        string? PurposeId = null,
+        DateTimeOffset? Deadline = null)
+    {
+        this.TradeSymbol = TradeSymbol;
+        this.UnitsNeeded = UnitsNeeded;
+        this.PurposeKind = PurposeKind;
+        this.Priority = Priority;
+        this.PurposeId = PurposeId;
+        this.Deadline = Deadline;
+    }
+}
+
+/// <summary>
 /// Budget decision describing whether a proposed cost can be afforded
 /// while keeping the configured credit reserve untouched.
 /// </summary>

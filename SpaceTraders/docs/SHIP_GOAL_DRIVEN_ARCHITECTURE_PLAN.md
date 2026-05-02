@@ -280,28 +280,29 @@ Deliverables:
 - ✅ A ship can have a persisted active goal that survives restarts.
 - ✅ Domain event types for goal lifecycle exist.
 
-### Phase 9: Assignment resolver
+### Phase 9: Assignment resolver ✅
 
 Goal: translate abstract resource needs into concrete ship goals with specific waypoints.
 
 Tasks:
 
-- Add `IAssignmentResolver` to `SpaceTraders.Application/Interfaces`:
+- ✅ Add `IAssignmentResolver` to `SpaceTraders.Application/Interfaces`:
   ```csharp
-  Task<ShipGoal> ResolveAsync(ShipModel ship, ResourceProductionGoal goal, CancellationToken ct);
+  Task<ShipGoal?> ResolveAsync(ShipModel ship, ResourceProductionGoal goal, CancellationToken ct);
+  Task<string?> FindNearestSellMarketAsync(ShipModel ship, string tradeSymbol, CancellationToken ct);
   ```
-- Add `AssignmentResolver` implementation in `SpaceTraders.Application/Services` that:
+- ✅ Add `AssignmentResolver` implementation in `SpaceTraders.Application/Services` that:
   - Queries `IWaypointRepository` for waypoints matching the resource type and extraction method.
   - Computes coordinate distance from the ship's current system/waypoint.
   - Queries `IMarketRepository` to find sell waypoints.
   - Returns the most appropriate concrete `ShipGoal`.
-- Add `ResourceProductionGoal` record to `SpaceTraders.Application/Orchestration/OrchestrationModels.cs`.
-- Add unit tests for resolver: asteroid selection by distance, market sell resolution, fallback
+- ✅ Add `ResourceProductionGoal` record to `SpaceTraders.Application/Orchestration/OrchestrationModels.cs`.
+- ✅ Add unit tests for resolver: asteroid selection by distance, market sell resolution, fallback
   when no data is cached, and feasibility reporting.
 
 Deliverables:
 
-- Given an abstract resource need and a ship, the resolver produces a concrete goal with a specific
+- ✅ Given an abstract resource need and a ship, the resolver produces a concrete goal with a specific
   source waypoint.
 
 ### Phase 10: Ship goal executors
