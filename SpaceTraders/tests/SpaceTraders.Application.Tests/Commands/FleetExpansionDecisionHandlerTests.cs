@@ -4,6 +4,7 @@ using NSubstitute;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
@@ -60,7 +61,12 @@ public sealed class FleetExpansionDecisionHandlerTests
         await handler.Handle(MakeGoalCompleted(), CancellationToken.None);
 
         await bus.Received(1).SendAsync(
-            Arg.Is<PurchaseShipCommand>(c => c.ShipType == "SHIP_PROBE" && c.ShipyardWaypoint == "X1-AB-SHIPYARD" && c.TargetAssignmentType == "MarketProbe" && c.TargetOriginWaypoint == "X1-AB-MKT-1"),
+            Arg.Is<PurchaseShipCommand>(c =>
+                c.ShipType == "SHIP_PROBE" &&
+                c.ShipyardWaypoint == "X1-AB-SHIPYARD" &&
+                c.TargetGoal != null &&
+                c.TargetGoal.Kind == FleetGoalKind.MarketCoverage &&
+                c.TargetGoal.OriginWaypoint == "X1-AB-MKT-1"),
             Arg.Any<DeliveryOptions>());
     }
 

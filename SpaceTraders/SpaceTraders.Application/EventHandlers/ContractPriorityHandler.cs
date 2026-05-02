@@ -1,6 +1,9 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Commands.Fleet;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Domain.Events;
 using Wolverine;
 
@@ -38,6 +41,13 @@ public sealed class ContractPriorityHandler(
             return;
         }
 
+        var deliverable = GetFirstPendingDeliverable(contract.DeliverablesJson);
+        if (deliverable is null)
+        {
+            logger.LogDebug("Contract {ContractId} has no pending deliverables; skipping emergency reassign.", @event.ContractId);
+            return;
+        }
+
         var allShips = await ships.GetAllAsync(cancellationToken);
 
         foreach (var ship in allShips.Where(s => !s.IsInTransit))
@@ -62,11 +72,17 @@ public sealed class ContractPriorityHandler(
                     "Contract {ContractId} deadline critical ({Remaining} remaining). Emergency reassigning ship {Symbol}.",
                     @event.ContractId, @event.Remaining, ship.Symbol);
 
-                await bus.SendAsync(new AssignShipCommand(
-                    ship.Symbol,
-                    "Contract",
+                var remaining = Math.Max(0, deliverable.UnitsRequired - deliverable.UnitsFulfilled);
+                var contractGoal = new FleetGoal(
+                    Kind: FleetGoalKind.Contract,
+                    Description: $"Emergency: deliver {remaining} {deliverable.TradeSymbol} for contract {@event.ContractId}.",
+                    Priority: FleetGoalPriority.Contract,
                     ContractId: @event.ContractId,
-                    RequiredUnits: assignment?.RequiredUnits ?? 0));
+                    TradeSymbol: deliverable.TradeSymbol,
+                    RemainingUnits: remaining,
+                    Deadline: contract.TermsDeadline ?? contract.Expiration);
+
+                await bus.SendAsync(new AssignShipToGoalCommand(ship.Symbol, contractGoal));
 
                 // Reassign only one ship per event to avoid over-allocating
                 return;
@@ -76,5 +92,23 @@ public sealed class ContractPriorityHandler(
         logger.LogWarning(
             "Contract {ContractId} deadline critical but no eligible ship found for emergency reassignment.",
             @event.ContractId);
+    }
+
+    private static ContractDeliverableDto? GetFirstPendingDeliverable(string? deliverablesJson)
+    {
+        if (string.IsNullOrWhiteSpace(deliverablesJson))
+        {
+            return null;
+        }
+
+        try
+        {
+            var deliverables = JsonSerializer.Deserialize<List<ContractDeliverableDto>>(deliverablesJson) ?? [];
+            return deliverables.FirstOrDefault(d => d.UnitsRequired > d.UnitsFulfilled);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }

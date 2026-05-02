@@ -6,6 +6,7 @@ using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Orchestration;
@@ -19,11 +20,23 @@ public sealed class FleetOrchestratorTests
         return repo;
     }
 
-    private static IShipAssignmentRepository EmptyAssignments()
+    private static IShipGoalRepository EmptyShipGoalRepository()
     {
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
-        return assignments;
+        var repo = Substitute.For<IShipGoalRepository>();
+        repo.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+        return repo;
+    }
+
+    /// <summary>Returns a goal repository where the given ship has an active (non-idle) goal.</summary>
+    private static IShipGoalRepository ShipGoalRepositoryWithBusyShip(string busyShipSymbol)
+    {
+        var repo = Substitute.For<IShipGoalRepository>();
+        repo.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+        repo.GetActiveGoalAsync(
+                Arg.Is<string>(s => s.Equals(busyShipSymbol, StringComparison.OrdinalIgnoreCase)),
+                Arg.Any<CancellationToken>())
+            .Returns(new ScoutWaypointGoal { TargetWaypointSymbol = "X1-BUSY" });
+        return repo;
     }
 
     private static IShipRepository ShipsWith(params ShipModel[] fleet)
@@ -46,7 +59,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("HAULER-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 60));
-        var assignments = EmptyAssignments();
         var contractGoal = new FleetGoal(
             FleetGoalKind.Contract,
             "Deliver iron",
@@ -58,7 +70,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(contractGoal)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -82,7 +94,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
-        var assignments = EmptyAssignments();
 
         var contract = new FleetGoal(FleetGoalKind.Contract, "C", FleetGoalPriority.Contract, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
         var market = new FleetGoal(FleetGoalKind.MarketCoverage, "M", FleetGoalPriority.MarketCoverage, OriginWaypoint: "X1-MKT");
@@ -90,7 +101,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(market), EvaluatorReturning(contract)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -111,7 +122,6 @@ public sealed class FleetOrchestratorTests
         var ships = ShipsWith(
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30),
             new ShipModel("S2", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
-        var assignments = EmptyAssignments();
 
         var highPriority = new FleetGoal(FleetGoalKind.Contract, "High", FleetGoalPriority.Contract, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 1);
         var lowPriority = new FleetGoal(FleetGoalKind.MarketCoverage, "Low", FleetGoalPriority.MarketCoverage, OriginWaypoint: "X1-MKT");
@@ -119,7 +129,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(lowPriority, highPriority)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -150,17 +160,13 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("BUSY-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 60));
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
-            new ShipAssignmentDto("BUSY-1", "Trade", null, null, null, null, 0, DateTimeOffset.UtcNow, null),
-        ]);
 
         var goal = new FleetGoal(FleetGoalKind.Contract, "C", 100, ContractId: "c1", TradeSymbol: "ORE", RemainingUnits: 5);
 
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            ShipGoalRepositoryWithBusyShip("BUSY-1"),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -176,13 +182,12 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("PROBE-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100));
-        var assignments = EmptyAssignments();
         var goal = new FleetGoal(FleetGoalKind.MarketCoverage, "M", 40, OriginWaypoint: "X1-MKT-1");
 
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -203,13 +208,12 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
-        var assignments = EmptyAssignments();
         var goal = new FleetGoal(FleetGoalKind.FleetExpansion, "Expand", 30, EstimatedCost: 100_000);
 
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -230,7 +234,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("PROBE-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 0));
-        var assignments = EmptyAssignments();
         var goal = new FleetGoal(
             FleetGoalKind.MarketScouting,
             "Scout X1-MKT",
@@ -240,7 +243,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -262,10 +265,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("PROBE-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 0));
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
-            new ShipAssignmentDto("PROBE-1", "Scout", null, null, null, null, 0, DateTimeOffset.UtcNow, null),
-        ]);
         var goal = new FleetGoal(
             FleetGoalKind.MarketScouting,
             "Scout X1-MKT",
@@ -275,7 +274,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            ShipGoalRepositoryWithBusyShip("PROBE-1"),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -293,10 +292,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("HAULER-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 60));
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([
-            new ShipAssignmentDto("HAULER-1", "Contract", null, null, null, null, 0, DateTimeOffset.UtcNow, null),
-        ]);
 
         var contractGoal = new FleetGoal(
             FleetGoalKind.Contract,
@@ -316,7 +311,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(contractGoal, expansionGoal)],
             ships,
-            assignments,
+            ShipGoalRepositoryWithBusyShip("HAULER-1"),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -341,7 +336,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("MINER-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 40));
-        var assignments = EmptyAssignments();
         var goal = new FleetGoal(
             FleetGoalKind.Construction,
             "Supply FAB_MATS to X1-GATE",
@@ -353,7 +347,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(goal)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -376,7 +370,6 @@ public sealed class FleetOrchestratorTests
         var bus = Substitute.For<IMessageBus>();
         var ships = ShipsWith(
             new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30));
-        var assignments = EmptyAssignments();
 
         var highPriority = new FleetGoal(
             FleetGoalKind.MarketScouting,
@@ -392,7 +385,7 @@ public sealed class FleetOrchestratorTests
         var orchestrator = new FleetOrchestrator(
             [EvaluatorReturning(lowPriority, highPriority)],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);

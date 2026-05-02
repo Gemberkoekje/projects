@@ -9,6 +9,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Orchestration;
@@ -36,6 +37,13 @@ public sealed class Phase65cOrchestratorWiringTests
         return repo;
     }
 
+    private static IShipGoalRepository EmptyShipGoalRepository()
+    {
+        var repo = Substitute.For<IShipGoalRepository>();
+        repo.GetActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+        return repo;
+    }
+
     [Fact]
     public async Task Orchestrator_WhenIdleShipAndContractGoal_EmitsAssignShipToGoalCommandOnly()
     {
@@ -44,9 +52,6 @@ public sealed class Phase65cOrchestratorWiringTests
         var ships = Substitute.For<IShipRepository>();
         ships.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([new ShipModel("HAULER-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 60)]);
-
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
 
         var goal = new FleetGoal(
             FleetGoalKind.Contract,
@@ -62,7 +67,7 @@ public sealed class Phase65cOrchestratorWiringTests
         var orchestrator = new FleetOrchestrator(
             [evaluator],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
@@ -96,9 +101,6 @@ public sealed class Phase65cOrchestratorWiringTests
         ships.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([new ShipModel("S1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100, CargoCapacity: 30)]);
 
-        var assignments = Substitute.For<IShipAssignmentRepository>();
-        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
-
         var goal = new FleetGoal(
             FleetGoalKind.FleetExpansion,
             "Expand fleet",
@@ -111,7 +113,7 @@ public sealed class Phase65cOrchestratorWiringTests
         var orchestrator = new FleetOrchestrator(
             [evaluator],
             ships,
-            assignments,
+            EmptyShipGoalRepository(),
             EmptyFleetGoalRepository(),
             bus,
             NullLogger<FleetOrchestrator>.Instance);
