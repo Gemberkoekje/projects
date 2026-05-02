@@ -4,9 +4,9 @@ using NSubstitute;
 using SpaceTraders.Application.Commands.Fleet;
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.EventHandlers;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
-using SpaceTraders.Application.Planning;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -18,11 +18,12 @@ namespace SpaceTraders.Application.Tests.Orchestration;
 /// Phase 7b: ShipDockedIdleEventHandler tests removed (handler deleted).
 /// Phase 11b: orchestrator now emits <see cref="AssignShipToGoalCommand"/> instead of
 ///   <see cref="AssignShipCommand"/>; fleet expansion is dispatched via the same command.
+/// Phase 12a: planner-based end-to-end test replaced with goal-executor variant.
 /// Remaining tests verify that:
 ///   1. <see cref="FleetOrchestrator"/> emits <see cref="AssignShipToGoalCommand"/> and never issues
 ///      low-level Dock/Orbit/Navigate commands directly.
 ///   2. After the orchestrator assigns a ship, a subsequent <see cref="ShipAutomationTickEvent"/>
-///      causes the planner to execute exactly one command.
+///      causes the goal executor service to be invoked exactly once.
 ///   3. Fleet expansion is dispatched via <see cref="AssignShipToGoalCommand"/>; the handler
 ///      handles purchasing.
 /// </summary>
@@ -129,22 +130,22 @@ public sealed class Phase65cOrchestratorWiringTests
     }
 
     // ──────────────────────────────────────────────────────────────────────────────
-    // End-to-end: orchestrator assigns → ShipAutomationTickEvent → planner executes
+    // End-to-end: orchestrator assigns → ShipAutomationTickEvent → goal executor runs
     // ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task AfterOrchestratorAssigns_ShipAutomationTickEvent_ExecutesExactlyOnePlannerCommand()
+    public async Task AfterOrchestratorAssigns_ShipAutomationTickEvent_InvokesGoalExecutorServiceOnce()
     {
-        // Arrange: planner service that records calls
-        var planner = Substitute.For<IShipPlannerService>();
-        planner.PlanAndExecuteAsync("HAULER-1", Arg.Any<CancellationToken>())
-            .Returns(ShipPlannerDecision.Orbit("HAULER-1", "ready to proceed"));
+        // Arrange: goal executor service that records calls
+        var goalExecutorService = Substitute.For<IShipGoalExecutorService>();
+        goalExecutorService.ExecuteAsync("HAULER-1", Arg.Any<CancellationToken>())
+            .Returns((GoalExecutionResult?)null);
 
         var tickHandler = new ShipAutomationTickEventHandler(
-            planner,
+            goalExecutorService,
             NullLogger<ShipAutomationTickEventHandler>.Instance);
 
-        // Act: simulate what happens after the orchestrator sends AssignShipCommand and
+        // Act: simulate what happens after the orchestrator sends AssignShipToGoalCommand and
         // the next automation tick fires for the ship.
         var tick = new ShipAutomationTickEvent(
             "HAULER-1",
@@ -155,8 +156,7 @@ public sealed class Phase65cOrchestratorWiringTests
 
         await tickHandler.Handle(tick, CancellationToken.None);
 
-        // Assert: planner was invoked exactly once; no other commands were issued here
-        // (the planner service owns execution of those).
-        await planner.Received(1).PlanAndExecuteAsync("HAULER-1", Arg.Any<CancellationToken>());
+        // Assert: goal executor service was invoked exactly once.
+        await goalExecutorService.Received(1).ExecuteAsync("HAULER-1", Arg.Any<CancellationToken>());
     }
 }

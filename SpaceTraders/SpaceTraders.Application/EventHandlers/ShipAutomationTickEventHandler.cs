@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Goals;
-using SpaceTraders.Application.Planning;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.EventHandlers;
@@ -9,8 +8,8 @@ namespace SpaceTraders.Application.EventHandlers;
 /// Phase 5: single ship automation handler. Receives the explicit
 /// <see cref="ShipAutomationTickEvent"/> and delegates to the goal executor service so exactly
 /// one command (or none) is issued per decision point.
-/// Phase 10: delegates to <see cref="IShipGoalExecutorService"/> which routes to the goal
-/// executor when an active goal exists, and falls back to the legacy planner otherwise.
+/// Phase 10: delegates to <see cref="IShipGoalExecutorService"/> which routes to the goal executor.
+/// Phase 12a: legacy planner constructor and adapter removed.
 /// </summary>
 public sealed class ShipAutomationTickEventHandler
 {
@@ -23,18 +22,6 @@ public sealed class ShipAutomationTickEventHandler
     {
         _goalExecutorService = goalExecutorService;
         _logger = logger;
-    }
-
-    /// <summary>
-    /// Phase 10 backward-compatibility constructor: wraps a legacy <see cref="IShipPlannerService"/>
-    /// in a <see cref="LegacyPlannerGoalExecutorAdapter"/> so existing test wiring continues to work.
-    /// </summary>
-    [Obsolete("Phase 10: inject IShipGoalExecutorService directly. Will be removed in Phase 12.")]
-    public ShipAutomationTickEventHandler(
-        IShipPlannerService plannerService,
-        ILogger<ShipAutomationTickEventHandler> logger)
-        : this(new LegacyPlannerGoalExecutorAdapter(plannerService), logger)
-    {
     }
 
     public async Task Handle(ShipAutomationTickEvent @event, CancellationToken cancellationToken)
@@ -54,18 +41,5 @@ public sealed class ShipAutomationTickEventHandler
                 result.Outcome,
                 result.Reason);
         }
-    }
-}
-
-/// <summary>
-/// Phase 10: adapts the legacy <see cref="IShipPlannerService"/> to the new
-/// <see cref="IShipGoalExecutorService"/> contract so backward-compatible test wiring works.
-/// </summary>
-internal sealed class LegacyPlannerGoalExecutorAdapter(IShipPlannerService plannerService) : IShipGoalExecutorService
-{
-    public async Task<GoalExecutionResult?> ExecuteAsync(string shipSymbol, CancellationToken ct)
-    {
-        await plannerService.PlanAndExecuteAsync(shipSymbol, ct);
-        return null;
     }
 }

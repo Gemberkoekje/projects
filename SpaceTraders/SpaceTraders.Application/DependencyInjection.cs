@@ -16,11 +16,11 @@ namespace SpaceTraders.Application;
 /// </summary>
 /// <remarks>
 /// Phase 6.5d: All ship automation is now driven by <see cref="EventHandlers.ShipAutomationTickEventHandler"/>
-/// → <see cref="Planning.IShipPlannerService"/>. Chain-of-command business-effect handler registrations
-/// have been removed.
+/// → <see cref="Goals.IShipGoalExecutorService"/>.
 /// Phase 7d: <see cref="Events.Handlers.Ships.ShipInTransitEventHandler"/> converted to a plain Wolverine
 /// handler; chain DI registration removed.
 /// Phase 7f: Chain-of-command infrastructure deleted entirely.
+/// Phase 12a: Deprecated planner infrastructure removed.
 /// </remarks>
 public static class DependencyInjection
 {
@@ -42,22 +42,6 @@ public static class DependencyInjection
         services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
         services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
         services.AddScoped<IInTransitCommandAcceptor, InTransitCommandAcceptor>();
-
-        // Phase 3: ship planner boundary. Planners are pure decision components; the
-        // ShipPlannerService loads context and dispatches a single command per decision via
-        // the command acceptors. Phase 6.5d: chain-of-command business handlers removed;
-        // planners are now the sole source of ship automation decisions.
-        // Phase 4b: cross-cutting planners (fuel recovery, maintenance) are registered first
-        // so they can preempt the role planner when applicable; if they return None the
-        // planner service falls through to the next matching planner.
-        services.AddScoped<Planning.IShipPlanner, Planning.FuelRecoveryShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.MaintenanceShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.MiningShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.TradingShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.ContractShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.ScoutingShipPlanner>();
-        services.AddScoped<Planning.IShipPlanner, Planning.BuilderShipPlanner>();
-        services.AddScoped<Planning.IShipPlannerService, Planning.ShipPlannerService>();
 
         // Phase 6: orchestrator goal evaluation. The orchestrator owns strategic goals,
         // capacity estimation, and budget policy. It assigns work to ships via
@@ -88,10 +72,8 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, PatrolMarketGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
 
-        // Phase 6.5d: Business-effect chain handler registrations have been removed.
-        // ShipAutomationTickEventHandler → ShipPlannerService now covers all docked, in-orbit,
-        // and in-transit decision points.
         // Phase 7f: Chain-of-command infrastructure deleted entirely.
+        // Phase 12a: Deprecated planner infrastructure deleted.
 
         services.AddScoped<SyncAllShipsHandler>();
 

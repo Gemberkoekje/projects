@@ -3,7 +3,6 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Planning;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events.Ships;
@@ -16,7 +15,7 @@ namespace SpaceTraders.Application.Goals;
 /// Phase 10: orchestrates goal-driven ship automation.
 /// Loads the ship's active goal, builds <see cref="ShipGoalContext"/>, selects the matching
 /// <see cref="IShipGoalExecutor"/>, and handles the <see cref="GoalExecutionResult"/> lifecycle.
-/// Falls back to the legacy <see cref="IShipPlannerService"/> when the ship has no active goal.
+/// Phase 12a: planner fallback removed; ships without an active goal are treated as idle.
 /// </summary>
 public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
@@ -31,7 +30,6 @@ public sealed class ShipGoalExecutorService(
     IContractRepository contracts,
     ISettingsRepository settings,
     IAssignmentResolver assignmentResolver,
-    IShipPlannerService plannerService,
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
@@ -49,10 +47,9 @@ public sealed class ShipGoalExecutorService(
 
         var activeGoal = await goals.GetActiveGoalAsync(shipSymbol, ct);
 
-        // No goal or Idle: fall back to the legacy planner for backward compatibility.
-        if (activeGoal is null or IdleGoal)
+        // No active goal: ship is idle, nothing to do.
+        if (activeGoal is null)
         {
-            await plannerService.PlanAndExecuteAsync(shipSymbol, ct);
             return null;
         }
 

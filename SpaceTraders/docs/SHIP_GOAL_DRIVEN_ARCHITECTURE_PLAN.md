@@ -689,15 +689,18 @@ Goal: remove deprecated planner infrastructure and add first-class capability tr
 
 Tasks:
 
-- Delete `IShipPlanner`, `ShipPlannerDecision`, `ShipPlannerCommandKind`, `ShipPlannerContext`,
+- ✅ Delete `IShipPlanner`, `ShipPlannerDecision`, `ShipPlannerCommandKind`, `ShipPlannerContext`,
   `ShipPlannerService`, and all concrete `*ShipPlanner.cs` files.
-- Remove all `ShipPlannerDecision`-related DI registrations from the composition root.
-- Verify that no compilation errors remain after removal (the goal executor layer must already
+- ✅ Remove all `ShipPlannerDecision`-related DI registrations from the composition root.
+- ✅ Remove legacy planner fallback from `ShipGoalExecutorService`; remove obsolete constructor
+  and `LegacyPlannerGoalExecutorAdapter` from `ShipAutomationTickEventHandler`.
+- ✅ Delete all `Planning/` test files and update affected event-handler and orchestrator tests.
+- ✅ Verify that no compilation errors remain after removal (the goal executor layer must already
   cover all ship types that had a planner).
 
 Deliverables:
 
-- Planner layer removed; the codebase compiles cleanly without any planner types.
+- ✅ Planner layer removed; the codebase compiles cleanly without any planner types.
 
 #### Phase 12b: Add `ShipCapabilityRegistry`
 

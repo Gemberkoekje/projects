@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.EventHandlers;
-using SpaceTraders.Application.Planning;
+using SpaceTraders.Application.Goals;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Tests.EventHandlers;
@@ -10,13 +10,13 @@ namespace SpaceTraders.Application.Tests.EventHandlers;
 public sealed class ShipAutomationTickEventHandlerTests
 {
     [Fact]
-    public async Task Handle_DelegatesToPlannerService()
+    public async Task Handle_DelegatesToGoalExecutorService()
     {
-        var planner = Substitute.For<IShipPlannerService>();
-        planner.PlanAndExecuteAsync("SHIP-1", Arg.Any<CancellationToken>())
-            .Returns(ShipPlannerDecision.None("SHIP-1", "no-op"));
+        var goalExecutorService = Substitute.For<IShipGoalExecutorService>();
+        goalExecutorService.ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns((GoalExecutionResult?)null);
 
-        var handler = new ShipAutomationTickEventHandler(planner, NullLogger<ShipAutomationTickEventHandler>.Instance);
+        var handler = new ShipAutomationTickEventHandler(goalExecutorService, NullLogger<ShipAutomationTickEventHandler>.Instance);
 
         var @event = new ShipAutomationTickEvent(
             "SHIP-1",
@@ -27,7 +27,7 @@ public sealed class ShipAutomationTickEventHandlerTests
 
         await handler.Handle(@event, CancellationToken.None);
 
-        await planner.Received(1).PlanAndExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
+        await goalExecutorService.Received(1).ExecuteAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     /// <summary>
