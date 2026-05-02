@@ -23,6 +23,7 @@ public enum FleetGoalKind
     Construction,
     MarketCoverage,
     FleetExpansion,
+    MarketScouting,
 }
 
 /// <summary>

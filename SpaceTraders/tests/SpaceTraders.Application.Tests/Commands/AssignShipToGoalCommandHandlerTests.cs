@@ -300,4 +300,42 @@ public sealed class AssignShipToGoalCommandHandlerTests
 
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
     }
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // MarketScouting goal
+    // ────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_MarketScouting_UsesResolverAndActivatesGoal()
+    {
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-MKT" };
+        _resolver
+            .ResolveMarketCoverageAsync("X1-AB-MKT", Arg.Any<CancellationToken>())
+            .Returns(scoutGoal);
+
+        var fleetGoal = new FleetGoal(
+            FleetGoalKind.MarketScouting,
+            "Scout stale market",
+            Priority: FleetGoalPriority.MarketScouting,
+            OriginWaypoint: "X1-AB-MKT");
+
+        await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
+
+        await _resolver.Received(1).ResolveMarketCoverageAsync("X1-AB-MKT", Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync("SHIP-1", scoutGoal, Arg.Any<CancellationToken>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<ShipAutomationTickEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "GoalAssigned"),
+            Arg.Any<DeliveryOptions>());
+    }
+
+    [Fact]
+    public async Task Handle_MarketScouting_WhenNoOriginWaypoint_DoesNotSetGoal()
+    {
+        var fleetGoal = new FleetGoal(FleetGoalKind.MarketScouting, "Scout stale market", FleetGoalPriority.MarketScouting);
+
+        await CreateHandler().Handle(new AssignShipToGoalCommand("SHIP-1", fleetGoal), CancellationToken.None);
+
+        await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
+        await _bus.DidNotReceive().PublishAsync(Arg.Any<ShipAutomationTickEvent>(), Arg.Any<DeliveryOptions>());
+    }
 }

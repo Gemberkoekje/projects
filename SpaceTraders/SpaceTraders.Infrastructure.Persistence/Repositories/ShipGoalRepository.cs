@@ -79,4 +79,29 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default)
+    {
+        var payloads = await db.Ships
+            .Where(s => s.GoalKind == "ScoutWaypoint" && s.GoalPayloadJson != null)
+            .Select(s => s.GoalPayloadJson)
+            .ToListAsync(cancellationToken);
+
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var json in payloads)
+        {
+            if (json is null)
+            {
+                continue;
+            }
+
+            var goal = JsonSerializer.Deserialize<ShipGoal>(json, JsonOptions);
+            if (goal is ScoutWaypointGoal scout && !string.IsNullOrWhiteSpace(scout.TargetWaypointSymbol))
+            {
+                targets.Add(scout.TargetWaypointSymbol);
+            }
+        }
+
+        return targets;
+    }
 }
