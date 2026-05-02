@@ -55,6 +55,9 @@ public static class DependencyInjection
         services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketScoutingGoalEvaluator>();
         services.AddScoped<Orchestration.IFleetOrchestrator, Orchestration.FleetOrchestrator>();
 
+        // Phase 15a/15b: observability read-model (FleetStatusQueryService is the concrete implementation from Phase 15b).
+        services.AddScoped<IFleetStatusQueryService, FleetStatusQueryService>();
+
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
         services.AddScoped<IMarketRefreshService, MarketRefreshService>();
         services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();

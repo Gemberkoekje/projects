@@ -976,7 +976,7 @@ the foundation for the API endpoints and dashboard in Phases 16 and 17.
 
 Each sub-phase defines one record and one query method, then implements and tests it independently.
 
-#### Phase 15a: Define `OrchestratorGoalChain` record and `IFleetStatusQueryService` interface
+#### Phase 15a: Define `OrchestratorGoalChain` record and `IFleetStatusQueryService` interface ✅
 
 Tasks:
 
@@ -1005,10 +1005,10 @@ Tasks:
 
 Deliverables:
 
-- `OrchestratorGoalChain`, `ResourceNeedEntry`, and `IFleetStatusQueryService` exist and compile.
-- DI wiring is in place; the application starts with the stub.
+- ✅ `OrchestratorGoalChain`, `ResourceNeedEntry`, and `IFleetStatusQueryService` exist and compile.
+- ✅ DI wiring is in place; the application starts with the stub.
 
-#### Phase 15b: Implement `GetGoalChainsAsync` and unit tests
+#### Phase 15b: Implement `GetGoalChainsAsync` and unit tests ✅
 
 Tasks:
 
@@ -1028,9 +1028,9 @@ Tasks:
 
 Deliverables:
 
-- `GetGoalChainsAsync` returns the full orchestrator intent tree with delivery progress and assigned ships.
+- ✅ `GetGoalChainsAsync` returns the full orchestrator intent tree with delivery progress and assigned ships.
 
-#### Phase 15c: Define `ShipAssignmentSnapshot` record and extend `IFleetStatusQueryService`
+#### Phase 15c: Define `ShipAssignmentSnapshot` record and extend `IFleetStatusQueryService` ✅
 
 Tasks:
 
@@ -1054,9 +1054,9 @@ Tasks:
 
 Deliverables:
 
-- `ShipAssignmentSnapshot` and `GetAssignmentsAsync` exist and compile.
+- ✅ `ShipAssignmentSnapshot` and `GetAssignmentsAsync` exist and compile.
 
-#### Phase 15d: Implement `GetAssignmentsAsync` and unit tests
+#### Phase 15d: Implement `GetAssignmentsAsync` and unit tests ✅
 
 Tasks:
 
@@ -1074,9 +1074,9 @@ Tasks:
 
 Deliverables:
 
-- Every ship's assignment is queryable with the fleet goal it serves.
+- ✅ Every ship's assignment is queryable with the fleet goal it serves.
 
-#### Phase 15e: Define `ShipActivitySnapshot` record and extend `IFleetStatusQueryService`
+#### Phase 15e: Define `ShipActivitySnapshot` record and extend `IFleetStatusQueryService` ✅
 
 Tasks:
 
@@ -1105,9 +1105,9 @@ Tasks:
 
 Deliverables:
 
-- `ShipActivitySnapshot` and both activity query methods exist and compile.
+- ✅ `ShipActivitySnapshot` and both activity query methods exist and compile.
 
-#### Phase 15f: Implement activity snapshots and unit tests
+#### Phase 15f: Implement activity snapshots and unit tests ✅
 
 Tasks:
 
@@ -1125,7 +1125,7 @@ Tasks:
 
 Deliverables:
 
-- Every ship's live state is queryable as a structured snapshot with a human-readable summary.
+- ✅ Every ship's live state is queryable as a structured snapshot with a human-readable summary.
 
 ---
 
