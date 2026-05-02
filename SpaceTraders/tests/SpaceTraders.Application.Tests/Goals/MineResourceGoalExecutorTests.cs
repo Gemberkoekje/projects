@@ -5,6 +5,7 @@ using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
@@ -18,8 +19,9 @@ public sealed class MineResourceGoalExecutorTests
     private readonly IInOrbitCommandAcceptor _inOrbit = Substitute.For<IInOrbitCommandAcceptor>();
     private readonly IDockedCommandAcceptor _docked = Substitute.For<IDockedCommandAcceptor>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
+    private readonly IShipCapabilityRegistry _capabilityRegistry = new ShipCapabilityRegistry();
 
-    private MineResourceGoalExecutor CreateExecutor() => new(_inOrbit, _docked, _bus);
+    private MineResourceGoalExecutor CreateExecutor() => new(_inOrbit, _docked, _bus, _capabilityRegistry);
 
     private static ShipModel Ship(
         string waypoint = "X1-AB-AST",

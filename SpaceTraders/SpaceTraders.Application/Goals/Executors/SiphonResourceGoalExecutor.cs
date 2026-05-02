@@ -1,6 +1,7 @@
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -12,11 +13,13 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Phase 10: executor for <see cref="SiphonResourceGoal"/>.
 /// Handles the full siphon → sell cycle from any starting state.
+/// Phase 12b: capability validation delegated to <see cref="IShipCapabilityRegistry"/>.
 /// </summary>
 public sealed class SiphonResourceGoalExecutor(
     IInOrbitCommandAcceptor inOrbitCommands,
     IDockedCommandAcceptor dockedCommands,
-    IMessageBus bus) : IShipGoalExecutor
+    IMessageBus bus,
+    IShipCapabilityRegistry capabilityRegistry) : IShipGoalExecutor
 {
     private const decimal CriticalFuelRatio = 0.15m;
 
@@ -26,7 +29,7 @@ public sealed class SiphonResourceGoalExecutor(
     {
         var siphonGoal = (SiphonResourceGoal)goal;
 
-        if (!ship.HasGasSiphonEquipment)
+        if (!capabilityRegistry.GetCapabilities(ship).CanSiphon)
         {
             return GoalExecutionResult.Blocked("Ship has no gas siphon equipment.");
         }
