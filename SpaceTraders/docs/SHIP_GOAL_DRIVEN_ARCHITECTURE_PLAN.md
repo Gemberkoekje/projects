@@ -1439,7 +1439,7 @@ Deliverables:
   description, current assignment, the fleet goal it serves, and a short history of recently
   completed or blocked goals.
 
-#### Phase 17h: Front-end tests
+#### Phase 17h: Front-end tests ✅
 
 Tasks:
 
