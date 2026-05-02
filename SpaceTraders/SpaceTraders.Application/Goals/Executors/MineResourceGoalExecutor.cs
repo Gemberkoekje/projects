@@ -1,6 +1,7 @@
 using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Goals;
@@ -12,11 +13,13 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Phase 10: executor for <see cref="MineResourceGoal"/>.
 /// Handles the full mine → sell cycle from any starting state.
+/// Phase 12b: capability validation delegated to <see cref="IShipCapabilityRegistry"/>.
 /// </summary>
 public sealed class MineResourceGoalExecutor(
     IInOrbitCommandAcceptor inOrbitCommands,
     IDockedCommandAcceptor dockedCommands,
-    IMessageBus bus) : IShipGoalExecutor
+    IMessageBus bus,
+    IShipCapabilityRegistry capabilityRegistry) : IShipGoalExecutor
 {
     private const decimal CriticalFuelRatio = 0.15m;
 
@@ -25,8 +28,9 @@ public sealed class MineResourceGoalExecutor(
     public async Task<GoalExecutionResult> ExecuteStepAsync(ShipModel ship, ShipGoal goal, ShipGoalContext ctx, CancellationToken ct)
     {
         var mineGoal = (MineResourceGoal)goal;
+        var caps = capabilityRegistry.GetCapabilities(ship);
 
-        if (!ship.HasMiningEquipment)
+        if (!caps.CanMine)
         {
             return GoalExecutionResult.Blocked("Ship has no mining equipment (no mining mount or miner frame).");
         }
@@ -50,7 +54,7 @@ public sealed class MineResourceGoalExecutor(
 
         if (atSource)
         {
-            return await PlanAtSourceAsync(ship, mineGoal, ctx, ct);
+            return await PlanAtSourceAsync(ship, mineGoal, ctx, caps, ct);
         }
 
         return await PlanNavigatingToSourceAsync(ship, mineGoal, ctx, ct);
@@ -113,7 +117,7 @@ public sealed class MineResourceGoalExecutor(
         return GoalExecutionResult.Progressing("Orbiting to continue mining cycle.");
     }
 
-    private async Task<GoalExecutionResult> PlanAtSourceAsync(ShipModel ship, MineResourceGoal goal, ShipGoalContext ctx, CancellationToken ct)
+    private async Task<GoalExecutionResult> PlanAtSourceAsync(ShipModel ship, MineResourceGoal goal, ShipGoalContext ctx, ShipCapabilities caps, CancellationToken ct)
     {
         // Check cooldown.
         var now = TimeProvider.System.GetUtcNow();
@@ -136,7 +140,7 @@ public sealed class MineResourceGoalExecutor(
         }
 
         // Survey if needed.
-        if (ship.HasSurveyEquipment && ctx.ActiveSurveyCount == 0)
+        if (caps.CanSurvey && ctx.ActiveSurveyCount == 0)
         {
             await inOrbitCommands.SurveyAsync(ship.Symbol, ct);
             return GoalExecutionResult.Progressing("Surveying before extraction.");

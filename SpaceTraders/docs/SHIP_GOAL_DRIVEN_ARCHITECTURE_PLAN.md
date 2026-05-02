@@ -706,16 +706,16 @@ Deliverables:
 
 Tasks:
 
-- Add a `ShipCapabilityRegistry` service to `SpaceTraders.Application/Services` that classifies
+- ✅ Add a `ShipCapabilityRegistry` service to `SpaceTraders.Application/Services` that classifies
   ships by capabilities derived from their cached mounts and frame:
   - `CanMine`, `CanSiphon`, `CanSurvey`, `HasCargo`, `HasFuelTank`, `CanRepair`.
-- Expose the registry via `IShipCapabilityRegistry` in `SpaceTraders.Application/Interfaces`.
-- Update goal executors to delegate capability validation to `IShipCapabilityRegistry` instead of
+- ✅ Expose the registry via `IShipCapabilityRegistry` in `SpaceTraders.Application/Interfaces`.
+- ✅ Update goal executors to delegate capability validation to `IShipCapabilityRegistry` instead of
   inspecting `ShipModel.Mounts` directly.
 
 Deliverables:
 
-- Ship capability is derived from game data through a single registry rather than duplicated checks.
+- ✅ Ship capability is derived from game data through a single registry rather than duplicated checks.
 
 #### Phase 12c: Update `FleetCapacityEstimator`
 
@@ -734,14 +734,14 @@ Deliverables:
 
 Tasks:
 
-- Add a `ShipCapabilityRegistryTests` suite covering:
-  - Each capability flag is correctly set for ships with the relevant mount or frame.
-  - Ships missing a mount or frame have the corresponding flag as `false`.
-  - A ship with multiple relevant mounts has all corresponding flags set.
+- ✅ Add a `ShipCapabilityRegistryTests` suite covering:
+  - ✅ Each capability flag is correctly set for ships with the relevant mount or frame.
+  - ✅ Ships missing a mount or frame have the corresponding flag as `false`.
+  - ✅ A ship with multiple relevant mounts has all corresponding flags set.
 
 Deliverables:
 
-- Full unit test coverage for `ShipCapabilityRegistry`.
+- ✅ Full unit test coverage for `ShipCapabilityRegistry`.
 
 ### Phase 13: Event rationalization
 

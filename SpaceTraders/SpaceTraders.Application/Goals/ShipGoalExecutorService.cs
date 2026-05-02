@@ -16,6 +16,7 @@ namespace SpaceTraders.Application.Goals;
 /// Loads the ship's active goal, builds <see cref="ShipGoalContext"/>, selects the matching
 /// <see cref="IShipGoalExecutor"/>, and handles the <see cref="GoalExecutionResult"/> lifecycle.
 /// Phase 12a: planner fallback removed; ships without an active goal are treated as idle.
+/// Phase 12b: capability checks delegated to <see cref="IShipCapabilityRegistry"/>.
 /// </summary>
 public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
@@ -30,6 +31,7 @@ public sealed class ShipGoalExecutorService(
     IContractRepository contracts,
     ISettingsRepository settings,
     IAssignmentResolver assignmentResolver,
+    IShipCapabilityRegistry capabilityRegistry,
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
@@ -146,7 +148,7 @@ public sealed class ShipGoalExecutorService(
         ShipGoal goal,
         CancellationToken ct)
     {
-        var activeSurveys = ship.HasSurveyEquipment && !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
+        var activeSurveys = capabilityRegistry.GetCapabilities(ship).CanSurvey && !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
             ? (await surveys.GetActiveByWaypointAsync(ship.WaypointSymbol, ct)).Count
             : 0;
 
