@@ -97,6 +97,88 @@ public sealed class FleetGoalEvaluatorTests
     }
 
     [Fact]
+    public async Task ContractGoalEvaluator_EmitsCorrectDefaultPriority()
+    {
+        var contracts = Substitute.For<IContractRepository>();
+        var deliverables = new[]
+        {
+            new ContractDeliverableDto("IRON_ORE", "X1-AB-DEST", 100, 0),
+        };
+        contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
+            new ContractDto("c1", "COSMIC", "PROCURE", true, false, null, null,
+                TermsDeadline: DateTimeOffset.UtcNow.AddDays(2),
+                DeliverablesJson: JsonSerializer.Serialize(deliverables)),
+        ]);
+
+        var evaluator = new ContractGoalEvaluator(contracts);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].Priority.Should().Be(FleetGoalPriority.Contract);
+    }
+
+    [Fact]
+    public async Task ConstructionGoalEvaluator_EmitsCorrectDefaultPriority()
+    {
+        var constructions = Substitute.For<IConstructionRepository>();
+        constructions.GetIncompleteAsync(Arg.Any<CancellationToken>()).Returns([
+            new ConstructionSiteModel("X1-AB-GATE", false, [
+                new ConstructionMaterialModel("FAB_MATS", 1000, 0),
+            ]),
+        ]);
+
+        var evaluator = new ConstructionGoalEvaluator(constructions);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].Priority.Should().Be(FleetGoalPriority.Construction);
+    }
+
+    [Fact]
+    public async Task MarketCoverageGoalEvaluator_EmitsCorrectDefaultPriority()
+    {
+        var ships = Substitute.For<IShipRepository>();
+        ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([
+            new ShipModel("S1", "X1-AB", "X1-AB-1", "DOCKED", "CRUISE", 100, 100),
+        ]);
+        var waypoints = Substitute.For<IWaypointRepository>();
+        waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
+            new WaypointCacheModel("X1-AB-MKT-1", "X1-AB", "PLANET", 0, 0, true, false, DateTimeOffset.UtcNow),
+        ]);
+        var assignments = Substitute.For<IShipAssignmentRepository>();
+        assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        var evaluator = new MarketCoverageGoalEvaluator(ships, waypoints, assignments);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].Priority.Should().Be(FleetGoalPriority.MarketCoverage);
+    }
+
+    [Fact]
+    public async Task FleetExpansionGoalEvaluator_EmitsCorrectDefaultPriority()
+    {
+        var capacity = Substitute.For<IFleetCapacityEstimator>();
+        capacity.EstimateAsync(Arg.Any<CancellationToken>()).Returns(
+            new FleetCapacityEstimate(2, 1, 1, 0, 0, IdleShips: 0, TotalCargoCapacity: 60, IdleCargoCapacity: 0));
+        var budget = Substitute.For<IBudgetPolicy>();
+        budget.EvaluateAsync(0, Arg.Any<CancellationToken>()).Returns(
+            new BudgetDecision(true, 500_000, 100_000, 400_000));
+        var settings = Substitute.For<ISettingsRepository>();
+        settings.GetAsync<int>("FleetExpansion.MaxShips", Arg.Any<CancellationToken>()).Returns(10);
+        var agents = Substitute.For<IAgentRepository>();
+        agents.GetAsync(Arg.Any<CancellationToken>()).Returns(new AgentModel("A", null, null, 500_000, "COSMIC", 2));
+        var shipyards = Substitute.For<IShipyardRepository>();
+        shipyards.FindShipyardForTypeAsync("SHIP_PROBE", Arg.Any<CancellationToken>()).Returns("X1-AB-SHIPYARD");
+
+        var evaluator = new FleetExpansionGoalEvaluator(capacity, budget, settings, agents, shipyards);
+        var goals = await evaluator.EvaluateAsync(CancellationToken.None);
+
+        goals.Should().HaveCount(1);
+        goals[0].Priority.Should().Be(FleetGoalPriority.FleetExpansion);
+    }
+
+    [Fact]
     public async Task FleetExpansionGoalEvaluator_SkipsWhenIdleShipsExist()
     {
         var capacity = Substitute.For<IFleetCapacityEstimator>();

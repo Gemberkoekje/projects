@@ -38,7 +38,7 @@ public sealed class ContractGoalEvaluator(IContractRepository contracts) : IFlee
                 goals.Add(new FleetGoal(
                     Kind: FleetGoalKind.Contract,
                     Description: $"Deliver {remaining} {deliverable.TradeSymbol} to {deliverable.DestinationSymbol} for contract {contract.Id}.",
-                    Priority: 100,
+                    Priority: FleetGoalPriority.Contract,
                     ContractId: contract.Id,
                     TradeSymbol: deliverable.TradeSymbol,
                     RemainingUnits: remaining,
@@ -86,7 +86,7 @@ public sealed class ConstructionGoalEvaluator(IConstructionRepository constructi
                 goals.Add(new FleetGoal(
                     Kind: FleetGoalKind.Construction,
                     Description: $"Supply {remaining} {material.TradeSymbol} to construction site {site.WaypointSymbol}.",
-                    Priority: 80,
+                    Priority: FleetGoalPriority.Construction,
                     TradeSymbol: material.TradeSymbol,
                     DestinationWaypoint: site.WaypointSymbol,
                     RemainingUnits: remaining));
@@ -158,7 +158,7 @@ public sealed class MarketCoverageGoalEvaluator(
             goals.Add(new FleetGoal(
                 Kind: FleetGoalKind.MarketCoverage,
                 Description: $"Place market probe at {market}.",
-                Priority: 40,
+                Priority: FleetGoalPriority.MarketCoverage,
                 OriginWaypoint: market));
         }
 
@@ -229,7 +229,7 @@ public sealed class FleetExpansionGoalEvaluator(
         return [new FleetGoal(
             Kind: FleetGoalKind.FleetExpansion,
             Description: description,
-            Priority: 30,
+            Priority: FleetGoalPriority.FleetExpansion,
             EstimatedCost: decision.SpendableCredits,
             ExpansionShipType: shipType,
             ExpansionShipyardWaypoint: shipyardWaypoint)];

@@ -544,7 +544,7 @@ Deliverables:
 - Fleet expansion transitions from advisory to actionable: a purchase command is emitted and the
   new ship is immediately assigned to the bottleneck goal.
 
-#### Phase 11d: `FleetGoal` priority field
+#### Phase 11d: `FleetGoal` priority field ✅
 
 Goal: add the `priority` field to `FleetGoal` and ensure every evaluator sets a sensible default.
 
