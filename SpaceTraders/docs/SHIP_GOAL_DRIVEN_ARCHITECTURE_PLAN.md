@@ -260,25 +260,25 @@ FleetOrchestrator reacts to completion (re-evaluates on next tick)
 The current codebase is at the end of Phase 7: clean, planner-driven, no chain infrastructure.
 Migration to goal-driven architecture proceeds in five phases.
 
-### Phase 8: Goal model and persistence
+### Phase 8: Goal model and persistence ✅
 
 Goal: introduce the goal type hierarchy and persist active goals per ship.
 
 Tasks:
 
-- Define `ShipGoalKind` enum and `ShipGoal` sealed record hierarchy (one subtype per goal type) in
+- ✅ Define `ShipGoalKind` enum and `ShipGoal` sealed record hierarchy (one subtype per goal type) in
   `SpaceTraders.Domain`.
-- Add `GoalId`, `GoalKind`, `GoalPayloadJson`, and `GoalStatus` columns to `cached_ships` (or a
+- ✅ Add `GoalId`, `GoalKind`, `GoalPayloadJson`, and `GoalStatus` columns to `cached_ships` (or a
   separate `ship_goals` table).
-- Add `IShipGoalRepository` to `SpaceTraders.Application/Interfaces/Repositories`.
-- Add `ShipGoalRepository` implementation in `SpaceTraders.Infrastructure.Persistence`.
-- Add `GoalCompletedEvent` and `GoalBlockedEvent` to `SpaceTraders.Domain/Events/Ships`.
-- Add unit tests for goal serialization, persistence roundtrip, and event payload preservation.
+- ✅ Add `IShipGoalRepository` to `SpaceTraders.Application/Interfaces/Repositories`.
+- ✅ Add `ShipGoalRepository` implementation in `SpaceTraders.Infrastructure.Persistence`.
+- ✅ Add `GoalCompletedEvent` and `GoalBlockedEvent` to `SpaceTraders.Domain/Events/Ships`.
+- ✅ Add unit tests for goal serialization, persistence roundtrip, and event payload preservation.
 
 Deliverables:
 
-- A ship can have a persisted active goal that survives restarts.
-- Domain event types for goal lifecycle exist.
+- ✅ A ship can have a persisted active goal that survives restarts.
+- ✅ Domain event types for goal lifecycle exist.
 
 ### Phase 9: Assignment resolver
 

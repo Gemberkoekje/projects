@@ -95,6 +95,10 @@ public sealed class SpaceTradersDbContext(
             entity.Property(x => x.FlightMode).HasMaxLength(50);
             entity.Property(x => x.LocalStatus).HasDefaultValue(ShipLocalStatus.None);
             entity.Property(x => x.ShipType).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.GoalId);
+            entity.Property(x => x.GoalKind).HasMaxLength(100);
+            entity.Property(x => x.GoalPayloadJson);
+            entity.Property(x => x.GoalStatus);
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 
