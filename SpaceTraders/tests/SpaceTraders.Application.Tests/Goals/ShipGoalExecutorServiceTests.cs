@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -34,6 +35,7 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IAssignmentResolver _assignmentResolver = Substitute.For<IAssignmentResolver>();
     private readonly IShipCapabilityRegistry _capabilityRegistry = Substitute.For<IShipCapabilityRegistry>();
     private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
+    private readonly IShipGoalHistoryRepository _goalHistory = Substitute.For<IShipGoalHistoryRepository>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly IShipGoalExecutor _executor = Substitute.For<IShipGoalExecutor>();
 
@@ -74,6 +76,7 @@ public sealed class ShipGoalExecutorServiceTests
             _assignmentResolver,
             _capabilityRegistry,
             _scheduler,
+            _goalHistory,
             _bus,
             NullLogger<ShipGoalExecutorService>.Instance);
 
@@ -300,5 +303,60 @@ public sealed class ShipGoalExecutorServiceTests
                 e.GoalKind == IdleGoal.Kind &&
                 e.Reason == reason),
             Arg.Any<DeliveryOptions>());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────────
+    // Phase 17e: goal history persistence
+    // ──────────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGoalCompleted_AppendsCompletedHistoryEntry()
+    {
+        SetupShipAndGoal();
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Completed("Done"));
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _goalHistory.Received(1).AppendAsync(
+            Arg.Is<ShipGoalHistoryEntry>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.GoalId == IdleGoal.GoalId &&
+                e.GoalKind == IdleGoal.Kind.ToString() &&
+                e.Outcome == "Completed" &&
+                e.Reason == null),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGoalBlocked_AppendsBlockedHistoryEntry()
+    {
+        SetupShipAndGoal();
+        const string reason = "No route";
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Blocked(reason));
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _goalHistory.Received(1).AppendAsync(
+            Arg.Is<ShipGoalHistoryEntry>(e =>
+                e.ShipSymbol == "SHIP-1" &&
+                e.GoalId == IdleGoal.GoalId &&
+                e.GoalKind == IdleGoal.Kind.ToString() &&
+                e.Outcome == "Blocked" &&
+                e.Reason == reason),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenProgressing_DoesNotAppendHistoryEntry()
+    {
+        SetupShipAndGoal();
+        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
+            .Returns(GoalExecutionResult.Progressing("Navigating"));
+
+        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        await _goalHistory.DidNotReceive().AppendAsync(Arg.Any<ShipGoalHistoryEntry>(), Arg.Any<CancellationToken>());
     }
 }

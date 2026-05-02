@@ -19,6 +19,7 @@ namespace SpaceTraders.Application.Goals;
 /// Phase 12b: capability checks delegated to <see cref="IShipCapabilityRegistry"/>.
 /// Phase 14c: <see cref="IShipEventScheduler"/> replaces <c>bus.ScheduleAsync</c> for arrival
 /// and cooldown wake-ups; completed and blocked goals cancel pending scheduled events.
+/// Phase 17e: <see cref="IShipGoalHistoryRepository"/> records completed and blocked goals.
 /// </summary>
 public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
@@ -35,6 +36,7 @@ public sealed class ShipGoalExecutorService(
     IAssignmentResolver assignmentResolver,
     IShipCapabilityRegistry capabilityRegistry,
     IShipEventScheduler scheduler,
+    IShipGoalHistoryRepository goalHistory,
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
@@ -97,6 +99,18 @@ public sealed class ShipGoalExecutorService(
                 await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
                 await bus.PublishAsync(new GoalCompletedEvent(
                     ship.Symbol, goal.GoalId, goal.Kind, Guid.NewGuid(), Guid.Empty, now));
+                // Phase 17e: persist goal history entry.
+                await goalHistory.AppendAsync(new ShipGoalHistoryEntry
+                {
+                    Id = Guid.NewGuid(),
+                    ShipSymbol = ship.Symbol,
+                    GoalKind = goal.Kind.ToString(),
+                    GoalId = goal.GoalId,
+                    Outcome = "Completed",
+                    Reason = null,
+                    StartedAt = goal.StartedAt,
+                    EndedAt = now,
+                }, ct);
                 await goals.ClearActiveGoalAsync(ship.Symbol, ct);
                 await bus.InvokeAsync(new AssignShipCommand(
                     ship.Symbol,
@@ -110,6 +124,18 @@ public sealed class ShipGoalExecutorService(
                 await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
                 await bus.PublishAsync(new GoalBlockedEvent(
                     ship.Symbol, goal.GoalId, goal.Kind, result.Reason, Guid.NewGuid(), Guid.Empty, now));
+                // Phase 17e: persist goal history entry.
+                await goalHistory.AppendAsync(new ShipGoalHistoryEntry
+                {
+                    Id = Guid.NewGuid(),
+                    ShipSymbol = ship.Symbol,
+                    GoalKind = goal.Kind.ToString(),
+                    GoalId = goal.GoalId,
+                    Outcome = "Blocked",
+                    Reason = result.Reason,
+                    StartedAt = goal.StartedAt,
+                    EndedAt = now,
+                }, ct);
                 await goals.ClearActiveGoalAsync(ship.Symbol, ct);
                 await bus.InvokeAsync(new AssignShipCommand(
                     ship.Symbol,
