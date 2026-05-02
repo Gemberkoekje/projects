@@ -1134,7 +1134,7 @@ Deliverables:
 Goal: expose the three read models from Phase 15 as HTTP endpoints so that any client (a browser
 dashboard, monitoring tool, or integration test) can poll the current fleet state.
 
-#### Phase 16a: Controller and route definitions
+#### Phase 16a: Controller and route definitions ✅
 
 Tasks:
 
@@ -1146,6 +1146,13 @@ Tasks:
 - All endpoints are read-only (`[HttpGet]`), require no request body, and return `200 OK` with
   JSON or `404 Not Found` for the single-ship variant when the symbol is unknown.
 - Wire `IFleetStatusQueryService` into the controller via constructor injection.
+
+Implementation notes:
+- Added `FleetStatusEndpoints.cs` (minimal API style, matching project conventions) at
+  `SpaceTraders.API/Endpoints/FleetStatusEndpoints.cs`, registered as `/fleet` route group.
+- `IFleetStatusQueryService` injected via parameter injection (minimal API pattern).
+- Smoke tests added to `ApiIntegrationTests.cs`; factory mock for `IFleetStatusQueryService`
+  added to `SpaceTradersApiFactory`.
 
 Deliverables:
 
