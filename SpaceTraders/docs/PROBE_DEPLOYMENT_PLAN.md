@@ -127,13 +127,13 @@ No waypoint symbol is hardcoded. Selection happens at runtime by querying `IWayp
 - [x] `ProbeDeploymentPlanState` — persisted plan with target and deployed waypoint lists; nullable `ShipyardWaypointSymbols` for backward compatibility with older persisted plans
 - [x] `PurchaseShipCommand` — generic reusable ship-purchase command (available for other fleet-expansion flows)
 - [x] `GameLoopService` integration — `EnsureBootstrappedAsync` called every tick
-- [x] Unit tests (`ProbeDeploymentPlanServiceTests`) — 19 passing tests covering bootstrap, resumption, phase ordering, multi-dispatch, inline purchase fallback, budget denial, in-transit probe exclusion, and already-deployed probe exclusion
+- [x] Unit tests (`ProbeDeploymentPlanServiceTests`) covering bootstrap, resumption, phase ordering, Phase 1 market-only purchase, multi-dispatch, inline purchase fallback, budget denial, in-transit probe exclusion, and already-deployed probe exclusion
 
 ### Pending
 - [ ] Frigate trading revenue to fund probe purchases (Phase 0 may stall if starting credits are insufficient after the reserve check)
 - [ ] Phase 1 auto-trigger — currently gated only on capital threshold; no explicit ROI measurement or 7-day gate logic implemented yet
 - [ ] Phase 2 / Phase 3 expansion — deployment beyond the home system not yet implemented; `SelectNextTargetAsync` only queries the headquarters system
-- [ ] Probe purchase for market-only Phase 1 targets — `TryPurchaseProbeAsync` is called for any target, but the Phase 1 capital gate must already be satisfied before `SelectNextTargetAsync` returns a market-only target; the interaction is correct but not separately tested
+- [x] Probe purchase for market-only Phase 1 targets — `TryPurchaseProbeAsync` is called after the Phase 1 capital gate is satisfied and has explicit test coverage
 - [x] Newly discovered waypoints — existing plans are reconciled against cached home-system waypoints each tick; newly discovered market/shipyard waypoints are appended to targets and completed plans are automatically re-opened when new coverage is required
 
 ---

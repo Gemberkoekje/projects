@@ -48,7 +48,7 @@ Check these items in your snapshot at the start of each reset:
 
 ---
 
-## Orchestrator Fleet Goal Priority Reference
+## Automation Priority and Budget Reference
 
 The orchestrator evaluates this goal list on every tick and assigns idle ships to the
 highest-priority unmet goal first. All priorities follow the constants defined in
@@ -68,6 +68,25 @@ highest-priority unmet goal first. All priorities follow the constants defined i
 > `"Prime supply chain: supply IRON to X1-TD7-M3"`. The evaluator assigns the lowest sub-priority
 > number (e.g. 31, 32, 33 …) to the deepest nodes in the dependency tree so the most foundational
 > bottlenecks are resolved first.
+
+### Cross-plan spending lanes
+
+The runtime budget policy currently exposes one shared reserve through `FleetExpansion.MinCreditReserve`.
+All automated purchases call the shared policy except the current contract miner fallback, which still
+uses a direct credits-versus-price check and is tracked as a contract-plan follow-up. Until a richer
+reservation ledger exists, treat the shared spendable balance (`credits - reserve`) as these ordered lanes:
+
+| Lane | Automation | Priority | Spending rule |
+|---|---|---:|---|
+| Safety reserve | All plans | Always first | Never spend below `FleetExpansion.MinCreditReserve`; recommended value is at least two probe purchases or 100K credits, whichever is higher |
+| Deadline revenue | Contract | 20 | Buy/assign miners for accepted mineral contracts before speculative mining or coverage work when deadlines are active |
+| Primary objective | Construction | 30 | Buy construction materials aggressively when price rules match, especially `FAB_MAT <= 2,500` |
+| Supply-chain stimulation | Mining automation | 31–35 equivalent | Mine and sell SCARCE mineral imports after contracts and direct construction needs, capped by `Mining.MaxDrones` |
+| Data coverage | Probe deployment / MarketCoverage | 40 | Cover home-system shipyards first, then market-only waypoints after the Phase 1 capital gate |
+| Capacity growth | FleetExpansion | 50 | Purchase extra ships only when higher-priority work is blocked by capacity and budget allows |
+
+If two plans can spend at the same time, pick the lowest numeric priority first. If priorities tie,
+prefer deadline-bound work, then construction blockers, then recurring income, then observability.
 
 ---
 

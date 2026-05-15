@@ -4,6 +4,7 @@ using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using SpaceTraders.Domain.Events.Ships;
+using SpaceTraders.Domain.ValueObjects;
 using Wolverine;
 
 namespace SpaceTraders.Application.Commands.Ships;
@@ -173,6 +174,9 @@ public sealed class NavigateToWaypointArrivedHandler(
             {
                 var market = await port.GetMarketAsync(systemSymbol, command.DestinationWaypoint, cancellationToken);
                 await markets.UpsertAsync(market, cancellationToken);
+                await bus.PublishAsync(new MarketDataRefreshedEvent(
+                    new WaypointSymbol(command.DestinationWaypoint),
+                    market.TradeGoodsJson));
                 logger.LogInformation(
                     "NavigateToWaypointArrivedHandler: market data updated for {Waypoint}.",
                     command.DestinationWaypoint);

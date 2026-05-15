@@ -181,4 +181,24 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
         result.Should().BeOfType<MoveToWaypointGoal>();
         ((MoveToWaypointGoal)result!).TargetWaypointSymbol.Should().Be("X1-TEST-WP2");
     }
+
+    [SkippableFact]
+    public async Task GetActiveTradeRouteTargetsAsync_ReturnsNormalizedTradeRouteTargets()
+    {
+        await SeedShipAsync("SHIP-G9");
+        var setRepo = new ShipGoalRepository(Db);
+        await setRepo.SetActiveGoalAsync("SHIP-G9", new TradeBetweenMarketsGoal
+        {
+            GoalId = Guid.NewGuid(),
+            TradeSymbol = "food",
+            BuyWaypointSymbol = "x1-test-buy",
+            SellWaypointSymbol = "x1-test-sell",
+        });
+
+        await using var fresh = CreateFreshContext();
+        var getRepo = new ShipGoalRepository(fresh);
+        var result = await getRepo.GetActiveTradeRouteTargetsAsync();
+
+        result.Should().Contain(("X1-TEST-BUY", "X1-TEST-SELL", "FOOD"));
+    }
 }

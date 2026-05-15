@@ -24,6 +24,10 @@ Create (or refresh) a mining goal when all conditions are true:
 - Deliver and sell at the triggering market waypoint
 - Keep the goal active until the opportunity is no longer valid or replaced by better rules
 
+### Cancellation Rule
+
+Cancel the mining goal when the destination sell market is updated and the mineral is no longer `SCARCE` at that market.
+
 ---
 
 ## Drone Assignment & Capacity Rules
@@ -63,6 +67,7 @@ Implementation should focus on wiring:
 3. **Assigned goal -> existing mining/sell commands**
 4. **No drone available -> optional purchase path -> immediate assignment if purchase succeeds**
 5. **Cannot purchase -> keep goal queued until ship/credits become available**
+6. **Market updates -> goal cancellation when destination sell supply is no longer `SCARCE`**
 
 No new low-level mining command behavior is required unless gaps are discovered.
 
@@ -77,7 +82,8 @@ No new low-level mining command behavior is required unless gaps are discovered.
 5. If none idle, evaluate purchase policy and max-drone cap
 6. If purchased, persist ship and assign goal
 7. Execute existing mining/sell command sequence
-8. On completion or re-evaluation, keep/requeue/close goal based on latest market data
+8. On market update, cancel the goal if the destination no longer buys the mineral at `SCARCE` supply
+9. On completion or re-evaluation, keep/requeue/close goal based on latest market data
 
 ---
 
@@ -97,30 +103,41 @@ Track enough state to avoid duplicate churn:
 - Active/pending mining goals by resource + destination market
 - Assigned ship (if any)
 - Last scan timestamp or freshness marker
-- Goal status (`Pending`, `Assigned`, `Executing`, `Completed`, `Dormant`)
+- Goal status (`Pending`, `Assigned`, `Executing`, `Completed`, `Dormant`, `Cancelled`)
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] SCARCE mineral buy opportunities from scanned markets create mining goals
-- [ ] Idle mining drones are assigned automatically
-- [ ] If no idle drone exists, purchase is attempted when budget and cap allow
-- [ ] `MaxMiningDrones` config exists and defaults to `20`
-- [ ] If purchase cannot proceed, goal stays pending and retries later
-- [ ] Existing mining command pipeline is reused via goal orchestration
-- [ ] End-to-end flow is covered by unit tests for: trigger, assign, buy fallback, pending retry, cap enforcement
+- [x] SCARCE mineral buy opportunities from scanned markets create mining goals
+- [x] Idle mining drones are assigned automatically
+- [x] If no idle drone exists, purchase is attempted when budget and cap allow
+- [x] `MaxMiningDrones` config exists and defaults to `20`
+- [x] If purchase cannot proceed, goal stays pending and retries later
+- [x] Mining goals are cancelled when destination sell supply is updated away from `SCARCE`
+- [x] Existing mining command pipeline is reused via goal orchestration
+- [x] Queued and assigned opportunities are observable via `/status/mining-opportunities` and the WebUI Plans page
+- [x] End-to-end flow is covered by unit tests for: trigger, assign, buy fallback, pending retry, cap enforcement, cancellation, and queued visibility
 
 ---
 
 ## Initial Implementation Status
 
-### Planned
-- [ ] Event-to-goal wiring for scanned market opportunities
-- [ ] Goal dispatcher integration with mining drones
-- [ ] Purchase fallback integration for missing idle drones
-- [ ] Configuration support for `MaxMiningDrones`
-- [ ] Automated tests for orchestration behavior
+### Implemented
+- [x] Event-to-goal wiring for scanned market opportunities
+- [x] Goal dispatcher integration with mining drones via existing `MineAndSellGoal`
+- [x] Purchase fallback integration for missing idle drones
+- [x] Configuration support for `MaxMiningDrones`
+- [x] Goal cancellation on market updates that invalidate the sell condition
+- [x] Retry hooks when ships become idle or credits change
+- [x] Persist explicit queued/pending mining opportunities separate from ship-attached active goals
+- [x] Automated tests for trigger, buy fallback, cap enforcement, reassignment, cancellation, queued persistence, and retry transition behavior
+- [x] Read model/API observability through `GET /status/mining-opportunities`
+- [x] WebUI Plans page panel for queued mining opportunities
+
+### Remaining
+- [x] Add broader multi-service orchestration coverage for persisted pending retry visibility/state (application event handlers and API transition visibility tests)
+- [ ] Add full hosted-loop orchestration integration coverage tying tick execution to retry visibility updates across services
 
 ### Out of Scope (Initial)
 - [ ] Multi-market optimization/ranking across many simultaneous SCARCE minerals
@@ -131,4 +148,4 @@ Track enough state to avoid duplicate churn:
 
 ## Conclusion
 
-This plan adds a lightweight orchestration layer: react to SCARCE mineral demand, create mining goals, assign available drones, optionally buy more up to a configurable cap, and defer safely when resources are constrained. The approach intentionally reuses existing mining commands and focuses only on event/goal/assignment stitching.
+This plan adds a lightweight orchestration layer: react to SCARCE mineral demand, create mining goals, assign available drones, optionally buy more up to a configurable cap, cancel goals when the sell condition is invalidated, and defer safely when resources are constrained. The current implementation covers active-goal assignment, purchase fallback, cancellation, retry triggers, persisted queued opportunities, and API/WebUI observability for pending and assigned mining opportunities.

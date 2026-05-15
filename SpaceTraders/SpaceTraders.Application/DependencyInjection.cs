@@ -6,6 +6,7 @@ using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
+using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Services;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -47,9 +48,12 @@ public static class DependencyInjection
         services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
         services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();
         services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();
+        services.AddScoped<IBudgetPolicy, BudgetPolicy>();
         services.AddScoped<IScoutAllMarketplacesPlanService, ScoutAllMarketplacesPlanService>();
         services.AddScoped<IContractPlanService, ContractPlanService>();
         services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
+        services.AddScoped<IMiningAutomationService, MiningAutomationService>();
+        services.AddScoped<ITradingAutomationService, TradingAutomationService>();
 
         // Generic command handlers are discovered from this assembly by Wolverine.
 
@@ -57,6 +61,8 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, IdleGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, ScoutWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, MineAndSellGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>

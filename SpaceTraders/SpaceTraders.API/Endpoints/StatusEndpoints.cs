@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
 using SpaceTraders.Infrastructure.Persistence;
@@ -62,6 +63,36 @@ public static class StatusEndpoints
         {
             var result = await bus.InvokeAsync<Application.DTOs.TradeOpportunityDto?>(new GetBestTradeRouteQuery(int.MaxValue), ct);
             return result is null ? Results.NoContent() : Results.Ok(result);
+        });
+
+        group.MapGet("/mining-opportunities", async (IPlanRepository plans, CancellationToken ct) =>
+        {
+            var state = await plans.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, ct);
+            state ??= new MiningAutomationPlanState
+            {
+                PlanId = Guid.Empty,
+                Opportunities = [],
+                CreatedAt = DateTimeOffset.MinValue,
+                UpdatedAt = DateTimeOffset.MinValue,
+            };
+
+            return Results.Ok(new
+            {
+                state.PlanId,
+                Opportunities = state.Opportunities.Select(opportunity => new
+                {
+                    opportunity.OpportunityKey,
+                    opportunity.TradeSymbol,
+                    opportunity.SellWaypointSymbol,
+                    Status = opportunity.Status.ToString(),
+                    opportunity.AssignedShipSymbol,
+                    opportunity.FirstObservedAt,
+                    opportunity.LastObservedAt,
+                    opportunity.StopReason,
+                }).ToList(),
+                state.CreatedAt,
+                state.UpdatedAt,
+            });
         });
 
         group.MapGet("/startup-snapshots", async (SpaceTradersDbContext db, CancellationToken ct) =>

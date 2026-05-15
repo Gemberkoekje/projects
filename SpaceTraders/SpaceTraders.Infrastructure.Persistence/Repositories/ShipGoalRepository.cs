@@ -104,4 +104,68 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
         return targets;
     }
+
+    public async Task<IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)>> GetActiveMineAndSellTargetsAsync(CancellationToken cancellationToken = default)
+    {
+        var payloads = await db.Ships
+            .Where(s => s.GoalKind == "MineAndSell" && s.GoalPayloadJson != null)
+            .Select(s => s.GoalPayloadJson)
+            .ToListAsync(cancellationToken);
+
+        var targets = new HashSet<(string SellWaypointSymbol, string TradeSymbol)>();
+        foreach (var json in payloads)
+        {
+            if (json is null)
+            {
+                continue;
+            }
+
+            var goal = JsonSerializer.Deserialize<ShipGoal>(json, JsonOptions);
+            if (goal is not MineAndSellGoal miningGoal
+                || string.IsNullOrWhiteSpace(miningGoal.SellWaypointSymbol)
+                || string.IsNullOrWhiteSpace(miningGoal.TradeSymbol))
+            {
+                continue;
+            }
+
+            targets.Add((
+                miningGoal.SellWaypointSymbol.ToUpperInvariant(),
+                miningGoal.TradeSymbol.ToUpperInvariant()));
+        }
+
+        return targets;
+    }
+
+    public async Task<IReadOnlySet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>> GetActiveTradeRouteTargetsAsync(CancellationToken cancellationToken = default)
+    {
+        var payloads = await db.Ships
+            .Where(s => s.GoalKind == "TradeBetweenMarkets" && s.GoalPayloadJson != null)
+            .Select(s => s.GoalPayloadJson)
+            .ToListAsync(cancellationToken);
+
+        var targets = new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>();
+        foreach (var json in payloads)
+        {
+            if (json is null)
+            {
+                continue;
+            }
+
+            var goal = JsonSerializer.Deserialize<ShipGoal>(json, JsonOptions);
+            if (goal is not TradeBetweenMarketsGoal tradeGoal
+                || string.IsNullOrWhiteSpace(tradeGoal.BuyWaypointSymbol)
+                || string.IsNullOrWhiteSpace(tradeGoal.SellWaypointSymbol)
+                || string.IsNullOrWhiteSpace(tradeGoal.TradeSymbol))
+            {
+                continue;
+            }
+
+            targets.Add((
+                tradeGoal.BuyWaypointSymbol.ToUpperInvariant(),
+                tradeGoal.SellWaypointSymbol.ToUpperInvariant(),
+                tradeGoal.TradeSymbol.ToUpperInvariant()));
+        }
+
+        return targets;
+    }
 }

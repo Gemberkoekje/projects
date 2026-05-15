@@ -150,4 +150,35 @@ public sealed class ShipGoalExecutorServiceTests
         await _goals.DidNotReceive().ClearActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _scoutPlanService.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenActiveGoalIsTradeBetweenMarkets_DispatchesToExecutor()
+    {
+        var tradeGoal = new TradeBetweenMarketsGoal
+        {
+            TradeSymbol = "FOOD",
+            BuyWaypointSymbol = "X1-AB-BUY",
+            SellWaypointSymbol = "X1-AB-SELL",
+        };
+        var expected = GoalExecutionResult.Progressing("trade");
+
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip with { CargoCapacity = 40, ShipType = "SHIP_LIGHT_HAULER" });
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(tradeGoal);
+        _executor.CanExecute(tradeGoal).Returns(true);
+        _executor.ExecuteStepAsync(
+                Arg.Any<ShipModel>(),
+                tradeGoal,
+                Arg.Any<ShipGoalContext>(),
+                Arg.Any<CancellationToken>())
+            .Returns(expected);
+
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().Be(expected);
+        await _executor.Received(1).ExecuteStepAsync(
+            Arg.Any<ShipModel>(),
+            tradeGoal,
+            Arg.Any<ShipGoalContext>(),
+            Arg.Any<CancellationToken>());
+    }
 }

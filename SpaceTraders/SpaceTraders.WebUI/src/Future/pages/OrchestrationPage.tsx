@@ -8,6 +8,7 @@
 import GoalChainPanel from '@/Future/components/GoalChainPanel'
 import AssignmentsPanel from '@/Future/components/AssignmentsPanel'
 import ActivityPanel from '@/Future/components/ActivityPanel'
+import MiningOpportunitiesPanel from '@/Future/components/MiningOpportunitiesPanel'
 
 export default function OrchestrationPage() {
   return (
@@ -26,6 +27,13 @@ export default function OrchestrationPage() {
           Ships by Plan
         </h2>
         <AssignmentsPanel />
+      </section>
+
+      <section aria-labelledby="mining-opportunities-heading">
+        <h2 id="mining-opportunities-heading" className="mb-3 text-lg font-medium">
+          Queued Mining Opportunities
+        </h2>
+        <MiningOpportunitiesPanel />
       </section>
 
       <section aria-labelledby="activity-heading">

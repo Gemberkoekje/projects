@@ -7,7 +7,7 @@ This document describes how the solution works today.
 | Area | Implemented today | Reference gap status |
 |------|-------------------|----------------------|
 | API host and automation runtime | Implemented | Stable baseline |
-| Razor Pages operational dashboard | Implemented | Needs expanded pages for deeper operations |
+| React/Vite operational dashboard | Implemented | Needs expanded pages for deeper operations |
 | Core SpaceTraders typed client (status/agent/ships/contracts/navigate/dock/orbit/extract/trade/refuel/purchase) | Implemented | Missing additional gameplay endpoints |
 | Cache persistence for agent/ships/contracts/systems/waypoints/markets/shipyards/settings/activity/assignments/trade opportunities | Implemented | Needs richer gameplay model fields |
 | Chain-of-command ship automation with state-gated command acceptors | Implemented | Needs full lifecycle strategies |
@@ -16,7 +16,7 @@ This document describes how the solution works today.
 ## Solution at a glance
 
 - **SpaceTraders.API**: automation host + internal control/status API.
-- **SpaceTraders.App**: Razor Pages dashboard reading cached data.
+- **SpaceTraders.WebUI**: React/Vite dashboard reading the internal API.
 - **SpaceTraders.Application**: commands, queries, automation/background services, event handlers.
 - **SpaceTraders.Infrastructure.Persistence**: EF Core + PostgreSQL cache, settings, activity logs, leases.
 - **SpaceTraders.Infrastructure.SpaceTradersAPI**: typed SpaceTraders HTTP client, rate limiting/retry, adapter.
@@ -41,6 +41,7 @@ After DI setup, the API host:
 - Initializes the database via `SpaceTradersDatabaseInitializer.InitializeAsync(...)` (except in `Testing` environment).
 - Enables API key middleware for internal endpoints.
 - Maps health, metrics, status, settings, and control endpoints.
+- Maps SignalR dashboard notifications at `/hubs/dashboard`.
 
 Development builds also expose Swagger UI. Scalar is not currently configured in the API host.
 
@@ -85,17 +86,13 @@ Implemented recurring services include:
   - Dead-reckoning for ship arrivals.
   - Low-fuel detection for docked ships.
   - API availability transition events.
-
-- **ContractWatchService** (every 5m)
-  - Checks accepted/unfulfilled contracts.
-  - Emits warning events around 24h and 6h thresholds.
-
-- **ShipRefreshWorkerService** (every 10m)
-  - Leader-gated execution.
-  - Refreshes market and shipyard caches for occupied waypoints.
+  - Probe deployment, contract, mining, and trade automation ticks.
 
 - **ActivityLogPruningService**
   - Prunes old activity log data.
+
+- **DataRetentionService**
+  - Prunes retained operational data according to configured retention policy.
 
 - **PrometheusMetricsService**
   - Records process/service metrics.
@@ -103,11 +100,15 @@ Implemented recurring services include:
 - **LeaderElectionService**
   - Ensures only one active instance performs leader-only automation work.
 
+- **ShipEventScheduler**
+  - Schedules ship arrival and cooldown events.
+
 ## Event and command processing
 
 The application uses Wolverine for command/event dispatch.
 
 - Command handlers cover ship operations, contract actions, sync jobs, fleet purchase, and probes.
+- Automation services cover contract mineral fulfillment, mining opportunities, probe deployment, scouting, and trading.
 - Domain and integration events are bridged into chain-of-command handlers.
 - Ship handling uses state-scoped command acceptors:
   - `IDockedCommandAcceptor`
@@ -121,26 +122,30 @@ This enforces issuing only commands valid for a ship's current physical state.
 The internal API is exposed under `/spacetraders/api` and includes:
 
 - `/health/live`, `/health/ready`, and `/health/startup`.
-- `/status/*` for agent, ships, contracts, rate limits, activity, trade opportunity.
+- `/health/automation` and `/health/rate-limit/history` for runtime health and API usage.
+- `/status/*` for agent, ships, ship diagnostics, contracts, rate limits, activity, trade opportunities, startup snapshots, system alerts, anomalies, top trade routes, and mining opportunities.
+- `/fleet/*` for goal chains, assignments, current ship activity, and ship goal history.
+- `/markets/*` for market snapshots, price history, best routes, and freshness.
+- `/shipyards/*` for shipyard snapshots and freshness.
 - `/settings/*` to read/update/reset runtime settings.
-- `/control/*` for automation enable/disable, ship reassignment, and sync trigger.
+- `/control/*` for automation enable/disable.
 - `/metrics` for Prometheus metrics.
+- `/hubs/dashboard` for SignalR dashboard invalidation events.
 
 Most internal endpoints are protected by API key middleware (`X-Api-Key`) when `SPACETRADERS_INTERNAL_API_KEY` is configured. Health endpoints are always unauthenticated.
 
-## Razor Pages app (current)
+## React WebUI (current)
 
-`SpaceTraders.App` provides read-heavy operational views from the same PostgreSQL cache:
+`SpaceTraders.WebUI` provides read-heavy operational views through the internal API:
 
-- `/` agent + fleet summary.
-- `/Ships/Detail` ship detail and assignment snapshot.
-- `/Contracts` contracts list.
-- `/Market` trade opportunities and market cache.
-- `/ApiUsage` endpoint usage counters.
-- `/Log` paged activity logs.
-- `/Settings` runtime settings and active/selected agent token controls.
+- Overview: agent credits, fleet counts, rate-limit status, and system health alerts.
+- Fleet: ships, detail views, diagnostics, assignments, activity, and goal history.
+- Markets and shipyards: cached snapshots, freshness, prices, and trade routes.
+- Plans: goal chains, ships by plan, queued mining opportunities, and current activity.
+- Settings: runtime setting read/update/reset controls.
+- Startup snapshots, logs, and API usage views.
 
-The app runs under path base `/spacetraders`.
+The app uses `X-Api-Key` through its API fetch wrapper and listens to the dashboard SignalR hub for invalidation events.
 
 ## Data model role (current)
 
@@ -149,6 +154,7 @@ PostgreSQL is used as a local operational cache and state store for:
 - Agent, ships, contracts.
 - Systems, waypoints, market, shipyard snapshots.
 - Ship assignments and trade opportunities.
+- Fleet goals, ship goals, ship goal history, and persisted plan states.
 - Settings, activity logs, API endpoint usage.
 - Leader lease and token/agent scoping data.
 

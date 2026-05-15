@@ -1,7 +1,27 @@
-# Contract Plan Implementation Plan
+# Contract Plan Implementation
 
 ## Objective
 Add a new **Contract plan** next to the existing scout plan. This plan automates mineral contract fulfillment end-to-end with clear stop behavior for unsupported contracts.
+
+## Current Implementation Status
+
+### Implemented
+- [x] `ContractPlanService` bootstraps/resumes a persisted mineral contract plan.
+- [x] Contract list refresh is performed once per bootstrap cycle and cached in `IContractRepository`.
+- [x] If no active contract exists, contract negotiation is attempted with an available ship.
+- [x] Pending contracts are accepted before execution.
+- [x] Non-mineral deliverables are deferred with a persisted stop reason.
+- [x] Idle mining-capable ships are preferred.
+- [x] If no idle miner exists and credits allow, `SHIP_MINING_DRONE` is purchased and persisted.
+- [x] `ContractMineralPlanState` persists contract id, ship, trade symbol, source/destination, unit progress, status, and stop reason.
+- [x] `MineResourceVolumeCommand` and `FulfillContractDeliveryCommand` implement the mine/deliver loop through existing navigation, dock/orbit, extraction, jettison, delivery, and fulfillment APIs.
+- [x] Contract delivery events advance plan progress and complete assignments.
+- [x] Unit tests cover non-mineral deferral, idle miner selection, purchase fallback, pending-budget state, API refresh, negotiation, acceptance, restart assignment restoration, partial delivery, and final fulfillment.
+
+### Remaining
+- [ ] Route contract miner purchase through the shared `IBudgetPolicy` reserve model instead of only checking current credits against ship price.
+- [ ] Add richer API/WebUI observability for current `ContractMineralPlanState` beyond fleet assignment/status views.
+- [ ] Add multi-ship parallel fulfillment after single-plan behavior remains stable.
 
 ## Phase 1 Scope
 - Handle accepted, active contracts with pending **mineral** deliverables.

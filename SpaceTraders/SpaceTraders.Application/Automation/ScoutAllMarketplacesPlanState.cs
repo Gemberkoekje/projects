@@ -1,6 +1,6 @@
 namespace SpaceTraders.Application.Automation;
 
-public static class PlanTypes
+public static partial class PlanTypes
 {
     public const string ScoutAllMarketplaces = "ScoutAllMarketplaces";
     public const string ContractMineral = "ContractMineral";

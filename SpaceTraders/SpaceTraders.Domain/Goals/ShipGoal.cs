@@ -22,6 +22,8 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(ScoutWaypointGoal), "ScoutWaypoint")]
 [JsonDerivedType(typeof(PatrolMarketGoal), "PatrolMarket")]
 [JsonDerivedType(typeof(DeployProbeGoal), "DeployProbe")]
+[JsonDerivedType(typeof(MineAndSellGoal), "MineAndSell")]
+[JsonDerivedType(typeof(TradeBetweenMarketsGoal), "TradeBetweenMarkets")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -139,4 +141,36 @@ public sealed record DeployProbeGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.DeployProbe;
+}
+
+/// <summary>
+/// The ship mines <see cref="TradeSymbol"/> at <see cref="SourceWaypointSymbol"/> and sells it at
+/// <see cref="SellWaypointSymbol"/> while the target market opportunity remains active.
+/// </summary>
+public sealed record MineAndSellGoal : ShipGoal
+{
+    public required string TradeSymbol { get; init; }
+
+    public required string SourceWaypointSymbol { get; init; }
+
+    public required string SellWaypointSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.MineAndSell;
+}
+
+/// <summary>
+/// The ship buys <see cref="TradeSymbol"/> at <see cref="BuyWaypointSymbol"/> and sells it at
+/// <see cref="SellWaypointSymbol"/> while the market opportunity remains active.
+/// </summary>
+public sealed record TradeBetweenMarketsGoal : ShipGoal
+{
+    public required string TradeSymbol { get; init; }
+
+    public required string BuyWaypointSymbol { get; init; }
+
+    public required string SellWaypointSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.TradeBetweenMarkets;
 }

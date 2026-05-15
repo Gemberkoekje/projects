@@ -60,6 +60,8 @@ public sealed class GameLoopService(
         var scoutPlanBootstrap = scope.ServiceProvider.GetRequiredService<IScoutAllMarketplacesPlanService>();
         var contractPlanBootstrap = scope.ServiceProvider.GetRequiredService<IContractPlanService>();
         var probeDeploymentPlanBootstrap = scope.ServiceProvider.GetRequiredService<IProbeDeploymentPlanService>();
+        var miningAutomation = scope.ServiceProvider.GetRequiredService<IMiningAutomationService>();
+        var tradingAutomation = scope.ServiceProvider.GetRequiredService<ITradingAutomationService>();
         var assignments = scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>();
         var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
@@ -67,6 +69,8 @@ public sealed class GameLoopService(
         await scoutPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
         await contractPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
         await probeDeploymentPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
+        await miningAutomation.EnsureBootstrappedAsync(cancellationToken);
+        await tradingAutomation.EnsureBootstrappedAsync(cancellationToken);
         await ExecuteActiveScoutAssignmentsAsync(assignments, goalExecutor, cancellationToken);
         await ExecuteActiveContractAssignmentsAsync(assignments, ships, bus, cancellationToken);
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);

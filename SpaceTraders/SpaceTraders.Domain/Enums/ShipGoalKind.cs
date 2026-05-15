@@ -13,4 +13,6 @@ public enum ShipGoalKind
     ScoutWaypoint = 8,
     PatrolMarket = 9,
     DeployProbe = 10,
+    MineAndSell = 11,
+    TradeBetweenMarkets = 12,
 }

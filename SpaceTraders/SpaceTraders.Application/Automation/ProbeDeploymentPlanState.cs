@@ -32,6 +32,12 @@ public sealed record ProbeDeploymentPlanState
 
     public required ProbeDeploymentPlanStatus Status { get; init; }
 
+    /// <summary>
+    /// Indicates Phase 1 was deferred due to insufficient credits and should remain dormant
+    /// until an <c>AgentCreditsChangedEvent</c> re-triggers evaluation.
+    /// </summary>
+    public bool WaitingForPhase1Credits { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public required DateTimeOffset UpdatedAt { get; init; }

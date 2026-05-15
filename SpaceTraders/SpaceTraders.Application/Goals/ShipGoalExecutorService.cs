@@ -36,7 +36,10 @@ public sealed class ShipGoalExecutorService(
         }
 
         var activeGoal = await goals.GetActiveGoalAsync(shipSymbol, ct);
-        if (activeGoal is not ScoutWaypointGoal and not DeployProbeGoal)
+        if (activeGoal is not ScoutWaypointGoal
+            and not DeployProbeGoal
+            and not MineAndSellGoal
+            and not TradeBetweenMarketsGoal)
         {
             return null;
         }

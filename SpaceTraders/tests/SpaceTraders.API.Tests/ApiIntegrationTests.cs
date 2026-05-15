@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using ApiDtos = SpaceTraders.API.Dtos;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -312,6 +313,103 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
     {
         using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/top-trade-routes");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task MiningOpportunities_WithValidApiKey_ReturnsPersistedQueue()
+    {
+        _factory.PlanRepository.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
+            .Returns(new MiningAutomationPlanState
+            {
+                PlanId = Guid.NewGuid(),
+                CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Opportunities =
+                [
+                    new MiningAutomationOpportunityState
+                    {
+                        OpportunityKey = "X1-AB-MKT1|IRON_ORE",
+                        TradeSymbol = "IRON_ORE",
+                        SellWaypointSymbol = "X1-AB-MKT1",
+                        Status = MarketAutomationOpportunityStatus.Pending,
+                        AssignedShipSymbol = null,
+                        FirstObservedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
+                        LastObservedAt = DateTimeOffset.UtcNow,
+                        StopReason = "No idle mining drone available and purchase unavailable.",
+                    }
+                ],
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/status/mining-opportunities");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("IRON_ORE");
+        body.Should().Contain("X1-AB-MKT1");
+        body.Should().Contain("Pending");
+    }
+
+    [Fact]
+    public async Task MiningOpportunities_WithValidApiKey_ReflectsPendingToAssignedTransitionAcrossCalls()
+    {
+        var planId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var updatedAt = DateTimeOffset.UtcNow;
+
+        _factory.PlanRepository.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
+            .Returns(
+                new MiningAutomationPlanState
+                {
+                    PlanId = planId,
+                    CreatedAt = createdAt,
+                    UpdatedAt = updatedAt,
+                    Opportunities =
+                    [
+                        new MiningAutomationOpportunityState
+                        {
+                            OpportunityKey = "X1-AB-MKT1|IRON_ORE",
+                            TradeSymbol = "IRON_ORE",
+                            SellWaypointSymbol = "X1-AB-MKT1",
+                            Status = MarketAutomationOpportunityStatus.Pending,
+                            AssignedShipSymbol = null,
+                            FirstObservedAt = createdAt,
+                            LastObservedAt = updatedAt,
+                            StopReason = "No idle mining drone available and purchase unavailable.",
+                        }
+                    ],
+                },
+                new MiningAutomationPlanState
+                {
+                    PlanId = planId,
+                    CreatedAt = createdAt,
+                    UpdatedAt = updatedAt.AddSeconds(10),
+                    Opportunities =
+                    [
+                        new MiningAutomationOpportunityState
+                        {
+                            OpportunityKey = "X1-AB-MKT1|IRON_ORE",
+                            TradeSymbol = "IRON_ORE",
+                            SellWaypointSymbol = "X1-AB-MKT1",
+                            Status = MarketAutomationOpportunityStatus.Assigned,
+                            AssignedShipSymbol = "MINER-1",
+                            FirstObservedAt = createdAt,
+                            LastObservedAt = updatedAt.AddSeconds(10),
+                            StopReason = null,
+                        }
+                    ],
+                });
+
+        using var responsePending = await _clientWithKey.GetAsync($"{ApiPathBase}/status/mining-opportunities");
+        responsePending.StatusCode.Should().Be(HttpStatusCode.OK);
+        var pendingBody = await responsePending.Content.ReadAsStringAsync();
+        pendingBody.Should().Contain("Pending");
+        pendingBody.Should().NotContain("MINER-1");
+
+        using var responseAssigned = await _clientWithKey.GetAsync($"{ApiPathBase}/status/mining-opportunities");
+        responseAssigned.StatusCode.Should().Be(HttpStatusCode.OK);
+        var assignedBody = await responseAssigned.Content.ReadAsStringAsync();
+        assignedBody.Should().Contain("Assigned");
+        assignedBody.Should().Contain("MINER-1");
     }
 
     // ── Phase 16a: Fleet status endpoints ────────────────────────────────────
@@ -650,6 +748,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
     public IMarketRepository MarketRepository { get; } = Substitute.For<IMarketRepository>();
 
+    public IPlanRepository PlanRepository { get; } = Substitute.For<IPlanRepository>();
+
     public IFleetStatusQueryService FleetStatusQueryService { get; } = Substitute.For<IFleetStatusQueryService>();
 
     public SpaceTradersApiFactory()
@@ -693,6 +793,8 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
             .Returns(Array.Empty<Application.Interfaces.MarketSnapshot>());
         MarketRepository.GetAllFreshnessAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Application.Interfaces.Repositories.MarketFreshnessRecord>());
+        PlanRepository.GetAsync<MiningAutomationPlanState>(PlanTypes.MiningAutomation, Arg.Any<CancellationToken>())
+            .Returns((MiningAutomationPlanState?)null);
         FleetStatusQueryService.GetGoalChainsAsync(Arg.Any<CancellationToken>())
             .Returns(Array.Empty<OrchestratorGoalChain>());
         FleetStatusQueryService.GetAssignmentsAsync(Arg.Any<CancellationToken>())
@@ -784,6 +886,9 @@ public sealed class SpaceTradersApiFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<IMarketRepository>();
             services.AddScoped(_ => MarketRepository);
+
+            services.RemoveAll<IPlanRepository>();
+            services.AddScoped(_ => PlanRepository);
 
             // ── Fleet status (Phase 16a) ─────────────────────────────────────
             services.RemoveAll<IFleetStatusQueryService>();

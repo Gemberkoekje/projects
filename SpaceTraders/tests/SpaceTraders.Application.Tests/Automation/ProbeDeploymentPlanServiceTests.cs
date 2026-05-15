@@ -344,6 +344,37 @@ public sealed class ProbeDeploymentPlanServiceTests
         await _bus.Received(1).PublishAsync(Arg.Is<object>(o => IsDeployCommand(o, "X1-AB-MKT1")));
     }
 
+    [Fact]
+    public async Task Dispatch_PurchasesProbeForMarketOnlyTarget_WhenPhase1ThresholdMetAndNoneAvailable()
+    {
+        var plan = ActivePlan(
+            targets: ["X1-AB-SY1", "X1-AB-MKT1"],
+            deployed: ["X1-AB-SY1"],
+            shipyardTargets: ["X1-AB-SY1"]);
+        _plans.GetAsync(Arg.Any<CancellationToken>()).Returns(plan);
+        _agents.GetAsync(Arg.Any<CancellationToken>()).Returns(Agent(credits: 250_000));
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
+        _shipyards.GetAllAsync(Arg.Any<CancellationToken>())
+            .Returns([Shipyard("X1-AB-SY1", probePrice: 23_000)]);
+        _budget.EvaluateAsync(23_000, Arg.Any<CancellationToken>())
+            .Returns(new BudgetDecision(
+                CanAfford: true,
+                AvailableCredits: 250_000,
+                ReservedCredits: 100_000,
+                SpendableCredits: 150_000,
+                FabMatsBuyThreshold: 2_500,
+                FabMatsTransactionSize: 60,
+                HourlyConstructionBudgetCapEnabled: false));
+        _port.PurchaseShipAsync("SHIP_PROBE", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(PurchaseResult("PROBE-PHASE1"));
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _port.Received(1).PurchaseShipAsync("SHIP_PROBE", "X1-AB-SY1", Arg.Any<CancellationToken>());
+        await _bus.Received(1).PublishAsync(
+            Arg.Is<object>(o => IsDeployCommand(o, "PROBE-PHASE1", "X1-AB-MKT1")));
+    }
+
     // -------------------------------------------------------------------------
     // Multi-probe parallel dispatch
     // -------------------------------------------------------------------------

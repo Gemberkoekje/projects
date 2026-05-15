@@ -30,4 +30,14 @@ public interface IShipGoalRepository
     /// across all ships.
     /// </summary>
     Task<IReadOnlySet<string>> GetActiveScoutTargetsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns active mining-market targets keyed by destination waypoint and trade symbol.
+    /// </summary>
+    Task<IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)>> GetActiveMineAndSellTargetsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns active trading targets keyed by source waypoint, destination waypoint, and trade symbol.
+    /// </summary>
+    Task<IReadOnlySet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>> GetActiveTradeRouteTargetsAsync(CancellationToken cancellationToken = default);
 }

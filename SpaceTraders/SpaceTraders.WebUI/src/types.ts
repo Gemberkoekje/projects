@@ -353,6 +353,24 @@ export interface ShipAssignmentDto {
   assignedAt: string | null
 }
 
+export interface MiningAutomationOpportunityDto {
+  opportunityKey: string
+  tradeSymbol: string
+  sellWaypointSymbol: string
+  status: string
+  assignedShipSymbol: string | null
+  firstObservedAt: string
+  lastObservedAt: string
+  stopReason: string | null
+}
+
+export interface MiningAutomationPlanStateDto {
+  planId: string
+  opportunities: MiningAutomationOpportunityDto[]
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ShipActivityDto {
   shipSymbol: string
   localStatus: string
