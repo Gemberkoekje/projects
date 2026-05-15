@@ -1,5 +1,6 @@
 using FluentAssertions;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.Persistence.Repositories;
 
 namespace SpaceTraders.Infrastructure.Tests;
@@ -115,5 +116,43 @@ public sealed class ShipRepositoryTests : IntegrationTestBase
 
         inTransit.Should().ContainSingle(s => s.Symbol == "SHIP-5");
         inTransit.Should().NotContain(s => s.Symbol == "SHIP-6");
+    }
+
+    [SkippableFact]
+    public async Task GetAllAsync_IgnoresShipsFromOtherAgentTokens()
+    {
+        var repo = new ShipRepository(Db);
+        await repo.UpsertAsync(new ShipModel(
+            Symbol: "SHIP-OWN",
+            SystemSymbol: "X1-SYS",
+            WaypointSymbol: "X1-SYS-A1",
+            Status: "DOCKED",
+            FlightMode: "CRUISE",
+            FuelCurrent: 100,
+            FuelCapacity: 100,
+            CargoCurrent: 0,
+            CargoCapacity: 10));
+
+        Db.Ships.Add(new CachedShip
+        {
+            AgentToken = "other-agent-token",
+            Symbol = "SHIP-OTHER",
+            SystemSymbol = "X1-OTHER",
+            WaypointSymbol = "X1-OTHER-A1",
+            Status = "DOCKED",
+            FlightMode = "CRUISE",
+            FuelCurrent = 100,
+            FuelCapacity = 100,
+            CargoCurrent = 0,
+            CargoCapacity = 10,
+            LastSyncedAt = DateTimeOffset.UtcNow,
+        });
+        await Db.SaveChangesAsync();
+
+        await using var fresh = CreateFreshContext();
+        var ships = await new ShipRepository(fresh).GetAllAsync();
+
+        ships.Should().ContainSingle(s => s.Symbol == "SHIP-OWN");
+        ships.Should().NotContain(s => s.Symbol == "SHIP-OTHER");
     }
 }

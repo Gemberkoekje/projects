@@ -29,6 +29,12 @@ public static class StatusEndpoints
             return Results.Ok(result);
         });
 
+        group.MapGet("/ships/{symbol}/diagnostics", async (string symbol, IMessageBus bus, CancellationToken ct) =>
+        {
+            var result = await bus.InvokeAsync<Application.DTOs.ShipDiagnosticsDto?>(new GetShipDiagnosticsQuery(symbol), ct);
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
         group.MapGet("/contracts", async (IMessageBus bus, CancellationToken ct) =>
         {
             var result = await bus.InvokeAsync<IReadOnlyList<Application.DTOs.ContractDto>>(new GetActiveContractsQuery(), ct);
@@ -102,12 +108,13 @@ public static class StatusEndpoints
 
         group.MapGet("/system-alerts", async (ISettingsRepository settings, CancellationToken ct) =>
         {
+            var automationEnabled = await settings.GetAsync<bool>("Automation.Enabled", ct);
             var response = new
             {
                 ApiUnavailable = await settings.GetAsync<bool>("Runtime.Alert.ApiUnavailable", ct),
                 TokenResetMismatch = await settings.GetAsync<bool>("Runtime.Alert.TokenResetMismatch", ct),
                 CacheDivergence = await settings.GetAsync<bool>("Runtime.Alert.CacheDivergence", ct),
-                AutomationDisabled = await settings.GetAsync<bool>("Runtime.Alert.AutomationDisabled", ct),
+                AutomationDisabled = !automationEnabled,
                 ContractDeadlinesApproaching = await settings.GetAsync<bool>("Runtime.Alert.ContractDeadlinesApproaching", ct),
                 ResetUpcoming = await settings.GetAsync<bool>("Runtime.Alert.ResetUpcoming", ct),
                 NextReset = await settings.GetRawAsync("Runtime.Reset.Next", ct),

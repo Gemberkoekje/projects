@@ -1,21 +1,17 @@
 using NSubstitute;
 using SpaceTraders.Application.Events.Handlers.Ships;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Domain.Events.Ships;
-using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Events.Handlers.Ships;
 
 public sealed class ShipInTransitEventHandlerTests
 {
-    /// <summary>
-    /// Phase 14c: ShipInTransitEventHandler is now a no-op; it no longer schedules ticks.
-    /// The ShipEventScheduler handles arrival scheduling via ShipArrivedEvent instead.
-    /// </summary>
     [Fact]
-    public async Task Handle_DoesNotScheduleAnyTick_WhenArrivalIsInFuture()
+    public async Task Handle_NotifiesDashboard_WhenArrivalIsInFuture()
     {
-        var bus = Substitute.For<IMessageBus>();
-        var handler = new ShipInTransitEventHandler();
+        var dashboardNotifier = Substitute.For<IDashboardNotifier>();
+        var handler = new ShipInTransitEventHandler(dashboardNotifier);
 
         var now = DateTimeOffset.UtcNow;
         var @event = new ShipInTransitEvent(
@@ -29,14 +25,16 @@ public sealed class ShipInTransitEventHandlerTests
 
         await handler.Handle(@event, CancellationToken.None);
 
-        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        dashboardNotifier.Received(1).Notify("ships", "SHIP-1");
+        dashboardNotifier.Received(1).Notify("fleet-activity", "SHIP-1");
+        dashboardNotifier.Received(1).Notify("activity", "SHIP-1");
     }
 
     [Fact]
-    public async Task Handle_DoesNotScheduleAnyTick_WhenArrivalIsDue()
+    public async Task Handle_NotifiesDashboard_WhenArrivalIsDue()
     {
-        var bus = Substitute.For<IMessageBus>();
-        var handler = new ShipInTransitEventHandler();
+        var dashboardNotifier = Substitute.For<IDashboardNotifier>();
+        var handler = new ShipInTransitEventHandler(dashboardNotifier);
 
         var now = DateTimeOffset.UtcNow;
         var @event = new ShipInTransitEvent(
@@ -50,6 +48,8 @@ public sealed class ShipInTransitEventHandlerTests
 
         await handler.Handle(@event, CancellationToken.None);
 
-        await bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        dashboardNotifier.Received(1).Notify("ships", "SHIP-1");
+        dashboardNotifier.Received(1).Notify("fleet-activity", "SHIP-1");
+        dashboardNotifier.Received(1).Notify("activity", "SHIP-1");
     }
 }

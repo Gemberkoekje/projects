@@ -1,26 +1,15 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Goals;
 
-/// <summary>
-/// Phase 10: orchestrates goal-driven ship automation.
-/// Loads the ship's active goal, builds <see cref="ShipGoalContext"/>, selects the matching
-/// <see cref="IShipGoalExecutor"/>, and handles the <see cref="GoalExecutionResult"/> lifecycle.
-/// Phase 12a: planner fallback removed; ships without an active goal are treated as idle.
-/// Phase 12b: capability checks delegated to <see cref="IShipCapabilityRegistry"/>.
-/// Phase 14c: <see cref="IShipEventScheduler"/> replaces <c>bus.ScheduleAsync</c> for arrival
-/// and cooldown wake-ups; completed and blocked goals cancel pending scheduled events.
-/// Phase 17e: <see cref="IShipGoalHistoryRepository"/> records completed and blocked goals.
-/// </summary>
 public sealed class ShipGoalExecutorService(
     IEnumerable<IShipGoalExecutor> executors,
     IShipGoalRepository goals,
@@ -28,21 +17,15 @@ public sealed class ShipGoalExecutorService(
     IShipAssignmentRepository assignments,
     ISurveyRepository surveys,
     INavigationPlanningService navigationPlanning,
-    IConstructionRepository constructions,
     IWaypointRepository waypoints,
     IMarketRepository markets,
-    IContractRepository contracts,
-    ISettingsRepository settings,
-    IAssignmentResolver assignmentResolver,
     IShipCapabilityRegistry capabilityRegistry,
     IShipEventScheduler scheduler,
     IShipGoalHistoryRepository goalHistory,
+    IScoutAllMarketplacesPlanService scoutPlanService,
     IMessageBus bus,
     ILogger<ShipGoalExecutorService> logger) : IShipGoalExecutorService
 {
-    /// <summary>Fallback retry delay when a cooldown expiry time is unavailable.</summary>
-    private const int CooldownRetrySeconds = 70;
-
     public async Task<GoalExecutionResult?> ExecuteAsync(string shipSymbol, CancellationToken ct)
     {
         var ship = await ships.FindAsync(shipSymbol, ct);
@@ -53,9 +36,7 @@ public sealed class ShipGoalExecutorService(
         }
 
         var activeGoal = await goals.GetActiveGoalAsync(shipSymbol, ct);
-
-        // No active goal: ship is idle, nothing to do.
-        if (activeGoal is null)
+        if (activeGoal is not ScoutWaypointGoal and not DeployProbeGoal)
         {
             return null;
         }
@@ -70,250 +51,17 @@ public sealed class ShipGoalExecutorService(
             return null;
         }
 
-        var ctx = await BuildContextAsync(ship, activeGoal, ct);
-        var result = await executor.ExecuteStepAsync(ship, activeGoal, ctx, ct);
+        var result = await executor.ExecuteStepAsync(ship, activeGoal, new ShipGoalContext(), ct);
 
-        logger.LogInformation(
-            "ShipGoalExecutorService: ship={Ship} goal={Kind} outcome={Outcome} reason={Reason}",
-            shipSymbol,
-            activeGoal.Kind,
-            result.Outcome,
-            result.Reason);
+        if (result.Outcome == GoalExecutionOutcome.Completed && activeGoal is ScoutWaypointGoal)
+        {
+            logger.LogInformation(
+                "ShipGoalExecutorService: ship {Ship} completed goal {Kind}; advancing scout plan.",
+                shipSymbol,
+                activeGoal.Kind);
+            await scoutPlanService.AdvanceAsync(shipSymbol, ct);
+        }
 
-        await HandleResultAsync(ship, activeGoal, result, ct);
         return result;
-    }
-
-    private async Task HandleResultAsync(
-        ShipModel ship,
-        ShipGoal goal,
-        GoalExecutionResult result,
-        CancellationToken ct)
-    {
-        var now = TimeProvider.System.GetUtcNow();
-
-        switch (result.Outcome)
-        {
-            case GoalExecutionOutcome.Completed:
-                // Phase 14c: cancel any pending scheduled event before goal is cleared.
-                await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
-                await bus.PublishAsync(new GoalCompletedEvent(
-                    ship.Symbol, goal.GoalId, goal.Kind, Guid.NewGuid(), Guid.Empty, now));
-                // Phase 17e: persist goal history entry.
-                await goalHistory.AppendAsync(new ShipGoalHistoryEntry
-                {
-                    Id = Guid.NewGuid(),
-                    ShipSymbol = ship.Symbol,
-                    GoalKind = goal.Kind.ToString(),
-                    GoalId = goal.GoalId,
-                    Outcome = "Completed",
-                    Reason = null,
-                    StartedAt = goal.StartedAt,
-                    EndedAt = now,
-                }, ct);
-                await goals.ClearActiveGoalAsync(ship.Symbol, ct);
-                await bus.InvokeAsync(new AssignShipCommand(
-                    ship.Symbol,
-                    "Idle",
-                    SystemSymbol: ship.SystemSymbol ?? string.Empty,
-                    WaypointSymbol: ship.WaypointSymbol ?? string.Empty), ct);
-                break;
-
-            case GoalExecutionOutcome.Blocked:
-                // Phase 14c: cancel any pending scheduled event before goal is cleared.
-                await scheduler.CancelScheduledAsync(ship.Symbol, goal.GoalId, ct);
-                await bus.PublishAsync(new GoalBlockedEvent(
-                    ship.Symbol, goal.GoalId, goal.Kind, result.Reason, Guid.NewGuid(), Guid.Empty, now));
-                // Phase 17e: persist goal history entry.
-                await goalHistory.AppendAsync(new ShipGoalHistoryEntry
-                {
-                    Id = Guid.NewGuid(),
-                    ShipSymbol = ship.Symbol,
-                    GoalKind = goal.Kind.ToString(),
-                    GoalId = goal.GoalId,
-                    Outcome = "Blocked",
-                    Reason = result.Reason,
-                    StartedAt = goal.StartedAt,
-                    EndedAt = now,
-                }, ct);
-                await goals.ClearActiveGoalAsync(ship.Symbol, ct);
-                await bus.InvokeAsync(new AssignShipCommand(
-                    ship.Symbol,
-                    "Idle",
-                    SystemSymbol: ship.SystemSymbol ?? string.Empty,
-                    WaypointSymbol: ship.WaypointSymbol ?? string.Empty), ct);
-                break;
-
-            case GoalExecutionOutcome.WaitingForCooldown when result.CooldownExpiresAt.HasValue:
-                // Phase 14c: use the persistent scheduler instead of bus.ScheduleAsync.
-                // The command handler (extract/siphon/survey) already called ScheduleCooldownExpiryAsync,
-                // but we upsert here to ensure recovery works correctly after a process restart.
-                await scheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, result.CooldownExpiresAt.Value, ct);
-                break;
-
-            case GoalExecutionOutcome.WaitingForCooldown:
-                // Cooldown without known expiry: schedule with a short fallback delay.
-                var retryAt = now.AddSeconds(CooldownRetrySeconds);
-                await scheduler.ScheduleCooldownExpiryAsync(ship.Symbol, goal.GoalId, retryAt, ct);
-                break;
-
-            case GoalExecutionOutcome.Progressing:
-                // Phase 13c+: Do NOT publish an immediate follow-up tick.
-                // The executor has issued a command (navigate, extract, etc.) that will complete
-                // asynchronously. The next tick should come from:
-                // - Ship arrival event (scheduled by navigate command)
-                // - Cooldown expiry event (scheduled by action commands)
-                // - External stimuli (market price change, etc.)
-                // Publishing an immediate tick here creates a cascade of rapid re-evaluations
-                // where the ship keeps re-entering this same executor step repeatedly.
-                break;
-
-            case GoalExecutionOutcome.WaitingForArrival:
-                // Phase 14c: use the persistent scheduler instead of ShipInTransitEventHandler.
-                // The navigate command handler already called ScheduleArrivalAsync, but we upsert
-                // here using ship.ArrivesAt to cover recovery scenarios after a process restart.
-                if (ship.ArrivesAt.HasValue)
-                {
-                    await scheduler.ScheduleArrivalAsync(ship.Symbol, goal.GoalId, ship.ArrivesAt.Value, ct);
-                }
-                break;
-        }
-    }
-
-    private async Task<ShipGoalContext> BuildContextAsync(
-        ShipModel ship,
-        ShipGoal goal,
-        CancellationToken ct)
-    {
-        var activeSurveys = capabilityRegistry.GetCapabilities(ship).CanSurvey && !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
-            ? (await surveys.GetActiveByWaypointAsync(ship.WaypointSymbol, ct)).Count
-            : 0;
-
-        var navigationTarget = ResolveNavigationTarget(ship, goal);
-        var recommendedFlightMode = string.Empty;
-        if (!string.IsNullOrWhiteSpace(navigationTarget) && ship.FuelCapacity > 0)
-        {
-            var plan = await navigationPlanning.BuildPlanAsync(ship, navigationTarget, ct);
-            if (plan is not null && !string.IsNullOrWhiteSpace(plan.RecommendedFlightMode))
-            {
-                recommendedFlightMode = plan.RecommendedFlightMode;
-            }
-        }
-
-        var fuelMarket = string.Empty;
-        var currentSellsFuel = false;
-        if (!string.IsNullOrWhiteSpace(ship.SystemSymbol))
-        {
-            (fuelMarket, currentSellsFuel) = await ResolveFuelContextAsync(ship, ct);
-        }
-
-        var constructionComplete = false;
-        if (goal is SupplyConstructionGoal supplyGoal && !string.IsNullOrWhiteSpace(supplyGoal.ConstructionSiteWaypointSymbol))
-        {
-            var site = await constructions.FindAsync(supplyGoal.ConstructionSiteWaypointSymbol, ct);
-            constructionComplete = site is not null && site.IsComplete;
-        }
-
-        IReadOnlyList<ContractDto> activeContracts = [];
-        MarketSnapshot? currentMarketSnapshot = null;
-        var miningReserveHydrocarbonUnits = 0;
-        var miningMinimumSellPrice = 0;
-        var miningJettisonLowValueWhenFull = false;
-
-        if (ship.LocalStatus == Domain.Enums.ShipLocalStatus.Docked)
-        {
-            activeContracts = await contracts.GetActiveAsync(ct);
-
-            if (!string.IsNullOrWhiteSpace(ship.WaypointSymbol))
-            {
-                currentMarketSnapshot = await markets.FindSnapshotByWaypointAsync(ship.WaypointSymbol, ct);
-            }
-
-            if (goal is MineResourceGoal or SiphonResourceGoal)
-            {
-                miningReserveHydrocarbonUnits = await settings.GetAsync<int>("Mining.ReserveHydrocarbonUnits", ct);
-                miningMinimumSellPrice = await settings.GetAsync<int>("Mining.MinimumSellPriceToKeepCargo", ct);
-                miningJettisonLowValueWhenFull = await settings.GetAsync<bool>("Mining.JettisonLowValueWhenFull", ct);
-            }
-        }
-
-        string? nearestSellMarket = null;
-        if (goal is MineResourceGoal mineGoal)
-        {
-            nearestSellMarket = await assignmentResolver.FindNearestSellMarketAsync(ship, mineGoal.TradeSymbol, ct);
-        }
-        else if (goal is SiphonResourceGoal siphonGoal)
-        {
-            nearestSellMarket = await assignmentResolver.FindNearestSellMarketAsync(ship, siphonGoal.TradeSymbol, ct);
-        }
-
-        return new ShipGoalContext
-        {
-            ActiveSurveyCount = activeSurveys,
-            RecommendedFlightMode = recommendedFlightMode,
-            FuelMarketWaypoint = fuelMarket,
-            CurrentWaypointSellsFuel = currentSellsFuel,
-            ConstructionComplete = constructionComplete,
-            ActiveContracts = activeContracts,
-            CurrentMarketSnapshot = currentMarketSnapshot,
-            MiningReserveHydrocarbonUnits = miningReserveHydrocarbonUnits,
-            MiningMinimumSellPrice = miningMinimumSellPrice,
-            MiningJettisonLowValueWhenFull = miningJettisonLowValueWhenFull,
-            NearestSellMarket = nearestSellMarket,
-        };
-    }
-
-    private static string ResolveNavigationTarget(ShipModel ship, ShipGoal goal)
-    {
-        return goal switch
-        {
-            MineResourceGoal mineGoal => ship.CargoCurrent > 0
-                ? string.Empty  // sell market, determined later
-                : mineGoal.SourceWaypointSymbol,
-            SiphonResourceGoal siphonGoal => ship.CargoCurrent > 0
-                ? string.Empty
-                : siphonGoal.SourceWaypointSymbol,
-            MoveToWaypointGoal moveGoal => moveGoal.TargetWaypointSymbol,
-            SellCargoGoal sellGoal => sellGoal.DestinationWaypointSymbol,
-            DeliverCargoGoal deliverGoal => deliverGoal.DeliveryWaypointSymbol,
-            SupplyConstructionGoal supplyGoal => supplyGoal.ConstructionSiteWaypointSymbol,
-            ScoutWaypointGoal scoutGoal => scoutGoal.TargetWaypointSymbol,
-            PatrolMarketGoal patrolGoal => patrolGoal.TargetWaypointSymbol,
-            _ => string.Empty,
-        };
-    }
-
-    private async Task<(string FuelMarket, bool CurrentSellsFuel)> ResolveFuelContextAsync(
-        ShipModel ship,
-        CancellationToken ct)
-    {
-        var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol!, ct);
-        if (systemWaypoints.Count == 0)
-        {
-            return (string.Empty, false);
-        }
-
-        var marketWaypoints = systemWaypoints
-            .Where(w => w.HasMarket)
-            .Select(w => w.Symbol)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (marketWaypoints.Count == 0)
-        {
-            return (string.Empty, false);
-        }
-
-        var snapshots = await markets.GetAllSnapshotsAsync(ct);
-        var fuelSellingMarkets = snapshots
-            .Where(s => s.SystemSymbol.Equals(ship.SystemSymbol, StringComparison.OrdinalIgnoreCase))
-            .Where(s => marketWaypoints.Contains(s.WaypointSymbol))
-            .Where(s => s.TradeGoods.Any(g => g.Symbol.Equals("FUEL", StringComparison.OrdinalIgnoreCase)))
-            .ToArray();
-
-        var fuelMarket = fuelSellingMarkets.FirstOrDefault()?.WaypointSymbol ?? string.Empty;
-        var currentSellsFuel = !string.IsNullOrWhiteSpace(ship.WaypointSymbol)
-            && fuelSellingMarkets.Any(s => s.WaypointSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase));
-
-        return (fuelMarket, currentSellsFuel);
     }
 }

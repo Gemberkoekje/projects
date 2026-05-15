@@ -16,7 +16,11 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task<IReadOnlyList<ShipModel>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var entities = await db.Ships.AsNoTracking().OrderBy(s => s.Symbol).ToListAsync(cancellationToken);
+        var entities = await db.Ships
+            .AsNoTracking()
+            .Where(s => s.AgentToken == db.AgentToken)
+            .OrderBy(s => s.Symbol)
+            .ToListAsync(cancellationToken);
         foreach (var e in entities)
             e.ApplyArrivalIfDue();
         return entities.Select(MapToModel).ToList();
@@ -24,14 +28,16 @@ public sealed class ShipRepository(SpaceTradersDbContext db) : IShipRepository
 
     public async Task<IReadOnlyList<ShipModel>> GetInTransitAsync(CancellationToken cancellationToken = default)
     {
-        var entities = await db.Ships.Where(s => s.ArrivesAt.HasValue).ToListAsync(cancellationToken);
+        var entities = await db.Ships
+            .Where(s => s.AgentToken == db.AgentToken && s.ArrivesAt.HasValue)
+            .ToListAsync(cancellationToken);
         return entities.Select(MapToModel).ToList();
     }
 
     public async Task<bool> IsShipAtWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default)
     {
         return await db.Ships.AsNoTracking()
-            .AnyAsync(s => s.WaypointSymbol == waypointSymbol && s.Status != "IN_TRANSIT", cancellationToken);
+            .AnyAsync(s => s.AgentToken == db.AgentToken && s.WaypointSymbol == waypointSymbol && s.Status != "IN_TRANSIT", cancellationToken);
     }
 
     public async Task UpsertAsync(ShipModel ship, CancellationToken cancellationToken = default)

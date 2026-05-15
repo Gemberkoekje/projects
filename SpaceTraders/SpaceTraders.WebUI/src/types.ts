@@ -25,6 +25,13 @@ export interface ShipDto {
   arrivesAt: string | null
   isInTransit: boolean
   lastSyncedAt: string
+  shipType: string
+  mountSymbols: string[]
+  hasMiningEquipment: boolean
+  hasSurveyEquipment: boolean
+  hasGasSiphonEquipment: boolean
+  hasGasProcessor: boolean
+  hasMineralProcessor: boolean
 }
 
 export interface ContractDeliverableDto {
@@ -364,8 +371,64 @@ export interface ShipActivityDto {
 export interface ShipGoalHistoryDto {
   id: string
   goalKind: string
-  outcome: string        // 'Completed' | 'Blocked'
+  outcome: string
   reason: string | null
   startedAt: string
   endedAt: string
+}
+
+export interface ShipyardShipDto {
+  type: string
+  name: string | null
+  description: string | null
+  supply: string | null
+  activity: string | null
+  purchasePrice: number
+}
+
+export interface ShipyardWaypointDto {
+  waypointSymbol: string
+  systemSymbol: string
+  shipTypes: string[]
+  ships: ShipyardShipDto[]
+}
+
+export interface ShipyardFreshnessDto {
+  waypointSymbol: string
+  systemSymbol: string
+  lastObservedAt: string
+  ageMinutes: number
+}
+
+export interface ShipDiagnosticsDto {
+  symbol: string
+  shipType: string
+  systemSymbol: string | null
+  waypointSymbol: string | null
+  status: string | null
+  flightMode: string | null
+  fuelCurrent: number
+  fuelCapacity: number
+  cargoCurrent: number
+  cargoCapacity: number
+  isInTransit: boolean
+  arrivesAt: string | null
+  lastSyncedAt: string
+  mountSymbols: string[]
+  hasMiningEquipment: boolean
+  hasSurveyEquipment: boolean
+  hasGasSiphonEquipment: boolean
+  hasGasProcessor: boolean
+  hasMineralProcessor: boolean
+  hasCargoSpace: boolean
+  hasFuelCapacity: boolean
+  isOccupied: boolean
+  activeAssignmentType: string | null
+  activeAssignmentContractId: string | null
+  activeAssignmentSourceWaypoint: string | null
+  activeAssignmentDestinationWaypoint: string | null
+  activeAssignmentAssignedAt: string | null
+  activeAssignmentStepIndex: number | null
+  isEligibleForContractMinerSelection: boolean
+  contractMinerEligibilityReason: string
 }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
 using NSubstitute;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
@@ -100,13 +101,21 @@ public sealed class FleetStatusQueryServiceTests
         return repo;
     }
 
+    private static IContractMineralPlanRepository NoContractPlans()
+    {
+        var repo = Substitute.For<IContractMineralPlanRepository>();
+        repo.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        return repo;
+    }
+
     private static FleetStatusQueryService Build(
         IFleetGoalRepository? goalRepo = null,
         IShipRepository? shipRepo = null,
         IShipGoalRepository? shipGoalRepo = null,
         IShipAssignmentRepository? assignmentRepo = null,
         IContractRepository? contractRepo = null,
-        IConstructionRepository? constructionRepo = null)
+        IConstructionRepository? constructionRepo = null,
+        IContractMineralPlanRepository? contractPlanRepo = null)
     {
         var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
         historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -118,7 +127,8 @@ public sealed class FleetStatusQueryServiceTests
             assignmentRepo ?? NoAssignments(),
             contractRepo ?? NoContracts(),
             constructionRepo ?? NoConstruction(),
-            historyRepo);
+            historyRepo,
+            contractPlanRepo ?? NoContractPlans());
     }
 
     // -----------------------------------------------------------------------
@@ -325,6 +335,41 @@ public sealed class FleetStatusQueryServiceTests
         result.Should().HaveCount(3);
         result.Should().AllSatisfy(chain => chain.ResourceNeeds.Should().BeEmpty());
     }
+
+    [Fact]
+    public async Task GetGoalChainsAsync_NoFleetGoals_FallsBackToActiveContractPlan()
+    {
+        var contractPlans = Substitute.For<IContractMineralPlanRepository>();
+        contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
+        {
+            PlanId = Guid.NewGuid(),
+            ContractId = "c-fallback",
+            ShipSymbol = "MINER-1",
+            TradeSymbol = "COPPER_ORE",
+            SourceWaypoint = "X1-ASTEROID",
+            DestinationWaypoint = "X1-DEST",
+            UnitsRequired = 120,
+            UnitsFulfilled = 40,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            StopReason = null,
+        });
+
+        var svc = Build(
+            goalRepo: GoalRepo(),
+            contractPlanRepo: contractPlans,
+            contractRepo: ContractWith("c-fallback",
+                new ContractDeliverableDto("COPPER_ORE", "X1-DEST", 120, 40)));
+
+        var result = await svc.GetGoalChainsAsync();
+
+        result.Should().HaveCount(1);
+        result[0].FleetGoalKind.Should().Be(FleetGoalKind.Contract);
+        result[0].FleetGoalDescription.Should().Be("Contract c-fallback");
+        result[0].ResourceNeeds.Should().ContainSingle();
+        result[0].ResourceNeeds[0].AssignedShips.Should().ContainSingle("MINER-1");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -371,13 +416,21 @@ public sealed class FleetStatusQueryServiceAssignmentTests
         return repo;
     }
 
+    private static IContractMineralPlanRepository NoContractPlans()
+    {
+        var repo = Substitute.For<IContractMineralPlanRepository>();
+        repo.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+        return repo;
+    }
+
     private static FleetStatusQueryService Build(
         IFleetGoalRepository? goalRepo = null,
         IShipRepository? shipRepo = null,
         IShipGoalRepository? shipGoalRepo = null,
         IShipAssignmentRepository? assignmentRepo = null,
         IContractRepository? contractRepo = null,
-        IConstructionRepository? constructionRepo = null)
+        IConstructionRepository? constructionRepo = null,
+        IContractMineralPlanRepository? contractPlanRepo = null)
     {
         var contracts = Substitute.For<IContractRepository>();
         contracts.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((ContractDto?)null);
@@ -400,7 +453,8 @@ public sealed class FleetStatusQueryServiceAssignmentTests
             assignmentRepo ?? assignments,
             contractRepo ?? contracts,
             constructionRepo ?? constructions,
-            historyRepo);
+            historyRepo,
+            contractPlanRepo ?? NoContractPlans());
     }
 
     [Fact]
@@ -498,6 +552,60 @@ public sealed class FleetStatusQueryServiceAssignmentTests
         result.Should().ContainSingle(s => s.GoalKind == ShipGoalKind.MineResource);
         result.Should().ContainSingle(s => s.GoalKind == ShipGoalKind.ScoutWaypoint);
     }
+
+    [Fact]
+    public async Task GetAssignmentsAsync_NoShipGoal_UsesActiveContractAssignmentSnapshot()
+    {
+        var assignedAt = new DateTimeOffset(2024, 2, 1, 10, 0, 0, TimeSpan.Zero);
+
+        var assignmentRepo = Substitute.For<IShipAssignmentRepository>();
+        assignmentRepo.FindAsync("MINER-1", Arg.Any<CancellationToken>()).Returns(
+            new ShipAssignmentDto(
+                "MINER-1",
+                "Contract",
+                "X1-ASTEROID",
+                "X1-DEST",
+                "COPPER_ORE",
+                "c4",
+                0,
+                assignedAt,
+                null));
+
+        var shipGoalRepo = Substitute.For<IShipGoalRepository>();
+        shipGoalRepo.GetActiveGoalAsync("MINER-1", Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+
+        var contractPlans = Substitute.For<IContractMineralPlanRepository>();
+        var planId = Guid.NewGuid();
+        contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns(new ContractMineralPlanState
+        {
+            PlanId = planId,
+            ContractId = "c4",
+            ShipSymbol = "MINER-1",
+            TradeSymbol = "COPPER_ORE",
+            SourceWaypoint = "X1-ASTEROID",
+            DestinationWaypoint = "X1-DEST",
+            UnitsRequired = 100,
+            UnitsFulfilled = 20,
+            Status = ContractMineralPlanStatus.Active,
+            CreatedAt = assignedAt,
+            UpdatedAt = assignedAt,
+            StopReason = null,
+        });
+
+        var svc = Build(
+            shipRepo: ShipsWith("MINER-1"),
+            shipGoalRepo: shipGoalRepo,
+            assignmentRepo: assignmentRepo,
+            contractPlanRepo: contractPlans);
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Should().HaveCount(1);
+        result[0].GoalKind.Should().Be(ShipGoalKind.MineResource);
+        result[0].GoalDescription.Should().Contain("Mining COPPER_ORE");
+        result[0].FleetGoalId.Should().Be(planId);
+        result[0].FleetGoalDescription.Should().Be("Contract c4");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -547,7 +655,10 @@ public sealed class FleetStatusQueryServiceActivityTests
         historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([]);
 
-        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions, historyRepo);
+        var contractPlans = Substitute.For<IContractMineralPlanRepository>();
+        contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
+
+        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions, historyRepo, contractPlans);
     }
 
     [Fact]

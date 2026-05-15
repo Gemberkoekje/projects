@@ -1,9 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { apiFetch } from '@/lib/api-fetch'
 import type { ShipDto } from '@/types'
-import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
@@ -55,6 +54,32 @@ function formatEta(iso: string) {
   const s = Math.floor((ms % 60_000) / 1_000)
   if (m > 0) return `ETA ${m}m ${s}s`
   return `ETA ${s}s`
+}
+
+function Countdown({ iso }: { iso: string }) {
+  const [label, setLabel] = useState(() => formatEta(iso))
+
+  useEffect(() => {
+    const tick = () => setLabel(formatEta(iso))
+    tick()
+    const id = setInterval(tick, 1_000)
+    return () => clearInterval(id)
+  }, [iso])
+
+  return <span className="text-xs text-status-yellow tabular-nums">{label}</span>
+}
+
+function CapabilityChip({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        ok ? 'bg-status-green/15 text-status-green' : 'bg-muted text-muted-foreground',
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 export default function FleetPage() {
@@ -134,7 +159,7 @@ export default function FleetPage() {
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2">Fuel</th>
               <th className="px-4 py-2">Cargo</th>
-              <th className="px-4 py-2 sr-only">Actions</th>
+              <th className="px-4 py-2">Checks</th>
             </tr>
           </thead>
           <tbody>
@@ -150,7 +175,11 @@ export default function FleetPage() {
                 key={ship.symbol}
                 className="border-b border-border last:border-0 hover:bg-accent/30 transition-colors"
               >
-                <td className="px-4 py-3 font-mono font-medium">{ship.symbol}</td>
+                <td className="px-4 py-3 font-mono font-medium">
+                  <Link to={`/fleet/${encodeURIComponent(ship.symbol)}`} className="text-primary hover:underline">
+                    {ship.symbol}
+                  </Link>
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   <div>{ship.systemSymbol ?? '—'}</div>
                   {ship.waypointSymbol && (
@@ -158,7 +187,7 @@ export default function FleetPage() {
                   )}
                   {ship.isInTransit && ship.arrivesAt && (
                     <div className="text-xs text-status-yellow">
-                      {formatEta(ship.arrivesAt)}
+                      <Countdown iso={ship.arrivesAt} />
                     </div>
                   )}
                 </td>
@@ -172,14 +201,11 @@ export default function FleetPage() {
                   <ProgressBar value={ship.cargoCurrent} max={ship.cargoCapacity} />
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    to={`/fleet/${ship.symbol}`}
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    aria-label={`View details for ${ship.symbol}`}
-                  >
-                    Details
-                    <ChevronRight size={12} aria-hidden />
-                  </Link>
+                  <div className="flex flex-wrap gap-1">
+                    <CapabilityChip label="mining" ok={ship.hasMiningEquipment} />
+                    <CapabilityChip label="cargo" ok={ship.cargoCapacity > 0} />
+                    <CapabilityChip label="fuel" ok={ship.fuelCapacity > 0} />
+                  </div>
                 </td>
               </tr>
             ))}

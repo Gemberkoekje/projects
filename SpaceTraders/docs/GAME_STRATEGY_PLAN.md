@@ -4,6 +4,14 @@
 > connected systems. Experienced players complete this in **18–24 hours** after reset — that is
 > your benchmark.
 
+> **Implementation status (updated):**
+> - ✅ Construction goals now resolve directly to `SupplyConstructionGoal` delivery work.
+> - ✅ Advanced circuitry construction cargo is ring-fenced from sale in the application layer.
+> - ✅ Supply-chain priming now emits precursor construction goals starting at priority `31`.
+> - ✅ Market coverage now ranks uncovered markets with industrial/high-tech/shipyard/fuel preferences before generic coverage.
+> - ✅ FAB_MAT budget settings and bulk-buy execution are now automated for qualifying construction runs.
+> - ✅ Tests and build are passing after this strategy-plan implementation pass.
+
 This document replaces `EXPANSION_PLAN.md` and `STARTER_SYSTEM_STRATEGY.md`. Every strategic phase
 is expressed in terms of the goal-driven orchestrator architecture described in
 `SHIP_GOAL_DRIVEN_ARCHITECTURE_PLAN.md`. The orchestrator maintains a prioritised list of active

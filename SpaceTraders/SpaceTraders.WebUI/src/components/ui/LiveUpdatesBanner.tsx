@@ -1,9 +1,9 @@
 import { WifiOff } from 'lucide-react'
-import { useSignalR } from '@/lib/signalr'
+import { useSignalR } from '@/lib/signalr-context'
 
 /**
  * Shown below the top nav when SignalR is not delivering live updates —
- * either the connection dropped or the server heartbeat has gone silent.
+ * i.e. the connection dropped or is reconnecting.
  */
 export function LiveUpdatesBanner() {
   const { state, liveUpdatesPaused } = useSignalR()
@@ -15,7 +15,7 @@ export function LiveUpdatesBanner() {
       ? 'Reconnecting — live updates paused'
       : state === 'disconnected'
         ? 'Disconnected — live updates paused'
-        : 'Live updates paused — server heartbeat not received'
+        : 'Live updates paused — connection not established'
 
   return (
     <div

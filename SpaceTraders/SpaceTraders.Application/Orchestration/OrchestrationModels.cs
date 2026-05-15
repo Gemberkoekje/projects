@@ -9,6 +9,7 @@ public static class FleetGoalPriority
     public const int MarketScouting = 10;
     public const int Contract = 20;
     public const int Construction = 30;
+    public const int ConstructionPrecursor = 31;
     public const int MarketCoverage = 40;
     public const int FleetExpansion = 50;
 }
@@ -72,6 +73,8 @@ public sealed record FleetGoal
     /// </summary>
     public FleetGoal? ExpansionTargetGoal { get; init; }
 
+    public bool IsSupplyChainPrecursor { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public FleetGoal(
         FleetGoalKind Kind,
@@ -86,7 +89,8 @@ public sealed record FleetGoal
         long EstimatedCost = 0,
         string? ExpansionShipType = null,
         string? ExpansionShipyardWaypoint = null,
-        FleetGoal? ExpansionTargetGoal = null)
+        FleetGoal? ExpansionTargetGoal = null,
+        bool IsSupplyChainPrecursor = false)
     {
         this.Kind = Kind;
         this.Description = Description;
@@ -101,6 +105,7 @@ public sealed record FleetGoal
         this.ExpansionShipType = ExpansionShipType;
         this.ExpansionShipyardWaypoint = ExpansionShipyardWaypoint;
         this.ExpansionTargetGoal = ExpansionTargetGoal;
+        this.IsSupplyChainPrecursor = IsSupplyChainPrecursor;
     }
 }
 
@@ -194,6 +199,30 @@ public sealed record ResourceProductionGoal
     /// <summary>Higher values are processed first by the orchestrator.</summary>
     public required int Priority { get; init; }
 
+    /// <summary>
+    /// Optional waypoint where the produced resource units should be delivered.
+    ///
+    /// This is used to ensure that resources needed for contract or construction goals
+    /// are delivered to the correct location, especially when multiple sites are involved.
+    /// </summary>
+    public string? DeliveryWaypoint { get; init; }
+
+    /// <summary>
+    /// Optional preferred waypoint for selling the produced resource units.
+    ///
+    /// This is a hint to the resolver about where the fleet should aim to sell the resources
+    /// for optimal profit, considering the current market conditions.
+    /// </summary>
+    public string? PreferredSellWaypoint { get; init; }
+
+    /// <summary>
+    /// Protects the trade symbol from being sold when the resource production goal is resolved.
+    ///
+    /// This is useful for scenarios where the produced resources are needed for fleet supply
+    /// or other strategic purposes and should not be traded away.
+    /// </summary>
+    public bool ProtectTradeSymbolFromSale { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public ResourceProductionGoal(
         string TradeSymbol,
@@ -201,7 +230,10 @@ public sealed record ResourceProductionGoal
         ResourceProductionPurpose PurposeKind,
         int Priority,
         string? PurposeId = null,
-        DateTimeOffset? Deadline = null)
+        DateTimeOffset? Deadline = null,
+        string? DeliveryWaypoint = null,
+        string? PreferredSellWaypoint = null,
+        bool ProtectTradeSymbolFromSale = false)
     {
         this.TradeSymbol = TradeSymbol;
         this.UnitsNeeded = UnitsNeeded;
@@ -209,6 +241,9 @@ public sealed record ResourceProductionGoal
         this.Priority = Priority;
         this.PurposeId = PurposeId;
         this.Deadline = Deadline;
+        this.DeliveryWaypoint = DeliveryWaypoint;
+        this.PreferredSellWaypoint = PreferredSellWaypoint;
+        this.ProtectTradeSymbolFromSale = ProtectTradeSymbolFromSale;
     }
 }
 
@@ -228,18 +263,30 @@ public sealed record BudgetDecision
 
     public string? Reason { get; init; }
 
+    public int FabMatsBuyThreshold { get; init; }
+
+    public int FabMatsTransactionSize { get; init; }
+
+    public bool HourlyConstructionBudgetCapEnabled { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public BudgetDecision(
         bool CanAfford,
         long AvailableCredits,
         long ReservedCredits,
         long SpendableCredits,
-        string? Reason = null)
+        string? Reason = null,
+        int FabMatsBuyThreshold = 2500,
+        int FabMatsTransactionSize = 60,
+        bool HourlyConstructionBudgetCapEnabled = false)
     {
         this.CanAfford = CanAfford;
         this.AvailableCredits = AvailableCredits;
         this.ReservedCredits = ReservedCredits;
         this.SpendableCredits = SpendableCredits;
         this.Reason = Reason;
+        this.FabMatsBuyThreshold = FabMatsBuyThreshold;
+        this.FabMatsTransactionSize = FabMatsTransactionSize;
+        this.HourlyConstructionBudgetCapEnabled = HourlyConstructionBudgetCapEnabled;
     }
 }

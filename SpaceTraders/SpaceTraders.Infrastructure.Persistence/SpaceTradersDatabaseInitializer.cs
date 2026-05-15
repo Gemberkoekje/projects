@@ -17,67 +17,85 @@ public static class SpaceTradersDatabaseInitializer
 
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"MountsJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ShipType\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "UPDATE cached_ships SET \"ShipType\" = '' WHERE \"ShipType\" IS NULL;",
+                [],
                 cancellationToken);
 
             // Phase 2: ship component enrichment
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ModulesJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"FrameJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"ReactorJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"EngineJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"CooldownExpiresAt\" timestamp with time zone NULL;",
+                [],
                 cancellationToken);
 
             // Phase 2: waypoint enrichment
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"TraitsJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ModifiersJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"OrbitalsJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ParentSymbol\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"IsUnderConstruction\" boolean NOT NULL DEFAULT FALSE;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"ChartJson\" text NULL;",
+                [],
                 cancellationToken);
 
             // Phase 2: shipyard enrichment
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_shipyards ADD COLUMN IF NOT EXISTS \"ShipsDetailJson\" text NULL;",
+                [],
                 cancellationToken);
 
             // Phase 3: contract objective planning metadata
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"TermsDeadline\" timestamp with time zone NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"DeliverablesJson\" text NULL;",
+                [],
                 cancellationToken);
 
             // Phase 1: local ship status
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"LocalStatus\" integer NOT NULL DEFAULT 0;",
+                [],
                 cancellationToken);
 
             // Startup snapshots table
@@ -91,9 +109,11 @@ public static class SpaceTradersDatabaseInitializer
                     "IsInitialSnapshot" boolean NOT NULL DEFAULT FALSE
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_startup_snapshots_agent_captured ON startup_snapshots (\"AgentToken\", \"CapturedAt\");",
+                [],
                 cancellationToken);
 
             // Phase 0a: analytics & observability tables
@@ -111,9 +131,11 @@ public static class SpaceTradersDatabaseInitializer
                     "EndingCredits" bigint NULL
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_runs_agent_started ON runs (\"AgentToken\", \"StartedAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -129,9 +151,11 @@ public static class SpaceTradersDatabaseInitializer
                     "CreatedAt" timestamp with time zone NOT NULL DEFAULT now()
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_scheduled_runs_agent_activates ON scheduled_runs (\"AgentToken\", \"ActivatesAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -151,15 +175,19 @@ public static class SpaceTradersDatabaseInitializer
                     "SourceEventId" character varying(200) NULL
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_occurred ON ledger_entries (\"AgentToken\", \"OccurredAt\");",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_run ON ledger_entries (\"AgentToken\", \"RunId\");",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_ledger_entries_agent_ship_occurred ON ledger_entries (\"AgentToken\", \"ShipSymbol\", \"OccurredAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -175,9 +203,11 @@ public static class SpaceTradersDatabaseInitializer
                     "Label" character varying(500) NULL
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_run_credit_highlights_agent_run_occurred ON run_credit_highlights (\"AgentToken\", \"RunId\", \"OccurredAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -189,9 +219,11 @@ public static class SpaceTradersDatabaseInitializer
                     "Credits" bigint NOT NULL DEFAULT 0
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_agent_credits_samples_agent_observed ON agent_credits_samples (\"AgentToken\", \"ObservedAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -209,12 +241,15 @@ public static class SpaceTradersDatabaseInitializer
                     "TradeVolume" integer NOT NULL DEFAULT 0
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_market_price_samples_agent_good_observed ON market_price_samples (\"AgentToken\", \"GoodSymbol\", \"ObservedAt\");",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_market_price_samples_agent_waypoint_good_observed ON market_price_samples (\"AgentToken\", \"WaypointSymbol\", \"GoodSymbol\", \"ObservedAt\");",
+                [],
                 cancellationToken);
 
             await dbContext.Database.ExecuteSqlRawAsync(
@@ -230,9 +265,11 @@ public static class SpaceTradersDatabaseInitializer
                     "PayloadJson" text NULL
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_ship_task_records_agent_ship_started ON ship_task_records (\"AgentToken\", \"ShipSymbol\", \"StartedAt\");",
+                [],
                 cancellationToken);
 
             // Phase 11e: fleet goals table
@@ -250,23 +287,83 @@ public static class SpaceTradersDatabaseInitializer
                     CONSTRAINT pk_fleet_goals PRIMARY KEY ("Id")
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_fleet_goals_agent_completed ON fleet_goals (\"AgentToken\", \"CompletedAt\");",
+                [],
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS scout_plan_states (
+                    "AgentToken" character varying(1024) NOT NULL,
+                    "PlanId" uuid NOT NULL,
+                    "ShipSymbol" character varying(100) NOT NULL,
+                    "StartWaypointSymbol" character varying(100) NOT NULL,
+                    "RouteWaypointSymbolsJson" text NOT NULL DEFAULT '[]',
+                    "CurrentRouteIndex" integer NOT NULL DEFAULT 0,
+                    "Status" integer NOT NULL DEFAULT 0,
+                    "CreatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    CONSTRAINT pk_scout_plan_states PRIMARY KEY ("AgentToken")
+                );
+                """,
+                [],
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS plan_states (
+                    "AgentToken" character varying(1024) NOT NULL,
+                    "PlanType" character varying(200) NOT NULL,
+                    "StateJson" text NOT NULL DEFAULT '{{}}',
+                    "UpdatedAt" timestamp with time zone NOT NULL DEFAULT now(),
+                    CONSTRAINT pk_plan_states PRIMARY KEY ("AgentToken", "PlanType")
+                );
+                """,
+                [],
+                cancellationToken);
+
+            await dbContext.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO plan_states ("AgentToken", "PlanType", "StateJson", "UpdatedAt")
+                SELECT
+                    sps."AgentToken",
+                    'ScoutAllMarketplaces',
+                    json_build_object(
+                        'PlanId', sps."PlanId",
+                        'ShipSymbol', sps."ShipSymbol",
+                        'StartWaypointSymbol', sps."StartWaypointSymbol",
+                        'RouteWaypointSymbols', COALESCE(sps."RouteWaypointSymbolsJson"::json, '[]'::json),
+                        'CurrentRouteIndex', sps."CurrentRouteIndex",
+                        'Status', sps."Status",
+                        'CreatedAt', sps."CreatedAt",
+                        'UpdatedAt', sps."UpdatedAt"
+                    )::text,
+                    sps."UpdatedAt"
+                FROM scout_plan_states sps
+                ON CONFLICT ("AgentToken", "PlanType") DO NOTHING;
+                """,
+                [],
                 cancellationToken);
 
             // Phase 8: ship goal model columns
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalId\" uuid NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalKind\" character varying(100) NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalPayloadJson\" text NULL;",
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"GoalStatus\" integer NULL;",
+                [],
                 cancellationToken);
 
             // Phase 14a: scheduled ship events table
@@ -280,9 +377,11 @@ public static class SpaceTradersDatabaseInitializer
                     CONSTRAINT "PK_scheduled_ship_events" PRIMARY KEY ("ShipSymbol", "GoalId")
                 );
                 """,
+                [],
                 cancellationToken);
             await dbContext.Database.ExecuteSqlRawAsync(
                 "CREATE INDEX IF NOT EXISTS idx_scheduled_ship_events_trigger_at ON scheduled_ship_events (\"TriggerAt\");",
+                [],
                 cancellationToken);
         }
 
@@ -296,35 +395,35 @@ public static class SpaceTradersDatabaseInitializer
         SpaceTradersDbContext dbContext,
         CancellationToken cancellationToken)
     {
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE stored_credentials ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_agents ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_markets ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_shipyards ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_systems ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"PurchaseUnitPrice\" integer NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"RequiredUnits\" integer NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"SupplyCompleted\" boolean NOT NULL DEFAULT FALSE;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"ProfitPerJump\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SupportsSupplyChain\" boolean NOT NULL DEFAULT FALSE;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SupplyChainDepth\" integer NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"ComputedAt\" timestamp with time zone NOT NULL DEFAULT now();", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"BuyType\" text NOT NULL DEFAULT 'UNKNOWN';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SellType\" text NOT NULL DEFAULT 'UNKNOWN';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EffectiveTradeVolume\" integer NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EstimatedFuelCost\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EstimatedTravelTimeMinutes\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"OpportunityCostPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"CooldownPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"RateLimitPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"RouteScore\" numeric(18,4) NOT NULL DEFAULT 0;", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE leader_leases ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE stored_credentials ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_agents ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_ships ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_contracts ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_markets ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_shipyards ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_waypoints ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE cached_systems ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE agent_settings ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"PurchaseUnitPrice\" integer NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"RequiredUnits\" integer NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE ship_assignment_records ADD COLUMN IF NOT EXISTS \"SupplyCompleted\" boolean NOT NULL DEFAULT FALSE;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"ProfitPerJump\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SupportsSupplyChain\" boolean NOT NULL DEFAULT FALSE;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SupplyChainDepth\" integer NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"ComputedAt\" timestamp with time zone NOT NULL DEFAULT now();", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"BuyType\" text NOT NULL DEFAULT 'UNKNOWN';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"SellType\" text NOT NULL DEFAULT 'UNKNOWN';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EffectiveTradeVolume\" integer NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EstimatedFuelCost\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"EstimatedTravelTimeMinutes\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"OpportunityCostPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"CooldownPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"RateLimitPenalty\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE trade_opportunities ADD COLUMN IF NOT EXISTS \"RouteScore\" numeric(18,4) NOT NULL DEFAULT 0;", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE leader_leases ADD COLUMN IF NOT EXISTS \"AgentToken\" text NOT NULL DEFAULT '';", [], cancellationToken);
 
         // Update column type constraints for AgentToken from varchar(512) to varchar(1024)
         await dbContext.Database.ExecuteSqlRawAsync(
@@ -336,6 +435,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -346,6 +446,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -356,6 +457,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -366,6 +468,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -376,6 +479,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -386,6 +490,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -396,6 +501,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -406,6 +512,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -416,6 +523,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -426,6 +534,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -436,6 +545,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -446,6 +556,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -456,6 +567,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -466,6 +578,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -476,6 +589,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
@@ -486,6 +600,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
 
         // Update Value column in stored_credentials
@@ -498,6 +613,7 @@ public static class SpaceTradersDatabaseInitializer
                 END IF;
             END $$;
             """,
+            [],
             cancellationToken);
 
         // Phase 17e: ship goal history table
@@ -516,12 +632,14 @@ public static class SpaceTradersDatabaseInitializer
                 CONSTRAINT pk_ship_goal_history PRIMARY KEY ("Id")
             );
             """,
+            [],
             cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
             CREATE INDEX IF NOT EXISTS idx_ship_goal_history_agent_ship_ended
                 ON ship_goal_history ("AgentToken", "ShipSymbol", "EndedAt" DESC);
             """,
+            [],
             cancellationToken);
     }
 
@@ -552,6 +670,6 @@ BEGIN
 END $$;
 """;
 
-        return dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+        return dbContext.Database.ExecuteSqlRawAsync(sql, [], cancellationToken);
     }
 }

@@ -69,11 +69,8 @@ public sealed class DeferredStartupHostedService(
             await StartServiceAsync<StartupRecoveryService>(cancellationToken);
             await StartServiceAsync<SettingsStartupLoggingService>(cancellationToken);
             await StartServiceAsync<GameLoopService>(cancellationToken);
-            await StartServiceAsync<ContractWatchService>(cancellationToken);
-            await StartServiceAsync<ResetAndReliabilityMonitorService>(cancellationToken);
             await StartServiceAsync<ActivityLogPruningService>(cancellationToken);
             await StartServiceAsync<DataRetentionService>(cancellationToken);
-            await StartServiceAsync<ShipRefreshWorkerService>(cancellationToken);
             await StartServiceAsync<PrometheusMetricsService>(cancellationToken);
 
             startupState.MarkCompleted();

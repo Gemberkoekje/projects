@@ -1,20 +1,25 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Domain.Events.Ships;
+using Wolverine;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
 
 /// <summary>
 /// Handles <see cref="ShipArrivedEvent"/> fired by <c>ShipEventScheduler</c>.
 /// Verifies that the <see cref="ShipArrivedEvent.GoalId"/> still matches the ship's active goal
-/// (stale wake-ups are silently ignored), then calls the goal executor directly.
+/// (stale wake-ups are silently ignored), then publishes <see cref="NavigateToWaypointArrivedCommand"/>
+/// to continue the navigate journey's post-arrival phase.
 /// </summary>
 public sealed class ShipArrivedEventHandler(
     IShipGoalRepository goals,
+    IShipRepository ships,
+    IMessageBus bus,
     ILogger<ShipArrivedEventHandler> logger)
 {
-    public async Task Handle(ShipArrivedEvent @event, IShipGoalExecutorService goalExecutor, CancellationToken cancellationToken)
+    public async Task Handle(ShipArrivedEvent @event, CancellationToken cancellationToken)
     {
         var activeGoal = await goals.GetActiveGoalAsync(@event.ShipSymbol, cancellationToken);
 
@@ -29,18 +34,15 @@ public sealed class ShipArrivedEventHandler(
         }
 
         logger.LogInformation(
-            "ShipArrivedEventHandler: ship {Ship} arrived; resuming goal execution.",
+            "ShipArrivedEventHandler: ship {Ship} arrived; dispatching post-arrival command.",
             @event.ShipSymbol);
 
-        var result = await goalExecutor.ExecuteAsync(@event.ShipSymbol, cancellationToken);
+        var ship = await ships.FindAsync(@event.ShipSymbol, cancellationToken);
+        var destination = ship?.WaypointSymbol ?? string.Empty;
 
-        if (result is not null)
-        {
-            logger.LogInformation(
-                "ShipArrivedEventHandler: ship {Ship} resumed after arrival; outcome={Outcome} reason={Reason}",
-                @event.ShipSymbol,
-                result.Outcome,
-                result.Reason);
-        }
+        await bus.PublishAsync(new NavigateToWaypointArrivedCommand(
+            @event.ShipSymbol,
+            destination,
+            @event.GoalId));
     }
 }

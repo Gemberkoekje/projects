@@ -62,6 +62,10 @@ public sealed class SpaceTradersDbContext(
 
     public DbSet<FleetGoalRecord> FleetGoals => Set<FleetGoalRecord>();
 
+    public DbSet<PlanStateRecord> PlanStates => Set<PlanStateRecord>();
+
+    public DbSet<ScoutPlanStateRecord> ScoutPlanStates => Set<ScoutPlanStateRecord>();
+
     public DbSet<ScheduledShipEvent> ScheduledShipEvents => Set<ScheduledShipEvent>();
 
     public DbSet<ShipGoalHistoryRecord> ShipGoalHistory => Set<ShipGoalHistoryRecord>();
@@ -375,7 +379,6 @@ public sealed class SpaceTradersDbContext(
         {
             entity.ToTable("fleet_goals");
             entity.HasKey(x => x.Id);
-            entity.Property(x => x.Id).ValueGeneratedNever();
             entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
             entity.Property(x => x.Kind).HasMaxLength(100).IsRequired();
             entity.Property(x => x.Description).IsRequired();
@@ -384,11 +387,34 @@ public sealed class SpaceTradersDbContext(
             entity.HasQueryFilter(x => x.AgentToken == AgentToken);
         });
 
+        modelBuilder.Entity<PlanStateRecord>(entity =>
+        {
+            entity.ToTable("plan_states");
+            entity.HasKey(x => new { x.AgentToken, x.PlanType });
+            entity.Property(x => x.AgentToken).HasMaxLength(1024).IsRequired();
+            entity.Property(x => x.PlanType).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.StateJson).IsRequired();
+            entity.Property(x => x.UpdatedAt).IsRequired();
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
+        modelBuilder.Entity<ScoutPlanStateRecord>(entity =>
+        {
+            entity.ToTable("scout_plan_states");
+            entity.HasKey(x => x.AgentToken);
+            entity.Property(x => x.AgentToken).HasMaxLength(1024);
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.StartWaypointSymbol).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.RouteWaypointSymbolsJson).IsRequired();
+            entity.Property(x => x.Status).IsRequired();
+            entity.HasQueryFilter(x => x.AgentToken == AgentToken);
+        });
+
         modelBuilder.Entity<ScheduledShipEvent>(entity =>
         {
             entity.ToTable("scheduled_ship_events");
             entity.HasKey(x => new { x.ShipSymbol, x.GoalId });
-            entity.Property(x => x.ShipSymbol).HasMaxLength(100);
+            entity.Property(x => x.ShipSymbol).HasMaxLength(100).IsRequired();
             entity.Property(x => x.EventKind).HasMaxLength(30).IsRequired();
             entity.HasIndex(x => x.TriggerAt);
         });

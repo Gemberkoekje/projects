@@ -161,6 +161,23 @@ public sealed record ContractDeliveryRecordedEvent
     }
 }
 
+public sealed record DeliverableObtainedEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string TradeSymbol { get; init; }
+
+    public required int UnitsObtained { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public DeliverableObtainedEvent(string ShipSymbol, string TradeSymbol, int UnitsObtained)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.TradeSymbol = TradeSymbol;
+        this.UnitsObtained = UnitsObtained;
+    }
+}
+
 public sealed record ContractDeadlineApproachingEvent
 {
     public required string ContractId { get; init; }
@@ -426,5 +443,27 @@ public sealed record ModuleInstalledEvent
         this.Cost = Cost;
         this.NewAgentCredits = NewAgentCredits;
         this.WaypointSymbol = WaypointSymbol;
+    }
+}
+
+/// <summary>
+/// Published by <c>NavigateToWaypointArrivedHandler</c> when the full navigate journey is complete:
+/// the ship has arrived, updated market/shipyard data, and docked at the destination.
+/// Consumers (goal executors, orchestrators) use this to trigger the next command.
+/// </summary>
+public sealed record ShipNavigationCompletedEvent
+{
+    public required string ShipSymbol { get; init; }
+
+    public required string DestinationWaypoint { get; init; }
+
+    public required Guid GoalId { get; init; }
+
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public ShipNavigationCompletedEvent(string ShipSymbol, string DestinationWaypoint, Guid GoalId)
+    {
+        this.ShipSymbol = ShipSymbol;
+        this.DestinationWaypoint = DestinationWaypoint;
+        this.GoalId = GoalId;
     }
 }

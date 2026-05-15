@@ -11,10 +11,12 @@
     <Project Path="tests/SpaceTraders.Infrastructure.Tests/SpaceTraders.Infrastructure.Tests.csproj" />
     <Project Path="tests/SpaceTraders.Integration.Test/SpaceTraders.Integration.Test.csproj" />
   </Folder>
+  <Project Path="docs/SpaceTraders.Docs.csproj" />
   <Project Path="SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj" />
   <Project Path="SpaceTraders.API/SpaceTraders.API.csproj" />
   <Project Path="SpaceTraders.Application/SpaceTraders.Application.csproj" />
   <Project Path="SpaceTraders.Domain/SpaceTraders.Domain.csproj" />
   <Project Path="SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj" />
   <Project Path="SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
+  <Project Path="SpaceTraders.WebUI/SpaceTraders.WebUI.csproj" />
 </Solution>

@@ -561,6 +561,43 @@ public sealed class ApiIntegrationTests : IClassFixture<SpaceTradersApiFactory>,
 
         await _factory.FleetStatusQueryService.Received(1).GetShipGoalHistoryAsync("X1-HIST-2", 5, Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task FleetGoalChains_WithPathBaseAndValidApiKey_ReturnsMappedChains()
+    {
+        var fleetGoalId = Guid.NewGuid();
+        _factory.FleetStatusQueryService
+            .GetGoalChainsAsync(Arg.Any<CancellationToken>())
+            .Returns(new[]
+            {
+                new OrchestratorGoalChain(
+                    FleetGoalId: fleetGoalId,
+                    FleetGoalKind: FleetGoalKind.Contract,
+                    Priority: 1,
+                    FleetGoalDescription: "Contract C-1",
+                    ResourceNeeds:
+                    [
+                        new ResourceNeedEntry(
+                            TradeSymbol: "COPPER_ORE",
+                            UnitsNeeded: 40,
+                            UnitsDelivered: 10,
+                            PurposeDescription: "needed for contract C-1",
+                            AssignedShips: ["SPECTER-DEBUG-1"]),
+                    ]),
+            });
+
+        using var response = await _clientWithKey.GetAsync($"{ApiPathBase}/fleet/goal-chains");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var chains = await response.Content.ReadFromJsonAsync<List<ApiDtos.FleetGoalChainDto>>();
+        chains.Should().HaveCount(1);
+        chains![0].FleetGoalId.Should().Be(fleetGoalId);
+        chains[0].FleetGoalKind.Should().Be("Contract");
+        chains[0].FleetGoalDescription.Should().Be("Contract C-1");
+        chains[0].ResourceNeeds.Should().HaveCount(1);
+        chains[0].ResourceNeeds[0].TradeSymbol.Should().Be("COPPER_ORE");
+        chains[0].ResourceNeeds[0].AssignedShips.Should().ContainSingle("SPECTER-DEBUG-1");
+    }
 }
 
 /// <summary>

@@ -1,16 +1,11 @@
 import {
-  Activity,
-  Database,
-  FileText,
-  Globe,
   HeartPulse,
   LayoutDashboard,
-  PlayCircle,
   Rocket,
-  Settings,
   ShoppingCart,
-  Target,
-  TrendingUp,
+  Settings,
+  Workflow,
+  Camera,
   type LucideIcon,
 } from 'lucide-react'
 import { NavLink } from 'react-router'
@@ -24,15 +19,10 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { path: '/', label: 'Overview', Icon: LayoutDashboard },
+  { path: '/plans', label: 'Plans', Icon: Workflow },
   { path: '/fleet', label: 'Fleet', Icon: Rocket },
-  { path: '/orchestration', label: 'Orchestration', Icon: Target },
-  { path: '/finance', label: 'Finance', Icon: TrendingUp },
   { path: '/markets', label: 'Markets', Icon: ShoppingCart },
-  { path: '/runs', label: 'Runs', Icon: PlayCircle },
-  { path: '/universe', label: 'Universe', Icon: Globe },
-  { path: '/contracts', label: 'Contracts', Icon: FileText },
-  { path: '/activity', label: 'Activity', Icon: Activity },
-  { path: '/snapshots', label: 'Snapshots', Icon: Database },
+  { path: '/snapshots', label: 'Snapshots', Icon: Camera },
   { path: '/health', label: 'Health', Icon: HeartPulse },
   { path: '/settings', label: 'Settings', Icon: Settings },
 ]

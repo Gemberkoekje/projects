@@ -77,4 +77,48 @@ public sealed class ShipAssignmentRepositoryTests : IntegrationTestBase
         result!.CompletedAt.Should().NotBeNull();
         result.CompletedAt!.Value.Should().BeCloseTo(completed, TimeSpan.FromSeconds(1));
     }
+
+    [SkippableFact]
+    public async Task GetAllActiveAsync_IgnoresAssignmentsFromOtherAgentTokens()
+    {
+        var repo = new ShipAssignmentRepository(Db);
+        var now = DateTimeOffset.UtcNow;
+
+        await repo.UpsertAsync(new ShipAssignmentDto(
+            ShipSymbol: "SHIP-OWN",
+            AssignmentType: "Scout",
+            OriginWaypoint: null,
+            DestWaypoint: "X1-OWN-WP",
+            CargoSymbol: null,
+            ContractId: null,
+            StepIndex: 0,
+            AssignedAt: now,
+            CompletedAt: null));
+
+        Db.ShipAssignments.Add(new Infrastructure.Persistence.Entities.ShipAssignmentRecord
+        {
+            AgentToken = "other-agent-token",
+            ShipSymbol = "SHIP-OTHER",
+            Type = "Scout",
+            OriginWaypoint = null,
+            DestWaypoint = "X1-OTHER-WP",
+            CargoSymbol = null,
+            ContractId = null,
+            StepIndex = 0,
+            AssignedAt = now,
+            CompletedAt = null,
+            PurchaseUnitPrice = 0,
+            RequiredUnits = 0,
+            SupplyCompleted = false,
+        });
+        await Db.SaveChangesAsync();
+
+        await using var fresh = CreateFreshContext();
+        var freshRepo = new ShipAssignmentRepository(fresh);
+
+        var active = await freshRepo.GetAllActiveAsync();
+
+        active.Should().ContainSingle(a => a.ShipSymbol == "SHIP-OWN");
+        active.Should().NotContain(a => a.ShipSymbol == "SHIP-OTHER");
+    }
 }

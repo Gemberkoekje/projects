@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -21,14 +22,16 @@ internal sealed class FleetStatusQueryService(
     IShipAssignmentRepository shipAssignments,
     IContractRepository contracts,
     IConstructionRepository constructions,
-    IShipGoalHistoryRepository goalHistory) : IFleetStatusQueryService
+    IShipGoalHistoryRepository goalHistory,
+    IContractMineralPlanRepository contractPlans) : IFleetStatusQueryService
 {
     public async Task<IReadOnlyList<OrchestratorGoalChain>> GetGoalChainsAsync(CancellationToken ct = default)
     {
         var activeGoals = await fleetGoals.GetActiveAsync(ct);
         if (activeGoals.Count == 0)
         {
-            return [];
+            var contractPlanChain = await BuildContractPlanChainAsync(ct);
+            return contractPlanChain is null ? [] : [contractPlanChain];
         }
 
         // Build a map of ship symbol → active ship goal for assignment lookup.
@@ -250,6 +253,7 @@ internal sealed class FleetStatusQueryService(
 
         var activeFleetGoals = await fleetGoals.GetActiveAsync(ct);
         var fleetGoalLookup = activeFleetGoals.ToList();
+        var activeContractPlan = await contractPlans.GetAsync(ct);
 
         var snapshots = new List<ShipAssignmentSnapshot>(allShips.Count);
         foreach (var ship in allShips)
@@ -259,11 +263,107 @@ internal sealed class FleetStatusQueryService(
             var assignedAt = assignment?.AssignedAt;
 
             var fleetGoal = TryMatchFleetGoal(goal, fleetGoalLookup);
-            var snapshot = BuildSnapshot(ship.Symbol, goal, assignedAt, fleetGoal);
+            var snapshot = goal is null && assignment is not null && !assignment.CompletedAt.HasValue
+                ? BuildSnapshotFromAssignment(ship.Symbol, assignment, activeContractPlan)
+                : BuildSnapshot(ship.Symbol, goal, assignedAt, fleetGoal);
             snapshots.Add(snapshot);
         }
 
         return snapshots.OrderBy(s => s.ShipSymbol, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private async Task<OrchestratorGoalChain?> BuildContractPlanChainAsync(CancellationToken ct)
+    {
+        var plan = await contractPlans.GetAsync(ct);
+        if (plan is null || plan.Status != ContractMineralPlanStatus.Active)
+        {
+            return null;
+        }
+
+        var unitsNeeded = plan.UnitsRequired;
+        var unitsDelivered = plan.UnitsFulfilled;
+
+        var contract = await contracts.FindAsync(plan.ContractId, ct);
+        if (contract is not null && !string.IsNullOrWhiteSpace(contract.DeliverablesJson))
+        {
+            var deliverable = TryDeserializeDeliverables(contract.DeliverablesJson)
+                .FirstOrDefault(d =>
+                    string.Equals(d.TradeSymbol, plan.TradeSymbol, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(d.DestinationSymbol, plan.DestinationWaypoint, StringComparison.OrdinalIgnoreCase));
+
+            if (deliverable is not null)
+            {
+                unitsNeeded = deliverable.UnitsRequired;
+                unitsDelivered = deliverable.UnitsFulfilled;
+            }
+        }
+
+        var assignedShips = string.IsNullOrWhiteSpace(plan.ShipSymbol)
+            ? []
+            : new[] { plan.ShipSymbol };
+
+        return new OrchestratorGoalChain(
+            FleetGoalId: plan.PlanId,
+            FleetGoalKind: FleetGoalKind.Contract,
+            Priority: 0,
+            FleetGoalDescription: $"Contract {plan.ContractId}",
+            ResourceNeeds:
+            [
+                new ResourceNeedEntry(
+                    TradeSymbol: plan.TradeSymbol,
+                    UnitsNeeded: unitsNeeded,
+                    UnitsDelivered: unitsDelivered,
+                    PurposeDescription: $"needed for contract {plan.ContractId}",
+                    AssignedShips: assignedShips),
+            ]);
+    }
+
+    private static ShipAssignmentSnapshot BuildSnapshotFromAssignment(
+        string shipSymbol,
+        ShipAssignmentDto assignment,
+        ContractMineralPlanState? activeContractPlan)
+    {
+        if (assignment.AssignmentType.Equals("Contract", StringComparison.OrdinalIgnoreCase))
+        {
+            var source = assignment.OriginWaypoint;
+            var destination = assignment.DestWaypoint;
+            var tradeSymbol = assignment.CargoSymbol ?? string.Empty;
+            var contractId = assignment.ContractId ?? string.Empty;
+            var description = string.IsNullOrWhiteSpace(source)
+                ? $"Delivering {tradeSymbol} to {destination}"
+                : $"Mining {tradeSymbol} at {source}";
+
+            Guid? fleetGoalId = activeContractPlan is not null
+                && !string.IsNullOrWhiteSpace(activeContractPlan.ContractId)
+                && activeContractPlan.ContractId.Equals(contractId, StringComparison.OrdinalIgnoreCase)
+                && activeContractPlan.TradeSymbol.Equals(tradeSymbol, StringComparison.OrdinalIgnoreCase)
+                ? activeContractPlan.PlanId
+                : null;
+
+            var fleetGoalDescription = string.IsNullOrWhiteSpace(contractId)
+                ? null
+                : $"Contract {contractId}";
+
+            return new ShipAssignmentSnapshot(
+                ShipSymbol: shipSymbol,
+                GoalKind: ShipGoalKind.MineResource,
+                GoalDescription: description,
+                AssignedAt: assignment.AssignedAt,
+                SourceWaypoint: source,
+                DestinationWaypoint: destination,
+                FleetGoalId: fleetGoalId,
+                FleetGoalDescription: fleetGoalDescription);
+        }
+
+        return new ShipAssignmentSnapshot(
+            ShipSymbol: shipSymbol,
+            GoalKind: ShipGoalKind.Idle,
+            GoalDescription: "Idle",
+            AssignedAt: assignment.AssignedAt,
+            SourceWaypoint: assignment.OriginWaypoint,
+            DestinationWaypoint: assignment.DestWaypoint,
+            FleetGoalId: null,
+            FleetGoalDescription: null);
     }
 
     // -----------------------------------------------------------------------

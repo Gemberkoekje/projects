@@ -1,6 +1,6 @@
 import { Rocket } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
-import { useSignalR } from '@/lib/signalr'
+import { useSignalR } from '@/lib/signalr-context'
 import { cn } from '@/lib/utils'
 
 /** Coloured dot that represents the SignalR connection state. */

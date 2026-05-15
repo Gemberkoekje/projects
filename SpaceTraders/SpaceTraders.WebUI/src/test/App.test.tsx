@@ -1,4 +1,12 @@
+import { vi, describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
+
+vi.mock('@/lib/signalr', () => ({
+  SignalRProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  useSignalR: () => ({ state: 'connected', liveUpdatesPaused: false }),
+}))
+
 import App from '../App'
 
 describe('App', () => {
@@ -17,13 +25,6 @@ describe('App', () => {
     const labels = [
       'Overview',
       'Fleet',
-      'Finance',
-      'Markets',
-      'Runs',
-      'Universe',
-      'Contracts',
-      'Activity',
-      'Snapshots',
       'Health',
       'Settings',
     ]

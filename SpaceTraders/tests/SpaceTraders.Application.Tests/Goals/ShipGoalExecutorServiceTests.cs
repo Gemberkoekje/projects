@@ -1,25 +1,18 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using SpaceTraders.Application.Commands.Ships;
+using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
 using SpaceTraders.Application.Services;
-using SpaceTraders.Domain.Events.Ships;
 using SpaceTraders.Domain.Goals;
 using Wolverine;
 
 namespace SpaceTraders.Application.Tests.Goals;
 
-/// <summary>
-/// Phase 13e: unit tests for <see cref="ShipGoalExecutorService"/>.
-/// Verifies that the service communicates with the orchestrator exclusively via
-/// <see cref="GoalCompletedEvent"/> and <see cref="GoalBlockedEvent"/>, and that
-/// continuation ticks are published or scheduled correctly for non-terminal outcomes.
-/// </summary>
 public sealed class ShipGoalExecutorServiceTests
 {
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
@@ -27,38 +20,17 @@ public sealed class ShipGoalExecutorServiceTests
     private readonly IShipAssignmentRepository _assignments = Substitute.For<IShipAssignmentRepository>();
     private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
     private readonly INavigationPlanningService _navigationPlanning = Substitute.For<INavigationPlanningService>();
-    private readonly IConstructionRepository _constructions = Substitute.For<IConstructionRepository>();
     private readonly IWaypointRepository _waypoints = Substitute.For<IWaypointRepository>();
     private readonly IMarketRepository _markets = Substitute.For<IMarketRepository>();
-    private readonly IContractRepository _contracts = Substitute.For<IContractRepository>();
-    private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
-    private readonly IAssignmentResolver _assignmentResolver = Substitute.For<IAssignmentResolver>();
     private readonly IShipCapabilityRegistry _capabilityRegistry = Substitute.For<IShipCapabilityRegistry>();
     private readonly IShipEventScheduler _scheduler = Substitute.For<IShipEventScheduler>();
     private readonly IShipGoalHistoryRepository _goalHistory = Substitute.For<IShipGoalHistoryRepository>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
     private readonly IShipGoalExecutor _executor = Substitute.For<IShipGoalExecutor>();
+    private readonly IScoutAllMarketplacesPlanService _scoutPlanService = Substitute.For<IScoutAllMarketplacesPlanService>();
 
-    private static readonly ShipModel Ship = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100);
-    private static readonly IdleGoal IdleGoal = new();
-
-    public ShipGoalExecutorServiceTests()
-    {
-        // Executor always accepts IdleGoal.
-        _executor.CanExecute(Arg.Any<ShipGoal>()).Returns(true);
-
-        // Capability registry: no survey capability, so survey repository is never called.
-        _capabilityRegistry.GetCapabilities(Arg.Any<ShipModel>())
-            .Returns(new ShipCapabilities(false, false, false, true, true, false));
-
-        // Waypoints: return empty list so fuel context returns early without further DB hits.
-        _waypoints.GetBySystemAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns([]);
-
-        // Markets: no snapshots.
-        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
-            .Returns([]);
-    }
+    private static readonly ShipModel FullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 100, 100);
+    private static readonly ShipModel NotFullFuelShip = new("SHIP-1", "X1-AB", "X1-AB-001", "IN_ORBIT", "CRUISE", 80, 100);
 
     private ShipGoalExecutorService CreateService() =>
         new(
@@ -68,288 +40,114 @@ public sealed class ShipGoalExecutorServiceTests
             _assignments,
             _surveys,
             _navigationPlanning,
-            _constructions,
             _waypoints,
             _markets,
-            _contracts,
-            _settings,
-            _assignmentResolver,
             _capabilityRegistry,
             _scheduler,
             _goalHistory,
+            _scoutPlanService,
             _bus,
             NullLogger<ShipGoalExecutorService>.Instance);
-
-    private void SetupShipAndGoal()
-    {
-        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(Ship);
-        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(IdleGoal);
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Terminal outcomes — orchestrator communication
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ExecuteAsync_WhenGoalCompleted_PublishesGoalCompletedEvent()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Completed("Done"));
-
-        var svc = CreateService();
-        var result = await svc.ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        result.Should().NotBeNull();
-        result!.Outcome.Should().Be(GoalExecutionOutcome.Completed);
-
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<GoalCompletedEvent>(e => e.ShipSymbol == "SHIP-1"),
-            Arg.Any<DeliveryOptions>());
-        await _goals.Received(1).ClearActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenGoalCompleted_DoesNotPublishGoalBlockedEvent()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Completed("Done"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        await _bus.DidNotReceive().PublishAsync(
-            Arg.Any<GoalBlockedEvent>(),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenGoalBlocked_PublishesGoalBlockedEvent()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Blocked("No route available"));
-
-        var svc = CreateService();
-        var result = await svc.ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        result.Should().NotBeNull();
-        result!.Outcome.Should().Be(GoalExecutionOutcome.Blocked);
-
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<GoalBlockedEvent>(e => e.ShipSymbol == "SHIP-1" && e.Reason == "No route available"),
-            Arg.Any<DeliveryOptions>());
-        await _goals.Received(1).ClearActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenGoalBlocked_DoesNotPublishGoalCompletedEvent()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Blocked("No route available"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        await _bus.DidNotReceive().PublishAsync(
-            Arg.Any<GoalCompletedEvent>(),
-            Arg.Any<DeliveryOptions>());
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Non-terminal outcomes — continuation ticks
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ExecuteAsync_WhenProgressing_PublishesImmediateAutomationTickEvent()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Progressing("Navigating"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        // Phase 13c+: Progressing outcome does NOT publish an immediate tick.
-        // Next tick should come from arrival event (scheduled by navigate command),
-        // cooldown expiry (scheduled by action commands), or external stimuli (market changes).
-
-        // No orchestrator events should be published for a progressing step.
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalBlockedEvent>(), Arg.Any<DeliveryOptions>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenWaitingForCooldownWithExpiry_SchedulesCooldownViaScheduler()
-    {
-        SetupShipAndGoal();
-        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(1);
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.WaitingForCooldown("On cooldown", expiresAt));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        // Phase 14c: scheduler is used instead of bus.ScheduleAsync.
-        await _scheduler.Received(1).ScheduleCooldownExpiryAsync(
-            "SHIP-1",
-            Arg.Any<Guid>(),
-            expiresAt,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenWaitingForCooldownWithoutExpiry_SchedulesFallbackViaScheduler()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.WaitingForCooldown("On cooldown, expiry unknown"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        // Phase 14c: scheduler is used with a fallback time (no bus.ScheduleAsync).
-        await _scheduler.Received(1).ScheduleCooldownExpiryAsync(
-            "SHIP-1",
-            Arg.Any<Guid>(),
-            Arg.Any<DateTimeOffset>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenWaitingForArrival_SchedulesArrivalViaScheduler()
-    {
-        var arrival = DateTimeOffset.UtcNow.AddMinutes(3);
-        var ship = Ship with { ArrivesAt = arrival };
-        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(ship);
-        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(IdleGoal);
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.WaitingForArrival("In transit"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        // Phase 14c: scheduler is used for arrival (no bus.PublishAsync for ticks).
-        await _scheduler.Received(1).ScheduleArrivalAsync(
-            "SHIP-1",
-            Arg.Any<Guid>(),
-            arrival,
-            Arg.Any<CancellationToken>());
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Edge cases
-    // ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_WhenShipNotFound_ReturnsNull()
     {
-        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns((ShipModel?)null);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns((ShipModel)null!);
 
         var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
         result.Should().BeNull();
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalBlockedEvent>(), Arg.Any<DeliveryOptions>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenNoActiveGoal_ReturnsNull()
+    public async Task ExecuteAsync_WhenFuelIsNotFull_ReturnsNull()
     {
-        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(Ship);
-        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(NotFullFuelShip);
 
         var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
         result.Should().BeNull();
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalCompletedEvent>(), Arg.Any<DeliveryOptions>());
-        await _bus.DidNotReceive().PublishAsync(Arg.Any<GoalBlockedEvent>(), Arg.Any<DeliveryOptions>());
+        await _goals.Received(1).GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenGoalCompleted_PreservesGoalIdInEvent()
+    public async Task ExecuteAsync_WhenActiveGoalIsNotScout_ReturnsNull()
     {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Completed("Done"));
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(new IdleGoal());
 
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<GoalCompletedEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.GoalId == IdleGoal.GoalId &&
-                e.GoalKind == IdleGoal.Kind),
-            Arg.Any<DeliveryOptions>());
+        result.Should().BeNull();
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenGoalBlocked_PreservesGoalIdInEvent()
+    public async Task ExecuteAsync_WhenNoExecutorCanHandleScoutGoal_ReturnsNull()
     {
-        SetupShipAndGoal();
-        const string reason = "No equipment";
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Blocked(reason));
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
 
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(false);
 
-        await _bus.Received(1).PublishAsync(
-            Arg.Is<GoalBlockedEvent>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.GoalId == IdleGoal.GoalId &&
-                e.GoalKind == IdleGoal.Kind &&
-                e.Reason == reason),
-            Arg.Any<DeliveryOptions>());
-    }
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Phase 17e: goal history persistence
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task ExecuteAsync_WhenGoalCompleted_AppendsCompletedHistoryEntry()
-    {
-        SetupShipAndGoal();
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Completed("Done"));
-
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
-
-        await _goalHistory.Received(1).AppendAsync(
-            Arg.Is<ShipGoalHistoryEntry>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.GoalId == IdleGoal.GoalId &&
-                e.GoalKind == IdleGoal.Kind.ToString() &&
-                e.Outcome == "Completed" &&
-                e.Reason == null),
+        result.Should().BeNull();
+        await _executor.DidNotReceive().ExecuteStepAsync(
+            Arg.Any<ShipModel>(),
+            Arg.Any<ShipGoal>(),
+            Arg.Any<ShipGoalContext>(),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenGoalBlocked_AppendsBlockedHistoryEntry()
+    public async Task ExecuteAsync_WhenScoutGoalAndExecutorExists_ReturnsExecutorResult()
     {
-        SetupShipAndGoal();
-        const string reason = "No route";
-        _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Blocked(reason));
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
+        var expected = GoalExecutionResult.Completed("done");
 
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
+        _executor.ExecuteStepAsync(
+                FullFuelShip,
+                scoutGoal,
+                Arg.Any<ShipGoalContext>(),
+                Arg.Any<CancellationToken>())
+            .Returns(expected);
 
-        await _goalHistory.Received(1).AppendAsync(
-            Arg.Is<ShipGoalHistoryEntry>(e =>
-                e.ShipSymbol == "SHIP-1" &&
-                e.GoalId == IdleGoal.GoalId &&
-                e.GoalKind == IdleGoal.Kind.ToString() &&
-                e.Outcome == "Blocked" &&
-                e.Reason == reason),
+        var result = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+
+        result.Should().Be(expected);
+        await _executor.Received(1).ExecuteStepAsync(
+            FullFuelShip,
+            scoutGoal,
+            Arg.Is<ShipGoalContext>(c =>
+                c.ActiveSurveyCount == 0 &&
+                c.FuelMarketWaypoint == string.Empty &&
+                !c.CurrentWaypointSellsFuel &&
+                c.RecommendedFlightMode == string.Empty),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenProgressing_DoesNotAppendHistoryEntry()
+    public async Task ExecuteAsync_WhenGoalExecutes_DoesNotPublishOrScheduleOrMutateState()
     {
-        SetupShipAndGoal();
+        var scoutGoal = new ScoutWaypointGoal { TargetWaypointSymbol = "X1-AB-009" };
+
+        _ships.FindAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(FullFuelShip);
+        _goals.GetActiveGoalAsync("SHIP-1", Arg.Any<CancellationToken>()).Returns(scoutGoal);
+        _executor.CanExecute(scoutGoal).Returns(true);
         _executor.ExecuteStepAsync(Arg.Any<ShipModel>(), Arg.Any<ShipGoal>(), Arg.Any<ShipGoalContext>(), Arg.Any<CancellationToken>())
-            .Returns(GoalExecutionResult.Progressing("Navigating"));
+            .Returns(GoalExecutionResult.Progressing("progress"));
 
-        await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
+        _ = await CreateService().ExecuteAsync("SHIP-1", CancellationToken.None);
 
+        await _bus.DidNotReceive().PublishAsync(Arg.Any<object>(), Arg.Any<DeliveryOptions>());
+        await _scheduler.DidNotReceive().ScheduleArrivalAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await _scheduler.DidNotReceive().ScheduleCooldownExpiryAsync(Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
         await _goalHistory.DidNotReceive().AppendAsync(Arg.Any<ShipGoalHistoryEntry>(), Arg.Any<CancellationToken>());
+        await _goals.DidNotReceive().ClearActiveGoalAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _scoutPlanService.DidNotReceive().AdvanceAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

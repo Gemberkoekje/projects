@@ -97,11 +97,8 @@ builder.Services.AddSingleton<StartupSnapshotService>();
 builder.Services.AddSingleton<StartupRecoveryService>();
 builder.Services.AddSingleton<SettingsStartupLoggingService>();
 builder.Services.AddSingleton<GameLoopService>();
-builder.Services.AddSingleton<ContractWatchService>();
-builder.Services.AddSingleton<ResetAndReliabilityMonitorService>();
 builder.Services.AddSingleton<ActivityLogPruningService>();
 builder.Services.AddSingleton<DataRetentionService>();
-builder.Services.AddSingleton<ShipRefreshWorkerService>();
 builder.Services.AddSingleton<PrometheusMetricsService>();
 
 // RunLifecycleService is both a singleton startup-managed service and the IRunLifecycleManager implementation.
@@ -160,14 +157,10 @@ app.MapMetrics();
 app.MapStatusEndpoints();
 app.MapSettingsEndpoints();
 app.MapControlEndpoints();
-app.MapFinanceEndpoints();
-app.MapRunsEndpoints();
-app.MapMarketsEndpoints();
-app.MapUniverseEndpoints();
-app.MapShipsReadEndpoints();
-app.MapContractsReadEndpoints();
-app.MapFleetStatusEndpoints();
 app.MapHealthExtendedEndpoints();
+app.MapFleetStatusEndpoints();
+app.MapMarketsEndpoints();
+app.MapShipyardsEndpoints();
 app.MapHub<DashboardHub>("/hubs/dashboard");
 
 await app.RunAsync();

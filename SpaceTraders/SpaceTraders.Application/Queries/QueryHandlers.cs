@@ -24,10 +24,25 @@ public sealed class GetAllShipsQueryHandler(IShipRepository ships)
         var all = await ships.GetAllAsync(cancellationToken);
         var now = TimeProvider.System.GetUtcNow();
         return all.Select(s => new ShipDto(
-            s.Symbol, s.SystemSymbol, s.WaypointSymbol, s.Status, s.FlightMode,
-            s.FuelCurrent, s.FuelCapacity, s.CargoCurrent, s.CargoCapacity,
-            s.ArrivesAt, s.ArrivesAt.HasValue && s.ArrivesAt > now,
-            now)).ToList();
+            s.Symbol,
+            s.SystemSymbol,
+            s.WaypointSymbol,
+            s.Status,
+            s.FlightMode,
+            s.FuelCurrent,
+            s.FuelCapacity,
+            s.CargoCurrent,
+            s.CargoCapacity,
+            s.ArrivesAt,
+            s.ArrivesAt.HasValue && s.ArrivesAt > now,
+            now,
+            s.ShipType,
+            s.MountSymbols ?? [],
+            s.HasMiningEquipment,
+            s.HasSurveyEquipment,
+            s.HasGasSiphonEquipment,
+            s.HasGasProcessor,
+            s.HasMineralProcessor)).ToList();
     }
 }
 
@@ -124,6 +139,98 @@ public sealed class GetBestTradeRouteQueryHandler(
 
         return await tradeOpportunities.GetBestRouteForCapacityAsync(
             query.CargoCapacity, minProfit, maxDistance, cancellationToken);
+    }
+}
+
+public sealed record GetShipDiagnosticsQuery(string ShipSymbol);
+
+public sealed class GetShipDiagnosticsQueryHandler(
+    IShipRepository ships,
+    IShipAssignmentRepository assignments)
+{
+    public async Task<ShipDiagnosticsDto?> Handle(GetShipDiagnosticsQuery query, CancellationToken cancellationToken)
+    {
+        var ship = await ships.FindAsync(query.ShipSymbol, cancellationToken);
+        if (ship is null)
+        {
+            return null;
+        }
+
+        var assignment = await assignments.FindAsync(query.ShipSymbol, cancellationToken);
+        var hasActiveAssignment = assignment is not null && !assignment.CompletedAt.HasValue;
+        var isEligibleForContractMinerSelection = !hasActiveAssignment
+            && ship.HasMiningEquipment
+            && ship.CargoCapacity > 0
+            && ship.FuelCapacity > 0;
+
+        return new ShipDiagnosticsDto(
+            Symbol: ship.Symbol,
+            ShipType: ship.ShipType,
+            SystemSymbol: ship.SystemSymbol,
+            WaypointSymbol: ship.WaypointSymbol,
+            Status: ship.Status,
+            FlightMode: ship.FlightMode,
+            FuelCurrent: ship.FuelCurrent,
+            FuelCapacity: ship.FuelCapacity,
+            CargoCurrent: ship.CargoCurrent,
+            CargoCapacity: ship.CargoCapacity,
+            IsInTransit: ship.IsInTransit,
+            ArrivesAt: ship.ArrivesAt,
+            LastSyncedAt: ship.LastSyncedAt,
+            MountSymbols: ship.MountSymbols ?? [],
+            HasMiningEquipment: ship.HasMiningEquipment,
+            HasSurveyEquipment: ship.HasSurveyEquipment,
+            HasGasSiphonEquipment: ship.HasGasSiphonEquipment,
+            HasGasProcessor: ship.HasGasProcessor,
+            HasMineralProcessor: ship.HasMineralProcessor,
+            HasCargoSpace: ship.CargoCapacity > 0,
+            HasFuelCapacity: ship.FuelCapacity > 0,
+            IsOccupied: hasActiveAssignment,
+            ActiveAssignmentType: hasActiveAssignment ? assignment!.AssignmentType : null,
+            ActiveAssignmentContractId: hasActiveAssignment ? assignment!.ContractId : null,
+            ActiveAssignmentSourceWaypoint: hasActiveAssignment ? assignment!.OriginWaypoint : null,
+            ActiveAssignmentDestinationWaypoint: hasActiveAssignment ? assignment!.DestWaypoint : null,
+            ActiveAssignmentAssignedAt: hasActiveAssignment ? assignment!.AssignedAt : null,
+            ActiveAssignmentStepIndex: hasActiveAssignment ? assignment!.StepIndex : null,
+            IsEligibleForContractMinerSelection: isEligibleForContractMinerSelection,
+            ContractMinerEligibilityReason: BuildContractMinerEligibilityReason(
+                hasActiveAssignment,
+                assignment?.AssignmentType,
+                ship.HasMiningEquipment,
+                ship.CargoCapacity,
+                ship.FuelCapacity));
+    }
+
+    private static string BuildContractMinerEligibilityReason(
+        bool hasActiveAssignment,
+        string? assignmentType,
+        bool hasMiningEquipment,
+        int cargoCapacity,
+        int fuelCapacity)
+    {
+        if (hasActiveAssignment)
+        {
+            return string.IsNullOrWhiteSpace(assignmentType)
+                ? "Occupied by active assignment"
+                : $"Occupied by {assignmentType} assignment";
+        }
+
+        if (!hasMiningEquipment)
+        {
+            return "Missing mining equipment";
+        }
+
+        if (cargoCapacity <= 0)
+        {
+            return "No cargo capacity";
+        }
+
+        if (fuelCapacity <= 0)
+        {
+            return "No fuel capacity";
+        }
+
+        return "Eligible";
     }
 }
 

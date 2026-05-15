@@ -23,15 +23,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup Label="Exclude future tests from build">
+    <Compile Remove="Future/**/*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../SpaceTraders.Application/SpaceTraders.Application.csproj" />
     <ProjectReference Include="../../SpaceTraders.Domain/SpaceTraders.Domain.csproj" />
     <ProjectReference Include="../../SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj" />
     <ProjectReference Include="../../SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="EventHandlers\" />
   </ItemGroup>
 
 </Project>

@@ -16,10 +16,13 @@ public sealed class BudgetPolicyTests
         return agents;
     }
 
-    private static ISettingsRepository MakeSettings(long reserve)
+    private static ISettingsRepository MakeSettings(long reserve, int fabMatsThreshold = 2_500, int fabMatsTransactionSize = 60, bool hourlyCapEnabled = false)
     {
         var settings = Substitute.For<ISettingsRepository>();
         settings.GetAsync<long>("FleetExpansion.MinCreditReserve", Arg.Any<CancellationToken>()).Returns(reserve);
+        settings.GetAsync<int>("Construction.FabMatsBuyThreshold", Arg.Any<CancellationToken>()).Returns(fabMatsThreshold);
+        settings.GetAsync<int>("Construction.FabMatsTransactionSize", Arg.Any<CancellationToken>()).Returns(fabMatsTransactionSize);
+        settings.GetAsync<bool>("Construction.HourlyBudgetCapEnabled", Arg.Any<CancellationToken>()).Returns(hourlyCapEnabled);
         return settings;
     }
 
@@ -52,5 +55,16 @@ public sealed class BudgetPolicyTests
 
         decision.CanAfford.Should().BeTrue();
         decision.SpendableCredits.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ReturnsFabMatsSettings()
+    {
+        var policy = new BudgetPolicy(MakeAgent(500_000), MakeSettings(100_000, fabMatsThreshold: 2_400, fabMatsTransactionSize: 55, hourlyCapEnabled: false));
+        var decision = await policy.EvaluateAsync(0, CancellationToken.None);
+
+        decision.FabMatsBuyThreshold.Should().Be(2_400);
+        decision.FabMatsTransactionSize.Should().Be(55);
+        decision.HourlyConstructionBudgetCapEnabled.Should().BeFalse();
     }
 }

@@ -4,18 +4,12 @@ import { Sidebar } from './Sidebar'
 import { LiveUpdatesBanner } from '@/components/ui/LiveUpdatesBanner'
 import OverviewPage from '@/pages/OverviewPage'
 import FleetPage from '@/pages/FleetPage'
-import ShipDetailPage from '@/pages/ShipDetailPage'
-import FinancePage from '@/pages/FinancePage'
 import MarketsPage from '@/pages/MarketsPage'
-import RunsPage from '@/pages/RunsPage'
-import UniversePage from '@/pages/UniversePage'
-import SystemMapPage from '@/pages/SystemMapPage'
-import ContractsPage from '@/pages/ContractsPage'
-import ActivityPage from '@/pages/ActivityPage'
-import SnapshotsPage from '@/pages/SnapshotsPage'
 import HealthPage from '@/pages/HealthPage'
 import SettingsPage from '@/pages/SettingsPage'
-import OrchestrationPage from '@/pages/OrchestrationPage'
+import SnapshotsPage from '@/pages/SnapshotsPage'
+import OrchestrationPage from '@/Future/pages/OrchestrationPage'
+import ShipDetailPage from '@/Future/pages/ShipDetailPage'
 
 export function AppShell() {
   return (
@@ -29,19 +23,13 @@ export function AppShell() {
         <main className="flex-1 overflow-auto p-6">
           <Routes>
             <Route path="/" element={<OverviewPage />} />
+            <Route path="/plans" element={<OrchestrationPage />} />
             <Route path="/fleet" element={<FleetPage />} />
             <Route path="/fleet/:symbol" element={<ShipDetailPage />} />
-            <Route path="/finance" element={<FinancePage />} />
-            <Route path="/markets/*" element={<MarketsPage />} />
-            <Route path="/runs/*" element={<RunsPage />} />
-            <Route path="/universe" element={<UniversePage />} />
-            <Route path="/systems/:symbol" element={<SystemMapPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/markets" element={<MarketsPage />} />
             <Route path="/snapshots" element={<SnapshotsPage />} />
             <Route path="/health" element={<HealthPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/orchestration" element={<OrchestrationPage />} />
           </Routes>
         </main>
       </div>

@@ -26,6 +26,10 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup Label="Exclude future tests from build">
+    <Compile Remove="Future/**/*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../SpaceTraders.API/SpaceTraders.API.csproj" />
     <ProjectReference Include="../../SpaceTraders.Application/SpaceTraders.Application.csproj" />

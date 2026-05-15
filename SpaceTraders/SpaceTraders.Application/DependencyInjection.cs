@@ -1,11 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
+using SpaceTraders.Application.Automation;
+using SpaceTraders.Application.Commands.Ships.SubCommands;
 using SpaceTraders.Application.EventHandlers;
 using SpaceTraders.Application.Events.Handlers.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Goals.Executors;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Services;
-using SpaceTraders.Application.Sync;
 using Wolverine;
 using Wolverine.ErrorHandling;
 
@@ -14,14 +15,6 @@ namespace SpaceTraders.Application;
 /// <summary>
 /// Registers all application services and event handlers for the SpaceTraders application.
 /// </summary>
-/// <remarks>
-/// Phase 6.5d: All ship automation is now driven by <see cref="EventHandlers.ShipAutomationTickEventHandler"/>
-/// → <see cref="Goals.IShipGoalExecutorService"/>.
-/// Phase 7d: <see cref="Events.Handlers.Ships.ShipInTransitEventHandler"/> converted to a plain Wolverine
-/// handler; chain DI registration removed.
-/// Phase 7f: Chain-of-command infrastructure deleted entirely.
-/// Phase 12a: Deprecated planner infrastructure removed.
-/// </remarks>
 public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(
@@ -30,27 +23,16 @@ public static class DependencyInjection
     {
         ArgumentNullException.ThrowIfNull(configureWolverine);
 
-        services.AddSingleton<ITradeAnalyser, TradeAnalyser>();
         services.AddSingleton<ICreditHistoryService, CreditHistoryService>();
         services.AddSingleton<IShipCapabilityRegistry, ShipCapabilityRegistry>();
-        services.AddScoped<IAssignmentResolver, AssignmentResolver>();
         services.AddScoped<INavigationPlanningService, NavigationPlanningService>();
         services.AddScoped<IJumpGateCacheService, JumpGateCacheService>();
 
-        services.AddScoped<IDockedCommandAcceptor, DockedCommandAcceptor>();
-        services.AddScoped<IInOrbitCommandAcceptor, InOrbitCommandAcceptor>();
-
-        // Phase 6: orchestrator goal evaluation. The orchestrator owns strategic goals,
-        // capacity estimation, and budget policy. It assigns work to ships via
-        // AssignShipCommand and never issues low-level ship commands directly.
-        services.AddScoped<Orchestration.IFleetCapacityEstimator, Orchestration.FleetCapacityEstimator>();
-        services.AddScoped<Orchestration.IBudgetPolicy, Orchestration.BudgetPolicy>();
-        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.ContractGoalEvaluator>();
-        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.ConstructionGoalEvaluator>();
-        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketCoverageGoalEvaluator>();
-        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.FleetExpansionGoalEvaluator>();
-        services.AddScoped<Orchestration.IFleetGoalEvaluator, Orchestration.MarketScoutingGoalEvaluator>();
-        services.AddScoped<Orchestration.IFleetOrchestrator, Orchestration.FleetOrchestrator>();
+        // Navigate subcommands — DI-injected, not bus-routed.
+        services.AddScoped<IOrbitSubCommand, OrbitSubCommand>();
+        services.AddScoped<INavigateSubCommand, NavigateSubCommand>();
+        services.AddScoped<IDockSubCommand, DockSubCommand>();
+        services.AddScoped<IRefuelSubCommand, RefuelSubCommand>();
 
         // Phase 15a/15b: observability read-model (FleetStatusQueryService is the concrete implementation from Phase 15b).
         // Phase 16c: wrap with a short-lived in-memory cache so dashboard polling does not overload the database.
@@ -62,27 +44,20 @@ public static class DependencyInjection
                 sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
-        services.AddScoped<IMarketRefreshService, MarketRefreshService>();
-        services.AddScoped<IShipyardRefreshService, ShipyardRefreshService>();
+        services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
+        services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();
+        services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();
+        services.AddScoped<IScoutAllMarketplacesPlanService, ScoutAllMarketplacesPlanService>();
+        services.AddScoped<IContractPlanService, ContractPlanService>();
+        services.AddScoped<IProbeDeploymentPlanService, ProbeDeploymentPlanService>();
 
-        // Phase 10: goal-driven executors. Registered before ShipGoalExecutorService so DI
-        // injects them as IEnumerable<IShipGoalExecutor> in registration order.
+        // Generic command handlers are discovered from this assembly by Wolverine.
+
+        // Baseline goal executors.
         services.AddScoped<IShipGoalExecutor, IdleGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, MoveToWaypointGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, MineResourceGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, SiphonResourceGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, SellCargoGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, DeliverCargoGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, SupplyConstructionGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, ScoutWaypointGoalExecutor>();
-        services.AddScoped<IShipGoalExecutor, PatrolMarketGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
-
-        // Phase 7f: Chain-of-command infrastructure deleted entirely.
-        // Phase 12a: Deprecated planner infrastructure deleted.
-        // Phase 18: IContractObjectivePlanner, IFleetMaintenancePlanner, IShipAssignmentPlanner removed from DI.
-
-        services.AddScoped<SyncAllShipsHandler>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>
         {
@@ -99,7 +74,6 @@ public static class DependencyInjection
                     TimeSpan.FromSeconds(1))
                 .Then.Discard();
         });
-
 
         return services;
     }

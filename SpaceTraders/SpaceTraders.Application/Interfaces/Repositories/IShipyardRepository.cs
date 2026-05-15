@@ -1,3 +1,4 @@
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Ports;
 
 namespace SpaceTraders.Application.Interfaces.Repositories;
@@ -9,4 +10,10 @@ public interface IShipyardRepository
     Task<string?> FindShipyardForTypeAsync(string shipType, CancellationToken cancellationToken = default);
 
     Task UpsertAsync(ShipyardDataModel shipyard, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ShipyardWaypointDto>> GetAllAsync(CancellationToken cancellationToken = default);
+
+    Task<ShipyardWaypointDto?> FindByWaypointAsync(string waypointSymbol, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ShipyardFreshnessDto>> GetAllFreshnessAsync(CancellationToken cancellationToken = default);
 }

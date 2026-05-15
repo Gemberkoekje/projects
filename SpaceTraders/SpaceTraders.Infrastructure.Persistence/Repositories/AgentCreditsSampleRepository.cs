@@ -39,16 +39,16 @@ public sealed class AgentCreditsSampleRepository(SpaceTradersDbContext db) : IAg
         var downsampledDeleted = await db.Database.ExecuteSqlAsync(
             $"""
             DELETE FROM agent_credits_samples
-            WHERE agent_token = {db.AgentToken}
-              AND observed_at < {rawRetentionCutoff}
-              AND observed_at >= {aggregateRetentionCutoff}
-              AND id NOT IN (
-                SELECT MIN(id)
+            WHERE "AgentToken" = {db.AgentToken}
+              AND "ObservedAt" < {rawRetentionCutoff}
+              AND "ObservedAt" >= {aggregateRetentionCutoff}
+              AND "Id" NOT IN (
+                SELECT MIN("Id")
                 FROM agent_credits_samples
-                WHERE agent_token = {db.AgentToken}
-                  AND observed_at < {rawRetentionCutoff}
-                  AND observed_at >= {aggregateRetentionCutoff}
-                GROUP BY date_trunc('hour', observed_at)
+                WHERE "AgentToken" = {db.AgentToken}
+                  AND "ObservedAt" < {rawRetentionCutoff}
+                  AND "ObservedAt" >= {aggregateRetentionCutoff}
+                GROUP BY date_trunc('hour', "ObservedAt")
               )
             """, cancellationToken);
 

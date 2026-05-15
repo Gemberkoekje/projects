@@ -21,12 +21,19 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup Label="Exclude future tests from build">
+    <Compile Remove="Future/**/*.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../SpaceTraders.Application/SpaceTraders.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="startup-snapshot-6-20260501-223730-initial.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="startup-snapshot-21-20260514-105213.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

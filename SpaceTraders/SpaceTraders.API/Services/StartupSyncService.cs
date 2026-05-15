@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using SpaceTraders.Application.Sync;
 using SpaceTraders.Infrastructure.Persistence;
 using SpaceTraders.Infrastructure.Persistence.Entities;
 using SpaceTraders.Infrastructure.SpaceTradersAPI.Clients;
@@ -25,7 +24,6 @@ public sealed class StartupSyncService(
         await using var scope = _serviceScopeFactory.CreateAsyncScope();
         var apiClient = scope.ServiceProvider.GetRequiredService<ISpaceTradersApiClient>();
         var dbContext = scope.ServiceProvider.GetRequiredService<SpaceTradersDbContext>();
-        var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         var now = TimeProvider.System.GetUtcNow();
 
         var agent = await apiClient.GetMyAgentAsync(cancellationToken);
@@ -63,6 +61,19 @@ public sealed class StartupSyncService(
         foreach (var ship in ships)
         {
             var existingShip = await dbContext.Ships.FindAsync([dbContext.AgentToken, ship.Symbol], cancellationToken);
+            var shipType = ship.Registration?.Role ?? string.Empty;
+            var mountsJson = ship.Mounts is null
+                ? null
+                : JsonSerializer.Serialize(ship.Mounts.Select(m => m.Symbol).ToList());
+            var modulesJson = ship.Modules is null ? null : JsonSerializer.Serialize(ship.Modules);
+            var frameJson = ship.Frame is null ? null : JsonSerializer.Serialize(ship.Frame);
+            var reactorJson = ship.Reactor is null ? null : JsonSerializer.Serialize(ship.Reactor);
+            var engineJson = ship.Engine is null ? null : JsonSerializer.Serialize(ship.Engine);
+            var cooldownExpiresAt = ship.Cooldown?.Expiration;
+            var cargoJson = ship.Cargo?.Inventory is null
+                ? existingShip?.CargoJson
+                : JsonSerializer.Serialize(ship.Cargo.Inventory.Select(i => new { i.Symbol, i.Units }).ToList());
+
             if (existingShip is null)
             {
                 dbContext.Ships.Add(new CachedShip
@@ -74,10 +85,18 @@ public sealed class StartupSyncService(
                     DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol,
                     Status = ship.Nav?.Status,
                     FlightMode = ship.Nav?.FlightMode,
+                    ShipType = shipType,
+                    MountsJson = mountsJson,
+                    ModulesJson = modulesJson,
+                    FrameJson = frameJson,
+                    ReactorJson = reactorJson,
+                    EngineJson = engineJson,
+                    CooldownExpiresAt = cooldownExpiresAt,
                     FuelCurrent = ship.Fuel?.Current ?? 0,
                     FuelCapacity = ship.Fuel?.Capacity ?? 0,
                     CargoCurrent = ship.Cargo?.Units ?? 0,
                     CargoCapacity = ship.Cargo?.Capacity ?? 0,
+                    CargoJson = cargoJson,
                     ArrivesAt = ship.Nav?.Route?.Arrival,
                     LastSyncedAt = now,
                 });
@@ -93,13 +112,18 @@ public sealed class StartupSyncService(
                     DestWaypointSymbol = ship.Nav?.Route?.Destination?.Symbol,
                     Status = ship.Nav?.Status,
                     FlightMode = ship.Nav?.FlightMode,
-                    ShipType = existingShip.ShipType,
-                    MountsJson = existingShip.MountsJson,
+                    ShipType = shipType,
+                    MountsJson = mountsJson,
+                    ModulesJson = modulesJson,
+                    FrameJson = frameJson,
+                    ReactorJson = reactorJson,
+                    EngineJson = engineJson,
+                    CooldownExpiresAt = cooldownExpiresAt,
                     FuelCurrent = ship.Fuel?.Current ?? 0,
                     FuelCapacity = ship.Fuel?.Capacity ?? 0,
                     CargoCurrent = ship.Cargo?.Units ?? existingShip.CargoCurrent,
                     CargoCapacity = ship.Cargo?.Capacity ?? existingShip.CargoCapacity,
-                    CargoJson = existingShip.CargoJson,
+                    CargoJson = cargoJson,
                     ArrivesAt = ship.Nav?.Route?.Arrival,
                     LastSyncedAt = now,
                 });
@@ -150,8 +174,6 @@ public sealed class StartupSyncService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Completed startup sync for agent, ships, and contracts.");
-
-        await bus.InvokeAsync(new RunPhase3OnboardingCommand(), cancellationToken);
     }
 
     /// <inheritdoc />

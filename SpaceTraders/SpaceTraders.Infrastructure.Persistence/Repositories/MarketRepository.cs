@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
@@ -9,6 +10,11 @@ namespace SpaceTraders.Infrastructure.Persistence.Repositories;
 
 public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketRepository
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     public async Task<DateTimeOffset?> GetLastObservedAtAsync(string waypointSymbol, CancellationToken cancellationToken = default)
     {
         var entity = await db.Markets.AsNoTracking()
@@ -91,7 +97,7 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
 
         try
         {
-            var goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(market.TradeGoodsJson);
+            var goods = JsonSerializer.Deserialize<List<TradeGoodJson>>(market.TradeGoodsJson, JsonOptions);
             if (goods is null || goods.Count == 0)
             {
                 return null;
@@ -101,8 +107,8 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
                 .Select(g => new TradeGoodSnapshot(
                     g.Symbol ?? string.Empty,
                     g.Type ?? string.Empty,
-                    g.PurchasePrice,
-                    g.SellPrice,
+                    ToInt32Safe(g.PurchasePrice),
+                    ToInt32Safe(g.SellPrice),
                     g.TradeVolume,
                     g.Supply ?? string.Empty,
                     g.Activity ?? string.Empty))
@@ -131,7 +137,7 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
 
         try
         {
-            return JsonSerializer.Deserialize<List<TradeGoodSymbolJson>>(json)
+            return JsonSerializer.Deserialize<List<TradeGoodSymbolJson>>(json, JsonOptions)
                 ?.Select(g => g.Symbol)
                 .Where(symbol => !string.IsNullOrWhiteSpace(symbol))
                 .Cast<string>()
@@ -144,19 +150,48 @@ public sealed class MarketRepository(SpaceTradersDbContext db) : IMarketReposito
         }
     }
 
+    private static int ToInt32Safe(long value)
+    {
+        if (value > int.MaxValue)
+        {
+            return int.MaxValue;
+        }
+
+        if (value < int.MinValue)
+        {
+            return int.MinValue;
+        }
+
+        return (int)value;
+    }
+
     private sealed class TradeGoodJson
     {
+        [JsonPropertyName("symbol")]
         public string? Symbol { get; init; }
+
+        [JsonPropertyName("type")]
         public string? Type { get; init; }
+
+        [JsonPropertyName("tradeVolume")]
         public int TradeVolume { get; init; }
+
+        [JsonPropertyName("supply")]
         public string? Supply { get; init; }
+
+        [JsonPropertyName("activity")]
         public string? Activity { get; init; }
-        public int PurchasePrice { get; init; }
-        public int SellPrice { get; init; }
+
+        [JsonPropertyName("purchasePrice")]
+        public long PurchasePrice { get; init; }
+
+        [JsonPropertyName("sellPrice")]
+        public long SellPrice { get; init; }
     }
 
     private sealed class TradeGoodSymbolJson
     {
+        [JsonPropertyName("symbol")]
         public string? Symbol { get; init; }
     }
 }

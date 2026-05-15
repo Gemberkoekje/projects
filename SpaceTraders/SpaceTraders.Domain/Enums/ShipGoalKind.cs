@@ -12,4 +12,5 @@ public enum ShipGoalKind
     SupplyConstruction = 7,
     ScoutWaypoint = 8,
     PatrolMarket = 9,
+    DeployProbe = 10,
 }

@@ -21,6 +21,7 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(SupplyConstructionGoal), "SupplyConstruction")]
 [JsonDerivedType(typeof(ScoutWaypointGoal), "ScoutWaypoint")]
 [JsonDerivedType(typeof(PatrolMarketGoal), "PatrolMarket")]
+[JsonDerivedType(typeof(DeployProbeGoal), "DeployProbe")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -129,4 +130,13 @@ public sealed record PatrolMarketGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.PatrolMarket;
+}
+
+/// <summary>The probe navigates to <see cref="TargetWaypointSymbol"/>, sets DRIFT flight mode, and stays docked to collect market/shipyard data.</summary>
+public sealed record DeployProbeGoal : ShipGoal
+{
+    public required string TargetWaypointSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.DeployProbe;
 }

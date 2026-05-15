@@ -1,23 +1,21 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Commands.Contracts;
+using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Orchestration;
-using SpaceTraders.Application.Ports;
 using SpaceTraders.Domain.Events;
-using SpaceTraders.Domain.ValueObjects;
 
 namespace SpaceTraders.Application.Automation;
 
 /// <summary>
-/// Dead-reckoning background service.
+/// Background service.
 /// Every 5 s:
 ///  - Skips processing if this instance is not the leader (see <see cref="ILeaderElection"/>).
-///  - Detects ships that have arrived at their destination (ArrivesAt elapsed),
-///    updates their nav state in the DB, and calls <see cref="IShipGoalExecutorService"/> directly to resume goal execution.
-///  - Detects ships with critically low fuel (≤ 20 %) that are docked and publishes ShipFuelLowEvent.
+///  - Ensures the single scout-all-marketplaces plan exists.
+///  - Executes active scout and contract assignments.
 ///  - Detects API availability transitions and publishes ApiUnavailableEvent / ApiAvailableEvent.
 /// </summary>
 public sealed class GameLoopService(
@@ -26,7 +24,6 @@ public sealed class GameLoopService(
     ILeaderElection leaderElection,
     ILogger<GameLoopService> logger) : BackgroundService
 {
-    private const double FuelLowThreshold = 0.20;
     private static readonly TimeSpan DeadReckoningInterval = TimeSpan.FromSeconds(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -59,77 +56,88 @@ public sealed class GameLoopService(
         }
 
         await using var scope = serviceScopeFactory.CreateAsyncScope();
-        var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<Wolverine.IMessageBus>();
-        var orchestrator = scope.ServiceProvider.GetRequiredService<IFleetOrchestrator>();
+        var scoutPlanBootstrap = scope.ServiceProvider.GetRequiredService<IScoutAllMarketplacesPlanService>();
+        var contractPlanBootstrap = scope.ServiceProvider.GetRequiredService<IContractPlanService>();
+        var probeDeploymentPlanBootstrap = scope.ServiceProvider.GetRequiredService<IProbeDeploymentPlanService>();
+        var assignments = scope.ServiceProvider.GetRequiredService<IShipAssignmentRepository>();
+        var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
+        var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
 
-        // Phase 6.5c: orchestrator evaluates and assigns idle ships before any ship-level
-        // automation ticks run, so every planner invocation executes an already-assigned role.
-        await orchestrator.EvaluateAndAssignAsync(cancellationToken);
-
-        await ApplyDeadReckoningAsync(ships, scope, cancellationToken);
-        await CheckFuelAsync(ships, bus, cancellationToken);
+        await scoutPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
+        await contractPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
+        await probeDeploymentPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
+        await ExecuteActiveScoutAssignmentsAsync(assignments, goalExecutor, cancellationToken);
+        await ExecuteActiveContractAssignmentsAsync(assignments, ships, bus, cancellationToken);
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
     }
 
-    private async Task ApplyDeadReckoningAsync(
-        IShipRepository ships,
-        IServiceScope scope,
+    private static async Task ExecuteActiveScoutAssignmentsAsync(
+        IShipAssignmentRepository assignments,
+        IShipGoalExecutorService goalExecutor,
         CancellationToken cancellationToken)
     {
-        var transitShips = await ships.GetInTransitAsync(cancellationToken);
+        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
 
-        foreach (var ship in transitShips)
+        foreach (var assignment in activeAssignments)
         {
-            if (ship.IsInTransit) continue;
-
-            var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol;
-
-            var arrivedNav = new NavModel(
-                Status: "IN_ORBIT",
-                SystemSymbol: ship.SystemSymbol ?? string.Empty,
-                WaypointSymbol: arrivedWaypoint ?? ship.WaypointSymbol ?? string.Empty,
-                FlightMode: ship.FlightMode ?? "CRUISE",
-                DestWaypointSymbol: null,
-                ArrivesAt: null);
-
-            await ships.UpdateNavAsync(ship.Symbol, arrivedNav, null, cancellationToken);
-
-            if (arrivedWaypoint is not null)
+            if (assignment.CompletedAt.HasValue
+                || !string.Equals(assignment.AssignmentType, "Scout", StringComparison.OrdinalIgnoreCase))
             {
-                var goalExecutor = scope.ServiceProvider.GetRequiredService<IShipGoalExecutorService>();
-                var result = await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
-
-                logger.LogInformation(
-                    "Ship {Symbol} arrived at {Waypoint} (dead-reckoning); executed goal step (outcome={Outcome}, reason={Reason}).",
-                    ship.Symbol,
-                    arrivedWaypoint,
-                    result?.Outcome,
-                    result?.Reason);
+                continue;
             }
+
+            await goalExecutor.ExecuteAsync(assignment.ShipSymbol, cancellationToken);
         }
     }
 
-    private async Task CheckFuelAsync(
+    private static async Task ExecuteActiveContractAssignmentsAsync(
+        IShipAssignmentRepository assignments,
         IShipRepository ships,
         Wolverine.IMessageBus bus,
         CancellationToken cancellationToken)
     {
-        var allShips = await ships.GetAllAsync(cancellationToken);
+        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
 
-        foreach (var ship in allShips)
+        foreach (var assignment in activeAssignments)
         {
-            if (ship.IsInTransit) continue;
-            if (ship.FuelCapacity == 0) continue;
-            if (!string.Equals(ship.Status, "DOCKED", StringComparison.OrdinalIgnoreCase)) continue;
-
-            var fuelRatio = (double)ship.FuelCurrent / ship.FuelCapacity;
-            if (fuelRatio <= FuelLowThreshold)
+            if (assignment.CompletedAt.HasValue
+                || !string.Equals(assignment.AssignmentType, "Contract", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(assignment.CargoSymbol)
+                || string.IsNullOrWhiteSpace(assignment.OriginWaypoint)
+                || string.IsNullOrWhiteSpace(assignment.DestWaypoint)
+                || string.IsNullOrWhiteSpace(assignment.ContractId))
             {
-                logger.LogInformation(
-                    "Ship {Symbol} fuel low ({Current}/{Capacity}) while docked; publishing ShipFuelLowEvent.",
-                    ship.Symbol, ship.FuelCurrent, ship.FuelCapacity);
-                await bus.PublishAsync(new ShipFuelLowEvent(ship.Symbol, ship.FuelCurrent, ship.FuelCapacity));
+                continue;
+            }
+
+            var ship = await ships.FindAsync(assignment.ShipSymbol, cancellationToken);
+            if (ship is null)
+            {
+                continue;
+            }
+
+            var cargoUnits = ship.CargoInventory?
+                .FirstOrDefault(i => i.Symbol.Equals(assignment.CargoSymbol, StringComparison.OrdinalIgnoreCase))?
+                .Units ?? 0;
+
+            if (cargoUnits > 0)
+            {
+                await bus.InvokeAsync(new FulfillContractDeliveryCommand(
+                    assignment.ShipSymbol,
+                    assignment.ContractId,
+                    assignment.CargoSymbol,
+                    assignment.DestWaypoint),
+                    cancellationToken);
+            }
+            else
+            {
+                await bus.InvokeAsync(new MineResourceVolumeCommand(
+                    assignment.ShipSymbol,
+                    assignment.CargoSymbol,
+                    assignment.OriginWaypoint,
+                    assignment.RequiredUnits),
+                    cancellationToken);
             }
         }
     }

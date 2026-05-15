@@ -63,7 +63,9 @@ public sealed class CachedShip
 
     public void ApplyArrivalIfDue()
     {
-        if (ArrivesAt.HasValue && !IsInTransit)
+        var isTransitStatus = string.Equals(Status, "IN_TRANSIT", StringComparison.OrdinalIgnoreCase);
+
+        if (ArrivesAt.HasValue && !IsInTransit && isTransitStatus)
         {
             WaypointSymbol = DestWaypointSymbol ?? WaypointSymbol;
             DestWaypointSymbol = null;

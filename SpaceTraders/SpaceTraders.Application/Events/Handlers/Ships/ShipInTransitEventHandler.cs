@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Domain.Events.Ships;
 
 namespace SpaceTraders.Application.Events.Handlers.Ships;
@@ -8,8 +10,13 @@ namespace SpaceTraders.Application.Events.Handlers.Ships;
 /// Phase 14c: tick scheduling removed; the <c>ShipEventScheduler</c> now fires
 /// <c>ShipArrivedEvent</c> at the correct arrival time instead of scheduling a polling tick.
 /// </summary>
-public sealed class ShipInTransitEventHandler
+public sealed class ShipInTransitEventHandler(IDashboardNotifier dashboardNotifier)
 {
     public Task Handle(ShipInTransitEvent @event, CancellationToken cancellationToken)
-        => Task.CompletedTask;
+    {
+        dashboardNotifier.Notify("ships", @event.ShipSymbol);
+        dashboardNotifier.Notify("fleet-activity", @event.ShipSymbol);
+        dashboardNotifier.Notify("activity", @event.ShipSymbol);
+        return Task.CompletedTask;
+    }
 }

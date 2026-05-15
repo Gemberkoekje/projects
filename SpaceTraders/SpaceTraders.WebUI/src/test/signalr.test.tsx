@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query'
-import { SignalRProvider, useSignalR } from '../lib/signalr'
+import { SignalRProvider } from '../lib/signalr'
+import { useSignalR } from '../lib/signalr-context'
 
 function StateDisplay() {
   const { state, liveUpdatesPaused } = useSignalR()

@@ -71,3 +71,18 @@ export default defineConfig([
   },
 ])
 ```
+
+## Install
+
+From the `SpaceTraders.WebUI` directory:
+
+```bash
+npm install
+```
+
+## Start
+
+Run the development server:
+
+```bash
+npm run dev

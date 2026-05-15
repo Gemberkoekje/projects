@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using SpaceTraders.Application.Goals;
 using SpaceTraders.Application.Interfaces.Repositories;
-using SpaceTraders.Application.Sync;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events.Ships;
 using Wolverine;
@@ -11,15 +10,6 @@ namespace SpaceTraders.API.Services;
 /// <summary>
 /// Runs once at startup (after <see cref="StartupSyncService"/>) to resume
 /// ships interrupted by a pod restart.
-///
-/// Always performs a full API sync to ensure the cached database mirrors the
-/// actual SpaceTraders API state before emitting recovery events.
-///
-/// For each ship:
-///  - Ship.ArrivesAt has elapsed  → update nav to IN_ORBIT and emit <see cref="ShipInTransitEvent"/> with arrival time = now,
-///                                   then execute goal step directly.
-///  - Ship.ArrivesAt is in the future → emit <see cref="ShipInTransitEvent"/> and schedule arrival via <see cref="IShipEventScheduler"/>.
-///  - Ship is docked or in orbit  → execute goal step directly.
 /// </summary>
 public sealed class StartupRecoveryService(
     IServiceScopeFactory serviceScopeFactory,
@@ -29,14 +19,10 @@ public sealed class StartupRecoveryService(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await using var scope = serviceScopeFactory.CreateAsyncScope();
-        var syncHandler = scope.ServiceProvider.GetRequiredService<SyncAllShipsHandler>();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
         var ships = scope.ServiceProvider.GetRequiredService<IShipRepository>();
         var settings = scope.ServiceProvider.GetRequiredService<ISettingsRepository>();
         var now = TimeProvider.System.GetUtcNow();
-
-        logger.LogInformation("StartupRecovery: syncing ships from API.");
-        await syncHandler.Handle(new SyncAllShipsCommand(), cancellationToken);
 
         var automationEnabled = await settings.GetAsync<bool>("Automation.Enabled", cancellationToken);
         if (!automationEnabled)
@@ -67,9 +53,6 @@ public sealed class StartupRecoveryService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // NOTE: Database is already synced from SyncAllShipsCommand.
-        // Recovery only emits events based on current state – no database updates needed.
-
         if (ship.ArrivesAt.HasValue && ship.ArrivesAt.Value <= now)
         {
             var arrivedWaypoint = ship.DestWaypointSymbol ?? ship.WaypointSymbol ?? string.Empty;
