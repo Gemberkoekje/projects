@@ -79,9 +79,9 @@ public static class DependencyInjection
         services.AddScoped<IProbeDeploymentPlanRepository, ProbeDeploymentPlanRepository>();
 
         // Phase 14b: scheduler fires ShipArrivedEvent / ShipCooldownExpiredEvent at the correct time.
+        // It is started by DeferredStartupHostedService after database initialization completes.
         services.AddSingleton<ShipEventScheduler>();
         services.AddSingleton<IShipEventScheduler>(sp => sp.GetRequiredService<ShipEventScheduler>());
-        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<ShipEventScheduler>());
 
         return services;
     }

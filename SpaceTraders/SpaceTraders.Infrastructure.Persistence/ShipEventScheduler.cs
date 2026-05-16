@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Domain.Events.Ships;
 using System.Collections.Concurrent;
+using System.Net.Sockets;
 using Wolverine;
 
 namespace SpaceTraders.Infrastructure.Persistence;
@@ -39,6 +41,8 @@ public sealed class ShipEventScheduler(
             if (cmp != 0) return cmp;
             return a.GoalId.CompareTo(b.GoalId);
         }));
+
+    private static readonly TimeSpan LoadRetryDelay = TimeSpan.FromSeconds(10);
 
     private readonly SemaphoreSlim _signal = new(0, int.MaxValue);
     private readonly object _lock = new();
@@ -87,7 +91,24 @@ public sealed class ShipEventScheduler(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await LoadFromDatabaseAsync(stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (!await LoadFromDatabaseAsync(stoppingToken))
+            {
+                try
+                {
+                    await Task.Delay(LoadRetryDelay, stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                continue;
+            }
+
+            break;
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -115,7 +136,7 @@ public sealed class ShipEventScheduler(
     // Internal helpers
     // ───────────────────────────────────────────────────────────────
 
-    private async Task LoadFromDatabaseAsync(CancellationToken ct)
+    private async Task<bool> LoadFromDatabaseAsync(CancellationToken ct)
     {
         try
         {
@@ -135,10 +156,32 @@ public sealed class ShipEventScheduler(
             }
 
             logger.LogInformation("ShipEventScheduler: loaded {Count} pending event(s) from database.", rows.Count);
+            return true;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            logger.LogWarning(
+                ex,
+                "ShipEventScheduler: scheduled_ship_events table is not available yet; retrying startup load in {DelaySeconds}s.",
+                LoadRetryDelay.TotalSeconds);
+            return false;
+        }
+        catch (NpgsqlException ex) when (IsTransientConnectionError(ex))
+        {
+            logger.LogWarning(
+                ex,
+                "ShipEventScheduler: database unavailable while loading scheduled events; retrying in {DelaySeconds}s.",
+                LoadRetryDelay.TotalSeconds);
+            return false;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return false;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "ShipEventScheduler: failed to load pending events from database on startup.");
+            return false;
         }
     }
 
@@ -279,5 +322,21 @@ public sealed class ShipEventScheduler(
         {
             logger.LogError(ex, "ShipEventScheduler: failed to delete scheduled event for {Ship} / goal {Goal}.", shipSymbol, goalId);
         }
+    }
+
+    private static bool IsTransientConnectionError(NpgsqlException exception)
+    {
+        if (exception.InnerException is SocketException socketException)
+        {
+            return socketException.SocketErrorCode == SocketError.ConnectionRefused
+                || socketException.SocketErrorCode == SocketError.TimedOut;
+        }
+
+        if (exception.InnerException is TimeoutException)
+        {
+            return true;
+        }
+
+        return exception.IsTransient;
     }
 }

@@ -59,6 +59,7 @@ public sealed class DeferredStartupHostedService(
             if (!hostEnvironment.IsEnvironment("Testing"))
             {
                 await InitializeDatabaseAsync(cancellationToken);
+                await StartServiceAsync<ShipEventScheduler>(cancellationToken);
             }
 
             await StartServiceAsync<AgentBootstrapService>(cancellationToken);
