@@ -304,6 +304,7 @@ public sealed class ContractPlanServiceTests
                 ShipSymbol: "SHIP-NEW-MINER",
                 ShipNav: new NavModel("DOCKED", "X1-AB", "X1-AB-SHIPYARD", "CRUISE", null, null),
                 ShipFuel: new FuelModel(80, 100),
+                ShipCargo: new CargoModel(0, 20, []),
                 Cost: 100_000));
 
         waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([

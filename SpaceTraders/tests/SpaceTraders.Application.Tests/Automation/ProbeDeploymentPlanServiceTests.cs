@@ -84,6 +84,7 @@ public sealed class ProbeDeploymentPlanServiceTests
             ShipSymbol: shipSymbol,
             ShipNav: new NavModel("DOCKED", "X1-AB", "X1-AB-SY1", "DRIFT", null, null),
             ShipFuel: new FuelModel(0, 0),
+            ShipCargo: new CargoModel(0, 0, []),
             Cost: 23_000);
 
     // Helper: checks published message is a DeployProbeCommand with the given destination.

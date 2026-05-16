@@ -554,6 +554,50 @@ public sealed class FleetStatusQueryServiceAssignmentTests
     }
 
     [Fact]
+    public async Task GetAssignmentsAsync_MineAndSellGoal_UsesMiningSnapshot()
+    {
+        var svc = Build(
+            shipRepo: ShipsWith("MINER-1"),
+            shipGoalRepo: ShipGoalsWith(
+                ("MINER-1", new MineAndSellGoal
+                {
+                    TradeSymbol = "COPPER_ORE",
+                    SourceWaypointSymbol = "X1-PT96-B10",
+                    SellWaypointSymbol = "X1-PT96-H52",
+                })));
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Should().HaveCount(1);
+        result[0].GoalKind.Should().Be(ShipGoalKind.MineResource);
+        result[0].GoalDescription.Should().Contain("Mining COPPER_ORE").And.Contain("X1-PT96-B10").And.Contain("X1-PT96-H52");
+        result[0].SourceWaypoint.Should().Be("X1-PT96-B10");
+        result[0].DestinationWaypoint.Should().Be("X1-PT96-H52");
+    }
+
+    [Fact]
+    public async Task GetAssignmentsAsync_TradeBetweenMarketsGoal_UsesTradingSnapshot()
+    {
+        var svc = Build(
+            shipRepo: ShipsWith("TRADER-1"),
+            shipGoalRepo: ShipGoalsWith(
+                ("TRADER-1", new TradeBetweenMarketsGoal
+                {
+                    TradeSymbol = "SHIP_PARTS",
+                    BuyWaypointSymbol = "X1-PT96-D41",
+                    SellWaypointSymbol = "X1-PT96-H53",
+                })));
+
+        var result = await svc.GetAssignmentsAsync();
+
+        result.Should().HaveCount(1);
+        result[0].GoalKind.Should().Be(ShipGoalKind.SellCargo);
+        result[0].GoalDescription.Should().Contain("Trading SHIP_PARTS").And.Contain("X1-PT96-D41").And.Contain("X1-PT96-H53");
+        result[0].SourceWaypoint.Should().Be("X1-PT96-D41");
+        result[0].DestinationWaypoint.Should().Be("X1-PT96-H53");
+    }
+
+    [Fact]
     public async Task GetAssignmentsAsync_NoShipGoal_UsesActiveContractAssignmentSnapshot()
     {
         var assignedAt = new DateTimeOffset(2024, 2, 1, 10, 0, 0, TimeSpan.Zero);

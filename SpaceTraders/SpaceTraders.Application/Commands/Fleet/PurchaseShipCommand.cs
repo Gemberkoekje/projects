@@ -64,7 +64,11 @@ public sealed class PurchaseShipHandler(
             result.ShipFuel.Current,
             result.ShipFuel.Capacity,
             result.ShipNav.ArrivesAt,
-            result.ShipNav.DestWaypointSymbol);
+            result.ShipNav.DestWaypointSymbol,
+            result.ShipCargo.Units,
+            result.ShipCargo.Capacity,
+            ShipType: command.ShipType,
+            CargoInventory: result.ShipCargo.Inventory);
 
         await ships.UpsertAsync(newShip, cancellationToken);
 

@@ -114,6 +114,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
                 ShipSymbol: "SPECTER-DEBUG-3",
                 ShipNav: new NavModel("DOCKED", "X1-PT96", "X1-PT96-H53", "CRUISE", null, null),
                 ShipFuel: new FuelModel(80, 80),
+                ShipCargo: new CargoModel(0, 20, []),
                 Cost: (int)miningDrone.PurchasePrice));
 
         waypoints.GetBySystemAsync("X1-PT96", Arg.Any<CancellationToken>()).Returns([

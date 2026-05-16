@@ -168,4 +168,35 @@ public sealed class ShipGoalRepository(SpaceTradersDbContext db) : IShipGoalRepo
 
         return targets;
     }
+
+    public async Task<IReadOnlySet<(string TargetWaypointSymbol, string TargetDepositSymbol)>> GetActiveSurveyTargetsAsync(CancellationToken cancellationToken = default)
+    {
+        var payloads = await db.Ships
+            .Where(s => s.GoalKind == "SurveyWaypoint" && s.GoalPayloadJson != null)
+            .Select(s => s.GoalPayloadJson)
+            .ToListAsync(cancellationToken);
+
+        var targets = new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>();
+        foreach (var json in payloads)
+        {
+            if (json is null)
+            {
+                continue;
+            }
+
+            var goal = JsonSerializer.Deserialize<ShipGoal>(json, JsonOptions);
+            if (goal is not SurveyWaypointGoal surveyGoal
+                || string.IsNullOrWhiteSpace(surveyGoal.TargetWaypointSymbol)
+                || string.IsNullOrWhiteSpace(surveyGoal.TargetDepositSymbol))
+            {
+                continue;
+            }
+
+            targets.Add((
+                surveyGoal.TargetWaypointSymbol.ToUpperInvariant(),
+                surveyGoal.TargetDepositSymbol.ToUpperInvariant()));
+        }
+
+        return targets;
+    }
 }

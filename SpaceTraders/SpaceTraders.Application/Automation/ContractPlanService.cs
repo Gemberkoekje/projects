@@ -444,30 +444,14 @@ public sealed class ContractPlanService(
                 continue;
             }
 
-            if (!ship.HasMiningEquipment)
+            if (!ship.IsMiningCapable)
             {
                 logger.LogDebug(
-                    "Contract plan ship selection: skipping ship {ShipSymbol} because it has no mining equipment (type {ShipType}, mounts: {Mounts}).",
+                    "Contract plan ship selection: skipping ship {ShipSymbol} — not mining-capable (type {ShipType}, mounts: {Mounts}, cargo: {Cargo}, fuel: {Fuel}).",
                     ship.Symbol,
                     ship.ShipType,
-                    string.Join(",", ship.MountSymbols ?? []));
-                continue;
-            }
-
-            if (ship.CargoCapacity <= 0)
-            {
-                logger.LogDebug(
-                    "Contract plan ship selection: skipping ship {ShipSymbol} because cargo capacity is {CargoCapacity}.",
-                    ship.Symbol,
-                    ship.CargoCapacity);
-                continue;
-            }
-
-            if (ship.FuelCapacity <= 0)
-            {
-                logger.LogDebug(
-                    "Contract plan ship selection: skipping ship {ShipSymbol} because fuel capacity is {FuelCapacity}.",
-                    ship.Symbol,
+                    string.Join(",", ship.MountSymbols ?? []),
+                    ship.CargoCapacity,
                     ship.FuelCapacity);
                 continue;
             }

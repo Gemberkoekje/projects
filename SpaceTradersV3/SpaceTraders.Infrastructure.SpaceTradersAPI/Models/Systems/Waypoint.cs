@@ -1,0 +1,69 @@
+using System.Text.Json.Serialization;
+
+namespace SpaceTraders.Infrastructure.SpaceTradersAPI.Models.Systems;
+
+public sealed class Waypoint
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+
+    [JsonPropertyName("type")]
+    required public string Type { get; init; }
+
+    [JsonPropertyName("systemSymbol")]
+    required public string SystemSymbol { get; init; }
+
+    [JsonPropertyName("x")]
+    public int X { get; init; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; init; }
+
+    [JsonPropertyName("orbitals")]
+    public IReadOnlyList<WaypointOrbital>? Orbitals { get; init; }
+
+    [JsonPropertyName("orbits")]
+    public string? Orbits { get; init; }
+
+    [JsonPropertyName("traits")]
+    public IReadOnlyList<WaypointTrait>? Traits { get; init; }
+
+    [JsonPropertyName("modifiers")]
+    public IReadOnlyList<WaypointModifier>? Modifiers { get; init; }
+
+    [JsonPropertyName("chart")]
+    public WaypointChart? Chart { get; init; }
+
+    [JsonPropertyName("isUnderConstruction")]
+    public bool IsUnderConstruction { get; init; }
+}
+
+public sealed class WaypointOrbital
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+}
+
+public sealed class WaypointTrait
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+}
+
+public sealed class WaypointModifier
+{
+    [JsonPropertyName("symbol")]
+    required public string Symbol { get; init; }
+}
+
+public sealed class WaypointChart
+{
+    [JsonPropertyName("waypointSymbol")]
+    public string? WaypointSymbol { get; init; }
+
+    [JsonPropertyName("submittedBy")]
+    public string? SubmittedBy { get; init; }
+
+    [JsonPropertyName("submittedOn")]
+    public DateTimeOffset? SubmittedOn { get; init; }
+}

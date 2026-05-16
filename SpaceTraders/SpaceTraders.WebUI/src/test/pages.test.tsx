@@ -617,9 +617,57 @@ describe('ShipDetailPage', () => {
             lastSyncedAt: new Date().toISOString(),
           },
         ])
-      if (path === '/ships/SHIP-1/timeline') return Promise.resolve([])
-      if (path === '/ships/SHIP-1/stats') return Promise.resolve({ ship: {}, ledger: [], summary: [] })
-      if (path.startsWith('/status/activity')) return Promise.resolve([])
+      if (path === '/status/ships/SHIP-1/diagnostics')
+        return Promise.resolve({
+          symbol: 'SHIP-1',
+          shipType: 'SHIP_MINING_DRONE',
+          systemSymbol: 'X1-AB',
+          waypointSymbol: 'X1-AB-01',
+          status: 'DOCKED',
+          flightMode: 'CRUISE',
+          fuelCurrent: 400,
+          fuelCapacity: 400,
+          cargoCurrent: 20,
+          cargoCapacity: 60,
+          isInTransit: false,
+          arrivesAt: null,
+          lastSyncedAt: new Date().toISOString(),
+          mountSymbols: [],
+          hasMiningEquipment: true,
+          hasSurveyEquipment: false,
+          hasGasSiphonEquipment: false,
+          hasGasProcessor: false,
+          hasMineralProcessor: false,
+          hasCargoSpace: true,
+          hasFuelCapacity: true,
+          isOccupied: false,
+          activeAssignmentType: null,
+          activeAssignmentContractId: null,
+          activeAssignmentSourceWaypoint: null,
+          activeAssignmentDestinationWaypoint: null,
+          activeAssignmentAssignedAt: null,
+          activeAssignmentStepIndex: null,
+          isEligibleForContractMinerSelection: true,
+          contractMinerEligibilityReason: 'Eligible',
+        })
+      if (path === '/status/waypoints/X1-AB-01')
+        return Promise.resolve({
+          symbol: 'X1-AB-01',
+          systemSymbol: 'X1-AB',
+          type: 'ASTEROID',
+          x: 4,
+          y: 7,
+          hasMarket: false,
+          hasShipyard: false,
+          isUnderConstruction: false,
+          lastObservedAt: new Date().toISOString(),
+          parentSymbol: null,
+          traitsJson: '[]',
+          modifiersJson: '[]',
+          orbitalsJson: '[]',
+          chartJson: null,
+          extractableResources: ['IRON_ORE'],
+        })
       return Promise.resolve([])
     })
 
@@ -648,8 +696,112 @@ describe('ShipDetailPage', () => {
     )
 
     await waitFor(() =>
-      expect(screen.getByText(/Ship "UNKNOWN" not found/)).toBeInTheDocument(),
+      expect(screen.getByText(/Unknown/)).toBeInTheDocument(),
     )
+  })
+
+  it('renders waypoint details including extractable resources', async () => {
+    const now = new Date().toISOString()
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/status/ships') {
+        return Promise.resolve([
+          {
+            symbol: 'SHIP-1',
+            systemSymbol: 'X1-AB',
+            waypointSymbol: 'X1-AB-01',
+            status: 'DOCKED',
+            flightMode: 'CRUISE',
+            fuelCurrent: 40,
+            fuelCapacity: 80,
+            cargoCurrent: 5,
+            cargoCapacity: 30,
+            arrivesAt: null,
+            isInTransit: false,
+            lastSyncedAt: now,
+            shipType: 'SHIP_MINING_DRONE',
+            mountSymbols: [],
+            hasMiningEquipment: true,
+            hasSurveyEquipment: false,
+            hasGasSiphonEquipment: false,
+            hasGasProcessor: false,
+            hasMineralProcessor: false,
+          },
+        ])
+      }
+
+      if (path === '/status/ships/SHIP-1/diagnostics') {
+        return Promise.resolve({
+          symbol: 'SHIP-1',
+          shipType: 'SHIP_MINING_DRONE',
+          systemSymbol: 'X1-AB',
+          waypointSymbol: 'X1-AB-01',
+          status: 'DOCKED',
+          flightMode: 'CRUISE',
+          fuelCurrent: 40,
+          fuelCapacity: 80,
+          cargoCurrent: 5,
+          cargoCapacity: 30,
+          isInTransit: false,
+          arrivesAt: null,
+          lastSyncedAt: now,
+          mountSymbols: [],
+          hasMiningEquipment: true,
+          hasSurveyEquipment: false,
+          hasGasSiphonEquipment: false,
+          hasGasProcessor: false,
+          hasMineralProcessor: false,
+          hasCargoSpace: true,
+          hasFuelCapacity: true,
+          isOccupied: false,
+          activeAssignmentType: null,
+          activeAssignmentContractId: null,
+          activeAssignmentSourceWaypoint: null,
+          activeAssignmentDestinationWaypoint: null,
+          activeAssignmentAssignedAt: null,
+          activeAssignmentStepIndex: null,
+          isEligibleForContractMinerSelection: true,
+          contractMinerEligibilityReason: 'Eligible',
+        })
+      }
+
+      if (path === '/status/waypoints/X1-AB-01') {
+        return Promise.resolve({
+          symbol: 'X1-AB-01',
+          systemSymbol: 'X1-AB',
+          type: 'ASTEROID',
+          x: 4,
+          y: 7,
+          hasMarket: false,
+          hasShipyard: false,
+          isUnderConstruction: false,
+          lastObservedAt: now,
+          parentSymbol: null,
+          traitsJson: '[]',
+          modifiersJson: '[]',
+          orbitalsJson: '[]',
+          chartJson: null,
+          extractableResources: ['IRON_ORE', 'COPPER_ORE'],
+        })
+      }
+
+      return Promise.resolve([])
+    })
+
+    render(
+      <WrapperWithRoute path="/fleet/:symbol" initialEntry="/fleet/SHIP-1">
+        <ShipDetailPage />
+      </WrapperWithRoute>,
+    )
+
+    await waitFor(() =>
+      expect(screen.getByText('Waypoint Details')).toBeInTheDocument(),
+    )
+
+    await waitFor(() =>
+      expect(screen.getByText('ASTEROID')).toBeInTheDocument(),
+    )
+    expect(screen.getByText('IRON_ORE')).toBeInTheDocument()
+    expect(screen.getByText('COPPER_ORE')).toBeInTheDocument()
   })
 })
 

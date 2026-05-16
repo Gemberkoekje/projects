@@ -17,13 +17,16 @@ public sealed record MineResourceVolumeCommand
 
     public required int RequiredUnitsTotal { get; init; }
 
+    public SurveyModel Survey { get; init; }
+
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal)
+    public MineResourceVolumeCommand(string ShipSymbol, string TradeSymbol, string SourceWaypoint, int RequiredUnitsTotal, SurveyModel Survey = null)
     {
         this.ShipSymbol = ShipSymbol;
         this.TradeSymbol = TradeSymbol;
         this.SourceWaypoint = SourceWaypoint;
         this.RequiredUnitsTotal = RequiredUnitsTotal;
+        this.Survey = Survey;
     }
 }
 
@@ -37,7 +40,7 @@ public sealed class MineResourceVolumeHandler(
     IMessageBus bus,
     ILogger<MineResourceVolumeHandler> logger)
 {
-    public Task Handle(MineResourceVolumeCommand command, CancellationToken cancellationToken)
+    public Task<ShipCommandResult> Handle(MineResourceVolumeCommand command, CancellationToken cancellationToken)
         => ExecuteAsync(command, cancellationToken);
 
     public async Task<ShipCommandResult> ExecuteAsync(MineResourceVolumeCommand command, CancellationToken cancellationToken)
@@ -159,7 +162,9 @@ public sealed class MineResourceVolumeHandler(
                 Accepted: true);
         }
 
-        var extractResult = await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
+        var extractResult = IsUsableSurvey(command.Survey)
+            ? await port.ExtractWithSurveyAsync(ship.Symbol, command.Survey, cancellationToken)
+            : await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
         await ships.UpdateCargoAsync(ship.Symbol, extractResult.Cargo, cancellationToken);
 
         var cooldownAt = extractResult.CooldownExpiresAt ?? now.AddSeconds(extractResult.CooldownSeconds);
@@ -239,4 +244,11 @@ public sealed class MineResourceVolumeHandler(
             await ships.UpdateCargoAsync(shipSymbol, result.Cargo, cancellationToken);
         }
     }
+
+    private static bool IsUsableSurvey(SurveyModel survey)
+        => survey is not null
+            && !string.IsNullOrWhiteSpace(survey.Signature)
+            && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)
+            && !string.IsNullOrWhiteSpace(survey.Size)
+            && survey.Expiration > TimeProvider.System.GetUtcNow();
 }

@@ -407,33 +407,18 @@ public sealed class ProbeDeploymentPlanService(
 
     private async Task TryPurchaseProbeAsync(string systemSymbol, string targetWaypoint, CancellationToken cancellationToken)
     {
-        var allShips = await ships.GetAllAsync(cancellationToken);
         var shipyardList = await shipyards.GetAllAsync(cancellationToken);
 
-        var shipyardCandidates = shipyardList
-            .Where(s => s.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
-                && s.ShipTypes.Contains(ProbeShipType, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        var shipyard = shipyardList
+            .FirstOrDefault(s => s.SystemSymbol.Equals(systemSymbol, StringComparison.OrdinalIgnoreCase)
+                && s.ShipTypes.Contains(ProbeShipType, StringComparer.OrdinalIgnoreCase));
 
-        if (shipyardCandidates.Count == 0)
+        if (shipyard is null)
         {
             logger.LogWarning(
                 "Probe deployment plan: no known shipyard in system {System} sells {Type}; will retry.",
                 systemSymbol,
                 ProbeShipType);
-            return;
-        }
-
-        var shipyard = shipyardCandidates.FirstOrDefault(s => allShips.Any(ship =>
-            !ship.LocalStatus.Equals(ShipLocalStatus.InTransit)
-            && s.WaypointSymbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase)));
-
-        if (shipyard is null)
-        {
-            logger.LogInformation(
-                "Probe deployment plan: delaying purchase for {Type} in system {System} because no owned ship is at a known selling shipyard.",
-                ProbeShipType,
-                systemSymbol);
             return;
         }
 

@@ -49,6 +49,9 @@ public sealed class TradingAutomationServiceTests
     private static ShipModel Trader(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
         new(symbol, "X1-AB", waypoint, status, "CRUISE", 20, 40, CargoCapacity: 40, ShipType: "SHIP_LIGHT_HAULER");
 
+    private static ShipModel Miner(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
+        new(symbol, "X1-AB", waypoint, status, "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 40, MountSymbols: ["MOUNT_MINING_LASER_I"]);
+
     private static ShipyardWaypointDto TradeShipyard(string waypoint = "X1-AB-SY1", long price = 60_000) =>
         new()
         {
@@ -118,11 +121,18 @@ public sealed class TradingAutomationServiceTests
                 "TRADER-NEW",
                 new NavModel("DOCKED", "X1-AB", "X1-AB-SY1", "CRUISE", null, null),
                 new FuelModel(20, 40),
+                new CargoModel(0, 40, []),
                 60_000));
 
         await CreateService().EnsureBootstrappedAsync();
 
         await _port.Received(1).PurchaseShipAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>());
+        await _ships.Received(1).UpsertAsync(
+            Arg.Is<ShipModel>(ship =>
+                ship.Symbol == "TRADER-NEW"
+                && ship.CargoCurrent == 0
+                && ship.CargoCapacity == 40),
+            Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync(
             "TRADER-NEW",
             Arg.Any<TradeBetweenMarketsGoal>(),
@@ -291,5 +301,101 @@ public sealed class TradingAutomationServiceTests
         await CreateService().EnsureBootstrappedAsync();
 
         await _goals.Received(1).ClearActiveGoalAsync("TRADER-STALE", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_AssignsTrader_WhenExistingGoalIsCompleted()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<MarketSnapshot>
+            {
+                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
+                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
+            });
+
+        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+
+        var trader = Trader("TRADER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([trader]);
+        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>())
+            .Returns(new TradeBetweenMarketsGoal
+            {
+                Status = SpaceTraders.Domain.Enums.GoalStatus.Completed,
+                TradeSymbol = "FOOD",
+                BuyWaypointSymbol = "X1-AB-MKT-OLD-BUY",
+                SellWaypointSymbol = "X1-AB-MKT-OLD-SELL",
+            });
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "TRADER-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g =>
+                g.TradeSymbol == "FOOD"
+                && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
+                && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_AssignsIdleMiner_WhenNoDedicatedTraderIsAvailable()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<MarketSnapshot>
+            {
+                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
+                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
+            });
+
+        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
+            .Returns((ShipGoal?)null);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<TradeBetweenMarketsGoal>(g =>
+                g.TradeSymbol == "FOOD"
+                && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
+                && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
+            Arg.Any<CancellationToken>());
+        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_PrefersDedicatedTrader_OverIdleMiner()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns(new List<MarketSnapshot>
+            {
+                Snapshot("X1-AB-MKT-BUY", Good("FOOD", "EXPORT", "ABUNDANT")),
+                Snapshot("X1-AB-MKT-SELL", Good("FOOD", "IMPORT", "SCARCE")),
+            });
+
+        _goals.GetActiveTradeRouteTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1");
+        var trader = Trader("TRADER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner, trader]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+        _goals.GetActiveGoalAsync(trader.Symbol, Arg.Any<CancellationToken>()).Returns((ShipGoal?)null);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "TRADER-1",
+            Arg.Any<TradeBetweenMarketsGoal>(),
+            Arg.Any<CancellationToken>());
+        await _goals.DidNotReceive().SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Any<TradeBetweenMarketsGoal>(),
+            Arg.Any<CancellationToken>());
     }
 }

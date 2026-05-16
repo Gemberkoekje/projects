@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { apiFetch } from '@/lib/api-fetch'
-import type { ShipDiagnosticsDto, ShipDto } from '@/types'
+import type { ShipDiagnosticsDto, ShipDto, WaypointDetailDto } from '@/types'
 import { cn } from '@/lib/utils'
 
 function formatTs(iso: string) {
@@ -56,6 +56,13 @@ export default function ShipDetailPage() {
   const ship = shipsQ.data?.find(s => s.symbol === symbol)
   const diagnostics = diagnosticsQ.data ?? null
 
+  const waypointDetailsQ = useQuery<WaypointDetailDto>({
+    queryKey: ['waypoint-detail', ship?.waypointSymbol],
+    queryFn: () => apiFetch(`/status/waypoints/${encodeURIComponent(ship?.waypointSymbol ?? '')}`),
+    enabled: Boolean(ship?.waypointSymbol),
+    staleTime: 30_000,
+  })
+
   if (!symbol) {
     return <p className="text-sm text-muted-foreground">No ship selected.</p>
   }
@@ -94,7 +101,17 @@ export default function ShipDetailPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Waypoint: </span>
-              <span className="font-mono">{ship.waypointSymbol ?? '—'}</span>
+              {ship.waypointSymbol ? (
+                <button
+                  type="button"
+                  onClick={() => waypointDetailsQ.refetch()}
+                  className="font-mono text-primary hover:underline"
+                >
+                  {ship.waypointSymbol}
+                </button>
+              ) : (
+                <span className="font-mono">—</span>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground">Flight mode: </span>
@@ -113,6 +130,71 @@ export default function ShipDetailPage() {
               <span className="tabular-nums">{ship.cargoCurrent}/{ship.cargoCapacity}</span>
             </div>
           </div>
+        </section>
+      )}
+
+      {ship?.waypointSymbol && (
+        <section aria-label="Waypoint details" className="rounded-lg border border-border bg-background p-4 text-sm">
+          <h2 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">
+            Waypoint Details
+          </h2>
+
+          {waypointDetailsQ.isLoading && (
+            <p className="text-sm text-muted-foreground">Loading waypoint details…</p>
+          )}
+
+          {waypointDetailsQ.isError && (
+            <p className="text-sm text-destructive">Failed to load waypoint details.</p>
+          )}
+
+          {waypointDetailsQ.data && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <span className="text-muted-foreground">Type: </span>
+                  <span className="font-mono">{waypointDetailsQ.data.type}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Coordinates: </span>
+                  <span className="font-mono">({waypointDetailsQ.data.x}, {waypointDetailsQ.data.y})</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Market: </span>
+                  <span>{waypointDetailsQ.data.hasMarket ? 'Yes' : 'No'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Shipyard: </span>
+                  <span>{waypointDetailsQ.data.hasShipyard ? 'Yes' : 'No'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Under construction: </span>
+                  <span>{waypointDetailsQ.data.isUnderConstruction ? 'Yes' : 'No'}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Last observed: </span>
+                  <span>{formatTs(waypointDetailsQ.data.lastObservedAt)}</span>
+                </div>
+              </div>
+
+              {waypointDetailsQ.data.extractableResources.length > 0 ? (
+                <div>
+                  <p className="text-muted-foreground mb-1">Extractable resources</p>
+                  <div className="flex flex-wrap gap-1">
+                    {waypointDetailsQ.data.extractableResources.map(resource => (
+                      <span
+                        key={resource}
+                        className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-mono text-muted-foreground"
+                      >
+                        {resource}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No known extractable resources cached for this waypoint.</p>
+              )}
+            </div>
+          )}
         </section>
       )}
 

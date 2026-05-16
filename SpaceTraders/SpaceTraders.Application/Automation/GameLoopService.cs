@@ -71,27 +71,21 @@ public sealed class GameLoopService(
         await probeDeploymentPlanBootstrap.EnsureBootstrappedAsync(cancellationToken);
         await miningAutomation.EnsureBootstrappedAsync(cancellationToken);
         await tradingAutomation.EnsureBootstrappedAsync(cancellationToken);
-        await ExecuteActiveScoutAssignmentsAsync(assignments, goalExecutor, cancellationToken);
+        await ExecuteAllShipGoalsAsync(ships, goalExecutor, cancellationToken);
         await ExecuteActiveContractAssignmentsAsync(assignments, ships, bus, cancellationToken);
         await PublishApiAvailabilityEventsAsync(bus, cancellationToken);
     }
 
-    private static async Task ExecuteActiveScoutAssignmentsAsync(
-        IShipAssignmentRepository assignments,
+    private static async Task ExecuteAllShipGoalsAsync(
+        IShipRepository ships,
         IShipGoalExecutorService goalExecutor,
         CancellationToken cancellationToken)
     {
-        var activeAssignments = await assignments.GetAllActiveAsync(cancellationToken);
+        var allShips = await ships.GetAllAsync(cancellationToken);
 
-        foreach (var assignment in activeAssignments)
+        foreach (var ship in allShips)
         {
-            if (assignment.CompletedAt.HasValue
-                || !string.Equals(assignment.AssignmentType, "Scout", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            await goalExecutor.ExecuteAsync(assignment.ShipSymbol, cancellationToken);
+            await goalExecutor.ExecuteAsync(ship.Symbol, cancellationToken);
         }
     }
 

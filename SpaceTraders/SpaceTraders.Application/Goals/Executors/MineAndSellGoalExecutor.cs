@@ -11,11 +11,13 @@ namespace SpaceTraders.Application.Goals.Executors;
 /// <summary>
 /// Executor for <see cref="MineAndSellGoal"/>.
 /// Mines the target resource at the source waypoint and sells collected units at the configured market.
+/// Prefers using cached surveys for increased extraction yield when available.
 /// </summary>
 public sealed class MineAndSellGoalExecutor(
     IShipRepository ships,
     IShipGoalRepository goals,
     IAgentRepository agents,
+    ISurveyRepository surveys,
     ISpaceTradersPort port,
     IMessageBus bus,
     ILogger<MineAndSellGoalExecutor> logger) : IShipGoalExecutor
@@ -42,13 +44,33 @@ public sealed class MineAndSellGoalExecutor(
 
         if (targetUnits <= 0)
         {
+            // Try to find a survey for the target mineral at the source waypoint
+            var survey = await surveys.GetBestActiveSurveyAsync(
+                miningGoal.SourceWaypointSymbol,
+                miningGoal.TradeSymbol,
+                ct);
+
+            if (!IsUsableSurvey(survey))
+            {
+                await TryAssignSurveyGoalAsync(ship, miningGoal, ct);
+            }
+
             var mineResult = await bus.InvokeAsync<ShipCommandResult>(
                 new MineResourceVolumeCommand(
                     ship.Symbol,
                     miningGoal.TradeSymbol,
                     miningGoal.SourceWaypointSymbol,
-                    Math.Max(1, ship.CargoCapacity)),
+                    Math.Max(1, ship.CargoCapacity),
+                    survey),
                 ct);
+
+            if (mineResult is null)
+            {
+                logger.LogWarning(
+                    "MineAndSellGoalExecutor: mining command returned null result for ship {ShipSymbol}.",
+                    ship.Symbol);
+                return GoalExecutionResult.Blocked("Mining command returned no result.");
+            }
 
             if (!mineResult.Accepted)
             {
@@ -107,4 +129,91 @@ public sealed class MineAndSellGoalExecutor(
         return GoalExecutionResult.Progressing(
             $"Sold {targetUnits} {miningGoal.TradeSymbol} at {miningGoal.SellWaypointSymbol}; continuing mining loop.");
     }
+
+    private async Task TryAssignSurveyGoalAsync(ShipModel minerShip, MineAndSellGoal miningGoal, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(miningGoal.SourceWaypointSymbol)
+            || string.IsNullOrWhiteSpace(miningGoal.TradeSymbol))
+        {
+            return;
+        }
+
+        var activeSurveyTargets = await goals.GetActiveSurveyTargetsAsync(ct);
+        var target = (
+            miningGoal.SourceWaypointSymbol.ToUpperInvariant(),
+            miningGoal.TradeSymbol.ToUpperInvariant());
+
+        if (activeSurveyTargets is not null && activeSurveyTargets.Contains(target))
+        {
+            return;
+        }
+
+        var surveyGoal = new SurveyWaypointGoal
+        {
+            TargetWaypointSymbol = miningGoal.SourceWaypointSymbol,
+            TargetDepositSymbol = miningGoal.TradeSymbol,
+        };
+
+        var surveyShipSymbol = string.Empty;
+
+        if (minerShip.HasSurveyEquipment)
+        {
+            surveyShipSymbol = minerShip.Symbol;
+        }
+        else
+        {
+            var allShips = await ships.GetAllAsync(ct);
+            foreach (var candidate in allShips)
+            {
+                if (!candidate.HasSurveyEquipment || candidate.LocalStatus == ShipLocalStatus.InTransit)
+                {
+                    continue;
+                }
+
+                var activeGoal = await goals.GetActiveGoalAsync(candidate.Symbol, ct);
+                if (activeGoal is null
+                    || activeGoal.Status is GoalStatus.Completed or GoalStatus.Blocked)
+                {
+                    surveyShipSymbol = candidate.Symbol;
+                    break;
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(surveyShipSymbol))
+        {
+            return;
+        }
+
+        var currentGoal = await goals.GetActiveGoalAsync(surveyShipSymbol, ct);
+        if (currentGoal is SurveyWaypointGoal existingSurveyGoal
+            && existingSurveyGoal.TargetWaypointSymbol.Equals(miningGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase)
+            && existingSurveyGoal.TargetDepositSymbol.Equals(miningGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase)
+            && existingSurveyGoal.Status is not GoalStatus.Completed
+            && existingSurveyGoal.Status is not GoalStatus.Blocked)
+        {
+            return;
+        }
+
+        if (currentGoal is not null
+            && currentGoal.Status is not GoalStatus.Completed
+            && currentGoal.Status is not GoalStatus.Blocked)
+        {
+            return;
+        }
+
+        await goals.SetActiveGoalAsync(surveyShipSymbol, surveyGoal, ct);
+        logger.LogInformation(
+            "MineAndSellGoalExecutor: queued SurveyWaypointGoal on ship {SurveyShip} for {TradeSymbol} at {Waypoint} after blind mining fallback.",
+            surveyShipSymbol,
+            miningGoal.TradeSymbol,
+            miningGoal.SourceWaypointSymbol);
+    }
+
+    private static bool IsUsableSurvey(SurveyModel survey) =>
+        survey is not null
+        && !string.IsNullOrWhiteSpace(survey.Signature)
+        && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)
+        && !string.IsNullOrWhiteSpace(survey.Size)
+        && survey.Expiration > TimeProvider.System.GetUtcNow();
 }

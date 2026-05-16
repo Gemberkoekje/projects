@@ -32,6 +32,7 @@ public sealed class MiningAutomationService(
 {
     private const string ScarceSupply = "SCARCE";
     private const string ImportType = "IMPORT";
+    private const string ExchangeType = "EXCHANGE";
     private const string MiningDroneShipType = "SHIP_MINING_DRONE";
     private const string MaxMiningDronesSettingKey = "Mining.MaxDrones";
     private const int DefaultMaxMiningDrones = 20;
@@ -56,6 +57,11 @@ public sealed class MiningAutomationService(
     {
         var now = TimeProvider.System.GetUtcNow();
         var opportunities = await GetScarceMineralBuyOpportunitiesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Mining automation: found {OpportunityCount} scarce market opportunity(s) in cached market data.",
+            opportunities.Count);
+
         var activeOpportunityKeys = BuildOpportunityKeySet(opportunities);
 
         await CleanupStaleMiningGoalsAsync(activeOpportunityKeys, cancellationToken);
@@ -119,6 +125,17 @@ public sealed class MiningAutomationService(
         var assignedShips = await ships.GetAllAsync(cancellationToken);
         var shipsWithGoals = await LoadShipsWithActiveGoalAsync(assignedShips, cancellationToken);
         var queueItems = queue.Opportunities.ToDictionary(item => item.OpportunityKey, StringComparer.OrdinalIgnoreCase);
+        var idleMinerCount = assignedShips.Count(ship =>
+            ship.IsMiningCapable
+            && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
+            && !shipsWithGoals.Contains(ship.Symbol));
+        var hasIdleMinerAtStart = idleMinerCount > 0;
+
+        logger.LogInformation(
+            "Mining automation: {IdleMinerCount} idle mining drone(s) available before assignment.",
+            idleMinerCount);
+
+        var unassignedOpportunities = new List<MiningOpportunity>();
 
         foreach (var opportunity in opportunities)
         {
@@ -145,31 +162,26 @@ public sealed class MiningAutomationService(
             var idleDrone = FindIdleMiningDrone(assignedShips, shipsWithGoals);
             if (idleDrone is null)
             {
-                idleDrone = await TryPurchaseMiningDroneAsync(opportunity.SellWaypointSymbol, assignedShips, cancellationToken);
-                if (idleDrone is null)
+                unassignedOpportunities.Add(opportunity);
+
+                if (queueItems.TryGetValue(queueKey, out var pendingItem))
                 {
-                    logger.LogInformation(
-                        "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no idle drone and purchase unavailable.",
-                        opportunity.TradeSymbol,
-                        opportunity.SellWaypointSymbol);
-
-                    if (queueItems.TryGetValue(queueKey, out var pendingItem))
+                    queueItems[queueKey] = pendingItem with
                     {
-                        queueItems[queueKey] = pendingItem with
-                        {
-                            Status = MarketAutomationOpportunityStatus.Pending,
-                            LastObservedAt = now,
-                            StopReason = "No idle mining drone available and purchase unavailable.",
-                        };
-                    }
-
-                    continue;
+                        Status = MarketAutomationOpportunityStatus.Pending,
+                        LastObservedAt = now,
+                        StopReason = "No idle mining drone currently available.",
+                    };
                 }
 
-                assignedShips = assignedShips.Append(idleDrone).ToList();
+                continue;
             }
 
-            var sourceWaypoint = await ResolveSourceAsteroidAsync(idleDrone, opportunity.TradeSymbol, cancellationToken);
+            var sourceWaypoint = await ResolveSourceAsteroidAsync(
+                idleDrone,
+                opportunity.TradeSymbol,
+                opportunity.SellWaypointSymbol,
+                cancellationToken);
             if (string.IsNullOrWhiteSpace(sourceWaypoint))
             {
                 logger.LogInformation(
@@ -223,6 +235,24 @@ public sealed class MiningAutomationService(
                 opportunity.SellWaypointSymbol);
         }
 
+        if (unassignedOpportunities.Count > 0 && !hasIdleMinerAtStart)
+        {
+            await TryPurchaseForUnassignedOpportunitiesAsync(
+                unassignedOpportunities,
+                assignedShips,
+                shipsWithGoals,
+                activeTargets,
+                queueItems,
+                now,
+                cancellationToken);
+        }
+        else if (unassignedOpportunities.Count > 0)
+        {
+            logger.LogInformation(
+                "Mining automation: skipping miner purchase for {OpportunityCount} unassigned opportunity(s) because idle mining drone(s) already exist.",
+                unassignedOpportunities.Count);
+        }
+
         return queue with
         {
             Opportunities = queueItems.Values
@@ -238,9 +268,122 @@ public sealed class MiningAutomationService(
         IReadOnlySet<string> shipsWithGoals)
     {
         return shipsInFleet.FirstOrDefault(ship =>
-            ship.ShipType.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase)
+            ship.IsMiningCapable
             && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
             && !shipsWithGoals.Contains(ship.Symbol));
+    }
+
+    private async Task TryPurchaseForUnassignedOpportunitiesAsync(
+        IReadOnlyList<MiningOpportunity> unassignedOpportunities,
+        IReadOnlyList<ShipModel> currentFleet,
+        IReadOnlySet<string> shipsWithGoals,
+        IReadOnlySet<(string SellWaypointSymbol, string TradeSymbol)> activeTargets,
+        Dictionary<string, MiningAutomationOpportunityState> queueItems,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (unassignedOpportunities.Count == 0)
+        {
+            return;
+        }
+
+        var updatedFleet = currentFleet.ToList();
+        var updatedShipsWithGoals = shipsWithGoals.ToHashSet();
+        var updatedActiveTargets = activeTargets.ToHashSet();
+
+        foreach (var opportunity in unassignedOpportunities)
+        {
+            var idleDrone = await TryPurchaseMiningDroneAsync(opportunity.SellWaypointSymbol, updatedFleet, cancellationToken);
+            if (idleDrone is null)
+            {
+                logger.LogInformation(
+                    "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint}; no idle drone and purchase unavailable.",
+                    opportunity.TradeSymbol,
+                    opportunity.SellWaypointSymbol);
+
+                var queueKey = FormatOpportunityKey(
+                    opportunity.SellWaypointSymbol.ToUpperInvariant(),
+                    opportunity.TradeSymbol.ToUpperInvariant());
+
+                if (queueItems.TryGetValue(queueKey, out var pendingItem))
+                {
+                    queueItems[queueKey] = pendingItem with
+                    {
+                        Status = MarketAutomationOpportunityStatus.Pending,
+                        LastObservedAt = now,
+                        StopReason = "No idle mining drone available and purchase unavailable.",
+                    };
+                }
+
+                continue;
+            }
+
+            updatedFleet.Add(idleDrone);
+
+            var sourceWaypoint = await ResolveSourceAsteroidAsync(
+                idleDrone,
+                opportunity.TradeSymbol,
+                opportunity.SellWaypointSymbol,
+                cancellationToken);
+            if (string.IsNullOrWhiteSpace(sourceWaypoint))
+            {
+                logger.LogInformation(
+                    "Mining automation: deferred goal for {TradeSymbol} at {SellWaypoint} after purchase; no asteroid source found.",
+                    opportunity.TradeSymbol,
+                    opportunity.SellWaypointSymbol);
+
+                var queueKey = FormatOpportunityKey(
+                    opportunity.SellWaypointSymbol.ToUpperInvariant(),
+                    opportunity.TradeSymbol.ToUpperInvariant());
+
+                if (queueItems.TryGetValue(queueKey, out var deferredItem))
+                {
+                    queueItems[queueKey] = deferredItem with
+                    {
+                        Status = MarketAutomationOpportunityStatus.Pending,
+                        LastObservedAt = now,
+                        StopReason = "No asteroid source waypoint found.",
+                    };
+                }
+
+                continue;
+            }
+
+            var goal = new MineAndSellGoal
+            {
+                TradeSymbol = opportunity.TradeSymbol,
+                SourceWaypointSymbol = sourceWaypoint,
+                SellWaypointSymbol = opportunity.SellWaypointSymbol,
+            };
+
+            await goals.SetActiveGoalAsync(idleDrone.Symbol, goal, cancellationToken);
+            updatedShipsWithGoals.Add(idleDrone.Symbol);
+
+            var targetKey = CreateOpportunityKey(
+                opportunity.SellWaypointSymbol,
+                opportunity.TradeSymbol);
+            updatedActiveTargets.Add(targetKey);
+
+            var queueKeyFinal = FormatOpportunityKey(targetKey.SellWaypointSymbol, targetKey.TradeSymbol);
+
+            if (queueItems.TryGetValue(queueKeyFinal, out var assignedItem))
+            {
+                queueItems[queueKeyFinal] = assignedItem with
+                {
+                    Status = MarketAutomationOpportunityStatus.Assigned,
+                    AssignedShipSymbol = idleDrone.Symbol,
+                    LastObservedAt = now,
+                    StopReason = null,
+                };
+            }
+
+            logger.LogInformation(
+                "Mining automation: purchased drone and assigned {ShipSymbol} to mine {TradeSymbol} from {SourceWaypoint} and sell at {SellWaypoint}.",
+                idleDrone.Symbol,
+                opportunity.TradeSymbol,
+                sourceWaypoint,
+                opportunity.SellWaypointSymbol);
+        }
     }
 
     private async Task<HashSet<string>> LoadShipsWithActiveGoalAsync(
@@ -251,7 +394,9 @@ public sealed class MiningAutomationService(
         foreach (var ship in fleet)
         {
             var activeGoal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
-            if (activeGoal is not null)
+            if (activeGoal is not null
+                && activeGoal.Status is not Domain.Enums.GoalStatus.Completed
+                and not Domain.Enums.GoalStatus.Blocked)
             {
                 withGoals.Add(ship.Symbol);
             }
@@ -266,8 +411,7 @@ public sealed class MiningAutomationService(
         CancellationToken cancellationToken)
     {
         var maxMiningDrones = await GetMaxMiningDronesAsync(cancellationToken);
-        var miningDroneCount = currentFleet.Count(ship =>
-            ship.ShipType.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase));
+        var miningDroneCount = currentFleet.Count(ship => ship.IsMiningCapable);
 
         if (miningDroneCount >= maxMiningDrones)
         {
@@ -299,6 +443,14 @@ public sealed class MiningAutomationService(
         var estimatedCost = shipyard.Ships
             .FirstOrDefault(s => s.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase))
             ?.PurchasePrice ?? 0;
+
+        if (estimatedCost <= 0)
+        {
+            logger.LogInformation(
+                "Mining automation: mining drone purchase skipped at {Shipyard} — purchase price unknown (shipyard not yet visited with a ship).",
+                shipyard.WaypointSymbol);
+            return null;
+        }
 
         var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
         if (!decision.CanAfford)
@@ -345,7 +497,7 @@ public sealed class MiningAutomationService(
         {
             foreach (var good in snapshot.TradeGoods)
             {
-                if (!good.Type.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
+                if (!IsDemandType(good.Type)
                     || !good.Supply.Equals(ScarceSupply, StringComparison.OrdinalIgnoreCase)
                     || !IsMineralSymbol(good.Symbol))
                 {
@@ -390,27 +542,68 @@ public sealed class MiningAutomationService(
         return DefaultMaxMiningDrones;
     }
 
-    private async Task<string> ResolveSourceAsteroidAsync(ShipModel ship, string tradeSymbol, CancellationToken cancellationToken)
+    private async Task<string> ResolveSourceAsteroidAsync(
+        ShipModel ship,
+        string tradeSymbol,
+        string sellWaypointSymbol,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(ship.SystemSymbol))
+        if (string.IsNullOrWhiteSpace(ship.SystemSymbol) || string.IsNullOrWhiteSpace(tradeSymbol))
         {
             return string.Empty;
         }
 
         var systemWaypoints = await waypoints.GetBySystemAsync(ship.SystemSymbol, cancellationToken);
-        var currentWaypoint = string.IsNullOrWhiteSpace(ship.WaypointSymbol)
-            ? null
-            : systemWaypoints.FirstOrDefault(w => w.Symbol.Equals(ship.WaypointSymbol, StringComparison.OrdinalIgnoreCase));
+        var originWaypoint = ResolveSourceSelectionOrigin(systemWaypoints, ship.WaypointSymbol, sellWaypointSymbol);
+        var resourceCandidates = systemWaypoints
+            .Where(IsAsteroidWaypoint)
+            .Where(waypoint => MatchesTradeSymbolAvailability(waypoint, tradeSymbol))
+            .OrderBy(waypoint => DistanceFrom(originWaypoint, waypoint))
+            .ThenBy(waypoint => waypoint.LastObservedAt)
+            .ToList();
 
-        var asteroid = systemWaypoints
-            .Where(w => w.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(w => DistanceFrom(currentWaypoint, w))
-            .ThenByDescending(w => ScoreTradeSymbolMatch(w, tradeSymbol))
-            .ThenBy(w => w.LastObservedAt)
-            .FirstOrDefault();
+        if (resourceCandidates.Count > 0)
+        {
+            return resourceCandidates[0].Symbol;
+        }
 
-        return asteroid?.Symbol ?? string.Empty;
+        var fallbackCandidates = systemWaypoints
+            .Where(IsAsteroidWaypoint)
+            .OrderBy(waypoint => DistanceFrom(originWaypoint, waypoint))
+            .ThenBy(waypoint => waypoint.LastObservedAt)
+            .ToList();
+
+        return fallbackCandidates.Count > 0
+            ? fallbackCandidates[0].Symbol
+            : string.Empty;
     }
+
+    private static WaypointCacheModel? ResolveSourceSelectionOrigin(
+        IReadOnlyList<WaypointCacheModel> systemWaypoints,
+        string? shipWaypointSymbol,
+        string sellWaypointSymbol)
+    {
+        if (!string.IsNullOrWhiteSpace(sellWaypointSymbol))
+        {
+            var sellWaypoint = systemWaypoints.FirstOrDefault(waypoint =>
+                waypoint.Symbol.Equals(sellWaypointSymbol, StringComparison.OrdinalIgnoreCase));
+            if (sellWaypoint is not null)
+            {
+                return sellWaypoint;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(shipWaypointSymbol))
+        {
+            return systemWaypoints.FirstOrDefault(waypoint =>
+                waypoint.Symbol.Equals(shipWaypointSymbol, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return null;
+    }
+
+    private static bool IsAsteroidWaypoint(WaypointCacheModel waypoint) =>
+        waypoint.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase);
 
     private static decimal DistanceFrom(WaypointCacheModel? from, WaypointCacheModel to)
     {
@@ -424,24 +617,63 @@ public sealed class MiningAutomationService(
         return (decimal)Math.Sqrt((dx * dx) + (dy * dy));
     }
 
-    private static int ScoreTradeSymbolMatch(WaypointCacheModel waypoint, string tradeSymbol)
+    private static bool MatchesTradeSymbolAvailability(WaypointCacheModel waypoint, string tradeSymbol)
     {
-        var haystack = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}";
-        var score = 0;
+        var upperTradeSymbol = tradeSymbol.ToUpperInvariant();
+        var haystack = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}"
+            .ToUpperInvariant();
 
-        if (haystack.Contains(tradeSymbol, StringComparison.OrdinalIgnoreCase))
+        if (haystack.Contains(upperTradeSymbol, StringComparison.OrdinalIgnoreCase))
         {
-            score += 20;
+            return true;
         }
 
-        if (tradeSymbol.EndsWith("_ORE", StringComparison.OrdinalIgnoreCase)
-            && haystack.Contains("ORE", StringComparison.OrdinalIgnoreCase))
+        foreach (var depositTrait in GetDepositTraitHintsForTradeSymbol(upperTradeSymbol))
         {
-            score += 10;
+            if (haystack.Contains(depositTrait, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
         }
 
-        return score;
+        return false;
     }
+
+    private static IReadOnlyList<string> GetDepositTraitHintsForTradeSymbol(string tradeSymbol)
+    {
+        return tradeSymbol switch
+        {
+            "IRON_ORE" or "COPPER_ORE" or "ALUMINUM_ORE" =>
+            ["COMMON_METAL_DEPOSITS", "METAL_ORES"],
+
+            "SILVER_ORE" or "GOLD_ORE" or "PLATINUM_ORE" or "MERITIUM_ORE" =>
+            ["PRECIOUS_METAL_DEPOSITS", "RARE_METAL_DEPOSITS", "METAL_ORES"],
+
+            "DIAMONDS" =>
+            ["PRECIOUS_STONE_DEPOSITS"],
+
+            "SILICON_CRYSTALS" or "QUARTZ_SAND" =>
+            ["SILICON_CRYSTALS", "QUARTZ_SAND", "MINERAL_DEPOSITS"],
+
+            "AMMONIA_ICE" or "ICE_WATER" =>
+            ["ICE_CRYSTALS", "AMMONIA_ICE"],
+
+            _ when tradeSymbol.EndsWith("_ORE", StringComparison.OrdinalIgnoreCase) =>
+            ["METAL_ORES", "MINERAL_DEPOSITS"],
+
+            _ when tradeSymbol.EndsWith("_CRYSTALS", StringComparison.OrdinalIgnoreCase) =>
+            ["CRYSTALS", "MINERAL_DEPOSITS"],
+
+            _ when tradeSymbol.EndsWith("_ICE", StringComparison.OrdinalIgnoreCase) =>
+            ["ICE_CRYSTALS", "MINERAL_DEPOSITS"],
+
+            _ => [tradeSymbol],
+        };
+    }
+
+    private static bool IsDemandType(string tradeType) =>
+        tradeType.Equals(ImportType, StringComparison.OrdinalIgnoreCase)
+        || tradeType.Equals(ExchangeType, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsMineralSymbol(string symbol)
     {

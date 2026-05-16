@@ -319,6 +319,24 @@ export interface WaypointDto {
   lastObservedAt: string
 }
 
+export interface WaypointDetailDto {
+  symbol: string
+  systemSymbol: string
+  type: string
+  x: number
+  y: number
+  hasMarket: boolean
+  hasShipyard: boolean
+  isUnderConstruction: boolean
+  lastObservedAt: string
+  parentSymbol: string | null
+  traitsJson: string | null
+  modifiersJson: string | null
+  orbitalsJson: string | null
+  chartJson: string | null
+  extractableResources: string[]
+}
+
 export interface SystemMapResponseDto {
   system: SystemDto
   waypoints: WaypointDto[]

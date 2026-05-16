@@ -118,6 +118,7 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
             result.Ship.Symbol,
             MapNav(result.Ship.Nav!),
             MapFuel(result.Ship.Fuel!),
+            MapFleetCargo(result.Ship.Cargo),
             result.Transaction.Price);
     }
 
@@ -402,6 +403,11 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
 
     private static CargoModel MapCargo(ShipCargo cargo) =>
         new(cargo.Units, cargo.Capacity, cargo.Inventory?.Select(MapCargoItem).ToList());
+
+    private static CargoModel MapFleetCargo(FleetShipCargo? cargo) =>
+        cargo is null
+            ? new CargoModel(0, 0, [])
+            : new CargoModel(cargo.Units, cargo.Capacity, cargo.Inventory?.Select(MapCargoItem).ToList());
 
     private static CargoItemModel MapCargoItem(CargoItem item) =>
         new(item.Symbol, item.Units);

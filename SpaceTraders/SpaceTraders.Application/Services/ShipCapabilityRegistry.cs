@@ -12,12 +12,5 @@ namespace SpaceTraders.Application.Services;
 public sealed class ShipCapabilityRegistry : IShipCapabilityRegistry
 {
     /// <inheritdoc/>
-    public ShipCapabilities GetCapabilities(ShipModel ship) =>
-        new(
-            CanMine: ship.HasMiningEquipment,
-            CanSiphon: ship.HasGasSiphonEquipment,
-            CanSurvey: ship.HasSurveyEquipment,
-            HasCargo: ship.CargoCapacity > 0,
-            HasFuelTank: ship.FuelCapacity > 0,
-            CanRepair: !string.IsNullOrWhiteSpace(ship.FrameJson));
+    public ShipCapabilities GetCapabilities(ShipModel ship) => ShipCapabilities.From(ship);
 }

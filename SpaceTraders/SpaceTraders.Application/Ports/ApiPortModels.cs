@@ -1,3 +1,4 @@
+using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Domain.Enums;
 
 namespace SpaceTraders.Application.Ports;
@@ -216,15 +217,18 @@ public sealed record PurchaseShipActionResult
 
     public required FuelModel ShipFuel { get; init; }
 
+    public required CargoModel ShipCargo { get; init; }
+
     public required long Cost { get; init; }
 
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
-    public PurchaseShipActionResult(AgentModel Agent, string ShipSymbol, NavModel ShipNav, FuelModel ShipFuel, long Cost)
+    public PurchaseShipActionResult(AgentModel Agent, string ShipSymbol, NavModel ShipNav, FuelModel ShipFuel, CargoModel ShipCargo, long Cost)
     {
         this.Agent = Agent;
         this.ShipSymbol = ShipSymbol;
         this.ShipNav = ShipNav;
         this.ShipFuel = ShipFuel;
+        this.ShipCargo = ShipCargo;
         this.Cost = Cost;
     }
 }
@@ -508,6 +512,22 @@ public sealed record ShipModel
 
     public bool HasSensorArray =>
         (MountSymbols ?? []).Any(m => m.Contains("SENSOR_ARRAY", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Ship can perform mining operations: has mining equipment, cargo capacity, and fuel.
+    /// </summary>
+    public bool IsMiningCapable => ShipCapabilities.From(this).IsMiningCapable;
+
+    /// <summary>
+    /// Ship can perform trade runs: has cargo capacity and fuel.
+    /// Dedicated haulers are preferred, but mining or siphon ships can trade when idle.
+    /// </summary>
+    public bool IsTradingCapable => ShipCapabilities.From(this).IsTradingCapable;
+
+    /// <summary>
+    /// Ship is a probe/scout: has fuel but no cargo hold and no mining or siphon equipment.
+    /// </summary>
+    public bool IsProbeCapable => ShipCapabilities.From(this).IsProbeCapable;
 
     public decimal AverageIntegrity
     {
@@ -1043,3 +1063,4 @@ public sealed record SupplyConstructionActionResult
         this.Cargo = Cargo;
     }
 }
+

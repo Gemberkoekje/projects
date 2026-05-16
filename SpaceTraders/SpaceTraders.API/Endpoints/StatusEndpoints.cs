@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Queries;
@@ -34,6 +35,14 @@ public static class StatusEndpoints
         {
             var result = await bus.InvokeAsync<Application.DTOs.ShipDiagnosticsDto?>(new GetShipDiagnosticsQuery(symbol), ct);
             return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
+        group.MapGet("/waypoints/{symbol}", async (string symbol, IWaypointRepository waypointRepo, CancellationToken ct) =>
+        {
+            var waypoint = await waypointRepo.FindAsync(symbol, ct);
+            return waypoint is null
+                ? Results.NotFound()
+                : Results.Ok(FleetStatusMapper.ToDto(waypoint));
         });
 
         group.MapGet("/contracts", async (IMessageBus bus, CancellationToken ct) =>

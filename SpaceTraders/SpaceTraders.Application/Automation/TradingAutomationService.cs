@@ -205,11 +205,15 @@ public sealed class TradingAutomationService(
         IReadOnlyList<ShipModel> shipsInFleet,
         IReadOnlySet<string> shipsWithGoals)
     {
-        return shipsInFleet.FirstOrDefault(ship =>
-            ship.ShipType.Equals(TradeShipType, StringComparison.OrdinalIgnoreCase)
-            && ship.CargoCapacity > 0
-            && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
-            && !shipsWithGoals.Contains(ship.Symbol));
+        return shipsInFleet
+            .Where(ship =>
+                ship.IsTradingCapable
+                && ship.LocalStatus != Domain.Enums.ShipLocalStatus.InTransit
+                && ship.FuelCurrent > 0
+                && ship.CargoCapacity > ship.CargoCurrent
+                && !shipsWithGoals.Contains(ship.Symbol))
+            .OrderBy(ship => ship.IsMiningCapable ? 1 : 0)
+            .FirstOrDefault();
     }
 
     private async Task<HashSet<string>> LoadShipsWithActiveGoalAsync(
@@ -220,7 +224,9 @@ public sealed class TradingAutomationService(
         foreach (var ship in fleet)
         {
             var activeGoal = await goals.GetActiveGoalAsync(ship.Symbol, cancellationToken);
-            if (activeGoal is not null)
+            if (activeGoal is not null
+                && activeGoal.Status is not Domain.Enums.GoalStatus.Completed
+                and not Domain.Enums.GoalStatus.Blocked)
             {
                 withGoals.Add(ship.Symbol);
             }
@@ -255,6 +261,14 @@ public sealed class TradingAutomationService(
             .FirstOrDefault(s => s.Type.Equals(TradeShipType, StringComparison.OrdinalIgnoreCase))
             ?.PurchasePrice ?? 0;
 
+        if (estimatedCost <= 0)
+        {
+            logger.LogInformation(
+                "Trading automation: trade ship purchase skipped at {Shipyard} — purchase price unknown (shipyard not yet visited with a ship).",
+                shipyard.WaypointSymbol);
+            return null;
+        }
+
         var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
         if (!decision.CanAfford)
         {
@@ -278,8 +292,10 @@ public sealed class TradingAutomationService(
             purchased.ShipFuel.Capacity,
             purchased.ShipNav.ArrivesAt,
             purchased.ShipNav.DestWaypointSymbol,
+            purchased.ShipCargo.Units,
+            purchased.ShipCargo.Capacity,
             ShipType: TradeShipType,
-            CargoCapacity: 40);
+            CargoInventory: purchased.ShipCargo.Inventory);
 
         await ships.UpsertAsync(ship, cancellationToken);
 

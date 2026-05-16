@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/Solution Items/" />
+  <Project Path="SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTradersV3.Infrastructure.SpaceTradersAPI.csproj" />
+  <Project Path="SpaceTradersV3.Application/SpaceTradersV3.Application.csproj" Id="f9f6443b-6679-457c-8abf-daf18a6bc3a6" />
+</Solution>

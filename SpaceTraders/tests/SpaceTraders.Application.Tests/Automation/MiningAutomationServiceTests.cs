@@ -45,18 +45,18 @@ public sealed class MiningAutomationServiceTests
             waypoint,
             "X1-AB",
             goods,
-            imports: goods.Where(g => g.Type == "IMPORT").Select(g => g.Symbol).ToList(),
-            exports: [],
-            exchange: []);
+            imports: goods.Where(g => g.Type.Equals("IMPORT", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList(),
+            exports: goods.Where(g => g.Type.Equals("EXPORT", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList(),
+            exchange: goods.Where(g => g.Type.Equals("EXCHANGE", StringComparison.OrdinalIgnoreCase)).Select(g => g.Symbol).ToList());
 
     private static TradeGoodSnapshot Good(string symbol, string type = "IMPORT", string supply = "SCARCE") =>
         new(symbol, type, 0, 0, 10, supply);
 
     private static ShipModel Miner(string symbol, string waypoint = "X1-AB-HQ", string status = "DOCKED") =>
-        new(symbol, "X1-AB", waypoint, status, "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE");
+        new(symbol, "X1-AB", waypoint, status, "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 40, MountSymbols: ["MOUNT_MINING_LASER_I"]);
 
-    private static WaypointCacheModel Waypoint(string symbol, string type = "ASTEROID") =>
-        new(symbol, "X1-AB", type, 0, 0, false, false, Now);
+    private static WaypointCacheModel Waypoint(string symbol, string type = "ASTEROID", int x = 0, int y = 0, string? traitsJson = null) =>
+        new(symbol, "X1-AB", type, x, y, false, false, Now, TraitsJson: traitsJson);
 
     private static ShipyardWaypointDto MiningShipyard(string waypoint = "X1-AB-SY1", long price = 23_000) =>
         new()
@@ -92,8 +92,10 @@ public sealed class MiningAutomationServiceTests
 
         _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
             .Returns([
-                Waypoint("X1-AB-AST", "ASTEROID"),
-                Waypoint("X1-AB-MKT1", "ORBITAL_STATION"),
+                Waypoint("X1-AB-AST", "ASTEROID", x: 40, y: 40),
+                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
+                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 2, y: 1, traitsJson: "COMMON_METAL_DEPOSITS"),
+                Waypoint("X1-AB-AST-FAR", "ASTEROID", x: 20, y: 18, traitsJson: "COMMON_METAL_DEPOSITS"),
             ]);
 
         await CreateService().EnsureBootstrappedAsync();
@@ -103,7 +105,41 @@ public sealed class MiningAutomationServiceTests
             Arg.Is<MineAndSellGoal>(g =>
                 g.TradeSymbol == "IRON_ORE"
                 && g.SellWaypointSymbol == "X1-AB-MKT1"
-                && g.SourceWaypointSymbol == "X1-AB-AST"),
+                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_AssignsIdleMiner_ForScarceMineralExchange()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                Snapshot("X1-AB-MKT1", Good("IRON_ORE", type: "EXCHANGE")),
+            ]);
+
+        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
+            .Returns((ShipGoal?)null);
+
+        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                Waypoint("X1-AB-AST", "ASTEROID", x: 20, y: 20),
+                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
+                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 1, y: 1, traitsJson: "COMMON_METAL_DEPOSITS"),
+            ]);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<MineAndSellGoal>(g =>
+                g.TradeSymbol == "IRON_ORE"
+                && g.SellWaypointSymbol == "X1-AB-MKT1"
+                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
             Arg.Any<CancellationToken>());
     }
 
@@ -131,6 +167,7 @@ public sealed class MiningAutomationServiceTests
                 "MINER-NEW",
                 new NavModel("DOCKED", "X1-AB", "X1-AB-SY1", "CRUISE", null, null),
                 new FuelModel(10, 40),
+                new CargoModel(0, 20, []),
                 23_000));
 
         _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
@@ -142,6 +179,35 @@ public sealed class MiningAutomationServiceTests
         await _goals.Received(1).SetActiveGoalAsync(
             "MINER-NEW",
             Arg.Any<MineAndSellGoal>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_DoesNotPurchase_WhenIdleMinerExists()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                Snapshot("X1-AB-MKT1", Good("COPPER_ORE")),
+            ]);
+
+        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
+            .Returns((ShipGoal?)null);
+
+        _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
+        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([Waypoint("X1-AB-AST", "ASTEROID")]);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<MineAndSellGoal>(g => g.TradeSymbol == "COPPER_ORE"),
             Arg.Any<CancellationToken>());
     }
 
@@ -235,6 +301,46 @@ public sealed class MiningAutomationServiceTests
             Arg.Is<MineAndSellGoal>(g =>
                 g.TradeSymbol == "COPPER_ORE"
                 && g.SellWaypointSymbol == "X1-AB-MKT2"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_AssignsMiner_WhenExistingGoalIsCompleted()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
+            ]);
+
+        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
+            .Returns(new MineAndSellGoal
+            {
+                Status = SpaceTraders.Domain.Enums.GoalStatus.Completed,
+                TradeSymbol = "COPPER_ORE",
+                SourceWaypointSymbol = "X1-AB-AST",
+                SellWaypointSymbol = "X1-AB-MKT2",
+            });
+
+        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
+                Waypoint("X1-AB-AST", "ASTEROID", x: 30, y: 30),
+                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 2, y: 2, traitsJson: "COMMON_METAL_DEPOSITS"),
+            ]);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<MineAndSellGoal>(g =>
+                g.TradeSymbol == "IRON_ORE"
+                && g.SellWaypointSymbol == "X1-AB-MKT1"
+                && g.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
             Arg.Any<CancellationToken>());
     }
 
@@ -466,16 +572,49 @@ public sealed class MiningAutomationServiceTests
     }
 
     [Fact]
-    public async Task EnsureBootstrappedAsync_DoesNothing_WhenMarketIsNotScarceImportMineral()
+    public async Task EnsureBootstrappedAsync_DoesNothing_WhenMarketIsNotScarceDemandMineral()
     {
         _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
             .Returns([
                 Snapshot("X1-AB-MKT1", Good("FOOD", type: "IMPORT", supply: "MODERATE")),
-                Snapshot("X1-AB-MKT2", Good("IRON_ORE", type: "EXPORT", supply: "SCARCE")),
+                Snapshot("X1-AB-MKT2", Good("IRON_ORE", type: "EXCHANGE", supply: "MODERATE")),
+                Snapshot("X1-AB-MKT3", Good("IRON_ORE", type: "EXPORT", supply: "SCARCE")),
             ]);
 
         await CreateService().EnsureBootstrappedAsync();
 
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EnsureBootstrappedAsync_UsesClosestAsteroidToSellWaypoint_WhenMultipleMatchingSourcesExist()
+    {
+        _markets.GetAllSnapshotsAsync(Arg.Any<CancellationToken>())
+            .Returns([
+                Snapshot("X1-AB-MKT1", Good("IRON_ORE")),
+            ]);
+
+        _goals.GetActiveMineAndSellTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string SellWaypointSymbol, string TradeSymbol)>());
+
+        var miner = Miner("MINER-1", waypoint: "X1-AB-HQ");
+        _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([miner]);
+        _goals.GetActiveGoalAsync(miner.Symbol, Arg.Any<CancellationToken>())
+            .Returns((ShipGoal?)null);
+
+        _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
+            .Returns([
+                Waypoint("X1-AB-HQ", "ORBITAL_STATION", x: 100, y: 100),
+                Waypoint("X1-AB-MKT1", "ORBITAL_STATION", x: 0, y: 0),
+                Waypoint("X1-AB-AST-CLOSE", "ASTEROID", x: 3, y: 3, traitsJson: "COMMON_METAL_DEPOSITS"),
+                Waypoint("X1-AB-AST-FAR", "ASTEROID", x: 40, y: 40, traitsJson: "COMMON_METAL_DEPOSITS"),
+            ]);
+
+        await CreateService().EnsureBootstrappedAsync();
+
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<MineAndSellGoal>(goal => goal.SourceWaypointSymbol == "X1-AB-AST-CLOSE"),
+            Arg.Any<CancellationToken>());
     }
 }

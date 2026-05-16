@@ -120,3 +120,39 @@ public sealed record ShipActivityDto
 
     public required string ActivityDescription { get; init; }
 }
+
+/// <summary>
+/// JSON-serializable DTO for detailed waypoint information.
+/// </summary>
+public sealed record WaypointDetailDto
+{
+    public required string Symbol { get; init; }
+
+    public required string SystemSymbol { get; init; }
+
+    public required string Type { get; init; }
+
+    public required int X { get; init; }
+
+    public required int Y { get; init; }
+
+    public required bool HasMarket { get; init; }
+
+    public required bool HasShipyard { get; init; }
+
+    public required bool IsUnderConstruction { get; init; }
+
+    public required DateTimeOffset LastObservedAt { get; init; }
+
+    public string? ParentSymbol { get; init; }
+
+    public string? TraitsJson { get; init; }
+
+    public string? ModifiersJson { get; init; }
+
+    public string? OrbitalsJson { get; init; }
+
+    public string? ChartJson { get; init; }
+
+    public required IReadOnlyList<string> ExtractableResources { get; init; }
+}

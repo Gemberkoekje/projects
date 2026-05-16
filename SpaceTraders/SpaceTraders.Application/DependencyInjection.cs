@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IShipGoalExecutor, DeployProbeGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, MineAndSellGoalExecutor>();
         services.AddScoped<IShipGoalExecutor, TradeBetweenMarketsGoalExecutor>();
+        services.AddScoped<IShipGoalExecutor, SurveyWaypointGoalExecutor>();
         services.AddScoped<IShipGoalExecutorService, ShipGoalExecutorService>();
 
         services.AddWolverine(ExtensionDiscovery.ManualOnly, opts =>

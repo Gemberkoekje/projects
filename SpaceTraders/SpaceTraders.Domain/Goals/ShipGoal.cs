@@ -24,6 +24,7 @@ namespace SpaceTraders.Domain.Goals;
 [JsonDerivedType(typeof(DeployProbeGoal), "DeployProbe")]
 [JsonDerivedType(typeof(MineAndSellGoal), "MineAndSell")]
 [JsonDerivedType(typeof(TradeBetweenMarketsGoal), "TradeBetweenMarkets")]
+[JsonDerivedType(typeof(SurveyWaypointGoal), "SurveyWaypoint")]
 public abstract record ShipGoal
 {
     /// <summary>Correlation token that links orchestrator assignment, goal execution, and completion events.</summary>
@@ -173,4 +174,18 @@ public sealed record TradeBetweenMarketsGoal : ShipGoal
 
     [JsonIgnore]
     public override ShipGoalKind Kind => ShipGoalKind.TradeBetweenMarkets;
+}
+
+/// <summary>
+/// The ship surveys <see cref="TargetWaypointSymbol"/> for <see cref="TargetDepositSymbol"/> deposits.
+/// Survey results are stored for later use by mining operations to maximize extraction efficiency.
+/// </summary>
+public sealed record SurveyWaypointGoal : ShipGoal
+{
+    public required string TargetWaypointSymbol { get; init; }
+
+    public required string TargetDepositSymbol { get; init; }
+
+    [JsonIgnore]
+    public override ShipGoalKind Kind => ShipGoalKind.SurveyWaypoint;
 }

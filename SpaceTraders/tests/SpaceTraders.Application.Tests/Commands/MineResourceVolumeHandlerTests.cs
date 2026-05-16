@@ -104,4 +104,45 @@ public sealed class MineResourceVolumeHandlerTests
         await navigate.Received(1).ExecuteAsync("SHIP-2", "X1-AB-AST", Guid.Empty, Arg.Any<CancellationToken>());
         await port.DidNotReceiveWithAnyArgs().ExtractResourcesAsync(default!, default);
     }
+
+    [Fact]
+    public async Task ExecuteAsync_IgnoresEmptySurveySentinel_WhenExtracting()
+    {
+        var port = Substitute.For<ISpaceTradersPort>();
+        var ships = Substitute.For<IShipRepository>();
+        var waypoints = Substitute.For<IWaypointRepository>();
+        var refuel = Substitute.For<IRefuelSubCommand>();
+        var orbit = Substitute.For<IOrbitSubCommand>();
+        var navigate = Substitute.For<INavigateSubCommand>();
+        var bus = Substitute.For<Wolverine.IMessageBus>();
+
+        var ship = new ShipModel(
+            Symbol: "SHIP-3",
+            SystemSymbol: "X1-AB",
+            WaypointSymbol: "X1-AB-AST",
+            Status: "IN_ORBIT",
+            FlightMode: "CRUISE",
+            FuelCurrent: 100,
+            FuelCapacity: 100,
+            CargoCurrent: 0,
+            CargoCapacity: 40);
+
+        ships.FindAsync("SHIP-3", Arg.Any<CancellationToken>()).Returns(ship);
+
+        var sentinelSurvey = new SurveyModel(string.Empty, "X1-AB-AST", [], DateTimeOffset.MinValue, string.Empty);
+        port.ExtractResourcesAsync("SHIP-3", Arg.Any<CancellationToken>())
+            .Returns(new ExtractionActionResult(
+                YieldSymbol: "IRON_ORE",
+                YieldUnits: 1,
+                Cargo: new CargoModel(1, 40),
+                CooldownSeconds: 1));
+
+        var sut = new MineResourceVolumeHandler(port, ships, waypoints, refuel, orbit, navigate, bus, NullLogger<MineResourceVolumeHandler>.Instance);
+
+        var result = await sut.ExecuteAsync(new MineResourceVolumeCommand("SHIP-3", "IRON_ORE", "X1-AB-AST", 15, sentinelSurvey), CancellationToken.None);
+
+        result.Accepted.Should().BeTrue();
+        await port.Received(1).ExtractResourcesAsync("SHIP-3", Arg.Any<CancellationToken>());
+        await port.DidNotReceiveWithAnyArgs().ExtractWithSurveyAsync(default!, default!, default);
+    }
 }

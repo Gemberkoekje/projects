@@ -15,4 +15,5 @@ public enum ShipGoalKind
     DeployProbe = 10,
     MineAndSell = 11,
     TradeBetweenMarkets = 12,
+    SurveyWaypoint = 13,
 }

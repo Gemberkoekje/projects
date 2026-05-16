@@ -201,4 +201,23 @@ public sealed class ShipGoalRepositoryTests : IntegrationTestBase
 
         result.Should().Contain(("X1-TEST-BUY", "X1-TEST-SELL", "FOOD"));
     }
+
+    [SkippableFact]
+    public async Task GetActiveSurveyTargetsAsync_ReturnsNormalizedSurveyTargets()
+    {
+        await SeedShipAsync("SHIP-G10");
+        var setRepo = new ShipGoalRepository(Db);
+        await setRepo.SetActiveGoalAsync("SHIP-G10", new SurveyWaypointGoal
+        {
+            GoalId = Guid.NewGuid(),
+            TargetWaypointSymbol = "x1-test-a1",
+            TargetDepositSymbol = "iron_ore",
+        });
+
+        await using var fresh = CreateFreshContext();
+        var getRepo = new ShipGoalRepository(fresh);
+        var result = await getRepo.GetActiveSurveyTargetsAsync();
+
+        result.Should().Contain(("X1-TEST-A1", "IRON_ORE"));
+    }
 }

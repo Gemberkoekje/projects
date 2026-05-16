@@ -16,17 +16,28 @@ public sealed class MineAndSellGoalExecutorTests
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
+    private readonly ISurveyRepository _surveys = Substitute.For<ISurveyRepository>();
     private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
     private readonly IMessageBus _bus = Substitute.For<IMessageBus>();
 
-    private MineAndSellGoalExecutor CreateExecutor() =>
-        new(
+    private MineAndSellGoalExecutor CreateExecutor()
+    {
+        // Default survey repository to return null (no survey available)
+        _surveys.GetBestActiveSurveyAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((SurveyModel)null);
+
+        _goals.GetActiveSurveyTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>());
+
+        return new(
             _ships,
             _goals,
             _agents,
+            _surveys,
             _port,
             _bus,
             NullLogger<MineAndSellGoalExecutor>.Instance);
+    }
 
     private static MineAndSellGoal Goal() =>
         new()
@@ -85,6 +96,72 @@ public sealed class MineAndSellGoalExecutorTests
         result.Outcome.Should().Be(GoalExecutionOutcome.WaitingForArrival);
         await _bus.Received(1).InvokeAsync(
             Arg.Is<NavigateToWaypointCommand>(c => c.ShipSymbol == "MINER-1" && c.DestinationWaypoint == "X1-AB-MKT"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_AssignsSurveyGoal_WhenNoUsableSurveyAndSurveyShipIsAvailable()
+    {
+        var ship = new ShipModel(
+            "MINER-1",
+            "X1-AB",
+            "X1-AB-AST",
+            "IN_ORBIT",
+            "CRUISE",
+            10,
+            40,
+            CargoCurrent: 0,
+            CargoCapacity: 40,
+            CargoInventory: [],
+            MountSymbols: ["MOUNT_SURVEYOR_I"]);
+
+        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipCommandResult("MINER-1", Domain.Enums.ShipLocalStatus.InOrbit, "X1-AB", "X1-AB-AST"));
+
+        var result = await CreateExecutor().ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _goals.Received(1).SetActiveGoalAsync(
+            "MINER-1",
+            Arg.Is<SurveyWaypointGoal>(goal =>
+                goal.TargetWaypointSymbol == "X1-AB-AST"
+                && goal.TargetDepositSymbol == "IRON_ORE"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteStepAsync_DoesNotAssignSurveyGoal_WhenTargetAlreadyActive()
+    {
+        var ship = new ShipModel(
+            "MINER-1",
+            "X1-AB",
+            "X1-AB-AST",
+            "IN_ORBIT",
+            "CRUISE",
+            10,
+            40,
+            CargoCurrent: 0,
+            CargoCapacity: 40,
+            CargoInventory: [],
+            MountSymbols: ["MOUNT_SURVEYOR_I"]);
+
+        var executor = CreateExecutor();
+
+        _goals.GetActiveSurveyTargetsAsync(Arg.Any<CancellationToken>())
+            .Returns(new HashSet<(string TargetWaypointSymbol, string TargetDepositSymbol)>
+            {
+                ("X1-AB-AST", "IRON_ORE")
+            });
+
+        _bus.InvokeAsync<ShipCommandResult>(Arg.Any<MineResourceVolumeCommand>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipCommandResult("MINER-1", Domain.Enums.ShipLocalStatus.InOrbit, "X1-AB", "X1-AB-AST"));
+
+        var result = await executor.ExecuteStepAsync(ship, Goal(), new ShipGoalContext(), CancellationToken.None);
+
+        result.Outcome.Should().Be(GoalExecutionOutcome.Progressing);
+        await _goals.DidNotReceive().SetActiveGoalAsync(
+            Arg.Any<string>(),
+            Arg.Is<SurveyWaypointGoal>(_ => true),
             Arg.Any<CancellationToken>());
     }
 

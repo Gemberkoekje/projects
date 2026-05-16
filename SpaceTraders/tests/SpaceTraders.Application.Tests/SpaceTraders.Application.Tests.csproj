@@ -34,4 +34,8 @@
     <ProjectReference Include="../../SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Future\EventHandlers\" />
+  </ItemGroup>
+
 </Project>
