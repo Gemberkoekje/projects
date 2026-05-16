@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SpaceTraders.API.Dtos;
 using SpaceTraders.Application.Automation;
@@ -12,6 +13,13 @@ namespace SpaceTraders.API.Endpoints;
 /// <summary>Maps status API endpoints.</summary>
 public static class StatusEndpoints
 {
+    private sealed record JumpGateConnectionSnapshot
+    {
+        public string WaypointSymbol { get; init; } = string.Empty;
+
+        public IReadOnlyList<string> ConnectedSystems { get; init; } = [];
+    }
+
     /// <summary>Registers the status route group on the given <paramref name="app"/>.</summary>
     /// <param name="app">The endpoint route builder to register the status routes on.</param>
     /// <returns>The updated endpoint route builder.</returns>
@@ -207,6 +215,114 @@ public static class StatusEndpoints
             CancellationToken ct = default) =>
         {
             var result = await repo.GetTopRoutesAsync(limit, ct);
+            return Results.Ok(result);
+        });
+
+        var universe = app.MapGroup("/universe");
+
+        universe.MapGet("/systems", async (
+            ISystemRepository systems,
+            IWaypointRepository waypoints,
+            CancellationToken ct) =>
+        {
+            var allSystems = await systems.GetAllAsync(ct);
+            var visitedSet = (await waypoints.GetVisitedSystemSymbolsAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var result = allSystems
+                .Select(system => new
+                {
+                    system.Symbol,
+                    system.SectorSymbol,
+                    system.Type,
+                    system.X,
+                    system.Y,
+                    system.LastObservedAt,
+                    IsVisited = visitedSet.Contains(system.Symbol),
+                })
+                .ToList();
+
+            return Results.Ok(result);
+        });
+
+        universe.MapGet("/jump-connections", async (ISettingsRepository settings, CancellationToken ct) =>
+        {
+            var rows = await settings.GetByKeyPrefixAsync("Navigation.JumpGateConnections.", ct);
+            var connections = new List<(string FromSystem, string ToSystem)>();
+
+            foreach (var (_, json) in rows)
+            {
+                JumpGateConnectionSnapshot snapshot;
+                try
+                {
+                    snapshot = JsonSerializer.Deserialize<JumpGateConnectionSnapshot>(json) ?? new JumpGateConnectionSnapshot();
+                }
+                catch (JsonException)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(snapshot.WaypointSymbol))
+                {
+                    continue;
+                }
+
+                var segments = snapshot.WaypointSymbol.Split('-', StringSplitOptions.RemoveEmptyEntries);
+                var fromSystem = segments.Length >= 2
+                    ? $"{segments[0]}-{segments[1]}"
+                    : snapshot.WaypointSymbol;
+
+                foreach (var toSystem in snapshot.ConnectedSystems)
+                {
+                    if (string.IsNullOrWhiteSpace(toSystem))
+                    {
+                        continue;
+                    }
+
+                    connections.Add((fromSystem, toSystem));
+                }
+            }
+
+            var result = connections
+                .Distinct()
+                .Select(connection => new
+                {
+                    connection.FromSystem,
+                    connection.ToSystem,
+                })
+                .ToList();
+
+            return Results.Ok(result);
+        });
+
+        var runs = app.MapGroup("/runs");
+
+        runs.MapGet("/{runId:guid}/kpis", async (
+            Guid runId,
+            IRunRepository runRepository,
+            CancellationToken ct) =>
+        {
+            var run = await runRepository.GetByIdAsync(runId, ct);
+            return run is null ? Results.NotFound() : Results.Ok(new Application.DTOs.RunKpisDto());
+        });
+
+        var finance = app.MapGroup("/finance");
+
+        finance.MapGet("/trade-routes", async (ITradeOpportunityRepository repo, CancellationToken ct) =>
+        {
+            var routes = await repo.GetTopRoutesAsync(10, ct);
+            var result = routes
+                .Select(route => new
+                {
+                    Good = route.TradeSymbol,
+                    route.BuyWaypoint,
+                    route.SellWaypoint,
+                    TotalUnits = route.EffectiveTradeVolume,
+                    TotalProfit = route.ProfitPerUnit * route.EffectiveTradeVolume,
+                    RunDurationHours = 0d,
+                    ProfitPerHour = 0d,
+                })
+                .ToList();
+
             return Results.Ok(result);
         });
 

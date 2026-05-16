@@ -31,7 +31,7 @@ public sealed class GameLoopServiceTests
             .AddSingleton(Substitute.For<IShipGoalExecutorService>())
             .BuildServiceProvider();
 
-        serviceScopeFactory.CreateAsyncScope().Returns(_ => serviceProvider.CreateAsyncScope());
+        serviceScopeFactory.CreateScope().Returns(_ => serviceProvider.CreateScope());
 
         var assignments = serviceProvider.GetRequiredService<IShipAssignmentRepository>();
         assignments.GetAllActiveAsync(Arg.Any<CancellationToken>()).Returns([]);
