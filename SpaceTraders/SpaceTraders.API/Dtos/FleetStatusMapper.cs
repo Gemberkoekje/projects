@@ -70,11 +70,17 @@ public static class FleetStatusMapper
         new()
         {
             Id = entry.Id,
+            GoalId = entry.GoalId,
             GoalKind = entry.GoalKind,
             Outcome = entry.Outcome,
             Reason = entry.Reason,
             StartedAt = entry.StartedAt,
             EndedAt = entry.EndedAt,
+            CreditsEarned = entry.CreditsEarned,
+            CreditsSpent = entry.CreditsSpent,
+            NetCredits = entry.NetCredits,
+            LedgerEntryCount = entry.LedgerEntryCount,
+            DurationSeconds = entry.DurationSeconds,
         };
 
     /// <summary>Maps a cached waypoint model to a detailed waypoint response DTO.</summary>

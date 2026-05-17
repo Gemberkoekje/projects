@@ -1,16 +1,20 @@
 using System.Net;
+using System.Threading;
 using System.Threading.RateLimiting;
 
 namespace SpaceTraders.Infrastructure.SpaceTradersAPI.RateLimiting;
 
 public sealed class RateLimitingHandler : DelegatingHandler
 {
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(25);
+    private static int s_pendingPriorityRequests;
+
     // PerSecond: 2 tokens, refills 2/s
     private readonly RateLimiter _perSecondLimiter = new TokenBucketRateLimiter(new TokenBucketRateLimiterOptions
     {
         TokenLimit = 2,
         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = int.MaxValue,
+        QueueLimit = 0,
         ReplenishmentPeriod = TimeSpan.FromSeconds(1),
         TokensPerPeriod = 2,
         AutoReplenishment = true,
@@ -21,7 +25,7 @@ public sealed class RateLimitingHandler : DelegatingHandler
     {
         TokenLimit = 30,
         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = int.MaxValue,
+        QueueLimit = 0,
         ReplenishmentPeriod = TimeSpan.FromSeconds(60),
         TokensPerPeriod = 30,
         AutoReplenishment = true,
@@ -36,17 +40,65 @@ public sealed class RateLimitingHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        using var perSecondLease = await _perSecondLimiter.AcquireAsync(permitCount: 1, cancellationToken);
-        using var burstLease = await _burstLimiter.AcquireAsync(permitCount: 1, cancellationToken);
+        var isPriorityRequest = !HttpMethod.Get.Equals(request.Method);
 
-        if (!perSecondLease.IsAcquired || !burstLease.IsAcquired)
+        if (isPriorityRequest)
         {
-            _status.ThrottledCount++;
-            throw new InvalidOperationException("Rate limit token could not be acquired.");
+            Interlocked.Increment(ref s_pendingPriorityRequests);
         }
 
-        _status.TotalRequests++;
-        return await base.SendAsync(request, cancellationToken);
+        try
+        {
+            var (perSecondLease, burstLease) = await AcquireRateLimitAsync(isPriorityRequest, cancellationToken);
+            using (perSecondLease)
+            using (burstLease)
+            {
+                _status.TotalRequests++;
+                return await base.SendAsync(request, cancellationToken);
+            }
+        }
+        finally
+        {
+            if (isPriorityRequest)
+            {
+                Interlocked.Decrement(ref s_pendingPriorityRequests);
+            }
+        }
+    }
+
+    private async Task<(RateLimitLease PerSecondLease, RateLimitLease BurstLease)> AcquireRateLimitAsync(bool isPriorityRequest, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!isPriorityRequest && Volatile.Read(ref s_pendingPriorityRequests) > 0)
+            {
+                await Task.Delay(RetryDelay, cancellationToken);
+                continue;
+            }
+
+            var perSecondLease = _perSecondLimiter.AttemptAcquire(permitCount: 1);
+            if (!perSecondLease.IsAcquired)
+            {
+                perSecondLease.Dispose();
+                _status.ThrottledCount++;
+                await Task.Delay(RetryDelay, cancellationToken);
+                continue;
+            }
+
+            var burstLease = _burstLimiter.AttemptAcquire(permitCount: 1);
+            if (!burstLease.IsAcquired)
+            {
+                burstLease.Dispose();
+                perSecondLease.Dispose();
+                _status.ThrottledCount++;
+                await Task.Delay(RetryDelay, cancellationToken);
+                continue;
+            }
+
+            return (perSecondLease, burstLease);
+        }
     }
 
     protected override void Dispose(bool disposing)

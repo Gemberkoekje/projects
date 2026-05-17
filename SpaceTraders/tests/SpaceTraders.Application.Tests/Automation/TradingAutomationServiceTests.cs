@@ -7,6 +7,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -17,10 +18,8 @@ public sealed class TradingAutomationServiceTests
     private readonly IShipRepository _ships = Substitute.For<IShipRepository>();
     private readonly IShipGoalRepository _goals = Substitute.For<IShipGoalRepository>();
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
-    private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
-    private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
-    private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
+    private readonly IShipPurchaseService _shipPurchases = Substitute.For<IShipPurchaseService>();
 
     private TradingAutomationService CreateService() =>
         new(
@@ -28,10 +27,8 @@ public sealed class TradingAutomationServiceTests
             _ships,
             _goals,
             _shipyards,
-            _agents,
             _plans,
-            _port,
-            _budget,
+            _shipPurchases,
             NullLogger<TradingAutomationService>.Instance);
 
     private static MarketSnapshot Snapshot(string waypoint, params TradeGoodSnapshot[] goods) =>
@@ -112,21 +109,19 @@ public sealed class TradingAutomationServiceTests
 
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _budget.EvaluateAsync(60_000, Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(true, 200_000, 100_000, 100_000));
-
-        _port.PurchaseShipAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new PurchaseShipActionResult(
-                new AgentModel("AGENT", null, "X1-AB-HQ", 140_000, "FACTION", 2),
-                "TRADER-NEW",
-                new NavModel("DOCKED", "X1-AB", "X1-AB-SY1", "CRUISE", null, null),
-                new FuelModel(20, 40),
-                new CargoModel(0, 40, []),
-                60_000));
+        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(TradeShipyard());
+        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = true,
+                PurchasedShip = new ShipModel("TRADER-NEW", "X1-AB", "X1-AB-SY1", "DOCKED", "CRUISE", 20, 40, ShipType: "SHIP_LIGHT_HAULER", CargoCapacity: 40),
+                EstimatedCost = 60_000,
+                ActualCost = 60_000,
+            });
 
         await CreateService().EnsureBootstrappedAsync();
 
-        await _port.Received(1).PurchaseShipAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>());
+        await _shipPurchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>());
         await _ships.Received(1).UpsertAsync(
             Arg.Is<ShipModel>(ship =>
                 ship.Symbol == "TRADER-NEW"
@@ -154,12 +149,17 @@ public sealed class TradingAutomationServiceTests
 
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _budget.EvaluateAsync(60_000, Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(false, 50_000, 100_000, -50_000, "reserve"));
+        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = false,
+                FailureReason = "reserve",
+                EstimatedCost = 60_000,
+            });
 
         await CreateService().EnsureBootstrappedAsync();
 
-        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
     }
 
@@ -178,8 +178,14 @@ public sealed class TradingAutomationServiceTests
 
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _budget.EvaluateAsync(60_000, Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(false, 50_000, 100_000, -50_000, "reserve"));
+        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(TradeShipyard());
+        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = false,
+                FailureReason = "reserve",
+                EstimatedCost = 60_000,
+            });
 
         await CreateService().EnsureBootstrappedAsync();
 
@@ -365,7 +371,7 @@ public sealed class TradingAutomationServiceTests
                 && g.BuyWaypointSymbol == "X1-AB-MKT-BUY"
                 && g.SellWaypointSymbol == "X1-AB-MKT-SELL"),
             Arg.Any<CancellationToken>());
-        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -113,12 +113,21 @@ public sealed class SpaceTradersPortAdapter(ISpaceTradersApiClient client) : ISp
     public async Task<PurchaseShipActionResult> PurchaseShipAsync(string shipType, string waypointSymbol, CancellationToken cancellationToken = default)
     {
         var result = await client.PurchaseShipAsync(shipType, waypointSymbol, cancellationToken);
+
+        var purchasedShip = await client.GetMyShipAsync(result.Ship.Symbol, cancellationToken);
+        var cargo = purchasedShip.Cargo is not null
+            ? new CargoModel(
+                purchasedShip.Cargo.Units,
+                purchasedShip.Cargo.Capacity,
+                purchasedShip.Cargo.Inventory?.Select(MapCargoItem).ToList())
+            : MapFleetCargo(result.Ship.Cargo);
+
         return new PurchaseShipActionResult(
             MapAgent(result.Agent),
             result.Ship.Symbol,
             MapNav(result.Ship.Nav!),
             MapFuel(result.Ship.Fuel!),
-            MapFleetCargo(result.Ship.Cargo),
+            cargo,
             result.Transaction.Price);
     }
 

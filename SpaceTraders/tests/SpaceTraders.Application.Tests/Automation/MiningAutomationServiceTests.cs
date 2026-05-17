@@ -7,6 +7,7 @@ using SpaceTraders.Application.Interfaces;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -23,8 +24,7 @@ public sealed class MiningAutomationServiceTests
     private readonly IAgentRepository _agents = Substitute.For<IAgentRepository>();
     private readonly ISettingsRepository _settings = Substitute.For<ISettingsRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
-    private readonly ISpaceTradersPort _port = Substitute.For<ISpaceTradersPort>();
-    private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
+    private readonly IShipPurchaseService _shipPurchases = Substitute.For<IShipPurchaseService>();
 
     private MiningAutomationService CreateService() =>
         new(
@@ -33,11 +33,9 @@ public sealed class MiningAutomationServiceTests
             _goals,
             _waypoints,
             _shipyards,
-            _agents,
             _settings,
             _plans,
-            _port,
-            _budget,
+            _shipPurchases,
             NullLogger<MiningAutomationService>.Instance);
 
     private static MarketSnapshot Snapshot(string waypoint, params TradeGoodSnapshot[] goods) =>
@@ -158,24 +156,22 @@ public sealed class MiningAutomationServiceTests
         _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
 
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([MiningShipyard()]);
-        _budget.EvaluateAsync(23_000, Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(true, 200_000, 100_000, 100_000));
-
-        _port.PurchaseShipAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new PurchaseShipActionResult(
-                new AgentModel("AGENT", null, "X1-AB-HQ", 177_000, "FACTION", 2),
-                "MINER-NEW",
-                new NavModel("DOCKED", "X1-AB", "X1-AB-SY1", "CRUISE", null, null),
-                new FuelModel(10, 40),
-                new CargoModel(0, 20, []),
-                23_000));
+        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(MiningShipyard());
+        _shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = true,
+                PurchasedShip = new ShipModel("MINER-NEW", "X1-AB", "X1-AB-SY1", "DOCKED", "CRUISE", 10, 40, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 20),
+                EstimatedCost = 23_000,
+                ActualCost = 23_000,
+            });
 
         _waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>())
             .Returns([Waypoint("X1-AB-AST", "ASTEROID")]);
 
         await CreateService().EnsureBootstrappedAsync();
 
-        await _port.Received(1).PurchaseShipAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>());
+        await _shipPurchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync(
             "MINER-NEW",
             Arg.Any<MineAndSellGoal>(),
@@ -204,7 +200,7 @@ public sealed class MiningAutomationServiceTests
 
         await CreateService().EnsureBootstrappedAsync();
 
-        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync(
             "MINER-1",
             Arg.Is<MineAndSellGoal>(g => g.TradeSymbol == "COPPER_ORE"),
@@ -235,7 +231,7 @@ public sealed class MiningAutomationServiceTests
 
         await CreateService().EnsureBootstrappedAsync();
 
-        await _port.DidNotReceive().PurchaseShipAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _shipPurchases.DidNotReceive().TryPurchaseAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _goals.DidNotReceive().SetActiveGoalAsync(Arg.Any<string>(), Arg.Any<ShipGoal>(), Arg.Any<CancellationToken>());
     }
 
@@ -358,8 +354,13 @@ public sealed class MiningAutomationServiceTests
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
         _settings.GetAsync<int>("Mining.MaxDrones", Arg.Any<CancellationToken>()).Returns(20);
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([MiningShipyard()]);
-        _budget.EvaluateAsync(23_000, Arg.Any<CancellationToken>())
-            .Returns(new BudgetDecision(false, 10_000, 100_000, -90_000, "reserve"));
+        _shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SY1", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = false,
+                FailureReason = "reserve",
+                EstimatedCost = 23_000,
+            });
 
         await CreateService().EnsureBootstrappedAsync();
 

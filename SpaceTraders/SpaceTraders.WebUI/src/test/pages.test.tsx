@@ -537,45 +537,86 @@ describe('GoalChainPanel', () => {
 import AssignmentsPanel from '../Future/components/AssignmentsPanel'
 
 describe('AssignmentsPanel', () => {
-  it('renders assignment rows with ship links', async () => {
-    mockApiFetch.mockResolvedValue([
-      {
-        shipSymbol: 'X1-AB-1',
-        goalKind: 'Mine',
-        goalDescription: 'Mine BAUXITE',
-        sourceWaypoint: 'X1-AB-A3',
-        destinationWaypoint: null,
-        fleetGoalId: 'g1',
-        fleetGoalDescription: 'Supply Jump Gate',
-        assignedAt: null,
-      },
-    ])
+  it('renders assignment rows with recent goal history details', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/fleet/assignments') {
+        return Promise.resolve([
+          {
+            shipSymbol: 'X1-AB-1',
+            goalKind: 'Mine',
+            goalDescription: 'Mine BAUXITE',
+            sourceWaypoint: 'X1-AB-A3',
+            destinationWaypoint: null,
+            fleetGoalId: 'g1',
+            fleetGoalDescription: 'Supply Jump Gate',
+            assignedAt: '2025-01-01T10:00:00Z',
+          },
+        ])
+      }
+
+      if (path === '/fleet/activity/X1-AB-1/history?limit=3') {
+        return Promise.resolve([
+          {
+            id: 'h1',
+            goalId: 'g-history-1',
+            goalKind: 'MineResource',
+            outcome: 'Completed',
+            reason: null,
+            startedAt: '2025-01-01T08:00:00Z',
+            endedAt: '2025-01-01T08:20:00Z',
+            creditsEarned: 600,
+            creditsSpent: 120,
+            netCredits: 480,
+            ledgerEntryCount: 2,
+            durationSeconds: 1200,
+          },
+        ])
+      }
+
+      return Promise.resolve([])
+    })
+
     render(
       <Wrapper>
         <AssignmentsPanel />
       </Wrapper>,
     )
+
     await waitFor(() =>
       expect(screen.getByRole('link', { name: 'X1-AB-1' })).toBeInTheDocument(),
     )
     expect(screen.getByText('Mine BAUXITE')).toBeInTheDocument()
-    expect(screen.getByText('X1-AB-A3')).toBeInTheDocument()
+    expect(screen.getByText('From: X1-AB-A3')).toBeInTheDocument()
     expect(screen.getByText('Supply Jump Gate')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('MineResource')).toBeInTheDocument())
+    expect(screen.getByText('Profit +480 cr')).toBeInTheDocument()
+    expect(screen.getByText(/Earned \+600 cr · Spent 120 cr · 2 ledger entries/)).toBeInTheDocument()
   })
 
-  it('shows empty message when no assignments match the filter', async () => {
-    mockApiFetch.mockResolvedValue([
-      {
-        shipSymbol: 'X1-AB-1',
-        goalKind: 'Mine',
-        goalDescription: 'Mine BAUXITE',
-        sourceWaypoint: null,
-        destinationWaypoint: null,
-        fleetGoalId: null,
-        fleetGoalDescription: null,
-        assignedAt: null,
-      },
-    ])
+  it('shows empty history state when assignments have no recent completed goals', async () => {
+    mockApiFetch.mockImplementation((path: string) => {
+      if (path === '/fleet/assignments') {
+        return Promise.resolve([
+          {
+            shipSymbol: 'X1-AB-1',
+            goalKind: 'Mine',
+            goalDescription: 'Mine BAUXITE',
+            sourceWaypoint: null,
+            destinationWaypoint: null,
+            fleetGoalId: null,
+            fleetGoalDescription: null,
+            assignedAt: null,
+          },
+        ])
+      }
+
+      if (path === '/fleet/activity/X1-AB-1/history?limit=3') {
+        return Promise.resolve([])
+      }
+
+      return Promise.resolve([])
+    })
+
     const { container } = render(
       <Wrapper>
         <AssignmentsPanel />
@@ -585,10 +626,11 @@ describe('AssignmentsPanel', () => {
       expect(screen.getByRole('link', { name: 'X1-AB-1' })).toBeInTheDocument(),
     )
 
-    // Change goal-kind filter to something that doesn't match
+    await waitFor(() =>
+      expect(screen.getByText('No recent completed goals yet.')).toBeInTheDocument(),
+    )
+
     const select = container.querySelector('select[aria-label="Filter by goal kind"]') as HTMLSelectElement
-    // The only option is Mine, so we go via direct value manipulation instead of user events
-    // Just verify the filter select is present and contains the goal kind
     expect(select).toBeTruthy()
   })
 })

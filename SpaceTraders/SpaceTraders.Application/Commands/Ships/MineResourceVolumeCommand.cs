@@ -162,6 +162,23 @@ public sealed class MineResourceVolumeHandler(
                 Accepted: true);
         }
 
+        var waypoint = await waypoints.FindAsync(command.SourceWaypoint, cancellationToken);
+        if (waypoint is not null && !IsValidExtractionWaypoint(waypoint.Type))
+        {
+            await bus.PublishMismatchAndTickAsync(
+                command.ShipSymbol,
+                nameof(MineResourceVolumeCommand),
+                "ASTEROID_FIELD or ENGINEERED_ASTEROID",
+                waypoint.Type,
+                $"Waypoint {command.SourceWaypoint} is type {waypoint.Type} which does not support resource extraction.");
+
+            return ShipCommandResult.Rejected(
+                ship.Symbol,
+                ship.LocalStatus,
+                ship.SystemSymbol ?? string.Empty,
+                ship.WaypointSymbol ?? string.Empty);
+        }
+
         var extractResult = IsUsableSurvey(command.Survey)
             ? await port.ExtractWithSurveyAsync(ship.Symbol, command.Survey, cancellationToken)
             : await port.ExtractResourcesAsync(ship.Symbol, cancellationToken);
@@ -251,4 +268,8 @@ public sealed class MineResourceVolumeHandler(
             && !string.IsNullOrWhiteSpace(survey.WaypointSymbol)
             && !string.IsNullOrWhiteSpace(survey.Size)
             && survey.Expiration > TimeProvider.System.GetUtcNow();
+
+    private static bool IsValidExtractionWaypoint(string waypointType)
+        => waypointType.Equals("ASTEROID_FIELD", StringComparison.OrdinalIgnoreCase)
+            || waypointType.Equals("ENGINEERED_ASTEROID", StringComparison.OrdinalIgnoreCase);
 }

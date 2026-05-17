@@ -12,6 +12,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 
 namespace SpaceTraders.Integration.Test;
 
@@ -140,15 +141,25 @@ public sealed class ContractPlanSnapshotIntegrationTests
                 TraitsJson: "MARKETPLACE")
         ]);
 
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
+        shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-PT96-H53", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = true,
+                PurchasedShip = new ShipModel("SPECTER-DEBUG-3", "X1-PT96", "X1-PT96-H53", "DOCKED", "CRUISE", 100, 100, ShipType: "SHIP_MINING_DRONE", CargoCapacity: 40),
+                EstimatedCost = 64_200,
+                ActualCost = 64_200,
+            });
+
         var sut = new ContractPlanService(
             plans,
             contracts,
             ships,
             assignments,
-            agents,
             shipyards,
             waypoints,
             port,
+            shipPurchases,
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);

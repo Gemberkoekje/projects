@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using SpaceTraders.Domain.Events;
 using Wolverine;
@@ -27,71 +27,44 @@ public sealed record PurchaseShipCommand
 }
 
 public sealed class PurchaseShipHandler(
-    ISpaceTradersPort port,
-    IAgentRepository agents,
-    IShipRepository ships,
-    IShipyardRepository shipyards,
-    IBudgetPolicy budget,
+    IShipPurchaseService shipPurchases,
     IMessageBus bus,
     ILogger<PurchaseShipHandler> logger)
 {
+    public PurchaseShipHandler(
+        ISpaceTradersPort port,
+        IAgentRepository agents,
+        IShipRepository ships,
+        IShipyardRepository shipyards,
+        IBudgetPolicy budget,
+        IMessageBus bus,
+        ILogger<PurchaseShipHandler> logger)
+        : this(new ShipPurchaseService(port, agents, ships, shipyards, budget, Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance), bus, logger)
+    {
+    }
+
     public async Task Handle(PurchaseShipCommand command, CancellationToken cancellationToken)
     {
-        var cached = await shipyards.FindByWaypointAsync(command.ShipyardWaypoint, cancellationToken);
-        var estimatedCost = ResolveShipPurchasePrice(cached, command.ShipType);
-
-        var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
-        if (!decision.CanAfford)
+        var purchase = await shipPurchases.TryPurchaseAsync(command.ShipType, command.ShipyardWaypoint, cancellationToken);
+        if (!purchase.IsSuccess || purchase.PurchasedShip is null)
         {
             logger.LogInformation(
                 "PurchaseShipHandler: skipping {ShipType} at {Shipyard} — {Reason}",
                 command.ShipType,
                 command.ShipyardWaypoint,
-                decision.Reason);
+                purchase.FailureReason ?? "Purchase failed.");
             return;
         }
 
-        var result = await port.PurchaseShipAsync(command.ShipType, command.ShipyardWaypoint, cancellationToken);
-
-        await agents.UpsertAsync(result.Agent, cancellationToken);
-
-        var newShip = new ShipModel(
-            result.ShipSymbol,
-            result.ShipNav.SystemSymbol,
-            result.ShipNav.WaypointSymbol,
-            result.ShipNav.Status,
-            result.ShipNav.FlightMode,
-            result.ShipFuel.Current,
-            result.ShipFuel.Capacity,
-            result.ShipNav.ArrivesAt,
-            result.ShipNav.DestWaypointSymbol,
-            result.ShipCargo.Units,
-            result.ShipCargo.Capacity,
-            ShipType: command.ShipType,
-            CargoInventory: result.ShipCargo.Inventory);
-
-        await ships.UpsertAsync(newShip, cancellationToken);
-
         if (Enum.TryParse<ShipType>(command.ShipType, true, out var shipTypeEnum))
         {
-            await bus.PublishAsync(new NewShipPurchasedEvent(result.ShipSymbol, shipTypeEnum, result.Cost));
+            await bus.PublishAsync(new NewShipPurchasedEvent(purchase.PurchasedShip.Symbol, shipTypeEnum, purchase.ActualCost));
         }
 
         logger.LogInformation(
             "PurchaseShipHandler: purchased {Symbol} ({Type}) for {Cost} credits.",
-            result.ShipSymbol,
+            purchase.PurchasedShip.Symbol,
             command.ShipType,
-            result.Cost);
-    }
-
-    private static long ResolveShipPurchasePrice(ShipyardWaypointDto? dto, string shipType)
-    {
-        if (dto is null)
-        {
-            return 0;
-        }
-
-        var match = dto.Ships.FirstOrDefault(s => shipType.Equals(s.Type, StringComparison.OrdinalIgnoreCase));
-        return match?.PurchasePrice ?? 0;
+            purchase.ActualCost);
     }
 }

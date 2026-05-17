@@ -70,6 +70,8 @@ public sealed record ShipGoalHistoryDto
 {
     public required Guid Id { get; init; }
 
+    public required Guid GoalId { get; init; }
+
     public required string GoalKind { get; init; }
 
     /// <summary>'Completed' or 'Blocked'.</summary>
@@ -83,6 +85,21 @@ public sealed record ShipGoalHistoryDto
 
     /// <summary>ISO 8601 timestamp of when the goal ended.</summary>
     public required DateTimeOffset EndedAt { get; init; }
+
+    /// <summary>Total positive credits recorded while the goal was active.</summary>
+    public required long CreditsEarned { get; init; }
+
+    /// <summary>Total credits spent while the goal was active, expressed as a positive number.</summary>
+    public required long CreditsSpent { get; init; }
+
+    /// <summary>Net credit impact while the goal was active.</summary>
+    public required long NetCredits { get; init; }
+
+    /// <summary>Number of ledger entries recorded while the goal was active.</summary>
+    public required int LedgerEntryCount { get; init; }
+
+    /// <summary>Duration of the goal in whole seconds.</summary>
+    public required long DurationSeconds { get; init; }
 }
 
 /// <summary>

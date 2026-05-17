@@ -357,6 +357,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([Shipyard("X1-AB-SY1", probePrice: 23_000)]);
+        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(Shipyard("X1-AB-SY1", probePrice: 23_000));
         _budget.EvaluateAsync(23_000, Arg.Any<CancellationToken>())
             .Returns(new BudgetDecision(
                 CanAfford: true,
@@ -428,6 +429,7 @@ public sealed class ProbeDeploymentPlanServiceTests
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns([]);
         _shipyards.GetAllAsync(Arg.Any<CancellationToken>())
             .Returns([Shipyard("X1-AB-SY1", probePrice: 23_000)]);
+        _shipyards.FindByWaypointAsync("X1-AB-SY1", Arg.Any<CancellationToken>()).Returns(Shipyard("X1-AB-SY1", probePrice: 23_000));
 
         _budget.EvaluateAsync(23_000, Arg.Any<CancellationToken>())
             .Returns(new BudgetDecision(

@@ -6,6 +6,7 @@ using SpaceTraders.Application.Automation;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Application.Tests.Automation;
@@ -40,10 +41,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             Substitute.For<IShipAssignmentRepository>(),
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -109,10 +110,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             waypoints,
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -150,6 +151,7 @@ public sealed class ContractPlanServiceTests
         var assignments = Substitute.For<IShipAssignmentRepository>();
         var agents = Substitute.For<IAgentRepository>();
         var shipyards = Substitute.For<IShipyardRepository>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
 
         plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
         contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
@@ -188,15 +190,23 @@ public sealed class ContractPlanServiceTests
             Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 100_000 }],
         });
 
+        shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = false,
+                FailureReason = "Insufficient credits.",
+                EstimatedCost = 100_000,
+            });
+
         var sut = new ContractPlanService(
             plans,
             contracts,
             ships,
             assignments,
-            agents,
             shipyards,
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            shipPurchases,
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -238,10 +248,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             Substitute.For<IShipAssignmentRepository>(),
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -260,6 +270,7 @@ public sealed class ContractPlanServiceTests
         var shipyards = Substitute.For<IShipyardRepository>();
         var waypoints = Substitute.For<IWaypointRepository>();
         var port = Substitute.For<ISpaceTradersPort>();
+        var shipPurchases = Substitute.For<IShipPurchaseService>();
 
         plans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
         contracts.GetActiveAsync(Arg.Any<CancellationToken>()).Returns([
@@ -298,14 +309,25 @@ public sealed class ContractPlanServiceTests
             Ships = [new ShipyardShipDto { Type = "SHIP_MINING_DRONE", PurchasePrice = 100_000 }],
         });
 
-        port.PurchaseShipAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>())
-            .Returns(new PurchaseShipActionResult(
-                Agent: new AgentModel("AGENT", null, null, 400_000, "COSMIC", 2),
-                ShipSymbol: "SHIP-NEW-MINER",
-                ShipNav: new NavModel("DOCKED", "X1-AB", "X1-AB-SHIPYARD", "CRUISE", null, null),
-                ShipFuel: new FuelModel(80, 100),
-                ShipCargo: new CargoModel(0, 20, []),
-                Cost: 100_000));
+        shipPurchases.TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>())
+            .Returns(new ShipPurchaseResult
+            {
+                IsSuccess = true,
+                EstimatedCost = 100_000,
+                ActualCost = 100_000,
+                PurchasedShip = new ShipModel(
+                    Symbol: "SHIP-NEW-MINER",
+                    SystemSymbol: "X1-AB",
+                    WaypointSymbol: "X1-AB-SHIPYARD",
+                    Status: "DOCKED",
+                    FlightMode: "CRUISE",
+                    FuelCurrent: 80,
+                    FuelCapacity: 100,
+                    CargoCurrent: 0,
+                    CargoCapacity: 20,
+                    ShipType: "SHIP_MINING_DRONE",
+                    MountSymbols: ["MOUNT_MINING_LASER_I"]),
+            });
 
         waypoints.GetBySystemAsync("X1-AB", Arg.Any<CancellationToken>()).Returns([
             new WaypointCacheModel("X1-AB-AST", "X1-AB", "ASTEROID_FIELD", 0, 0, false, false, DateTimeOffset.UtcNow, TraitsJson: "IRON_ORE"),
@@ -317,15 +339,15 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            agents,
             shipyards,
             waypoints,
             port,
+            shipPurchases,
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
 
-        await port.Received(1).PurchaseShipAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>());
+        await shipPurchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", "X1-AB-SHIPYARD", Arg.Any<CancellationToken>());
         await plans.Received(1).UpsertAsync(
             Arg.Is<ContractMineralPlanState>(p =>
                 p.Status == ContractMineralPlanStatus.Active
@@ -411,10 +433,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             waypoints,
             port,
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -484,10 +506,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             waypoints,
             port,
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -597,10 +619,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             waypoints,
             port,
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -649,10 +671,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -723,10 +745,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -803,10 +825,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -876,10 +898,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.AdvanceAsync(CancellationToken.None);
@@ -928,10 +950,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             Substitute.For<IShipAssignmentRepository>(),
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -980,10 +1002,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(evnt, CancellationToken.None);
@@ -1022,10 +1044,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             Substitute.For<IShipAssignmentRepository>(),
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.Handle(new DeliverableObtainedEvent("SHIP-MINER-1", "IRON_ORE", 4), CancellationToken.None);
@@ -1090,10 +1112,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             ships,
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             waypoints,
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1150,10 +1172,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1229,10 +1251,10 @@ public sealed class ContractPlanServiceTests
             contracts,
             Substitute.For<IShipRepository>(),
             assignments,
-            Substitute.For<IAgentRepository>(),
             Substitute.For<IShipyardRepository>(),
             Substitute.For<IWaypointRepository>(),
             Substitute.For<ISpaceTradersPort>(),
+            Substitute.For<IShipPurchaseService>(),
             NullLogger<ContractPlanService>.Instance);
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
@@ -1249,3 +1271,5 @@ public sealed class ContractPlanServiceTests
             Arg.Any<CancellationToken>());
     }
 }
+
+

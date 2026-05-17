@@ -45,6 +45,7 @@ public static class DependencyInjection
                 sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>()));
 
         services.AddScoped<IWaypointVisitService, WaypointVisitService>();
+        services.AddScoped<IShipPurchaseService, ShipPurchaseService>();
         services.AddScoped<IScoutShipSelectionService, ScoutShipSelectionService>();
         services.AddScoped<IScoutMarketplaceDiscoveryService, ScoutMarketplaceDiscoveryService>();
         services.AddScoped<IMarketplaceRoutePlanner, MarketplaceRoutePlanner>();

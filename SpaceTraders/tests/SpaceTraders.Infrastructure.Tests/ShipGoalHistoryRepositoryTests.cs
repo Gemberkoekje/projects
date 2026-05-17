@@ -43,6 +43,11 @@ public sealed class ShipGoalHistoryRepositoryTests : IntegrationTestBase
         result.Reason.Should().BeNull();
         result.StartedAt.Should().BeCloseTo(entry.StartedAt, TimeSpan.FromMilliseconds(1));
         result.EndedAt.Should().BeCloseTo(entry.EndedAt, TimeSpan.FromMilliseconds(1));
+        result.CreditsEarned.Should().Be(0);
+        result.CreditsSpent.Should().Be(0);
+        result.NetCredits.Should().Be(0);
+        result.LedgerEntryCount.Should().Be(0);
+        result.DurationSeconds.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [SkippableFact]
@@ -164,5 +169,33 @@ public sealed class ShipGoalHistoryRepositoryTests : IntegrationTestBase
         resultsA[0].ShipSymbol.Should().Be("SHIP-H5A");
         resultsB.Should().HaveCount(1);
         resultsB[0].ShipSymbol.Should().Be("SHIP-H5B");
+    }
+
+    [SkippableFact]
+    public async Task GetShipSummaryAsync_ReturnsEarnedSpentAndNetCreditsForShipWindow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var ledger = new LedgerRepository(Db, new StubActiveRunIdProvider());
+
+        await ledger.AppendAsync("SHIP-L1", SpaceTraders.Domain.Enums.LedgerCategory.TradeSell, 500, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-L1", SpaceTraders.Domain.Enums.LedgerCategory.FuelPurchase, -120, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-L1", SpaceTraders.Domain.Enums.LedgerCategory.Repair, -30, cancellationToken: CancellationToken.None);
+        await ledger.AppendAsync("SHIP-L2", SpaceTraders.Domain.Enums.LedgerCategory.TradeSell, 999, cancellationToken: CancellationToken.None);
+
+        var summary = await ledger.GetShipSummaryAsync("SHIP-L1", now.AddMinutes(-1), DateTimeOffset.UtcNow.AddMinutes(1), CancellationToken.None);
+
+        summary.CreditsEarned.Should().Be(500);
+        summary.CreditsSpent.Should().Be(150);
+        summary.NetCredits.Should().Be(350);
+        summary.EntryCount.Should().Be(3);
+    }
+
+    private sealed class StubActiveRunIdProvider : SpaceTraders.Application.Interfaces.IActiveRunIdProvider
+    {
+        public Guid? ActiveRunId => null;
+
+        public void SetActiveRunId(Guid? runId)
+        {
+        }
     }
 }

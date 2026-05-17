@@ -120,6 +120,9 @@ public sealed class FleetStatusQueryServiceTests
         var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
         historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([]);
+        var ledger = Substitute.For<ILedgerRepository>();
+        ledger.GetShipSummaryAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipLedgerWindowSummaryDto(0, 0, 0, 0));
         return new(
             goalRepo ?? GoalRepo(),
             shipRepo ?? NoShips(),
@@ -128,7 +131,8 @@ public sealed class FleetStatusQueryServiceTests
             contractRepo ?? NoContracts(),
             constructionRepo ?? NoConstruction(),
             historyRepo,
-            contractPlanRepo ?? NoContractPlans());
+            contractPlanRepo ?? NoContractPlans(),
+            ledger);
     }
 
     // -----------------------------------------------------------------------
@@ -141,6 +145,56 @@ public sealed class FleetStatusQueryServiceTests
         var svc = Build(goalRepo: GoalRepo());
         var result = await svc.GetGoalChainsAsync();
         result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetShipGoalHistoryAsync_EnrichesEntriesWithLedgerSummary()
+    {
+        var shipRepo = Substitute.For<IShipRepository>();
+        shipRepo.FindAsync("SHIP-1", Arg.Any<CancellationToken>())
+            .Returns(new ShipModel("SHIP-1", "X1", "X1-A", "DOCKED", "CRUISE", 100, 100));
+
+        var startedAt = new DateTimeOffset(2024, 1, 1, 8, 0, 0, TimeSpan.Zero);
+        var endedAt = startedAt.AddMinutes(20);
+        var historyEntry = new ShipGoalHistoryEntry
+        {
+            Id = Guid.NewGuid(),
+            ShipSymbol = "SHIP-1",
+            GoalKind = "MineResource",
+            GoalId = Guid.NewGuid(),
+            Outcome = "Completed",
+            StartedAt = startedAt,
+            EndedAt = endedAt,
+        };
+
+        var historyRepo = Substitute.For<IShipGoalHistoryRepository>();
+        historyRepo.GetRecentAsync("SHIP-1", 5, Arg.Any<CancellationToken>())
+            .Returns([historyEntry]);
+
+        var ledger = Substitute.For<ILedgerRepository>();
+        ledger.GetShipSummaryAsync("SHIP-1", startedAt, endedAt, Arg.Any<CancellationToken>())
+            .Returns(new ShipLedgerWindowSummaryDto(900, 250, 650, 4));
+
+        var svc = new FleetStatusQueryService(
+            GoalRepo(),
+            shipRepo,
+            NoShipGoals(),
+            NoAssignments(),
+            NoContracts(),
+            NoConstruction(),
+            historyRepo,
+            NoContractPlans(),
+            ledger);
+
+        var result = await svc.GetShipGoalHistoryAsync("SHIP-1", 5);
+
+        result.Should().NotBeNull();
+        result.Should().ContainSingle();
+        result![0].CreditsEarned.Should().Be(900);
+        result[0].CreditsSpent.Should().Be(250);
+        result[0].NetCredits.Should().Be(650);
+        result[0].LedgerEntryCount.Should().Be(4);
+        result[0].DurationSeconds.Should().Be(1200);
     }
 
     [Fact]
@@ -446,6 +500,10 @@ public sealed class FleetStatusQueryServiceAssignmentTests
         historyRepo.GetRecentAsync(Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns([]);
 
+        var ledger = Substitute.For<ILedgerRepository>();
+        ledger.GetShipSummaryAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipLedgerWindowSummaryDto(0, 0, 0, 0));
+
         return new(
             goalRepo ?? GoalRepo(),
             shipRepo ?? ShipsWith(),
@@ -454,7 +512,8 @@ public sealed class FleetStatusQueryServiceAssignmentTests
             contractRepo ?? contracts,
             constructionRepo ?? constructions,
             historyRepo,
-            contractPlanRepo ?? NoContractPlans());
+            contractPlanRepo ?? NoContractPlans(),
+            ledger);
     }
 
     [Fact]
@@ -702,7 +761,11 @@ public sealed class FleetStatusQueryServiceActivityTests
         var contractPlans = Substitute.For<IContractMineralPlanRepository>();
         contractPlans.GetAsync(Arg.Any<CancellationToken>()).Returns((ContractMineralPlanState?)null);
 
-        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions, historyRepo, contractPlans);
+        var ledger = Substitute.For<ILedgerRepository>();
+        ledger.GetShipSummaryAsync(Arg.Any<string>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new ShipLedgerWindowSummaryDto(0, 0, 0, 0));
+
+        return new(goalRepo, shipRepo, shipGoalRepo ?? defaultGoalRepo, assignments, contracts, constructions, historyRepo, contractPlans, ledger);
     }
 
     [Fact]

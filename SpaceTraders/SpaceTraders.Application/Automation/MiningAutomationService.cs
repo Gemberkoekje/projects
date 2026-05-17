@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
@@ -23,11 +24,9 @@ public sealed class MiningAutomationService(
     IShipGoalRepository goals,
     IWaypointRepository waypoints,
     IShipyardRepository shipyards,
-    IAgentRepository agents,
     ISettingsRepository settings,
     IPlanRepository plans,
-    ISpaceTradersPort port,
-    IBudgetPolicy budget,
+    IShipPurchaseService shipPurchases,
     ILogger<MiningAutomationService> logger) : IMiningAutomationService
 {
     private const string ScarceSupply = "SCARCE";
@@ -440,52 +439,25 @@ public sealed class MiningAutomationService(
             return null;
         }
 
-        var estimatedCost = shipyard.Ships
-            .FirstOrDefault(s => s.Type.Equals(MiningDroneShipType, StringComparison.OrdinalIgnoreCase))
-            ?.PurchasePrice ?? 0;
-
-        if (estimatedCost <= 0)
-        {
-            logger.LogInformation(
-                "Mining automation: mining drone purchase skipped at {Shipyard} — purchase price unknown (shipyard not yet visited with a ship).",
-                shipyard.WaypointSymbol);
-            return null;
-        }
-
-        var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
-        if (!decision.CanAfford)
+        var purchased = await shipPurchases.TryPurchaseAsync(
+            MiningDroneShipType,
+            shipyard.WaypointSymbol,
+            cancellationToken);
+        if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
             logger.LogInformation(
                 "Mining automation: mining drone purchase denied at {Shipyard} — {Reason}.",
                 shipyard.WaypointSymbol,
-                decision.Reason);
+                purchased.FailureReason ?? "Purchase failed.");
             return null;
         }
 
-        var purchased = await port.PurchaseShipAsync(MiningDroneShipType, shipyard.WaypointSymbol, cancellationToken);
-        await agents.UpsertAsync(purchased.Agent, cancellationToken);
-
-        var ship = new ShipModel(
-            purchased.ShipSymbol,
-            purchased.ShipNav.SystemSymbol,
-            purchased.ShipNav.WaypointSymbol,
-            purchased.ShipNav.Status,
-            purchased.ShipNav.FlightMode,
-            purchased.ShipFuel.Current,
-            purchased.ShipFuel.Capacity,
-            purchased.ShipNav.ArrivesAt,
-            purchased.ShipNav.DestWaypointSymbol,
-            ShipType: MiningDroneShipType,
-            MountSymbols: ["MOUNT_MINING_LASER_I"]);
-
-        await ships.UpsertAsync(ship, cancellationToken);
-
         logger.LogInformation(
             "Mining automation: purchased mining drone {ShipSymbol} at {Shipyard}.",
-            purchased.ShipSymbol,
+            purchased.PurchasedShip.Symbol,
             shipyard.WaypointSymbol);
 
-        return ship;
+        return purchased.PurchasedShip;
     }
 
     private async Task<IReadOnlyList<MiningOpportunity>> GetScarceMineralBuyOpportunitiesAsync(CancellationToken cancellationToken)
@@ -603,7 +575,8 @@ public sealed class MiningAutomationService(
     }
 
     private static bool IsAsteroidWaypoint(WaypointCacheModel waypoint) =>
-        waypoint.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase);
+        waypoint.Type.Equals("ASTEROID_FIELD", StringComparison.OrdinalIgnoreCase) ||
+        waypoint.Type.Equals("ENGINEERED_ASTEROID", StringComparison.OrdinalIgnoreCase);
 
     private static decimal DistanceFrom(WaypointCacheModel? from, WaypointCacheModel to)
     {

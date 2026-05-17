@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Events;
 
 namespace SpaceTraders.Application.Automation;
@@ -19,12 +20,13 @@ public sealed class ContractPlanService(
     IContractRepository contracts,
     IShipRepository ships,
     IShipAssignmentRepository assignments,
-    IAgentRepository agents,
     IShipyardRepository shipyards,
     IWaypointRepository waypoints,
     ISpaceTradersPort port,
+    IShipPurchaseService shipPurchases,
     ILogger<ContractPlanService> logger) : IContractPlanService
 {
+
     private const string ContractAssignmentType = "Contract";
     private const string MinerShipType = "SHIP_MINING_DRONE";
 
@@ -471,13 +473,6 @@ public sealed class ContractPlanService(
 
     private async Task<ShipModel?> TryPurchaseMinerDroneAsync(CancellationToken cancellationToken)
     {
-        var agent = await agents.GetAsync(cancellationToken);
-        if (agent is null)
-        {
-            logger.LogDebug("Contract plan purchase fallback: no agent cached; cannot evaluate miner purchase.");
-            return null;
-        }
-
         var shipyardWaypoint = await shipyards.FindShipyardForTypeAsync(MinerShipType, cancellationToken);
         if (string.IsNullOrWhiteSpace(shipyardWaypoint))
         {
@@ -487,63 +482,23 @@ public sealed class ContractPlanService(
             return null;
         }
 
-        var shipyard = await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken);
-        if (shipyard is null)
-        {
-            logger.LogDebug(
-                "Contract plan purchase fallback: shipyard details not found for waypoint {Waypoint}.",
-                shipyardWaypoint);
-            return null;
-        }
-
-        var price = shipyard.Ships
-            .FirstOrDefault(s => s.Type.Equals(MinerShipType, StringComparison.OrdinalIgnoreCase))?
-            .PurchasePrice ?? 0;
-
-        if (price <= 0)
-        {
-            logger.LogDebug(
-                "Contract plan purchase fallback: shipyard {Waypoint} has no valid purchase price for {ShipType}.",
-                shipyardWaypoint,
-                MinerShipType);
-            return null;
-        }
-
-        if (agent.Credits < price)
+        var purchased = await shipPurchases.TryPurchaseAsync(MinerShipType, shipyardWaypoint, cancellationToken);
+        if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
             logger.LogInformation(
-                "Contract plan purchase fallback: insufficient credits for {ShipType}. Credits={Credits}, Price={Price}, Waypoint={Waypoint}.",
+                "Contract plan purchase fallback: purchase denied for {ShipType} at {Waypoint} - {Reason}",
                 MinerShipType,
-                agent.Credits,
-                price,
-                shipyardWaypoint);
+                shipyardWaypoint,
+                purchased.FailureReason ?? "Purchase failed.");
             return null;
         }
-
-        var purchased = await port.PurchaseShipAsync(MinerShipType, shipyardWaypoint, cancellationToken);
-        await agents.UpsertAsync(purchased.Agent, cancellationToken);
-
-        var ship = new ShipModel(
-            purchased.ShipSymbol,
-            purchased.ShipNav.SystemSymbol,
-            purchased.ShipNav.WaypointSymbol,
-            purchased.ShipNav.Status,
-            purchased.ShipNav.FlightMode,
-            purchased.ShipFuel.Current,
-            purchased.ShipFuel.Capacity,
-            purchased.ShipNav.ArrivesAt,
-            purchased.ShipNav.DestWaypointSymbol,
-            ShipType: MinerShipType,
-            MountSymbols: ["MOUNT_MINING_LASER_I"]);
-
-        await ships.UpsertAsync(ship, cancellationToken);
 
         logger.LogInformation(
             "Contract plan purchased new miner drone {ShipSymbol} at {ShipyardWaypoint} for contract work.",
-            purchased.ShipSymbol,
+            purchased.PurchasedShip.Symbol,
             shipyardWaypoint);
 
-        return ship;
+        return purchased.PurchasedShip;
     }
 
     public async Task<string> ResolveSourceAsteroidAsync(ShipModel ship, string tradeSymbol, CancellationToken cancellationToken)
@@ -789,4 +744,77 @@ public sealed class ContractPlanService(
         string DestinationSymbol,
         int UnitsRequired,
         int UnitsFulfilled);
+
+    private sealed class LegacyContractShipPurchaseService(
+        ISpaceTradersPort port,
+        IAgentRepository agents,
+        IShipRepository ships,
+        IShipyardRepository shipyards,
+        ILogger<LegacyContractShipPurchaseService> logger) : IShipPurchaseService
+    {
+        public async Task<ShipPurchaseResult> TryPurchaseAsync(
+            string shipType,
+            string shipyardWaypoint,
+            CancellationToken cancellationToken = default)
+        {
+            var shipyard = await shipyards.FindByWaypointAsync(shipyardWaypoint, cancellationToken);
+            var price = shipyard?.Ships
+                .FirstOrDefault(s => s.Type.Equals(shipType, StringComparison.OrdinalIgnoreCase))?
+                .PurchasePrice ?? 0;
+
+            if (price <= 0)
+            {
+                return new ShipPurchaseResult
+                {
+                    IsSuccess = false,
+                    FailureReason = "Purchase price unknown.",
+                    EstimatedCost = price,
+                };
+            }
+
+            var agent = await agents.GetAsync(cancellationToken);
+            if (agent is null || agent.Credits < price)
+            {
+                return new ShipPurchaseResult
+                {
+                    IsSuccess = false,
+                    FailureReason = "Insufficient credits.",
+                    EstimatedCost = price,
+                };
+            }
+
+            var purchased = await port.PurchaseShipAsync(shipType, shipyardWaypoint, cancellationToken);
+            await agents.UpsertAsync(purchased.Agent, cancellationToken);
+
+            var ship = new ShipModel(
+                purchased.ShipSymbol,
+                purchased.ShipNav.SystemSymbol,
+                purchased.ShipNav.WaypointSymbol,
+                purchased.ShipNav.Status,
+                purchased.ShipNav.FlightMode,
+                purchased.ShipFuel.Current,
+                purchased.ShipFuel.Capacity,
+                purchased.ShipNav.ArrivesAt,
+                purchased.ShipNav.DestWaypointSymbol,
+                purchased.ShipCargo.Units,
+                purchased.ShipCargo.Capacity,
+                ShipType: shipType,
+                CargoInventory: purchased.ShipCargo.Inventory);
+
+            await ships.UpsertAsync(ship, cancellationToken);
+
+            logger.LogInformation(
+                "LegacyContractShipPurchaseService: purchased {ShipSymbol} at {Shipyard}.",
+                ship.Symbol,
+                shipyardWaypoint);
+
+            return new ShipPurchaseResult
+            {
+                IsSuccess = true,
+                EstimatedCost = price,
+                ActualCost = purchased.Cost,
+                PurchasedShip = ship,
+            };
+        }
+    }
 }

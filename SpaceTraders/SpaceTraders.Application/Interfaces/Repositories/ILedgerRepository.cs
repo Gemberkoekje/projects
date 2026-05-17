@@ -32,6 +32,16 @@ public interface ILedgerRepository
     /// <summary>Returns total income and expense grouped by <see cref="LedgerCategory"/> for the given run (or all entries if <paramref name="runId"/> is null).</summary>
     Task<IReadOnlyList<LedgerSummaryDto>> GetSummaryAsync(Guid? runId = null, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns aggregated credit totals for a single ship over the given time window.
+    /// Positive ledger amounts are counted as earned credits; negative amounts are counted as spent credits.
+    /// </summary>
+    Task<ShipLedgerWindowSummaryDto> GetShipSummaryAsync(
+        string shipSymbol,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Returns the number of distinct ship symbols that have ledger entries for the given run.</summary>
     Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default);
 
@@ -53,3 +63,5 @@ public sealed record LedgerEntryDto(
     string? WaypointSymbol);
 
 public sealed record LedgerSummaryDto(string Category, long TotalAmount, int EntryCount);
+
+public sealed record ShipLedgerWindowSummaryDto(long CreditsEarned, long CreditsSpent, long NetCredits, int EntryCount);

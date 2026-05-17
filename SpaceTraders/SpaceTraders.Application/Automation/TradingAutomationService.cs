@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Goals;
 
 namespace SpaceTraders.Application.Automation;
@@ -22,12 +23,11 @@ public sealed class TradingAutomationService(
     IShipRepository ships,
     IShipGoalRepository goals,
     IShipyardRepository shipyards,
-    IAgentRepository agents,
     IPlanRepository plans,
-    ISpaceTradersPort port,
-    IBudgetPolicy budget,
+    IShipPurchaseService shipPurchases,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
+
     private const string ScarceSupply = "SCARCE";
     private const string AbundantSupply = "ABUNDANT";
     private const string ImportType = "IMPORT";
@@ -257,54 +257,25 @@ public sealed class TradingAutomationService(
             return null;
         }
 
-        var estimatedCost = shipyard.Ships
-            .FirstOrDefault(s => s.Type.Equals(TradeShipType, StringComparison.OrdinalIgnoreCase))
-            ?.PurchasePrice ?? 0;
-
-        if (estimatedCost <= 0)
-        {
-            logger.LogInformation(
-                "Trading automation: trade ship purchase skipped at {Shipyard} — purchase price unknown (shipyard not yet visited with a ship).",
-                shipyard.WaypointSymbol);
-            return null;
-        }
-
-        var decision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
-        if (!decision.CanAfford)
+        var purchased = await shipPurchases.TryPurchaseAsync(
+            TradeShipType,
+            shipyard.WaypointSymbol,
+            cancellationToken);
+        if (!purchased.IsSuccess || purchased.PurchasedShip is null)
         {
             logger.LogInformation(
                 "Trading automation: trade ship purchase denied at {Shipyard} — {Reason}.",
                 shipyard.WaypointSymbol,
-                decision.Reason);
+                purchased.FailureReason ?? "Purchase failed.");
             return null;
         }
 
-        var purchased = await port.PurchaseShipAsync(TradeShipType, shipyard.WaypointSymbol, cancellationToken);
-        await agents.UpsertAsync(purchased.Agent, cancellationToken);
-
-        var ship = new ShipModel(
-            purchased.ShipSymbol,
-            purchased.ShipNav.SystemSymbol,
-            purchased.ShipNav.WaypointSymbol,
-            purchased.ShipNav.Status,
-            purchased.ShipNav.FlightMode,
-            purchased.ShipFuel.Current,
-            purchased.ShipFuel.Capacity,
-            purchased.ShipNav.ArrivesAt,
-            purchased.ShipNav.DestWaypointSymbol,
-            purchased.ShipCargo.Units,
-            purchased.ShipCargo.Capacity,
-            ShipType: TradeShipType,
-            CargoInventory: purchased.ShipCargo.Inventory);
-
-        await ships.UpsertAsync(ship, cancellationToken);
-
         logger.LogInformation(
             "Trading automation: purchased trade ship {ShipSymbol} at {Shipyard}.",
-            purchased.ShipSymbol,
+            purchased.PurchasedShip.Symbol,
             shipyard.WaypointSymbol);
 
-        return ship;
+        return purchased.PurchasedShip;
     }
 
     private async Task<IReadOnlyList<TradingOpportunity>> GetTradeOpportunitiesAsync(CancellationToken cancellationToken)

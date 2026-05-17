@@ -44,7 +44,7 @@ public sealed class MineAndSellGoalExecutor(
 
         if (targetUnits <= 0)
         {
-            // Try to find a survey for the target mineral at the source waypoint
+            // Try to find a survey for the target mineral at the source waypoint.
             var survey = await surveys.GetBestActiveSurveyAsync(
                 miningGoal.SourceWaypointSymbol,
                 miningGoal.TradeSymbol,
@@ -53,6 +53,8 @@ public sealed class MineAndSellGoalExecutor(
             if (!IsUsableSurvey(survey))
             {
                 await TryAssignSurveyGoalAsync(ship, miningGoal, ct);
+                return GoalExecutionResult.WaitingForArrival(
+                    $"Waiting for active survey for {miningGoal.TradeSymbol} at {miningGoal.SourceWaypointSymbol} before mining.");
             }
 
             var mineResult = await bus.InvokeAsync<ShipCommandResult>(
@@ -154,30 +156,53 @@ public sealed class MineAndSellGoalExecutor(
             TargetDepositSymbol = miningGoal.TradeSymbol,
         };
 
-        var surveyShipSymbol = string.Empty;
+        var allShips = await ships.GetAllAsync(ct);
+        var surveyShips = allShips
+            .Where(candidate =>
+                candidate.HasSurveyEquipment
+                && candidate.LocalStatus != ShipLocalStatus.InTransit)
+            .OrderByDescending(candidate =>
+                candidate.Symbol.Equals(minerShip.Symbol, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(candidate => candidate.Symbol, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        if (minerShip.HasSurveyEquipment)
+        if (surveyShips.Count == 0)
         {
-            surveyShipSymbol = minerShip.Symbol;
+            return;
         }
-        else
-        {
-            var allShips = await ships.GetAllAsync(ct);
-            foreach (var candidate in allShips)
-            {
-                if (!candidate.HasSurveyEquipment || candidate.LocalStatus == ShipLocalStatus.InTransit)
-                {
-                    continue;
-                }
 
-                var activeGoal = await goals.GetActiveGoalAsync(candidate.Symbol, ct);
-                if (activeGoal is null
-                    || activeGoal.Status is GoalStatus.Completed or GoalStatus.Blocked)
-                {
-                    surveyShipSymbol = candidate.Symbol;
-                    break;
-                }
+        var surveyShipSymbol = string.Empty;
+        var fallbackSurveyShipSymbol = string.Empty;
+
+        foreach (var candidate in surveyShips)
+        {
+            var currentGoal = await goals.GetActiveGoalAsync(candidate.Symbol, ct);
+            if (currentGoal is SurveyWaypointGoal existingSurveyGoal
+                && existingSurveyGoal.TargetWaypointSymbol.Equals(miningGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase)
+                && existingSurveyGoal.TargetDepositSymbol.Equals(miningGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase)
+                && existingSurveyGoal.Status is not GoalStatus.Completed
+                && existingSurveyGoal.Status is not GoalStatus.Blocked)
+            {
+                return;
             }
+
+            if (string.IsNullOrWhiteSpace(fallbackSurveyShipSymbol))
+            {
+                fallbackSurveyShipSymbol = candidate.Symbol;
+            }
+
+            if (currentGoal is null
+                || currentGoal.Status is GoalStatus.Completed or GoalStatus.Blocked
+                || candidate.Symbol.Equals(minerShip.Symbol, StringComparison.OrdinalIgnoreCase))
+            {
+                surveyShipSymbol = candidate.Symbol;
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(surveyShipSymbol))
+        {
+            surveyShipSymbol = fallbackSurveyShipSymbol;
         }
 
         if (string.IsNullOrWhiteSpace(surveyShipSymbol))
@@ -185,26 +210,9 @@ public sealed class MineAndSellGoalExecutor(
             return;
         }
 
-        var currentGoal = await goals.GetActiveGoalAsync(surveyShipSymbol, ct);
-        if (currentGoal is SurveyWaypointGoal existingSurveyGoal
-            && existingSurveyGoal.TargetWaypointSymbol.Equals(miningGoal.SourceWaypointSymbol, StringComparison.OrdinalIgnoreCase)
-            && existingSurveyGoal.TargetDepositSymbol.Equals(miningGoal.TradeSymbol, StringComparison.OrdinalIgnoreCase)
-            && existingSurveyGoal.Status is not GoalStatus.Completed
-            && existingSurveyGoal.Status is not GoalStatus.Blocked)
-        {
-            return;
-        }
-
-        if (currentGoal is not null
-            && currentGoal.Status is not GoalStatus.Completed
-            && currentGoal.Status is not GoalStatus.Blocked)
-        {
-            return;
-        }
-
         await goals.SetActiveGoalAsync(surveyShipSymbol, surveyGoal, ct);
         logger.LogInformation(
-            "MineAndSellGoalExecutor: queued SurveyWaypointGoal on ship {SurveyShip} for {TradeSymbol} at {Waypoint} after blind mining fallback.",
+            "MineAndSellGoalExecutor: assigned high-priority SurveyWaypointGoal on ship {SurveyShip} for {TradeSymbol} at {Waypoint}.",
             surveyShipSymbol,
             miningGoal.TradeSymbol,
             miningGoal.SourceWaypointSymbol);

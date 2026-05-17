@@ -406,11 +406,17 @@ export interface ShipActivityDto {
 
 export interface ShipGoalHistoryDto {
   id: string
+  goalId: string
   goalKind: string
   outcome: string
   reason: string | null
   startedAt: string
   endedAt: string
+  creditsEarned: number
+  creditsSpent: number
+  netCredits: number
+  ledgerEntryCount: number
+  durationSeconds: number
 }
 
 export interface ShipyardShipDto {

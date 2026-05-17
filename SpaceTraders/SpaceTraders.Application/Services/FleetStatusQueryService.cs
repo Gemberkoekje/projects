@@ -23,7 +23,8 @@ internal sealed class FleetStatusQueryService(
     IContractRepository contracts,
     IConstructionRepository constructions,
     IShipGoalHistoryRepository goalHistory,
-    IContractMineralPlanRepository contractPlans) : IFleetStatusQueryService
+    IContractMineralPlanRepository contractPlans,
+    ILedgerRepository ledger) : IFleetStatusQueryService
 {
     public async Task<IReadOnlyList<OrchestratorGoalChain>> GetGoalChainsAsync(CancellationToken ct = default)
     {
@@ -554,6 +555,24 @@ internal sealed class FleetStatusQueryService(
             return null;
         }
 
-        return await goalHistory.GetRecentAsync(shipSymbol, limit, ct);
+        var history = await goalHistory.GetRecentAsync(shipSymbol, limit, ct);
+        if (history.Count == 0)
+        {
+            return history;
+        }
+
+        var enriched = await Task.WhenAll(history.Select(async entry =>
+        {
+            var summary = await ledger.GetShipSummaryAsync(shipSymbol, entry.StartedAt, entry.EndedAt, ct);
+            return entry with
+            {
+                CreditsEarned = summary.CreditsEarned,
+                CreditsSpent = summary.CreditsSpent,
+                NetCredits = summary.NetCredits,
+                LedgerEntryCount = summary.EntryCount,
+            };
+        }));
+
+        return enriched;
     }
 }

@@ -489,6 +489,21 @@ public sealed record ShipGoalHistoryEntry
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset EndedAt { get; init; }
+
+    /// <summary>Total positive credits recorded in the ledger while this goal was active.</summary>
+    public long CreditsEarned { get; init; }
+
+    /// <summary>Total credits spent while this goal was active, expressed as a positive number.</summary>
+    public long CreditsSpent { get; init; }
+
+    /// <summary>Net credit impact while this goal was active.</summary>
+    public long NetCredits { get; init; }
+
+    /// <summary>Number of ledger entries attributed to the ship while this goal was active.</summary>
+    public int LedgerEntryCount { get; init; }
+
+    /// <summary>Duration of the goal in whole seconds.</summary>
+    public long DurationSeconds => Math.Max(0L, (long)(EndedAt - StartedAt).TotalSeconds);
 }
 
 public sealed record ShipyardShipDto

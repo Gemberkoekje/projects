@@ -3,6 +3,7 @@ using SpaceTraders.Application.Commands.Ships;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
+using SpaceTraders.Application.Services;
 using SpaceTraders.Domain.Enums;
 using Wolverine;
 
@@ -32,9 +33,40 @@ public sealed class ProbeDeploymentPlanService(
     IShipyardRepository shipyards,
     IBudgetPolicy budget,
     ISpaceTradersPort port,
+    IShipPurchaseService shipPurchases,
     IMessageBus bus,
     ILogger<ProbeDeploymentPlanService> logger) : IProbeDeploymentPlanService
 {
+    public ProbeDeploymentPlanService(
+        IProbeDeploymentPlanRepository probeDeploymentPlans,
+        IShipRepository ships,
+        IWaypointRepository waypoints,
+        IAgentRepository agents,
+        IShipyardRepository shipyards,
+        IBudgetPolicy budget,
+        ISpaceTradersPort port,
+        IMessageBus bus,
+        ILogger<ProbeDeploymentPlanService> logger)
+        : this(
+            probeDeploymentPlans,
+            ships,
+            waypoints,
+            agents,
+            shipyards,
+            budget,
+            port,
+            new ShipPurchaseService(
+                port,
+                agents,
+                ships,
+                shipyards,
+                budget,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ShipPurchaseService>.Instance),
+            bus,
+            logger)
+    {
+    }
+
     private const string ProbeShipType = "SHIP_PROBE";
     private const long Phase1CapitalThreshold = 200_000;
 
@@ -442,29 +474,22 @@ public sealed class ProbeDeploymentPlanService(
             shipyard.WaypointSymbol,
             estimatedCost);
 
-        var result = await port.PurchaseShipAsync(ProbeShipType, shipyard.WaypointSymbol, cancellationToken);
-
-        await agents.UpsertAsync(result.Agent, cancellationToken);
-
-        var newShip = new ShipModel(
-            result.ShipSymbol,
-            result.ShipNav.SystemSymbol,
-            result.ShipNav.WaypointSymbol,
-            result.ShipNav.Status,
-            result.ShipNav.FlightMode,
-            result.ShipFuel.Current,
-            result.ShipFuel.Capacity,
-            result.ShipNav.ArrivesAt,
-            result.ShipNav.DestWaypointSymbol);
-
-        await ships.UpsertAsync(newShip, cancellationToken);
+        var purchase = await shipPurchases.TryPurchaseAsync(ProbeShipType, shipyard.WaypointSymbol, cancellationToken);
+        if (!purchase.IsSuccess || purchase.PurchasedShip is null)
+        {
+            logger.LogInformation(
+                "Probe deployment plan: probe purchase denied at {Shipyard} — {Reason}",
+                shipyard.WaypointSymbol,
+                purchase.FailureReason ?? "Purchase failed.");
+            return;
+        }
 
         logger.LogInformation(
             "Probe deployment plan: purchased {Symbol}; dispatching to {Waypoint}.",
-            result.ShipSymbol,
+            purchase.PurchasedShip.Symbol,
             targetWaypoint);
 
-        await bus.PublishAsync(new DeployProbeCommand(result.ShipSymbol, targetWaypoint));
+        await bus.PublishAsync(new DeployProbeCommand(purchase.PurchasedShip.Symbol, targetWaypoint));
     }
 
     private static bool IsProbeShip(ShipModel ship)

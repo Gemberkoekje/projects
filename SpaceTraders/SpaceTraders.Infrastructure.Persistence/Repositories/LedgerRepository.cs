@@ -91,6 +91,34 @@ public sealed class LedgerRepository(SpaceTradersDbContext db, IActiveRunIdProvi
             .ToList();
     }
 
+    public async Task<ShipLedgerWindowSummaryDto> GetShipSummaryAsync(
+        string shipSymbol,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken cancellationToken = default)
+    {
+        var summary = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.ShipSymbol == shipSymbol && e.OccurredAt >= from && e.OccurredAt <= to)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                CreditsEarned = g.Where(e => e.Amount > 0).Sum(e => (long?)e.Amount) ?? 0L,
+                CreditsSpent = -(g.Where(e => e.Amount < 0).Sum(e => (long?)e.Amount) ?? 0L),
+                NetCredits = g.Sum(e => (long?)e.Amount) ?? 0L,
+                EntryCount = g.Count(),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return summary is null
+            ? new ShipLedgerWindowSummaryDto(0L, 0L, 0L, 0)
+            : new ShipLedgerWindowSummaryDto(
+                summary.CreditsEarned,
+                summary.CreditsSpent,
+                summary.NetCredits,
+                summary.EntryCount);
+    }
+
     public async Task<int> GetDistinctShipCountAsync(Guid runId, CancellationToken cancellationToken = default)
     {
         return await db.LedgerEntries
