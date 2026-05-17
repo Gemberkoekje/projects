@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using SpaceTraders.Application.DTOs;
 using SpaceTraders.Application.Interfaces.Repositories;
 using SpaceTraders.Application.Orchestration;
 using SpaceTraders.Application.Ports;
@@ -25,6 +26,7 @@ public sealed class TradingAutomationService(
     IShipyardRepository shipyards,
     IPlanRepository plans,
     IShipPurchaseService shipPurchases,
+    IBudgetPolicy budget,
     ILogger<TradingAutomationService> logger) : ITradingAutomationService
 {
 
@@ -132,6 +134,29 @@ public sealed class TradingAutomationService(
             var idleTrader = FindIdleTradeShip(fleet, shipsWithGoals);
             if (idleTrader is null)
             {
+                var estimatedCost = await GetTradeShipPurchaseCostAsync(opportunity.BuyWaypointSymbol, cancellationToken);
+                var purchaseDecision = await budget.EvaluateAsync(estimatedCost, cancellationToken);
+                if (!purchaseDecision.CanAfford)
+                {
+                    logger.LogInformation(
+                        "Trading automation: deferred goal for {TradeSymbol} from {BuyWaypoint} to {SellWaypoint}; purchase skipped because budget is unavailable.",
+                        opportunity.TradeSymbol,
+                        opportunity.BuyWaypointSymbol,
+                        opportunity.SellWaypointSymbol);
+
+                    if (queueItems.TryGetValue(queueKey, out var pendingItem))
+                    {
+                        queueItems[queueKey] = pendingItem with
+                        {
+                            Status = MarketAutomationOpportunityStatus.Pending,
+                            LastObservedAt = now,
+                            StopReason = "No idle trade ship available and purchase unavailable.",
+                        };
+                    }
+
+                    continue;
+                }
+
                 idleTrader = await TryPurchaseTradeShipAsync(opportunity.BuyWaypointSymbol, cancellationToken);
                 if (idleTrader is null)
                 {
@@ -239,19 +264,7 @@ public sealed class TradingAutomationService(
         string buyWaypointSymbol,
         CancellationToken cancellationToken)
     {
-        var shipyardOptions = await shipyards.GetAllAsync(cancellationToken);
-        if (shipyardOptions.Count == 0)
-        {
-            return null;
-        }
-
-        var preferredSystem = ExtractSystemSymbol(buyWaypointSymbol);
-        var shipyard = shipyardOptions.FirstOrDefault(candidate =>
-            candidate.SystemSymbol.Equals(preferredSystem, StringComparison.OrdinalIgnoreCase)
-            && candidate.ShipTypes.Contains(TradeShipType, StringComparer.OrdinalIgnoreCase))
-            ?? shipyardOptions.FirstOrDefault(candidate =>
-                candidate.ShipTypes.Contains(TradeShipType, StringComparer.OrdinalIgnoreCase));
-
+        var shipyard = await FindTradeShipyardAsync(buyWaypointSymbol, cancellationToken);
         if (shipyard is null)
         {
             return null;
@@ -276,6 +289,39 @@ public sealed class TradingAutomationService(
             shipyard.WaypointSymbol);
 
         return purchased.PurchasedShip;
+    }
+
+    private async Task<long> GetTradeShipPurchaseCostAsync(
+        string buyWaypointSymbol,
+        CancellationToken cancellationToken)
+    {
+        var shipyard = await FindTradeShipyardAsync(buyWaypointSymbol, cancellationToken);
+        if (shipyard is null)
+        {
+            return 0;
+        }
+
+        var ship = shipyard.Ships.FirstOrDefault(candidate =>
+            TradeShipType.Equals(candidate.Type, StringComparison.OrdinalIgnoreCase));
+        return ship?.PurchasePrice ?? 0;
+    }
+
+    private async Task<ShipyardWaypointDto?> FindTradeShipyardAsync(
+        string buyWaypointSymbol,
+        CancellationToken cancellationToken)
+    {
+        var shipyardOptions = await shipyards.GetAllAsync(cancellationToken);
+        if (shipyardOptions.Count == 0)
+        {
+            return null;
+        }
+
+        var preferredSystem = ExtractSystemSymbol(buyWaypointSymbol);
+        return shipyardOptions.FirstOrDefault(candidate =>
+            candidate.SystemSymbol.Equals(preferredSystem, StringComparison.OrdinalIgnoreCase)
+            && candidate.ShipTypes.Contains(TradeShipType, StringComparer.OrdinalIgnoreCase))
+            ?? shipyardOptions.FirstOrDefault(candidate =>
+                candidate.ShipTypes.Contains(TradeShipType, StringComparer.OrdinalIgnoreCase));
     }
 
     private async Task<IReadOnlyList<TradingOpportunity>> GetTradeOpportunitiesAsync(CancellationToken cancellationToken)

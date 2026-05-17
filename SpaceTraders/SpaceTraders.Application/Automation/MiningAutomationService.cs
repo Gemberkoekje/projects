@@ -574,9 +574,24 @@ public sealed class MiningAutomationService(
         return null;
     }
 
-    private static bool IsAsteroidWaypoint(WaypointCacheModel waypoint) =>
-        waypoint.Type.Equals("ASTEROID_FIELD", StringComparison.OrdinalIgnoreCase) ||
-        waypoint.Type.Equals("ENGINEERED_ASTEROID", StringComparison.OrdinalIgnoreCase);
+    private static bool IsAsteroidWaypoint(WaypointCacheModel waypoint)
+    {
+        var traitBlob = $"{waypoint.TraitsJson} {waypoint.ModifiersJson}";
+        return traitBlob.Contains("_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("MINERAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("COMMON_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("PRECIOUS_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("RARE_METAL_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("METAL_ORES", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("PRECIOUS_STONE_DEPOSITS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("SILICON_CRYSTALS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("QUARTZ_SAND", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("ICE_CRYSTALS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("AMMONIA_ICE", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("METHANE_POOLS", StringComparison.OrdinalIgnoreCase)
+            || traitBlob.Contains("EXPLOSIVE_GASES", StringComparison.OrdinalIgnoreCase)
+            || waypoint.Type.Contains("ASTEROID", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static decimal DistanceFrom(WaypointCacheModel? from, WaypointCacheModel to)
     {

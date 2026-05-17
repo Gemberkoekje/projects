@@ -164,7 +164,7 @@ public sealed class ContractPlanSnapshotIntegrationTests
 
         await sut.EnsureBootstrappedAsync(CancellationToken.None);
 
-        await port.Received(1).PurchaseShipAsync("SHIP_MINING_DRONE", "X1-PT96-H53", Arg.Any<CancellationToken>());
+        await shipPurchases.Received(1).TryPurchaseAsync("SHIP_MINING_DRONE", "X1-PT96-H53", Arg.Any<CancellationToken>());
 
         await plans.Received(1).UpsertAsync(
             Arg.Is<ContractMineralPlanState>(p =>

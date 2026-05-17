@@ -20,16 +20,23 @@ public sealed class TradingAutomationServiceTests
     private readonly IShipyardRepository _shipyards = Substitute.For<IShipyardRepository>();
     private readonly IPlanRepository _plans = Substitute.For<IPlanRepository>();
     private readonly IShipPurchaseService _shipPurchases = Substitute.For<IShipPurchaseService>();
+    private readonly IBudgetPolicy _budget = Substitute.For<IBudgetPolicy>();
 
-    private TradingAutomationService CreateService() =>
-        new(
+    private TradingAutomationService CreateService()
+    {
+        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new BudgetDecision(true, 220_000, 0, 220_000));
+
+        return new(
             _markets,
             _ships,
             _goals,
             _shipyards,
             _plans,
             _shipPurchases,
+            _budget,
             NullLogger<TradingAutomationService>.Instance);
+    }
 
     private static MarketSnapshot Snapshot(string waypoint, params TradeGoodSnapshot[] goods) =>
         new(
@@ -122,12 +129,7 @@ public sealed class TradingAutomationServiceTests
         await CreateService().EnsureBootstrappedAsync();
 
         await _shipPurchases.Received(1).TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>());
-        await _ships.Received(1).UpsertAsync(
-            Arg.Is<ShipModel>(ship =>
-                ship.Symbol == "TRADER-NEW"
-                && ship.CargoCurrent == 0
-                && ship.CargoCapacity == 40),
-            Arg.Any<CancellationToken>());
+        await _ships.DidNotReceive().UpsertAsync(Arg.Any<ShipModel>(), Arg.Any<CancellationToken>());
         await _goals.Received(1).SetActiveGoalAsync(
             "TRADER-NEW",
             Arg.Any<TradeBetweenMarketsGoal>(),
@@ -148,14 +150,8 @@ public sealed class TradingAutomationServiceTests
             .Returns(new HashSet<(string BuyWaypointSymbol, string SellWaypointSymbol, string TradeSymbol)>());
 
         _ships.GetAllAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<ShipModel>());
-        _shipyards.GetAllAsync(Arg.Any<CancellationToken>()).Returns([TradeShipyard()]);
-        _shipPurchases.TryPurchaseAsync("SHIP_LIGHT_HAULER", "X1-AB-SY1", Arg.Any<CancellationToken>())
-            .Returns(new ShipPurchaseResult
-            {
-                IsSuccess = false,
-                FailureReason = "reserve",
-                EstimatedCost = 60_000,
-            });
+        _budget.EvaluateAsync(Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns(new BudgetDecision(false, 10_000, 0, 10_000, Reason: "reserve"));
 
         await CreateService().EnsureBootstrappedAsync();
 
