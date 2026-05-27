@@ -22,6 +22,7 @@
     { "id": "scarlet_woman", "displayName": "Scarlet Woman", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "baron", "displayName": "Baron", "type": "Minion", "setupRules": [{ "kind": "OutsiderDelta", "delta": 2, "isStorytellerChoice": false }], "availabilityConstraints": [] },
     { "id": "imp", "displayName": "Imp", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "legion", "displayName": "Legion", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
     { "id": "fang_gu", "displayName": "Fang Gu", "type": "Demon", "setupRules": [{ "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": false }], "availabilityConstraints": [] },
     { "id": "vigormortis", "displayName": "Vigormortis", "type": "Demon", "setupRules": [{ "kind": "OutsiderDelta", "delta": -1, "isStorytellerChoice": false }], "availabilityConstraints": [] },
     { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [{ "kind": "ReplaceDemon" }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },

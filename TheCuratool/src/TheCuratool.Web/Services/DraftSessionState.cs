@@ -48,13 +48,17 @@ public sealed class DraftSessionState
 
     public SetupCalculationResult SetupResult { get; private set; } = new(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>());
 
-    public GameSession CurrentSession { get; private set; } = new(Guid.Empty, new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), 0, Array.Empty<PlayerSlot>(), GameStatus.Unknown, Array.Empty<string>(), false);
+    public GameSession CurrentSession { get; private set; } = new(Guid.Empty, new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), 0, Array.Empty<PlayerSlot>(), GameStatus.Unknown, Array.Empty<string>(), false, false, 0);
 
     public bool HasCurrentSession { get; private set; }
 
     public int PlayerCount { get; set; } = 7;
 
     public bool UseMarionette { get; set; }
+
+    public bool IsLegionGame { get; set; }
+
+    public int LegionCount { get; set; }
 
     public bool RevealChosenCharacters { get; set; }
 
@@ -65,6 +69,8 @@ public sealed class DraftSessionState
     public bool IsCuratingOffer { get; private set; }
 
     public bool SupportsMarionetteOption => ScriptContainsCharacter("marionette");
+
+    public bool SupportsLegionOption => ScriptContainsCharacter("legion");
 
     public bool SupportsAtheistCommitment => ScriptContainsCharacter("atheist");
 
@@ -110,8 +116,14 @@ public sealed class DraftSessionState
             SetupResult = new SetupCalculationResult(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>());
             ResetDraftState();
             HasCurrentSession = false;
-            CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette);
+            CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
             return Task.CompletedTask;
+        }
+
+        if (!SupportsLegionOption)
+        {
+            IsLegionGame = false;
+            LegionCount = 0;
         }
 
         ResetDraftState();
@@ -135,6 +147,11 @@ public sealed class DraftSessionState
         _loadedScriptId = storedScript.Id;
         ScriptJson = storedScript.RawJson;
         LoadResult = new ScriptParseResult(storedScript.Script, Array.Empty<string>(), Array.Empty<string>());
+        if (!SupportsLegionOption)
+        {
+            IsLegionGame = false;
+            LegionCount = 0;
+        }
         ResetDraftState();
         RecalculateSetup();
     }
@@ -161,6 +178,8 @@ public sealed class DraftSessionState
             HasCurrentSession = true;
             PlayerCount = loaded.PlayerCount;
             UseMarionette = loaded.UseMarionette;
+            IsLegionGame = loaded.IsLegionGame;
+            LegionCount = loaded.LegionCount;
             _activeLoricIds.Clear();
             _activeLoricIds.AddRange(loaded.ActiveLoricIds);
             EnsureCuratorLoric();
@@ -174,6 +193,34 @@ public sealed class DraftSessionState
             SetDraftMessage($"Session '{sessionId}' was not found.");
             return false;
         }
+    }
+
+    public void SetPlayerCount(int playerCount)
+    {
+        PlayerCount = playerCount;
+        if (IsLegionGame && LegionCount == 0 && playerCount is >= 5 and <= 15)
+        {
+            LegionCount = _setupCalculator.GetDefaultLegionCount(playerCount);
+        }
+    }
+
+    public void SetLegionGame(bool isLegionGame)
+    {
+        IsLegionGame = isLegionGame && SupportsLegionOption;
+        if (IsLegionGame && LegionCount == 0 && PlayerCount is >= 5 and <= 15)
+        {
+            LegionCount = _setupCalculator.GetDefaultLegionCount(PlayerCount);
+        }
+
+        if (!IsLegionGame)
+        {
+            LegionCount = 0;
+        }
+    }
+
+    public void SetLegionCount(int legionCount)
+    {
+        LegionCount = Math.Clamp(legionCount, 0, PlayerCount);
     }
 
     public void SetLoricActive(string loricId, bool isActive)
@@ -221,7 +268,7 @@ public sealed class DraftSessionState
             Array.Empty<string>(),
             ActiveLoricIds,
             new Dictionary<string, HiddenFlags>(),
-            new SessionSetupOptions(UseMarionette),
+            new SessionSetupOptions(UseMarionette, IsLegionGame, LegionCount),
             _characterDatabase,
             _loricDatabase);
     }
@@ -247,7 +294,7 @@ public sealed class DraftSessionState
         try
         {
             RecalculateSetup();
-            var started = _draftEngine.StartSession(LoadResult.Script, PlayerCount, ActiveLoricIds, UseMarionette);
+            var started = _draftEngine.StartSession(LoadResult.Script, PlayerCount, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
             var scriptId = await EnsureLoadedScriptIdAsync(started.Script);
             var persisted = await _gameSessionRepository.AddAsync(started, scriptId);
             CurrentSession = persisted;
@@ -426,6 +473,8 @@ public sealed class DraftSessionState
             status = CurrentSession.Status.ToString(),
             activeLorics = CurrentSession.ActiveLoricIds,
             useMarionette = CurrentSession.UseMarionette,
+            isLegionGame = CurrentSession.IsLegionGame,
+            legionCount = CurrentSession.LegionCount,
             assignments = CurrentSession.Players
                 .OrderBy(slot => slot.DraftOrder)
                 .Select(slot => new
@@ -600,7 +649,7 @@ public sealed class DraftSessionState
     private void ResetDraftState()
     {
         HasCurrentSession = false;
-        CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette);
+        CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
         ResetOfferState();
         ClearDraftMessage();
     }

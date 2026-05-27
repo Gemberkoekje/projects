@@ -539,3 +539,28 @@ Run phases in order. Phases 1–5 produce a working CLI-testable core. Phase 6 a
   - Lunatic-flagged Fang Gu does not apply outsider delta.
   - Drunk-flagged Godfather does not produce storyteller-choice outsider outcomes.
 - Existing draft invariant remains covered: lunatic-flagged Demon picks still require a real non-lunatic Demon before completion.
+
+### ✅ Completed
+
+**Phase S4 — Legion Game Mode**
+- Added Legion setup options in session/setup models:
+  - `SessionSetupOptions.IsLegionGame`
+  - `SessionSetupOptions.LegionCount`
+  - `GameSession.IsLegionGame`
+  - `GameSession.LegionCount`
+- Implemented Legion-mode setup branch in `SetupCalculator`:
+  - Legion-mode distribution replaces normal setup math.
+  - Default Legion count is derived from the normal setup's good-player baseline.
+  - Storyteller Legion-count override is honored.
+- Added Legion draft-flow behavior in `DraftEngine`:
+  - `legion` is excluded from non-Legion games even when present on script.
+  - Legion evil seats return only the `"evil"` sentinel offer.
+  - Choosing `"evil"` stores the sentinel with empty hidden flags.
+  - Added idempotent `ResolveEvilSlot(sessionId, draftOrder, actualCharacterId, hiddenFlags)` resolution action.
+  - Makeup summary marks unresolved evil sentinel picks as `Evil (ST-assigned)`.
+- Added `legion` character definition to `characters.json`.
+- Added Setup UI support:
+  - Legion toggle gated by script content.
+  - Legion count input shown when Legion mode is enabled.
+- Persisted Legion session settings through API/infrastructure mappings.
+- Added Legion coverage tests in `SetupCalculatorTests` and `DraftEngineTests`.

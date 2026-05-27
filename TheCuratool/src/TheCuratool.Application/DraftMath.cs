@@ -18,6 +18,12 @@ internal static class DraftMath
                 continue;
             }
 
+            if (string.Equals(chosen.CharacterId, "evil", StringComparison.OrdinalIgnoreCase))
+            {
+                demons++;
+                continue;
+            }
+
             var definition = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosen.CharacterId, StringComparison.OrdinalIgnoreCase))
                 ?? characterDatabase.Resolve(chosen.CharacterId);
 
@@ -64,6 +70,12 @@ internal static class DraftMath
         {
             if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
             {
+                continue;
+            }
+
+            if (string.Equals(chosen.CharacterId, "evil", StringComparison.OrdinalIgnoreCase))
+            {
+                grouped[CharacterType.Demon].Add("Evil (ST-assigned)");
                 continue;
             }
 

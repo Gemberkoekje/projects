@@ -17,6 +17,10 @@ public sealed class CreateSessionRequest
     public IReadOnlyList<string> ActiveLorics { get; init; } = Array.Empty<string>();
 
     public bool UseMarionette { get; init; }
+
+    public bool IsLegionGame { get; init; }
+
+    public int LegionCount { get; init; }
 }
 
 public sealed class CuratedOfferRequest
@@ -98,6 +102,8 @@ public sealed record SessionApiResponse(
     GameStatus Status,
     IReadOnlyList<string> ActiveLorics,
     bool UseMarionette,
+    bool IsLegionGame,
+    int LegionCount,
     int CurrentPlayerSlot,
     IReadOnlyList<PlayerSlotApiResponse> Players,
     MakeupSummaryApiResponse MakeupSummary);
@@ -114,6 +120,8 @@ internal static class SessionApiMapper
             session.Status,
             session.ActiveLoricIds,
             session.UseMarionette,
+            session.IsLegionGame,
+            session.LegionCount,
             session.Players.Where(slot => !slot.IsChosen).OrderBy(slot => slot.DraftOrder).Select(slot => slot.DraftOrder).FirstOrDefault(),
             session.Players.Select(MapPlayerSlot).ToList().AsReadOnly(),
             MapMakeupSummary(summary));

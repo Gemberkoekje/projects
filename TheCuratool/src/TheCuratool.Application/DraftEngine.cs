@@ -8,6 +8,9 @@ namespace TheCuratool.Application;
 /// </summary>
 public sealed class DraftEngine
 {
+    private const string LegionCharacterId = "legion";
+    private const string EvilSentinelCharacterId = "evil";
+
     private readonly CharacterDatabase _characterDatabase;
     private readonly LoricDatabase _loricDatabase;
     private readonly SetupCalculator _setupCalculator;
@@ -28,7 +31,13 @@ public sealed class DraftEngine
     /// <param name="playerCount">Number of players (5–15).</param>
     /// <param name="activeLoricIds">IDs of Lorics that are active for this session.</param>
     /// <param name="useMarionette">When <see langword="true"/>, applies the Marionette pre-draft adjustment.</param>
-    public GameSession StartSession(Script script, int playerCount, IReadOnlyList<string> activeLoricIds, bool useMarionette = false)
+    public GameSession StartSession(
+        Script script,
+        int playerCount,
+        IReadOnlyList<string> activeLoricIds,
+        bool useMarionette = false,
+        bool isLegionGame = false,
+        int legionCount = 0)
     {
         if (playerCount < 5)
         {
@@ -52,7 +61,9 @@ public sealed class DraftEngine
             players,
             GameStatus.Drafting,
             activeLoricIds.Distinct(StringComparer.OrdinalIgnoreCase).ToList().AsReadOnly(),
-            useMarionette);
+            useMarionette,
+            isLegionGame,
+            legionCount);
 
         _sessions[session.Id] = session;
         return session;
@@ -73,6 +84,27 @@ public sealed class DraftEngine
         var currentCounts = DraftMath.ComputeCurrentCounts(current, _characterDatabase);
         var chosenSet = new HashSet<string>(state.ChosenCharacterIds, StringComparer.OrdinalIgnoreCase);
         var remainingSeats = GetRemainingSeats(current);
+        var setupResult = _setupCalculator.Calculate(
+            current.Script,
+            current.PlayerCount,
+            state.ChosenCharacterIds,
+            current.ActiveLoricIds,
+            state.HiddenFlagsByCharacterId,
+            new SessionSetupOptions(current.UseMarionette, current.IsLegionGame, current.LegionCount),
+            _characterDatabase,
+            _loricDatabase);
+
+        if (current.IsLegionGame)
+        {
+            var legionTarget = setupResult.ValidTargetCounts[0].Demons;
+            if (currentCounts.Demons < legionTarget)
+            {
+                return new[]
+                {
+                    new CharacterDefinition(EvilSentinelCharacterId, "Evil", CharacterType.Demon, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), false, false, false),
+                }.ToList().AsReadOnly();
+            }
+        }
 
         var valid = new List<CharacterDefinition>();
 
@@ -93,6 +125,18 @@ public sealed class DraftEngine
                 continue;
             }
 
+            if (!current.IsLegionGame
+                && string.Equals(character.Id, LegionCharacterId, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (current.IsLegionGame && (character.Type == CharacterType.Minion || character.Type == CharacterType.Demon))
+            {
+                // Legion mode drafts only good roles directly; evil seats are handled by the "evil" sentinel branch above.
+                continue;
+            }
+
             if (!IsAvailableByConstraints(current, character, state))
             {
                 continue;
@@ -110,7 +154,7 @@ public sealed class DraftEngine
                 projectedChosenIds,
                 current.ActiveLoricIds,
                 projectedHiddenFlags,
-                new SessionSetupOptions(current.UseMarionette),
+                new SessionSetupOptions(current.UseMarionette, current.IsLegionGame, current.LegionCount),
                 _characterDatabase,
                 _loricDatabase);
 
@@ -269,6 +313,7 @@ public sealed class DraftEngine
         }
 
         var normalizedChosenId = chosenCharacterId.Trim();
+        var isEvilSentinel = string.Equals(normalizedChosenId, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase);
         if (!normalizedOfferedIds.Contains(normalizedChosenId, StringComparer.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Chosen character must be one of the offered ids.");
@@ -280,15 +325,17 @@ public sealed class DraftEngine
             throw new InvalidOperationException("Recorded offered ids conflict with curated offer for this slot.");
         }
 
-        var chosenDefinition = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, normalizedChosenId, StringComparison.OrdinalIgnoreCase))
-            ?? _characterDatabase.Resolve(normalizedChosenId);
+        var chosenDefinition = isEvilSentinel
+            ? new CharacterDefinition(EvilSentinelCharacterId, "Evil", CharacterType.Demon, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), false, false, false)
+            : session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, normalizedChosenId, StringComparison.OrdinalIgnoreCase))
+                ?? _characterDatabase.Resolve(normalizedChosenId);
 
-        if (hiddenFlags.IsDrunk && chosenDefinition.Type != CharacterType.Townsfolk)
+        if (!isEvilSentinel && hiddenFlags.IsDrunk && chosenDefinition.Type != CharacterType.Townsfolk)
         {
             throw new InvalidOperationException("Drunk can only be applied to a Townsfolk character.");
         }
 
-        if (hiddenFlags.IsLunatic && chosenDefinition.Type != CharacterType.Demon)
+        if (!isEvilSentinel && hiddenFlags.IsLunatic && chosenDefinition.Type != CharacterType.Demon)
         {
             throw new InvalidOperationException("Lunatic can only be applied to a Demon character.");
         }
@@ -318,7 +365,8 @@ public sealed class DraftEngine
             throw new InvalidOperationException("Atheist requires explicit commitment confirmation unless chosen as Drunk.");
         }
 
-        var newChoice = new PlayerChoice.ChosenChoice(normalizedChosenId, normalizedOfferedIds, hiddenFlags);
+        var storedHiddenFlags = isEvilSentinel ? new HiddenFlags(false, false) : hiddenFlags;
+        var newChoice = new PlayerChoice.ChosenChoice(normalizedChosenId, normalizedOfferedIds, storedHiddenFlags);
         var updatedSlot = currentSlot with { Choice = newChoice };
         var updatedSession = ReplaceSlot(session, updatedSlot);
         updatedSession = ApplyAutoAddedRequiredCharacters(updatedSession, chosenDefinition);
@@ -329,6 +377,40 @@ public sealed class DraftEngine
             updatedSession = updatedSession with { Status = GameStatus.Completed };
         }
 
+        _sessions[updatedSession.Id] = updatedSession;
+        return updatedSession;
+    }
+
+    public GameSession ResolveEvilSlot(Guid sessionId, int draftOrder, string actualCharacterId, HiddenFlags hiddenFlags)
+    {
+        if (string.IsNullOrWhiteSpace(actualCharacterId))
+        {
+            throw new ArgumentException("Actual character id is required.", nameof(actualCharacterId));
+        }
+
+        var session = GetSession(sessionId);
+        var slot = session.Players.FirstOrDefault(player => player.DraftOrder == draftOrder)
+            ?? throw new InvalidOperationException($"Draft slot '{draftOrder}' was not found.");
+
+        if (slot.Choice is not PlayerChoice.ChosenChoice chosenChoice
+            || (!string.Equals(chosenChoice.CharacterId, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase)
+                && !(chosenChoice.OfferedIds.Count == 1
+                    && chosenChoice.OfferedIds.Contains(EvilSentinelCharacterId, StringComparer.OrdinalIgnoreCase))))
+        {
+            throw new InvalidOperationException("Draft slot is not awaiting evil resolution.");
+        }
+
+        var normalizedId = actualCharacterId.Trim();
+        var actualDefinition = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
+            ?? _characterDatabase.Resolve(normalizedId);
+
+        if (actualDefinition.Type != CharacterType.Minion && actualDefinition.Type != CharacterType.Demon)
+        {
+            throw new InvalidOperationException("Resolved evil assignment must be a Minion or Demon.");
+        }
+
+        var resolvedSlot = slot with { Choice = new PlayerChoice.ChosenChoice(normalizedId, chosenChoice.OfferedIds, hiddenFlags) };
+        var updatedSession = ReplaceSlot(session, resolvedSlot);
         _sessions[updatedSession.Id] = updatedSession;
         return updatedSession;
     }
@@ -345,7 +427,7 @@ public sealed class DraftEngine
             state.ChosenCharacterIds,
             current.ActiveLoricIds,
             state.HiddenFlagsByCharacterId,
-            new SessionSetupOptions(current.UseMarionette),
+            new SessionSetupOptions(current.UseMarionette, current.IsLegionGame, current.LegionCount),
             _characterDatabase,
             _loricDatabase);
 
@@ -638,7 +720,7 @@ public sealed class DraftEngine
             snapshot.ChosenCharacterIds,
             session.ActiveLoricIds,
             snapshot.HiddenFlagsByCharacterId,
-            new SessionSetupOptions(session.UseMarionette),
+            new SessionSetupOptions(session.UseMarionette, session.IsLegionGame, session.LegionCount),
             _characterDatabase,
             _loricDatabase);
 

@@ -14,6 +14,10 @@ public sealed class GameSessionEntity
 
     public bool UseMarionette { get; set; }
 
+    public bool IsLegionGame { get; set; }
+
+    public int LegionCount { get; set; }
+
     public int Status { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }

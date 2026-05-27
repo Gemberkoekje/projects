@@ -318,6 +318,52 @@ public sealed class SetupCalculatorTests
         Assert.Equal(new SetupCounts(5, 0, 1, 1), Assert.Single(result.ValidTargetCounts));
     }
 
+    [Theory]
+    [InlineData(9, 7)]
+    [InlineData(10, 7)]
+    [InlineData(11, 8)]
+    [InlineData(12, 9)]
+    [InlineData(15, 11)]
+    public void Calculate_LegionGame_UsesDerivedDefaultLegionCount(int playerCount, int expectedLegionCount)
+    {
+        var script = CreateScript("legion", "chef", "washerwoman", "poisoner", "imp");
+
+        var result = _calculator.Calculate(
+            script,
+            playerCount,
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false, true, 0),
+            _characterDatabase,
+            _loricDatabase);
+
+        var counts = Assert.Single(result.ValidTargetCounts);
+        Assert.Equal(expectedLegionCount, counts.Demons);
+        Assert.Equal(0, counts.Minions);
+        Assert.Equal(playerCount - expectedLegionCount, counts.Townsfolk + counts.Outsiders);
+    }
+
+    [Fact]
+    public void Calculate_LegionGame_UsesStorytellerOverrideLegionCount()
+    {
+        var script = CreateScript("legion", "chef", "washerwoman", "poisoner", "imp");
+
+        var result = _calculator.Calculate(
+            script,
+            10,
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false, true, 5),
+            _characterDatabase,
+            _loricDatabase);
+
+        var counts = Assert.Single(result.ValidTargetCounts);
+        Assert.Equal(5, counts.Demons);
+        Assert.Equal(5, counts.Townsfolk + counts.Outsiders);
+    }
+
     private Script CreateScript(params string[] ids)
     {
         IReadOnlyList<CharacterDefinition> characters = ids.Length == 0

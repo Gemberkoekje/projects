@@ -116,7 +116,13 @@ public static class CuratoolApi
             return TypedResults.NotFound(CreateNotFoundProblem("Script not found.", $"Script '{request.ScriptId}' was not found."));
         }
 
-        var session = draftEngine.StartSession(storedScript.Script, request.PlayerCount, NormalizeIds(request.ActiveLorics), request.UseMarionette);
+        var session = draftEngine.StartSession(
+            storedScript.Script,
+            request.PlayerCount,
+            NormalizeIds(request.ActiveLorics),
+            request.UseMarionette,
+            request.IsLegionGame,
+            request.LegionCount);
         await gameSessionRepository.AddAsync(session, storedScript.Id, cancellationToken);
         var persisted = await gameSessionRepository.GetByIdAsync(session.Id, cancellationToken);
         return TypedResults.Created($"/api/sessions/{persisted.Id}", SessionApiMapper.MapSession(persisted, draftEngine.GetMakeupSummary(persisted)));
@@ -355,6 +361,8 @@ public static class CuratoolApi
             Array.Empty<PlayerSlot>(),
             GameStatus.Unknown,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
     }
 }

@@ -28,6 +28,28 @@ else
             </div>
         }
 
+        @if (SessionState.SupportsLegionOption)
+        {
+            <div>
+                <label>
+                    <InputCheckbox Value="SessionState.IsLegionGame" ValueChanged="OnLegionGameChanged" ValueExpression="@(() => SessionState.IsLegionGame)" /> Legion game?
+                </label>
+            </div>
+
+            @if (SessionState.IsLegionGame)
+            {
+                <div>
+                    <label for="legionCount"><strong>Legion Count</strong></label><br />
+                    <input id="legionCount"
+                           type="number"
+                           min="0"
+                           max="@SessionState.PlayerCount"
+                           value="@SessionState.LegionCount"
+                           @onchange="OnLegionCountChanged" />
+                </div>
+            }
+        }
+
         <fieldset>
             <legend><strong>Active Lorics</strong></legend>
             @foreach (var loric in SessionState.AvailableLorics)
@@ -113,6 +135,28 @@ else
     private void OnUseMarionetteChanged(bool value)
     {
         SessionState.UseMarionette = value;
+        SessionState.RecalculateSetup();
+    }
+
+    private void OnLegionGameChanged(bool value)
+    {
+        SessionState.SetLegionGame(value);
+        SessionState.RecalculateSetup();
+    }
+
+    private void OnLegionCountChanged(ChangeEventArgs args)
+    {
+        if (args.Value is null)
+        {
+            return;
+        }
+
+        if (!int.TryParse(args.Value.ToString(), out var legionCount))
+        {
+            return;
+        }
+
+        SessionState.SetLegionCount(legionCount);
         SessionState.RecalculateSetup();
     }
 

@@ -38,7 +38,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             players,
             GameStatus.Drafting,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         var addedSession = await _repository.AddAsync(session, _scriptId);
 
@@ -65,7 +67,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             players,
             GameStatus.Drafting,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         await _repository.AddAsync(session, _scriptId);
 
@@ -96,7 +100,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             players,
             GameStatus.Drafting,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         await _repository.AddAsync(session, _scriptId);
 
@@ -113,7 +119,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             updatedPlayers,
             GameStatus.Completed,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         // Act
         await _repository.UpdateAsync(completedSession);
@@ -143,7 +151,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             players,
             GameStatus.Drafting,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         await _repository.AddAsync(session, _scriptId);
 
@@ -165,7 +175,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             updatedPlayers,
             GameStatus.Drafting,
             Array.Empty<string>(),
-            false);
+            false,
+            false,
+            0);
 
         // Act
         await _repository.UpdateAsync(chosenSession);
@@ -205,7 +217,9 @@ public sealed class GameSessionPersistenceTests : IDisposable
             players,
             GameStatus.Drafting,
             activeLorics,
-            true);
+            true,
+            false,
+            0);
 
         // Act
         await _repository.AddAsync(session, _scriptId);
