@@ -249,7 +249,7 @@ public sealed class DraftEngine
         var validIds = new HashSet<string>(GetRemainingValidCharacters(session).Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
         foreach (var offeredId in offeredSet)
         {
-            if (!validIds.Contains(offeredId))
+            if (!validIds.Contains(offeredId) && !string.Equals(offeredId, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException($"Curated offer contains invalid id '{offeredId}'.");
             }
@@ -344,7 +344,9 @@ public sealed class DraftEngine
             && hiddenFlags.IsDrunk;
 
         var validIds = new HashSet<string>(GetRemainingValidCharacters(session).Select(c => c.Id), StringComparer.OrdinalIgnoreCase);
-        if (!validIds.Contains(normalizedChosenId) && !allowsDrunkAtheistOverride)
+        if (!validIds.Contains(normalizedChosenId)
+            && !isEvilSentinel
+            && !allowsDrunkAtheistOverride)
         {
             throw new InvalidOperationException("Chosen character is not currently valid.");
         }
@@ -352,6 +354,7 @@ public sealed class DraftEngine
         foreach (var offeredId in normalizedOfferedIds)
         {
             if (!validIds.Contains(offeredId)
+                && !string.Equals(offeredId, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase)
                 && !(allowsDrunkAtheistOverride && string.Equals(offeredId, normalizedChosenId, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException($"Offered id '{offeredId}' is not currently valid.");

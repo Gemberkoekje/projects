@@ -100,6 +100,12 @@ else
                 @if (SessionState.IsCuratingOffer)
                 {
                     <p><strong>Curate up to 3 characters:</strong></p>
+                    <label>
+                        <InputCheckbox
+                            Value="SessionState.AddEvilOptionToCuratedOffer"
+                            ValueChanged="value => OnAddEvilOptionChanged(value)"
+                            ValueExpression="@(() => SessionState.AddEvilOptionToCuratedOffer)" /> Add Evil option
+                    </label>
                     <div class="selection-box">
                         @foreach (var character in SessionState.CurrentValidCharacters)
                         {
@@ -223,6 +229,11 @@ else
     private async Task ConfirmCurated()
     {
         await SessionState.ConfirmCuratedOfferAsync();
+    }
+
+    private void OnAddEvilOptionChanged(bool value)
+    {
+        SessionState.SetAddEvilOptionToCuratedOffer(value);
     }
 
     private async Task ConfirmAtheist()

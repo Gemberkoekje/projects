@@ -8,6 +8,7 @@ namespace TheCuratool.Web;
 public sealed class DraftSessionState
 {
     private const string CuratorLoricId = "the_curator";
+    private const string EvilSentinelCharacterId = "evil";
 
     private readonly ScriptParser _scriptParser;
     private readonly SetupCalculator _setupCalculator;
@@ -67,6 +68,8 @@ public sealed class DraftSessionState
     public bool NextChoiceIsLunatic { get; set; }
 
     public bool IsCuratingOffer { get; private set; }
+
+    public bool AddEvilOptionToCuratedOffer { get; private set; }
 
     public bool SupportsMarionetteOption => ScriptContainsCharacter("marionette");
 
@@ -340,7 +343,25 @@ public sealed class DraftSessionState
 
         ClearDraftMessage();
         IsCuratingOffer = true;
+        AddEvilOptionToCuratedOffer = false;
         _curatedOfferSelection.Clear();
+    }
+
+    public void SetAddEvilOptionToCuratedOffer(bool addEvil)
+    {
+        if (!IsCuratingOffer)
+        {
+            return;
+        }
+
+        if (addEvil && _curatedOfferSelection.Count >= 3)
+        {
+            SetDraftMessage("When adding Evil, curate up to 2 other characters.");
+            return;
+        }
+
+        AddEvilOptionToCuratedOffer = addEvil;
+        ClearDraftMessage();
     }
 
     public void ToggleCuratedCharacter(string characterId)
@@ -357,9 +378,12 @@ public sealed class DraftSessionState
             return;
         }
 
-        if (_curatedOfferSelection.Count >= 3)
+        var maxCuratedCharacters = AddEvilOptionToCuratedOffer ? 2 : 3;
+        if (_curatedOfferSelection.Count >= maxCuratedCharacters)
         {
-            SetDraftMessage("You can curate up to 3 characters.");
+            SetDraftMessage(AddEvilOptionToCuratedOffer
+                ? "When adding Evil, curate up to 2 other characters."
+                : "You can curate up to 3 characters.");
             return;
         }
 
@@ -383,10 +407,15 @@ public sealed class DraftSessionState
 
         try
         {
-            CurrentSession = _draftEngine.CreateCuratedOffer(CurrentSession.Id, slot, _curatedOfferSelection);
+            var offeredIds = AddEvilOptionToCuratedOffer
+                ? _curatedOfferSelection.Concat(new[] { EvilSentinelCharacterId }).ToList().AsReadOnly()
+                : _curatedOfferSelection.AsReadOnly();
+
+            CurrentSession = _draftEngine.CreateCuratedOffer(CurrentSession.Id, slot, offeredIds);
             await _gameSessionRepository.UpdateAsync(CurrentSession);
             SyncOfferFromCurrentSlot();
             IsCuratingOffer = false;
+            AddEvilOptionToCuratedOffer = false;
             _curatedOfferSelection.Clear();
             ClearDraftMessage();
         }
@@ -545,6 +574,12 @@ public sealed class DraftSessionState
         var resolved = new List<CharacterDefinition>();
         foreach (var id in ids)
         {
+            if (string.Equals(id, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
+            {
+                resolved.Add(CreateEvilSentinelCharacter());
+                continue;
+            }
+
             if (scriptMap.TryGetValue(id, out var inScript))
             {
                 resolved.Add(inScript);
@@ -570,6 +605,11 @@ public sealed class DraftSessionState
             return false;
         }
 
+        if (string.Equals(characterId.Trim(), EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         var character = ResolveCharacter(characterId);
         return character.Type == CharacterType.Townsfolk;
     }
@@ -582,6 +622,11 @@ public sealed class DraftSessionState
         }
 
         if (string.IsNullOrWhiteSpace(characterId))
+        {
+            return false;
+        }
+
+        if (string.Equals(characterId.Trim(), EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -621,6 +666,11 @@ public sealed class DraftSessionState
     private CharacterDefinition ResolveCharacter(string characterId)
     {
         var normalized = characterId.Trim();
+        if (string.Equals(normalized, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateEvilSentinelCharacter();
+        }
+
         var fromScript = LoadResult.Script.Characters.FirstOrDefault(character => string.Equals(character.Id, normalized, StringComparison.OrdinalIgnoreCase));
         return fromScript ?? _characterDatabase.Resolve(normalized);
     }
@@ -659,8 +709,14 @@ public sealed class DraftSessionState
         _currentOfferIds.Clear();
         _curatedOfferSelection.Clear();
         IsCuratingOffer = false;
+        AddEvilOptionToCuratedOffer = false;
         NextChoiceIsDrunk = false;
         NextChoiceIsLunatic = false;
+    }
+
+    private static CharacterDefinition CreateEvilSentinelCharacter()
+    {
+        return new CharacterDefinition(EvilSentinelCharacterId, "Evil", CharacterType.Demon, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), false, false, false);
     }
 
     private void SetDraftMessage(string message)
