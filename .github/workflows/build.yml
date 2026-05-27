@@ -24,10 +24,10 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore TheCuratool.slnx
+        run: dotnet restore TheCuratool/TheCuratool.slnx
 
       - name: Build
-        run: dotnet build TheCuratool.slnx --configuration Release --no-restore
+        run: dotnet build TheCuratool/TheCuratool.slnx --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test TheCuratool.slnx --configuration Release --no-build --verbosity normal
+        run: dotnet test TheCuratool/TheCuratool.slnx --configuration Release --no-build --verbosity normal
