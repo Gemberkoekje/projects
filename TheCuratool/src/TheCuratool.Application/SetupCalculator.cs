@@ -49,6 +49,35 @@ public sealed class SetupCalculator
             throw new ArgumentOutOfRangeException(nameof(playerCount), "Player count must be between 5 and 15.");
         }
 
+        if (options.IsLegionGame)
+        {
+            var legionCount = options.LegionCount == 0
+                ? GetDefaultLegionCount(playerCount)
+                : options.LegionCount;
+
+            if (legionCount < 0 || legionCount > playerCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(options.LegionCount), "Legion count must be between 0 and player count.");
+            }
+
+            var goodSlots = playerCount - legionCount;
+            var outsiderCount = GetOutsiderCountForGoodSlots(goodSlots);
+            if (outsiderCount > goodSlots)
+            {
+                outsiderCount = goodSlots;
+            }
+
+            var legionDistribution = new SetupCounts(
+                goodSlots - outsiderCount,
+                outsiderCount,
+                0,
+                legionCount);
+
+            return new SetupCalculationResult(
+                legionDistribution,
+                new[] { legionDistribution }.ToList().AsReadOnly());
+        }
+
         var setupContext = new SetupContext(playerCount, chosenCharacterIds, activeLoricIds);
         var activeRules = ResolveRules(script, chosenCharacterIds, activeLoricIds, hiddenFlagsByCharacterId, options, characterDatabase, loricDatabase);
 
@@ -80,6 +109,31 @@ public sealed class SetupCalculator
             .AsReadOnly();
 
         return new SetupCalculationResult(baseDistribution, validTargetCounts);
+    }
+
+    public int GetDefaultLegionCount(int playerCount)
+    {
+        if (!_baseDistributions.TryGetValue(playerCount, out var baseDistribution))
+        {
+            throw new ArgumentOutOfRangeException(nameof(playerCount), "Player count must be between 5 and 15.");
+        }
+
+        return baseDistribution.Townsfolk + baseDistribution.Outsiders;
+    }
+
+    private int GetOutsiderCountForGoodSlots(int goodSlots)
+    {
+        if (goodSlots <= 0)
+        {
+            return 0;
+        }
+
+        if (_baseDistributions.TryGetValue(goodSlots, out var baseline))
+        {
+            return baseline.Outsiders;
+        }
+
+        return 0;
     }
 
     private static IReadOnlyList<ISetupRule> ResolveRules(

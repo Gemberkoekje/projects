@@ -348,6 +348,56 @@ public sealed class DraftEngineTests
         Assert.Contains("king", summary.OutOfScriptCharacterIds, StringComparer.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void LegionOnScript_WhenLegionModeDisabled_ExcludesLegionFromRemainingPool()
+    {
+        var script = CreateScript("legion", "chef", "washerwoman", "librarian", "poisoner", "baron", "imp");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>(), isLegionGame: false);
+
+        var remaining = engine.GetRemainingValidCharacters(session);
+
+        Assert.DoesNotContain(remaining, character => string.Equals(character.Id, "legion", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LegionMode_EvilSlotsOfferOnlyEvilSentinel()
+    {
+        var script = CreateScript("legion", "chef", "washerwoman", "librarian", "poisoner", "baron", "imp");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>(), isLegionGame: true);
+
+        var suggestions = engine.SuggestThree(session);
+        var evilOnly = Assert.Single(suggestions);
+        Assert.Equal("evil", evilOnly.Id, ignoreCase: true);
+        Assert.Equal(CharacterType.Demon, evilOnly.Type);
+    }
+
+    [Fact]
+    public void ResolveEvilSlot_ReplacesSentinelAndUpdatesSummaryGrouping()
+    {
+        var script = CreateScript("legion", "imp", "poisoner", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>(), isLegionGame: true, legionCount: 1);
+        var evilDraftOrder = GetCurrentDraftOrder(session);
+
+        session = engine.RecordChoice(
+            session.Id,
+            evilDraftOrder,
+            "evil",
+            new[] { "evil" },
+            new HiddenFlags(false, false));
+
+        var unresolvedSummary = engine.GetMakeupSummary(session);
+        Assert.Contains(unresolvedSummary.ChosenCharactersByType[CharacterType.Demon], name => string.Equals(name, "Evil (ST-assigned)", StringComparison.Ordinal));
+
+        session = engine.ResolveEvilSlot(session.Id, evilDraftOrder, "imp", new HiddenFlags(false, false));
+        var resolvedSummary = engine.GetMakeupSummary(session);
+
+        Assert.DoesNotContain(resolvedSummary.ChosenCharactersByType[CharacterType.Demon], name => string.Equals(name, "Evil (ST-assigned)", StringComparison.Ordinal));
+        Assert.Contains(resolvedSummary.ChosenCharactersByType[CharacterType.Demon], name => string.Equals(name, "Imp", StringComparison.Ordinal));
+    }
+
     private DraftEngine CreateEngine()
     {
         return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator());

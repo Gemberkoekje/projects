@@ -28,6 +28,17 @@ public sealed record DraftStateSnapshot(
             chosenIds.Add(chosen.CharacterId);
             hiddenFlags[chosen.CharacterId] = chosen.HiddenFlags;
 
+            if (string.Equals(chosen.CharacterId, "evil", StringComparison.OrdinalIgnoreCase))
+            {
+                hasAnyDemon = true;
+                if (session.IsLegionGame)
+                {
+                    realDemonsChosen++;
+                }
+
+                continue;
+            }
+
             var character = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosen.CharacterId, StringComparison.OrdinalIgnoreCase));
             if (character is null)
             {

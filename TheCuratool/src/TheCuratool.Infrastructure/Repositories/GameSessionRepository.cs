@@ -17,6 +17,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             PlayerCount = session.PlayerCount,
             ActiveLorics = JsonSerializer.Serialize(session.ActiveLoricIds),
             UseMarionette = session.UseMarionette,
+            IsLegionGame = session.IsLegionGame,
+            LegionCount = session.LegionCount,
             Status = (int)session.Status,
             CreatedAt = DateTimeOffset.UtcNow,
         };
@@ -51,6 +53,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
 
         entity.Status = (int)session.Status;
         entity.UseMarionette = session.UseMarionette;
+        entity.IsLegionGame = session.IsLegionGame;
+        entity.LegionCount = session.LegionCount;
         entity.ActiveLorics = JsonSerializer.Serialize(session.ActiveLoricIds);
 
         var existingSlots = entity.PlayerSlots.ToList();
@@ -135,7 +139,9 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             playerSlots,
             (GameStatus)entity.Status,
             activeLorics,
-            entity.UseMarionette);
+            entity.UseMarionette,
+            entity.IsLegionGame,
+            entity.LegionCount);
     }
 
     private static void UpdatePlayerSlotEntity(PlayerSlotEntity entity, PlayerSlot slot)

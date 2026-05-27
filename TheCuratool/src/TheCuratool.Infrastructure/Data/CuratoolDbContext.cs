@@ -70,6 +70,14 @@ public sealed class CuratoolDbContext(DbContextOptions<CuratoolDbContext> option
             .HasDefaultValue(false);
 
         modelBuilder.Entity<GameSessionEntity>()
+            .Property(g => g.IsLegionGame)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<GameSessionEntity>()
+            .Property(g => g.LegionCount)
+            .HasDefaultValue(0);
+
+        modelBuilder.Entity<GameSessionEntity>()
             .Property(g => g.Status)
             .IsRequired()
             .HasDefaultValue(1); // GameStatus.Drafting

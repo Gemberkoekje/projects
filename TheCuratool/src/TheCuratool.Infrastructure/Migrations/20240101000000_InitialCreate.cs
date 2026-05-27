@@ -35,6 +35,8 @@ namespace TheCuratool.Infrastructure.Migrations
                     PlayerCount = table.Column<int>(type: "integer", nullable: false),
                     ActiveLorics = table.Column<string>(type: "text", nullable: false, defaultValue: "[]"),
                     UseMarionette = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    IsLegionGame = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    LegionCount = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     Status = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'")
                 },
