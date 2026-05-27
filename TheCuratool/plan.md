@@ -529,3 +529,13 @@ Run phases in order. Phases 1–5 produce a working CLI-testable core. Phase 6 a
   - Added `AspNetCore.HealthChecks.NpgSql` package.
   - Configured `AddHealthChecks().AddNpgSql(...)` and mapped `/healthz` via `MapHealthChecks`.
 - README k8s section updated with `kubectl apply -k deploy/k8s/`, namespace-aware verification, and port-forward usage.
+
+### ✅ Completed
+
+**Phase S3 — Hidden Flag Setup Suppression**
+- Confirmed setup-rule suppression in `SetupCalculator` for hidden-flagged picks (`IsDrunk` / `IsLunatic`) while preserving hidden-flag type reassignment behavior in draft math.
+- Added regression unit tests in `SetupCalculatorTests`:
+  - Drunk-flagged Baron does not apply outsider delta.
+  - Lunatic-flagged Fang Gu does not apply outsider delta.
+  - Drunk-flagged Godfather does not produce storyteller-choice outsider outcomes.
+- Existing draft invariant remains covered: lunatic-flagged Demon picks still require a real non-lunatic Demon before completion.

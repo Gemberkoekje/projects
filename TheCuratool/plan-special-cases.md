@@ -110,6 +110,8 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S3 — Hidden Flag Setup Suppression
 
+**Status:** ✅ Completed
+
 **Goal:** Honor "When a token is flagged Drunk or Lunatic, its setup rules are ignored for draft math purposes."
 
 **Deliverables:**
