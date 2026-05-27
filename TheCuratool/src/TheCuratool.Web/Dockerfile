@@ -1,16 +1,16 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-COPY ["src/TheCuratool.Web/TheCuratool.Web.csproj", "src/TheCuratool.Web/"]
-COPY ["src/TheCuratool.Application/TheCuratool.Application.csproj", "src/TheCuratool.Application/"]
-COPY ["src/TheCuratool.Domain/TheCuratool.Domain.csproj", "src/TheCuratool.Domain/"]
-COPY ["src/TheCuratool.Infrastructure/TheCuratool.Infrastructure.csproj", "src/TheCuratool.Infrastructure/"]
-COPY ["tests/TheCuratool.UnitTests/TheCuratool.UnitTests.csproj", "tests/TheCuratool.UnitTests/"]
-COPY ["Directory.Build.props", "."]
-COPY ["TheCuratool.slnx", "."]
+COPY ["TheCuratool/src/TheCuratool.Web/TheCuratool.Web.csproj", "src/TheCuratool.Web/"]
+COPY ["TheCuratool/src/TheCuratool.Application/TheCuratool.Application.csproj", "src/TheCuratool.Application/"]
+COPY ["TheCuratool/src/TheCuratool.Domain/TheCuratool.Domain.csproj", "src/TheCuratool.Domain/"]
+COPY ["TheCuratool/src/TheCuratool.Infrastructure/TheCuratool.Infrastructure.csproj", "src/TheCuratool.Infrastructure/"]
+COPY ["TheCuratool/tests/TheCuratool.UnitTests/TheCuratool.UnitTests.csproj", "tests/TheCuratool.UnitTests/"]
+COPY ["TheCuratool/Directory.Build.props", "."]
+COPY ["TheCuratool/TheCuratool.slnx", "."]
 RUN dotnet restore "src/TheCuratool.Web/TheCuratool.Web.csproj"
 
-COPY . .
+COPY TheCuratool/ .
 WORKDIR /src/src/TheCuratool.Web
 RUN dotnet publish "TheCuratool.Web.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
