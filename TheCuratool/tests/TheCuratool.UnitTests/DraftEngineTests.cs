@@ -294,18 +294,18 @@ public sealed class DraftEngineTests
     [Fact]
     public void CreateCuratedOffer_AllowsEvilSentinelAlongsideCharacters()
     {
-        var script = CreateScript("fortune_teller", "goon", "chef", "poisoner", "imp", "baron", "washerwoman");
+        var script = CreateScript("fortune_teller", "goon", "drunk", "chef", "poisoner", "imp", "baron", "washerwoman", "librarian");
         var engine = CreateEngine();
-        var session = engine.StartSession(script, 7, Array.Empty<string>());
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
         var slot = GetCurrentDraftOrder(session);
 
         session = engine.CreateCuratedOffer(session.Id, slot, new[] { "fortune_teller", "goon", "evil" });
 
         var updatedSlot = session.Players.Single(player => player.DraftOrder == slot);
         var offer = Assert.IsType<PlayerChoice.UnchosenChoice>(updatedSlot.Choice);
-        Assert.True(offer.OfferedIds.Contains("fortune_teller", StringComparer.OrdinalIgnoreCase));
-        Assert.True(offer.OfferedIds.Contains("goon", StringComparer.OrdinalIgnoreCase));
-        Assert.True(offer.OfferedIds.Contains("evil", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains("fortune_teller", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("goon", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("evil", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

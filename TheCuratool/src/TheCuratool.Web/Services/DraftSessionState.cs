@@ -9,6 +9,7 @@ public sealed class DraftSessionState
 {
     private const string CuratorLoricId = "the_curator";
     private const string EvilSentinelCharacterId = "evil";
+    private const string EvilCurationLimitMessage = "When adding Evil, curate up to 2 other characters.";
 
     private readonly ScriptParser _scriptParser;
     private readonly SetupCalculator _setupCalculator;
@@ -356,7 +357,7 @@ public sealed class DraftSessionState
 
         if (addEvil && _curatedOfferSelection.Count >= 3)
         {
-            SetDraftMessage("When adding Evil, curate up to 2 other characters.");
+            SetDraftMessage(EvilCurationLimitMessage);
             return;
         }
 
@@ -382,7 +383,7 @@ public sealed class DraftSessionState
         if (_curatedOfferSelection.Count >= maxCuratedCharacters)
         {
             SetDraftMessage(AddEvilOptionToCuratedOffer
-                ? "When adding Evil, curate up to 2 other characters."
+                ? EvilCurationLimitMessage
                 : "You can curate up to 3 characters.");
             return;
         }
