@@ -31,6 +31,27 @@ public sealed class SetupCalculatorTests
     }
 
     [Fact]
+    public void Calculate_DrunkFlaggedBaron_DoesNotApplyOutsiderDelta()
+    {
+        var script = CreateScript("baron");
+
+        var result = _calculator.Calculate(
+            script,
+            7,
+            new[] { "baron" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>
+            {
+                ["baron"] = new HiddenFlags(true, false),
+            },
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Equal(new SetupCounts(5, 0, 1, 1), Assert.Single(result.ValidTargetCounts));
+    }
+
+    [Fact]
     public void Calculate_Godfather_ProducesStorytellerChoiceOutcomes()
     {
         var script = CreateScript("godfather");
@@ -50,6 +71,27 @@ public sealed class SetupCalculatorTests
     }
 
     [Fact]
+    public void Calculate_DrunkFlaggedGodfather_DoesNotProduceOutsiderChoiceOutcomes()
+    {
+        var script = CreateScript("godfather");
+
+        var result = _calculator.Calculate(
+            script,
+            8,
+            new[] { "godfather" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>
+            {
+                ["godfather"] = new HiddenFlags(true, false),
+            },
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Equal(new SetupCounts(5, 1, 1, 1), Assert.Single(result.ValidTargetCounts));
+    }
+
+    [Fact]
     public void Calculate_FangGu_AddsAnOutsider()
     {
         var script = CreateScript("fang_gu");
@@ -65,6 +107,27 @@ public sealed class SetupCalculatorTests
             _loricDatabase);
 
         Assert.Contains(new SetupCounts(4, 1, 1, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_LunaticFlaggedFangGu_DoesNotApplyOutsiderDelta()
+    {
+        var script = CreateScript("fang_gu");
+
+        var result = _calculator.Calculate(
+            script,
+            7,
+            new[] { "fang_gu" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>
+            {
+                ["fang_gu"] = new HiddenFlags(false, true),
+            },
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Equal(new SetupCounts(5, 0, 1, 1), Assert.Single(result.ValidTargetCounts));
     }
 
     [Fact]
