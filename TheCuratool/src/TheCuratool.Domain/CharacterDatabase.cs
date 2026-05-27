@@ -53,7 +53,27 @@ public sealed class CharacterDatabase
             CharacterType.Townsfolk,
             Array.Empty<ISetupRule>(),
             Array.Empty<IAvailabilityConstraint>(),
-            true);
+            true,
+            false);
+    }
+
+    private static CharacterDefinition CreateDefinition(
+        string id,
+        string displayName,
+        CharacterType type,
+        IReadOnlyList<ISetupRule> setupRules,
+        IReadOnlyList<IAvailabilityConstraint> availabilityConstraints,
+        bool isUnknown,
+        bool isDraftExcluded)
+    {
+        return new CharacterDefinition(
+            id,
+            displayName,
+            type,
+            setupRules,
+            availabilityConstraints,
+            isUnknown,
+            isDraftExcluded);
     }
 
     private static IReadOnlyDictionary<string, CharacterDefinition> Parse(string json)
@@ -81,14 +101,16 @@ public sealed class CharacterDatabase
             var type = ParseCharacterType(ReadStringOrDefault(item, "type", CharacterType.Townsfolk.ToString()));
             var setupRules = ParseSetupRules(item);
             var constraints = ParseAvailabilityConstraints(item);
+            var isDraftExcluded = ReadBoolOrDefault(item, "isDraftExcluded", false);
 
-            characters[normalizedId] = new CharacterDefinition(
+            characters[normalizedId] = CreateDefinition(
                 normalizedId,
                 displayName,
                 type,
                 setupRules,
                 constraints,
-                false);
+                false,
+                isDraftExcluded);
         }
 
         return new ReadOnlyDictionary<string, CharacterDefinition>(characters);
@@ -126,9 +148,30 @@ public sealed class CharacterDatabase
 
             return new StoryTellerChoiceSetupRule(new ISetupRule[]
             {
-                new NoSetupRule(),
-                new OutsiderDeltaSetupRule(delta, false),
+                new OutsiderDeltaSetupRule(-Math.Abs(delta), false),
+                new OutsiderDeltaSetupRule(Math.Abs(delta), false),
             });
+        }
+
+        if (string.Equals(kind, "ReplaceDemon", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ReplaceDemonSetupRule();
+        }
+
+        if (string.Equals(kind, "SwapOutsiderForTownsfolk", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SwapOutsiderForTownsfolkSetupRule();
+        }
+
+        if (string.Equals(kind, "MinionDelta", StringComparison.OrdinalIgnoreCase))
+        {
+            var delta = rule.GetProperty("delta").GetInt32();
+            return new MinionDeltaSetupRule(delta);
+        }
+
+        if (string.Equals(kind, "UnconstrainedOutsiderDelta", StringComparison.OrdinalIgnoreCase))
+        {
+            return new UnconstrainedOutsiderDeltaSetupRule();
         }
 
         if (string.Equals(kind, "ReplaceTownsfolk", StringComparison.OrdinalIgnoreCase))

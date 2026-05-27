@@ -20,30 +20,37 @@ public sealed class CharacterDatabaseTests
 
         var storytellerChoice = Assert.IsType<StoryTellerChoiceSetupRule>(Assert.Single(godfather.SetupRules));
         Assert.Equal(2, storytellerChoice.Options.Count);
+        Assert.All(storytellerChoice.Options, option => Assert.IsType<OutsiderDeltaSetupRule>(option));
 
-        var drunk = database.Resolve("drunk");
-        Assert.Equal(CharacterType.Outsider, drunk.Type);
-        Assert.IsType<ReplaceTownsfolkSetupRule>(Assert.Single(drunk.SetupRules));
+        var fangGu = database.Resolve("fang_gu");
+        Assert.Contains(fangGu.SetupRules, r => r is OutsiderDeltaSetupRule);
 
-        var nodashii = database.Resolve("nodashii");
-        Assert.Equal(CharacterType.Demon, nodashii.Type);
-
-        var kazali = database.Resolve("kazali");
-        var minionConstraint = Assert.IsType<BlockedIfAnyChosenOfTypeConstraint>(Assert.Single(kazali.AvailabilityConstraints));
-        Assert.Equal(CharacterType.Minion, minionConstraint.Type);
+        var vigormortis = database.Resolve("vigormortis");
+        Assert.Contains(vigormortis.SetupRules, r => r is OutsiderDeltaSetupRule);
 
         var summoner = database.Resolve("summoner");
+        Assert.IsType<ReplaceDemonSetupRule>(Assert.Single(summoner.SetupRules));
         var demonConstraint = Assert.IsType<BlockedIfAnyChosenOfTypeConstraint>(Assert.Single(summoner.AvailabilityConstraints));
         Assert.Equal(CharacterType.Demon, demonConstraint.Type);
+
+        var hermit = database.Resolve("hermit");
+        var hermitChoice = Assert.IsType<StoryTellerChoiceSetupRule>(Assert.Single(hermit.SetupRules));
+        Assert.Contains(hermitChoice.Options, option => option is NoSetupRule);
+        Assert.Contains(hermitChoice.Options, option => option is SwapOutsiderForTownsfolkSetupRule);
+
+        var lordOfTyphon = database.Resolve("lord_of_typhon");
+        Assert.Contains(lordOfTyphon.SetupRules, r => r is UnconstrainedOutsiderDeltaSetupRule);
+        Assert.Contains(lordOfTyphon.SetupRules, r => r is MinionDeltaSetupRule);
+
+        var marionette = database.Resolve("marionette");
+        Assert.True(marionette.IsDraftExcluded);
+        Assert.Empty(marionette.SetupRules);
 
         var atheist = database.Resolve("atheist");
         Assert.IsType<AtheistFirstPickConstraint>(Assert.Single(atheist.AvailabilityConstraints));
 
         var huntsman = database.Resolve("huntsman");
         Assert.Contains(huntsman.SetupRules, r => r is RequiresCharacterSetupRule requires && requires.RequiredId == "damsel");
-
-        var lilMonsta = database.Resolve("lil_monsta");
-        Assert.IsType<MinionSwapSetupRule>(Assert.Single(lilMonsta.SetupRules));
 
         var alsaahir = database.Resolve("alsaahir");
         Assert.Empty(alsaahir.SetupRules);

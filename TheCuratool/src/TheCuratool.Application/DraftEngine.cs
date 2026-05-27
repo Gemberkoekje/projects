@@ -78,6 +78,11 @@ public sealed class DraftEngine
 
         foreach (var character in current.Script.Characters)
         {
+            if (character.IsDraftExcluded)
+            {
+                continue;
+            }
+
             if (chosenSet.Contains(character.Id))
             {
                 continue;
@@ -160,6 +165,11 @@ public sealed class DraftEngine
 
         foreach (var character in valid)
         {
+            if (character.IsDraftExcluded)
+            {
+                continue;
+            }
+
             if (selected.Any(s => string.Equals(s.Id, character.Id, StringComparison.OrdinalIgnoreCase)))
             {
                 continue;

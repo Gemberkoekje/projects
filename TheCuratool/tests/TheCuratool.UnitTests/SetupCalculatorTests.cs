@@ -37,7 +37,7 @@ public sealed class SetupCalculatorTests
 
         var result = _calculator.Calculate(
             script,
-            7,
+            8,
             new[] { "godfather" },
             Array.Empty<string>(),
             new Dictionary<string, HiddenFlags>(),
@@ -45,8 +45,107 @@ public sealed class SetupCalculatorTests
             _characterDatabase,
             _loricDatabase);
 
-        Assert.Contains(new SetupCounts(5, 0, 1, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(6, 0, 1, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(4, 2, 1, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_FangGu_AddsAnOutsider()
+    {
+        var script = CreateScript("fang_gu");
+
+        var result = _calculator.Calculate(
+            script,
+            7,
+            new[] { "fang_gu" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
         Assert.Contains(new SetupCounts(4, 1, 1, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_Vigormortis_SubtractsAnOutsider()
+    {
+        var script = CreateScript("vigormortis");
+
+        var result = _calculator.Calculate(
+            script,
+            8,
+            new[] { "vigormortis" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Contains(new SetupCounts(6, 0, 1, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_Summoner_ReplacesADemonWithATownsfolk()
+    {
+        var script = CreateScript("summoner");
+
+        var result = _calculator.Calculate(
+            script,
+            7,
+            new[] { "summoner" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Contains(new SetupCounts(6, 0, 1, 0), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_Hermit_ProducesChoiceBetweenNoChangeAndSwap()
+    {
+        var script = CreateScript("hermit");
+
+        var result = _calculator.Calculate(
+            script,
+            8,
+            new[] { "hermit" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Contains(new SetupCounts(5, 1, 1, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(6, 0, 1, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Calculate_LordOfTyphon_UsesDeferredOutsiderAndExtraMinionRule()
+    {
+        var script = CreateScript("lord_of_typhon");
+
+        var result = _calculator.Calculate(
+            script,
+            7,
+            new[] { "lord_of_typhon" },
+            Array.Empty<string>(),
+            new Dictionary<string, HiddenFlags>(),
+            new SessionSetupOptions(false),
+            _characterDatabase,
+            _loricDatabase);
+
+        Assert.Contains(new SetupCounts(5, 0, 2, 1), result.ValidTargetCounts);
+    }
+
+    [Fact]
+    public void Marionette_IsNeverPartOfSetupCalculationInput()
+    {
+        var marionette = _characterDatabase.Resolve("marionette");
+
+        Assert.True(marionette.IsDraftExcluded);
     }
 
     [Fact]
@@ -74,7 +173,7 @@ public sealed class SetupCalculatorTests
 
         var result = _calculator.Calculate(
             script,
-            7,
+            8,
             new[] { "huntsman", "damsel" },
             Array.Empty<string>(),
             new Dictionary<string, HiddenFlags>(),
@@ -82,8 +181,8 @@ public sealed class SetupCalculatorTests
             _characterDatabase,
             _loricDatabase);
 
-        Assert.Contains(new SetupCounts(5, 0, 1, 1), result.ValidTargetCounts);
-        Assert.Contains(new SetupCounts(4, 1, 1, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(4, 2, 1, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(6, 0, 1, 1), result.ValidTargetCounts);
     }
 
     [Fact]

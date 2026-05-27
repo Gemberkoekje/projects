@@ -139,10 +139,22 @@ public sealed class DraftEngineTests
         var session = engine.StartSession(script, 7, Array.Empty<string>());
 
         var valid = engine.GetRemainingValidCharacters(session);
+        var suggestions = engine.SuggestThree(session);
 
         Assert.DoesNotContain(valid, c => string.Equals(c.Id, "drunk", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(valid, c => string.Equals(c.Id, "lunatic", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(valid, c => string.Equals(c.Id, "marionette", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, c => string.Equals(c.Id, "marionette", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CreateCuratedOffer_RejectsDraftExcludedCharacters()
+    {
+        var script = CreateScript("marionette", "chef", "poisoner", "imp", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        Assert.Throws<InvalidOperationException>(() => engine.CreateCuratedOffer(session.Id, GetCurrentDraftOrder(session), new[] { "marionette", "chef" }));
     }
 
     [Fact]

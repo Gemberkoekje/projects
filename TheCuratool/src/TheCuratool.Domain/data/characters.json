@@ -22,6 +22,12 @@
     { "id": "scarlet_woman", "displayName": "Scarlet Woman", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "baron", "displayName": "Baron", "type": "Minion", "setupRules": [{ "kind": "OutsiderDelta", "delta": 2, "isStorytellerChoice": false }], "availabilityConstraints": [] },
     { "id": "imp", "displayName": "Imp", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "fang_gu", "displayName": "Fang Gu", "type": "Demon", "setupRules": [{ "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": false }], "availabilityConstraints": [] },
+    { "id": "vigormortis", "displayName": "Vigormortis", "type": "Demon", "setupRules": [{ "kind": "OutsiderDelta", "delta": -1, "isStorytellerChoice": false }], "availabilityConstraints": [] },
+    { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [{ "kind": "ReplaceDemon" }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },
+    { "id": "godfather", "displayName": "Godfather", "type": "Minion", "setupRules": [{ "kind": "StoryTellerChoice", "options": [{ "kind": "OutsiderDelta", "delta": -1, "isStorytellerChoice": false }, { "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": false }] }], "availabilityConstraints": [] },
+    { "id": "hermit", "displayName": "Hermit", "type": "Outsider", "setupRules": [{ "kind": "StoryTellerChoice", "options": [{ "kind": "NoOp" }, { "kind": "SwapOutsiderForTownsfolk" }] }], "availabilityConstraints": [] },
+    { "id": "lord_of_typhon", "displayName": "Lord of Typhon", "type": "Demon", "setupRules": [{ "kind": "UnconstrainedOutsiderDelta" }, { "kind": "MinionDelta", "delta": 1 }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Minion" }] },
 
     { "id": "grandmother", "displayName": "Grandmother", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] },
     { "id": "sailor", "displayName": "Sailor", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] },
@@ -40,7 +46,6 @@
     { "id": "lunatic", "displayName": "Lunatic", "type": "Outsider", "setupRules": [], "availabilityConstraints": [] },
     { "id": "tinker", "displayName": "Tinker", "type": "Outsider", "setupRules": [], "availabilityConstraints": [] },
     { "id": "moonchild", "displayName": "Moonchild", "type": "Outsider", "setupRules": [], "availabilityConstraints": [] },
-    { "id": "godfather", "displayName": "Godfather", "type": "Minion", "setupRules": [{ "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": true }], "availabilityConstraints": [] },
     { "id": "devils_advocate", "displayName": "Devil's Advocate", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "assassin", "displayName": "Assassin", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "mastermind", "displayName": "Mastermind", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
@@ -70,8 +75,6 @@
     { "id": "witch", "displayName": "Witch", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "cerenovus", "displayName": "Cerenovus", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
     { "id": "pit_hag", "displayName": "Pit Hag", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
-    { "id": "fang_gu", "displayName": "Fang Gu", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
-    { "id": "vigormortis", "displayName": "Vigormortis", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
     { "id": "no_dashii", "displayName": "No Dashii", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
     { "id": "nodashii", "displayName": "No Dashii", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
     { "id": "vortox", "displayName": "Vortox", "type": "Demon", "setupRules": [], "availabilityConstraints": [] },
@@ -81,9 +84,9 @@
     { "id": "damsel", "displayName": "Damsel", "type": "Outsider", "setupRules": [], "availabilityConstraints": [] },
     { "id": "atheist", "displayName": "Atheist", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [{ "kind": "AtheistFirstPick" }] },
     { "id": "kazali", "displayName": "Kazali", "type": "Minion", "setupRules": [], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Minion" }] },
-    { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },
+    { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [{ "kind": "ReplaceDemon" }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },
     { "id": "lil_monsta", "displayName": "Lil' Monsta", "type": "Demon", "setupRules": [{ "kind": "MinionSwap" }], "availabilityConstraints": [] },
-    { "id": "marionette", "displayName": "Marionette", "type": "Minion", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "marionette", "displayName": "Marionette", "type": "Minion", "setupRules": [], "availabilityConstraints": [], "isDraftExcluded": true },
     { "id": "alsaahir", "displayName": "Alsaahir", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] }
   ]
 }
