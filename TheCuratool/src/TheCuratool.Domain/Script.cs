@@ -9,4 +9,12 @@ namespace TheCuratool.Domain;
 public sealed record Script(
     string Name,
     string Author,
-    IReadOnlyList<CharacterDefinition> Characters);
+    IReadOnlyList<CharacterDefinition> Characters)
+{
+    public IReadOnlyList<CharacterDefinition> EffectiveCharacters => Characters;
+
+    public IReadOnlyList<CharacterDefinition> OutOfScriptCharacters => Characters
+        .Where(character => character.IsOutOfScript)
+        .ToList()
+        .AsReadOnly();
+}

@@ -82,6 +82,8 @@
     { "id": "balloonist", "displayName": "Balloonist", "type": "Townsfolk", "setupRules": [{ "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": true }], "availabilityConstraints": [] },
     { "id": "huntsman", "displayName": "Huntsman", "type": "Townsfolk", "setupRules": [{ "kind": "OutsiderDelta", "delta": 1, "isStorytellerChoice": true }, { "kind": "RequiresCharacter", "requiredId": "damsel" }], "availabilityConstraints": [] },
     { "id": "damsel", "displayName": "Damsel", "type": "Outsider", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "choirboy", "displayName": "Choirboy", "type": "Townsfolk", "setupRules": [{ "kind": "RequiresCharacter", "requiredId": "king", "autoAddIfMissing": true }], "availabilityConstraints": [] },
+    { "id": "king", "displayName": "King", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] },
     { "id": "atheist", "displayName": "Atheist", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [{ "kind": "AtheistFirstPick" }] },
     { "id": "kazali", "displayName": "Kazali", "type": "Minion", "setupRules": [], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Minion" }] },
     { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [{ "kind": "ReplaceDemon" }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },

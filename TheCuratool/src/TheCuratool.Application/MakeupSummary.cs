@@ -6,4 +6,5 @@ public sealed record MakeupSummary(
     SetupCounts CurrentCounts,
     IReadOnlyList<SetupCounts> TargetCounts,
     IReadOnlyDictionary<CharacterType, IReadOnlyList<string>> ChosenCharactersByType,
-    int RemainingSeats);
+    int RemainingSeats,
+    IReadOnlyList<string> OutOfScriptCharacterIds);

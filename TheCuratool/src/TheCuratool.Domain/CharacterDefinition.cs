@@ -10,6 +10,7 @@ namespace TheCuratool.Domain;
 /// <param name="AvailabilityConstraints">Dynamic constraints that can block this character from being offered during a draft.</param>
 /// <param name="IsUnknown">When <see langword="true"/>, this character was not found in the database and was inferred from the script.</param>
 /// <param name="IsDraftExcluded">When <see langword="true"/>, this character is excluded from drafting and curated offers.</param>
+/// <param name="IsOutOfScript">When <see langword="true"/>, this character was injected into the effective script for the current session.</param>
 public sealed record CharacterDefinition(
     string Id,
     string DisplayName,
@@ -17,4 +18,5 @@ public sealed record CharacterDefinition(
     IReadOnlyList<ISetupRule> SetupRules,
     IReadOnlyList<IAvailabilityConstraint> AvailabilityConstraints,
     bool IsUnknown,
-    bool IsDraftExcluded = false);
+    bool IsDraftExcluded = false,
+    bool IsOutOfScript = false);

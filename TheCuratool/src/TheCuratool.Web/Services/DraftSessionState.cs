@@ -89,7 +89,7 @@ public sealed class DraftSessionState
 
     public MakeupSummary CurrentMakeupSummary => HasCurrentSession
         ? _draftEngine.GetMakeupSummary(CurrentSession)
-        : new MakeupSummary(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>(), new Dictionary<CharacterType, IReadOnlyList<string>>(), 0);
+        : new MakeupSummary(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>(), new Dictionary<CharacterType, IReadOnlyList<string>>(), 0, Array.Empty<string>());
 
     public IReadOnlyList<CharacterDefinition> CurrentOfferCharacters => ResolveCharacters(CurrentOfferIds);
 

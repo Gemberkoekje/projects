@@ -54,6 +54,7 @@ public sealed class CharacterDatabase
             Array.Empty<ISetupRule>(),
             Array.Empty<IAvailabilityConstraint>(),
             true,
+            false,
             false);
     }
 
@@ -64,7 +65,8 @@ public sealed class CharacterDatabase
         IReadOnlyList<ISetupRule> setupRules,
         IReadOnlyList<IAvailabilityConstraint> availabilityConstraints,
         bool isUnknown,
-        bool isDraftExcluded)
+        bool isDraftExcluded,
+        bool isOutOfScript)
     {
         return new CharacterDefinition(
             id,
@@ -73,7 +75,8 @@ public sealed class CharacterDatabase
             setupRules,
             availabilityConstraints,
             isUnknown,
-            isDraftExcluded);
+            isDraftExcluded,
+            isOutOfScript);
     }
 
     private static IReadOnlyDictionary<string, CharacterDefinition> Parse(string json)
@@ -110,7 +113,8 @@ public sealed class CharacterDatabase
                 setupRules,
                 constraints,
                 false,
-                isDraftExcluded);
+                isDraftExcluded,
+                false);
         }
 
         return new ReadOnlyDictionary<string, CharacterDefinition>(characters);
@@ -182,7 +186,8 @@ public sealed class CharacterDatabase
         if (string.Equals(kind, "RequiresCharacter", StringComparison.OrdinalIgnoreCase))
         {
             var requiredId = ReadStringOrDefault(rule, "requiredId", string.Empty);
-            return new RequiresCharacterSetupRule(requiredId);
+            var autoAddIfMissing = ReadBoolOrDefault(rule, "autoAddIfMissing", false);
+            return new RequiresCharacterSetupRule(requiredId, autoAddIfMissing);
         }
 
         if (string.Equals(kind, "MinionSwap", StringComparison.OrdinalIgnoreCase))

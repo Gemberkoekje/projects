@@ -114,12 +114,12 @@ public sealed class DraftEngine
                 _characterDatabase,
                 _loricDatabase);
 
-            if (!IsHardFeasible(character, currentCounts, projectedSetup.ValidTargetCounts, state, remainingSeats, chosenSet))
+            if (!IsHardFeasible(character, current.Script, currentCounts, projectedSetup.ValidTargetCounts, state, remainingSeats, chosenSet))
             {
                 continue;
             }
 
-            if (!SatisfiesPairFeasibility(character, chosenSet, currentCounts, projectedSetup.ValidTargetCounts, remainingSeats))
+            if (!SatisfiesPairFeasibility(character, current.Script, chosenSet, currentCounts, projectedSetup.ValidTargetCounts, remainingSeats))
             {
                 continue;
             }
@@ -321,6 +321,7 @@ public sealed class DraftEngine
         var newChoice = new PlayerChoice.ChosenChoice(normalizedChosenId, normalizedOfferedIds, hiddenFlags);
         var updatedSlot = currentSlot with { Choice = newChoice };
         var updatedSession = ReplaceSlot(session, updatedSlot);
+        updatedSession = ApplyAutoAddedRequiredCharacters(updatedSession, chosenDefinition);
 
         if (GetRemainingSeats(updatedSession) == 0)
         {
@@ -352,7 +353,12 @@ public sealed class DraftEngine
             DraftMath.ComputeCurrentCounts(current, _characterDatabase),
             setupResult.ValidTargetCounts,
             DraftMath.GroupChosenByUnderlyingType(current, _characterDatabase),
-            GetRemainingSeats(current));
+            GetRemainingSeats(current),
+            current.Script.OutOfScriptCharacters
+                .Select(character => character.Id)
+                .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                .AsReadOnly());
     }
 
     private static int GetRemainingSeats(GameSession session)
@@ -391,6 +397,7 @@ public sealed class DraftEngine
 
     private static bool IsHardFeasible(
         CharacterDefinition candidate,
+        Script script,
         SetupCounts currentCounts,
         IReadOnlyList<SetupCounts> targetOutcomes,
         DraftStateSnapshot state,
@@ -402,9 +409,9 @@ public sealed class DraftEngine
             return false;
         }
 
-        var hasHuntsmanWithoutDamsel = chosenSet.Contains("huntsman")
-            && !chosenSet.Contains("damsel")
-            && string.Equals(candidate.Id, "damsel", StringComparison.OrdinalIgnoreCase);
+        var pendingRequirements = GetPendingRequiredCharacters(script, chosenSet);
+        var isPendingRequiredOutsider = candidate.Type == CharacterType.Outsider
+            && pendingRequirements.Any(requiredId => string.Equals(requiredId, candidate.Id, StringComparison.OrdinalIgnoreCase));
 
         var incremented = Increment(currentCounts, candidate.Type);
         var seatsLeftAfterPick = remainingSeats - 1;
@@ -418,7 +425,7 @@ public sealed class DraftEngine
                 continue;
             }
 
-            if (!hasHuntsmanWithoutDamsel && incremented.Outsiders > target.Outsiders)
+            if (!isPendingRequiredOutsider && incremented.Outsiders > target.Outsiders)
             {
                 continue;
             }
@@ -447,27 +454,44 @@ public sealed class DraftEngine
 
     private static bool SatisfiesPairFeasibility(
         CharacterDefinition candidate,
+        Script script,
         HashSet<string> chosenSet,
         SetupCounts currentCounts,
         IReadOnlyList<SetupCounts> targetOutcomes,
         int remainingSeats)
     {
-        var candidateId = candidate.Id;
-        var hasHuntsman = chosenSet.Contains("huntsman") || string.Equals(candidateId, "huntsman", StringComparison.OrdinalIgnoreCase);
-        var hasDamsel = chosenSet.Contains("damsel") || string.Equals(candidateId, "damsel", StringComparison.OrdinalIgnoreCase);
+        var chosenAfterPick = new HashSet<string>(chosenSet, StringComparer.OrdinalIgnoreCase)
+        {
+            candidate.Id,
+        };
 
-        if (!hasHuntsman || hasDamsel)
+        var pendingRequirements = GetPendingRequirements(script, chosenAfterPick);
+        if (pendingRequirements.Count == 0)
         {
             return true;
         }
 
-        var incremented = Increment(currentCounts, candidate.Type);
-        var seatsLeftAfterPick = remainingSeats - 1;
+        foreach (var requirement in pendingRequirements)
+        {
+            var isOnScript = script.EffectiveCharacters.Any(character => string.Equals(character.Id, requirement.RequiredId, StringComparison.OrdinalIgnoreCase));
+            if (!isOnScript && !requirement.AutoAddIfMissing)
+            {
+                return false;
+            }
+        }
 
-        if (seatsLeftAfterPick <= 0)
+        var seatsLeftAfterPick = remainingSeats - 1;
+        var distinctPendingRequiredIds = pendingRequirements
+            .Select(requirement => requirement.RequiredId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (seatsLeftAfterPick < distinctPendingRequiredIds.Count)
         {
             return false;
         }
+
+        var incremented = Increment(currentCounts, candidate.Type);
 
         foreach (var target in targetOutcomes)
         {
@@ -484,6 +508,43 @@ public sealed class DraftEngine
 
         return false;
     }
+
+    private static IReadOnlyList<string> GetPendingRequiredCharacters(Script script, IReadOnlyCollection<string> chosenIds)
+    {
+        return GetPendingRequirements(script, chosenIds)
+            .Select(requirement => requirement.RequiredId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static IReadOnlyList<PendingRequirement> GetPendingRequirements(Script script, IReadOnlyCollection<string> chosenIds)
+    {
+        var pendingRequirements = new List<PendingRequirement>();
+
+        foreach (var chosenCharacterId in chosenIds)
+        {
+            var chosenCharacter = script.EffectiveCharacters.FirstOrDefault(character => string.Equals(character.Id, chosenCharacterId, StringComparison.OrdinalIgnoreCase));
+            if (chosenCharacter is null)
+            {
+                continue;
+            }
+
+            foreach (var rule in chosenCharacter.SetupRules.OfType<RequiresCharacterSetupRule>())
+            {
+                if (chosenIds.Contains(rule.RequiredId, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                pendingRequirements.Add(new PendingRequirement(rule.RequiredId, rule.AutoAddIfMissing));
+            }
+        }
+
+        return pendingRequirements.AsReadOnly();
+    }
+
+    private readonly record struct PendingRequirement(string RequiredId, bool AutoAddIfMissing);
 
     private static SetupCounts Increment(SetupCounts counts, CharacterType type)
     {
@@ -532,6 +593,40 @@ public sealed class DraftEngine
         return string.Equals(characterId, "drunk", StringComparison.OrdinalIgnoreCase)
             || string.Equals(characterId, "lunatic", StringComparison.OrdinalIgnoreCase)
             || string.Equals(characterId, "marionette", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private GameSession ApplyAutoAddedRequiredCharacters(GameSession session, CharacterDefinition chosenDefinition)
+    {
+        var autoAddRules = chosenDefinition.SetupRules
+            .OfType<RequiresCharacterSetupRule>()
+            .Where(rule => rule.AutoAddIfMissing)
+            .ToList();
+
+        if (autoAddRules.Count == 0)
+        {
+            return session;
+        }
+
+        var updatedCharacters = session.Script.Characters.ToList();
+
+        foreach (var rule in autoAddRules)
+        {
+            if (updatedCharacters.Any(character => string.Equals(character.Id, rule.RequiredId, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            var requiredCharacter = _characterDatabase.Resolve(rule.RequiredId) with { IsOutOfScript = true };
+            updatedCharacters.Add(requiredCharacter);
+        }
+
+        if (updatedCharacters.Count == session.Script.Characters.Count)
+        {
+            return session;
+        }
+
+        var updatedScript = session.Script with { Characters = updatedCharacters.AsReadOnly() };
+        return session with { Script = updatedScript };
     }
 
     private void EnsureFinalDemonRequirement(GameSession session)

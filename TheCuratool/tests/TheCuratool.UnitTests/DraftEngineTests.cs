@@ -291,6 +291,63 @@ public sealed class DraftEngineTests
             new HiddenFlags(false, false)));
     }
 
+    [Fact]
+    public void ChoirboyAndKing_OnScript_NeitherChosen_BothRemainAvailable()
+    {
+        var script = CreateScript("choirboy", "king", "chef", "washerwoman", "librarian", "poisoner", "imp");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var valid = engine.GetRemainingValidCharacters(session);
+
+        Assert.Contains(valid, character => string.Equals(character.Id, "choirboy", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(valid, character => string.Equals(character.Id, "king", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ChoirboyChosen_WhenKingOnScript_DoesNotAddOutOfScriptCharacter()
+    {
+        var script = CreateScript("choirboy", "king", "chef", "washerwoman", "librarian", "poisoner", "imp");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "choirboy",
+            new[] { "choirboy" },
+            new HiddenFlags(false, false));
+
+        var outOfScriptCharacters = session.Script.Characters.Where(character => character.IsOutOfScript).ToList();
+
+        Assert.Empty(outOfScriptCharacters);
+        Assert.Equal(1, session.Script.Characters.Count(character => string.Equals(character.Id, "king", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    public void ChoirboyChosen_WhenKingMissing_AddsKingAsOutOfScriptAndIncludesInSummary()
+    {
+        var script = CreateScript("choirboy", "chef", "washerwoman", "librarian", "investigator", "poisoner", "imp");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "choirboy",
+            new[] { "choirboy" },
+            new HiddenFlags(false, false));
+
+        var addedKing = session.Script.Characters.Single(character => string.Equals(character.Id, "king", StringComparison.OrdinalIgnoreCase));
+        Assert.True(addedKing.IsOutOfScript);
+
+        var valid = engine.GetRemainingValidCharacters(session);
+        Assert.Contains(valid, character => string.Equals(character.Id, "king", StringComparison.OrdinalIgnoreCase));
+
+        var summary = engine.GetMakeupSummary(session);
+        Assert.Contains("king", summary.OutOfScriptCharacterIds, StringComparer.OrdinalIgnoreCase);
+    }
+
     private DraftEngine CreateEngine()
     {
         return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator());

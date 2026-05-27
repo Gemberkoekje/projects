@@ -87,7 +87,8 @@ public sealed record MakeupSummaryApiResponse(
     SetupCountsApiResponse CurrentCounts,
     IReadOnlyList<SetupCountsApiResponse> TargetCounts,
     IReadOnlyDictionary<string, IReadOnlyList<string>> ChosenCharactersByType,
-    int RemainingSeats);
+    int RemainingSeats,
+    IReadOnlyList<string> OutOfScriptCharacterIds);
 
 public sealed record SessionApiResponse(
     Guid Id,
@@ -148,7 +149,8 @@ internal static class SessionApiMapper
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
                 StringComparer.Ordinal),
-            summary.RemainingSeats);
+            summary.RemainingSeats,
+            summary.OutOfScriptCharacterIds);
     }
 
     private static SetupCountsApiResponse MapSetupCounts(SetupCounts counts)

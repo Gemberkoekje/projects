@@ -82,6 +82,8 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S2 — Required-Pair: Choirboy ↔ King
 
+**Status:** ✅ Completed
+
 **Goal:** Implement the Choirboy / King handshake including the **out-of-script auto-add** case.
 
 **Deliverables:**
