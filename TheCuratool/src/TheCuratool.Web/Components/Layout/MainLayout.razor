@@ -1,0 +1,23 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <header class="topbar">
+        <div class="topbar-inner">
+            <span class="app-title">The Curatool</span>
+            <nav class="nav">
+                <NavLink href="/" Match="NavLinkMatch.All">Script Load</NavLink>
+                <NavLink href="/setup">Setup</NavLink>
+                <NavLink href="/draft">Draft</NavLink>
+                <NavLink href="/summary">Summary</NavLink>
+            </nav>
+        </div>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        The Curatool &mdash; a Storyteller helper for Blood on the Clocktower
+    </footer>
+</div>

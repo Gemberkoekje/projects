@@ -1,0 +1,124 @@
+@page "/setup"
+@inject DraftSessionState SessionState
+@inject NavigationManager Nav
+
+<h1 class="page-title">Session Setup</h1>
+
+@if (SessionState.LoadResult.Script.Characters.Count == 0)
+{
+    <p class="panel">No script loaded. <a href="/">Load a script first ←</a></p>
+}
+else
+{
+    <div class="panel stack-md">
+        <p class="muted">Configure the session parameters for <strong>@SessionState.LoadResult.Script.Name</strong> before starting the draft.</p>
+
+        <div>
+            <label for="playerCount"><strong>Player Count</strong> (5–15)</label><br />
+            <InputNumber id="playerCount" @bind-Value="SessionState.PlayerCount" min="5" max="15" />
+        </div>
+
+        @if (SessionState.SupportsMarionetteOption)
+        {
+            <div>
+                <label>
+                    <InputCheckbox Value="SessionState.UseMarionette" ValueChanged="OnUseMarionetteChanged" ValueExpression="@(() => SessionState.UseMarionette)" /> Use Marionette
+                    <span class="muted">(+1 Townsfolk / −1 Minion pre-draft adjustment)</span>
+                </label>
+            </div>
+        }
+
+        <fieldset>
+            <legend><strong>Active Lorics</strong></legend>
+            @foreach (var loric in SessionState.AvailableLorics)
+            {
+                var isCurator = string.Equals(loric.Id, "the_curator", StringComparison.OrdinalIgnoreCase);
+                <div>
+                    <label>
+                        <input type="checkbox"
+                               checked="@SessionState.IsLoricActive(loric.Id)"
+                               disabled="@isCurator"
+                               @onchange="args => OnLoricChanged(loric.Id, args)" />
+                        @loric.DisplayName
+                        @if (isCurator)
+                        {
+                            <span class="muted">(always active)</span>
+                        }
+                    </label>
+                </div>
+            }
+        </fieldset>
+
+        <div>
+            <button @onclick="Recalculate">Calculate Distribution</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(SessionState.DraftMessage))
+    {
+        <p class="panel error-text"><strong>@SessionState.DraftMessage</strong></p>
+    }
+
+    @if (SessionState.SetupResult.BaseDistribution != SetupCounts.Empty)
+    {
+        <section class="panel stack-md" style="margin-top: 1rem;">
+            <h2>Base Distribution</h2>
+            <p>
+                @SessionState.SetupResult.BaseDistribution.Townsfolk Townsfolk /
+                @SessionState.SetupResult.BaseDistribution.Outsiders Outsiders /
+                @SessionState.SetupResult.BaseDistribution.Minions Minions /
+                @SessionState.SetupResult.BaseDistribution.Demons Demons
+            </p>
+
+            @if (SessionState.SetupResult.ValidTargetCounts.Count > 0)
+            {
+                <h3>Valid Target Distributions</h3>
+                <ul>
+                    @foreach (var counts in SessionState.SetupResult.ValidTargetCounts)
+                    {
+                        <li>@counts.Townsfolk T / @counts.Outsiders O / @counts.Minions M / @counts.Demons D</li>
+                    }
+                </ul>
+            }
+
+            <p>
+                <button @onclick="StartDraftAsync">Start Draft →</button>
+            </p>
+
+            @if (SessionState.HasCurrentSession)
+            {
+                <p>
+                    <a href="/draft">Go to Draft</a>
+                </p>
+            }
+        </section>
+    }
+}
+
+@code {
+    private void Recalculate()
+    {
+        SessionState.RecalculateSetup();
+    }
+
+    private async Task StartDraftAsync()
+    {
+        await SessionState.StartDraftAsync();
+        if (SessionState.HasCurrentSession)
+        {
+            Nav.NavigateTo($"/draft/{SessionState.CurrentSessionId}");
+        }
+    }
+
+    private void OnUseMarionetteChanged(bool value)
+    {
+        SessionState.UseMarionette = value;
+        SessionState.RecalculateSetup();
+    }
+
+    private void OnLoricChanged(string loricId, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool checkedValue && checkedValue;
+        SessionState.SetLoricActive(loricId, isChecked);
+    }
+}

@@ -1,0 +1,284 @@
+@page "/draft"
+@page "/draft/{SessionId:guid}"
+@inject DraftSessionState SessionState
+@inject NavigationManager Nav
+
+<h1 class="page-title">Draft</h1>
+
+@if (!_isReady)
+{
+    <p class="panel muted">Loading session...</p>
+}
+else if (!SessionState.HasCurrentSession)
+{
+    <p class="panel">No draft session has been started. <a href="/setup">Configure a session first ←</a></p>
+}
+else
+{
+    var session = SessionState.CurrentSession;
+    var remaining = session.Players.Count(p => p.Choice is not PlayerChoice.ChosenChoice);
+    var chosen = session.Players.Count(p => p.Choice is PlayerChoice.ChosenChoice);
+    var summary = SessionState.CurrentMakeupSummary;
+
+    <div class="panel stack-md">
+        <p>
+            <strong>Script:</strong> @session.Script.Name
+            &mdash; <strong>Players:</strong> @session.PlayerCount
+            &mdash; <strong>Status:</strong> @session.Status
+        </p>
+
+        <p class="muted">@chosen of @session.PlayerCount players assigned &mdash; @remaining seat(s) remaining.</p>
+
+        @if (!string.IsNullOrWhiteSpace(SessionState.DraftMessage))
+        {
+            <p class="error-text"><strong>@SessionState.DraftMessage</strong></p>
+        }
+    </div>
+
+    <div class="draft-grid" style="margin-top: 1rem;">
+        <section class="panel stack-md">
+            <h2>Player Order</h2>
+            <label>
+                <InputCheckbox @bind-Value="SessionState.RevealChosenCharacters" /> Reveal chosen characters
+            </label>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Draft</th>
+                        <th>Status</th>
+                        <th>Character</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var slot in session.Players.OrderBy(p => p.DraftOrder))
+                    {
+                        var isCurrent = slot.DraftOrder == SessionState.CurrentPlayerSlot;
+                        <tr class="@(isCurrent ? "current-row" : string.Empty)">
+                            <td>@slot.DraftOrder</td>
+                            <td>@(slot.IsChosen ? "Chosen" : isCurrent ? "Current" : "Pending")</td>
+                            <td>
+                                @if (slot.Choice is PlayerChoice.ChosenChoice chosenSlot)
+                                {
+                                    if (SessionState.RevealChosenCharacters)
+                                    {
+                                        @FormatChosenCharacter(chosenSlot)
+                                    }
+                                    else
+                                    {
+                                        <em class="muted">hidden</em>
+                                    }
+                                }
+                                else
+                                {
+                                    <em class="muted">not yet chosen</em>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+
+        <section class="panel stack-md">
+            <h2>Current Player</h2>
+            @if (session.Status == GameStatus.Completed)
+            {
+                <p class="success-text">Draft completed.</p>
+            }
+            else
+            {
+                <p><strong>Slot:</strong> @SessionState.CurrentPlayerSlot</p>
+                <div class="action-row">
+                    <button @onclick="OfferRandom">Random 3</button>
+                    <button @onclick="BeginCurate">Curate</button>
+                    @if (SessionState.SupportsAtheistCommitment)
+                    {
+                        <button @onclick="ConfirmAtheist">Confirm Atheist Commitment</button>
+                    }
+                </div>
+
+                @if (SessionState.IsCuratingOffer)
+                {
+                    <p><strong>Curate up to 3 characters:</strong></p>
+                    <div class="selection-box">
+                        @foreach (var character in SessionState.CurrentValidCharacters)
+                        {
+                            var selected = SessionState.CuratedOfferSelection.Contains(character.Id, StringComparer.OrdinalIgnoreCase);
+                            <div>
+                                <label>
+                                    <input type="checkbox"
+                                           checked="@selected"
+                                           @onchange="_ => ToggleCurated(character.Id)" />
+                                    @character.DisplayName (@character.Type)
+                                </label>
+                            </div>
+                        }
+                    </div>
+                    <div>
+                        <button @onclick="ConfirmCurated">Confirm Curated Offer</button>
+                    </div>
+                }
+
+                @if (SessionState.CurrentOfferCharacters.Count > 0)
+                {
+                    <h3>Offered Characters</h3>
+                    <div class="action-row">
+                        @foreach (var offer in SessionState.CurrentOfferCharacters)
+                        {
+                            <button @onclick="() => Pick(offer.Id)">@offer.DisplayName (@offer.Type)</button>
+                        }
+                    </div>
+
+                    @if (SessionState.SupportsDrunkFlag || SessionState.SupportsLunaticFlag)
+                    {
+                        <div>
+                            @if (SessionState.SupportsDrunkFlag)
+                            {
+                                <label style="margin-right: 1rem;">
+                                    <InputCheckbox
+                                        Value="SessionState.NextChoiceIsDrunk"
+                                        ValueChanged="value => OnDrunkChanged(value)"
+                                        ValueExpression="@(() => SessionState.NextChoiceIsDrunk)"
+                                        disabled="@(!CanCurrentChoiceBeDrunk())" /> Drunk
+                                </label>
+                            }
+                            @if (SessionState.SupportsLunaticFlag)
+                            {
+                                <label>
+                                    <InputCheckbox
+                                        Value="SessionState.NextChoiceIsLunatic"
+                                        ValueChanged="value => OnLunaticChanged(value)"
+                                        ValueExpression="@(() => SessionState.NextChoiceIsLunatic)"
+                                        disabled="@(!CanCurrentChoiceBeLunatic())" /> Lunatic
+                                </label>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="muted">No active offer for this slot yet.</p>
+                }
+            }
+        </section>
+
+        <section class="panel stack-md">
+            <h2>Makeup Summary</h2>
+            <p>
+                Townsfolk: @summary.CurrentCounts.Townsfolk
+                · Outsiders: @summary.CurrentCounts.Outsiders
+                · Minions: @summary.CurrentCounts.Minions
+                · Demons: @summary.CurrentCounts.Demons
+            </p>
+            @if (summary.TargetCounts.Count > 0)
+            {
+                <p><strong>Targets:</strong></p>
+                <ul>
+                    @foreach (var target in summary.TargetCounts)
+                    {
+                        <li>@target.Townsfolk T / @target.Outsiders O / @target.Minions M / @target.Demons D</li>
+                    }
+                </ul>
+            }
+        </section>
+    </div>
+
+    @if (session.Status == GameStatus.Completed)
+    {
+        <p style="margin-top: 1rem;"><a href="@($"/summary/{session.Id}")">View Summary →</a></p>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid SessionId { get; set; }
+
+    private bool _isReady;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SessionId != Guid.Empty)
+        {
+            await SessionState.EnsureSessionLoadedAsync(SessionId);
+        }
+
+        _isReady = true;
+    }
+
+    private void OfferRandom()
+    {
+        SessionState.OfferRandomThree();
+    }
+
+    private void BeginCurate()
+    {
+        SessionState.BeginCuratedOffer();
+    }
+
+    private void ToggleCurated(string characterId)
+    {
+        SessionState.ToggleCuratedCharacter(characterId);
+    }
+
+    private async Task ConfirmCurated()
+    {
+        await SessionState.ConfirmCuratedOfferAsync();
+    }
+
+    private async Task ConfirmAtheist()
+    {
+        await SessionState.ConfirmAtheistCommitmentAsync();
+    }
+
+    private bool CanCurrentChoiceBeDrunk()
+    {
+        var selectedId = SessionState.CurrentOfferIds.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(selectedId))
+        {
+            return false;
+        }
+
+        return SessionState.CanApplyDrunkToChoice(selectedId);
+    }
+
+    private bool CanCurrentChoiceBeLunatic()
+    {
+        var selectedId = SessionState.CurrentOfferIds.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(selectedId))
+        {
+            return false;
+        }
+
+        return SessionState.CanApplyLunaticToChoice(selectedId);
+    }
+
+    private void OnDrunkChanged(bool value)
+    {
+        SessionState.NextChoiceIsDrunk = value;
+    }
+
+    private void OnLunaticChanged(bool value)
+    {
+        SessionState.NextChoiceIsLunatic = value;
+    }
+
+    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen)
+    {
+        if (chosen.HiddenFlags.IsDrunk)
+        {
+            return $"{chosen.CharacterId} (drunk)";
+        }
+
+        if (chosen.HiddenFlags.IsLunatic)
+        {
+            return $"{chosen.CharacterId} (lunatic)";
+        }
+
+        return chosen.CharacterId;
+    }
+
+    private async Task Pick(string characterId)
+    {
+        await SessionState.RecordChoiceAsync(characterId);
+    }
+}

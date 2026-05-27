@@ -1,0 +1,135 @@
+@page "/"
+@inject DraftSessionState SessionState
+@inject NavigationManager Nav
+
+<h1 class="page-title">Load Script</h1>
+
+<div class="panel stack-md">
+    <p class="muted">Choose a standard Blood on the Clocktower script, upload a script JSON file, or paste the content directly into the text area.</p>
+
+    @if (SessionState.AvailableScripts.Count > 0)
+    {
+        <div>
+            <label for="standardScript"><strong>Standard Scripts</strong></label><br />
+            <select id="standardScript" @onchange="OnStoredScriptChanged">
+                <option value="">Select a script...</option>
+                @foreach (var script in SessionState.AvailableScripts)
+                {
+                    <option value="@script.Id">@script.Script.Name</option>
+                }
+            </select>
+        </div>
+    }
+
+    <div>
+        <InputFile OnChange="HandleFileSelected" />
+    </div>
+
+    <textarea @bind="SessionState.ScriptJson" rows="12" style="width: 100%; font-family: Consolas, monospace;"
+              placeholder="Paste script JSON here..."></textarea>
+
+    <div>
+        <button @onclick="LoadScript">Parse &amp; Load Script</button>
+    </div>
+</div>
+
+@if (SessionState.LoadResult.Script.Characters.Count > 0
+    || SessionState.LoadResult.Errors.Count > 0
+    || SessionState.LoadResult.Warnings.Count > 0)
+{
+    var characters = SessionState.LoadResult.Script.Characters;
+    var unknownCharacters = characters.Where(character => character.IsUnknown).OrderBy(character => character.DisplayName, StringComparer.Ordinal).ToList();
+
+    <section class="panel stack-md" style="margin-top: 1rem;">
+        <h2>@(string.IsNullOrWhiteSpace(SessionState.LoadResult.Script.Name) ? "(unnamed script)" : SessionState.LoadResult.Script.Name)</h2>
+        @if (!string.IsNullOrWhiteSpace(SessionState.LoadResult.Script.Author))
+        {
+            <p><strong>Author:</strong> @SessionState.LoadResult.Script.Author</p>
+        }
+        <p><strong>Characters:</strong> @characters.Count</p>
+
+        @if (unknownCharacters.Count > 0)
+        {
+            <p class="warning-text"><strong>@unknownCharacters.Count unknown character(s) detected.</strong> Review before drafting.</p>
+        }
+
+        @if (SessionState.LoadResult.Warnings.Count > 0)
+        {
+            <details>
+                <summary>@SessionState.LoadResult.Warnings.Count warning(s)</summary>
+                <ul>
+                    @foreach (var warning in SessionState.LoadResult.Warnings)
+                    {
+                        <li>@warning</li>
+                    }
+                </ul>
+            </details>
+        }
+
+        @if (SessionState.LoadResult.Errors.Count > 0)
+        {
+            <div class="error-text">
+                <strong>Errors:</strong>
+                <ul>
+                    @foreach (var error in SessionState.LoadResult.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <details>
+            <summary>Show characters</summary>
+            <ul>
+                @foreach (var character in characters.OrderBy(c => c.Type).ThenBy(c => c.DisplayName, StringComparer.Ordinal))
+                {
+                    <li>
+                        @character.DisplayName (@character.Type)
+                        @if (character.IsUnknown)
+                        {
+                            <strong class="warning-text"> [unknown]</strong>
+                        }
+                    </li>
+                }
+            </ul>
+        </details>
+
+        @if (SessionState.LoadResult.Errors.Count == 0)
+        {
+            <p>
+                <a href="/setup">Proceed to Setup →</a>
+            </p>
+        }
+    </section>
+}
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await SessionState.LoadAvailableScriptsAsync();
+    }
+
+    private async Task LoadScript()
+    {
+        await SessionState.LoadScriptAsync();
+    }
+
+    private async Task OnStoredScriptChanged(ChangeEventArgs args)
+    {
+        if (args.Value is not string value || !Guid.TryParse(value, out var scriptId))
+        {
+            return;
+        }
+
+        await SessionState.LoadStoredScriptAsync(scriptId);
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        await using var stream = file.OpenReadStream(maxAllowedSize: 1024 * 1024);
+        using var reader = new StreamReader(stream);
+        SessionState.ScriptJson = await reader.ReadToEndAsync();
+    }
+}

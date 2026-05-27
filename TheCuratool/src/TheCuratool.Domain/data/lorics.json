@@ -1,0 +1,18 @@
+{
+  "lorics": [
+    { "id": "the_curator", "displayName": "The Curator", "setupRules": [] },
+    {
+      "id": "sentinel",
+      "displayName": "Sentinel",
+      "setupRules": [
+        {
+          "kind": "StoryTellerChoice",
+          "options": [
+            { "kind": "OutsiderDelta", "delta": 1 },
+            { "kind": "OutsiderDelta", "delta": -1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

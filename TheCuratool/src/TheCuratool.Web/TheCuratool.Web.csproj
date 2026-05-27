@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>TheCuratool.Web</AssemblyName>
+    <RootNamespace>TheCuratool.Web</RootNamespace>
+    <UserSecretsId>719151ce-b603-4f3d-9a00-ccb43dc7383e</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheCuratool.Application\TheCuratool.Application.csproj" />
+    <ProjectReference Include="..\TheCuratool.Infrastructure\TheCuratool.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\TheCuratool.Domain\data\characters.json" Link="data\characters.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\TheCuratool.Domain\data\lorics.json" Link="data\lorics.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

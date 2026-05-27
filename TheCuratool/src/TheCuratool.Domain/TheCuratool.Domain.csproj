@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>TheCuratool.Domain</AssemblyName>
+    <RootNamespace>TheCuratool.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="data\characters.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="data\lorics.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

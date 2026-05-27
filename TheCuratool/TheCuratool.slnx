@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Docs/">
+    <File Path="plan.md" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="src/TheCuratool.Application/TheCuratool.Application.csproj" />
+  <Project Path="src/TheCuratool.Domain/TheCuratool.Domain.csproj" />
+  <Project Path="src/TheCuratool.Infrastructure/TheCuratool.Infrastructure.csproj" />
+  <Project Path="src/TheCuratool.Web/TheCuratool.Web.csproj" />
+  <Project Path="tests/TheCuratool.UnitTests/TheCuratool.UnitTests.csproj" />
+</Solution>

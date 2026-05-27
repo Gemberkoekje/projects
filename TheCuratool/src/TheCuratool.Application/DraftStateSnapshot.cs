@@ -1,0 +1,60 @@
+using TheCuratool.Domain;
+
+namespace TheCuratool.Application;
+
+public sealed record DraftStateSnapshot(
+    IReadOnlyList<string> ChosenCharacterIds,
+    IReadOnlyDictionary<string, HiddenFlags> HiddenFlagsByCharacterId,
+    bool HasAnyMinion,
+    bool HasAnyDemon,
+    int PicksMade,
+    int RealDemonsChosen)
+{
+    public static DraftStateSnapshot FromSession(GameSession session)
+    {
+        var chosenIds = new List<string>();
+        var hiddenFlags = new Dictionary<string, HiddenFlags>(StringComparer.OrdinalIgnoreCase);
+        var hasAnyMinion = false;
+        var hasAnyDemon = false;
+        var realDemonsChosen = 0;
+
+        foreach (var slot in session.Players)
+        {
+            if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
+            {
+                continue;
+            }
+
+            chosenIds.Add(chosen.CharacterId);
+            hiddenFlags[chosen.CharacterId] = chosen.HiddenFlags;
+
+            var character = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosen.CharacterId, StringComparison.OrdinalIgnoreCase));
+            if (character is null)
+            {
+                continue;
+            }
+
+            if (character.Type == CharacterType.Minion)
+            {
+                hasAnyMinion = true;
+            }
+
+            if (character.Type == CharacterType.Demon)
+            {
+                hasAnyDemon = true;
+                if (!chosen.HiddenFlags.IsLunatic)
+                {
+                    realDemonsChosen++;
+                }
+            }
+        }
+
+        return new DraftStateSnapshot(
+            chosenIds.AsReadOnly(),
+            hiddenFlags,
+            hasAnyMinion,
+            hasAnyDemon,
+            chosenIds.Count,
+            realDemonsChosen);
+    }
+}

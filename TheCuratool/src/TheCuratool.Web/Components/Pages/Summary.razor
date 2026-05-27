@@ -1,0 +1,110 @@
+@page "/summary"
+@page "/summary/{SessionId:guid}"
+@inject DraftSessionState SessionState
+
+<h1 class="page-title">Session Summary</h1>
+
+@if (!_isReady)
+{
+    <p class="panel muted">Loading session...</p>
+}
+else if (!SessionState.HasCurrentSession)
+{
+    <p class="panel">No completed session is available. <a href="/">Start a new session ←</a></p>
+}
+else
+{
+    var session = SessionState.CurrentSession;
+    var summary = SessionState.CurrentMakeupSummary;
+
+    <div class="panel stack-md">
+        <p><strong>Script:</strong> @(string.IsNullOrWhiteSpace(session.Script.Name) ? "(unnamed)" : session.Script.Name)</p>
+        <p><strong>Status:</strong> @session.Status</p>
+        <p><strong>Players:</strong> @session.PlayerCount</p>
+
+        <p>
+            <strong>Final Makeup:</strong>
+            Townsfolk @summary.CurrentCounts.Townsfolk,
+            Outsiders @summary.CurrentCounts.Outsiders,
+            Minions @summary.CurrentCounts.Minions,
+            Demons @summary.CurrentCounts.Demons
+        </p>
+    </div>
+
+    <section class="panel" style="margin-top: 1rem;">
+        <h2>Final Assignments</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Draft Order</th>
+                    <th>Character</th>
+                    <th>Hidden Flags</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var slot in session.Players.OrderBy(p => p.DraftOrder))
+                {
+                    <tr>
+                        <td>@slot.DraftOrder</td>
+                        <td>
+                            @if (slot.Choice is PlayerChoice.ChosenChoice chosen)
+                            {
+                                @FormatChosenCharacter(chosen)
+                            }
+                            else
+                            {
+                                <em class="muted">unassigned</em>
+                            }
+                        </td>
+                        <td>
+                            @if (slot.Choice is PlayerChoice.ChosenChoice c)
+                            {
+                                @(c.HiddenFlags.IsDrunk ? "Drunk " : string.Empty)
+                                @(c.HiddenFlags.IsLunatic ? "Lunatic" : string.Empty)
+                                @(!c.HiddenFlags.IsDrunk && !c.HiddenFlags.IsLunatic ? "—" : string.Empty)
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel stack-md" style="margin-top: 1rem;">
+        <h2>Export JSON</h2>
+        <p class="muted">Copy this payload to save the final grimoire state.</p>
+        <textarea readonly rows="18" style="width: 100%; font-family: Consolas, monospace;">@SessionState.BuildSummaryJson()</textarea>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid SessionId { get; set; }
+
+    private bool _isReady;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SessionId != Guid.Empty)
+        {
+            await SessionState.EnsureSessionLoadedAsync(SessionId);
+        }
+
+        _isReady = true;
+    }
+
+    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen)
+    {
+        if (chosen.HiddenFlags.IsDrunk)
+        {
+            return $"{chosen.CharacterId} (drunk)";
+        }
+
+        if (chosen.HiddenFlags.IsLunatic)
+        {
+            return $"{chosen.CharacterId} (lunatic)";
+        }
+
+        return chosen.CharacterId;
+    }
+}

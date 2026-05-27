@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>TheCuratool.Application</AssemblyName>
+    <RootNamespace>TheCuratool.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheCuratool.Domain\TheCuratool.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

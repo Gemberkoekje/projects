@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>TheCuratool.UnitTests</AssemblyName>
+    <RootNamespace>TheCuratool.UnitTests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageReference Include="xunit" Version="2.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TheCuratool.Domain\TheCuratool.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TheCuratool.Application\TheCuratool.Application.csproj" />
+    <ProjectReference Include="..\..\src\TheCuratool.Infrastructure\TheCuratool.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TheCuratool.Web\TheCuratool.Web.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\NoVortox.json" Link="NoVortox.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

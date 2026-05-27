@@ -28,6 +28,7 @@
 ## Modern C# Patterns
 
 ### Null Safety
+- Avoid nullable annotations except for specific `DateTimeOffset?` optional timestamps
 - Use null-conditional operators (`?.`, `??`, `??=`) when available
 - Validate parameters with appropriate null checks
 - Use `string.IsNullOrEmpty()` and `string.IsNullOrWhiteSpace()` for string validation
@@ -173,3 +174,18 @@
 
 ## Project Guidelines
 - In Qowaiv.Validation.Abstractions, use non-generic `Result` (with `Result.OK` for success and `Result.WithMessages(...)` for failure) when no value needs to be returned, instead of `Result<bool>`.
+- Architecture plans should explicitly address deduplication, Blazor Server BFF vs JWT auth decision, authenticated names handling, and deliberate v1 omissions (closing/rate limiting/Redis/pagination).
+
+## TheCuratool Planning/Domain Rules
+- Model Kazali/Summoner/Atheist as availability constraints (not setup rules)
+- Treat SuggestThree variety as preference not enforcement
+- Alsaahir has no setup rule
+- Storyteller-only Drunk/Lunatic flags alter effective setup counting with specific semantics.
+- Lunatic-flagged Demon must keep a mandatory real Demon slot
+- Hidden flags must persist in storage/API
+- Curated offers should be explicit engine/API contract
+- Availability context naming should use explicit hidden-flag booleans.
+- Marionette is handled via pre-draft Use Marionette session option (+1 Townsfolk/-1 Minion)
+- Constraint priority in valid-character resolution is hard feasibility then pair requirements then soft balance
+- Huntsman is invalid if Damsel cannot still fit
+- Curated offers lock offeredIds for RecordChoice idempotency/conflict handling.

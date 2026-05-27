@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+	<TargetFramework>net9.0</TargetFramework>
+	<LangVersion>latest</LangVersion>
+	<Nullable>enable</Nullable>
+	<ImplicitUsings>disable</ImplicitUsings>
+	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	<NoWarn>$(NoWarn);CA1050;CA1707;CA1711;CA1716;CA2007</NoWarn>
+  </PropertyGroup>
+</Project>
