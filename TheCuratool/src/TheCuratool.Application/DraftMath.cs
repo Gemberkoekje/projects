@@ -13,6 +13,12 @@ internal static class DraftMath
 
         foreach (var slot in session.Players)
         {
+            if (slot.IsStAssigned)
+            {
+                minions++;
+                continue;
+            }
+
             if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
             {
                 continue;
@@ -68,6 +74,22 @@ internal static class DraftMath
 
         foreach (var slot in session.Players)
         {
+            if (slot.IsStAssigned)
+            {
+                if (string.IsNullOrWhiteSpace(slot.BorrowedAbilityCharacterId))
+                {
+                    grouped[CharacterType.Minion].Add("ST-assigned night one");
+                }
+                else
+                {
+                    var resolvedDefinition = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, slot.BorrowedAbilityCharacterId, StringComparison.OrdinalIgnoreCase))
+                        ?? characterDatabase.Resolve(slot.BorrowedAbilityCharacterId);
+                    grouped[CharacterType.Minion].Add(resolvedDefinition.DisplayName);
+                }
+
+                continue;
+            }
+
             if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
             {
                 continue;

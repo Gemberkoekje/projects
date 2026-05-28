@@ -115,6 +115,15 @@ public sealed class CuratoolDbContext(DbContextOptions<CuratoolDbContext> option
             .HasMaxLength(128);
 
         modelBuilder.Entity<PlayerSlotEntity>()
+            .Property(p => p.IsStAssigned)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<PlayerSlotEntity>()
+            .Property(p => p.BorrowedAbilityCharacterId)
+            .HasMaxLength(128)
+            .HasDefaultValue(string.Empty);
+
+        modelBuilder.Entity<PlayerSlotEntity>()
             .Property(p => p.OfferedCharacterIds)
             .IsRequired()
             .HasDefaultValue("[]");

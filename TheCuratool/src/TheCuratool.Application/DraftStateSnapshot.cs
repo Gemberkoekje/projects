@@ -20,6 +20,12 @@ public sealed record DraftStateSnapshot(
 
         foreach (var slot in session.Players)
         {
+            if (slot.IsStAssigned)
+            {
+                hasAnyMinion = true;
+                continue;
+            }
+
             if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
             {
                 continue;

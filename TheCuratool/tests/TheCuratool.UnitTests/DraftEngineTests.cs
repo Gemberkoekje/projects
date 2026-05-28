@@ -439,6 +439,96 @@ public sealed class DraftEngineTests
         Assert.Contains(resolvedSummary.ChosenCharactersByType[CharacterType.Demon], name => string.Equals(name, "Imp", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void PickingKazali_MarksRemainingMinionSlotsAsStorytellerAssigned()
+    {
+        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller", "empath");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 10, Array.Empty<string>());
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "chef",
+            new[] { "chef" },
+            new HiddenFlags(false, false));
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "kazali",
+            new[] { "kazali" },
+            new HiddenFlags(false, false));
+
+        var storytellerAssigned = session.Players.Where(slot => slot.IsStAssigned).ToList();
+        Assert.Single(storytellerAssigned);
+
+        var valid = engine.GetRemainingValidCharacters(session);
+        Assert.DoesNotContain(valid, character => character.Type == CharacterType.Minion);
+    }
+
+    [Fact]
+    public void PickingLordOfTyphon_AddsExtraStorytellerAssignedMinionSlot()
+    {
+        var script = CreateScript(
+            "lord_of_typhon",
+            "imp",
+            "poisoner",
+            "baron",
+            "scarlet_woman",
+            "chef",
+            "washerwoman",
+            "librarian",
+            "investigator",
+            "fortune_teller",
+            "empath",
+            "undertaker",
+            "slayer",
+            "soldier",
+            "ravenkeeper",
+            "saint",
+            "drunk",
+            "butler");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 10, Array.Empty<string>());
+        var valid = engine.GetRemainingValidCharacters(session);
+        Assert.Contains(valid, character => string.Equals(character.Id, "lord_of_typhon", StringComparison.OrdinalIgnoreCase));
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "lord_of_typhon",
+            new[] { "lord_of_typhon" },
+            new HiddenFlags(false, false));
+
+        Assert.Equal(3, session.Players.Count(slot => slot.IsStAssigned));
+    }
+
+    [Fact]
+    public void ResolveMinionSlot_ReplacesUnresolvedStorytellerAssignmentInSummary()
+    {
+        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller", "empath");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 10, Array.Empty<string>());
+
+        session = engine.RecordChoice(
+            session.Id,
+            GetCurrentDraftOrder(session),
+            "kazali",
+            new[] { "kazali" },
+            new HiddenFlags(false, false));
+
+        var unresolvedSummary = engine.GetMakeupSummary(session);
+        Assert.Contains(unresolvedSummary.ChosenCharactersByType[CharacterType.Minion], name => string.Equals(name, "ST-assigned night one", StringComparison.Ordinal));
+
+        var unresolvedSlot = session.Players.Single(slot => slot.IsStAssigned);
+        session = engine.ResolveMinionSlot(session.Id, unresolvedSlot.DraftOrder, "poisoner");
+
+        var resolvedSummary = engine.GetMakeupSummary(session);
+        Assert.DoesNotContain(resolvedSummary.ChosenCharactersByType[CharacterType.Minion], name => string.Equals(name, "ST-assigned night one", StringComparison.Ordinal));
+        Assert.Contains(resolvedSummary.ChosenCharactersByType[CharacterType.Minion], name => string.Equals(name, "Poisoner", StringComparison.Ordinal));
+    }
+
     private DraftEngine CreateEngine()
     {
         return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator());
@@ -469,7 +559,7 @@ public sealed class DraftEngineTests
 
     private static int GetRemainingSeatCount(GameSession session)
     {
-        return session.Players.Count(slot => slot.Choice is not PlayerChoice.ChosenChoice);
+        return session.Players.Count(slot => slot.Choice is not PlayerChoice.ChosenChoice && !slot.IsStAssigned);
     }
 
     private static string GetCharactersFilePath()

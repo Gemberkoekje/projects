@@ -14,6 +14,10 @@ public sealed class PlayerSlotEntity
 
     public string ChosenCharacterId { get; set; } = string.Empty;
 
+    public bool IsStAssigned { get; set; }
+
+    public string BorrowedAbilityCharacterId { get; set; } = string.Empty;
+
     public required string OfferedCharacterIds { get; set; } // JSON array
 
     public required string HiddenFlags { get; set; } // JSON object: { "isDrunk": bool, "isLunatic": bool }

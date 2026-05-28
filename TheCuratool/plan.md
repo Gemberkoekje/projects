@@ -564,3 +564,16 @@ Run phases in order. Phases 1–5 produce a working CLI-testable core. Phase 6 a
   - Legion count input shown when Legion mode is enabled.
 - Persisted Legion session settings through API/infrastructure mappings.
 - Added Legion coverage tests in `SetupCalculatorTests` and `DraftEngineTests`.
+
+### ✅ Completed
+
+**Phase S6 — Unresolved Minion Slots (Kazali / Lord of Typhon)**
+- Added ST-assigned minion-slot state to `PlayerSlot` (`IsStAssigned`, `BorrowedAbilityCharacterId`) and integrated it into draft progression so those slots are removed from the active draft queue.
+- Extended `DraftEngine.RecordChoice` to auto-mark remaining minion slots as ST-assigned when `kazali` or `lord_of_typhon` is chosen.
+- Added `ResolveMinionSlot(sessionId, draftOrder, characterId)` for idempotent storyteller resolution of ST-assigned minion slots.
+- Updated summary/count math so unresolved ST-assigned minion slots surface as `ST-assigned night one`, and resolved slots show the assigned minion.
+- Extended `PlayerSlotEntity` and repository/data mappings to round-trip `IsStAssigned` and `BorrowedAbilityCharacterId`.
+- Added `DraftEngineTests` coverage for:
+  - Kazali reducing remaining minion draft slots into ST-assigned slots
+  - Lord of Typhon creating the extra minion assignment slot
+  - `ResolveMinionSlot` replacing unresolved summary entries with resolved minions
