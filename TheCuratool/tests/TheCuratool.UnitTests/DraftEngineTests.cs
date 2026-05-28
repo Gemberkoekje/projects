@@ -292,6 +292,47 @@ public sealed class DraftEngineTests
     }
 
     [Fact]
+    public void CreateCuratedOffer_AllowsEvilSentinelAlongsideCharacters()
+    {
+        var script = CreateScript("fortune_teller", "goon", "drunk", "chef", "poisoner", "imp", "baron", "washerwoman", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
+        var slot = GetCurrentDraftOrder(session);
+
+        session = engine.CreateCuratedOffer(session.Id, slot, new[] { "fortune_teller", "goon", "evil" });
+
+        var updatedSlot = session.Players.Single(player => player.DraftOrder == slot);
+        var offer = Assert.IsType<PlayerChoice.UnchosenChoice>(updatedSlot.Choice);
+        Assert.Contains("fortune_teller", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("goon", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("evil", offer.OfferedIds, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RecordChoice_EvilSentinelCanBeResolvedOutsideLegionMode()
+    {
+        var script = CreateScript("chef", "washerwoman", "librarian", "poisoner", "baron", "imp", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+        var slot = GetCurrentDraftOrder(session);
+
+        session = engine.CreateCuratedOffer(session.Id, slot, new[] { "chef", "poisoner", "evil" });
+        session = engine.RecordChoice(session.Id, slot, "evil", new[] { "chef", "poisoner", "evil" }, new HiddenFlags(true, true));
+
+        var pendingResolution = session.Players.Single(player => player.DraftOrder == slot);
+        var pendingChoice = Assert.IsType<PlayerChoice.ChosenChoice>(pendingResolution.Choice);
+        Assert.Equal("evil", pendingChoice.CharacterId, ignoreCase: true);
+        Assert.False(pendingChoice.HiddenFlags.IsDrunk);
+        Assert.False(pendingChoice.HiddenFlags.IsLunatic);
+
+        session = engine.ResolveEvilSlot(session.Id, slot, "imp", new HiddenFlags(false, false));
+
+        var resolvedSlot = session.Players.Single(player => player.DraftOrder == slot);
+        var resolvedChoice = Assert.IsType<PlayerChoice.ChosenChoice>(resolvedSlot.Choice);
+        Assert.Equal("imp", resolvedChoice.CharacterId, ignoreCase: true);
+    }
+
+    [Fact]
     public void ChoirboyAndKing_OnScript_NeitherChosen_BothRemainAvailable()
     {
         var script = CreateScript("choirboy", "king", "chef", "washerwoman", "librarian", "poisoner", "imp");

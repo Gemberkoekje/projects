@@ -171,6 +171,8 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S5 — Non-Legion "Evil" Offer
 
+**Status:** ✅ Completed
+
 **Goal:** Allow the ST to deliberately include "Evil" as one of the offered options for any slot on any script.
 
 **Deliverables:**
