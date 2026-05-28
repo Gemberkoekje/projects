@@ -17,11 +17,13 @@ else
     var session = SessionState.CurrentSession;
     var summary = SessionState.CurrentMakeupSummary;
 
+    var dynamicOptionsByOrder = session.Players
+        .Where(p => p.Choice is PlayerChoice.ChosenChoice && string.IsNullOrEmpty(p.BorrowedAbilityCharacterId))
+        .ToDictionary(p => p.DraftOrder, p => SessionState.GetDynamicAbilityOptions(p.DraftOrder));
+
     @if (summary.RequiresStorytellerSetupConfirmation)
     {
-        var unassignedCount = session.Players.Count(p =>
-            p.Choice is PlayerChoice.ChosenChoice && string.IsNullOrEmpty(p.BorrowedAbilityCharacterId)
-            && SessionState.GetDynamicAbilityOptions(p.DraftOrder).Count > 0);
+        var unassignedCount = dynamicOptionsByOrder.Count(kv => kv.Value.Count > 0);
         <div class="panel" style="border-left: 4px solid orange; margin-bottom: 1rem;">
             <strong>⚠ Confirm effective counts</strong> — @unassignedCount borrowed @(unassignedCount == 1 ? "ability" : "abilities") still unassigned.
         </div>
@@ -77,8 +79,7 @@ else
                     </tr>
                     @if (slot.Choice is PlayerChoice.ChosenChoice slotChosen && string.IsNullOrEmpty(slot.BorrowedAbilityCharacterId))
                     {
-                        var abilityOptions = SessionState.GetDynamicAbilityOptions(slot.DraftOrder);
-                        @if (abilityOptions.Count > 0)
+                        if (dynamicOptionsByOrder.TryGetValue(slot.DraftOrder, out var abilityOptions) && abilityOptions.Count > 0)
                         {
                             <tr>
                                 <td></td>
