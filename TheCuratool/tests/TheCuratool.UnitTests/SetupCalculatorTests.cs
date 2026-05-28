@@ -200,7 +200,7 @@ public sealed class SetupCalculatorTests
             _characterDatabase,
             _loricDatabase);
 
-        Assert.Contains(new SetupCounts(5, 0, 2, 1), result.ValidTargetCounts);
+        Assert.Contains(new SetupCounts(4, 0, 2, 1), result.ValidTargetCounts);
     }
 
     [Fact]

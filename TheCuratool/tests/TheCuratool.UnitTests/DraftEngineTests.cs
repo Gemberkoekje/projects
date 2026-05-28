@@ -442,9 +442,9 @@ public sealed class DraftEngineTests
     [Fact]
     public void PickingKazali_MarksRemainingMinionSlotsAsStorytellerAssigned()
     {
-        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller");
+        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller", "empath");
         var engine = CreateEngine();
-        var session = engine.StartSession(script, 9, Array.Empty<string>());
+        var session = engine.StartSession(script, 10, Array.Empty<string>());
 
         session = engine.RecordChoice(
             session.Id,
@@ -470,9 +470,29 @@ public sealed class DraftEngineTests
     [Fact]
     public void PickingLordOfTyphon_AddsExtraStorytellerAssignedMinionSlot()
     {
-        var script = CreateScript("lord_of_typhon", "kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller");
+        var script = CreateScript(
+            "lord_of_typhon",
+            "imp",
+            "poisoner",
+            "baron",
+            "scarlet_woman",
+            "chef",
+            "washerwoman",
+            "librarian",
+            "investigator",
+            "fortune_teller",
+            "empath",
+            "undertaker",
+            "slayer",
+            "soldier",
+            "ravenkeeper",
+            "saint",
+            "drunk",
+            "butler");
         var engine = CreateEngine();
         var session = engine.StartSession(script, 10, Array.Empty<string>());
+        var valid = engine.GetRemainingValidCharacters(session);
+        Assert.Contains(valid, character => string.Equals(character.Id, "lord_of_typhon", StringComparison.OrdinalIgnoreCase));
 
         session = engine.RecordChoice(
             session.Id,
@@ -487,9 +507,9 @@ public sealed class DraftEngineTests
     [Fact]
     public void ResolveMinionSlot_ReplacesUnresolvedStorytellerAssignmentInSummary()
     {
-        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller");
+        var script = CreateScript("kazali", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "fortune_teller", "empath");
         var engine = CreateEngine();
-        var session = engine.StartSession(script, 9, Array.Empty<string>());
+        var session = engine.StartSession(script, 10, Array.Empty<string>());
 
         session = engine.RecordChoice(
             session.Id,
