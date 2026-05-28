@@ -214,7 +214,9 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ---
 
-## Phase S7 — Dynamic-Setup Flag (Alchemist / Boffin) + Inline Ability Assignment
+## Phase S7 — Dynamic-Setup Flag (Alchemist / Boffin) + Inline Ability Assignment ✅
+
+**Status: COMPLETE**
 
 **Goal:** Surface ST-runtime setup uncertainty AND let the ST resolve it immediately at the moment of choice by picking the actual borrowed ability. Once picked, that ability's `ISetupRule` is applied as if it had been on the character from the start.
 

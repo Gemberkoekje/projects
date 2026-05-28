@@ -11,6 +11,8 @@ namespace TheCuratool.Domain;
 /// <param name="IsUnknown">When <see langword="true"/>, this character was not found in the database and was inferred from the script.</param>
 /// <param name="IsDraftExcluded">When <see langword="true"/>, this character is excluded from drafting and curated offers.</param>
 /// <param name="IsOutOfScript">When <see langword="true"/>, this character was injected into the effective script for the current session.</param>
+/// <param name="IsDynamicSetup">When <see langword="true"/>, the Storyteller must assign a borrowed ability to this character at setup time (Alchemist / Boffin).</param>
+/// <param name="DynamicAbilityScope">The pool of characters from which a borrowed ability may be selected. Only relevant when <see cref="IsDynamicSetup"/> is <see langword="true"/>.</param>
 public sealed record CharacterDefinition(
     string Id,
     string DisplayName,
@@ -19,4 +21,6 @@ public sealed record CharacterDefinition(
     IReadOnlyList<IAvailabilityConstraint> AvailabilityConstraints,
     bool IsUnknown,
     bool IsDraftExcluded = false,
-    bool IsOutOfScript = false);
+    bool IsOutOfScript = false,
+    bool IsDynamicSetup = false,
+    DynamicAbilityScope DynamicAbilityScope = DynamicAbilityScope.Unknown);

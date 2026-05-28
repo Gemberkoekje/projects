@@ -168,6 +168,31 @@ else
             }
         </section>
 
+        @if (SessionState.PendingDynamicAbilityDraftOrder.HasValue)
+        {
+            var pendingOrder = SessionState.PendingDynamicAbilityDraftOrder.Value;
+            var abilityOptions = SessionState.GetDynamicAbilityOptions(pendingOrder);
+            var pendingSlot = session.Players.FirstOrDefault(p => p.DraftOrder == pendingOrder);
+            var pendingCharId = pendingSlot?.Choice is PlayerChoice.ChosenChoice pc ? pc.CharacterId : string.Empty;
+            <section class="panel stack-md">
+                <h2>Assign Borrowed Ability</h2>
+                <p>Choose the ability that <strong>@pendingCharId</strong> (slot @pendingOrder) will use:</p>
+                <div class="action-row">
+                    @foreach (var option in abilityOptions)
+                    {
+                        if (option.IsAvailable)
+                        {
+                            <button @onclick="() => PickDynamicAbility(pendingOrder, option.AbilityCharacterId)">@option.DisplayName</button>
+                        }
+                        else
+                        {
+                            <button disabled title="@option.UnavailableReason">@option.DisplayName</button>
+                        }
+                    }
+                </div>
+            </section>
+        }
+
         <section class="panel stack-md">
             <h2>Makeup Summary</h2>
             <p>
@@ -291,5 +316,10 @@ else
     private async Task Pick(string characterId)
     {
         await SessionState.RecordChoiceAsync(characterId);
+    }
+
+    private async Task PickDynamicAbility(int draftOrder, string abilityCharacterId)
+    {
+        await SessionState.AssignDynamicAbilityAsync(draftOrder, abilityCharacterId);
     }
 }

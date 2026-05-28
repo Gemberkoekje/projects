@@ -17,6 +17,16 @@ else
     var session = SessionState.CurrentSession;
     var summary = SessionState.CurrentMakeupSummary;
 
+    @if (summary.RequiresStorytellerSetupConfirmation)
+    {
+        var unassignedCount = session.Players.Count(p =>
+            p.Choice is PlayerChoice.ChosenChoice && string.IsNullOrEmpty(p.BorrowedAbilityCharacterId)
+            && SessionState.GetDynamicAbilityOptions(p.DraftOrder).Count > 0);
+        <div class="panel" style="border-left: 4px solid orange; margin-bottom: 1rem;">
+            <strong>⚠ Confirm effective counts</strong> — @unassignedCount borrowed @(unassignedCount == 1 ? "ability" : "abilities") still unassigned.
+        </div>
+    }
+
     <div class="panel stack-md">
         <p><strong>Script:</strong> @(string.IsNullOrWhiteSpace(session.Script.Name) ? "(unnamed)" : session.Script.Name)</p>
         <p><strong>Status:</strong> @session.Status</p>
@@ -49,7 +59,7 @@ else
                         <td>
                             @if (slot.Choice is PlayerChoice.ChosenChoice chosen)
                             {
-                                @FormatChosenCharacter(chosen)
+                                @FormatChosenCharacter(chosen, slot.BorrowedAbilityCharacterId)
                             }
                             else
                             {
@@ -65,6 +75,32 @@ else
                             }
                         </td>
                     </tr>
+                    @if (slot.Choice is PlayerChoice.ChosenChoice slotChosen && string.IsNullOrEmpty(slot.BorrowedAbilityCharacterId))
+                    {
+                        var abilityOptions = SessionState.GetDynamicAbilityOptions(slot.DraftOrder);
+                        @if (abilityOptions.Count > 0)
+                        {
+                            <tr>
+                                <td></td>
+                                <td colspan="2">
+                                    <strong>Assign borrowed ability:</strong>
+                                    <div class="action-row">
+                                        @foreach (var option in abilityOptions)
+                                        {
+                                            if (option.IsAvailable)
+                                            {
+                                                <button @onclick="() => PickDynamicAbility(slot.DraftOrder, option.AbilityCharacterId)">@option.DisplayName</button>
+                                            }
+                                            else
+                                            {
+                                                <button disabled title="@option.UnavailableReason">@option.DisplayName</button>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
                 }
             </tbody>
         </table>
@@ -93,18 +129,24 @@ else
         _isReady = true;
     }
 
-    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen)
+    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen, string borrowedAbilityCharacterId)
     {
-        if (chosen.HiddenFlags.IsDrunk)
+        var baseName = chosen.HiddenFlags.IsDrunk
+            ? $"{chosen.CharacterId} (drunk)"
+            : chosen.HiddenFlags.IsLunatic
+                ? $"{chosen.CharacterId} (lunatic)"
+                : chosen.CharacterId;
+
+        if (!string.IsNullOrEmpty(borrowedAbilityCharacterId))
         {
-            return $"{chosen.CharacterId} (drunk)";
+            return $"{baseName} (as {borrowedAbilityCharacterId})";
         }
 
-        if (chosen.HiddenFlags.IsLunatic)
-        {
-            return $"{chosen.CharacterId} (lunatic)";
-        }
+        return baseName;
+    }
 
-        return chosen.CharacterId;
+    private async Task PickDynamicAbility(int draftOrder, string abilityCharacterId)
+    {
+        await SessionState.AssignDynamicAbilityAsync(draftOrder, abilityCharacterId);
     }
 }

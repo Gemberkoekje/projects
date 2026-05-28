@@ -90,6 +90,8 @@
     { "id": "summoner", "displayName": "Summoner", "type": "Minion", "setupRules": [{ "kind": "ReplaceDemon" }], "availabilityConstraints": [{ "kind": "BlockedIfAnyChosenOfType", "type": "Demon" }] },
     { "id": "lil_monsta", "displayName": "Lil' Monsta", "type": "Demon", "setupRules": [{ "kind": "MinionSwap" }], "availabilityConstraints": [] },
     { "id": "marionette", "displayName": "Marionette", "type": "Minion", "setupRules": [], "availabilityConstraints": [], "isDraftExcluded": true },
-    { "id": "alsaahir", "displayName": "Alsaahir", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] }
+    { "id": "alsaahir", "displayName": "Alsaahir", "type": "Townsfolk", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "alchemist", "displayName": "Alchemist", "type": "Townsfolk", "dynamicSetup": true, "dynamicAbilityScope": "NotInPlayMinion", "setupRules": [], "availabilityConstraints": [] },
+    { "id": "boffin", "displayName": "Boffin", "type": "Minion", "dynamicSetup": true, "dynamicAbilityScope": "NotInPlayTownsfolkOrOutsider", "setupRules": [], "availabilityConstraints": [] }
   ]
 }

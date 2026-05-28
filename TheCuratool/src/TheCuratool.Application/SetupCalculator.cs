@@ -34,6 +34,7 @@ public sealed class SetupCalculator
     /// <param name="options">Pre-draft session options (e.g. Marionette).</param>
     /// <param name="characterDatabase">The character database for rule resolution.</param>
     /// <param name="loricDatabase">The Loric database for rule resolution.</param>
+    /// <param name="borrowedAbilityCharacterIds">IDs of abilities borrowed by dynamic-setup characters (Alchemist / Boffin). Their setup rules are included unconditionally.</param>
     public SetupCalculationResult Calculate(
         Script script,
         int playerCount,
@@ -42,7 +43,8 @@ public sealed class SetupCalculator
         IReadOnlyDictionary<string, HiddenFlags> hiddenFlagsByCharacterId,
         SessionSetupOptions options,
         CharacterDatabase characterDatabase,
-        LoricDatabase loricDatabase)
+        LoricDatabase loricDatabase,
+        IReadOnlyList<string>? borrowedAbilityCharacterIds = null)
     {
         if (!_baseDistributions.TryGetValue(playerCount, out var baseDistribution))
         {
@@ -79,7 +81,7 @@ public sealed class SetupCalculator
         }
 
         var setupContext = new SetupContext(playerCount, chosenCharacterIds, activeLoricIds);
-        var activeRules = ResolveRules(script, chosenCharacterIds, activeLoricIds, hiddenFlagsByCharacterId, options, characterDatabase, loricDatabase);
+        var activeRules = ResolveRules(script, chosenCharacterIds, activeLoricIds, hiddenFlagsByCharacterId, options, characterDatabase, loricDatabase, borrowedAbilityCharacterIds);
 
         var outcomes = new HashSet<SetupCounts> { baseDistribution };
         foreach (var rule in activeRules)
@@ -143,7 +145,8 @@ public sealed class SetupCalculator
         IReadOnlyDictionary<string, HiddenFlags> hiddenFlagsByCharacterId,
         SessionSetupOptions options,
         CharacterDatabase characterDatabase,
-        LoricDatabase loricDatabase)
+        LoricDatabase loricDatabase,
+        IReadOnlyList<string>? borrowedAbilityCharacterIds = null)
     {
         var rules = new List<ISetupRule>();
 
@@ -162,6 +165,18 @@ public sealed class SetupCalculator
                 ?? characterDatabase.Resolve(id);
 
             rules.AddRange(character.SetupRules);
+        }
+
+        // Include borrowed ability rules unconditionally (not subject to hidden flags)
+        if (borrowedAbilityCharacterIds is not null)
+        {
+            foreach (var borrowedId in borrowedAbilityCharacterIds)
+            {
+                var borrowedCharacter = script.Characters.FirstOrDefault(c => string.Equals(c.Id, borrowedId, StringComparison.OrdinalIgnoreCase))
+                    ?? characterDatabase.Resolve(borrowedId);
+
+                rules.AddRange(borrowedCharacter.SetupRules);
+            }
         }
 
         foreach (var loricId in activeLoricIds)

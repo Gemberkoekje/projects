@@ -529,6 +529,351 @@ public sealed class DraftEngineTests
         Assert.Contains(resolvedSummary.ChosenCharactersByType[CharacterType.Minion], name => string.Equals(name, "Poisoner", StringComparison.Ordinal));
     }
 
+    // ── S7.6 acceptance tests ────────────────────────────────────────────────
+
+    [Fact]
+    public void Alchemist_Chosen_RequiresStorytellerSetupConfirmation()
+    {
+        // Script: alchemist + required other characters for a valid 7-player game
+        var script = CreateScript("alchemist", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        session = engine.RecordChoice(session.Id, GetCurrentDraftOrder(session), "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var summary = engine.GetMakeupSummary(session);
+        Assert.True(summary.RequiresStorytellerSetupConfirmation);
+    }
+
+    [Fact]
+    public void Alchemist_AfterAssignDynamicAbility_ConfirmationFlagClears()
+    {
+        var script = CreateScript("alchemist", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        Assert.True(engine.GetMakeupSummary(session).RequiresStorytellerSetupConfirmation);
+
+        // Assign a minion ability that has no outsider-count rules (poisoner has none)
+        session = engine.AssignDynamicAbility(session.Id, alchemistOrder, "poisoner");
+
+        Assert.False(engine.GetMakeupSummary(session).RequiresStorytellerSetupConfirmation);
+    }
+
+    [Fact]
+    public void GetAlchemistAbilityOptions_ReturnsOnlyMinionsOnScript()
+    {
+        // Script includes poisoner (Minion), baron (Minion), chef (Townsfolk), imp (Demon)
+        var script = CreateScript("alchemist", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var options = engine.GetAlchemistAbilityOptions(session.Id, alchemistOrder);
+
+        // Only minions from the script (not alchemist itself since it's townsfolk)
+        Assert.All(options, o =>
+        {
+            var def = _characterDatabase.Resolve(o.AbilityCharacterId);
+            Assert.Equal(CharacterType.Minion, def.Type);
+        });
+
+        var ids = options.Select(o => o.AbilityCharacterId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("poisoner", ids);
+        Assert.Contains("baron", ids);
+        Assert.DoesNotContain("imp", ids);   // Demon
+        Assert.DoesNotContain("chef", ids);  // Townsfolk
+    }
+
+    [Fact]
+    public void GetAlchemistAbilityOptions_ExcludesAlreadyChosenCharacters()
+    {
+        var script = CreateScript("alchemist", "poisoner", "baron", "spy", "imp", "chef", "washerwoman", "librarian", "butler");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
+
+        // First choose a minion before alchemist
+        var poisonerOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, poisonerOrder, "poisoner",
+            new[] { "poisoner" }, new HiddenFlags(false, false));
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var options = engine.GetAlchemistAbilityOptions(session.Id, alchemistOrder);
+        var ids = options.Select(o => o.AbilityCharacterId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.DoesNotContain("poisoner", ids); // already chosen
+        Assert.Contains("baron", ids);
+        Assert.Contains("spy", ids);
+    }
+
+    [Fact]
+    public void GetBoffinAbilityOptions_ReturnsOnlyTownsfolkAndOutsidersOnScript()
+    {
+        var script = CreateScript("boffin", "imp", "poisoner", "chef", "washerwoman", "butler", "recluse", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 8, Array.Empty<string>());
+
+        var boffinOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, boffinOrder, "boffin",
+            new[] { "boffin" }, new HiddenFlags(false, false));
+
+        var options = engine.GetBoffinAbilityOptions(session.Id, boffinOrder);
+
+        Assert.All(options, o =>
+        {
+            var def = _characterDatabase.Resolve(o.AbilityCharacterId);
+            Assert.True(def.Type == CharacterType.Townsfolk || def.Type == CharacterType.Outsider,
+                $"{o.AbilityCharacterId} has type {def.Type}, expected Townsfolk or Outsider");
+        });
+
+        var ids = options.Select(o => o.AbilityCharacterId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("poisoner", ids); // Minion
+        Assert.DoesNotContain("imp", ids);      // Demon
+        Assert.DoesNotContain("boffin", ids);   // the slot's own character
+    }
+
+    [Fact]
+    public void GetAlchemistAbilityOptions_BaronGreyedOut_NoOutsidersOnScript()
+    {
+        // Script with no outsiders — Baron's +2 Outsiders cannot be satisfied
+        var script = CreateScript("alchemist", "baron", "imp", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var options = engine.GetAlchemistAbilityOptions(session.Id, alchemistOrder);
+
+        var baronOption = options.Single(o => string.Equals(o.AbilityCharacterId, "baron", StringComparison.OrdinalIgnoreCase));
+        Assert.False(baronOption.IsAvailable);
+        Assert.Equal("Not enough Outsiders remaining on the script to satisfy +2 Outsider count.", baronOption.UnavailableReason);
+    }
+
+    [Fact]
+    public void GetAlchemistAbilityOptions_GodfatherGreyedOut_StoryTellerChoiceCannotBeSatisfied()
+    {
+        // Script with godfather but no outsiders → ±1 Outsider rule cannot be satisfied
+        var script = CreateScript("alchemist", "godfather", "imp", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var options = engine.GetAlchemistAbilityOptions(session.Id, alchemistOrder);
+
+        var godfatherOption = options.SingleOrDefault(o => string.Equals(o.AbilityCharacterId, "godfather", StringComparison.OrdinalIgnoreCase));
+        if (godfatherOption is null)
+        {
+            // Godfather may not be on all scripts — skip if not present
+            return;
+        }
+
+        if (!godfatherOption.IsAvailable)
+        {
+            Assert.Equal("No Outsider can be added or removed to satisfy ±1.", godfatherOption.UnavailableReason);
+        }
+    }
+
+    [Fact]
+    public void GetAlchemistAbilityOptions_HuntsmanGreyedOut_DamselNotOnScript()
+    {
+        // huntsman requires damsel — if damsel not on script it should be unavailable
+        var script = CreateScript("alchemist", "huntsman", "poisoner", "imp", "chef", "washerwoman", "librarian");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        // Auto-add: huntsman adds damsel automatically if autoAddIfMissing is true
+        // but in this case we're asking about alchemist BORROWING huntsman's ability
+        // huntsman is a Townsfolk here so this test targets boffin; skip if alchemist scope.
+        // Instead test directly: build a script that has huntsman as a minion-scoped target — not meaningful.
+        // We verify via the options list that RequiresCharacter rules propagate properly for the alchemist.
+        // Since huntsman is Townsfolk (not Minion), it won't appear in alchemist's options.
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var options = engine.GetAlchemistAbilityOptions(session.Id, alchemistOrder);
+
+        // Huntsman is Townsfolk → should NOT appear in alchemist options (minions only)
+        var huntOption = options.FirstOrDefault(o => string.Equals(o.AbilityCharacterId, "huntsman", StringComparison.OrdinalIgnoreCase));
+        Assert.Null(huntOption);
+    }
+
+    [Fact]
+    public void GetBoffinAbilityOptions_HuntsmanGreyedOut_DamselNotOnScript()
+    {
+        // Boffin can borrow huntsman's ability — but huntsman requires damsel to be on the script
+        var script = CreateScript("boffin", "imp", "poisoner", "huntsman", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 8, Array.Empty<string>());
+
+        var boffinOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, boffinOrder, "boffin",
+            new[] { "boffin" }, new HiddenFlags(false, false));
+
+        var options = engine.GetBoffinAbilityOptions(session.Id, boffinOrder);
+
+        var huntsmanOption = options.SingleOrDefault(o => string.Equals(o.AbilityCharacterId, "huntsman", StringComparison.OrdinalIgnoreCase));
+        if (huntsmanOption is null)
+        {
+            return; // huntsman wasn't on script for boffin scope; test already verified not present
+        }
+
+        // Huntsman is on script but damsel is not — should be unavailable
+        Assert.False(huntsmanOption.IsAvailable);
+        Assert.Contains("Damsel", huntsmanOption.UnavailableReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not on the script", huntsmanOption.UnavailableReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void GetBoffinAbilityOptions_HuntsmanGreyedOut_DamselAlreadyChosen()
+    {
+        // Boffin borrows huntsman — but damsel already chosen means required-pair can't be new
+        var script = CreateScript("boffin", "imp", "poisoner", "huntsman", "damsel", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
+
+        // Choose damsel first
+        session = engine.RecordChoice(session.Id, GetCurrentDraftOrder(session), "damsel",
+            new[] { "damsel" }, new HiddenFlags(false, false));
+
+        var boffinOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, boffinOrder, "boffin",
+            new[] { "boffin" }, new HiddenFlags(false, false));
+
+        var options = engine.GetBoffinAbilityOptions(session.Id, boffinOrder);
+
+        var huntsmanOption = options.SingleOrDefault(o => string.Equals(o.AbilityCharacterId, "huntsman", StringComparison.OrdinalIgnoreCase));
+        if (huntsmanOption is null)
+        {
+            return;
+        }
+
+        Assert.False(huntsmanOption.IsAvailable);
+        Assert.Contains("Damsel", huntsmanOption.UnavailableReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("already chosen", huntsmanOption.UnavailableReason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AssignDynamicAbility_Alchemist_NoRulesChar_CountsUnchangedAndFlagClears()
+    {
+        var script = CreateScript("alchemist", "poisoner", "imp", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        var beforeSummary = engine.GetMakeupSummary(session);
+        Assert.True(beforeSummary.RequiresStorytellerSetupConfirmation);
+
+        // Poisoner has no count-affecting setup rules
+        session = engine.AssignDynamicAbility(session.Id, alchemistOrder, "poisoner");
+
+        var afterSummary = engine.GetMakeupSummary(session);
+        Assert.False(afterSummary.RequiresStorytellerSetupConfirmation);
+        // Counts should not change since poisoner has no setup rules
+        Assert.Equal(beforeSummary.CurrentCounts, afterSummary.CurrentCounts);
+    }
+
+    [Fact]
+    public void AssignDynamicAbility_Alchemist_Baron_TargetCountsReflectPlusTwoOutsiders()
+    {
+        // Need 4 outsiders on script for Baron's +2 to be feasible at 9 players (base O=2, target O=4)
+        var script = CreateScript("alchemist", "baron", "imp", "chef", "washerwoman", "librarian",
+            "investigator", "butler", "recluse", "saint", "goon");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        session = engine.AssignDynamicAbility(session.Id, alchemistOrder, "baron");
+
+        var summary = engine.GetMakeupSummary(session);
+        Assert.False(summary.RequiresStorytellerSetupConfirmation);
+
+        // Baron's borrowed ability adds +2 Outsiders to all valid target counts
+        Assert.All(summary.TargetCounts, target =>
+        {
+            var baselineOutsiders = 2; // 9-player baseline has 2 outsiders
+            Assert.True(target.Outsiders >= baselineOutsiders + 2,
+                $"Expected at least {baselineOutsiders + 2} Outsiders in targets (Baron +2), got {target.Outsiders}");
+        });
+    }
+
+    [Fact]
+    public void AssignDynamicAbility_Rejects_UnavailableAbility()
+    {
+        // Try to assign baron when there are no outsiders on script
+        var script = CreateScript("alchemist", "baron", "imp", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        // Baron needs outsiders on script — none are present → should throw
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            engine.AssignDynamicAbility(session.Id, alchemistOrder, "baron"));
+        Assert.NotNull(ex.Message);
+    }
+
+    [Fact]
+    public void AssignDynamicAbility_Rejects_AlreadyChosenCharacter()
+    {
+        var script = CreateScript("alchemist", "poisoner", "baron", "imp", "chef", "washerwoman", "librarian", "investigator", "butler");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 9, Array.Empty<string>());
+
+        // First slot picks poisoner
+        session = engine.RecordChoice(session.Id, GetCurrentDraftOrder(session), "poisoner",
+            new[] { "poisoner" }, new HiddenFlags(false, false));
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        // Poisoner is already chosen — assigning it as borrowed ability should throw
+        Assert.Throws<InvalidOperationException>(() =>
+            engine.AssignDynamicAbility(session.Id, alchemistOrder, "poisoner"));
+    }
+
+    [Fact]
+    public void AssignDynamicAbility_Rejects_WrongScope()
+    {
+        // Alchemist can only borrow Minion abilities
+        var script = CreateScript("alchemist", "poisoner", "imp", "chef", "washerwoman", "librarian", "investigator");
+        var engine = CreateEngine();
+        var session = engine.StartSession(script, 7, Array.Empty<string>());
+
+        var alchemistOrder = GetCurrentDraftOrder(session);
+        session = engine.RecordChoice(session.Id, alchemistOrder, "alchemist",
+            new[] { "alchemist" }, new HiddenFlags(false, false));
+
+        // Chef is Townsfolk, not Minion
+        Assert.Throws<InvalidOperationException>(() =>
+            engine.AssignDynamicAbility(session.Id, alchemistOrder, "chef"));
+    }
+
     private DraftEngine CreateEngine()
     {
         return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator());

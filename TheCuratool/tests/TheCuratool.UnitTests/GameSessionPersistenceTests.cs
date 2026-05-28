@@ -230,6 +230,96 @@ public sealed class GameSessionPersistenceTests : IDisposable
         Assert.True(retrievedSession.UseMarionette);
     }
 
+    [Fact]
+    public async Task BorrowedAbilityCharacterId_RoundTrips_ForChosenChoice()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Test Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId = Guid.NewGuid();
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId,
+                new PlayerChoice.ChosenChoice("alchemist", new[] { "alchemist" }, new HiddenFlags(false, false)),
+                false,
+                "baron"),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            1,
+            players,
+            GameStatus.Completed,
+            Array.Empty<string>(),
+            false,
+            false,
+            0);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        var slot = retrieved.Players.Single();
+        Assert.True(slot.IsChosen);
+        Assert.Equal("baron", slot.BorrowedAbilityCharacterId);
+
+        if (slot.Choice is PlayerChoice.ChosenChoice chosen)
+        {
+            Assert.Equal("alchemist", chosen.CharacterId);
+        }
+        else
+        {
+            Assert.Fail("Expected ChosenChoice");
+        }
+    }
+
+    [Fact]
+    public async Task BorrowedAbilityCharacterId_PersistedOnUpdate_ForChosenChoice()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Test Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId = Guid.NewGuid();
+        var initialPlayers = new List<PlayerSlot>
+        {
+            new PlayerSlot(1, playerId, PlayerChoice.UnchosenChoice.Empty),
+        };
+        var session = new GameSession(
+            sessionId, script, 1, initialPlayers, GameStatus.Drafting,
+            Array.Empty<string>(), false, false, 0);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Update: assign a chosen choice with a borrowed ability
+        var updatedPlayers = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId,
+                new PlayerChoice.ChosenChoice("alchemist", new[] { "alchemist" }, new HiddenFlags(false, false)),
+                false,
+                "poisoner"),
+        };
+        var updatedSession = new GameSession(
+            sessionId, script, 1, updatedPlayers, GameStatus.Completed,
+            Array.Empty<string>(), false, false, 0);
+
+        await _repository.UpdateAsync(updatedSession);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        var slot = retrieved.Players.Single();
+        Assert.Equal("poisoner", slot.BorrowedAbilityCharacterId);
+    }
+
     public void Dispose()
     {
         _dbContext?.Dispose();
