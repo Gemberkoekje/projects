@@ -9,8 +9,10 @@ namespace TheCuratool.Domain;
 public sealed record PlayerSlot(
     int DraftOrder,
     Guid PlayerId,
-    PlayerChoice Choice)
+    PlayerChoice Choice,
+    bool IsStAssigned = false,
+    string BorrowedAbilityCharacterId = "")
 {
     /// <summary>Returns <see langword="true"/> if the player has made a confirmed character selection.</summary>
-    public bool IsChosen => Choice is PlayerChoice.ChosenChoice;
+    public bool IsChosen => Choice is PlayerChoice.ChosenChoice || IsStAssigned;
 }

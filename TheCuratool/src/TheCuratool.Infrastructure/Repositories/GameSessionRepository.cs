@@ -151,6 +151,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
         if (slot.Choice is PlayerChoice.UnchosenChoice unchosen)
         {
             entity.ChosenCharacterId = string.Empty;
+            entity.IsStAssigned = slot.IsStAssigned;
+            entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
             entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedIds);
             entity.IsAtheistCommitmentConfirmed = unchosen.IsAtheistCommitmentConfirmed;
             entity.HiddenFlags = JsonSerializer.Serialize(new HiddenFlags(false, false));
@@ -159,6 +161,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
 
         var chosen = (PlayerChoice.ChosenChoice)slot.Choice;
         entity.ChosenCharacterId = chosen.CharacterId;
+        entity.IsStAssigned = false;
+        entity.BorrowedAbilityCharacterId = string.Empty;
         entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedIds);
         entity.HiddenFlags = JsonSerializer.Serialize(chosen.HiddenFlags);
         entity.IsAtheistCommitmentConfirmed = false;
@@ -179,6 +183,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
 
         if (slot.Choice is PlayerChoice.UnchosenChoice unchosen)
         {
+            entity.IsStAssigned = slot.IsStAssigned;
+            entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
             entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedIds);
             entity.IsAtheistCommitmentConfirmed = unchosen.IsAtheistCommitmentConfirmed;
             return entity;
@@ -186,6 +192,8 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
 
         var chosen = (PlayerChoice.ChosenChoice)slot.Choice;
         entity.ChosenCharacterId = chosen.CharacterId;
+        entity.IsStAssigned = false;
+        entity.BorrowedAbilityCharacterId = string.Empty;
         entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedIds);
         entity.HiddenFlags = JsonSerializer.Serialize(chosen.HiddenFlags);
         return entity;
@@ -196,7 +204,12 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
         var offeredIds = JsonSerializer.Deserialize<string[]>(entity.OfferedCharacterIds) ?? Array.Empty<string>();
         if (string.IsNullOrEmpty(entity.ChosenCharacterId))
         {
-            return new PlayerSlot(entity.DraftOrder, entity.PlayerId, new PlayerChoice.UnchosenChoice(offeredIds, entity.IsAtheistCommitmentConfirmed));
+            return new PlayerSlot(
+                entity.DraftOrder,
+                entity.PlayerId,
+                new PlayerChoice.UnchosenChoice(offeredIds, entity.IsAtheistCommitmentConfirmed),
+                entity.IsStAssigned,
+                entity.BorrowedAbilityCharacterId);
         }
 
         var hiddenFlags = JsonSerializer.Deserialize<HiddenFlags>(entity.HiddenFlags) ?? new HiddenFlags(false, false);

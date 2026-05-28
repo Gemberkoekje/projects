@@ -192,6 +192,8 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S6 — Unresolved Minion Slots (Kazali / Lord of Typhon)
 
+**Status:** ✅ Completed
+
 **Goal:** When Kazali or Lord of Typhon is chosen, mark all remaining Minion slots as ST-assigned and remove them from the active draft queue.
 
 **Deliverables:**

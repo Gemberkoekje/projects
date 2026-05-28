@@ -10,6 +10,7 @@ public sealed class DraftEngine
 {
     private const string LegionCharacterId = "legion";
     private const string EvilSentinelCharacterId = "evil";
+    private static readonly string[] StAssignedMinionCharacterIds = ["kazali", "lord_of_typhon"];
 
     private readonly CharacterDatabase _characterDatabase;
     private readonly LoricDatabase _loricDatabase;
@@ -373,6 +374,7 @@ public sealed class DraftEngine
         var updatedSlot = currentSlot with { Choice = newChoice };
         var updatedSession = ReplaceSlot(session, updatedSlot);
         updatedSession = ApplyAutoAddedRequiredCharacters(updatedSession, chosenDefinition);
+        updatedSession = ApplyStorytellerAssignedMinionSlots(updatedSession, chosenDefinition);
 
         if (GetRemainingSeats(updatedSession) == 0)
         {
@@ -380,6 +382,37 @@ public sealed class DraftEngine
             updatedSession = updatedSession with { Status = GameStatus.Completed };
         }
 
+        _sessions[updatedSession.Id] = updatedSession;
+        return updatedSession;
+    }
+
+    public GameSession ResolveMinionSlot(Guid sessionId, int draftOrder, string characterId)
+    {
+        if (string.IsNullOrWhiteSpace(characterId))
+        {
+            throw new ArgumentException("Resolved character id is required.", nameof(characterId));
+        }
+
+        var session = GetSession(sessionId);
+        var slot = session.Players.FirstOrDefault(player => player.DraftOrder == draftOrder)
+            ?? throw new InvalidOperationException($"Draft slot '{draftOrder}' was not found.");
+
+        if (!slot.IsStAssigned)
+        {
+            throw new InvalidOperationException("Draft slot is not awaiting minion resolution.");
+        }
+
+        var normalizedId = characterId.Trim();
+        var resolvedDefinition = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
+            ?? _characterDatabase.Resolve(normalizedId);
+
+        if (resolvedDefinition.Type != CharacterType.Minion)
+        {
+            throw new InvalidOperationException("Resolved minion assignment must be a Minion.");
+        }
+
+        var resolvedSlot = slot with { BorrowedAbilityCharacterId = normalizedId };
+        var updatedSession = ReplaceSlot(session, resolvedSlot);
         _sessions[updatedSession.Id] = updatedSession;
         return updatedSession;
     }
@@ -448,7 +481,7 @@ public sealed class DraftEngine
 
     private static int GetRemainingSeats(GameSession session)
     {
-        return session.Players.Count(slot => slot.Choice is not PlayerChoice.ChosenChoice);
+        return session.Players.Count(slot => slot.Choice is not PlayerChoice.ChosenChoice && !slot.IsStAssigned);
     }
 
     private bool IsAvailableByConstraints(GameSession session, CharacterDefinition candidate, DraftStateSnapshot state)
@@ -645,7 +678,7 @@ public sealed class DraftEngine
 
     private static PlayerSlot GetCurrentSlot(GameSession session)
     {
-        var slot = session.Players.FirstOrDefault(p => p.Choice is not PlayerChoice.ChosenChoice);
+        var slot = session.Players.FirstOrDefault(p => p.Choice is not PlayerChoice.ChosenChoice && !p.IsStAssigned);
 
         if (slot is null)
         {
@@ -712,6 +745,58 @@ public sealed class DraftEngine
 
         var updatedScript = session.Script with { Characters = updatedCharacters.AsReadOnly() };
         return session with { Script = updatedScript };
+    }
+
+    private GameSession ApplyStorytellerAssignedMinionSlots(GameSession session, CharacterDefinition chosenDefinition)
+    {
+        if (!StAssignedMinionCharacterIds.Contains(chosenDefinition.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            return session;
+        }
+
+        var state = DraftStateSnapshot.FromSession(session);
+        var setupResult = _setupCalculator.Calculate(
+            session.Script,
+            session.PlayerCount,
+            state.ChosenCharacterIds,
+            session.ActiveLoricIds,
+            state.HiddenFlagsByCharacterId,
+            new SessionSetupOptions(session.UseMarionette, session.IsLegionGame, session.LegionCount),
+            _characterDatabase,
+            _loricDatabase);
+
+        if (setupResult.ValidTargetCounts.Count == 0)
+        {
+            return session;
+        }
+
+        var currentCounts = DraftMath.ComputeCurrentCounts(session, _characterDatabase);
+        var targetMinions = setupResult.ValidTargetCounts.Max(counts => counts.Minions);
+        var minionSlotsToAssign = Math.Max(0, targetMinions - currentCounts.Minions);
+        if (minionSlotsToAssign == 0)
+        {
+            return session;
+        }
+
+        var slotKeysToAssign = session.Players
+            .Where(slot => slot.Choice is not PlayerChoice.ChosenChoice && !slot.IsStAssigned)
+            .Take(minionSlotsToAssign)
+            .Select(slot => slot.DraftOrder)
+            .ToHashSet();
+
+        if (slotKeysToAssign.Count == 0)
+        {
+            return session;
+        }
+
+        var updatedPlayers = session.Players
+            .Select(slot => slotKeysToAssign.Contains(slot.DraftOrder)
+                ? slot with { IsStAssigned = true, BorrowedAbilityCharacterId = string.Empty }
+                : slot)
+            .ToList()
+            .AsReadOnly();
+
+        return session with { Players = updatedPlayers };
     }
 
     private void EnsureFinalDemonRequirement(GameSession session)
