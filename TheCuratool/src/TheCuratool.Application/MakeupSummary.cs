@@ -7,4 +7,5 @@ public sealed record MakeupSummary(
     IReadOnlyList<SetupCounts> TargetCounts,
     IReadOnlyDictionary<CharacterType, IReadOnlyList<string>> ChosenCharactersByType,
     int RemainingSeats,
-    IReadOnlyList<string> OutOfScriptCharacterIds);
+    IReadOnlyList<string> OutOfScriptCharacterIds,
+    bool RequiresStorytellerSetupConfirmation = false);

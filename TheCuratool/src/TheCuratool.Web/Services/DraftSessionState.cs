@@ -481,6 +481,85 @@ public sealed class DraftSessionState
             await _gameSessionRepository.UpdateAsync(CurrentSession);
             ResetOfferState();
             ClearDraftMessage();
+
+            // Check if the chosen character requires a dynamic ability assignment
+            var chosenDef = CurrentSession.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosenCharacterId, StringComparison.OrdinalIgnoreCase))
+                ?? _characterDatabase.Resolve(chosenCharacterId);
+
+            if (chosenDef.IsDynamicSetup)
+            {
+                PendingDynamicAbilityDraftOrder = slot;
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            SetDraftMessage(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// When non-null, indicates the draft order of a slot that requires a dynamic ability assignment
+    /// (Alchemist / Boffin) before the summary counts are accurate.
+    /// </summary>
+    public int? PendingDynamicAbilityDraftOrder { get; private set; }
+
+    /// <summary>
+    /// Returns the available ability options for the dynamic-setup character at <paramref name="draftOrder"/>.
+    /// </summary>
+    public IReadOnlyList<AbilityOption> GetDynamicAbilityOptions(int draftOrder)
+    {
+        if (!HasCurrentSession)
+        {
+            return Array.Empty<AbilityOption>();
+        }
+
+        var slot = CurrentSession.Players.FirstOrDefault(p => p.DraftOrder == draftOrder);
+        if (slot is null || slot.Choice is not PlayerChoice.ChosenChoice chosen)
+        {
+            return Array.Empty<AbilityOption>();
+        }
+
+        var slotDef = CurrentSession.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosen.CharacterId, StringComparison.OrdinalIgnoreCase))
+            ?? _characterDatabase.Resolve(chosen.CharacterId);
+
+        try
+        {
+            return slotDef.DynamicAbilityScope switch
+            {
+                DynamicAbilityScope.NotInPlayMinion => _draftEngine.GetAlchemistAbilityOptions(CurrentSession.Id, draftOrder),
+                DynamicAbilityScope.NotInPlayTownsfolkOrOutsider => _draftEngine.GetBoffinAbilityOptions(CurrentSession.Id, draftOrder),
+                _ => Array.Empty<AbilityOption>(),
+            };
+        }
+        catch (Exception ex) when (ex is InvalidOperationException)
+        {
+            SetDraftMessage(ex.Message);
+            return Array.Empty<AbilityOption>();
+        }
+    }
+
+    /// <summary>
+    /// Assigns the borrowed ability identified by <paramref name="abilityCharacterId"/> to the
+    /// dynamic-setup character at <paramref name="draftOrder"/> and persists the session.
+    /// </summary>
+    public async Task AssignDynamicAbilityAsync(int draftOrder, string abilityCharacterId)
+    {
+        if (!HasCurrentSession)
+        {
+            return;
+        }
+
+        try
+        {
+            CurrentSession = _draftEngine.AssignDynamicAbility(CurrentSession.Id, draftOrder, abilityCharacterId);
+            await _gameSessionRepository.UpdateAsync(CurrentSession);
+
+            if (PendingDynamicAbilityDraftOrder == draftOrder)
+            {
+                PendingDynamicAbilityDraftOrder = null;
+            }
+
+            ClearDraftMessage();
         }
         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
         {

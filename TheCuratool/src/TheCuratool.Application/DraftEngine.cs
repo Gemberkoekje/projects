@@ -465,7 +465,15 @@ public sealed class DraftEngine
             state.HiddenFlagsByCharacterId,
             new SessionSetupOptions(current.UseMarionette, current.IsLegionGame, current.LegionCount),
             _characterDatabase,
-            _loricDatabase);
+            _loricDatabase,
+            state.BorrowedAbilityCharacterIds);
+
+        // A Storyteller setup confirmation is needed when a dynamic-setup character is chosen
+        // but its borrowed ability has not yet been assigned.
+        var requiresConfirmation = current.Players.Any(slot =>
+            slot.Choice is PlayerChoice.ChosenChoice chosen
+            && string.IsNullOrEmpty(slot.BorrowedAbilityCharacterId)
+            && ResolveDef(current, chosen.CharacterId).IsDynamicSetup);
 
         return new MakeupSummary(
             DraftMath.ComputeCurrentCounts(current, _characterDatabase),
@@ -476,7 +484,311 @@ public sealed class DraftEngine
                 .Select(character => character.Id)
                 .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
                 .ToList()
-                .AsReadOnly());
+                .AsReadOnly(),
+            requiresConfirmation);
+    }
+
+    private CharacterDefinition ResolveDef(GameSession session, string characterId)
+    {
+        return session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? _characterDatabase.Resolve(characterId);
+    }
+
+    /// <summary>
+    /// Returns the list of Minion abilities on the script that an Alchemist at <paramref name="draftOrder"/> may borrow.
+    /// </summary>
+    public IReadOnlyList<AbilityOption> GetAlchemistAbilityOptions(Guid sessionId, int draftOrder)
+    {
+        return GetDynamicAbilityOptions(sessionId, draftOrder, DynamicAbilityScope.NotInPlayMinion);
+    }
+
+    /// <summary>
+    /// Returns the list of Townsfolk/Outsider abilities on the script that a Boffin at <paramref name="draftOrder"/> may borrow.
+    /// </summary>
+    public IReadOnlyList<AbilityOption> GetBoffinAbilityOptions(Guid sessionId, int draftOrder)
+    {
+        return GetDynamicAbilityOptions(sessionId, draftOrder, DynamicAbilityScope.NotInPlayTownsfolkOrOutsider);
+    }
+
+    private IReadOnlyList<AbilityOption> GetDynamicAbilityOptions(Guid sessionId, int draftOrder, DynamicAbilityScope scope)
+    {
+        var session = GetSession(sessionId);
+        var slot = session.Players.FirstOrDefault(p => p.DraftOrder == draftOrder)
+            ?? throw new InvalidOperationException($"Draft slot '{draftOrder}' was not found.");
+
+        if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
+        {
+            throw new InvalidOperationException("Draft slot does not have a chosen character.");
+        }
+
+        var slotDef = ResolveDef(session, chosen.CharacterId);
+        if (!slotDef.IsDynamicSetup || slotDef.DynamicAbilityScope != scope)
+        {
+            throw new InvalidOperationException($"Draft slot character is not a dynamic-setup character with scope {scope}.");
+        }
+
+        var state = DraftStateSnapshot.FromSession(session);
+        var chosenSet = new HashSet<string>(state.ChosenCharacterIds, StringComparer.OrdinalIgnoreCase);
+        var borrowedSet = new HashSet<string>(state.BorrowedAbilityCharacterIds, StringComparer.OrdinalIgnoreCase);
+
+        IEnumerable<CharacterDefinition> candidates = scope switch
+        {
+            DynamicAbilityScope.NotInPlayMinion =>
+                session.Script.Characters.Where(c => c.Type == CharacterType.Minion),
+            DynamicAbilityScope.NotInPlayTownsfolkOrOutsider =>
+                session.Script.Characters.Where(c => c.Type == CharacterType.Townsfolk || c.Type == CharacterType.Outsider),
+            _ => throw new InvalidOperationException("Unknown dynamic ability scope.")
+        };
+
+        // Exclude already chosen characters and already borrowed abilities
+        candidates = candidates
+            .Where(c => !chosenSet.Contains(c.Id))
+            .Where(c => !borrowedSet.Contains(c.Id));
+
+        var currentCounts = DraftMath.ComputeCurrentCounts(session, _characterDatabase);
+        var remainingSeats = GetRemainingSeats(session);
+        var options = new List<AbilityOption>();
+
+        foreach (var candidate in candidates)
+        {
+            // Validate RequiresCharacter constraints before count-affecting rule check
+            var requiresCharRules = candidate.SetupRules.OfType<RequiresCharacterSetupRule>().ToList();
+            string? unavailableReason = null;
+
+            foreach (var rule in requiresCharRules)
+            {
+                var requiredId = rule.RequiredId;
+                if (!session.Script.Characters.Any(c => string.Equals(c.Id, requiredId, StringComparison.OrdinalIgnoreCase)))
+                {
+                    var requiredDef = _characterDatabase.Resolve(requiredId);
+                    unavailableReason = $"{requiredDef.DisplayName} is not on the script.";
+                    break;
+                }
+
+                if (chosenSet.Contains(requiredId))
+                {
+                    var requiredDef = _characterDatabase.Resolve(requiredId);
+                    unavailableReason = $"{requiredDef.DisplayName} is already chosen, cannot satisfy required-pair.";
+                    break;
+                }
+            }
+
+            if (unavailableReason is not null)
+            {
+                options.Add(new AbilityOption(candidate.Id, candidate.DisplayName, false, unavailableReason));
+                continue;
+            }
+
+            // If there are no count-affecting rules the ability is freely assignable
+            var countAffectingRules = candidate.SetupRules
+                .Where(r => r is not RequiresCharacterSetupRule)
+                .ToList();
+
+            if (countAffectingRules.Count == 0)
+            {
+                options.Add(new AbilityOption(candidate.Id, candidate.DisplayName, true, string.Empty));
+                continue;
+            }
+
+            // Speculative feasibility check
+            var speculativeBorrowedIds = state.BorrowedAbilityCharacterIds
+                .Append(candidate.Id)
+                .ToList()
+                .AsReadOnly();
+
+            var speculativeResult = _setupCalculator.Calculate(
+                session.Script,
+                session.PlayerCount,
+                state.ChosenCharacterIds,
+                session.ActiveLoricIds,
+                state.HiddenFlagsByCharacterId,
+                new SessionSetupOptions(session.UseMarionette, session.IsLegionGame, session.LegionCount),
+                _characterDatabase,
+                _loricDatabase,
+                speculativeBorrowedIds);
+
+            if (IsSetupFeasible(speculativeResult.ValidTargetCounts, currentCounts, remainingSeats, session, chosenSet, borrowedSet))
+            {
+                options.Add(new AbilityOption(candidate.Id, candidate.DisplayName, true, string.Empty));
+            }
+            else
+            {
+                var reason = GenerateUnavailableReason(candidate, remainingSeats, session, chosenSet);
+                options.Add(new AbilityOption(candidate.Id, candidate.DisplayName, false, reason));
+            }
+        }
+
+        return options
+            .OrderBy(o => o.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Assigns a borrowed ability to a dynamic-setup character (Alchemist / Boffin).
+    /// </summary>
+    public GameSession AssignDynamicAbility(Guid sessionId, int draftOrder, string abilityCharacterId)
+    {
+        if (string.IsNullOrWhiteSpace(abilityCharacterId))
+        {
+            throw new ArgumentException("Ability character id is required.", nameof(abilityCharacterId));
+        }
+
+        var session = GetSession(sessionId);
+        var slot = session.Players.FirstOrDefault(p => p.DraftOrder == draftOrder)
+            ?? throw new InvalidOperationException($"Draft slot '{draftOrder}' was not found.");
+
+        if (slot.Choice is not PlayerChoice.ChosenChoice chosen)
+        {
+            throw new InvalidOperationException("Draft slot does not have a chosen character.");
+        }
+
+        var slotDef = ResolveDef(session, chosen.CharacterId);
+        if (!slotDef.IsDynamicSetup)
+        {
+            throw new InvalidOperationException("Draft slot character is not a dynamic-setup character.");
+        }
+
+        var normalizedId = abilityCharacterId.Trim();
+        var candidateDef = session.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, normalizedId, StringComparison.OrdinalIgnoreCase))
+            ?? _characterDatabase.Resolve(normalizedId);
+
+        // Validate scope
+        CharacterType[] expectedTypes = slotDef.DynamicAbilityScope switch
+        {
+            DynamicAbilityScope.NotInPlayMinion => [CharacterType.Minion],
+            DynamicAbilityScope.NotInPlayTownsfolkOrOutsider => [CharacterType.Townsfolk, CharacterType.Outsider],
+            _ => throw new InvalidOperationException("Character has unknown dynamic ability scope.")
+        };
+
+        if (!expectedTypes.Contains(candidateDef.Type))
+        {
+            throw new InvalidOperationException($"Ability character '{normalizedId}' does not match the expected scope for {slotDef.DisplayName}.");
+        }
+
+        if (!session.Script.Characters.Any(c => string.Equals(c.Id, normalizedId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException($"Character '{normalizedId}' is not on the script.");
+        }
+
+        var state = DraftStateSnapshot.FromSession(session);
+        var chosenSet = new HashSet<string>(state.ChosenCharacterIds, StringComparer.OrdinalIgnoreCase);
+        var borrowedSet = new HashSet<string>(state.BorrowedAbilityCharacterIds, StringComparer.OrdinalIgnoreCase);
+
+        if (chosenSet.Contains(normalizedId))
+        {
+            throw new InvalidOperationException($"Character '{normalizedId}' is already chosen.");
+        }
+
+        if (borrowedSet.Contains(normalizedId))
+        {
+            throw new InvalidOperationException($"Character '{normalizedId}' is already borrowed by another character.");
+        }
+
+        // Re-validate feasibility for count-affecting abilities (stale-state rejection)
+        var countAffectingRules = candidateDef.SetupRules.Where(r => r is not RequiresCharacterSetupRule).ToList();
+        if (countAffectingRules.Count > 0)
+        {
+            var speculativeBorrowedIds = state.BorrowedAbilityCharacterIds
+                .Append(normalizedId)
+                .ToList()
+                .AsReadOnly();
+
+            var speculativeResult = _setupCalculator.Calculate(
+                session.Script,
+                session.PlayerCount,
+                state.ChosenCharacterIds,
+                session.ActiveLoricIds,
+                state.HiddenFlagsByCharacterId,
+                new SessionSetupOptions(session.UseMarionette, session.IsLegionGame, session.LegionCount),
+                _characterDatabase,
+                _loricDatabase,
+                speculativeBorrowedIds);
+
+            var currentCounts = DraftMath.ComputeCurrentCounts(session, _characterDatabase);
+            var remainingSeats = GetRemainingSeats(session);
+
+            if (!IsSetupFeasible(speculativeResult.ValidTargetCounts, currentCounts, remainingSeats, session, chosenSet, borrowedSet))
+            {
+                throw new InvalidOperationException($"Assigning ability '{normalizedId}' would make the setup infeasible.");
+            }
+        }
+
+        var updatedSlot = slot with { BorrowedAbilityCharacterId = normalizedId };
+        var updatedSession = ReplaceSlot(session, updatedSlot);
+        _sessions[updatedSession.Id] = updatedSession;
+        return updatedSession;
+    }
+
+    private static bool IsSetupFeasible(
+        IReadOnlyList<SetupCounts> targets,
+        SetupCounts currentCounts,
+        int remainingSeats,
+        GameSession session,
+        HashSet<string> chosenSet,
+        HashSet<string> borrowedSet)
+    {
+        var availableTF = session.Script.Characters.Count(c => c.Type == CharacterType.Townsfolk && !chosenSet.Contains(c.Id) && !borrowedSet.Contains(c.Id));
+        var availableOut = session.Script.Characters.Count(c => c.Type == CharacterType.Outsider && !chosenSet.Contains(c.Id) && !borrowedSet.Contains(c.Id));
+        var availableMin = session.Script.Characters.Count(c => c.Type == CharacterType.Minion && !chosenSet.Contains(c.Id) && !borrowedSet.Contains(c.Id));
+        var availableDem = session.Script.Characters.Count(c => c.Type == CharacterType.Demon && !chosenSet.Contains(c.Id) && !borrowedSet.Contains(c.Id));
+
+        foreach (var target in targets)
+        {
+            var neededTF = target.Townsfolk - currentCounts.Townsfolk;
+            var neededOut = target.Outsiders - currentCounts.Outsiders;
+            var neededMin = target.Minions - currentCounts.Minions;
+            var neededDem = target.Demons - currentCounts.Demons;
+
+            if (neededTF < 0 || neededOut < 0 || neededMin < 0 || neededDem < 0)
+            {
+                continue;
+            }
+
+            var totalNeeded = neededTF + neededOut + neededMin + neededDem;
+
+            if (neededTF <= availableTF
+                && neededOut <= availableOut
+                && neededMin <= availableMin
+                && neededDem <= availableDem
+                && totalNeeded <= remainingSeats)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string GenerateUnavailableReason(
+        CharacterDefinition candidate,
+        int remainingSeats,
+        GameSession session,
+        HashSet<string> chosenSet)
+    {
+        foreach (var rule in candidate.SetupRules)
+        {
+            if (rule is OutsiderDeltaSetupRule deltaRule && !deltaRule.IsStorytellerChoice && deltaRule.Delta > 0)
+            {
+                var availableOutsiders = session.Script.Characters.Count(c => c.Type == CharacterType.Outsider && !chosenSet.Contains(c.Id));
+                if (availableOutsiders < deltaRule.Delta)
+                {
+                    return $"Not enough Outsiders remaining on the script to satisfy +{deltaRule.Delta} Outsider count.";
+                }
+
+                if (remainingSeats < deltaRule.Delta)
+                {
+                    return $"Not enough remaining seats to add {deltaRule.Delta} Outsiders.";
+                }
+            }
+
+            if (rule is StoryTellerChoiceSetupRule)
+            {
+                return "No Outsider can be added or removed to satisfy ±1.";
+            }
+        }
+
+        return "Resulting counts cannot be satisfied by the remaining script.";
     }
 
     private static int GetRemainingSeats(GameSession session)

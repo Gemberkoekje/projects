@@ -66,7 +66,9 @@ public sealed class CharacterDatabase
         IReadOnlyList<IAvailabilityConstraint> availabilityConstraints,
         bool isUnknown,
         bool isDraftExcluded,
-        bool isOutOfScript)
+        bool isOutOfScript,
+        bool isDynamicSetup = false,
+        DynamicAbilityScope dynamicAbilityScope = DynamicAbilityScope.Unknown)
     {
         return new CharacterDefinition(
             id,
@@ -76,7 +78,9 @@ public sealed class CharacterDatabase
             availabilityConstraints,
             isUnknown,
             isDraftExcluded,
-            isOutOfScript);
+            isOutOfScript,
+            isDynamicSetup,
+            dynamicAbilityScope);
     }
 
     private static IReadOnlyDictionary<string, CharacterDefinition> Parse(string json)
@@ -105,6 +109,8 @@ public sealed class CharacterDatabase
             var setupRules = ParseSetupRules(item);
             var constraints = ParseAvailabilityConstraints(item);
             var isDraftExcluded = ReadBoolOrDefault(item, "isDraftExcluded", false);
+            var isDynamicSetup = ReadBoolOrDefault(item, "dynamicSetup", false);
+            var dynamicAbilityScope = ParseDynamicAbilityScope(ReadStringOrDefault(item, "dynamicAbilityScope", DynamicAbilityScope.Unknown.ToString()));
 
             characters[normalizedId] = CreateDefinition(
                 normalizedId,
@@ -114,7 +120,9 @@ public sealed class CharacterDatabase
                 constraints,
                 false,
                 isDraftExcluded,
-                false);
+                false,
+                isDynamicSetup,
+                dynamicAbilityScope);
         }
 
         return new ReadOnlyDictionary<string, CharacterDefinition>(characters);
@@ -285,6 +293,16 @@ public sealed class CharacterDatabase
         }
 
         return CharacterType.Unknown;
+    }
+
+    private static DynamicAbilityScope ParseDynamicAbilityScope(string value)
+    {
+        if (Enum.TryParse<DynamicAbilityScope>(value, true, out var parsed))
+        {
+            return parsed;
+        }
+
+        return DynamicAbilityScope.Unknown;
     }
 
     private static string ToTitleCase(string id)

@@ -73,6 +73,13 @@ namespace TheCuratool.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BorrowedAbilityCharacterId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("ChosenCharacterId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -87,6 +94,11 @@ namespace TheCuratool.Infrastructure.Migrations
                         .HasDefaultValue("{\"isDrunk\":false,\"isLunatic\":false}");
 
                     b.Property<bool>("IsAtheistCommitmentConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("IsStAssigned")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
