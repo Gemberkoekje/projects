@@ -41,6 +41,17 @@ builder.Services.AddHealthChecks().AddNpgSql(postgresConnectionString);
 
 var app = builder.Build();
 
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/curatool", out var remainingPath))
+    {
+        context.Request.PathBase = context.Request.PathBase.Add("/curatool");
+        context.Request.Path = remainingPath.HasValue ? remainingPath : "/";
+    }
+
+    await next();
+});
+
 if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 {
     using var scope = app.Services.CreateScope();

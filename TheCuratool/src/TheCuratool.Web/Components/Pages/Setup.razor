@@ -6,7 +6,7 @@
 
 @if (SessionState.LoadResult.Script.Characters.Count == 0)
 {
-    <p class="panel">No script loaded. <a href="/">Load a script first ←</a></p>
+    <p class="panel">No script loaded. <a href="">Load a script first ←</a></p>
 }
 else
 {
@@ -91,7 +91,6 @@ else
                 @SessionState.SetupResult.BaseDistribution.Minions Minions /
                 @SessionState.SetupResult.BaseDistribution.Demons Demons
             </p>
-
             @if (SessionState.SetupResult.ValidTargetCounts.Count > 0)
             {
                 <h3>Valid Target Distributions</h3>
@@ -110,7 +109,7 @@ else
             @if (SessionState.HasCurrentSession)
             {
                 <p>
-                    <a href="/draft">Go to Draft</a>
+                    <a href="draft">Go to Draft</a>
                 </p>
             }
         </section>
@@ -128,7 +127,7 @@ else
         await SessionState.StartDraftAsync();
         if (SessionState.HasCurrentSession)
         {
-            Nav.NavigateTo($"/draft/{SessionState.CurrentSessionId}");
+            Nav.NavigateTo($"draft/{SessionState.CurrentSessionId}");
         }
     }
 
