@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using TheCuratool.Application;
 using TheCuratool.Domain;
@@ -35,11 +36,23 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Trust all proxies in the cluster; restrict further if the ingress IP range is known.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
     ?? "Host=localhost;Port=5432;Database=curatool;Username=postgres;Password=postgres";
 builder.Services.AddHealthChecks().AddNpgSql(postgresConnectionString);
 
 var app = builder.Build();
+
+// Must be first — rewrites Request.Scheme to https based on X-Forwarded-Proto
+// set by the Kubernetes ingress controller before any other middleware sees it.
+app.UseForwardedHeaders();
 
 app.Use(async (context, next) =>
 {
@@ -83,7 +96,7 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler();
-    app.UseHsts();
+    // HSTS and HTTPS redirection are handled by the ingress; skip them here.
 }
 
 app.UsePathBase("/curatool");
@@ -96,7 +109,6 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("v1/swagger.json", "TheCuratool API v1");
 });
 
-app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
