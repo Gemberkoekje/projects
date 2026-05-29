@@ -73,23 +73,8 @@ if (app.Configuration.GetValue<bool>("Database:AutoMigrate"))
 
     if (dbContext.Database.IsRelational())
     {
-        try
-        {
-            await dbContext.Database.MigrateAsync();
-        }
-        catch (Exception migrationException)
-        {
-            logger.LogWarning(migrationException, "Database auto-migration failed during startup. Attempting EnsureCreated fallback.");
-
-            try
-            {
-                await dbContext.Database.EnsureCreatedAsync();
-            }
-            catch (Exception ensureCreatedException)
-            {
-                logger.LogError(ensureCreatedException, "Database EnsureCreated fallback failed during startup. Continuing without blocking app launch.");
-            }
-        }
+        await dbContext.Database.MigrateAsync();
+        logger.LogInformation("Database migration completed successfully.");
     }
 }
 
