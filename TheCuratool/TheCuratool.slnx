@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Docs/">
+    <File Path="plan-special-cases.md" />
     <File Path="plan.md" />
     <File Path="README.md" />
   </Folder>

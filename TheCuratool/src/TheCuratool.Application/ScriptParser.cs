@@ -22,7 +22,7 @@ public sealed class ScriptParser
         if (string.IsNullOrWhiteSpace(json))
         {
             var emptyScript = new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>());
-            return new ScriptParseResult(emptyScript, Array.Empty<string>(), new[] { "Script JSON content is required." });
+            return new ScriptParseResult(emptyScript, Array.Empty<string>(), Array.Empty<string>(), new[] { "Script JSON content is required." });
         }
 
         try
@@ -33,7 +33,7 @@ public sealed class ScriptParser
         catch (JsonException ex)
         {
             var emptyScript = new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>());
-            return new ScriptParseResult(emptyScript, Array.Empty<string>(), new[] { $"Invalid JSON: {ex.Message}" });
+            return new ScriptParseResult(emptyScript, Array.Empty<string>(), Array.Empty<string>(), new[] { $"Invalid JSON: {ex.Message}" });
         }
     }
 
@@ -55,6 +55,7 @@ public sealed class ScriptParser
     {
         ArgumentNullException.ThrowIfNull(characterDatabase);
 
+        var info = new List<string>();
         var warnings = new List<string>();
         var errors = new List<string>();
 
@@ -62,7 +63,7 @@ public sealed class ScriptParser
         {
             var emptyScript = new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>());
             errors.Add("Script JSON root must be an array.");
-            return new ScriptParseResult(emptyScript, warnings.AsReadOnly(), errors.AsReadOnly());
+            return new ScriptParseResult(emptyScript, info.AsReadOnly(), warnings.AsReadOnly(), errors.AsReadOnly());
         }
 
         var name = string.Empty;
@@ -112,12 +113,12 @@ public sealed class ScriptParser
             .AsReadOnly();
 
         var script = new Script(name, author, characters);
-        Validate(script, warnings, errors);
+        Validate(script, info, warnings, errors);
 
-        return new ScriptParseResult(script, warnings.AsReadOnly(), errors.AsReadOnly());
+        return new ScriptParseResult(script, info.AsReadOnly(), warnings.AsReadOnly(), errors.AsReadOnly());
     }
 
-    private static void Validate(Script script, List<string> warnings, List<string> errors)
+    private static void Validate(Script script, List<string> info, List<string> warnings, List<string> errors)
     {
         if (!script.Characters.Any(c => c.Type == CharacterType.Townsfolk))
         {
@@ -137,6 +138,19 @@ public sealed class ScriptParser
         if (!script.Characters.Any(c => c.Type == CharacterType.Minion))
         {
             warnings.Add("Script has no Minion characters.");
+        }
+
+        var hasChoirboy = script.Characters.Any(c => string.Equals(c.Id, "choirboy", StringComparison.OrdinalIgnoreCase));
+        var hasKing = script.Characters.Any(c => string.Equals(c.Id, "king", StringComparison.OrdinalIgnoreCase));
+        if (hasChoirboy && !hasKing)
+        {
+            info.Add("Script includes Choirboy without King; King will be auto-added if Choirboy is drafted.");
+        }
+
+        var hasLegion = script.Characters.Any(c => string.Equals(c.Id, "legion", StringComparison.OrdinalIgnoreCase));
+        if (hasLegion)
+        {
+            info.Add("Script includes Legion; Setup will show a Legion game option.");
         }
     }
 

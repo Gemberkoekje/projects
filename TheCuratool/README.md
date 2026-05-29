@@ -110,6 +110,26 @@ TheCuratool/
 10. ✅ **Phase 10** — Kubernetes
 11. ✅ **Phase 11** — Polish & Documentation
 
+## Special Cases
+
+Beyond the base phases, The Curatool implements a full set of Blood on the Clocktower
+special-case setup behaviors. The complete design and acceptance criteria live in
+[plan-special-cases.md](plan-special-cases.md). Summary of implemented S-phases:
+
+| Phase | Area | Status |
+|-------|------|--------|
+| ✅ S1 | Setup rule coverage — Fang Gu (+1 Outsider), Vigormortis (−1 Outsider), Summoner (ReplaceDemon), Godfather (true ±1), Hermit, Lord of Typhon (unconstrained Outsider + Minion delta), Marionette draft exclusion | Done |
+| ✅ S2 | Required pair — Choirboy → King with out-of-script auto-add | Done |
+| ✅ S3 | Hidden-flag setup suppression — Drunk/Lunatic tokens ignore their own setup rules | Done |
+| ✅ S4 | Legion game mode — derived Legion count, "Evil" sentinel offers, `ResolveEvilSlot` | Done |
+| ✅ S5 | Non-Legion "Evil" offer — opt-in evil sentinel on any curated offer | Done |
+| ✅ S6 | Unresolved Minion slots — Kazali / Lord of Typhon ST-assigned slots, `ResolveMinionSlot` | Done |
+| ✅ S7 | Dynamic-setup — Alchemist / Boffin borrowed-ability assignment with feasibility greying-out | Done |
+| ✅ S8 | Script validation — Choirboy-without-King and Legion-on-script informational diagnostics | Done |
+| ✅ S9 | Web UI surfacing — Legion controls, evil-option toggle, ST-assigned/dynamic resolution UI | Done |
+| ✅ S10 | Persistence round-trip — Legion settings, evil sentinels, ST-assigned/borrowed-ability fields | Done |
+| ✅ S11 | Documentation — this section + plan status tracking | Done |
+
 ## Code Style
 
 - **Nullability:** `Nullable=enable`; avoid nullable annotations (`?`) unless essential. Use explicit types (Result<T>, Option<T>, etc.) for optional outcomes.

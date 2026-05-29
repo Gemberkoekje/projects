@@ -63,6 +63,10 @@ else
                             {
                                 @FormatChosenCharacter(chosen, slot.BorrowedAbilityCharacterId)
                             }
+                            else if (slot.IsStAssigned)
+                            {
+                                <em class="muted">ST-assigned (awaiting resolution)</em>
+                            }
                             else
                             {
                                 <em class="muted">unassigned</em>
@@ -102,6 +106,25 @@ else
                             </tr>
                         }
                     }
+                    @if (slot.IsStAssigned && slot.Choice is not PlayerChoice.ChosenChoice)
+                    {
+                        <tr>
+                            <td></td>
+                            <td colspan="2">
+                                <strong>Resolve ST-assigned slot:</strong>
+                                <div>
+                                    <select @onchange="args => _selectedResolutionCharacterId[slot.DraftOrder] = args.Value?.ToString() ?? string.Empty">
+                                        <option value="">-- Select character --</option>
+                                        @foreach (var character in SessionState.CurrentValidCharacters.OrderBy(c => c.DisplayName))
+                                        {
+                                            <option value="@character.Id">@character.DisplayName (@character.Type)</option>
+                                        }
+                                    </select>
+                                    <button @onclick="() => ResolveSlot(slot.DraftOrder)">Confirm</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>
@@ -119,6 +142,7 @@ else
     public Guid SessionId { get; set; }
 
     private bool _isReady;
+    private readonly Dictionary<int, string> _selectedResolutionCharacterId = new();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -149,5 +173,40 @@ else
     private async Task PickDynamicAbility(int draftOrder, string abilityCharacterId)
     {
         await SessionState.AssignDynamicAbilityAsync(draftOrder, abilityCharacterId);
+    }
+
+    private async Task ResolveSlot(int draftOrder)
+    {
+        if (!_selectedResolutionCharacterId.TryGetValue(draftOrder, out var characterId) || string.IsNullOrWhiteSpace(characterId))
+        {
+            return;
+        }
+
+        // Determine if this is an evil slot or minion slot based on what was chosen
+        var session = SessionState.CurrentSession;
+        var slot = session.Players.FirstOrDefault(p => p.DraftOrder == draftOrder);
+        if (slot is null)
+        {
+            return;
+        }
+
+        var isEvilSlot = slot.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "evil", StringComparison.OrdinalIgnoreCase);
+
+        if (isEvilSlot)
+        {
+            await SessionState.ResolveEvilSlotAsync(draftOrder, characterId, new HiddenFlags(false, false));
+        }
+        else
+        {
+            // It's a minion slot
+            await SessionState.ResolveMinionSlotAsync(draftOrder, characterId);
+        }
+
+        // Clear the selection
+        if (_selectedResolutionCharacterId.ContainsKey(draftOrder))
+        {
+            _selectedResolutionCharacterId[draftOrder] = string.Empty;
+        }
     }
 }

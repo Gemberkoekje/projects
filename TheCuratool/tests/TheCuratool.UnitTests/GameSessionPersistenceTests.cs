@@ -320,6 +320,247 @@ public sealed class GameSessionPersistenceTests : IDisposable
         Assert.Equal("poisoner", slot.BorrowedAbilityCharacterId);
     }
 
+    [Fact]
+    public async Task LegionSession_RoundTrips_WithEvilSentinelsAndLegionCount()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Legion Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId1 = Guid.NewGuid();
+        var playerId2 = Guid.NewGuid();
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId1,
+                new PlayerChoice.ChosenChoice("evil", new[] { "evil" }, new HiddenFlags(false, false)),
+                false,
+                string.Empty),
+            new PlayerSlot(
+                2,
+                playerId2,
+                new PlayerChoice.ChosenChoice("librarian", new[] { "librarian" }, new HiddenFlags(false, false)),
+                false,
+                string.Empty),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            2,
+            players,
+            GameStatus.Drafting,
+            Array.Empty<string>(),
+            false,
+            true,
+            5);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        Assert.True(retrieved.IsLegionGame);
+        Assert.Equal(5, retrieved.LegionCount);
+        Assert.Equal(2, retrieved.Players.Count);
+
+        var evilSlot = retrieved.Players.First(p => p.DraftOrder == 1);
+        Assert.True(evilSlot.IsChosen);
+        if (evilSlot.Choice is PlayerChoice.ChosenChoice evilChoice)
+        {
+            Assert.Equal("evil", evilChoice.CharacterId);
+        }
+        else
+        {
+            Assert.Fail("Expected ChosenChoice for evil slot");
+        }
+    }
+
+    [Fact]
+    public async Task UnresolvedStAssignedSlot_RoundTrips_WithEmptyBorrowedAbilityCharacterId()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Test Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId = Guid.NewGuid();
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId,
+                PlayerChoice.UnchosenChoice.Empty,
+                true,
+                string.Empty),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            1,
+            players,
+            GameStatus.Drafting,
+            Array.Empty<string>(),
+            false,
+            false,
+            0);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        var slot = retrieved.Players.Single();
+        Assert.True(slot.IsStAssigned);
+        Assert.Equal(string.Empty, slot.BorrowedAbilityCharacterId);
+        Assert.True(slot.IsChosen);
+    }
+
+    [Fact]
+    public async Task ResolvedStAssignedMinionSlot_RoundTrips_WithBorrowedAbilityCharacterId()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Test Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId = Guid.NewGuid();
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId,
+                PlayerChoice.UnchosenChoice.Empty,
+                true,
+                "poisoner"),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            1,
+            players,
+            GameStatus.Drafting,
+            Array.Empty<string>(),
+            false,
+            false,
+            0);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        var slot = retrieved.Players.Single();
+        Assert.True(slot.IsStAssigned);
+        Assert.Equal("poisoner", slot.BorrowedAbilityCharacterId);
+        Assert.True(slot.IsChosen);
+    }
+
+    [Fact]
+    public async Task ResolvedEvilSlot_RoundTrips_WithActualCharacterAssignment()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Test Script", "Author", Array.Empty<CharacterDefinition>());
+        var playerId = Guid.NewGuid();
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                playerId,
+                new PlayerChoice.ChosenChoice("evil", new[] { "evil" }, new HiddenFlags(false, false)),
+                false,
+                "imp"),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            1,
+            players,
+            GameStatus.Completed,
+            Array.Empty<string>(),
+            false,
+            false,
+            0);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        var slot = retrieved.Players.Single();
+        Assert.True(slot.IsChosen);
+        Assert.Equal("imp", slot.BorrowedAbilityCharacterId);
+
+        if (slot.Choice is PlayerChoice.ChosenChoice chosen)
+        {
+            Assert.Equal("evil", chosen.CharacterId);
+        }
+        else
+        {
+            Assert.Fail("Expected ChosenChoice");
+        }
+    }
+
+    [Fact]
+    public async Task LegionSession_WithMultipleEvilSentinels_RoundTrips()
+    {
+        // Arrange
+        var sessionId = Guid.NewGuid();
+        var script = new Script("Legion Script", "Author", Array.Empty<CharacterDefinition>());
+        var players = new List<PlayerSlot>
+        {
+            new PlayerSlot(
+                1,
+                Guid.NewGuid(),
+                new PlayerChoice.ChosenChoice("evil", new[] { "evil" }, new HiddenFlags(false, false)),
+                false,
+                string.Empty),
+            new PlayerSlot(
+                2,
+                Guid.NewGuid(),
+                new PlayerChoice.ChosenChoice("evil", new[] { "evil" }, new HiddenFlags(false, false)),
+                false,
+                "legion"),
+            new PlayerSlot(
+                3,
+                Guid.NewGuid(),
+                new PlayerChoice.ChosenChoice("evil", new[] { "evil" }, new HiddenFlags(false, false)),
+                false,
+                "legion"),
+        };
+        var session = new GameSession(
+            sessionId,
+            script,
+            3,
+            players,
+            GameStatus.Completed,
+            Array.Empty<string>(),
+            false,
+            true,
+            3);
+
+        await _repository.AddAsync(session, _scriptId);
+
+        // Act
+        var retrieved = await _repository.GetByIdAsync(sessionId);
+
+        // Assert
+        Assert.NotNull(retrieved);
+        Assert.True(retrieved.IsLegionGame);
+        Assert.Equal(3, retrieved.LegionCount);
+        Assert.Equal(3, retrieved.Players.Count);
+
+        var unresolvedSlot = retrieved.Players.First(p => p.DraftOrder == 1);
+        Assert.Equal(string.Empty, unresolvedSlot.BorrowedAbilityCharacterId);
+
+        var resolvedSlots = retrieved.Players.Where(p => p.DraftOrder > 1).ToList();
+        Assert.All(resolvedSlots, slot => Assert.Equal("legion", slot.BorrowedAbilityCharacterId));
+    }
+
     public void Dispose()
     {
         _dbContext?.Dispose();

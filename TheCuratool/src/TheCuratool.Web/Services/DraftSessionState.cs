@@ -46,7 +46,7 @@ public sealed class DraftSessionState
 
     public IReadOnlyList<StoredScript> AvailableScripts { get; private set; } = Array.Empty<StoredScript>();
 
-    public ScriptParseResult LoadResult { get; private set; } = new(new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), Array.Empty<string>(), Array.Empty<string>());
+    public ScriptParseResult LoadResult { get; private set; } = new(new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
 
     public SetupCalculationResult SetupResult { get; private set; } = new(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>());
 
@@ -150,7 +150,7 @@ public sealed class DraftSessionState
         var storedScript = await _scriptRepository.GetByIdAsync(scriptId);
         _loadedScriptId = storedScript.Id;
         ScriptJson = storedScript.RawJson;
-        LoadResult = new ScriptParseResult(storedScript.Script, Array.Empty<string>(), Array.Empty<string>());
+        LoadResult = new ScriptParseResult(storedScript.Script, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
         if (!SupportsLegionOption)
         {
             IsLegionGame = false;
@@ -176,7 +176,7 @@ public sealed class DraftSessionState
         {
             var loaded = await _gameSessionRepository.GetByIdAsync(sessionId);
             CurrentSession = loaded;
-            LoadResult = new ScriptParseResult(loaded.Script, Array.Empty<string>(), Array.Empty<string>());
+            LoadResult = new ScriptParseResult(loaded.Script, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>());
             ScriptJson = string.Empty;
             _loadedScriptId = Guid.Empty;
             HasCurrentSession = true;
@@ -559,6 +559,64 @@ public sealed class DraftSessionState
                 PendingDynamicAbilityDraftOrder = null;
             }
 
+            ClearDraftMessage();
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            SetDraftMessage(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Resolves an unresolved ST-assigned evil slot (from Legion mode or ST-offered evil) by assigning the actual character.
+    /// </summary>
+    public async Task ResolveEvilSlotAsync(int draftOrder, string actualCharacterId, HiddenFlags hiddenFlags)
+    {
+        if (!HasCurrentSession || CurrentSession.Status != GameStatus.Drafting)
+        {
+            SetDraftMessage("No active draft session is available.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(actualCharacterId))
+        {
+            SetDraftMessage("Character id is required.");
+            return;
+        }
+
+        try
+        {
+            CurrentSession = _draftEngine.ResolveEvilSlot(CurrentSession.Id, draftOrder, actualCharacterId, hiddenFlags);
+            await _gameSessionRepository.UpdateAsync(CurrentSession);
+            ClearDraftMessage();
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            SetDraftMessage(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Resolves an unresolved ST-assigned minion slot (from Kazali or Lord of Typhon) by assigning the minion character.
+    /// </summary>
+    public async Task ResolveMinionSlotAsync(int draftOrder, string characterId)
+    {
+        if (!HasCurrentSession || CurrentSession.Status != GameStatus.Drafting)
+        {
+            SetDraftMessage("No active draft session is available.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(characterId))
+        {
+            SetDraftMessage("Character id is required.");
+            return;
+        }
+
+        try
+        {
+            CurrentSession = _draftEngine.ResolveMinionSlot(CurrentSession.Id, draftOrder, characterId);
+            await _gameSessionRepository.UpdateAsync(CurrentSession);
             ClearDraftMessage();
         }
         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)

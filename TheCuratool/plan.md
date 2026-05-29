@@ -577,3 +577,103 @@ Run phases in order. Phases 1–5 produce a working CLI-testable core. Phase 6 a
   - Kazali reducing remaining minion draft slots into ST-assigned slots
   - Lord of Typhon creating the extra minion assignment slot
   - `ResolveMinionSlot` replacing unresolved summary entries with resolved minions
+
+### ✅ Completed
+
+**Phase S8 — Script Validation Updates**
+- Extended `ScriptParseResult` with an explicit informational diagnostics channel (`Info`) in addition to warnings/errors.
+- Updated `ScriptParser` validation to emit informational diagnostics when:
+  - `choirboy` is present without `king` (King auto-add reminder).
+  - `legion` is present (Legion setup toggle reminder).
+- Preserved existing validation severity semantics:
+  - no new errors were introduced beyond the existing no-Townsfolk error.
+  - missing demon/minion/outsider remain warnings.
+- Updated API upload response contract to return parser info diagnostics alongside warnings.
+- Extended `ScriptParserTests` with dedicated fixtures for Choirboy-without-King and Legion-on-script diagnostics.
+
+### ✅ Completed
+
+**Phase S9 — Web UI Surfacing**
+- **Setup.razor:** Legion checkbox and LegionCount input already implemented with default calculation based on normal game good-count baseline, gated by script content.
+- **Draft.razor:**
+  - "Add Evil option" toggle already implemented on Curate panel with proper checkbox binding.
+  - Inline ability picker for dynamic-setup characters (Alchemist/Boffin) already present after RecordChoice.
+  - Added visual markers for unresolved ST-assigned slots showing "ST-assigned" status and "awaiting ST resolution" message in player order table.
+- **Summary.razor:**
+  - Added unresolved ST-assigned slot resolution UI with dropdown to select resolution character.
+  - ResolveSlot method detects evil sentinel vs minion slots and calls appropriate resolution methods.
+  - Dynamic-setup confirmation banner already exists showing warning when setup confirmation is needed.
+  - Extended table to show unresolved slots distinctly.
+- **DraftSessionState:**
+  - Added `ResolveEvilSlotAsync(draftOrder, actualCharacterId, hiddenFlags)` wrapper method for evil-slot resolution.
+  - Added `ResolveMinionSlotAsync(draftOrder, characterId)` wrapper method for minion-slot resolution.
+  - All other pass-through methods already present: `GetDynamicAbilityOptions`, `AssignDynamicAbilityAsync`.
+- **DraftSessionStateTests:**
+  - Extended with S9-specific test scenarios:
+    - `StartDraft_WithLegionScript_AllowsLegionGameOption`: verifies normal draft without Legion.
+    - `ResolveEvilSlotAsync_WhenCalled_UpdatesSessionAndClears`: tests evil-slot resolution flow.
+    - `ResolveMinionSlotAsync_WhenCalled_UpdatesSessionWithMinion`: tests minion-slot resolution flow.
+    - `DynamicAbilityBanner_ShowsWhenAlchemistChosen`: tests dynamic-setup confirmation banner state.
+- ✅ Build succeeds: 0 warnings, 0 errors.
+- ✅ All tests pass: 97 tests (93 original + 4 new S9-specific tests).
+
+### ✅ Completed
+
+**Phase S10 — Persistence Round-Trip**
+- All entity models have required fields: `IsLegionGame` and `LegionCount` on `GameSessionEntity`, `IsStAssigned` and `BorrowedAbilityCharacterId` on `PlayerSlotEntity`.
+- Migration `AddBorrowedAbility` persists the ST-assigned and borrowed-ability fields to the database.
+- `GameSessionRepository` mapping handles all special-case fields in both directions (entity-to-domain and domain-to-entity).
+- Added comprehensive persistence round-trip tests in `GameSessionPersistenceTests`:
+  - `LegionSession_RoundTrips_WithEvilSentinelsAndLegionCount`: verifies Legion game settings and "evil" sentinel choices persist correctly.
+  - `UnresolvedStAssignedSlot_RoundTrips_WithEmptyBorrowedAbilityCharacterId`: verifies ST-assigned slots without resolution persist with `IsStAssigned=true` and empty `BorrowedAbilityCharacterId`.
+  - `ResolvedStAssignedMinionSlot_RoundTrips_WithBorrowedAbilityCharacterId`: verifies ST-assigned minion slots resolved via `ResolveMinionSlot` persist with the assigned character id.
+  - `ResolvedEvilSlot_RoundTrips_WithActualCharacterAssignment`: verifies evil sentinel slots resolved via `ResolveEvilSlot` persist with the actual character stored in `BorrowedAbilityCharacterId`.
+  - `LegionSession_WithMultipleEvilSentinels_RoundTrips`: verifies complex Legion sessions with multiple evil sentinels (some resolved, some unresolved) persist correctly.
+- ✅ Build succeeds: 0 warnings, 0 errors.
+- ✅ All tests pass: 102 tests (97 original + 5 new S10-specific persistence tests).
+
+### ✅ Completed
+
+**Phase S1 — Setup Rule Coverage Fixes**
+- Added new setup rule kinds in `TheCuratool.Domain`: `ReplaceDemonSetupRule`, `UnconstrainedOutsiderDeltaSetupRule`, `MinionDeltaSetupRule`, `SwapOutsiderForTownsfolkSetupRule`, and `NoSetupRule`.
+- Registered all new rule kinds in the `CharacterDatabase` JSON loader.
+- Updated `characters.json` per the reference table: `fang_gu` (+1 Outsider), `vigormortis` (−1 Outsider), `summoner` (`ReplaceDemon` + Demon-blocked availability), `godfather` (true ±1 via `StoryTellerChoice`), new `hermit` (NoOp / swap), new `lord_of_typhon` (unconstrained Outsider + extra Minion, Minion-blocked).
+- Marionette retained for script-validation but flagged `isDraftExcluded` so it is filtered from `GetRemainingValidCharacters`, `SuggestThree`, and `CreateCuratedOffer`.
+- Removed a duplicate `summoner` definition that existed in `characters.json`.
+- Covered by `SetupCalculatorTests` (Fang Gu, Vigormortis, Summoner, Godfather, Hermit, Lord of Typhon, Marionette exclusion) and `DraftEngineTests` draft-exclusion regression.
+
+### ✅ Completed
+
+**Phase S2 — Required-Pair: Choirboy ↔ King**
+- Added `autoAddIfMissing` flag on `RequiresCharacterSetupRule` and `IsOutOfScript` marker on `CharacterDefinition`.
+- `DraftEngine` injects King as an out-of-script character when Choirboy is chosen and King is not on the script, surfacing it in the makeup summary.
+- Added `choirboy` and `king` entries to `characters.json`.
+- Covered by `DraftEngineTests`: both-on-script-neither-chosen, Choirboy-with-King-on-script, and Choirboy-without-King out-of-script auto-add.
+
+### ✅ Completed
+
+**Phase S5 — Non-Legion "Evil" Offer**
+- `CreateCuratedOffer` accepts the `"evil"` sentinel alongside real character ids.
+- `RecordChoice` accepts and stores `"evil"` (empty hidden flags) and bypasses character-database validation for the sentinel only.
+- Resolution reuses the `ResolveEvilSlot` action from Phase S4; "Add Evil option" toggle present on the Draft Curate panel.
+- Covered by `DraftEngineTests`: curated offer with evil sentinel accepted, and evil choice resolvable outside Legion mode.
+
+### ✅ Completed
+
+**Phase S7 — Dynamic-Setup Flag (Alchemist / Boffin) + Inline Ability Assignment**
+- Added `IsDynamicSetup` and `DynamicAbilityScope` on `CharacterDefinition`, plus `BorrowedAbilityCharacterId` state for borrowed abilities.
+- Added `AbilityOption` record and `DraftEngine` APIs: `GetAlchemistAbilityOptions`, `GetBoffinAbilityOptions`, and `AssignDynamicAbility`, with speculative feasibility checks producing human-readable greying-out reasons.
+- `DraftMath.RequiresStorytellerSetupConfirmation` flags unresolved dynamic-setup slots until assigned.
+- Inline ability picker on `Draft.razor` and late-resolution UI on `Summary.razor`; round-trip persistence via `BorrowedAbilityCharacterId`.
+- Added `alchemist` and `boffin` entries to `characters.json`.
+- Covered by `DraftEngineTests` (scope filtering, Baron/Godfather/Huntsman greying-out, assignment rejection, count effects, no-rule clearing) and persistence round-trip tests.
+
+### ✅ Completed
+
+**Phase S11 — Documentation**
+- Added a "Special Cases" section to `README.md` linking to `plan-special-cases.md` with a per-S-phase status table.
+- Recorded the S-phase completion entries in this `## Implementation Status` section.
+- Added completion status markers to S1, S4, S9, and S11 headers in `plan-special-cases.md`.
+- ✅ Build succeeds: 0 warnings, 0 errors.
+- ✅ All 102 tests pass.
+

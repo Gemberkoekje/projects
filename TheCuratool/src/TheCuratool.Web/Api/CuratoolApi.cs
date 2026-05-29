@@ -89,6 +89,7 @@ public static class CuratoolApi
             storedScript.Script.Name,
             storedScript.Script.Author,
             storedScript.Script.Characters.Count,
+            parseResult.Info,
             parseResult.Warnings);
 
         return TypedResults.Created($"/api/scripts/{storedScript.Id}", response);

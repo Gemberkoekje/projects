@@ -60,6 +60,7 @@ public sealed record ScriptApiResponse(
     string Name,
     string Author,
     int CharacterCount,
+    IReadOnlyList<string> Info,
     IReadOnlyList<string> Warnings);
 
 public sealed record CharacterApiResponse(

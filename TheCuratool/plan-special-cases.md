@@ -38,6 +38,8 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S1 — Setup Rule Coverage Fixes
 
+**Status:** ✅ Completed
+
 **Goal:** Bring `characters.json` and the rule kinds into full alignment with the reference table.
 
 **Deliverables:**
@@ -131,7 +133,9 @@ Everything below is either **missing entirely**, **partially modelled**, or **en
 
 ## Phase S4 — Legion Game Mode
 
-**Goal:** Add Legion as a first-class binary game mode with its own distribution math and an "Evil" offer flow that behaves like a hidden borrowed-ability choice until Legion mode is committed.
+**Status:** ✅ Completed
+
+**Goal:** Add Legion as a first-class binary game mode
 
 **Deliverables:**
 
@@ -308,6 +312,8 @@ Unit tests in `DraftEngineTests`:
 
 ## Phase S8 — Script Validation Updates
 
+**Status:** ✅ Completed
+
 **Goal:** Round out `ScriptParser` validation per the reference doc.
 
 **Deliverables:**
@@ -323,6 +329,8 @@ Unit tests in `DraftEngineTests`:
 ---
 
 ## Phase S9 — Web UI Surfacing
+
+**Status:** ✅ Completed
 
 **Goal:** Make all of the above visible and operable in the Blazor UI.
 
@@ -345,6 +353,8 @@ Unit tests in `DraftEngineTests`:
 ---
 
 ## Phase S10 — Persistence Round-Trip
+
+**Status:** ✅ Completed
 
 **Goal:** Persist all new fields/flags so sessions resume correctly.
 
@@ -376,6 +386,8 @@ Unit tests in `DraftEngineTests`:
 ---
 
 ## Phase S11 — Documentation
+
+**Status:** ✅ Completed
 
 **Goal:** Update `README.md` and `plan.md` "Implementation Status" with a new section listing each S-phase as it lands.
 

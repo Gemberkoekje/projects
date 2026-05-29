@@ -19,6 +19,7 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(json, _characterDatabase);
 
         Assert.True(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Empty(result.Errors);
         Assert.Equal("No Vortox", result.Script.Name);
         Assert.Equal("Gemberkoekje", result.Script.Author);
@@ -47,6 +48,7 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(json, _characterDatabase);
 
         Assert.True(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Empty(result.Errors);
         Assert.Contains("Script has no Demon characters.", result.Warnings);
     }
@@ -59,6 +61,7 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(json, _characterDatabase);
 
         Assert.False(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Contains("Script must include at least one Townsfolk character.", result.Errors);
     }
 
@@ -70,6 +73,7 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(json, _characterDatabase);
 
         Assert.True(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Equal("Mixed", result.Script.Name);
         Assert.Equal("Tester", result.Script.Author);
         Assert.Equal(4, result.Script.Characters.Count);
@@ -88,6 +92,7 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(stream, _characterDatabase);
 
         Assert.True(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Equal("Streamed", result.Script.Name);
         Assert.Equal("Tester", result.Script.Author);
         Assert.Equal(2, result.Script.Characters.Count);
@@ -101,8 +106,31 @@ public sealed class ScriptParserTests
         var result = _parser.Parse(json, _characterDatabase);
 
         Assert.True(result.IsSuccess);
+        Assert.Empty(result.Info);
         Assert.Contains("Script has no Outsider characters.", result.Warnings);
         Assert.Contains("Script has no Minion characters.", result.Warnings);
+    }
+
+    [Fact]
+    public void Parse_ChoirboyWithoutKing_AddsInformationalDiagnostic()
+    {
+        const string json = "[\"choirboy\",\"chef\",\"baron\",\"imp\"]";
+
+        var result = _parser.Parse(json, _characterDatabase);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Script includes Choirboy without King; King will be auto-added if Choirboy is drafted.", result.Info);
+    }
+
+    [Fact]
+    public void Parse_ScriptWithLegion_AddsInformationalDiagnostic()
+    {
+        const string json = "[\"chef\",\"baron\",\"legion\"]";
+
+        var result = _parser.Parse(json, _characterDatabase);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("Script includes Legion; Setup will show a Legion game option.", result.Info);
     }
 
     private static string GetCharactersFilePath()

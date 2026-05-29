@@ -55,7 +55,16 @@ else
                         var isCurrent = slot.DraftOrder == SessionState.CurrentPlayerSlot;
                         <tr class="@(isCurrent ? "current-row" : string.Empty)">
                             <td>@slot.DraftOrder</td>
-                            <td>@(slot.IsChosen ? "Chosen" : isCurrent ? "Current" : "Pending")</td>
+                            <td>
+                                @if (slot.IsStAssigned)
+                                {
+                                    <span title="Storyteller-assigned (unresolved)">ST-assigned</span>
+                                }
+                                else
+                                {
+                                    @(slot.IsChosen ? "Chosen" : isCurrent ? "Current" : "Pending")
+                                }
+                            </td>
                             <td>
                                 @if (slot.Choice is PlayerChoice.ChosenChoice chosenSlot)
                                 {
@@ -67,6 +76,10 @@ else
                                     {
                                         <em class="muted">hidden</em>
                                     }
+                                }
+                                else if (slot.IsStAssigned)
+                                {
+                                    <em class="muted">awaiting ST resolution</em>
                                 }
                                 else
                                 {
