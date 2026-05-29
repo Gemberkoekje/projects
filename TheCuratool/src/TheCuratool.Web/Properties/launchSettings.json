@@ -3,6 +3,7 @@
     "TheCuratool.Web": {
       "commandName": "Project",
       "launchBrowser": true,
+      "launchUrl": "curatool/",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

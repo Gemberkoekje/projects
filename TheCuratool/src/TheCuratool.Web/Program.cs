@@ -86,11 +86,14 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+app.UsePathBase("/curatool");
+app.UseRouting();
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.RoutePrefix = "swagger";
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "TheCuratool API v1");
+    options.SwaggerEndpoint("v1/swagger.json", "TheCuratool API v1");
 });
 
 app.UseHttpsRedirection();
