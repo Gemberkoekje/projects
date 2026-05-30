@@ -28,6 +28,16 @@ else
             </div>
         }
 
+        @if (SessionState.SupportsAtheistOption)
+        {
+            <div>
+                <label>
+                    <InputCheckbox Value="SessionState.UseAtheist" ValueChanged="OnUseAtheistChanged" ValueExpression="@(() => SessionState.UseAtheist)" /> Use Atheist
+                    <span class="muted">(all-good canonical setup)</span>
+                </label>
+            </div>
+        }
+
         @if (SessionState.SupportsLegionOption)
         {
             <div>
@@ -134,6 +144,12 @@ else
     private void OnUseMarionetteChanged(bool value)
     {
         SessionState.UseMarionette = value;
+        SessionState.RecalculateSetup();
+    }
+
+    private void OnUseAtheistChanged(bool value)
+    {
+        SessionState.UseAtheist = value;
         SessionState.RecalculateSetup();
     }
 

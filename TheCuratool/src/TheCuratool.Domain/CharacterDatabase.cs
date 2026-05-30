@@ -153,16 +153,7 @@ public sealed class CharacterDatabase
         {
             var delta = rule.GetProperty("delta").GetInt32();
             var isStorytellerChoice = ReadBoolOrDefault(rule, "isStorytellerChoice", false);
-            if (!isStorytellerChoice)
-            {
-                return new OutsiderDeltaSetupRule(delta, false);
-            }
-
-            return new StoryTellerChoiceSetupRule(new ISetupRule[]
-            {
-                new OutsiderDeltaSetupRule(-Math.Abs(delta), false),
-                new OutsiderDeltaSetupRule(Math.Abs(delta), false),
-            });
+            return new OutsiderDeltaSetupRule(delta, isStorytellerChoice);
         }
 
         if (string.Equals(kind, "ReplaceDemon", StringComparison.OrdinalIgnoreCase))
@@ -186,6 +177,11 @@ public sealed class CharacterDatabase
             return new UnconstrainedOutsiderDeltaSetupRule();
         }
 
+        if (string.Equals(kind, "RemoveAllMinions", StringComparison.OrdinalIgnoreCase))
+        {
+            return new RemoveAllMinionsSetupRule();
+        }
+
         if (string.Equals(kind, "ReplaceTownsfolk", StringComparison.OrdinalIgnoreCase))
         {
             return new ReplaceTownsfolkSetupRule();
@@ -201,6 +197,11 @@ public sealed class CharacterDatabase
         if (string.Equals(kind, "MinionSwap", StringComparison.OrdinalIgnoreCase))
         {
             return new MinionSwapSetupRule();
+        }
+
+        if (string.Equals(kind, "ReplaceDemonOutsiderDisplay", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ReplaceDemonOutsiderDisplayRule();
         }
 
         if (string.Equals(kind, "StoryTellerChoice", StringComparison.OrdinalIgnoreCase)
@@ -244,10 +245,6 @@ public sealed class CharacterDatabase
                 continue;
             }
 
-            if (string.Equals(kind, "AtheistFirstPick", StringComparison.OrdinalIgnoreCase))
-            {
-                constraints.Add(new AtheistFirstPickConstraint());
-            }
         }
 
         return constraints.AsReadOnly();

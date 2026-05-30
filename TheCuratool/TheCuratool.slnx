@@ -4,6 +4,7 @@
     <File Path="plan.md" />
     <File Path="README.md" />
   </Folder>
+  <Project Path="../../plotboek-generator/.net.csproj" />
   <Project Path="src/TheCuratool.Application/TheCuratool.Application.csproj" />
   <Project Path="src/TheCuratool.Domain/TheCuratool.Domain.csproj" />
   <Project Path="src/TheCuratool.Infrastructure/TheCuratool.Infrastructure.csproj" />

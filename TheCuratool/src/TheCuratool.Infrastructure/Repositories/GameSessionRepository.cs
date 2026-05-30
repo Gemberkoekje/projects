@@ -17,6 +17,7 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             PlayerCount = session.PlayerCount,
             ActiveLorics = JsonSerializer.Serialize(session.ActiveLoricIds),
             UseMarionette = session.UseMarionette,
+            UseAtheist = session.UseAtheist,
             IsLegionGame = session.IsLegionGame,
             LegionCount = session.LegionCount,
             Status = (int)session.Status,
@@ -53,6 +54,7 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
 
         entity.Status = (int)session.Status;
         entity.UseMarionette = session.UseMarionette;
+        entity.UseAtheist = session.UseAtheist;
         entity.IsLegionGame = session.IsLegionGame;
         entity.LegionCount = session.LegionCount;
         entity.ActiveLorics = JsonSerializer.Serialize(session.ActiveLoricIds);
@@ -140,6 +142,7 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             (GameStatus)entity.Status,
             activeLorics,
             entity.UseMarionette,
+            entity.UseAtheist,
             entity.IsLegionGame,
             entity.LegionCount);
     }
@@ -153,8 +156,7 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             entity.ChosenCharacterId = string.Empty;
             entity.IsStAssigned = slot.IsStAssigned;
             entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
-            entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedIds);
-            entity.IsAtheistCommitmentConfirmed = unchosen.IsAtheistCommitmentConfirmed;
+            entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedOptions);
             entity.HiddenFlags = JsonSerializer.Serialize(new HiddenFlags(false, false));
             return;
         }
@@ -163,10 +165,9 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
         entity.ChosenCharacterId = chosen.CharacterId;
         entity.IsStAssigned = false;
         entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
-        entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedIds);
+        entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedOptions);
         entity.HiddenFlags = JsonSerializer.Serialize(chosen.HiddenFlags);
-        entity.IsAtheistCommitmentConfirmed = false;
-    }
+        }
 
     private static PlayerSlotEntity MapPlayerSlotToEntity(PlayerSlot slot, Guid sessionId)
     {
@@ -176,17 +177,15 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
             SessionId = sessionId,
             DraftOrder = slot.DraftOrder,
             PlayerId = slot.PlayerId,
-            OfferedCharacterIds = JsonSerializer.Serialize(Array.Empty<string>()),
+            OfferedCharacterIds = JsonSerializer.Serialize(Array.Empty<OfferOption>()),
             HiddenFlags = JsonSerializer.Serialize(new HiddenFlags(false, false)),
-            IsAtheistCommitmentConfirmed = false,
         };
 
         if (slot.Choice is PlayerChoice.UnchosenChoice unchosen)
         {
             entity.IsStAssigned = slot.IsStAssigned;
             entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
-            entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedIds);
-            entity.IsAtheistCommitmentConfirmed = unchosen.IsAtheistCommitmentConfirmed;
+            entity.OfferedCharacterIds = JsonSerializer.Serialize(unchosen.OfferedOptions);
             return entity;
         }
 
@@ -194,29 +193,31 @@ public sealed class GameSessionRepository(CuratoolDbContext dbContext, Character
         entity.ChosenCharacterId = chosen.CharacterId;
         entity.IsStAssigned = false;
         entity.BorrowedAbilityCharacterId = slot.BorrowedAbilityCharacterId;
-        entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedIds);
+        entity.OfferedCharacterIds = JsonSerializer.Serialize(chosen.OfferedOptions);
         entity.HiddenFlags = JsonSerializer.Serialize(chosen.HiddenFlags);
         return entity;
     }
 
     private static PlayerSlot MapPlayerSlotEntity(PlayerSlotEntity entity)
     {
-        var offeredIds = JsonSerializer.Deserialize<string[]>(entity.OfferedCharacterIds) ?? Array.Empty<string>();
+        var offeredOptions = JsonSerializer.Deserialize<OfferOption[]>(entity.OfferedCharacterIds) ?? Array.Empty<OfferOption>();
         if (string.IsNullOrEmpty(entity.ChosenCharacterId))
         {
             return new PlayerSlot(
                 entity.DraftOrder,
                 entity.PlayerId,
-                new PlayerChoice.UnchosenChoice(offeredIds, entity.IsAtheistCommitmentConfirmed),
+                new PlayerChoice.UnchosenChoice(offeredOptions),
                 entity.IsStAssigned,
                 entity.BorrowedAbilityCharacterId);
         }
 
         var hiddenFlags = JsonSerializer.Deserialize<HiddenFlags>(entity.HiddenFlags) ?? new HiddenFlags(false, false);
+        var chosenOption = offeredOptions.FirstOrDefault(option => string.Equals(option.CharacterId, entity.ChosenCharacterId, StringComparison.OrdinalIgnoreCase));
+        var disguiseCharacterId = chosenOption is null ? string.Empty : chosenOption.DisguiseCharacterId;
         return new PlayerSlot(
             entity.DraftOrder,
             entity.PlayerId,
-            new PlayerChoice.ChosenChoice(entity.ChosenCharacterId, offeredIds, hiddenFlags),
+            new PlayerChoice.ChosenChoice(entity.ChosenCharacterId, offeredOptions, hiddenFlags, disguiseCharacterId),
             false,
             entity.BorrowedAbilityCharacterId);
     }

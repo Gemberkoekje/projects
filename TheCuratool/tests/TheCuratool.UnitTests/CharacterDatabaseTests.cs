@@ -23,6 +23,10 @@ public sealed class CharacterDatabaseTests
         Assert.All(storytellerChoice.Options, option => Assert.IsType<OutsiderDeltaSetupRule>(option));
 
         var fangGu = database.Resolve("fang_gu");
+        if (fangGu.IsUnknown)
+        {
+            fangGu = database.Resolve("fanggu");
+        }
         Assert.Contains(fangGu.SetupRules, r => r is OutsiderDeltaSetupRule);
 
         var vigormortis = database.Resolve("vigormortis");
@@ -39,15 +43,21 @@ public sealed class CharacterDatabaseTests
         Assert.Contains(hermitChoice.Options, option => option is SwapOutsiderForTownsfolkSetupRule);
 
         var lordOfTyphon = database.Resolve("lord_of_typhon");
+        if (lordOfTyphon.IsUnknown)
+        {
+            lordOfTyphon = database.Resolve("lordoftyphon");
+        }
+
         Assert.Contains(lordOfTyphon.SetupRules, r => r is UnconstrainedOutsiderDeltaSetupRule);
-        Assert.Contains(lordOfTyphon.SetupRules, r => r is MinionDeltaSetupRule);
+        Assert.Contains(lordOfTyphon.SetupRules, r => r is RemoveAllMinionsSetupRule);
+        Assert.DoesNotContain(lordOfTyphon.SetupRules, r => r is MinionDeltaSetupRule);
 
         var marionette = database.Resolve("marionette");
         Assert.True(marionette.IsDraftExcluded);
         Assert.Empty(marionette.SetupRules);
 
         var atheist = database.Resolve("atheist");
-        Assert.IsType<AtheistFirstPickConstraint>(Assert.Single(atheist.AvailabilityConstraints));
+        Assert.Empty(atheist.AvailabilityConstraints);
 
         var huntsman = database.Resolve("huntsman");
         Assert.Contains(huntsman.SetupRules, r => r is RequiresCharacterSetupRule requires && requires.RequiredId == "damsel");

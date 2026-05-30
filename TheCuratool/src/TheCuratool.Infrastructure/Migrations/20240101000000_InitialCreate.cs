@@ -62,7 +62,6 @@ namespace TheCuratool.Infrastructure.Migrations
                     ChosenCharacterId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     OfferedCharacterIds = table.Column<string>(type: "text", nullable: false, defaultValue: "[]"),
                     HiddenFlags = table.Column<string>(type: "text", nullable: false, defaultValue: "{\"isDrunk\":false,\"isLunatic\":false}"),
-                    IsAtheistCommitmentConfirmed = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
                 },
                 constraints: table =>
                 {

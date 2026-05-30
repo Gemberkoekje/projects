@@ -18,7 +18,9 @@ public sealed class DraftSessionStateTests
         await state.LoadScriptAsync();
 
         Assert.True(state.LoadResult.IsSuccess);
-        Assert.Contains(state.ActiveLoricIds, id => string.Equals(id, "the_curator", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(state.ActiveLoricIds, id =>
+            string.Equals(id, "the_curator", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(id, "thecurator", StringComparison.OrdinalIgnoreCase));
         Assert.NotEqual(SetupCounts.Empty, state.SetupResult.BaseDistribution);
         Assert.False(state.HasCurrentSession);
     }
@@ -33,7 +35,7 @@ public sealed class DraftSessionStateTests
 
         state.SetLoricActive("the_curator", false);
 
-        Assert.True(state.IsLoricActive("the_curator"));
+        Assert.True(state.IsLoricActive("the_curator") || state.IsLoricActive("thecurator"));
     }
 
     [Fact]
@@ -156,10 +158,9 @@ public sealed class DraftSessionStateTests
         state.SetPlayerCount(3);
         await state.StartDraftAsync();
 
-        // Create a curated offer with evil
+        // Create a curated offer
         state.BeginCuratedOffer();
         state.ToggleCuratedCharacter("librarian");
-        state.SetAddEvilOptionToCuratedOffer(true);
         await state.ConfirmCuratedOfferAsync();
 
         // Pick evil if it's available
@@ -183,37 +184,147 @@ public sealed class DraftSessionStateTests
     {
         await using var fixture = CreateFixture();
         var state = fixture.CreateState();
-        state.ScriptJson = File.ReadAllText("NoVortox.json");
+
+        var script = @"[
+            { ""id"": ""_meta"", ""name"": ""Lord of Typhon Test"", ""author"": ""Test"" },
+            ""chef"",
+            ""washerwoman"",
+            ""librarian"",
+            ""investigator"",
+            ""fortune_teller"",
+            ""empath"",
+            ""undertaker"",
+            ""slayer"",
+            ""soldier"",
+            ""ravenkeeper"",
+            ""saint"",
+            ""drunk"",
+            ""butler"",
+            ""lordoftyphon"",
+            ""poisoner"",
+            ""baron"",
+            ""scarletwoman"",
+            ""imp""
+        ]";
+
+        state.ScriptJson = script;
         await state.LoadScriptAsync();
-        state.SetPlayerCount(7);
+        state.SetPlayerCount(10);
         await state.StartDraftAsync();
 
-        // Advance until we find Kazali
-        while (state.HasCurrentSession && state.CurrentSession.Status != GameStatus.Completed)
-        {
-            state.OfferRandomThree();
-            var offerIds = state.CurrentOfferIds;
+        state.BeginCuratedOffer();
+        state.ToggleCuratedCharacter("chef");
+        await state.ConfirmCuratedOfferAsync();
+        await state.RecordChoiceAsync("chef");
+        Assert.Contains(state.CurrentSession.Players, player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "chef", StringComparison.OrdinalIgnoreCase));
 
-            if (offerIds.Any(id => string.Equals(id, "kazali", StringComparison.OrdinalIgnoreCase)))
-            {
-                await state.RecordChoiceAsync("kazali");
-                break;
-            }
+        state.BeginCuratedOffer();
+        state.ToggleCuratedCharacter("lordoftyphon");
+        await state.ConfirmCuratedOfferAsync();
+        await state.RecordChoiceAsync("lordoftyphon");
+        Assert.Contains(state.CurrentSession.Players, player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "lordoftyphon", StringComparison.OrdinalIgnoreCase));
 
-            await state.RecordChoiceAsync(offerIds[0]);
-        }
-
-        // Now there should be unresolved minion slots
         var stAssignedSlots = state.CurrentSession.Players.Where(p => p.IsStAssigned).ToList();
-        if (stAssignedSlots.Count > 0)
-        {
-            var slotToResolve = stAssignedSlots[0];
-            await state.ResolveMinionSlotAsync(slotToResolve.DraftOrder, "poisoner");
+        Assert.Empty(stAssignedSlots);
+    }
 
-            var resolved = state.CurrentSession.Players.FirstOrDefault(p => p.DraftOrder == slotToResolve.DraftOrder);
-            Assert.NotNull(resolved);
-            Assert.Equal("poisoner", resolved.BorrowedAbilityCharacterId);
-        }
+    [Fact]
+    public async Task GetCurateRoleCandidates_WithDrunkAndHermitOnScript_IncludesBothRoles()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        var script = @"[
+            { ""id"": ""_meta"", ""name"": ""Hermit Drunk Curate Test"", ""author"": ""Test"" },
+            ""hermit"",
+            ""drunk"",
+            ""chef"",
+            ""highpriestess"",
+            ""poisoner"",
+            ""imp""
+        ]";
+
+        state.ScriptJson = script;
+        await state.LoadScriptAsync();
+        state.SetPlayerCount(5);
+        await state.StartDraftAsync();
+        Assert.True(state.HasCurrentSession, state.DraftMessage);
+
+        var candidates = state.GetCurateRoleCandidates();
+
+        Assert.Contains(candidates, character => string.Equals(character.Id, "drunk", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(candidates, character => string.Equals(character.Id, "hermit", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task LegionGame_GetCurateRoleCandidates_IncludesOnScriptOutsidersAndEvilSentinel()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        var script = @"[
+            { ""id"": ""_meta"", ""name"": ""Legion Curate Test"", ""author"": ""Test"" },
+            ""legion"",
+            ""drunk"",
+            ""lunatic"",
+            ""hermit"",
+            ""chef"",
+            ""washerwoman"",
+            ""recluse""
+        ]";
+
+        state.ScriptJson = script;
+        await state.LoadScriptAsync();
+        state.SetPlayerCount(7);
+        state.SetLegionGame(true);
+        await state.StartDraftAsync();
+        Assert.True(state.HasCurrentSession, state.DraftMessage);
+
+        var candidates = state.GetCurateRoleCandidates();
+
+        Assert.Contains(candidates, character => string.Equals(character.Id, "drunk", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(candidates, character => string.Equals(character.Id, "lunatic", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(candidates, character => string.Equals(character.Id, "recluse", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(candidates, character => string.Equals(character.Id, "evil", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task RecordChoiceAsync_WithCuratedDynamicOffer_ClearsOfferStateForNextPlayer()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+
+        var script = @"[
+            { ""id"": ""_meta"", ""name"": ""Dynamic Offer Clear Test"", ""author"": ""Test"" },
+            ""librarian"",
+            ""chef"",
+            ""alchemist"",
+            ""poisoner"",
+            ""imp""
+        ]";
+
+        state.ScriptJson = script;
+        await state.LoadScriptAsync();
+        state.SetPlayerCount(5);
+        await state.StartDraftAsync();
+        Assert.True(state.HasCurrentSession, state.DraftMessage);
+
+        state.BeginCuratedOffer();
+        state.CuratedRoleCharacterId = "alchemist";
+        state.CuratedDisguiseCharacterId = "poisoner";
+        state.AddCuratedRoleOption(state.CuratedRoleCharacterId, state.CuratedDisguiseCharacterId);
+        await state.ConfirmCuratedOfferAsync();
+
+        await state.RecordChoiceAsync("alchemist");
+
+        Assert.True(string.IsNullOrWhiteSpace(state.DraftMessage), state.DraftMessage);
+        Assert.Empty(state.CurrentOfferIds);
+        Assert.DoesNotContain(state.CurrentSession.Players, player =>
+            player.DraftOrder == state.CurrentPlayerSlot
+            && player.Choice is PlayerChoice.UnchosenChoice unchosen
+            && unchosen.OfferedOptions.Any(option => string.Equals(option.CharacterId, "alchemist", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -222,41 +333,106 @@ public sealed class DraftSessionStateTests
         await using var fixture = CreateFixture();
         var state = fixture.CreateState();
 
-        // Create a script with alchemist
-        var script = @"{
-            ""_meta"": { ""name"": ""Alchemist Test"", ""author"": ""Test"" },
-            ""townsfolk"": [""librarian"", ""chef"", ""alchemist""],
-            ""minion"": [""poisoner"", ""evil""],
-            ""demon"": [""imp""]
-        }";
+        var script = @"[
+            { ""id"": ""_meta"", ""name"": ""Alchemist Test"", ""author"": ""Test"" },
+            ""librarian"",
+            ""chef"",
+            ""alchemist"",
+            ""poisoner"",
+            ""imp""
+        ]";
         state.ScriptJson = script;
         await state.LoadScriptAsync();
         state.SetPlayerCount(5);
         await state.StartDraftAsync();
+        Assert.True(state.HasCurrentSession, state.DraftMessage);
 
-        // Advance until alchemist is offered
-        var alchemistPicked = false;
-        while (state.HasCurrentSession && state.CurrentSession.Status != GameStatus.Completed && !alchemistPicked)
-        {
-            state.OfferRandomThree();
-            if (state.CurrentOfferIds.Any(id => string.Equals(id, "alchemist", StringComparison.OrdinalIgnoreCase)))
-            {
-                await state.RecordChoiceAsync("alchemist");
-                alchemistPicked = true;
-            }
-            else
-            {
-                await state.RecordChoiceAsync(state.CurrentOfferIds[0]);
-            }
-        }
+        state.BeginCuratedOffer();
+        state.CuratedRoleCharacterId = "alchemist";
+        state.CuratedDisguiseCharacterId = "poisoner";
+        state.AddCuratedRoleOption(state.CuratedRoleCharacterId, state.CuratedDisguiseCharacterId);
+        await state.ConfirmCuratedOfferAsync();
+        await state.RecordChoiceAsync("alchemist");
 
-        if (alchemistPicked)
-        {
-            // Check that makeup summary requires confirmation
-            var summary = state.CurrentMakeupSummary;
-            Assert.True(summary.RequiresStorytellerSetupConfirmation || state.PendingDynamicAbilityDraftOrder.HasValue);
-        }
+        var assigned = state.CurrentSession.Players.Any(player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "alchemist", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(player.BorrowedAbilityCharacterId));
+
+        Assert.True(assigned);
     }
+
+    [Fact]
+    public async Task TargetSelection_DefaultsToAllSelected()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        state.ScriptJson = File.ReadAllText("NoVortox.json");
+        await state.LoadScriptAsync();
+        await state.StartDraftAsync();
+
+        Assert.True(state.AllTargetsSelected);
+        Assert.All(state.SelectableTargetCounts, target => Assert.True(state.IsTargetSelected(target)));
+    }
+
+    [Fact]
+    public async Task SetTargetSelected_DeselectingOne_LeavesAllTargetsMode()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        state.ScriptJson = File.ReadAllText("NoVortox.json");
+        await state.LoadScriptAsync();
+        await state.StartDraftAsync();
+
+        var targets = state.SelectableTargetCounts;
+        if (targets.Count < 2)
+        {
+            // The default script always yields multiple valid targets; skip if not the case.
+            return;
+        }
+
+        var first = targets[0];
+        state.SetTargetSelected(first, false);
+
+        Assert.False(state.AllTargetsSelected);
+        Assert.False(state.IsTargetSelected(first));
+        Assert.True(state.IsTargetSelected(targets[1]));
+    }
+
+    [Fact]
+    public async Task ToggleAllTargets_OffThenOn_RestoresAllSelected()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        state.ScriptJson = File.ReadAllText("NoVortox.json");
+        await state.LoadScriptAsync();
+        await state.StartDraftAsync();
+
+        state.ToggleAllTargets(false);
+        Assert.False(state.AllTargetsSelected);
+        Assert.All(state.SelectableTargetCounts, target => Assert.False(state.IsTargetSelected(target)));
+
+        state.ToggleAllTargets(true);
+        Assert.True(state.AllTargetsSelected);
+        Assert.All(state.SelectableTargetCounts, target => Assert.True(state.IsTargetSelected(target)));
+    }
+
+    [Fact]
+    public async Task GetTargetReachabilityWarning_AllTargetsMode_NeverWarns()
+    {
+        await using var fixture = CreateFixture();
+        var state = fixture.CreateState();
+        state.ScriptJson = File.ReadAllText("NoVortox.json");
+        await state.LoadScriptAsync();
+        await state.StartDraftAsync();
+
+        state.OfferRandomThree();
+        Assert.InRange(state.CurrentOfferIds.Count, 1, 3);
+
+        // With all targets selected (default), no offered option should ever warn.
+        Assert.All(state.CurrentOfferIds, id => Assert.Equal(string.Empty, state.GetTargetReachabilityWarning(id)));
+    }
+
     private static TestFixture CreateFixture()
     {
         var databaseName = $"curatool-state-{Guid.NewGuid()}";

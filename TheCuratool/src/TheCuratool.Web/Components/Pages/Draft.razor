@@ -70,7 +70,7 @@ else
                                 {
                                     if (SessionState.RevealChosenCharacters)
                                     {
-                                        @FormatChosenCharacter(chosenSlot)
+                                        @FormatChosenCharacter(chosenSlot, slot.BorrowedAbilityCharacterId)
                                     }
                                     else
                                     {
@@ -104,75 +104,91 @@ else
                 <div class="action-row">
                     <button @onclick="OfferRandom">Random 3</button>
                     <button @onclick="BeginCurate">Curate</button>
-                    @if (SessionState.SupportsAtheistCommitment)
-                    {
-                        <button @onclick="ConfirmAtheist">Confirm Atheist Commitment</button>
-                    }
                 </div>
 
                 @if (SessionState.IsCuratingOffer)
                 {
+                    var roleCandidates = SessionState.GetCurateRoleCandidates();
+                    var selectedRoleIsSpecial = SessionState.IsCuratedSpecialRole(SessionState.CuratedRoleCharacterId);
+                    var disguiseCandidates = SessionState.GetCurateDisguiseCandidates(SessionState.CuratedRoleCharacterId);
+                    var canAddCuratedRole = !string.IsNullOrWhiteSpace(SessionState.CuratedRoleCharacterId)
+                        && (!selectedRoleIsSpecial || !string.IsNullOrWhiteSpace(SessionState.CuratedDisguiseCharacterId));
+
                     <p><strong>Curate up to 3 characters:</strong></p>
-                    <label>
-                        <InputCheckbox
-                            Value="SessionState.AddEvilOptionToCuratedOffer"
-                            ValueChanged="value => OnAddEvilOptionChanged(value)"
-                            ValueExpression="@(() => SessionState.AddEvilOptionToCuratedOffer)" /> Add Evil option
-                    </label>
-                    <div class="selection-box">
-                        @foreach (var character in SessionState.CurrentValidCharacters)
-                        {
-                            var selected = SessionState.CuratedOfferSelection.Contains(character.Id, StringComparer.OrdinalIgnoreCase);
-                            <div>
-                                <label>
-                                    <input type="checkbox"
-                                           checked="@selected"
-                                           @onchange="_ => ToggleCurated(character.Id)" />
-                                    @character.DisplayName (@character.Type)
-                                </label>
-                            </div>
-                        }
+                    <div class="selection-box" style="margin-top:0.75rem;">
+                        <div class="action-row">
+                            <select @bind="SessionState.CuratedRoleCharacterId">
+                                <option value="">Select role</option>
+                                @foreach (var candidate in roleCandidates)
+                                {
+                                    <option value="@candidate.Id">@candidate.DisplayName (@candidate.Type)</option>
+                                }
+                            </select>
+
+                            @if (selectedRoleIsSpecial)
+                            {
+                                <select @bind="SessionState.CuratedDisguiseCharacterId" disabled="@(disguiseCandidates.Count == 0)">
+                                    <option value="">@GetCurateSecondarySelectorPlaceholder(SessionState.CuratedRoleCharacterId)</option>
+                                    @foreach (var candidate in disguiseCandidates)
+                                    {
+                                        <option value="@candidate.Id">@candidate.DisplayName</option>
+                                    }
+                                </select>
+                            }
+
+                            <button @onclick="AddCuratedRole" disabled="@(!canAddCuratedRole)">Add role</button>
+                        </div>
                     </div>
+
+                    @if (SessionState.CuratedOfferSelection.Count > 0)
+                    {
+                        <p><strong>Current curated options:</strong></p>
+                        <ul>
+                            @foreach (var option in SessionState.CuratedOfferSelection)
+                            {
+                                var curatedWarning = SessionState.GetTargetReachabilityWarning(GetPresentedCharacterId(option));
+                                <li>
+                                    @FormatOfferOption(option)
+                                    @if (!string.IsNullOrEmpty(curatedWarning))
+                                    {
+                                        <span class="error-text" title="@curatedWarning"> ⚠ @curatedWarning</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+
                     <div>
                         <button @onclick="ConfirmCurated">Confirm Curated Offer</button>
                     </div>
                 }
 
-                @if (SessionState.CurrentOfferCharacters.Count > 0)
+                @if (SessionState.CurrentOfferOptions.Count > 0)
                 {
                     <h3>Offered Characters</h3>
-                    <div class="action-row">
-                        @foreach (var offer in SessionState.CurrentOfferCharacters)
+                    <p class="warning-text">
+                        <strong>Player-facing prompt:</strong> only read the role name on the button to the player.
+                        Any extra text shown below is Storyteller-only guidance.
+                    </p>
+                    <div class="action-row offer-options-row">
+                        @foreach (var offer in SessionState.CurrentOfferOptions)
                         {
-                            <button @onclick="() => Pick(offer.Id)">@offer.DisplayName (@offer.Type)</button>
+                            <div class="offer-option">
+                                <button class="offer-button" @onclick="() => Pick(GetPresentedCharacterId(offer))">@GetPlayerFacingOfferLabel(offer)</button>
+                                <div class="offer-meta">@GetOfferButtonMetaLabel(offer)</div>
+                            </div>
                         }
                     </div>
-
-                    @if (SessionState.SupportsDrunkFlag || SessionState.SupportsLunaticFlag)
-                    {
-                        <div>
-                            @if (SessionState.SupportsDrunkFlag)
+                    <ul class="error-text">
+                        @foreach (var offer in SessionState.CurrentOfferOptions)
+                        {
+                            var offeredWarning = SessionState.GetTargetReachabilityWarning(GetPresentedCharacterId(offer));
+                            if (!string.IsNullOrEmpty(offeredWarning))
                             {
-                                <label style="margin-right: 1rem;">
-                                    <InputCheckbox
-                                        Value="SessionState.NextChoiceIsDrunk"
-                                        ValueChanged="value => OnDrunkChanged(value)"
-                                        ValueExpression="@(() => SessionState.NextChoiceIsDrunk)"
-                                        disabled="@(!CanCurrentChoiceBeDrunk())" /> Drunk
-                                </label>
+                                <li>⚠ @FormatOfferOption(offer): @offeredWarning</li>
                             }
-                            @if (SessionState.SupportsLunaticFlag)
-                            {
-                                <label>
-                                    <InputCheckbox
-                                        Value="SessionState.NextChoiceIsLunatic"
-                                        ValueChanged="value => OnLunaticChanged(value)"
-                                        ValueExpression="@(() => SessionState.NextChoiceIsLunatic)"
-                                        disabled="@(!CanCurrentChoiceBeLunatic())" /> Lunatic
-                                </label>
-                            }
-                        </div>
-                    }
+                        }
+                    </ul>
                 }
                 else
                 {
@@ -180,31 +196,6 @@ else
                 }
             }
         </section>
-
-        @if (SessionState.PendingDynamicAbilityDraftOrder.HasValue)
-        {
-            var pendingOrder = SessionState.PendingDynamicAbilityDraftOrder.Value;
-            var abilityOptions = SessionState.GetDynamicAbilityOptions(pendingOrder);
-            var pendingSlot = session.Players.FirstOrDefault(p => p.DraftOrder == pendingOrder);
-            var pendingCharId = pendingSlot?.Choice is PlayerChoice.ChosenChoice pc ? pc.CharacterId : string.Empty;
-            <section class="panel stack-md">
-                <h2>Assign Borrowed Ability</h2>
-                <p>Choose the ability that <strong>@pendingCharId</strong> (slot @pendingOrder) will use:</p>
-                <div class="action-row">
-                    @foreach (var option in abilityOptions)
-                    {
-                        if (option.IsAvailable)
-                        {
-                            <button @onclick="() => PickDynamicAbility(pendingOrder, option.AbilityCharacterId)">@option.DisplayName</button>
-                        }
-                        else
-                        {
-                            <button disabled title="@option.UnavailableReason">@option.DisplayName</button>
-                        }
-                    }
-                </div>
-            </section>
-        }
 
         <section class="panel stack-md">
             <h2>Makeup Summary</h2>
@@ -217,10 +208,24 @@ else
             @if (summary.TargetCounts.Count > 0)
             {
                 <p><strong>Targets:</strong></p>
+                <label>
+                    <input type="checkbox"
+                           checked="@SessionState.AllTargetsSelected"
+                           @onchange="OnToggleAllTargets" />
+                    Select all
+                </label>
                 <ul>
                     @foreach (var target in summary.TargetCounts)
                     {
-                        <li>@target.Townsfolk T / @target.Outsiders O / @target.Minions M / @target.Demons D</li>
+                        var current = target;
+                        <li>
+                            <label>
+                                <input type="checkbox"
+                                       checked="@SessionState.IsTargetSelected(current)"
+                                       @onchange="e => OnToggleTarget(current, e)" />
+                                @current.Townsfolk T / @current.Outsiders O / @current.Minions M / @current.Demons D
+                            </label>
+                        </li>
                     }
                 </ul>
             }
@@ -259,71 +264,164 @@ else
         SessionState.BeginCuratedOffer();
     }
 
-    private void ToggleCurated(string characterId)
-    {
-        SessionState.ToggleCuratedCharacter(characterId);
-    }
-
     private async Task ConfirmCurated()
     {
         await SessionState.ConfirmCuratedOfferAsync();
     }
 
-    private void OnAddEvilOptionChanged(bool value)
+    private void AddCuratedRole()
     {
-        SessionState.SetAddEvilOptionToCuratedOffer(value);
+        SessionState.AddCuratedRoleOption(SessionState.CuratedRoleCharacterId, SessionState.CuratedDisguiseCharacterId);
     }
 
-    private async Task ConfirmAtheist()
+    private void OnToggleAllTargets(ChangeEventArgs e)
     {
-        await SessionState.ConfirmAtheistCommitmentAsync();
+        var selectAll = e.Value is bool value && value;
+        SessionState.ToggleAllTargets(selectAll);
     }
 
-    private bool CanCurrentChoiceBeDrunk()
+    private void OnToggleTarget(SetupCounts target, ChangeEventArgs e)
     {
-        var selectedId = SessionState.CurrentOfferIds.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(selectedId))
+        var isSelected = e.Value is bool value && value;
+        SessionState.SetTargetSelected(target, isSelected);
+    }
+
+    private string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen, string borrowedAbilityCharacterId)
+    {
+        var shownCharacterId = (chosen.HiddenFlags.IsDrunk || chosen.HiddenFlags.IsLunatic)
+            && !string.IsNullOrWhiteSpace(chosen.DisguiseCharacterId)
+                ? chosen.DisguiseCharacterId
+                : chosen.CharacterId;
+        var shownDefinition = ResolveCharacter(shownCharacterId);
+        var effectiveDefinition = ResolveCharacter(chosen.CharacterId);
+        var effectiveType = chosen.HiddenFlags.IsDrunk
+            ? CharacterType.Outsider
+            : chosen.HiddenFlags.IsLunatic
+                ? CharacterType.Outsider
+                : effectiveDefinition.Type;
+        var hiddenRoleLabel = GetHiddenRoleLabel(chosen.CharacterId, chosen.HiddenFlags);
+        var baseName = hiddenRoleLabel.Length == 0
+            ? shownDefinition.DisplayName
+            : $"{shownDefinition.DisplayName} ({hiddenRoleLabel})";
+
+        if (!string.IsNullOrWhiteSpace(borrowedAbilityCharacterId))
         {
-            return false;
+            var borrowedDefinition = ResolveCharacter(borrowedAbilityCharacterId);
+            return $"{baseName} ({borrowedDefinition.DisplayName}) ({effectiveType})";
         }
 
-        return SessionState.CanApplyDrunkToChoice(selectedId);
+        return $"{baseName} ({effectiveType})";
     }
 
-    private bool CanCurrentChoiceBeLunatic()
+    private string GetPlayerFacingOfferLabel(OfferOption option)
     {
-        var selectedId = SessionState.CurrentOfferIds.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(selectedId))
+        var presentedId = GetPresentedCharacterId(option);
+        if (SessionState.CurrentSession.IsLegionGame
+            && (string.Equals(presentedId, "evil", StringComparison.OrdinalIgnoreCase)
+                || option.HiddenFlags.IsLunatic))
         {
-            return false;
+            return "Evil";
         }
 
-        return SessionState.CanApplyLunaticToChoice(selectedId);
+        var presented = SessionState.CurrentSession.Script.Characters.FirstOrDefault(character =>
+            string.Equals(character.Id, presentedId, StringComparison.OrdinalIgnoreCase));
+
+        return presented?.DisplayName ?? presentedId;
     }
 
-    private void OnDrunkChanged(bool value)
+    private string GetOfferStorytellerDetails(OfferOption option)
     {
-        SessionState.NextChoiceIsDrunk = value;
-    }
+        var presentedId = GetPresentedCharacterId(option);
+        var presented = SessionState.CurrentSession.Script.Characters.FirstOrDefault(character =>
+            string.Equals(character.Id, presentedId, StringComparison.OrdinalIgnoreCase));
 
-    private void OnLunaticChanged(bool value)
-    {
-        SessionState.NextChoiceIsLunatic = value;
-    }
+        var displayType = presented?.Type ?? CharacterType.Unknown;
+        var hiddenRoleLabel = GetHiddenRoleLabel(option.CharacterId, option.HiddenFlags);
 
-    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen)
-    {
-        if (chosen.HiddenFlags.IsDrunk)
+        if (hiddenRoleLabel.Length > 0)
         {
-            return $"{chosen.CharacterId} (drunk)";
+            return $"hidden role: {hiddenRoleLabel}; shown type: {displayType}";
         }
 
-        if (chosen.HiddenFlags.IsLunatic)
+        if (!string.IsNullOrWhiteSpace(option.BorrowedAbilityCharacterId))
         {
-            return $"{chosen.CharacterId} (lunatic)";
+            var borrowedDefinition = ResolveCharacter(option.BorrowedAbilityCharacterId);
+            return $"borrowed ability: {borrowedDefinition.DisplayName}; shown type: {displayType}";
         }
 
-        return chosen.CharacterId;
+        return $"shown type: {displayType}";
+    }
+
+    private string FormatOfferOption(OfferOption option)
+    {
+        var displayName = GetPlayerFacingOfferLabel(option);
+        var details = GetOfferStorytellerDetails(option);
+        return $"{displayName} ({details})";
+    }
+
+    private string GetOfferButtonMetaLabel(OfferOption option)
+    {
+        if (SessionState.CurrentSession.IsLegionGame
+            && (string.Equals(GetPresentedCharacterId(option), "evil", StringComparison.OrdinalIgnoreCase)
+                || option.HiddenFlags.IsLunatic))
+        {
+            return "(legion) (demon)";
+        }
+
+        var hiddenRoleLabel = GetHiddenRoleLabel(option.CharacterId, option.HiddenFlags);
+        var effectiveType = option.HiddenFlags.IsDrunk || option.HiddenFlags.IsLunatic
+            ? CharacterType.Outsider
+            : ResolveCharacter(GetPresentedCharacterId(option)).Type;
+
+        var parts = new List<string>();
+
+        if (hiddenRoleLabel.Length > 0)
+        {
+            parts.Add(hiddenRoleLabel.ToLowerInvariant());
+        }
+
+        if (!string.IsNullOrWhiteSpace(option.BorrowedAbilityCharacterId))
+        {
+            var borrowedDefinition = ResolveCharacter(option.BorrowedAbilityCharacterId);
+            parts.Add(borrowedDefinition.DisplayName.ToLowerInvariant());
+        }
+
+        parts.Add(effectiveType.ToString().ToLowerInvariant());
+
+        return string.Join(" ", parts.Select(part => $"({part})"));
+    }
+
+    private static string GetPresentedCharacterId(OfferOption option)
+    {
+        return string.IsNullOrWhiteSpace(option.DisguiseCharacterId)
+            ? option.CharacterId
+            : option.DisguiseCharacterId;
+    }
+
+    private static string GetHiddenRoleLabel(string characterId, HiddenFlags hiddenFlags)
+    {
+        if (!hiddenFlags.IsDrunk && !hiddenFlags.IsLunatic)
+        {
+            return string.Empty;
+        }
+
+        if (string.Equals(characterId, "hermit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "hermit";
+        }
+
+        return hiddenFlags.IsDrunk ? "drunk" : "lunatic";
+    }
+
+    private CharacterDefinition ResolveCharacter(string characterId)
+    {
+        return SessionState.CurrentSession.Script.Characters.FirstOrDefault(character =>
+            string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? SessionState.CurrentSession.Script.OutOfScriptCharacters.FirstOrDefault(character =>
+                string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? SessionState.LoadResult.Script.Characters.FirstOrDefault(character =>
+                string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? new CharacterDefinition(characterId, characterId, CharacterType.Unknown, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), true, false, false);
     }
 
     private async Task Pick(string characterId)
@@ -331,8 +429,24 @@ else
         await SessionState.RecordChoiceAsync(characterId);
     }
 
-    private async Task PickDynamicAbility(int draftOrder, string abilityCharacterId)
+    private static string GetCurateSecondarySelectorPlaceholder(string roleCharacterId)
     {
-        await SessionState.AssignDynamicAbilityAsync(draftOrder, abilityCharacterId);
+        if (string.Equals(roleCharacterId, "drunk", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Shown as townsfolk...";
+        }
+
+        if (string.Equals(roleCharacterId, "lunatic", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Shown as demon...";
+        }
+
+        if (string.Equals(roleCharacterId, "alchemist", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(roleCharacterId, "boffin", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Borrowed ability...";
+        }
+
+        return "Select option...";
     }
 }

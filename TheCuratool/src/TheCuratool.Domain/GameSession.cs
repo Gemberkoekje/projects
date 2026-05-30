@@ -10,6 +10,7 @@ namespace TheCuratool.Domain;
 /// <param name="Status">Current lifecycle state of the session.</param>
 /// <param name="ActiveLoricIds">Loric IDs that are active for this session, affecting distribution and offer generation.</param>
 /// <param name="UseMarionette">When <see langword="true"/>, the pre-draft Marionette adjustment is applied (+1 Townsfolk / −1 Minion).</param>
+/// <param name="UseAtheist">When <see langword="true"/>, this session uses Atheist setup/draft behavior.</param>
 /// <param name="IsLegionGame">When <see langword="true"/>, this session uses Legion game-mode behavior.</param>
 /// <param name="LegionCount">Configured Legion slot count for Legion-mode sessions.</param>
 public sealed record GameSession(
@@ -20,5 +21,21 @@ public sealed record GameSession(
     GameStatus Status,
     IReadOnlyList<string> ActiveLoricIds,
     bool UseMarionette,
+    bool UseAtheist,
     bool IsLegionGame,
-    int LegionCount);
+    int LegionCount)
+{
+    public GameSession(
+        Guid id,
+        Script script,
+        int playerCount,
+        IReadOnlyList<PlayerSlot> players,
+        GameStatus status,
+        IReadOnlyList<string> activeLoricIds,
+        bool useMarionette,
+        bool isLegionGame,
+        int legionCount)
+        : this(id, script, playerCount, players, status, activeLoricIds, useMarionette, false, isLegionGame, legionCount)
+    {
+    }
+}

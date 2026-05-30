@@ -70,6 +70,10 @@ public sealed class CuratoolDbContext(DbContextOptions<CuratoolDbContext> option
             .HasDefaultValue(false);
 
         modelBuilder.Entity<GameSessionEntity>()
+            .Property(g => g.UseAtheist)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<GameSessionEntity>()
             .Property(g => g.IsLegionGame)
             .HasDefaultValue(false);
 
@@ -132,10 +136,6 @@ public sealed class CuratoolDbContext(DbContextOptions<CuratoolDbContext> option
             .Property(p => p.HiddenFlags)
             .IsRequired()
             .HasDefaultValue(@"{""isDrunk"":false,""isLunatic"":false}");
-
-        modelBuilder.Entity<PlayerSlotEntity>()
-            .Property(p => p.IsAtheistCommitmentConfirmed)
-            .HasDefaultValue(false);
 
         // Ensure unique constraint on (SessionId, DraftOrder)
         modelBuilder.Entity<PlayerSlotEntity>()

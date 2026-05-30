@@ -21,6 +21,4 @@ public sealed class PlayerSlotEntity
     public required string OfferedCharacterIds { get; set; } // JSON array
 
     public required string HiddenFlags { get; set; } // JSON object: { "isDrunk": bool, "isLunatic": bool }
-
-    public bool IsAtheistCommitmentConfirmed { get; set; }
 }

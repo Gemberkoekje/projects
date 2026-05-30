@@ -33,6 +33,7 @@
 - Validate parameters with appropriate null checks
 - Use `string.IsNullOrEmpty()` and `string.IsNullOrWhiteSpace()` for string validation
 - Consider nullable reference types when using C# 8+
+- Follow a no-nullable-annotations convention: avoid nullable reference annotations (e.g. `Type?` parameters); prefer empty-collection sentinels over null for "no value" cases.
 
 ### String Handling
 - Use string interpolation `$""` instead of `String.Format()` or concatenation
@@ -153,6 +154,7 @@
 - Remove any extra blank lines at the end of files
 - Ensure proper indentation (4 spaces for C#, no tabs)
 - Format code according to project standards
+- Execute all steps continuously without pausing for confirmations
 
 ## Security Considerations
 - Validate all input parameters
@@ -189,3 +191,10 @@
 - Constraint priority in valid-character resolution is hard feasibility then pair requirements then soft balance
 - Huntsman is invalid if Damsel cannot still fit
 - Curated offers lock offeredIds for RecordChoice idempotency/conflict handling.
+- When diagnosing setup-count bugs in The Curatool, distinguish optional +0/+1 outsider effects like Balloonist/Huntsman from symmetric -1/+1 storyteller-choice effects like Godfather.
+- When displaying Boffin or Alchemist, include the borrowed ability in the rendered character name format like 'Boffin (Balloonist) (Minion)'.
+- In TheCuratool, selecting an offer displayed as a drunk-hidden dynamic role like 'Alchemist (drunk)' must never produce a final chosen display of 'Drunk (drunk)'; the shown role identity must remain coherent.
+- **Game rules**: Drunk never changes outsider count; Drunk/Hermit-as-Drunk only affects displayed Townsfolk identity, which must be an unchosen Townsfolk and becomes unavailable for later picks; Hermit and Drunk can both be in play with different Townsfolk disguises.
+
+## Execution Guidelines
+- Continue through the plan without conversational pauses between steps.

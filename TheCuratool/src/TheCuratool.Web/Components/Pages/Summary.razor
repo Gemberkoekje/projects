@@ -81,31 +81,6 @@ else
                             }
                         </td>
                     </tr>
-                    @if (slot.Choice is PlayerChoice.ChosenChoice slotChosen && string.IsNullOrEmpty(slot.BorrowedAbilityCharacterId))
-                    {
-                        if (dynamicOptionsByOrder.TryGetValue(slot.DraftOrder, out var abilityOptions) && abilityOptions.Count > 0)
-                        {
-                            <tr>
-                                <td></td>
-                                <td colspan="2">
-                                    <strong>Assign borrowed ability:</strong>
-                                    <div class="action-row">
-                                        @foreach (var option in abilityOptions)
-                                        {
-                                            if (option.IsAvailable)
-                                            {
-                                                <button @onclick="() => PickDynamicAbility(slot.DraftOrder, option.AbilityCharacterId)">@option.DisplayName</button>
-                                            }
-                                            else
-                                            {
-                                                <button disabled title="@option.UnavailableReason">@option.DisplayName</button>
-                                            }
-                                        }
-                                    </div>
-                                </td>
-                            </tr>
-                        }
-                    }
                     @if (slot.IsStAssigned && slot.Choice is not PlayerChoice.ChosenChoice)
                     {
                         <tr>
@@ -154,25 +129,57 @@ else
         _isReady = true;
     }
 
-    private static string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen, string borrowedAbilityCharacterId)
+    private string FormatChosenCharacter(PlayerChoice.ChosenChoice chosen, string borrowedAbilityCharacterId)
     {
-        var baseName = chosen.HiddenFlags.IsDrunk
-            ? $"{chosen.CharacterId} (drunk)"
-            : chosen.HiddenFlags.IsLunatic
-                ? $"{chosen.CharacterId} (lunatic)"
+        var shownCharacterId = (chosen.HiddenFlags.IsDrunk || chosen.HiddenFlags.IsLunatic)
+            && !string.IsNullOrWhiteSpace(chosen.DisguiseCharacterId)
+                ? chosen.DisguiseCharacterId
                 : chosen.CharacterId;
+        var shownDefinition = ResolveCharacter(shownCharacterId);
+        var effectiveDefinition = ResolveCharacter(chosen.CharacterId);
+        var effectiveType = chosen.HiddenFlags.IsDrunk
+            ? CharacterType.Outsider
+            : chosen.HiddenFlags.IsLunatic
+                ? CharacterType.Outsider
+                : effectiveDefinition.Type;
+        var hiddenRoleLabel = GetHiddenRoleLabel(chosen.CharacterId, chosen.HiddenFlags);
+        var baseName = hiddenRoleLabel.Length == 0
+            ? shownDefinition.DisplayName
+            : $"{shownDefinition.DisplayName} ({hiddenRoleLabel})";
 
-        if (!string.IsNullOrEmpty(borrowedAbilityCharacterId))
+        if (!string.IsNullOrWhiteSpace(borrowedAbilityCharacterId))
         {
-            return $"{baseName} (as {borrowedAbilityCharacterId})";
+            var borrowedDefinition = ResolveCharacter(borrowedAbilityCharacterId);
+            return $"{baseName} ({borrowedDefinition.DisplayName}) ({effectiveType})";
         }
 
-        return baseName;
+        return $"{baseName} ({effectiveType})";
     }
 
-    private async Task PickDynamicAbility(int draftOrder, string abilityCharacterId)
+    private static string GetHiddenRoleLabel(string characterId, HiddenFlags hiddenFlags)
     {
-        await SessionState.AssignDynamicAbilityAsync(draftOrder, abilityCharacterId);
+        if (!hiddenFlags.IsDrunk && !hiddenFlags.IsLunatic)
+        {
+            return string.Empty;
+        }
+
+        if (string.Equals(characterId, "hermit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "hermit";
+        }
+
+        return hiddenFlags.IsDrunk ? "drunk" : "lunatic";
+    }
+
+    private CharacterDefinition ResolveCharacter(string characterId)
+    {
+        return SessionState.CurrentSession.Script.Characters.FirstOrDefault(character =>
+            string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? SessionState.CurrentSession.Script.OutOfScriptCharacters.FirstOrDefault(character =>
+                string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? SessionState.LoadResult.Script.Characters.FirstOrDefault(character =>
+                string.Equals(character.Id, characterId, StringComparison.OrdinalIgnoreCase))
+            ?? new CharacterDefinition(characterId, characterId, CharacterType.Unknown, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), true, false, false);
     }
 
     private async Task ResolveSlot(int draftOrder)

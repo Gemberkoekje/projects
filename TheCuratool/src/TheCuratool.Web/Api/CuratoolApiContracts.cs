@@ -18,6 +18,8 @@ public sealed class CreateSessionRequest
 
     public bool UseMarionette { get; init; }
 
+    public bool UseAtheist { get; init; }
+
     public bool IsLegionGame { get; init; }
 
     public int LegionCount { get; init; }
@@ -27,12 +29,9 @@ public sealed class CuratedOfferRequest
 {
     public int PlayerSlot { get; init; }
 
-    public IReadOnlyList<string> OfferedIds { get; init; } = Array.Empty<string>();
-}
+    public IReadOnlyList<OfferOptionRequest> OfferedOptions { get; init; } = Array.Empty<OfferOptionRequest>();
 
-public sealed class AtheistCommitmentRequest
-{
-    public int PlayerSlot { get; init; }
+    public IReadOnlyList<string> OfferedIds { get; init; } = Array.Empty<string>();
 }
 
 public sealed class RecordChoiceRequest
@@ -41,9 +40,22 @@ public sealed class RecordChoiceRequest
 
     public string ChosenCharacterId { get; init; } = string.Empty;
 
+    public IReadOnlyList<OfferOptionRequest> OfferedOptions { get; init; } = Array.Empty<OfferOptionRequest>();
+
     public IReadOnlyList<string> OfferedIds { get; init; } = Array.Empty<string>();
 
     public HiddenFlagsRequest HiddenFlags { get; init; } = HiddenFlagsRequest.Empty;
+}
+
+public sealed class OfferOptionRequest
+{
+    public string CharacterId { get; init; } = string.Empty;
+
+    public HiddenFlagsRequest HiddenFlags { get; init; } = HiddenFlagsRequest.Empty;
+
+    public string DisguiseCharacterId { get; init; } = string.Empty;
+
+    public string BorrowedAbilityCharacterId { get; init; } = string.Empty;
 }
 
 public sealed class HiddenFlagsRequest
@@ -72,9 +84,16 @@ public sealed record CharacterApiResponse(
 public sealed record ChoiceApiResponse(
     string State,
     string CharacterId,
-    IReadOnlyList<string> OfferedIds,
-    bool IsAtheistCommitmentConfirmed,
-    HiddenFlags HiddenFlags);
+    IReadOnlyList<OfferOptionApiResponse> OfferedOptions,
+    HiddenFlags HiddenFlags,
+    string DisguiseCharacterId);
+
+public sealed record OfferOptionApiResponse(
+    string CharacterId,
+    HiddenFlags HiddenFlags,
+    string DisguiseCharacterId,
+    string BorrowedAbilityCharacterId,
+    string PresentedCharacterId);
 
 public sealed record PlayerSlotApiResponse(
     int DraftOrder,
@@ -103,6 +122,7 @@ public sealed record SessionApiResponse(
     GameStatus Status,
     IReadOnlyList<string> ActiveLorics,
     bool UseMarionette,
+    bool UseAtheist,
     bool IsLegionGame,
     int LegionCount,
     int CurrentPlayerSlot,
@@ -121,6 +141,7 @@ internal static class SessionApiMapper
             session.Status,
             session.ActiveLoricIds,
             session.UseMarionette,
+            session.UseAtheist,
             session.IsLegionGame,
             session.LegionCount,
             session.Players.Where(slot => !slot.IsChosen).OrderBy(slot => slot.DraftOrder).Select(slot => slot.DraftOrder).FirstOrDefault(),
@@ -142,11 +163,35 @@ internal static class SessionApiMapper
     {
         if (choice is PlayerChoice.ChosenChoice chosen)
         {
-            return new ChoiceApiResponse("Chosen", chosen.CharacterId, chosen.OfferedIds, false, chosen.HiddenFlags);
+            return new ChoiceApiResponse(
+                "Chosen",
+                chosen.CharacterId,
+                chosen.OfferedOptions.Select(MapOfferOption).ToList().AsReadOnly(),
+                chosen.HiddenFlags,
+                chosen.DisguiseCharacterId);
         }
 
         var unchosen = (PlayerChoice.UnchosenChoice)choice;
-        return new ChoiceApiResponse("Unchosen", string.Empty, unchosen.OfferedIds, unchosen.IsAtheistCommitmentConfirmed, new HiddenFlags(false, false));
+        return new ChoiceApiResponse(
+            "Unchosen",
+            string.Empty,
+            unchosen.OfferedOptions.Select(MapOfferOption).ToList().AsReadOnly(),
+            new HiddenFlags(false, false),
+            string.Empty);
+    }
+
+    private static OfferOptionApiResponse MapOfferOption(OfferOption option)
+    {
+        var presentedCharacterId = string.IsNullOrWhiteSpace(option.DisguiseCharacterId)
+            ? option.CharacterId
+            : option.DisguiseCharacterId;
+
+        return new OfferOptionApiResponse(
+            option.CharacterId,
+            option.HiddenFlags,
+            option.DisguiseCharacterId,
+            option.BorrowedAbilityCharacterId,
+            presentedCharacterId);
     }
 
     private static MakeupSummaryApiResponse MapMakeupSummary(MakeupSummary summary)

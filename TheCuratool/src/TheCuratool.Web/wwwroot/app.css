@@ -145,6 +145,33 @@ tbody tr:nth-child(even) {
     flex-wrap: wrap;
 }
 
+.offer-options-row {
+    align-items: stretch;
+}
+
+.offer-option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 11rem;
+    flex: 1 1 11rem;
+    max-width: 14rem;
+}
+
+.offer-button {
+    width: 100%;
+    text-align: center;
+    font-weight: 600;
+}
+
+.offer-meta {
+    font-size: 0.9rem;
+    opacity: 0.92;
+    color: #9baac6;
+    text-align: center;
+    min-height: 1.3rem;
+}
+
 .selection-box {
     max-height: 14rem;
     overflow: auto;

@@ -7,9 +7,8 @@ namespace TheCuratool.Web;
 
 public sealed class DraftSessionState
 {
-    private const string CuratorLoricId = "the_curator";
+    private const string CuratorLoricId = "thecurator";
     private const string EvilSentinelCharacterId = "evil";
-    private const string EvilCurationLimitMessage = "When adding Evil, curate up to 2 other characters.";
 
     private readonly ScriptParser _scriptParser;
     private readonly SetupCalculator _setupCalculator;
@@ -19,8 +18,11 @@ public sealed class DraftSessionState
     private readonly IScriptRepository _scriptRepository;
     private readonly IGameSessionRepository _gameSessionRepository;
     private readonly List<string> _activeLoricIds = new();
-    private readonly List<string> _currentOfferIds = new();
-    private readonly List<string> _curatedOfferSelection = new();
+    private readonly List<OfferOption> _currentOfferOptions = new();
+    private readonly List<OfferOption> _curatedOfferSelection = new();
+    private readonly Dictionary<string, string> _curatedDynamicAbilitySelections = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<SetupCounts> _selectedTargetCounts = new();
+    private bool _allTargetsMode = true;
     private Guid _loadedScriptId;
 
     public DraftSessionState(
@@ -50,7 +52,7 @@ public sealed class DraftSessionState
 
     public SetupCalculationResult SetupResult { get; private set; } = new(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>());
 
-    public GameSession CurrentSession { get; private set; } = new(Guid.Empty, new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), 0, Array.Empty<PlayerSlot>(), GameStatus.Unknown, Array.Empty<string>(), false, false, 0);
+    public GameSession CurrentSession { get; private set; } = new(Guid.Empty, new Script(string.Empty, string.Empty, Array.Empty<CharacterDefinition>()), 0, Array.Empty<PlayerSlot>(), GameStatus.Unknown, Array.Empty<string>(), false, false, false, 0);
 
     public bool HasCurrentSession { get; private set; }
 
@@ -58,29 +60,33 @@ public sealed class DraftSessionState
 
     public bool UseMarionette { get; set; }
 
+    public bool UseAtheist { get; set; }
+
     public bool IsLegionGame { get; set; }
 
     public int LegionCount { get; set; }
 
     public bool RevealChosenCharacters { get; set; }
 
-    public bool NextChoiceIsDrunk { get; set; }
+    public string CuratedRoleCharacterId { get; set; } = string.Empty;
 
-    public bool NextChoiceIsLunatic { get; set; }
+    public string CuratedDisguiseCharacterId { get; set; } = string.Empty;
 
     public bool IsCuratingOffer { get; private set; }
-
-    public bool AddEvilOptionToCuratedOffer { get; private set; }
 
     public bool SupportsMarionetteOption => ScriptContainsCharacter("marionette");
 
     public bool SupportsLegionOption => ScriptContainsCharacter("legion");
 
-    public bool SupportsAtheistCommitment => ScriptContainsCharacter("atheist");
+    public bool SupportsAtheistOption => ScriptContainsCharacter("atheist");
 
     public bool SupportsDrunkFlag => ScriptContainsCharacter("drunk");
 
     public bool SupportsLunaticFlag => ScriptContainsCharacter("lunatic");
+
+    public bool SupportsAlchemistOption => ScriptContainsCharacter("alchemist");
+
+    public bool SupportsBoffinOption => ScriptContainsCharacter("boffin");
 
     public string DraftMessage { get; private set; } = string.Empty;
 
@@ -93,15 +99,116 @@ public sealed class DraftSessionState
 
     public IReadOnlyList<string> ActiveLoricIds => _activeLoricIds.AsReadOnly();
 
-    public IReadOnlyList<string> CurrentOfferIds => _currentOfferIds.AsReadOnly();
+    public IReadOnlyList<OfferOption> CurrentOfferOptions => _currentOfferOptions.AsReadOnly();
 
-    public IReadOnlyList<string> CuratedOfferSelection => _curatedOfferSelection.AsReadOnly();
+    public IReadOnlyList<string> CurrentOfferIds => _currentOfferOptions.Select(GetPresentedCharacterId).ToList().AsReadOnly();
+
+    public IReadOnlyList<OfferOption> CuratedOfferSelection => _curatedOfferSelection.AsReadOnly();
 
     public MakeupSummary CurrentMakeupSummary => HasCurrentSession
         ? _draftEngine.GetMakeupSummary(CurrentSession)
         : new MakeupSummary(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>(), new Dictionary<CharacterType, IReadOnlyList<string>>(), 0, Array.Empty<string>());
 
-    public IReadOnlyList<CharacterDefinition> CurrentOfferCharacters => ResolveCharacters(CurrentOfferIds);
+    /// <summary>
+    /// The currently valid target distributions the Storyteller can select among.
+    /// </summary>
+    public IReadOnlyList<SetupCounts> SelectableTargetCounts => CurrentMakeupSummary.TargetCounts;
+
+    /// <summary>
+    /// Whether the given target distribution is currently selected (in scope for Random 3 and curation warnings).
+    /// </summary>
+    public bool IsTargetSelected(SetupCounts target) => _allTargetsMode || _selectedTargetCounts.Contains(target);
+
+    /// <summary>
+    /// Whether every currently-valid target is selected.
+    /// </summary>
+    public bool AllTargetsSelected
+    {
+        get
+        {
+            if (_allTargetsMode)
+            {
+                return true;
+            }
+
+            var targets = SelectableTargetCounts;
+            return targets.Count > 0 && targets.All(_selectedTargetCounts.Contains);
+        }
+    }
+
+    /// <summary>
+    /// Selects or deselects a single target distribution. Leaves explicit "all targets" mode when toggled.
+    /// </summary>
+    public void SetTargetSelected(SetupCounts target, bool isSelected)
+    {
+        if (_allTargetsMode)
+        {
+            // Materialize the explicit selection set from the current targets before diverging from "all".
+            _allTargetsMode = false;
+            _selectedTargetCounts.Clear();
+            foreach (var current in SelectableTargetCounts)
+            {
+                _selectedTargetCounts.Add(current);
+            }
+        }
+
+        if (isSelected)
+        {
+            _selectedTargetCounts.Add(target);
+        }
+        else
+        {
+            _selectedTargetCounts.Remove(target);
+        }
+
+        RefreshOffersForTargetSelection();
+    }
+
+    /// <summary>
+    /// Convenience toggle that selects or clears all target distributions at once.
+    /// </summary>
+    public void ToggleAllTargets(bool selectAll)
+    {
+        if (selectAll)
+        {
+            _allTargetsMode = true;
+            _selectedTargetCounts.Clear();
+        }
+        else
+        {
+            _allTargetsMode = false;
+            _selectedTargetCounts.Clear();
+        }
+
+        RefreshOffersForTargetSelection();
+    }
+
+    /// <summary>
+    /// The selected targets to pass to the engine. An empty collection means "all targets" (no filtering).
+    /// </summary>
+    private IReadOnlyCollection<SetupCounts> EffectiveSelectedTargets =>
+        _allTargetsMode ? Array.Empty<SetupCounts>() : _selectedTargetCounts.ToArray();
+
+    /// <summary>
+    /// Returns a non-empty warning when locking in <paramref name="characterId"/> would make every selected
+    /// target distribution unachievable; otherwise returns an empty string. Non-blocking by design.
+    /// </summary>
+    public string GetTargetReachabilityWarning(string characterId)
+    {
+        if (!HasCurrentSession || CurrentSession.Status != GameStatus.Drafting || string.IsNullOrWhiteSpace(characterId))
+        {
+            return string.Empty;
+        }
+
+        if (_draftEngine.WouldPickKeepAnyTargetReachable(CurrentSession, characterId, EffectiveSelectedTargets))
+        {
+            return string.Empty;
+        }
+
+        return "This option would make your desired target distribution unachievable.";
+    }
+
+    public IReadOnlyList<CharacterDefinition> CurrentOfferCharacters => ResolvePresentedCharacters(CurrentOfferOptions);
 
     public IReadOnlyList<CharacterDefinition> CurrentValidCharacters => HasCurrentSession
         ? _draftEngine.GetRemainingValidCharacters(CurrentSession)
@@ -120,7 +227,7 @@ public sealed class DraftSessionState
             SetupResult = new SetupCalculationResult(new SetupCounts(0, 0, 0, 0), Array.Empty<SetupCounts>());
             ResetDraftState();
             HasCurrentSession = false;
-            CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
+            CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, UseAtheist, IsLegionGame, LegionCount);
             return Task.CompletedTask;
         }
 
@@ -130,6 +237,11 @@ public sealed class DraftSessionState
             LegionCount = 0;
         }
 
+        if (!SupportsAtheistOption)
+        {
+            UseAtheist = false;
+        }
+
         ResetDraftState();
         RecalculateSetup();
         return Task.CompletedTask;
@@ -137,7 +249,7 @@ public sealed class DraftSessionState
 
     public async Task LoadAvailableScriptsAsync()
     {
-        AvailableScripts = await _scriptRepository.GetAllAsync();
+        AvailableScripts = await _scriptRepository.GetAllAsync(includeCustomScripts: false);
     }
 
     public async Task LoadStoredScriptAsync(Guid scriptId)
@@ -156,6 +268,12 @@ public sealed class DraftSessionState
             IsLegionGame = false;
             LegionCount = 0;
         }
+
+        if (!SupportsAtheistOption)
+        {
+            UseAtheist = false;
+        }
+
         ResetDraftState();
         RecalculateSetup();
     }
@@ -182,12 +300,14 @@ public sealed class DraftSessionState
             HasCurrentSession = true;
             PlayerCount = loaded.PlayerCount;
             UseMarionette = loaded.UseMarionette;
+            UseAtheist = loaded.UseAtheist;
             IsLegionGame = loaded.IsLegionGame;
             LegionCount = loaded.LegionCount;
             _activeLoricIds.Clear();
             _activeLoricIds.AddRange(loaded.ActiveLoricIds);
             EnsureCuratorLoric();
             _draftEngine.TrackSession(loaded);
+            ResetTargetSelection();
             SyncOfferFromCurrentSlot();
             ClearDraftMessage();
             return true;
@@ -272,7 +392,7 @@ public sealed class DraftSessionState
             Array.Empty<string>(),
             ActiveLoricIds,
             new Dictionary<string, HiddenFlags>(),
-            new SessionSetupOptions(UseMarionette, IsLegionGame, LegionCount),
+            new SessionSetupOptions(UseMarionette, UseAtheist, IsLegionGame, LegionCount),
             _characterDatabase,
             _loricDatabase);
     }
@@ -298,12 +418,13 @@ public sealed class DraftSessionState
         try
         {
             RecalculateSetup();
-            var started = _draftEngine.StartSession(LoadResult.Script, PlayerCount, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
+            var started = _draftEngine.StartSession(LoadResult.Script, PlayerCount, ActiveLoricIds, UseMarionette, UseAtheist, IsLegionGame, LegionCount);
             var scriptId = await EnsureLoadedScriptIdAsync(started.Script);
             var persisted = await _gameSessionRepository.AddAsync(started, scriptId);
             CurrentSession = persisted;
             _draftEngine.TrackSession(persisted);
             HasCurrentSession = true;
+            ResetTargetSelection();
             ResetOfferState();
         }
         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
@@ -322,16 +443,73 @@ public sealed class DraftSessionState
         }
 
         ClearDraftMessage();
-        var suggestions = _draftEngine.SuggestThree(CurrentSession);
-        _currentOfferIds.Clear();
-        _currentOfferIds.AddRange(suggestions.Select(character => character.Id));
+        var suggestions = _draftEngine.SuggestThree(CurrentSession, EffectiveSelectedTargets);
+        _currentOfferOptions.Clear();
+        _currentOfferOptions.AddRange(suggestions);
         IsCuratingOffer = false;
         _curatedOfferSelection.Clear();
+        _curatedDynamicAbilitySelections.Clear();
+        CuratedRoleCharacterId = string.Empty;
+        CuratedDisguiseCharacterId = string.Empty;
 
-        if (_currentOfferIds.Count == 0)
+        if (_currentOfferOptions.Count == 0)
         {
             SetDraftMessage("No valid characters remain for this slot.");
         }
+    }
+
+    /// <summary>
+    /// Re-generates the active Random 3 offer when the Storyteller changes the selected target distributions,
+    /// so the offered pool always reflects the current selection. Curated offers are left untouched.
+    /// </summary>
+    private void RefreshOffersForTargetSelection()
+    {
+        if (!HasCurrentSession || CurrentSession.Status != GameStatus.Drafting)
+        {
+            return;
+        }
+
+        if (IsCuratingOffer || _currentOfferOptions.Count == 0)
+        {
+            return;
+        }
+
+        var suggestions = _draftEngine.SuggestThree(CurrentSession, EffectiveSelectedTargets);
+        _currentOfferOptions.Clear();
+        _currentOfferOptions.AddRange(suggestions);
+    }
+
+    /// <summary>
+    /// Reconciles the explicit selected-target set against the latest valid targets. Targets that are no longer
+    /// valid are dropped; newly appearing targets are auto-included only while "all targets" mode is active.
+    /// In all-targets mode the explicit set stays empty (the empty=all sentinel covers any newly valid targets).
+    /// </summary>
+    private void ReconcileSelectedTargets()
+    {
+        if (_allTargetsMode)
+        {
+            _selectedTargetCounts.Clear();
+            return;
+        }
+
+        var validTargets = SelectableTargetCounts.ToHashSet();
+        _selectedTargetCounts.IntersectWith(validTargets);
+
+        // If every explicit selection disappeared, fall back to "all targets" so the pool never becomes empty.
+        if (_selectedTargetCounts.Count == 0)
+        {
+            _allTargetsMode = true;
+        }
+    }
+
+    /// <summary>
+    /// Resets the target selection back to the default "all targets" mode for a fresh or newly loaded session.
+    /// The selection is in-memory only and is intentionally not persisted across browser refreshes.
+    /// </summary>
+    private void ResetTargetSelection()
+    {
+        _allTargetsMode = true;
+        _selectedTargetCounts.Clear();
     }
 
     public void BeginCuratedOffer()
@@ -344,24 +522,39 @@ public sealed class DraftSessionState
 
         ClearDraftMessage();
         IsCuratingOffer = true;
-        AddEvilOptionToCuratedOffer = false;
         _curatedOfferSelection.Clear();
+        _curatedDynamicAbilitySelections.Clear();
+        CuratedRoleCharacterId = string.Empty;
+        CuratedDisguiseCharacterId = string.Empty;
     }
 
-    public void SetAddEvilOptionToCuratedOffer(bool addEvil)
+    public void AddCuratedRoleOption(string roleCharacterId, string secondaryCharacterId)
     {
-        if (!IsCuratingOffer)
+        if (!IsCuratingOffer || string.IsNullOrWhiteSpace(roleCharacterId))
         {
             return;
         }
 
-        if (addEvil && _curatedOfferSelection.Count >= 3)
+        var normalizedRole = roleCharacterId.Trim();
+        if (IsCuratedSpecialRole(normalizedRole))
         {
-            SetDraftMessage(EvilCurationLimitMessage);
+            AddCuratedSpecialOption(normalizedRole, secondaryCharacterId);
             return;
         }
 
-        AddEvilOptionToCuratedOffer = addEvil;
+        if (_curatedOfferSelection.Count >= 3)
+        {
+            SetDraftMessage("You can curate up to 3 characters.");
+            return;
+        }
+
+        var option = OfferOption.Normal(normalizedRole);
+        if (_curatedOfferSelection.Any(existing => existing == option))
+        {
+            return;
+        }
+
+        _curatedOfferSelection.Add(option);
         ClearDraftMessage();
     }
 
@@ -373,22 +566,16 @@ public sealed class DraftSessionState
         }
 
         var normalized = characterId.Trim();
-        if (_curatedOfferSelection.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+        var option = OfferOption.Normal(normalized);
+        var existing = _curatedOfferSelection.FirstOrDefault(current => current == option);
+
+        if (existing is not null)
         {
-            _curatedOfferSelection.RemoveAll(id => string.Equals(id, normalized, StringComparison.OrdinalIgnoreCase));
+            _curatedOfferSelection.Remove(existing);
             return;
         }
 
-        var maxCuratedCharacters = AddEvilOptionToCuratedOffer ? 2 : 3;
-        if (_curatedOfferSelection.Count >= maxCuratedCharacters)
-        {
-            SetDraftMessage(AddEvilOptionToCuratedOffer
-                ? EvilCurationLimitMessage
-                : "You can curate up to 3 characters.");
-            return;
-        }
-
-        _curatedOfferSelection.Add(normalized);
+        AddCuratedRoleOption(normalized, string.Empty);
     }
 
     public async Task ConfirmCuratedOfferAsync()
@@ -408,43 +595,13 @@ public sealed class DraftSessionState
 
         try
         {
-            var offeredIds = AddEvilOptionToCuratedOffer
-                ? _curatedOfferSelection.Concat(new[] { EvilSentinelCharacterId }).ToList().AsReadOnly()
-                : _curatedOfferSelection.AsReadOnly();
-
-            CurrentSession = _draftEngine.CreateCuratedOffer(CurrentSession.Id, slot, offeredIds);
+            CurrentSession = _draftEngine.CreateCuratedOffer(CurrentSession.Id, slot, _curatedOfferSelection.AsReadOnly());
             await _gameSessionRepository.UpdateAsync(CurrentSession);
             SyncOfferFromCurrentSlot();
             IsCuratingOffer = false;
-            AddEvilOptionToCuratedOffer = false;
             _curatedOfferSelection.Clear();
-            ClearDraftMessage();
-        }
-        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
-        {
-            SetDraftMessage(ex.Message);
-        }
-    }
-
-    public async Task ConfirmAtheistCommitmentAsync()
-    {
-        if (!HasCurrentSession || CurrentSession.Status != GameStatus.Drafting)
-        {
-            SetDraftMessage("No active draft session is available.");
-            return;
-        }
-
-        var slot = CurrentPlayerSlot;
-        if (slot < 1)
-        {
-            SetDraftMessage("No pending player slot remains.");
-            return;
-        }
-
-        try
-        {
-            CurrentSession = _draftEngine.ConfirmAtheistCommitment(CurrentSession.Id, slot);
-            await _gameSessionRepository.UpdateAsync(CurrentSession);
+            CuratedRoleCharacterId = string.Empty;
+            CuratedDisguiseCharacterId = string.Empty;
             ClearDraftMessage();
         }
         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
@@ -461,7 +618,7 @@ public sealed class DraftSessionState
             return;
         }
 
-        if (_currentOfferIds.Count == 0)
+        if (_currentOfferOptions.Count == 0)
         {
             SetDraftMessage("Generate or curate an offer before recording a choice.");
             return;
@@ -476,32 +633,58 @@ public sealed class DraftSessionState
 
         try
         {
-            var hiddenFlags = CreateHiddenFlagsForChoice(chosenCharacterId);
-            CurrentSession = _draftEngine.RecordChoice(CurrentSession.Id, slot, chosenCharacterId, CurrentOfferIds, hiddenFlags);
-            await _gameSessionRepository.UpdateAsync(CurrentSession);
-            ResetOfferState();
-            ClearDraftMessage();
+            var offeredOptions = _currentOfferOptions.ToList().AsReadOnly();
+            var chosenOption = offeredOptions.FirstOrDefault(option =>
+                string.Equals(GetPresentedCharacterId(option), chosenCharacterId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(option.CharacterId, chosenCharacterId, StringComparison.OrdinalIgnoreCase));
 
-            // Check if the chosen character requires a dynamic ability assignment
-            var chosenDef = CurrentSession.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, chosenCharacterId, StringComparison.OrdinalIgnoreCase))
-                ?? _characterDatabase.Resolve(chosenCharacterId);
+            CurrentSession = _draftEngine.RecordChoice(CurrentSession.Id, slot, chosenCharacterId, offeredOptions);
+            await _gameSessionRepository.UpdateAsync(CurrentSession);
+
+            var resolvedChosenId = chosenOption?.CharacterId ?? chosenCharacterId;
+
+            var chosenDef = CurrentSession.Script.Characters.FirstOrDefault(c => string.Equals(c.Id, resolvedChosenId, StringComparison.OrdinalIgnoreCase))
+                ?? _characterDatabase.Resolve(resolvedChosenId);
 
             if (chosenDef.IsDynamicSetup)
             {
-                PendingDynamicAbilityDraftOrder = slot;
+                if (_curatedDynamicAbilitySelections.TryGetValue(resolvedChosenId, out var preselectedAbilityId))
+                {
+                    if (string.IsNullOrWhiteSpace(CurrentSession.Players.First(player => player.DraftOrder == slot).BorrowedAbilityCharacterId))
+                    {
+                        CurrentSession = _draftEngine.AssignDynamicAbility(CurrentSession.Id, slot, preselectedAbilityId);
+                        await _gameSessionRepository.UpdateAsync(CurrentSession);
+                    }
+
+                    _curatedDynamicAbilitySelections.Remove(resolvedChosenId);
+                }
+                else if (string.IsNullOrWhiteSpace(CurrentSession.Players.First(player => player.DraftOrder == slot).BorrowedAbilityCharacterId))
+                {
+                    var abilityOptions = GetDynamicAbilityOptions(slot)
+                        .Where(option => option.IsAvailable)
+                        .ToList();
+
+                    if (abilityOptions.Count == 0)
+                    {
+                        throw new InvalidOperationException($"No available borrowed abilities for {chosenDef.DisplayName}.");
+                    }
+
+                    var randomIndex = Random.Shared.Next(abilityOptions.Count);
+                    var selectedAbility = abilityOptions[randomIndex];
+                    CurrentSession = _draftEngine.AssignDynamicAbility(CurrentSession.Id, slot, selectedAbility.AbilityCharacterId);
+                    await _gameSessionRepository.UpdateAsync(CurrentSession);
+                }
             }
+
+            ResetOfferState();
+            ReconcileSelectedTargets();
+            ClearDraftMessage();
         }
         catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
         {
             SetDraftMessage(ex.Message);
         }
     }
-
-    /// <summary>
-    /// When non-null, indicates the draft order of a slot that requires a dynamic ability assignment
-    /// (Alchemist / Boffin) before the summary counts are accurate.
-    /// </summary>
-    public int? PendingDynamicAbilityDraftOrder { get; private set; }
 
     /// <summary>
     /// Returns the available ability options for the dynamic-setup character at <paramref name="draftOrder"/>.
@@ -535,35 +718,6 @@ public sealed class DraftSessionState
         {
             SetDraftMessage(ex.Message);
             return Array.Empty<AbilityOption>();
-        }
-    }
-
-    /// <summary>
-    /// Assigns the borrowed ability identified by <paramref name="abilityCharacterId"/> to the
-    /// dynamic-setup character at <paramref name="draftOrder"/> and persists the session.
-    /// </summary>
-    public async Task AssignDynamicAbilityAsync(int draftOrder, string abilityCharacterId)
-    {
-        if (!HasCurrentSession)
-        {
-            return;
-        }
-
-        try
-        {
-            CurrentSession = _draftEngine.AssignDynamicAbility(CurrentSession.Id, draftOrder, abilityCharacterId);
-            await _gameSessionRepository.UpdateAsync(CurrentSession);
-
-            if (PendingDynamicAbilityDraftOrder == draftOrder)
-            {
-                PendingDynamicAbilityDraftOrder = null;
-            }
-
-            ClearDraftMessage();
-        }
-        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
-        {
-            SetDraftMessage(ex.Message);
         }
     }
 
@@ -652,7 +806,8 @@ public sealed class DraftSessionState
                         ? new
                         {
                             characterId = chosen.CharacterId,
-                            offeredIds = chosen.OfferedIds,
+                            disguiseCharacterId = chosen.DisguiseCharacterId,
+                            offeredOptions = chosen.OfferedOptions,
                             hiddenFlags = new { chosen.HiddenFlags.IsDrunk, chosen.HiddenFlags.IsLunatic },
                         }
                         : null,
@@ -703,92 +858,351 @@ public sealed class DraftSessionState
         return true;
     }
 
-    private IReadOnlyList<CharacterDefinition> ResolveCharacters(IReadOnlyList<string> ids)
+    private IReadOnlyList<CharacterDefinition> ResolvePresentedCharacters(IReadOnlyList<OfferOption> options)
     {
         var scriptMap = LoadResult.Script.Characters
             .GroupBy(character => character.Id, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
         var resolved = new List<CharacterDefinition>();
-        foreach (var id in ids)
+        foreach (var option in options)
         {
-            if (string.Equals(id, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
+            var presentedId = GetPresentedCharacterId(option);
+
+            if (CurrentSession.IsLegionGame
+                && string.Equals(presentedId, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
             {
                 resolved.Add(CreateEvilSentinelCharacter());
                 continue;
             }
 
-            if (scriptMap.TryGetValue(id, out var inScript))
+            if (scriptMap.TryGetValue(presentedId, out var inScript))
             {
                 resolved.Add(inScript);
             }
             else
             {
-                resolved.Add(_characterDatabase.Resolve(id));
+                resolved.Add(_characterDatabase.Resolve(presentedId));
             }
         }
 
         return resolved.AsReadOnly();
     }
 
-    public bool CanApplyDrunkToChoice(string characterId)
+    public bool CanUseDrunkRoleForCurate()
     {
-        if (!SupportsDrunkFlag)
+        if (!SupportsDrunkFlag || !HasCurrentSession)
         {
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(characterId))
-        {
-            return false;
-        }
-
-        if (string.Equals(characterId.Trim(), EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var character = ResolveCharacter(characterId);
-        return character.Type == CharacterType.Townsfolk;
+        return !CurrentSession.Players.Any(player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "drunk", StringComparison.OrdinalIgnoreCase));
     }
 
-    public bool CanApplyLunaticToChoice(string characterId)
+    public bool CanUseLunaticRoleForCurate()
     {
-        if (!SupportsLunaticFlag)
+        if (!SupportsLunaticFlag || !HasCurrentSession)
         {
             return false;
         }
 
-        if (string.IsNullOrWhiteSpace(characterId))
-        {
-            return false;
-        }
-
-        if (string.Equals(characterId.Trim(), EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var character = ResolveCharacter(characterId);
-        return character.Type == CharacterType.Demon;
+        return !CurrentSession.Players.Any(player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "lunatic", StringComparison.OrdinalIgnoreCase));
     }
 
-    private HiddenFlags CreateHiddenFlagsForChoice(string characterId)
+    public bool CanUseAlchemistRoleForCurate()
     {
-        var canApplyDrunk = CanApplyDrunkToChoice(characterId);
-        var canApplyLunatic = CanApplyLunaticToChoice(characterId);
-
-        if (!canApplyDrunk)
+        if (!SupportsAlchemistOption || !HasCurrentSession)
         {
-            NextChoiceIsDrunk = false;
+            return false;
         }
 
-        if (!canApplyLunatic)
+        return !CurrentSession.Players.Any(player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "alchemist", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool CanUseBoffinRoleForCurate()
+    {
+        if (!SupportsBoffinOption || !HasCurrentSession)
         {
-            NextChoiceIsLunatic = false;
+            return false;
         }
 
-        return new HiddenFlags(NextChoiceIsDrunk && canApplyDrunk, NextChoiceIsLunatic && canApplyLunatic);
+        return !CurrentSession.Players.Any(player =>
+            player.Choice is PlayerChoice.ChosenChoice chosen
+            && string.Equals(chosen.CharacterId, "boffin", StringComparison.OrdinalIgnoreCase));
+    }
+
+    public IReadOnlyList<CharacterDefinition> GetCurateRoleCandidates()
+    {
+        if (!HasCurrentSession)
+        {
+            return Array.Empty<CharacterDefinition>();
+        }
+
+        var candidates = CurrentValidCharacters.ToList();
+
+        if (CanUseDrunkRoleForCurate())
+        {
+            candidates.Add(ResolveCharacter("drunk"));
+        }
+
+        if (CanUseLunaticRoleForCurate())
+        {
+            candidates.Add(ResolveCharacter("lunatic"));
+        }
+
+        if (IsCuratedSpecialRole("hermit"))
+        {
+            candidates.Add(ResolveCharacter("hermit"));
+        }
+
+        if (CanUseAlchemistRoleForCurate())
+        {
+            candidates.Add(ResolveCharacter("alchemist"));
+        }
+
+        if (CanUseBoffinRoleForCurate())
+        {
+            candidates.Add(ResolveCharacter("boffin"));
+        }
+
+        return candidates
+            .GroupBy(character => character.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public bool IsCuratedSpecialRole(string roleCharacterId)
+    {
+        if (string.IsNullOrWhiteSpace(roleCharacterId))
+        {
+            return false;
+        }
+
+        var normalizedRole = roleCharacterId.Trim();
+
+        if (string.Equals(normalizedRole, "drunk", StringComparison.OrdinalIgnoreCase))
+        {
+            return CanUseDrunkRoleForCurate();
+        }
+
+        if (string.Equals(normalizedRole, "lunatic", StringComparison.OrdinalIgnoreCase))
+        {
+            return CanUseLunaticRoleForCurate();
+        }
+
+        if (string.Equals(normalizedRole, "hermit", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!ScriptContainsCharacter("hermit") || !HasCurrentSession)
+            {
+                return false;
+            }
+
+            var hasDrunkOnScript = ScriptContainsCharacter("drunk");
+            var hasLunaticOnScript = ScriptContainsCharacter("lunatic");
+            if (hasDrunkOnScript == hasLunaticOnScript)
+            {
+                return false;
+            }
+
+            return !CurrentSession.Players.Any(player =>
+                player.Choice is PlayerChoice.ChosenChoice chosen
+                && string.Equals(chosen.CharacterId, "hermit", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (string.Equals(normalizedRole, "alchemist", StringComparison.OrdinalIgnoreCase))
+        {
+            return CanUseAlchemistRoleForCurate();
+        }
+
+        if (string.Equals(normalizedRole, "boffin", StringComparison.OrdinalIgnoreCase))
+        {
+            return CanUseBoffinRoleForCurate();
+        }
+
+        return false;
+    }
+
+    public IReadOnlyList<CharacterDefinition> GetCurateDisguiseCandidates(string roleCharacterId)
+    {
+        if (!HasCurrentSession || string.IsNullOrWhiteSpace(roleCharacterId))
+        {
+            return Array.Empty<CharacterDefinition>();
+        }
+
+        var chosenSet = CurrentSession.Players
+            .Select(player => player.Choice)
+            .OfType<PlayerChoice.ChosenChoice>()
+            .Select(chosen => chosen.CharacterId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var consumedDrunkDisguises = CurrentSession.Players
+            .Select(player => player.Choice)
+            .OfType<PlayerChoice.ChosenChoice>()
+            .Where(chosen => chosen.HiddenFlags.IsDrunk && !string.IsNullOrWhiteSpace(chosen.DisguiseCharacterId))
+            .Select(chosen => chosen.DisguiseCharacterId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (string.Equals(roleCharacterId, "drunk", StringComparison.OrdinalIgnoreCase))
+        {
+            return CurrentSession.Script.Characters
+                .Where(character => character.Type == CharacterType.Townsfolk)
+                .Where(character => !chosenSet.Contains(character.Id))
+                .Where(character => !consumedDrunkDisguises.Contains(character.Id))
+                .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        if (string.Equals(roleCharacterId, "lunatic", StringComparison.OrdinalIgnoreCase))
+        {
+            return CurrentSession.Script.Characters
+                .Where(character => character.Type == CharacterType.Demon)
+                .Where(character => !chosenSet.Contains(character.Id))
+                .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        if (string.Equals(roleCharacterId, "hermit", StringComparison.OrdinalIgnoreCase))
+        {
+            var hasDrunkOnScript = ScriptContainsCharacter("drunk");
+            var hasLunaticOnScript = ScriptContainsCharacter("lunatic");
+
+            if (hasDrunkOnScript && hasLunaticOnScript)
+            {
+                return Array.Empty<CharacterDefinition>();
+            }
+
+            if (hasDrunkOnScript)
+            {
+                return CurrentSession.Script.Characters
+                    .Where(character => character.Type == CharacterType.Townsfolk)
+                    .Where(character => !chosenSet.Contains(character.Id))
+                    .Where(character => !consumedDrunkDisguises.Contains(character.Id))
+                    .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                    .AsReadOnly();
+            }
+
+            if (hasLunaticOnScript)
+            {
+                return CurrentSession.Script.Characters
+                    .Where(character => character.Type == CharacterType.Demon)
+                    .Where(character => !chosenSet.Contains(character.Id))
+                    .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+                    .AsReadOnly();
+            }
+
+            return Array.Empty<CharacterDefinition>();
+        }
+
+        if (string.Equals(roleCharacterId, "alchemist", StringComparison.OrdinalIgnoreCase))
+        {
+            return CurrentSession.Script.Characters
+                .Where(character => character.Type == CharacterType.Minion)
+                .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        if (string.Equals(roleCharacterId, "boffin", StringComparison.OrdinalIgnoreCase))
+        {
+            return CurrentSession.Script.Characters
+                .Where(character => character.Type == CharacterType.Townsfolk || character.Type == CharacterType.Outsider)
+                .Where(character => !chosenSet.Contains(character.Id))
+                .Where(character => !consumedDrunkDisguises.Contains(character.Id))
+                .OrderBy(character => character.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        return Array.Empty<CharacterDefinition>();
+    }
+
+    public void AddCuratedSpecialOption(string roleCharacterId, string disguiseCharacterId)
+    {
+        if (!IsCuratingOffer || string.IsNullOrWhiteSpace(roleCharacterId) || string.IsNullOrWhiteSpace(disguiseCharacterId))
+        {
+            return;
+        }
+
+        var normalizedRole = roleCharacterId.Trim();
+        var normalizedDisguise = disguiseCharacterId.Trim();
+
+        if (_curatedOfferSelection.Count >= 3)
+        {
+            SetDraftMessage("You can curate up to 3 characters.");
+            return;
+        }
+
+        OfferOption option;
+        if (string.Equals(normalizedRole, "drunk", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!CanUseDrunkRoleForCurate())
+            {
+                SetDraftMessage("Drunk is already chosen in this game.");
+                return;
+            }
+
+            option = new OfferOption(normalizedRole, new HiddenFlags(true, false), normalizedDisguise, string.Empty);
+        }
+        else if (string.Equals(normalizedRole, "lunatic", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!CanUseLunaticRoleForCurate())
+            {
+                SetDraftMessage("Lunatic is already chosen in this game.");
+                return;
+            }
+
+            option = new OfferOption(normalizedRole, new HiddenFlags(false, true), normalizedDisguise, string.Empty);
+        }
+        else if (string.Equals(normalizedRole, "hermit", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!IsCuratedSpecialRole(normalizedRole))
+            {
+                SetDraftMessage("Hermit cannot be curated in the current script configuration.");
+                return;
+            }
+
+            var hasDrunkOnScript = ScriptContainsCharacter("drunk");
+            var hasLunaticOnScript = ScriptContainsCharacter("lunatic");
+            var isDrunkVariant = hasDrunkOnScript && !hasLunaticOnScript;
+            option = new OfferOption(normalizedRole, new HiddenFlags(isDrunkVariant, !isDrunkVariant), normalizedDisguise, string.Empty);
+        }
+        else if (string.Equals(normalizedRole, "alchemist", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedRole, "boffin", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!CurrentSession.Script.Characters.Any(character => string.Equals(character.Id, normalizedRole, StringComparison.OrdinalIgnoreCase)))
+            {
+                SetDraftMessage($"{normalizedRole} is not on this script.");
+                return;
+            }
+
+            option = new OfferOption(normalizedRole, new HiddenFlags(false, false), string.Empty, normalizedDisguise);
+            _curatedDynamicAbilitySelections[normalizedRole] = normalizedDisguise;
+        }
+        else
+        {
+            SetDraftMessage("Special option role must be drunk, lunatic, hermit, alchemist, or boffin.");
+            return;
+        }
+
+        if (_curatedOfferSelection.Any(existing => existing == option))
+        {
+            return;
+        }
+
+        _curatedOfferSelection.Add(option);
+        ClearDraftMessage();
     }
 
     private bool ScriptContainsCharacter(string characterId)
@@ -804,7 +1218,8 @@ public sealed class DraftSessionState
     private CharacterDefinition ResolveCharacter(string characterId)
     {
         var normalized = characterId.Trim();
-        if (string.Equals(normalized, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
+        if (CurrentSession.IsLegionGame
+            && string.Equals(normalized, EvilSentinelCharacterId, StringComparison.OrdinalIgnoreCase))
         {
             return CreateEvilSentinelCharacter();
         }
@@ -813,16 +1228,23 @@ public sealed class DraftSessionState
         return fromScript ?? _characterDatabase.Resolve(normalized);
     }
 
+    private static string GetPresentedCharacterId(OfferOption option)
+    {
+        return string.IsNullOrWhiteSpace(option.DisguiseCharacterId)
+            ? option.CharacterId
+            : option.DisguiseCharacterId;
+    }
+
     private void SyncOfferFromCurrentSlot()
     {
-        _currentOfferIds.Clear();
+        _currentOfferOptions.Clear();
 
         var slot = CurrentSession.Players
             .FirstOrDefault(player => player.Choice is not PlayerChoice.ChosenChoice);
 
-        if (slot?.Choice is PlayerChoice.UnchosenChoice unchosen && unchosen.OfferedIds.Count > 0)
+        if (slot?.Choice is PlayerChoice.UnchosenChoice unchosen && unchosen.OfferedOptions.Count > 0)
         {
-            _currentOfferIds.AddRange(unchosen.OfferedIds);
+            _currentOfferOptions.AddRange(unchosen.OfferedOptions);
         }
     }
 
@@ -837,22 +1259,22 @@ public sealed class DraftSessionState
     private void ResetDraftState()
     {
         HasCurrentSession = false;
-        CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, IsLegionGame, LegionCount);
+        CurrentSession = new GameSession(Guid.Empty, LoadResult.Script, PlayerCount, Array.Empty<PlayerSlot>(), GameStatus.Unknown, ActiveLoricIds, UseMarionette, UseAtheist, IsLegionGame, LegionCount);
         ResetOfferState();
         ClearDraftMessage();
     }
 
     private void ResetOfferState()
     {
-        _currentOfferIds.Clear();
+        _currentOfferOptions.Clear();
         _curatedOfferSelection.Clear();
+        _curatedDynamicAbilitySelections.Clear();
         IsCuratingOffer = false;
-        AddEvilOptionToCuratedOffer = false;
-        NextChoiceIsDrunk = false;
-        NextChoiceIsLunatic = false;
+        CuratedRoleCharacterId = string.Empty;
+        CuratedDisguiseCharacterId = string.Empty;
     }
 
-    private static CharacterDefinition CreateEvilSentinelCharacter()
+    private CharacterDefinition CreateEvilSentinelCharacter()
     {
         return new CharacterDefinition(EvilSentinelCharacterId, "Evil", CharacterType.Demon, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), false, false, false);
     }

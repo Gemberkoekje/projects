@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <AdditionalFiles Include="*.yaml" />
+    <AdditionalFiles Include="src/props/**" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <AdditionalFiles Remove="NuGet.config" />
+    <AdditionalFiles Remove="SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="docs/implementation/CURRENT_IMPLEMENTATION_OVERVIEW.md" />
+    <None Include="docs/implementation/RACE_CONDITION_PREVENTION_IMPLEMENTATION.md" />
+    <None Include="docs/operations/LOCAL_DEVELOPMENT.md" />
+    <None Include="docs/SPACE_TRADERS_IMPLEMENTATION_PLAN.md" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="DotNetProjectFile.Analyzers.Sdk" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

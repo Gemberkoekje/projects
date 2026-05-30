@@ -8,12 +8,27 @@ public sealed record ReplaceTownsfolkSetupRule : ISetupRule
 {
     public IEnumerable<SetupCounts> Apply(SetupCounts current, SetupContext context)
     {
-        var adjusted = current with
+        if (current.Townsfolk == 0 && current.Outsiders > 0)
         {
-            Townsfolk = current.Townsfolk - 1,
-            Outsiders = current.Outsiders + 1,
-        };
+            // No townsfolk slots remain, but outsider slots exist: the Drunk is shown as a
+            // townsfolk by definition, so one outsider slot becomes a townsfolk display slot.
+            return new[]
+            {
+                current with
+                {
+                    Townsfolk = current.Townsfolk + 1,
+                    Outsiders = current.Outsiders - 1,
+                },
+            };
+        }
 
-        return new[] { adjusted };
+        return new[]
+        {
+            current with
+            {
+                Townsfolk = current.Townsfolk - 1,
+                Outsiders = current.Outsiders + 1,
+            },
+        };
     }
 }

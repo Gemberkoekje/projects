@@ -44,11 +44,6 @@ public static class CuratoolApi
             .WithSummary("Create a curated offer for a player")
             .WithDescription("Locks a set of up to 3 character IDs as the curated offer for the specified player slot. The offer is idempotent — re-posting with the same IDs is safe.");
 
-        group.MapPost("/sessions/{id:guid}/atheist-commitment", ConfirmAtheistCommitmentAsync)
-            .WithName("ConfirmAtheistCommitment")
-            .WithSummary("Confirm Atheist commitment for a player slot")
-            .WithDescription("Marks the specified player slot as Atheist-committed, allowing the Atheist to be offered outside of the first-pick constraint.");
-
         group.MapPost("/sessions/{id:guid}/choices", RecordChoiceAsync)
             .WithName("RecordChoice")
             .WithSummary("Record a player's character choice")
@@ -122,6 +117,7 @@ public static class CuratoolApi
             request.PlayerCount,
             NormalizeIds(request.ActiveLorics),
             request.UseMarionette,
+            request.UseAtheist,
             request.IsLegionGame,
             request.LegionCount);
         await gameSessionRepository.AddAsync(session, storedScript.Id, cancellationToken);
@@ -160,7 +156,16 @@ public static class CuratoolApi
 
         draftEngine.TrackSession(lookup.Session);
         IReadOnlyList<CharacterApiResponse> suggestions = draftEngine.SuggestThree(lookup.Session)
-            .Select(SessionApiMapper.MapCharacter)
+            .Select(option =>
+            {
+                var presentedId = string.IsNullOrWhiteSpace(option.DisguiseCharacterId)
+                    ? option.CharacterId
+                    : option.DisguiseCharacterId;
+                var presented = lookup.Session.Script.Characters.FirstOrDefault(character =>
+                        string.Equals(character.Id, presentedId, StringComparison.OrdinalIgnoreCase))
+                    ?? new CharacterDefinition(presentedId, presentedId, CharacterType.Unknown, Array.Empty<ISetupRule>(), Array.Empty<IAvailabilityConstraint>(), false, true, false);
+                return SessionApiMapper.MapCharacter(presented);
+            })
             .ToList();
 
         return TypedResults.Ok(suggestions);
@@ -204,38 +209,19 @@ public static class CuratoolApi
             return TypedResults.NotFound(lookup.Problem);
         }
 
-        return await ExecuteMutationAsync(
-            lookup.Session,
-            gameSessionRepository,
-            draftEngine,
-            cancellationToken,
-            session => draftEngine.CreateCuratedOffer(session.Id, request.PlayerSlot, request.OfferedIds));
-    }
-
-    private static async Task<Results<Ok<SessionApiResponse>, ValidationProblem, NotFound<ProblemDetails>>> ConfirmAtheistCommitmentAsync(
-        Guid id,
-        [FromBody] AtheistCommitmentRequest request,
-        IGameSessionRepository gameSessionRepository,
-        DraftEngine draftEngine,
-        CancellationToken cancellationToken)
-    {
-        if (request.PlayerSlot < 1)
-        {
-            return TypedResults.ValidationProblem(CreateValidationErrors(nameof(request.PlayerSlot), "PlayerSlot must be greater than zero."));
-        }
-
-        var lookup = await TryGetSessionAsync(id, gameSessionRepository, cancellationToken);
-        if (!lookup.Found)
-        {
-            return TypedResults.NotFound(lookup.Problem);
-        }
+        var offeredOptions = request.OfferedOptions.Count > 0
+            ? request.OfferedOptions.Select(MapOfferOption).ToList().AsReadOnly()
+            : request.OfferedIds.Select(OfferOption.Normal).ToList().AsReadOnly();
 
         return await ExecuteMutationAsync(
             lookup.Session,
             gameSessionRepository,
             draftEngine,
             cancellationToken,
-            session => draftEngine.ConfirmAtheistCommitment(session.Id, request.PlayerSlot));
+            session => draftEngine.CreateCuratedOffer(
+                session.Id,
+                request.PlayerSlot,
+                offeredOptions));
     }
 
     private static async Task<Results<Ok<SessionApiResponse>, ValidationProblem, NotFound<ProblemDetails>>> RecordChoiceAsync(
@@ -261,17 +247,28 @@ public static class CuratoolApi
             return TypedResults.NotFound(lookup.Problem);
         }
 
+        if (request.OfferedOptions.Count == 0 && request.OfferedIds.Count == 0)
+        {
+            return TypedResults.ValidationProblem(CreateValidationErrors(nameof(request.OfferedOptions), "Offered options are required."));
+        }
+
         return await ExecuteMutationAsync(
             lookup.Session,
             gameSessionRepository,
             draftEngine,
             cancellationToken,
-            session => draftEngine.RecordChoice(
-                session.Id,
-                request.PlayerSlot,
-                request.ChosenCharacterId,
-                request.OfferedIds,
-                new HiddenFlags(request.HiddenFlags.IsDrunk, request.HiddenFlags.IsLunatic)));
+            session => request.OfferedOptions.Count > 0
+                ? draftEngine.RecordChoice(
+                    session.Id,
+                    request.PlayerSlot,
+                    request.ChosenCharacterId,
+                    request.OfferedOptions.Select(MapOfferOption).ToList().AsReadOnly())
+                : draftEngine.RecordChoice(
+                    session.Id,
+                    request.PlayerSlot,
+                    request.ChosenCharacterId,
+                    request.OfferedIds,
+                    new HiddenFlags(request.HiddenFlags.IsDrunk, request.HiddenFlags.IsLunatic)));
     }
 
     private static async Task<Results<Ok<SessionApiResponse>, ValidationProblem, NotFound<ProblemDetails>>> ExecuteMutationAsync(
@@ -341,6 +338,15 @@ public static class CuratoolApi
         return CreateValidationErrors("request", exception.Message);
     }
 
+    private static OfferOption MapOfferOption(OfferOptionRequest request)
+    {
+        return new OfferOption(
+            request.CharacterId.Trim(),
+            new HiddenFlags(request.HiddenFlags.IsDrunk, request.HiddenFlags.IsLunatic),
+            request.DisguiseCharacterId.Trim(),
+            request.BorrowedAbilityCharacterId.Trim());
+    }
+
     private static IReadOnlyList<string> NormalizeIds(IReadOnlyList<string> ids)
     {
         return ids
@@ -362,6 +368,7 @@ public static class CuratoolApi
             Array.Empty<PlayerSlot>(),
             GameStatus.Unknown,
             Array.Empty<string>(),
+            false,
             false,
             false,
             0);

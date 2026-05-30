@@ -14,6 +14,8 @@ public sealed class GameSessionEntity
 
     public bool UseMarionette { get; set; }
 
+    public bool UseAtheist { get; set; }
+
     public bool IsLegionGame { get; set; }
 
     public int LegionCount { get; set; }

@@ -41,19 +41,26 @@ public sealed class ScriptRepository(CuratoolDbContext dbContext, CharacterDatab
         return MapStoredScript(entity);
     }
 
-    public async Task<IReadOnlyList<StoredScript>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<StoredScript>> GetAllAsync(bool includeCustomScripts = true, CancellationToken cancellationToken = default)
     {
-        var entities = await dbContext.Scripts
-            .OrderBy(script => script.CreatedAt)
-            .ToListAsync(cancellationToken);
-
         var standardScripts = StandardScriptCatalog.GetAll();
         var standardIds = standardScripts
             .Select(script => script.Id)
             .ToHashSet();
 
-        var storedScripts = standardScripts
-            .Select(script => MapStoredScript(script.Id, script.Name, script.Author, script.RawJson))
+        var storedStandardScripts = standardScripts
+            .Select(script => MapStoredScript(script.Id, script.Name, script.Author, script.RawJson));
+
+        if (!includeCustomScripts)
+        {
+            return storedStandardScripts.ToList().AsReadOnly();
+        }
+
+        var entities = await dbContext.Scripts
+            .OrderBy(script => script.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var storedScripts = storedStandardScripts
             .Concat(entities
                 .Where(entity => !standardIds.Contains(entity.Id))
                 .Select(MapStoredScript))

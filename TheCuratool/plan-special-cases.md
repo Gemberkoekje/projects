@@ -10,7 +10,7 @@ Audit baseline (already in place — do **not** re-implement):
 - `ReplaceTownsfolkSetupRule` — Drunk.
 - `RequiresCharacterSetupRule` — Huntsman → Damsel.
 - `MarionetteSessionAdjustmentRule` — pre-draft toggle (+1 Townsfolk / −1 Minion).
-- `LoricSetupRule` — Sentinel (±1 Outsider via storyteller choice).
+- `LoricSetupRule` — Sentinel (-1 / 0 / +1 Outsider via storyteller choice).
 - `AtheistFirstPickConstraint` — including Drunk-override bypass.
 - `BlockedIfAnyChosenOfTypeConstraint` — Kazali, Summoner.
 - Hidden flag math in `DraftEngine` / `DraftMath` / `SetupCalculator` — Drunk Townsfolk → Outsider slot, Lunatic Demon → Outsider slot, mandatory non-Lunatic Demon completion invariant.

@@ -5,14 +5,14 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace TheCuratool.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddSpecialCaseFields : Migration
+    public partial class AddSpecialCaseFields4 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Use IF NOT EXISTS because InitialCreate was modified in-place to include
-            // these columns, so fresh databases already have them while existing
-            // deployed databases do not.
+            // The live database had AddSpecialCaseFields3 recorded in __EFMigrationsHistory
+            // before the column SQL was present in that migration, so those columns were never
+            // actually created. This migration adds them idempotently with IF NOT EXISTS.
             migrationBuilder.Sql(
                 """
                 ALTER TABLE "GameSessions"
@@ -24,28 +24,16 @@ namespace TheCuratool.Infrastructure.Migrations
             migrationBuilder.Sql(
                 """
                 ALTER TABLE "PlayerSlots"
-                    ADD COLUMN IF NOT EXISTS "IsAtheistCommitmentConfirmed" boolean NOT NULL DEFAULT false;
+                    ADD COLUMN IF NOT EXISTS "IsStAssigned" boolean NOT NULL DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS "BorrowedAbilityCharacterId" character varying(128) NOT NULL DEFAULT '';
                 """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "UseMarionette",
-                table: "GameSessions");
-
-            migrationBuilder.DropColumn(
-                name: "IsLegionGame",
-                table: "GameSessions");
-
-            migrationBuilder.DropColumn(
-                name: "LegionCount",
-                table: "GameSessions");
-
-            migrationBuilder.DropColumn(
-                name: "IsAtheistCommitmentConfirmed",
-                table: "PlayerSlots");
+            // No-op: these columns are expected to exist in the model; removing them would
+            // break the application. Down() is intentionally left empty.
         }
     }
 }

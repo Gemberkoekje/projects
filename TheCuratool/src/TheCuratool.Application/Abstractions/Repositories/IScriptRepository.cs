@@ -9,8 +9,8 @@ public interface IScriptRepository
     /// <summary>Returns the <see cref="StoredScript"/> with the specified <paramref name="id"/>.</summary>
     Task<StoredScript> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns all persisted scripts.</summary>
-    Task<IReadOnlyList<StoredScript>> GetAllAsync(CancellationToken cancellationToken = default);
+    /// <summary>Returns all scripts, optionally including custom persisted scripts.</summary>
+    Task<IReadOnlyList<StoredScript>> GetAllAsync(bool includeCustomScripts = true, CancellationToken cancellationToken = default);
 
     /// <summary>Flushes pending changes to the underlying store.</summary>
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

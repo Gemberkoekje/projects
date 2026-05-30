@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TheCuratool.Infrastructure.Data;
@@ -11,9 +12,11 @@ using TheCuratool.Infrastructure.Data;
 namespace TheCuratool.Infrastructure.Migrations
 {
     [DbContext(typeof(CuratoolDbContext))]
-    partial class CuratoolDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260530000000_AddSpecialCaseFields3")]
+    partial class AddSpecialCaseFields3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -60,11 +63,6 @@ namespace TheCuratool.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
 
-                    b.Property<bool>("UseAtheist")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
                     b.Property<bool>("UseMarionette")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -103,6 +101,11 @@ namespace TheCuratool.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasDefaultValue("{\"isDrunk\":false,\"isLunatic\":false}");
+
+                    b.Property<bool>("IsAtheistCommitmentConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsStAssigned")
                         .ValueGeneratedOnAdd()

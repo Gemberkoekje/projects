@@ -8,8 +8,9 @@
         {
           "kind": "StoryTellerChoice",
           "options": [
-            { "kind": "OutsiderDelta", "delta": 1 },
-            { "kind": "OutsiderDelta", "delta": -1 }
+            { "kind": "OutsiderDelta", "delta": -1 },
+            { "kind": "OutsiderDelta", "delta": 0 },
+            { "kind": "OutsiderDelta", "delta": 1 }
           ]
         }
       ]

@@ -73,3 +73,15 @@
     font-size: 0.82rem;
     border-top: 1px solid #202b45;
 }
+
+.footer p {
+    margin: 0.35rem 0;
+}
+
+.footer a {
+    color: #b7ccff;
+}
+
+.footer a:hover {
+    color: #d8e4ff;
+}
