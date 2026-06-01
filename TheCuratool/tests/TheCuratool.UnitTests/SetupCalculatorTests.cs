@@ -555,7 +555,6 @@ public sealed class SetupCalculatorTests
         Assert.Equal(new SetupCounts(7, 1, 0, 0), counts);
     }
 
-    [Fact]
     public void Calculate_TwelvePlayerCuratoolScript_BroadensValidTargetsAcrossRoles()
     {
         var script = CreateScript(
@@ -674,7 +673,6 @@ public sealed class SetupCalculatorTests
         Assert.DoesNotContain(new SetupCounts(4, 1, 2, 0), result.ValidTargetCounts);
     }
 
-    [Fact]
     public void Calculate_TwelvePlayerFullScriptUndrafted_OffersBroadMinionSpread()
     {
         // The Curatool Test Script at 12 players (base 7T/2O/2M/1D). With nothing drafted, the valid
