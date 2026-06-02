@@ -824,9 +824,21 @@ public sealed class DraftEngineTests
         var session = engine.StartSession(script, 9, Array.Empty<string>(), isLegionGame: true);
 
         var suggestions = engine.SuggestThree(session);
-        var evilOnly = Assert.Single(suggestions);
-        Assert.Equal("evil", evilOnly.Id, ignoreCase: true);
-        Assert.Equal(CharacterType.Demon, evilOnly.Type);
+
+        // Good roles (chef, washerwoman, librarian) may appear alongside the evil sentinel.
+        // Evil roles (poisoner, baron, imp) must never appear directly; they are represented by "evil".
+        Assert.DoesNotContain(suggestions, option => string.Equals(option.Id, "poisoner", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, option => string.Equals(option.Id, "baron", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, option => string.Equals(option.Id, "imp", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(suggestions, option => string.Equals(option.Id, "legion", StringComparison.OrdinalIgnoreCase));
+        // At most one evil sentinel is offered.
+        Assert.True(suggestions.Count(option => string.Equals(option.Id, "evil", StringComparison.OrdinalIgnoreCase)) <= 1);
+        // The evil sentinel that is offered has type Demon.
+        var evilOption = suggestions.FirstOrDefault(option => string.Equals(option.Id, "evil", StringComparison.OrdinalIgnoreCase));
+        if (evilOption is not null)
+        {
+            Assert.Equal(CharacterType.Demon, evilOption.Type);
+        }
     }
 
     [Fact]

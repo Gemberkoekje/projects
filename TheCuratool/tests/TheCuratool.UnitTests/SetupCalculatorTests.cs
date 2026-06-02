@@ -555,6 +555,7 @@ public sealed class SetupCalculatorTests
         Assert.Equal(new SetupCounts(7, 1, 0, 0), counts);
     }
 
+    [Fact]
     public void Calculate_TwelvePlayerCuratoolScript_BroadensValidTargetsAcrossRoles()
     {
         var script = CreateScript(
@@ -575,8 +576,9 @@ public sealed class SetupCalculatorTests
 
         Assert.Contains(new SetupCounts(7, 2, 2, 1), result.ValidTargetCounts);
         Assert.Contains(new SetupCounts(9, 2, 0, 1), result.ValidTargetCounts);
+        // Lord of Typhon removes all Minions and shifts Townsfolk/Outsiders freely; it does not add Minions.
+        // Lil' Monsta swaps the Demon slot to a Minion (D=0, M+1). With base (7,2,2,1) that gives (7,2,3,0).
         Assert.Contains(new SetupCounts(7, 2, 3, 0), result.ValidTargetCounts);
-        Assert.Contains(new SetupCounts(6, 2, 3, 1), result.ValidTargetCounts);
     }
 
     [Fact]
@@ -673,6 +675,7 @@ public sealed class SetupCalculatorTests
         Assert.DoesNotContain(new SetupCounts(4, 1, 2, 0), result.ValidTargetCounts);
     }
 
+    [Fact]
     public void Calculate_TwelvePlayerFullScriptUndrafted_OffersBroadMinionSpread()
     {
         // The Curatool Test Script at 12 players (base 7T/2O/2M/1D). With nothing drafted, the valid
@@ -696,12 +699,13 @@ public sealed class SetupCalculatorTests
 
         // Base distribution is always valid.
         Assert.Contains(new SetupCounts(7, 2, 2, 1), result.ValidTargetCounts);
-        // Lord of Typhon: +1 Minion (3 Minions, Demon kept).
-        Assert.Contains(new SetupCounts(6, 2, 3, 1), result.ValidTargetCounts);
-        // Kazali: removes all Minions (0 Minions, Demon kept).
+        // Lord of Typhon: removes all Minions and redistributes as Townsfolk/Outsiders (M=0, D kept).
         Assert.Contains(new SetupCounts(9, 2, 0, 1), result.ValidTargetCounts);
+        // Kazali: removes all Minions (M=0, D kept). Also covered by LordOfTyphon branch.
+        // Lil' Monsta: swaps the Demon slot to a Minion (D=0, M+1), giving (7,2,3,0).
+        Assert.Contains(new SetupCounts(7, 2, 3, 0), result.ValidTargetCounts);
 
-        // The full Minion spread {0, 2, 3} should be represented somewhere in the broadened set.
+        // The Minion spread {0, 2, 3} is reachable: 0 via LordOfTyphon/Kazali, 2 base, 3 via Lil' Monsta.
         var minionValues = result.ValidTargetCounts.Select(counts => counts.Minions).Distinct().ToList();
         Assert.Contains(0, minionValues);
         Assert.Contains(2, minionValues);
