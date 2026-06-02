@@ -15,13 +15,20 @@ public sealed class DraftEngine
     private readonly CharacterDatabase _characterDatabase;
     private readonly LoricDatabase _loricDatabase;
     private readonly SetupCalculator _setupCalculator;
+    private readonly Random _random;
     private readonly Dictionary<Guid, GameSession> _sessions = new();
 
     public DraftEngine(CharacterDatabase characterDatabase, LoricDatabase loricDatabase, SetupCalculator setupCalculator)
+        : this(characterDatabase, loricDatabase, setupCalculator, Random.Shared)
+    {
+    }
+
+    public DraftEngine(CharacterDatabase characterDatabase, LoricDatabase loricDatabase, SetupCalculator setupCalculator, Random random)
     {
         _characterDatabase = characterDatabase;
         _loricDatabase = loricDatabase;
         _setupCalculator = setupCalculator;
+        _random = random;
     }
 
     /// <summary>
@@ -50,10 +57,9 @@ public sealed class DraftEngine
         ArgumentNullException.ThrowIfNull(script);
         ArgumentNullException.ThrowIfNull(activeLoricIds);
 
-        var random = Random.Shared;
         var players = Enumerable.Range(0, playerCount)
             .Select(index => new PlayerSlot(index + 1, Guid.NewGuid(), PlayerChoice.UnchosenChoice.Empty))
-            .OrderBy(_ => random.Next())
+            .OrderBy(_ => _random.Next())
             .ToList()
             .AsReadOnly();
 
@@ -233,6 +239,7 @@ public sealed class DraftEngine
         var normalPool = BuildNormalOfferOptions(current, valid);
         var specialPool = BuildSpecialDisguiseOfferOptions(current)
             .Where(option => IsSpecialOfferCompatibleWithSelectedTargets(current, option, selectedTargets))
+            .Where(option => IsSpecialOfferFeasible(current, option, selectedTargets))
             .ToList();
         var pool = normalPool.Concat(specialPool).ToList();
 
@@ -242,7 +249,7 @@ public sealed class DraftEngine
         }
 
         var selected = new List<OfferOption>();
-        var random = Random.Shared;
+        var random = _random;
         var orderedTypes = new[] { CharacterType.Townsfolk, CharacterType.Outsider, CharacterType.Minion, CharacterType.Demon };
         var hasLegionEvilFacingOffer = false;
 
@@ -984,7 +991,7 @@ public sealed class DraftEngine
             return string.Empty;
         }
 
-        return availableAbilityIds[Random.Shared.Next(availableAbilityIds.Count)];
+        return availableAbilityIds[_random.Next(availableAbilityIds.Count)];
     }
 
     private IReadOnlyList<string> GetAvailableBorrowedAbilityIds(GameSession session, DraftStateSnapshot state, CharacterDefinition character)
@@ -1211,6 +1218,12 @@ public sealed class DraftEngine
             return CharacterType.Demon;
         }
 
+        // Drunk and lunatic hidden options both count as Outsiders in the draft type ordering.
+        if (option.HiddenFlags.IsDrunk || option.HiddenFlags.IsLunatic)
+        {
+            return CharacterType.Outsider;
+        }
+
         var presentedCharacterId = GetPresentedCharacterId(option);
         var definition = session.Script.Characters.FirstOrDefault(character =>
                 string.Equals(character.Id, presentedCharacterId, StringComparison.OrdinalIgnoreCase))
@@ -1265,6 +1278,52 @@ public sealed class DraftEngine
                 CharacterType.Outsider => target.Outsiders > 0,
                 _ => true,
             });
+    }
+
+    private bool IsSpecialOfferFeasible(
+        GameSession session,
+        OfferOption option,
+        IReadOnlyCollection<SetupCounts> selectedTargets)
+    {
+        // Only hidden-outsider options need the extra feasibility gate.
+        if (!option.HiddenFlags.IsDrunk && !option.HiddenFlags.IsLunatic)
+        {
+            return true;
+        }
+
+        var state = DraftStateSnapshot.FromSession(session);
+        var currentCounts = DraftMath.ComputeCurrentCounts(session, _characterDatabase);
+        var remainingSeats = GetRemainingSeats(session);
+        var chosenSet = new HashSet<string>(state.ChosenCharacterIds, StringComparer.OrdinalIgnoreCase);
+
+        var setupResult = _setupCalculator.Calculate(
+            session.Script,
+            session.PlayerCount,
+            state.ChosenCharacterIds,
+            session.ActiveLoricIds,
+            state.HiddenFlagsByCharacterId,
+            new SessionSetupOptions(session.UseMarionette, session.UseAtheist, session.IsLegionGame, session.LegionCount),
+            _characterDatabase,
+            _loricDatabase);
+
+        var targets = FilterToSelectedTargets(setupResult.ValidTargetCounts, selectedTargets);
+        if (targets.Count == 0)
+        {
+            return false;
+        }
+
+        // Treat the hidden option as adding an Outsider to the current counts.
+        var outsiderCharacter = new CharacterDefinition(
+            option.CharacterId,
+            option.CharacterId,
+            CharacterType.Outsider,
+            Array.Empty<ISetupRule>(),
+            Array.Empty<IAvailabilityConstraint>(),
+            false,
+            false,
+            false);
+
+        return IsHardFeasible(outsiderCharacter, session.Script, currentCounts, targets, state, remainingSeats, chosenSet, setupResult.BaseDistribution.Outsiders);
     }
 
     private IReadOnlySet<string> GetConsumedDrunkDisguiseIds(GameSession session)

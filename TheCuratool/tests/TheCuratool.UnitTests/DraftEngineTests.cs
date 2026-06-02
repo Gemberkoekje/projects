@@ -585,7 +585,7 @@ public sealed class DraftEngineTests
     public void SuggestThree_MultipleDraws_CanVaryWithSameSessionState()
     {
         var script = CreateScript("chef", "washerwoman", "librarian", "empath", "investigator", "poisoner", "baron", "imp", "vortox");
-        var engine = CreateEngine();
+        var engine = CreateEngine(seed: null);
         var session = engine.StartSession(script, 9, Array.Empty<string>());
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -1537,9 +1537,10 @@ public sealed class DraftEngineTests
         Assert.DoesNotContain(new SetupCounts(6, 1, 1, 1), afterTargets);
     }
 
-    private DraftEngine CreateEngine()
+    private DraftEngine CreateEngine(int? seed = 0)
     {
-        return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator());
+        var random = seed.HasValue ? new Random(seed.Value) : Random.Shared;
+        return new DraftEngine(_characterDatabase, _loricDatabase, new SetupCalculator(), random);
     }
 
     private Script LoadNoVortoxScript()

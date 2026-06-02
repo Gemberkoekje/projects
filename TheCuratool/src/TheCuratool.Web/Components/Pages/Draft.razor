@@ -355,8 +355,10 @@ else
     private string FormatOfferOption(OfferOption option)
     {
         var displayName = GetPlayerFacingOfferLabel(option);
-        var details = GetOfferStorytellerDetails(option);
-        return $"{displayName} ({details})";
+        var meta = GetOfferButtonMetaLabel(option);
+        return string.IsNullOrWhiteSpace(meta)
+            ? displayName
+            : $"{displayName} {meta}";
     }
 
     private string GetOfferButtonMetaLabel(OfferOption option)
