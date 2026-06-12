@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AdventureEngine.Application/AdventureEngine.Application.csproj" />
+    <Project Path="src/AdventureEngine.Domain/AdventureEngine.Domain.csproj" />
+    <Project Path="src/AdventureEngine.Infrastructure/AdventureEngine.Infrastructure.csproj" />
+    <Project Path="src/AdventureEngine.Web/AdventureEngine.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AdventureEngine.Tests/AdventureEngine.Tests.csproj" />
+  </Folder>
+</Solution>
