@@ -15,8 +15,12 @@ internal static class MartenConfiguration
         options.Events.AddEventType<NpcSpoke>();
         options.Events.AddEventType<ChapterCompleted>();
         options.Events.AddEventType<GameEnded>();
+        options.Events.AddEventType<UsageRecorded>();
 
-        options.Projections.Snapshot<GameSession>(SnapshotLifecycle.Async);
+        options.Projections.Snapshot<GameSession>(SnapshotLifecycle.Inline);
+
+        options.Schema.For<GameSession>()
+            .Index(x => x.PlayerId);
 
         return options;
     }

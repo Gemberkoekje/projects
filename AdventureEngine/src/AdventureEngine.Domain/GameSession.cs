@@ -21,6 +21,15 @@ public sealed class GameSession
     /// <summary>The last six player/narrator exchange pairs for the sliding context window.</summary>
     public List<(string PlayerInput, string NarratorResponse)> RecentHistory { get; private set; } = new();
 
+    /// <summary>All player/narrator exchanges in the current chapter (cleared on chapter completion).</summary>
+    public List<(string PlayerInput, string NarratorResponse)> CurrentChapterHistory { get; private set; } = new();
+
+    /// <summary>Total input tokens consumed across all API calls in this session.</summary>
+    public int TotalInputTokens { get; private set; }
+
+    /// <summary>Total output tokens consumed across all API calls in this session.</summary>
+    public int TotalOutputTokens { get; private set; }
+
     // Marten requires a public parameterless constructor for aggregate rehydration.
     public GameSession() { }
 
@@ -41,11 +50,13 @@ public sealed class GameSession
         RecentHistory.Add((e.Input, e.NarratorResponse));
         if (RecentHistory.Count > 6)
             RecentHistory.RemoveAt(0);
+        CurrentChapterHistory.Add((e.Input, e.NarratorResponse));
     }
 
     public void Apply(Events.ChapterCompleted e)
     {
         ChapterSummaries[e.ChapterIndex] = e.OutcomeSummary;
+        CurrentChapterHistory.Clear();
         var nextChapter = WorldManifest?.Chapters
             .FirstOrDefault(c => c.Index == e.ChapterIndex + 1);
         if (nextChapter is not null)
@@ -63,5 +74,11 @@ public sealed class GameSession
     public void Apply(Events.GameEnded e)
     {
         Status = e.Won ? SessionStatus.Completed : SessionStatus.Abandoned;
+    }
+
+    public void Apply(Events.UsageRecorded e)
+    {
+        TotalInputTokens += e.InputTokens;
+        TotalOutputTokens += e.OutputTokens;
     }
 }
