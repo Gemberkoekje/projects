@@ -42,3 +42,10 @@ public sealed record GameEnded(
     bool Won,
     string Outcome,
     DateTime OccurredAt);
+
+public sealed record UsageRecorded(
+    Guid SessionId,
+    string Agent,
+    int InputTokens,
+    int OutputTokens,
+    DateTime OccurredAt);

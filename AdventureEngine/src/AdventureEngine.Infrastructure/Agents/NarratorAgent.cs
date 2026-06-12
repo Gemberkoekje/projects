@@ -7,12 +7,20 @@ using AdventureEngine.Infrastructure.Anthropic;
 /// </summary>
 internal sealed class NarratorAgent : INarratorAgent
 {
+    private const int MaxExitDescriptionLength = 60;
+
     private static readonly string NarratorSystemPrompt =
         """
         You are the narrator of an interactive fiction adventure.
         Be vivid, second-person, present tense. Respond to player actions.
         Keep responses to 150-250 words unless drama demands more.
         Honour established facts in the story context below.
+
+        After your narrative response, if any of these apply, add them on their own new lines at the very end:
+        - If the player moves to a new scene, add: <!-- SCENE:{scene_id} --> (use the exact exit scene ID listed below)
+        - If the win condition is clearly met, add: <!-- OUTCOME:WON -->
+        - If the lose condition is clearly met, add: <!-- OUTCOME:LOST -->
+        Never invent scene IDs. Only emit a SCENE tag when the player is clearly navigating to a listed exit.
         """;
 
     private readonly AnthropicClient _client;
@@ -34,7 +42,7 @@ internal sealed class NarratorAgent : INarratorAgent
 
         var worldAnchor = BuildWorldAnchor(ctx.WorldManifest);
         var storyProgress = BuildStoryProgress(ctx.ChapterSummaries);
-        var currentChapter = BuildCurrentChapter(chapter, scene, activeNpcs);
+        var currentChapter = BuildCurrentChapter(chapter, scene, activeNpcs, ctx.WorldManifest);
         var recentHistory = BuildRecentHistory(ctx.RecentHistory);
 
         var userContent = $"""
@@ -139,7 +147,8 @@ internal sealed class NarratorAgent : INarratorAgent
     private static string BuildCurrentChapter(
         ChapterDefinition? chapter,
         SceneDefinition? scene,
-        List<NpcDefinition> npcs)
+        List<NpcDefinition> npcs,
+        WorldManifest world)
     {
         if (chapter is null || scene is null)
             return "[CURRENT SCENE]\nUnknown location.";
@@ -148,15 +157,20 @@ internal sealed class NarratorAgent : INarratorAgent
             ? string.Join(", ", npcs.Select(n => n.Name))
             : "none";
 
+        var allScenes = world.Chapters.SelectMany(c => c.Scenes).ToDictionary(s => s.Id);
         var exits = scene.Exits.Count > 0
-            ? string.Join(", ", scene.Exits)
-            : "none visible";
+            ? string.Join("\n", scene.Exits.Select(id =>
+                allScenes.TryGetValue(id, out var exitScene)
+                    ? $"  {id}: {exitScene.Description[..Math.Min(MaxExitDescriptionLength, exitScene.Description.Length)].TrimEnd()}…"
+                    : $"  {id}"))
+            : "  none visible";
 
         return $"""
             [CURRENT SCENE — Chapter {chapter.Index}: {chapter.Title}]
             {scene.Description}
             Active NPCs: {npcNames}
-            Available exits: {exits}
+            Available exits:
+            {exits}
             """;
     }
 

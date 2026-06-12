@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDirectorAgent, DirectorAgent>();
         services.AddScoped<INarratorAgent, NarratorAgent>();
         services.AddScoped<INpcAgent, NpcAgent>();
+        services.AddScoped<ModerationAgent>();
         services.AddScoped<IGameSessionService, GameSessionService>();
 
         return services;

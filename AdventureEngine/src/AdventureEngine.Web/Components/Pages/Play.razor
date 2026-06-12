@@ -16,37 +16,69 @@
     }
     else
     {
-        <div class="mb-3">
-            <h4 class="text-light">@_world?.Title</h4>
-            <small class="text-muted">Chapter @_gameSession.CurrentChapterIndex</small>
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="text-light mb-0">@_world?.Title</h4>
+                <small class="text-muted">Chapter @_gameSession.CurrentChapterIndex</small>
+            </div>
+            <a href="/" class="btn btn-sm btn-outline-secondary">← Home</a>
         </div>
+
+        @if (_chapterTransitionMessage is not null)
+        {
+            <div class="alert alert-info alert-dismissible mb-3" role="alert">
+                @_chapterTransitionMessage
+                <button type="button" class="btn-close" @onclick="() => _chapterTransitionMessage = null" />
+            </div>
+        }
 
         <GameTerminal Lines="_terminalLines" StreamingText="_streamBuffer" />
 
-        <div class="mt-3">
-            <div class="input-group">
-                <input class="form-control bg-dark text-light border-secondary"
-                       placeholder="What do you do?"
-                       @bind="_playerInput"
-                       @bind:event="oninput"
-                       @onkeydown="HandleKeyDownAsync"
-                       disabled="@_isStreaming" />
-                <button class="btn btn-outline-light" @onclick="SubmitActionAsync" disabled="@(_isStreaming || string.IsNullOrWhiteSpace(_playerInput))">
-                    @if (_isStreaming)
-                    {
-                        <span class="spinner-border spinner-border-sm" />
-                    }
-                    else
-                    {
-                        <span>↵</span>
-                    }
-                </button>
+        @if (_gameSession.Status == SessionStatus.Completed)
+        {
+            <div class="alert alert-success mt-3 text-center fw-bold fs-5">
+                🏆 Victory! Your adventure is complete.
             </div>
-            @if (_errorMessage is not null)
-            {
-                <div class="alert alert-danger mt-2">@_errorMessage</div>
-            }
-        </div>
+            <div class="text-center mt-2">
+                <a href="/" class="btn btn-primary">Start a new adventure</a>
+            </div>
+        }
+        else if (_gameSession.Status == SessionStatus.Abandoned)
+        {
+            <div class="alert alert-secondary mt-3 text-center fw-bold fs-5">
+                💀 Your adventure has ended.
+            </div>
+            <div class="text-center mt-2">
+                <a href="/" class="btn btn-primary">Try again</a>
+            </div>
+        }
+        else
+        {
+            <div class="mt-3">
+                <div class="input-group">
+                    <input class="form-control bg-dark text-light border-secondary"
+                           placeholder="What do you do?"
+                           @bind="_playerInput"
+                           @bind:event="oninput"
+                           @onkeydown="HandleKeyDownAsync"
+                           disabled="@_isStreaming" />
+                    <button class="btn btn-outline-light" @onclick="SubmitActionAsync" disabled="@(_isStreaming || string.IsNullOrWhiteSpace(_playerInput))">
+                        @if (_isStreaming)
+                        {
+                            <span class="spinner-border spinner-border-sm" />
+                        }
+                        else
+                        {
+                            <span>↵</span>
+                        }
+                    </button>
+                </div>
+                @if (_errorMessage is not null)
+                {
+                    <div class="alert alert-danger mt-2">@_errorMessage</div>
+                }
+            </div>
+        }
     }
 </div>
 
@@ -60,6 +92,7 @@
     private string _playerInput = string.Empty;
     private bool _isStreaming;
     private string? _errorMessage;
+    private string? _chapterTransitionMessage;
     private CancellationTokenSource? _cts;
 
     protected override async Task OnInitializedAsync()
@@ -99,9 +132,12 @@
         _isStreaming = true;
         _streamBuffer = string.Empty;
         _errorMessage = null;
+        _chapterTransitionMessage = null;
         _terminalLines.Add(("player", $"> {input}"));
 
         _cts = new CancellationTokenSource();
+
+        var previousChapter = _gameSession?.CurrentChapterIndex ?? 1;
 
         try
         {
@@ -109,6 +145,20 @@
             _streamBuffer = string.Empty;
             _terminalLines.Add(("narrator", response));
             _gameSession = await SessionService.GetSessionAsync(SessionId);
+
+            if (_gameSession is not null && _gameSession.CurrentChapterIndex != previousChapter)
+            {
+                _chapterTransitionMessage =
+                    $"📖 Chapter {previousChapter} complete! Now entering Chapter {_gameSession.CurrentChapterIndex}: " +
+                    $"{_world?.Chapters.FirstOrDefault(c => c.Index == _gameSession.CurrentChapterIndex)?.Title ?? string.Empty}";
+
+                var newScene = _world?.Chapters
+                    .FirstOrDefault(c => c.Index == _gameSession.CurrentChapterIndex)
+                    ?.Scenes.FirstOrDefault(s => s.Id == _gameSession.CurrentSceneId);
+
+                if (newScene is not null)
+                    _terminalLines.Add(("narrator", $"[New scene: {newScene.Description}]"));
+            }
         }
         catch (OperationCanceledException)
         {
@@ -116,6 +166,9 @@
         }
         catch (Exception ex)
         {
+            if (_terminalLines.Count > 0)
+                _terminalLines.RemoveAt(_terminalLines.Count - 1);
+            _playerInput = input;
             _errorMessage = $"Error: {ex.Message}";
         }
         finally

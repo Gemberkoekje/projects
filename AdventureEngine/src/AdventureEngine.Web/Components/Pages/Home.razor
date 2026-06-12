@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject IGameSessionService SessionService
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>LLM Adventure</PageTitle>
 
@@ -11,36 +12,74 @@
             <h1 class="mb-4">⚔️ LLM Adventure</h1>
             <p class="lead text-muted mb-5">Enter a premise and let the AI weave your adventure.</p>
 
-            <div class="card shadow-sm mb-5">
-                <div class="card-body p-4">
-                    <h5 class="card-title mb-3">Begin a new adventure</h5>
-                    <EditForm Model="_model" OnValidSubmit="StartAdventureAsync">
-                        <DataAnnotationsValidator />
-                        <div class="mb-3">
-                            <label class="form-label">Your premise</label>
-                            <InputTextArea class="form-control" rows="4"
-                                           @bind-Value="_model.Prompt"
-                                           placeholder="e.g. A cyberpunk detective investigating a corporate cover-up in neon-soaked Neo Tokyo..." />
-                            <ValidationMessage For="@(() => _model.Prompt)" />
+            @if (_playerId is null)
+            {
+                <div class="card shadow-sm mb-5">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-3">Choose your name</h5>
+                        <div class="input-group">
+                            <input class="form-control" placeholder="Enter your adventurer name…"
+                                   @bind="_nameInput" @bind:event="oninput"
+                                   @onkeydown="HandleNameKeyDownAsync" />
+                            <button class="btn btn-primary" @onclick="SaveNameAsync"
+                                    disabled="@string.IsNullOrWhiteSpace(_nameInput)">
+                                Begin
+                            </button>
                         </div>
-                        <button type="submit" class="btn btn-primary" disabled="@_isCreating">
-                            @if (_isCreating)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2" />
-                                <span>Generating world…</span>
-                            }
-                            else
-                            {
-                                <span>Start Adventure</span>
-                            }
-                        </button>
-                    </EditForm>
-                    @if (_errorMessage is not null)
-                    {
-                        <div class="alert alert-danger mt-3">@_errorMessage</div>
-                    }
+                    </div>
                 </div>
-            </div>
+            }
+            else
+            {
+                <div class="card shadow-sm mb-5">
+                    <div class="card-body p-4">
+                        <h5 class="card-title mb-3">Begin a new adventure</h5>
+                        <p class="text-muted small mb-3">Playing as <strong>@_playerId</strong> — <a href="#" @onclick="ClearNameAsync" @onclick:preventDefault>change name</a></p>
+                        <EditForm Model="_model" OnValidSubmit="StartAdventureAsync">
+                            <DataAnnotationsValidator />
+                            <div class="mb-3">
+                                <label class="form-label">Your premise</label>
+                                <InputTextArea class="form-control" rows="4"
+                                               @bind-Value="_model.Prompt"
+                                               placeholder="e.g. A cyberpunk detective investigating a corporate cover-up in neon-soaked Neo Tokyo…" />
+                                <ValidationMessage For="@(() => _model.Prompt)" />
+                            </div>
+                            <button type="submit" class="btn btn-primary" disabled="@_isCreating">
+                                @if (_isCreating)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" />
+                                    <span>Generating world…</span>
+                                }
+                                else
+                                {
+                                    <span>Start Adventure</span>
+                                }
+                            </button>
+                        </EditForm>
+                        @if (_errorMessage is not null)
+                        {
+                            <div class="alert alert-danger mt-3">@_errorMessage</div>
+                        }
+                    </div>
+                </div>
+
+                @if (_pastSessions.Count > 0)
+                {
+                    <h5 class="mb-3 text-muted">Your past adventures</h5>
+                    <div class="list-group shadow-sm mb-5">
+                        @foreach (var s in _pastSessions)
+                        {
+                            <a href="/play/@s.Id" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-semibold">@(s.WorldManifest?.Title ?? "Untitled Adventure")</div>
+                                    <small class="text-muted">@s.CreatedAt.ToLocalTime().ToString("d MMM yyyy HH:mm")</small>
+                                </div>
+                                <span class="badge @StatusBadgeClass(s.Status) rounded-pill align-self-center">@s.Status</span>
+                            </a>
+                        }
+                    </div>
+                }
+            }
         </div>
     </div>
 </div>
@@ -56,6 +95,81 @@
     private readonly NewAdventureModel _model = new();
     private bool _isCreating;
     private string? _errorMessage;
+    private string? _playerId;
+    private string _nameInput = string.Empty;
+    private List<GameSession> _pastSessions = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "adventure_player_id");
+            if (!string.IsNullOrWhiteSpace(stored))
+            {
+                _playerId = stored;
+                await LoadPastSessionsAsync();
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // localStorage may be unavailable (e.g. strict privacy mode); proceed as a guest
+        }
+    }
+
+    private async Task SaveNameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_nameInput)) return;
+        _playerId = _nameInput.Trim();
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "adventure_player_id", _playerId);
+        }
+        catch
+        {
+            // Proceed without persisting if localStorage is unavailable
+        }
+        await LoadPastSessionsAsync();
+    }
+
+    private async Task HandleNameKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SaveNameAsync();
+    }
+
+    private async Task ClearNameAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.removeItem", "adventure_player_id");
+        }
+        catch
+        {
+            // Ignore
+        }
+        _playerId = null;
+        _nameInput = string.Empty;
+        _pastSessions.Clear();
+    }
+
+    private async Task LoadPastSessionsAsync()
+    {
+        if (_playerId is null) return;
+        try
+        {
+            var sessions = await SessionService.GetPlayerSessionsAsync(_playerId);
+            _pastSessions = sessions
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(10)
+                .ToList();
+        }
+        catch
+        {
+            // Session history is best-effort; ignore failures
+        }
+    }
 
     private async Task StartAdventureAsync()
     {
@@ -64,9 +178,7 @@
 
         try
         {
-            // Use a placeholder player ID until authentication is added.
-            const string guestPlayerId = "guest";
-            var sessionId = await SessionService.CreateSessionAsync(guestPlayerId, _model.Prompt);
+            var sessionId = await SessionService.CreateSessionAsync(_playerId ?? "guest", _model.Prompt);
             Nav.NavigateTo($"/play/{sessionId}");
         }
         catch (Exception ex)
@@ -78,4 +190,11 @@
             _isCreating = false;
         }
     }
+
+    private static string StatusBadgeClass(SessionStatus status) => status switch
+    {
+        SessionStatus.Completed => "bg-success",
+        SessionStatus.Abandoned => "bg-secondary",
+        _ => "bg-primary",
+    };
 }
