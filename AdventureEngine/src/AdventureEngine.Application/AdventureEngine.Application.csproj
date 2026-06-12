@@ -1,0 +1,12 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>AdventureEngine.Application</AssemblyName>
+    <RootNamespace>AdventureEngine.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdventureEngine.Domain\AdventureEngine.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
