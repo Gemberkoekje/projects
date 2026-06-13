@@ -101,6 +101,17 @@ internal sealed partial class GameSessionService : IGameSessionService
 
         var (cleanResponse, nextSceneId, outcomeWon) = ParseStateMarkers(rawResponse);
 
+        if (narratorUsage is not null)
+        {
+            _logger.LogInformation(
+                "Narrator usage for session {SessionId}: input={Input}, output={Output}, cacheRead={CacheRead}, cacheCreation={CacheCreation}",
+                sessionId,
+                narratorUsage.InputTokens,
+                narratorUsage.OutputTokens,
+                narratorUsage.CacheReadInputTokens,
+                narratorUsage.CacheCreationInputTokens);
+        }
+
         var events = new List<object>
         {
             new PlayerActed(sessionId, playerInput, cleanResponse, DateTime.UtcNow),

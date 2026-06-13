@@ -46,33 +46,43 @@ internal sealed class NarratorAgent : INarratorAgent
         var currentChapter = BuildCurrentChapter(chapter, scene, activeNpcs, ctx.WorldManifest);
         var recentHistory = BuildRecentHistory(ctx.RecentHistory);
 
-        var userContent = $"""
-            {worldAnchor}
+        // Stable prefix (constant within a session): World Anchor + story progress.
+        // Marked with an explicit cache breakpoint so the Anthropic API can reuse it
+        // across repeated narrator calls without re-tokenising the world context.
+        var stablePrefix = $"{worldAnchor}\n\n{storyProgress}";
 
-            {storyProgress}
+        // Dynamic suffix changes on every action: scene, recent history, player input.
+        var dynamicSuffix = $"{currentChapter}\n\n{recentHistory}\n\nPlayer action: {ctx.PlayerInput}";
 
-            {currentChapter}
-
-            {recentHistory}
-
-            Player action: {ctx.PlayerInput}
-            """;
+        var userMessage = new Message { Role = RoleType.User };
+        userMessage.Content = new List<ContentBase>
+        {
+            new TextContent
+            {
+                Text = stablePrefix,
+                CacheControl = new CacheControl { Type = CacheControlType.ephemeral },
+            },
+            new TextContent
+            {
+                Text = dynamicSuffix,
+            },
+        };
 
         var parameters = new MessageParameters
         {
-            Messages = new List<Message>
-            {
-                new Message(RoleType.User, userContent),
-            },
+            Messages = new List<Message> { userMessage },
             System = new List<SystemMessage>
             {
-                new SystemMessage(NarratorSystemPrompt),
+                new SystemMessage(NarratorSystemPrompt)
+                {
+                    CacheControl = new CacheControl { Type = CacheControlType.ephemeral },
+                },
             },
             MaxTokens = 512,
             Model = AnthropicModels.Claude46Sonnet,
             Stream = true,
             Temperature = 1.0m,
-            PromptCaching = PromptCacheType.AutomaticToolsAndSystem,
+            PromptCaching = PromptCacheType.FineGrained,
         };
 
         Usage? usage = null;
