@@ -17,9 +17,9 @@ internal sealed class ModerationAgent
     }
 
     /// <summary>
-    /// Returns true if the premise is safe to use as a game prompt, false if it should be rejected.
+    /// Returns (isSafe, usage): isSafe is true if the premise is safe to use as a game prompt.
     /// </summary>
-    public async Task<bool> IsSafeAsync(string premise, CancellationToken ct = default)
+    public async Task<(bool IsSafe, AgentUsage Usage)> IsSafeAsync(string premise, CancellationToken ct = default)
     {
         var parameters = new MessageParameters
         {
@@ -49,14 +49,16 @@ internal sealed class ModerationAgent
 
         var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
         var verdict = response.Message.ToString().Trim();
+        var ru = response.Usage;
+        var usage = new AgentUsage(ru.InputTokens, ru.OutputTokens, ru.CacheReadInputTokens, ru.CacheCreationInputTokens);
 
         if (string.IsNullOrEmpty(verdict))
         {
             _logger.LogWarning("Moderation agent returned an empty response; defaulting to SAFE");
-            return true;
+            return (true, usage);
         }
 
         _logger.LogDebug("Moderation verdict for premise: {Verdict}", verdict);
-        return !verdict.StartsWith("UNSAFE", StringComparison.OrdinalIgnoreCase);
+        return (!verdict.StartsWith("UNSAFE", StringComparison.OrdinalIgnoreCase), usage);
     }
 }

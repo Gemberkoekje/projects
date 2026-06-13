@@ -98,6 +98,28 @@ public class GameSessionTests
     }
 
     [Fact]
+    public void Apply_UsageRecorded_AccumulatesAllNonStreamingAgentTags()
+    {
+        var session = new GameSession();
+        session.Apply(MakeSessionCreated());
+
+        // Simulate events emitted during session creation
+        session.Apply(new UsageRecorded(session.Id, "moderation", 50, 5, DateTime.UtcNow));
+        session.Apply(new UsageRecorded(session.Id, "director", 3000, 800, DateTime.UtcNow, 0, 100));
+
+        // Simulate events emitted during a player action
+        session.Apply(new UsageRecorded(session.Id, "npc", 200, 30, DateTime.UtcNow));
+
+        // Simulate events emitted during a chapter boundary
+        session.Apply(new UsageRecorded(session.Id, "chapter_summary", 500, 120, DateTime.UtcNow));
+
+        Assert.Equal(3750, session.TotalInputTokens);
+        Assert.Equal(955, session.TotalOutputTokens);
+        Assert.Equal(0, session.TotalCacheReadInputTokens);
+        Assert.Equal(100, session.TotalCacheCreationInputTokens);
+    }
+
+    [Fact]
     public void UsageRecorded_DeserializesLegacyPayloadWithZeroCacheDefaults()
     {
         var occurredAt = DateTime.UtcNow;

@@ -14,7 +14,7 @@ internal sealed class NpcAgent : INpcAgent
         _client = new AnthropicClient(new APIAuthentication(options.Value.ApiKey));
     }
 
-    public async Task<string> RespondAsync(NpcContext ctx, CancellationToken ct = default)
+    public async Task<(string Dialogue, AgentUsage Usage)> RespondAsync(NpcContext ctx, CancellationToken ct = default)
     {
         var systemPrompt = $"""
             You are {ctx.Npc.Name}. Respond only as this character. Stay in voice.
@@ -52,6 +52,11 @@ internal sealed class NpcAgent : INpcAgent
         };
 
         var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
-        return response.Message.ToString();
+        var usage = response.Usage;
+        return (response.Message.ToString(), new AgentUsage(
+            usage.InputTokens,
+            usage.OutputTokens,
+            usage.CacheReadInputTokens,
+            usage.CacheCreationInputTokens));
     }
 }

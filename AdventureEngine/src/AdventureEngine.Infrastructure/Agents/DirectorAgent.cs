@@ -53,7 +53,7 @@ internal sealed class DirectorAgent : IDirectorAgent
         _logger = logger;
     }
 
-    public async Task<WorldManifest> GenerateWorldAsync(string playerPrompt, CancellationToken ct = default)
+    public async Task<(WorldManifest World, AgentUsage Usage)> GenerateWorldAsync(string playerPrompt, CancellationToken ct = default)
     {
         _logger.LogInformation("Director generating world for prompt: {Prompt}", playerPrompt);
 
@@ -101,7 +101,12 @@ internal sealed class DirectorAgent : IDirectorAgent
         if (manifest is null)
             throw new InvalidOperationException("Director returned null WorldManifest.");
 
+        var usage = response.Usage;
         _logger.LogInformation("Director generated world: {Title}", manifest.Title);
-        return manifest;
+        return (manifest, new AgentUsage(
+            usage.InputTokens,
+            usage.OutputTokens,
+            usage.CacheReadInputTokens,
+            usage.CacheCreationInputTokens));
     }
 }

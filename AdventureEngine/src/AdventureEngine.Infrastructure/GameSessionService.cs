@@ -36,17 +36,21 @@ internal sealed partial class GameSessionService : IGameSessionService
 
     public async Task<Guid> CreateSessionAsync(string playerId, string playerPrompt, CancellationToken ct = default)
     {
-        if (!await _moderator.IsSafeAsync(playerPrompt, ct))
+        var (isSafe, moderationUsage) = await _moderator.IsSafeAsync(playerPrompt, ct);
+        if (!isSafe)
             throw new InvalidOperationException(
                 "Your premise was flagged by content moderation. Premises containing graphic sexual content, " +
                 "instructions for real-world violence, hate speech, or harmful content involving minors are not permitted. " +
                 "Please try a different premise.");
 
-        var world = await _director.GenerateWorldAsync(playerPrompt, ct);
+        var (world, directorUsage) = await _director.GenerateWorldAsync(playerPrompt, ct);
         var sessionId = Guid.NewGuid();
 
         var created = new SessionCreated(sessionId, playerId, playerPrompt, world, DateTime.UtcNow);
-        _session.Events.StartStream<GameSession>(sessionId, created);
+        _session.Events.StartStream<GameSession>(sessionId,
+            created,
+            new UsageRecorded(sessionId, "moderation", moderationUsage.InputTokens, moderationUsage.OutputTokens, DateTime.UtcNow, moderationUsage.CacheReadInputTokens, moderationUsage.CacheCreationInputTokens),
+            new UsageRecorded(sessionId, "director", directorUsage.InputTokens, directorUsage.OutputTokens, DateTime.UtcNow, directorUsage.CacheReadInputTokens, directorUsage.CacheCreationInputTokens));
         await _session.SaveChangesAsync(ct);
 
         _logger.LogInformation("Created session {SessionId} for player {PlayerId}", sessionId, playerId);
@@ -88,7 +92,7 @@ internal sealed partial class GameSessionService : IGameSessionService
             PlayerInput = playerInput,
         };
 
-        NarratorUsage? narratorUsage = null;
+        AgentUsage? narratorUsage = null;
         var rawResponse = await CallWithRetryAsync(
             ct2 => CollectStreamAsync(
                 _narrator.StreamResponseAsync(ctx, usage => narratorUsage = usage, ct2),
@@ -130,12 +134,17 @@ internal sealed partial class GameSessionService : IGameSessionService
                         RecentNarratorText = cleanResponse,
                         PlayerInput = playerInput,
                     };
-                    var dialogue = await CallWithRetryAsync(ct2 => _npcAgent.RespondAsync(npcCtx, ct2), ct);
-                    return new NpcSpoke(sessionId, npc.Id, dialogue, DateTime.UtcNow);
+                    var (dialogue, npcUsage) = await CallWithRetryAsync(ct2 => _npcAgent.RespondAsync(npcCtx, ct2), ct);
+                    return new object[]
+                    {
+                        new NpcSpoke(sessionId, npc.Id, dialogue, DateTime.UtcNow),
+                        new UsageRecorded(sessionId, "npc", npcUsage.InputTokens, npcUsage.OutputTokens, DateTime.UtcNow, npcUsage.CacheReadInputTokens, npcUsage.CacheCreationInputTokens),
+                    };
                 });
 
-            var npcEvents = await Task.WhenAll(npcTasks);
-            events.AddRange(npcEvents);
+            var npcResults = await Task.WhenAll(npcTasks);
+            foreach (var result in npcResults)
+                events.AddRange(result);
         }
 
         // Chapter boundary detection and scene transitions
@@ -151,7 +160,7 @@ internal sealed partial class GameSessionService : IGameSessionService
                     .Append((playerInput, cleanResponse))
                     .ToList();
 
-                var summary = await CallWithRetryAsync(
+                var (summary, summaryUsage) = await CallWithRetryAsync(
                     ct2 => _narrator.GenerateChapterSummaryAsync(world, gameSession.CurrentChapterIndex, chapterHistory, ct2),
                     ct);
 
@@ -159,6 +168,7 @@ internal sealed partial class GameSessionService : IGameSessionService
                     "Chapter {Chapter} completed for session {SessionId}", gameSession.CurrentChapterIndex, sessionId);
 
                 events.Add(new ChapterCompleted(sessionId, gameSession.CurrentChapterIndex, summary, DateTime.UtcNow));
+                events.Add(new UsageRecorded(sessionId, "chapter_summary", summaryUsage.InputTokens, summaryUsage.OutputTokens, DateTime.UtcNow, summaryUsage.CacheReadInputTokens, summaryUsage.CacheCreationInputTokens));
             }
 
             events.Add(new SceneEntered(sessionId, nextSceneId, string.Empty, DateTime.UtcNow));
