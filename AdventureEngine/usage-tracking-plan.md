@@ -22,7 +22,7 @@ actual implementation, where `UsageRecorded` is defined but never emitted by any
 
 ---
 
-## Step 1 — Extend the `UsageRecorded` event (do this first)
+## Step 1 — Extend the `UsageRecorded` event (completed)
 
 In `src/AdventureEngine.Domain/Events/GameEvents.cs`, add two cache fields to `UsageRecorded`:
 
@@ -43,6 +43,12 @@ Update the existing test in `tests/AdventureEngine.Tests/GameSessionTests.cs` th
 > stream, older `UsageRecorded` events must still deserialize. Keep new fields as additive positional
 > record parameters with default-friendly values, or add an explicit upcast if Marten cannot fill the
 > new positions. Verify replay of an existing stream during testing.
+
+✅ Implemented:
+- Added `CacheReadInputTokens` and `CacheCreationInputTokens` to `UsageRecorded` with default `0` values.
+- Added `TotalCacheReadInputTokens` / `TotalCacheCreationInputTokens` accumulation in `GameSession`.
+- Updated `GameSessionTests.Apply_UsageRecorded_AccumulatesTokens` with cache assertions.
+- Added a legacy JSON deserialization test to verify older payloads still default cache fields to `0`.
 
 ## Step 2 — Narrator streaming usage (highest priority)
 
@@ -126,7 +132,7 @@ Add/extend unit tests:
 
 ## Suggested sequencing
 
-1. Step 1 (event shape) — unblocks everything else.
+1. ✅ Step 1 (event shape) — complete.
 2. Step 2 (Narrator streaming usage) — hardest to retrofit.
 3. Step 3 (non-streaming usage).
 4. Step 4 (cache verification + possible cache-control fix).

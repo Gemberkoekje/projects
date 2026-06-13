@@ -30,6 +30,12 @@ public sealed class GameSession
     /// <summary>Total output tokens consumed across all API calls in this session.</summary>
     public int TotalOutputTokens { get; private set; }
 
+    /// <summary>Total cache-read input tokens consumed across all API calls in this session.</summary>
+    public int TotalCacheReadInputTokens { get; private set; }
+
+    /// <summary>Total cache-creation input tokens consumed across all API calls in this session.</summary>
+    public int TotalCacheCreationInputTokens { get; private set; }
+
     // Marten requires a public parameterless constructor for aggregate rehydration.
     public GameSession() { }
 
@@ -80,5 +86,7 @@ public sealed class GameSession
     {
         TotalInputTokens += e.InputTokens;
         TotalOutputTokens += e.OutputTokens;
+        TotalCacheReadInputTokens += e.CacheReadInputTokens;
+        TotalCacheCreationInputTokens += e.CacheCreationInputTokens;
     }
 }
