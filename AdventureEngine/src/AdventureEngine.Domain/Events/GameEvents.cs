@@ -48,4 +48,6 @@ public sealed record UsageRecorded(
     string Agent,
     int InputTokens,
     int OutputTokens,
-    DateTime OccurredAt);
+    DateTime OccurredAt,
+    int CacheReadInputTokens = 0,
+    int CacheCreationInputTokens = 0);

@@ -1,5 +1,6 @@
 using AdventureEngine.Domain;
 using AdventureEngine.Domain.Events;
+using System.Text.Json;
 
 namespace AdventureEngine.Tests;
 
@@ -87,11 +88,34 @@ public class GameSessionTests
         var session = new GameSession();
         session.Apply(MakeSessionCreated());
 
-        session.Apply(new UsageRecorded(session.Id, "narrator", 1000, 300, DateTime.UtcNow));
-        session.Apply(new UsageRecorded(session.Id, "npc", 800, 100, DateTime.UtcNow));
+        session.Apply(new UsageRecorded(session.Id, "narrator", 1000, 300, DateTime.UtcNow, 200, 50));
+        session.Apply(new UsageRecorded(session.Id, "npc", 800, 100, DateTime.UtcNow, 100, 25));
 
         Assert.Equal(1800, session.TotalInputTokens);
         Assert.Equal(400, session.TotalOutputTokens);
+        Assert.Equal(300, session.TotalCacheReadInputTokens);
+        Assert.Equal(75, session.TotalCacheCreationInputTokens);
+    }
+
+    [Fact]
+    public void UsageRecorded_DeserializesLegacyPayloadWithZeroCacheDefaults()
+    {
+        var occurredAt = DateTime.UtcNow;
+        var json = $$"""
+                     {
+                       "SessionId": "{{Guid.NewGuid()}}",
+                       "Agent": "director",
+                       "InputTokens": 120,
+                       "OutputTokens": 45,
+                       "OccurredAt": "{{occurredAt:O}}"
+                     }
+                     """;
+
+        var evt = JsonSerializer.Deserialize<UsageRecorded>(json);
+
+        Assert.NotNull(evt);
+        Assert.Equal(0, evt!.CacheReadInputTokens);
+        Assert.Equal(0, evt.CacheCreationInputTokens);
     }
 
     private static SessionCreated MakeSessionCreated()
