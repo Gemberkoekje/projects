@@ -7,10 +7,10 @@ public interface INarratorAgent
 {
     IAsyncEnumerable<string> StreamResponseAsync(
         NarratorContext ctx,
-        Action<NarratorUsage>? onComplete = null,
+        Action<AgentUsage>? onComplete = null,
         CancellationToken ct = default);
 
-    Task<string> GenerateChapterSummaryAsync(
+    Task<(string Summary, AgentUsage Usage)> GenerateChapterSummaryAsync(
         WorldManifest world,
         int chapterIndex,
         IReadOnlyList<(string PlayerInput, string NarratorResponse)> chapterHistory,

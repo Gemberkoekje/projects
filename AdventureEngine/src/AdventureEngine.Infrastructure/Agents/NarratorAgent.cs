@@ -32,7 +32,7 @@ internal sealed class NarratorAgent : INarratorAgent
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         NarratorContext ctx,
-        Action<NarratorUsage>? onComplete = null,
+        Action<AgentUsage>? onComplete = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var chapter = ctx.WorldManifest.Chapters.FirstOrDefault(c => c.Index == ctx.CurrentChapterIndex);
@@ -87,7 +87,7 @@ internal sealed class NarratorAgent : INarratorAgent
 
         if (usage is not null)
         {
-            onComplete?.Invoke(new NarratorUsage(
+            onComplete?.Invoke(new AgentUsage(
                 usage.InputTokens,
                 usage.OutputTokens,
                 usage.CacheReadInputTokens,
@@ -95,7 +95,7 @@ internal sealed class NarratorAgent : INarratorAgent
         }
     }
 
-    public async Task<string> GenerateChapterSummaryAsync(
+    public async Task<(string Summary, AgentUsage Usage)> GenerateChapterSummaryAsync(
         WorldManifest world,
         int chapterIndex,
         IReadOnlyList<(string PlayerInput, string NarratorResponse)> chapterHistory,
@@ -131,7 +131,12 @@ internal sealed class NarratorAgent : INarratorAgent
         };
 
         var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
-        return response.Message.ToString();
+        var usage = response.Usage;
+        return (response.Message.ToString(), new AgentUsage(
+            usage.InputTokens,
+            usage.OutputTokens,
+            usage.CacheReadInputTokens,
+            usage.CacheCreationInputTokens));
     }
 
     private static string BuildWorldAnchor(WorldManifest world)

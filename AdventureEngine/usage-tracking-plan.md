@@ -91,6 +91,17 @@ Then `GameSessionService` is the single place that appends `UsageRecorded` event
 event-sourcing write path centralized. `CreateSessionAsync` emits the Director (and moderation) usage;
 `SubmitActionAsync` emits Narrator, NPC, and chapter-summary usage.
 
+✅ Implemented:
+- Renamed `NarratorUsage` → `AgentUsage` (shared record for all agents).
+- Changed `IDirectorAgent.GenerateWorldAsync` to return `(WorldManifest World, AgentUsage Usage)`.
+- Changed `INpcAgent.RespondAsync` to return `(string Dialogue, AgentUsage Usage)`.
+- Changed `INarratorAgent.GenerateChapterSummaryAsync` to return `(string Summary, AgentUsage Usage)`.
+- Changed `ModerationAgent.IsSafeAsync` to return `(bool IsSafe, AgentUsage Usage)`.
+- Updated all implementations to read `.Usage` from the Anthropic response and return it.
+- Updated `GameSessionService.CreateSessionAsync` to emit `UsageRecorded` for "moderation" and "director".
+- Updated `GameSessionService.SubmitActionAsync` to emit `UsageRecorded` for "npc" and "chapter_summary".
+- Added `Apply_UsageRecorded_AccumulatesAllNonStreamingAgentTags` test covering all four new agent tags.
+
 ## Step 4 — Cache hit verification
 
 Once usage flows with cache fields:
@@ -139,7 +150,7 @@ Add/extend unit tests:
 
 1. ✅ Step 1 (event shape) — complete.
 2. ✅ Step 2 (Narrator streaming usage) — complete.
-3. Step 3 (non-streaming usage).
+3. ✅ Step 3 (non-streaming usage) — complete.
 4. Step 4 (cache verification + possible cache-control fix).
 5. Step 5 (moderation reason).
 6. Step 6 (status.md).

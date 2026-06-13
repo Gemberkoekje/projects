@@ -5,5 +5,5 @@ namespace AdventureEngine.Application.Agents;
 /// </summary>
 public interface INpcAgent
 {
-    Task<string> RespondAsync(NpcContext ctx, CancellationToken ct = default);
+    Task<(string Dialogue, AgentUsage Usage)> RespondAsync(NpcContext ctx, CancellationToken ct = default);
 }

@@ -5,5 +5,5 @@ namespace AdventureEngine.Application.Agents;
 /// </summary>
 public interface IDirectorAgent
 {
-    Task<WorldManifest> GenerateWorldAsync(string playerPrompt, CancellationToken ct = default);
+    Task<(WorldManifest World, AgentUsage Usage)> GenerateWorldAsync(string playerPrompt, CancellationToken ct = default);
 }
