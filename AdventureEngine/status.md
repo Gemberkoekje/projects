@@ -19,7 +19,7 @@ Blazor Server project wired up, Marten configured, Postgres health check registe
 `Home.razor` accepts the player prompt, calls `GameSessionService.CreateSessionAsync` (which invokes the Director), and navigates to `Play.razor` on success.
 
 ### ✅ 5. Narrator
-`NarratorAgent` builds the full layered context (system prompt, world anchor, story-so-far, current chapter, recent history, player input) and streams tokens back via `IAsyncEnumerable<string>`. Prompt caching is enabled (`PromptCacheType.AutomaticToolsAndSystem`) on the stable prefix.
+`NarratorAgent` builds the full layered context (system prompt, world anchor, story-so-far, current chapter, recent history, player input) and streams tokens back via `IAsyncEnumerable<string>`. Prompt caching is enabled with `PromptCacheType.FineGrained`, using explicit cache-control breakpoints on the stable system prompt and world-anchor prefix.
 
 ### ✅ 6. Play.razor
 `Play.razor` renders the `GameTerminal` component, streams narrator tokens one by one (calling `StateHasChanged()` per token), and exposes a player input box. `GameTerminal.razor` shows a blinking cursor while streaming.
@@ -42,7 +42,7 @@ The narrator system prompt instructs it to emit HTML comment markers at the end 
 The `BuildCurrentChapter` helper now includes the description of each exit scene so the narrator can correctly emit scene IDs.
 
 ### ✅ 9. Prompt caching
-Cache control is applied to the static narrator prefix in `NarratorAgent.StreamResponseAsync`. No further work needed here until the caching strategy is re-evaluated.
+Cache control is applied to the stable narrator prefix in `NarratorAgent.StreamResponseAsync`, and usage tracking now records cache-read/cache-creation tokens so cache effectiveness can be verified from real sessions.
 
 ### ✅ 10. Polish
 
@@ -51,7 +51,7 @@ Cache control is applied to the static narrator prefix in `NarratorAgent.StreamR
 | Session history UI (list past games on Home page) | ✅ Home.razor shows a paginated list of up to 10 past sessions with title, date, and status |
 | Save / resume (reconnect rebuilds context from event log) | ✅ Marten event sourcing rebuilds context on every load; `Play.razor` restores terminal history on reconnect; Home page shows Resume links |
 | Error recovery (graceful fallbacks for API failures) | ✅ `GameSessionService` retries transient HTTP/timeout errors up to 3 times with exponential back-off; failed player actions restore the input field |
-| Cost / token-usage tracking | ✅ `UsageRecorded` event added; `GameSession` accumulates `TotalInputTokens`/`TotalOutputTokens`; recorded for Director, NPC, and chapter summary calls |
+| Cost / token-usage tracking | ✅ Every LLM call now emits `UsageRecorded`, including Director, moderation, Narrator streaming, NPC, and chapter-summary calls; `GameSession` accumulates input/output plus `TotalCacheReadInputTokens`/`TotalCacheCreationInputTokens`; narrator cache usage is logged and verified against the fine-grained cached stable prefix |
 | Input moderation (Haiku pre-screen before Director) | ✅ `ModerationAgent` calls claude-haiku-4-5 to classify the player's premise as SAFE/UNSAFE before the Director is invoked |
 | Authentication (replace hardcoded `"guest"` PlayerId) | ✅ Player name stored in browser localStorage; Home.razor prompts for a name on first visit |
 
@@ -80,4 +80,3 @@ Cache control is applied to the static narrator prefix in `NarratorAgent.StreamR
 | LLM — NPC | claude-haiku-4-5 | ✅ |
 | Prompt caching | Anthropic cache control on stable prefix | ✅ |
 | Auth | Player name via localStorage | ✅ (lightweight; no IdP) |
-
