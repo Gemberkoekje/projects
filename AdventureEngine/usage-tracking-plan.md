@@ -153,6 +153,11 @@ Update `status.md` section 10 / "Cost / token-usage tracking" row to accurately 
 - the new cache fields, and
 - the caching verification outcome.
 
+✅ Implemented:
+- Updated `status.md` to state that every LLM call now emits `UsageRecorded`, including moderation and Narrator streaming.
+- Updated `status.md` to mention `TotalCacheReadInputTokens` / `TotalCacheCreationInputTokens`.
+- Updated `status.md` to describe the verified fine-grained narrator cache strategy and cache-usage logging outcome.
+
 ---
 
 ## Validation
@@ -173,4 +178,4 @@ Add/extend unit tests:
 3. ✅ Step 3 (non-streaming usage) — complete.
 4. ✅ Step 4 (cache verification + cache-control fix) — complete.
 5. ✅ Step 5 (moderation reason) — complete.
-6. Step 6 (status.md).
+6. ✅ Step 6 (status.md) — complete.
