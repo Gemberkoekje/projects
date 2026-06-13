@@ -39,7 +39,7 @@ internal sealed partial class GameSessionService : IGameSessionService
         var (moderationResult, moderationUsage) = await _moderator.IsSafeAsync(playerPrompt, ct);
         if (!moderationResult.IsSafe)
         {
-            var moderationReason = string.IsNullOrWhiteSpace(moderationResult.Reason)
+            var moderationReason = moderationResult.Reason is null
                 ? string.Empty
                 : $" Moderation reason: {moderationResult.Reason}";
 

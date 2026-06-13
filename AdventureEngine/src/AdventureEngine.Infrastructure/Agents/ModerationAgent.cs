@@ -26,18 +26,18 @@ internal sealed class ModerationAgent
             Messages = new List<Message>
             {
                 new Message(RoleType.User,
-                    $"""
+                    $$"""
                     Evaluate whether this game premise is appropriate for an interactive fiction adventure.
                     Reject premises that contain: graphic sexual content, instructions for real-world violence/harm,
                     hate speech targeting real groups, or content involving minors in harmful situations.
                     Permitted: fantasy violence, mature themes, morally complex stories.
 
-                    Premise: {premise}
+                    Premise: {{premise}}
 
                     Reply with strict JSON only:
-                    {{"result":"SAFE"}}
+                    {"result":"SAFE"}
                     or
-                    {{"result":"UNSAFE","reason":"<short reason>"}}
+                    {"result":"UNSAFE","reason":"<short reason>"}
                     """),
             },
             System = new List<SystemMessage>
