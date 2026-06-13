@@ -7,6 +7,7 @@ public interface INarratorAgent
 {
     IAsyncEnumerable<string> StreamResponseAsync(
         NarratorContext ctx,
+        Action<NarratorUsage>? onComplete = null,
         CancellationToken ct = default);
 
     Task<string> GenerateChapterSummaryAsync(

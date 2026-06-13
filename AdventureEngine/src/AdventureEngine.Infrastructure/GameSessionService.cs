@@ -88,8 +88,11 @@ internal sealed partial class GameSessionService : IGameSessionService
             PlayerInput = playerInput,
         };
 
+        NarratorUsage? narratorUsage = null;
         var rawResponse = await CallWithRetryAsync(
-            ct2 => CollectStreamAsync(_narrator.StreamResponseAsync(ctx, ct2), ct2),
+            ct2 => CollectStreamAsync(
+                _narrator.StreamResponseAsync(ctx, usage => narratorUsage = usage, ct2),
+                ct2),
             ct);
 
         var (cleanResponse, nextSceneId, outcomeWon) = ParseStateMarkers(rawResponse);
@@ -98,6 +101,17 @@ internal sealed partial class GameSessionService : IGameSessionService
         {
             new PlayerActed(sessionId, playerInput, cleanResponse, DateTime.UtcNow),
         };
+        if (narratorUsage is not null)
+        {
+            events.Add(new UsageRecorded(
+                sessionId,
+                "narrator",
+                narratorUsage.InputTokens,
+                narratorUsage.OutputTokens,
+                DateTime.UtcNow,
+                narratorUsage.CacheReadInputTokens,
+                narratorUsage.CacheCreationInputTokens));
+        }
 
         // NPC dialogue for active NPCs in the current scene
         var chapter = world.Chapters.FirstOrDefault(c => c.Index == gameSession.CurrentChapterIndex);

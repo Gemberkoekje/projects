@@ -68,6 +68,11 @@ In `GameSessionService.SubmitActionAsync`:
 - `CollectStreamAsync` already drains the stream; thread the callback through so the usage is captured
   by the time the events list is appended.
 
+✅ Implemented:
+- Added `NarratorUsage` and an optional `onComplete` callback to `INarratorAgent.StreamResponseAsync`.
+- Updated `NarratorAgent.StreamResponseAsync` to capture streaming `Usage` metadata and invoke callback on completion.
+- Updated `GameSessionService.SubmitActionAsync` to pass the callback and append narrator `UsageRecorded` events.
+
 ## Step 3 — Non-streaming usage (Director, NPC, chapter summary, moderation)
 
 For each non-streaming call site, read `.Usage` from the response (alongside the existing `.Message`)
@@ -133,7 +138,7 @@ Add/extend unit tests:
 ## Suggested sequencing
 
 1. ✅ Step 1 (event shape) — complete.
-2. Step 2 (Narrator streaming usage) — hardest to retrofit.
+2. ✅ Step 2 (Narrator streaming usage) — complete.
 3. Step 3 (non-streaming usage).
 4. Step 4 (cache verification + possible cache-control fix).
 5. Step 5 (moderation reason).

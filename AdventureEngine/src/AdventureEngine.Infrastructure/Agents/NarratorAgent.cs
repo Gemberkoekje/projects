@@ -32,6 +32,7 @@ internal sealed class NarratorAgent : INarratorAgent
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         NarratorContext ctx,
+        Action<NarratorUsage>? onComplete = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var chapter = ctx.WorldManifest.Chapters.FirstOrDefault(c => c.Index == ctx.CurrentChapterIndex);
@@ -74,10 +75,23 @@ internal sealed class NarratorAgent : INarratorAgent
             PromptCaching = PromptCacheType.AutomaticToolsAndSystem,
         };
 
+        Usage? usage = null;
         await foreach (var res in _client.Messages.StreamClaudeMessageAsync(parameters, ct))
         {
             if (res.Delta?.Text is { Length: > 0 } text)
                 yield return text;
+
+            usage ??= res.StreamStartMessage?.Usage;
+            usage = res.Usage ?? usage;
+        }
+
+        if (usage is not null)
+        {
+            onComplete?.Invoke(new NarratorUsage(
+                usage.InputTokens,
+                usage.OutputTokens,
+                usage.CacheReadInputTokens,
+                usage.CacheCreationInputTokens));
         }
     }
 
