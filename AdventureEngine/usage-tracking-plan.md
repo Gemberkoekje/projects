@@ -137,6 +137,15 @@ In `GameSessionService.CreateSessionAsync`:
 - Include the returned reason in the thrown `InvalidOperationException` message so `Home.razor` can show
   the player *why* the premise was rejected instead of a generic message.
 
+✅ Implemented:
+- Updated `ModerationAgent` to prompt Haiku for strict JSON moderation responses:
+  - `{"result":"SAFE"}`
+  - `{"result":"UNSAFE","reason":"..."}`
+- Added `ModerationResult` and `ModerationResultParser` to parse SAFE/UNSAFE payloads with optional reason.
+- Preserved fail-open behavior by defaulting to SAFE on empty/unparseable output and logging a warning.
+- Updated `GameSessionService.CreateSessionAsync` to include moderation reason text in rejection exceptions.
+- Added `ModerationResultParserTests` to cover SAFE, UNSAFE+reason, and empty/garbage fail-open parsing.
+
 ## Step 6 — Docs
 
 Update `status.md` section 10 / "Cost / token-usage tracking" row to accurately describe:
@@ -163,5 +172,5 @@ Add/extend unit tests:
 2. ✅ Step 2 (Narrator streaming usage) — complete.
 3. ✅ Step 3 (non-streaming usage) — complete.
 4. ✅ Step 4 (cache verification + cache-control fix) — complete.
-5. Step 5 (moderation reason).
+5. ✅ Step 5 (moderation reason) — complete.
 6. Step 6 (status.md).

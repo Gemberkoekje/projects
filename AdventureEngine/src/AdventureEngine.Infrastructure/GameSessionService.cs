@@ -36,12 +36,18 @@ internal sealed partial class GameSessionService : IGameSessionService
 
     public async Task<Guid> CreateSessionAsync(string playerId, string playerPrompt, CancellationToken ct = default)
     {
-        var (isSafe, moderationUsage) = await _moderator.IsSafeAsync(playerPrompt, ct);
-        if (!isSafe)
+        var (moderationResult, moderationUsage) = await _moderator.IsSafeAsync(playerPrompt, ct);
+        if (!moderationResult.IsSafe)
+        {
+            var moderationReason = string.IsNullOrWhiteSpace(moderationResult.Reason)
+                ? string.Empty
+                : $" Moderation reason: {moderationResult.Reason}";
+
             throw new InvalidOperationException(
                 "Your premise was flagged by content moderation. Premises containing graphic sexual content, " +
                 "instructions for real-world violence, hate speech, or harmful content involving minors are not permitted. " +
-                "Please try a different premise.");
+                $"Please try a different premise.{moderationReason}");
+        }
 
         var (world, directorUsage) = await _director.GenerateWorldAsync(playerPrompt, ct);
         var sessionId = Guid.NewGuid();
