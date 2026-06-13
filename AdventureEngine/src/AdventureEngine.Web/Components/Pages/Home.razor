@@ -73,6 +73,11 @@
                                 <div>
                                     <div class="fw-semibold">@(s.WorldManifest?.Title ?? "Untitled Adventure")</div>
                                     <small class="text-muted">@s.CreatedAt.ToLocalTime().ToString("d MMM yyyy HH:mm")</small>
+                                    <small class="text-muted ms-2" title="Total tokens used: @s.TotalInputTokens input, @s.TotalOutputTokens output">· @s.TotalInputTokens in / @s.TotalOutputTokens out tokens</small>
+                                    @if (s.TotalCacheReadInputTokens > 0)
+                                    {
+                                        <small class="text-success ms-1" title="Cache-read input tokens saved: @s.TotalCacheReadInputTokens">· @s.TotalCacheReadInputTokens cached</small>
+                                    }
                                 </div>
                                 <span class="badge @StatusBadgeClass(s.Status) rounded-pill align-self-center">@s.Status</span>
                             </a>

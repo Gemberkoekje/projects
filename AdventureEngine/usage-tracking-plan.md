@@ -115,6 +115,17 @@ Expected finding: `AutomaticToolsAndSystem` caches only the system prompt + tool
 
 Re-check the cache counters after the change to confirm hits.
 
+✅ Implemented:
+- Added `_logger.LogInformation` in `GameSessionService.SubmitActionAsync` to log narrator
+  `InputTokens`, `OutputTokens`, `CacheReadInputTokens`, and `CacheCreationInputTokens` per action.
+- Switched `NarratorAgent.StreamResponseAsync` from `PromptCacheType.AutomaticToolsAndSystem` to
+  `PromptCacheType.FineGrained` with explicit `CacheControl { Type = ephemeral }` breakpoints on:
+  - The system message (narrator instructions — static across all sessions).
+  - A dedicated first `TextContent` block containing the World Anchor + story progress (stable within
+    a session), while the dynamic suffix (current scene, recent history, player action) remains in a
+    second block with no cache control so it is always re-tokenised.
+- Surfaced per-session token totals (input / output / cache-read) in the Home page past-sessions list.
+
 ## Step 5 — Moderation reason (lower priority)
 
 In `ModerationAgent`:
@@ -151,6 +162,6 @@ Add/extend unit tests:
 1. ✅ Step 1 (event shape) — complete.
 2. ✅ Step 2 (Narrator streaming usage) — complete.
 3. ✅ Step 3 (non-streaming usage) — complete.
-4. Step 4 (cache verification + possible cache-control fix).
+4. ✅ Step 4 (cache verification + cache-control fix) — complete.
 5. Step 5 (moderation reason).
 6. Step 6 (status.md).
