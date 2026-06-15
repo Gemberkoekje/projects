@@ -21,7 +21,7 @@
                 <h4 class="text-light mb-0">@_world?.Title</h4>
                 <small class="text-muted">Chapter @_gameSession.CurrentChapterIndex</small>
             </div>
-            <a href="/" class="btn btn-sm btn-outline-secondary">← Home</a>
+            <a href="" class="btn btn-sm btn-outline-secondary">← Home</a>
         </div>
 
         @if (_chapterTransitionMessage is not null)
@@ -40,7 +40,7 @@
                 🏆 Victory! Your adventure is complete.
             </div>
             <div class="text-center mt-2">
-                <a href="/" class="btn btn-primary">Start a new adventure</a>
+                <a href="" class="btn btn-primary">Start a new adventure</a>
             </div>
         }
         else if (_gameSession.Status == SessionStatus.Abandoned)
@@ -49,7 +49,7 @@
                 💀 Your adventure has ended.
             </div>
             <div class="text-center mt-2">
-                <a href="/" class="btn btn-primary">Try again</a>
+                <a href="" class="btn btn-primary">Try again</a>
             </div>
         }
         else

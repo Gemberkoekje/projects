@@ -19,6 +19,8 @@ builder.Services.AddHealthChecks().AddNpgSql(postgresConnectionString);
 
 var app = builder.Build();
 
+app.UsePathBase("/adventureengine");
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

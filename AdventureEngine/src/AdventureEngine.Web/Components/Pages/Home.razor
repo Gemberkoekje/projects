@@ -69,7 +69,7 @@
                     <div class="list-group shadow-sm mb-5">
                         @foreach (var s in _pastSessions)
                         {
-                            <a href="/play/@s.Id" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+                            <a href="play/@s.Id" class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
                                 <div>
                                     <div class="fw-semibold">@(s.WorldManifest?.Title ?? "Untitled Adventure")</div>
                                     <small class="text-muted">@s.CreatedAt.ToLocalTime().ToString("d MMM yyyy HH:mm")</small>
@@ -184,7 +184,7 @@
         try
         {
             var sessionId = await SessionService.CreateSessionAsync(_playerId ?? "guest", _model.Prompt);
-            Nav.NavigateTo($"/play/{sessionId}");
+            Nav.NavigateTo($"play/{sessionId}");
         }
         catch (Exception ex)
         {
