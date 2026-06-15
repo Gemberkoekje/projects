@@ -1,12 +1,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY ["Directory.Build.props", "./"]
-COPY ["AdventureEngine.slnx", "./"]
-COPY ["src/AdventureEngine.Domain/AdventureEngine.Domain.csproj", "src/AdventureEngine.Domain/"]
-COPY ["src/AdventureEngine.Application/AdventureEngine.Application.csproj", "src/AdventureEngine.Application/"]
-COPY ["src/AdventureEngine.Infrastructure/AdventureEngine.Infrastructure.csproj", "src/AdventureEngine.Infrastructure/"]
-COPY ["src/AdventureEngine.Web/AdventureEngine.Web.csproj", "src/AdventureEngine.Web/"]
+COPY ["AdventureEngine/Directory.Build.props", "./"]
+COPY ["AdventureEngine/AdventureEngine.slnx", "./"]
+COPY ["AdventureEngine/src/AdventureEngine.Domain/AdventureEngine.Domain.csproj", "src/AdventureEngine.Domain/"]
+COPY ["AdventureEngine/src/AdventureEngine.Application/AdventureEngine.Application.csproj", "src/AdventureEngine.Application/"]
+COPY ["AdventureEngine/src/AdventureEngine.Infrastructure/AdventureEngine.Infrastructure.csproj", "src/AdventureEngine.Infrastructure/"]
+COPY ["AdventureEngine/src/AdventureEngine.Web/AdventureEngine.Web.csproj", "src/AdventureEngine.Web/"]
 RUN dotnet restore ./src/AdventureEngine.Web/AdventureEngine.Web.csproj
 
 COPY . .
