@@ -14,7 +14,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddAdventureEngineInfrastructure(builder.Configuration);
 
 var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
-    ?? "Host=localhost;Port=5432;Database=adventure;Username=postgres;******";
+    ?? throw new InvalidOperationException("Connection string 'Postgres' was not found. Configure it via user secrets or environment variables.");
 builder.Services.AddHealthChecks().AddNpgSql(postgresConnectionString);
 
 var app = builder.Build();

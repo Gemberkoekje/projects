@@ -1,3 +1,4 @@
+
 namespace AdventureEngine.Infrastructure;
 
 using System.Net.Http;
@@ -18,6 +19,12 @@ internal sealed partial class GameSessionService : IGameSessionService
     [GeneratedRegex(@"<!--\s*SCENE:([a-zA-Z0-9_]+)\s*-->")]
     private static partial Regex SceneMarkerRegex();
 
+    [GeneratedRegex(@"^\s*\[New scene:.*?\]\s*$", RegexOptions.Multiline)]
+    private static partial Regex BracketedSceneMarkerRegex();
+
+    [GeneratedRegex(@"^\s*_streamBuffer[^\r\n]*\s*$", RegexOptions.Multiline)]
+    private static partial Regex StreamBufferMarkerRegex();
+
     public GameSessionService(
         IDocumentSession session,
         IDirectorAgent director,
@@ -36,6 +43,8 @@ internal sealed partial class GameSessionService : IGameSessionService
 
     public async Task<Guid> CreateSessionAsync(string playerId, string playerPrompt, CancellationToken ct = default)
     {
+        var normalizedPlayerId = NormalizePlayerId(playerId);
+
         var (moderationResult, moderationUsage) = await _moderator.IsSafeAsync(playerPrompt, ct);
         if (!moderationResult.IsSafe)
         {
@@ -52,14 +61,14 @@ internal sealed partial class GameSessionService : IGameSessionService
         var (world, directorUsage) = await _director.GenerateWorldAsync(playerPrompt, ct);
         var sessionId = Guid.NewGuid();
 
-        var created = new SessionCreated(sessionId, playerId, playerPrompt, world, DateTime.UtcNow);
+        var created = new SessionCreated(sessionId, normalizedPlayerId, playerPrompt, world, DateTime.UtcNow);
         _session.Events.StartStream<GameSession>(sessionId,
             created,
             new UsageRecorded(sessionId, "moderation", moderationUsage.InputTokens, moderationUsage.OutputTokens, DateTime.UtcNow, moderationUsage.CacheReadInputTokens, moderationUsage.CacheCreationInputTokens),
             new UsageRecorded(sessionId, "director", directorUsage.InputTokens, directorUsage.OutputTokens, DateTime.UtcNow, directorUsage.CacheReadInputTokens, directorUsage.CacheCreationInputTokens));
         await _session.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Created session {SessionId} for player {PlayerId}", sessionId, playerId);
+        _logger.LogInformation("Created session {SessionId} for player {PlayerId}", sessionId, normalizedPlayerId);
         return sessionId;
     }
 
@@ -70,9 +79,38 @@ internal sealed partial class GameSessionService : IGameSessionService
 
     public async Task<IReadOnlyList<GameSession>> GetPlayerSessionsAsync(string playerId, CancellationToken ct = default)
     {
-        return await _session.Query<GameSession>()
-            .Where(s => s.PlayerId == playerId)
+        var normalizedPlayerId = NormalizePlayerId(playerId);
+        if (string.IsNullOrEmpty(normalizedPlayerId))
+            return Array.Empty<GameSession>();
+
+        var sessions = await _session.Query<GameSession>()
+            .Where(s => s.PlayerId == normalizedPlayerId)
             .ToListAsync(ct);
+
+        if (sessions.Count > 0)
+            return sessions;
+
+        // Fallback for streams that exist in events but don't have a materialized snapshot document yet.
+        var createdEvents = await _session.Events.QueryRawEventDataOnly<SessionCreated>()
+            .ToListAsync(ct);
+
+        var matchingSessionIds = createdEvents
+            .Where(e => string.Equals(e.PlayerId, normalizedPlayerId, StringComparison.OrdinalIgnoreCase))
+            .Select(e => e.SessionId)
+            .Distinct()
+            .ToArray();
+
+        if (matchingSessionIds.Length == 0)
+            return Array.Empty<GameSession>();
+
+        var aggregateTasks = matchingSessionIds
+            .Select(id => _session.Events.AggregateStreamAsync<GameSession>(id, token: ct));
+
+        var aggregatedSessions = await Task.WhenAll(aggregateTasks);
+        return aggregatedSessions
+            .Where(s => s is not null)
+            .Cast<GameSession>()
+            .ToList();
     }
 
     public async Task<string> SubmitActionAsync(Guid sessionId, string playerInput, CancellationToken ct = default)
@@ -233,7 +271,16 @@ internal sealed partial class GameSessionService : IGameSessionService
             cleaned = cleaned.Replace("<!-- OUTCOME:LOST -->", string.Empty);
         }
 
+        cleaned = StripInternalDisplayArtifacts(cleaned);
+
         return (cleaned.Trim(), nextSceneId, outcomeWon);
+    }
+
+    private static string StripInternalDisplayArtifacts(string text)
+    {
+        var cleaned = BracketedSceneMarkerRegex().Replace(text, string.Empty);
+        cleaned = StreamBufferMarkerRegex().Replace(cleaned, string.Empty);
+        return cleaned;
     }
 
     private static async Task<string> CollectStreamAsync(IAsyncEnumerable<string> stream, CancellationToken ct)
@@ -264,4 +311,11 @@ internal sealed partial class GameSessionService : IGameSessionService
 
     private static bool IsTransientError(Exception ex) =>
         ex is HttpRequestException or TimeoutException or TaskCanceledException { InnerException: TimeoutException };
+
+    private static string NormalizePlayerId(string playerId)
+    {
+        return string.IsNullOrWhiteSpace(playerId)
+            ? "guest"
+            : playerId.Trim();
+    }
 }

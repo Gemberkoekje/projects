@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Chapter1Playthrough.txt" />
+    <File Path="llm-adventure-plan.md" />
+    <File Path="status.md" />
+    <File Path="usage-tracking-plan.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AdventureEngine.Application/AdventureEngine.Application.csproj" />
     <Project Path="src/AdventureEngine.Domain/AdventureEngine.Domain.csproj" />

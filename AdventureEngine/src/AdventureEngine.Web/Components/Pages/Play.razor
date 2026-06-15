@@ -157,7 +157,7 @@
                     ?.Scenes.FirstOrDefault(s => s.Id == _gameSession.CurrentSceneId);
 
                 if (newScene is not null)
-                    _terminalLines.Add(("narrator", $"[New scene: {newScene.Description}]"));
+                    _terminalLines.Add(("narrator", newScene.Description));
             }
         }
         catch (OperationCanceledException)

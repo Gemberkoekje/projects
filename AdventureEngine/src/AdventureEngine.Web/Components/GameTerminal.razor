@@ -1,6 +1,9 @@
 @using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 
-<div class="terminal-output bg-dark text-light p-3 rounded font-monospace"
+<div @ref="_terminalOutput"
+     class="terminal-output bg-dark text-light p-3 rounded font-monospace"
      style="min-height: 400px; max-height: 600px; overflow-y: auto;">
     @foreach (var (role, text) in Lines)
     {
@@ -22,4 +25,30 @@
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<(string Role, string Text)> Lines { get; set; } = Array.Empty<(string, string)>();
     [Parameter] public string StreamingText { get; set; } = string.Empty;
+
+    private ElementReference _terminalOutput;
+    private int _lastLineCount = -1;
+    private string _lastStreamingText = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var contentChanged = firstRender
+            || _lastLineCount != Lines.Count
+            || !string.Equals(_lastStreamingText, StreamingText, StringComparison.Ordinal);
+
+        if (!contentChanged)
+            return;
+
+        _lastLineCount = Lines.Count;
+        _lastStreamingText = StreamingText;
+
+        try
+        {
+            await JS.InvokeVoidAsync("adventureTerminal.scrollToBottom", _terminalOutput);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Ignore disconnects during navigation/reconnect windows.
+        }
+    }
 }

@@ -1,5 +1,6 @@
 using AdventureEngine.Domain;
 using AdventureEngine.Domain.Events;
+using System.Reflection;
 using System.Text.Json;
 
 namespace AdventureEngine.Tests;
@@ -138,6 +139,48 @@ public class GameSessionTests
         Assert.NotNull(evt);
         Assert.Equal(0, evt!.CacheReadInputTokens);
         Assert.Equal(0, evt.CacheCreationInputTokens);
+    }
+
+    [Fact]
+    public void ParseStateMarkers_StripsLeakedDisplayArtifacts()
+    {
+        const string raw = "Narrative begins.\n[New scene: Internal note]\n_streamBuffer▌\nNarrative continues.";
+
+        var (response, nextSceneId, outcomeWon) = InvokeParseStateMarkers(raw);
+
+        Assert.Equal("Narrative begins.\n\nNarrative continues.", response);
+        Assert.Null(nextSceneId);
+        Assert.Null(outcomeWon);
+    }
+
+    [Fact]
+    public void ParseStateMarkers_ParsesSceneAndOutcomeMarkers()
+    {
+        const string raw = "You move forward. <!-- SCENE:ch2_sc1 --> <!-- OUTCOME:WON -->";
+
+        var (response, nextSceneId, outcomeWon) = InvokeParseStateMarkers(raw);
+
+        Assert.Equal("You move forward.", response);
+        Assert.Equal("ch2_sc1", nextSceneId);
+        Assert.True(outcomeWon);
+    }
+
+    private static (string response, string? nextSceneId, bool? outcomeWon) InvokeParseStateMarkers(string raw)
+    {
+        var infrastructureAssembly = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => a.GetName().Name == "AdventureEngine.Infrastructure")
+            ?? Assembly.Load("AdventureEngine.Infrastructure");
+
+        var serviceType = infrastructureAssembly.GetType("AdventureEngine.Infrastructure.GameSessionService", throwOnError: true)
+            ?? throw new InvalidOperationException("GameSessionService type not found.");
+
+        var parseMethod = serviceType.GetMethod("ParseStateMarkers", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ParseStateMarkers method not found.");
+
+        var result = parseMethod.Invoke(null, new object[] { raw })
+            ?? throw new InvalidOperationException("ParseStateMarkers returned null.");
+
+        return ((string, string?, bool?))result;
     }
 
     private static SessionCreated MakeSessionCreated()

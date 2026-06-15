@@ -12,8 +12,9 @@ public static class ModerationResultParser
 
         try
         {
+            var json = JsonResponseParser.ExtractJsonPayload(response);
             var parsed = JsonSerializer.Deserialize<ModerationResponse>(
-                response,
+                json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (parsed is null || string.IsNullOrWhiteSpace(parsed.Result))

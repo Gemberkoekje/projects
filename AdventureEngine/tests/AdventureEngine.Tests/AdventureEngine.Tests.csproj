@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AdventureEngine.Domain\AdventureEngine.Domain.csproj" />
     <ProjectReference Include="..\..\src\AdventureEngine.Application\AdventureEngine.Application.csproj" />
+    <ProjectReference Include="..\..\src\AdventureEngine.Infrastructure\AdventureEngine.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

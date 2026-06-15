@@ -1,6 +1,7 @@
 namespace AdventureEngine.Infrastructure.Agents;
 
 using System.Text.Json;
+using AdventureEngine.Application.Agents;
 using AdventureEngine.Infrastructure.Anthropic;
 
 /// <summary>
@@ -61,6 +62,7 @@ internal sealed class DirectorAgent : IDirectorAgent
             You are a creative director generating a 5-chapter interactive fiction adventure.
             Generate ONLY valid JSON matching the WorldManifest schema below.
             Do not include any text outside the JSON object.
+            Keep the output concise so it fits comfortably in a single response: use short titles, brief chapter summaries, and scene descriptions of roughly 2-4 sentences each.
 
             Schema:
             {{WorldManifestSchema}}
@@ -84,19 +86,30 @@ internal sealed class DirectorAgent : IDirectorAgent
             {
                 new SystemMessage(systemPrompt),
             },
-            MaxTokens = 4096,
+            MaxTokens = 8192,
             Model = AnthropicModels.Claude46Opus,
             Stream = false,
             Temperature = 1.0m,
         };
 
         var response = await _client.Messages.GetClaudeMessageAsync(parameters, ct);
-        var json = response.Message.ToString();
+        var rawResponse = response.Message.ToString();
+        var json = JsonResponseParser.ExtractJsonPayload(rawResponse);
 
-        var manifest = JsonSerializer.Deserialize<WorldManifest>(json, new JsonSerializerOptions
+        WorldManifest? manifest;
+        try
         {
-            PropertyNameCaseInsensitive = true,
-        });
+            manifest = JsonSerializer.Deserialize<WorldManifest>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(
+                $"Director returned invalid WorldManifest JSON.\n\nRaw response:\n{rawResponse}\n\nExtracted JSON:\n{json}",
+                ex);
+        }
 
         if (manifest is null)
             throw new InvalidOperationException("Director returned null WorldManifest.");

@@ -5,6 +5,7 @@
     <RootNamespace>AdventureEngine.Web</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>57f16d1b-7c41-4253-87ba-d11f8d5aae2f</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
