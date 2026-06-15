@@ -4,25 +4,25 @@ on:
   push:
     branches: [main]
     paths:
-      - 'AdventureEngine.slnx'
-      - 'Directory.Build.props'
-      - 'src/AdventureEngine.Application/**'
-      - 'src/AdventureEngine.Domain/**'
-      - 'src/AdventureEngine.Infrastructure/**'
-      - 'src/AdventureEngine.Web/**'
-      - 'tests/AdventureEngine.Tests/**'
-      - '.github/workflows/build-and-push.yml'
+      - 'AdventureEngine/AdventureEngine.slnx'
+      - 'AdventureEngine/Directory.Build.props'
+      - 'AdventureEngine/src/AdventureEngine.Application/**'
+      - 'AdventureEngine/src/AdventureEngine.Domain/**'
+      - 'AdventureEngine/src/AdventureEngine.Infrastructure/**'
+      - 'AdventureEngine/src/AdventureEngine.Web/**'
+      - 'AdventureEngine/tests/AdventureEngine.Tests/**'
+      - '.github/workflows/ae-build-and-push.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'AdventureEngine.slnx'
-      - 'Directory.Build.props'
-      - 'src/AdventureEngine.Application/**'
-      - 'src/AdventureEngine.Domain/**'
-      - 'src/AdventureEngine.Infrastructure/**'
-      - 'src/AdventureEngine.Web/**'
-      - 'tests/AdventureEngine.Tests/**'
-      - '.github/workflows/build-and-push.yml'
+      - 'AdventureEngine/AdventureEngine.slnx'
+      - 'AdventureEngine/Directory.Build.props'
+      - 'AdventureEngine/src/AdventureEngine.Application/**'
+      - 'AdventureEngine/src/AdventureEngine.Domain/**'
+      - 'AdventureEngine/src/AdventureEngine.Infrastructure/**'
+      - 'AdventureEngine/src/AdventureEngine.Web/**'
+      - 'AdventureEngine/tests/AdventureEngine.Tests/**'
+      - '.github/workflows/ae-build-and-push.yml'
   workflow_dispatch:
 
 permissions:
