@@ -6,7 +6,7 @@ A suite of 7 multiplayer hacker-themed minigames playable in the browser,
 designed so multiple players can work on the same board simultaneously.
 Each browser tab is a distinct player for PoC purposes.
 
-**Stack:** ASP.NET Core (.NET 9), SignalR for real-time sync, Blazor Server or
+**Stack:** ASP.NET Core (.NET 10), SignalR for real-time sync, Blazor Server or
 minimal API + vanilla JS frontend (see Frontend note below), deployed to
 Kubernetes via existing cluster.
 
