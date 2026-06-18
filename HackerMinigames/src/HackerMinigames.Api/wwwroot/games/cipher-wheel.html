@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cipher Wheel</title>
+  <style>
+    :root {
+      --bg: #070b07; --panel: #0c110c; --border: #172a14;
+      --dim: #1e4a1a; --mid: #39a028; --fg: #39ff14;
+      --solved-bg: rgba(57,255,20,.07);
+      /* group accent colours — one per wheel slot */
+      --g0: #e05050; --g1: #50b8d0; --g2: #d0a040; --g3: #9050c8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg);
+           font-family: "Cascadia Code","Consolas",monospace; min-height: 100vh; }
+
+    header { padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+             display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+    a.back { color: var(--dim); text-decoration: none; font-size: .9rem; }
+    a.back:hover { color: var(--fg); }
+    h1 { font-size: 1.1rem; letter-spacing: 2px; white-space: nowrap; }
+    .share-wrap { margin-left: auto; font-size: .75rem; color: var(--dim); }
+    .share-wrap input { background: #000; color: var(--fg); border: 1px solid var(--border);
+                        padding: .2rem .4rem; width: 220px; font-family: inherit; font-size: .75rem; }
+    #status { font-size: .75rem; white-space: nowrap; }
+
+    main { padding: 1.2rem 1.4rem; max-width: 900px; }
+
+    .howto { background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+             padding: .7rem 1rem; font-size: .8rem; line-height: 1.6; color: #90c486;
+             margin-bottom: 1.2rem; }
+    .howto b { color: var(--fg); }
+
+    .global-prog { display: flex; align-items: center; gap: .7rem;
+                   font-size: .78rem; color: var(--dim); margin-bottom: 1.2rem; }
+    .prog-track  { flex: 1; max-width: 200px; height: 6px; background: #000;
+                   border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+    .prog-fill   { height: 100%; width: 0; background: var(--fg); transition: width .3s; }
+
+    /* ---- sentence panel ---- */
+    .sentence-panel { background: var(--panel); border: 1px solid var(--border);
+                      border-radius: 8px; padding: 1rem 1.1rem 1.1rem;
+                      margin-bottom: 1rem; transition: border-color .4s, background .4s; }
+    .sentence-panel.solved { border-color: var(--fg); background: var(--solved-bg); }
+
+    .panel-head  { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .9rem; }
+    .panel-num   { font-size: .72rem; color: var(--dim); }
+    .panel-chip  { margin-left: auto; font-size: .68rem; padding: .1rem .45rem;
+                   border: 1px solid var(--border); border-radius: 3px; color: var(--dim); }
+    .sentence-panel.solved .panel-chip { border-color: var(--fg); color: var(--fg); }
+
+    /* ---- wheels ---- */
+    .wheels-row { display: flex; gap: .55rem; flex-wrap: wrap; margin-bottom: 1rem; }
+
+    .dial { position: relative; width: 68px; background: #000;
+            border: 1px solid var(--border); border-radius: 7px;
+            text-align: center; padding: .45rem 0 .4rem; user-select: none; }
+    /* coloured top stripe = the group this wheel SKIPS */
+    .dial[data-g="0"] { border-top: 3px solid var(--g0); }
+    .dial[data-g="1"] { border-top: 3px solid var(--g1); }
+    .dial[data-g="2"] { border-top: 3px solid var(--g2); }
+    .dial[data-g="3"] { border-top: 3px solid var(--g3); }
+
+    .dial-letter { font-size: 2rem; line-height: 1; color: var(--mid); }
+    .dial-num    { font-size: .6rem; color: var(--dim); margin: .12rem 0 .3rem; }
+    .dial-btns   { display: flex; justify-content: space-between; padding: 0 .35rem; }
+    .dial-btns button { background: var(--panel); color: var(--fg);
+                        border: 1px solid var(--border); border-radius: 4px;
+                        width: 22px; height: 22px; cursor: pointer;
+                        font-family: inherit; font-size: .9rem; line-height: 1; }
+    .dial-btns button:hover  { border-color: var(--fg); background: #111; }
+    .dial-btns button:active { transform: scale(.92); }
+    /* skip label under the dial */
+    .dial-skip { font-size: .58rem; color: var(--dim); margin-top: .3rem;
+                 padding: 0 .2rem; white-space: nowrap; overflow: hidden; }
+    /* attribution dot */
+    .dial-who { position: absolute; top: 5px; right: 5px;
+                width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+
+    /* ---- sentence text ---- */
+    .sentence-text { font-size: 1.25rem; letter-spacing: .1em; line-height: 1.8;
+                     word-break: break-word; }
+    /* Each alpha character rendered as a <span class="lt" data-g="N">.
+       The coloured underline shows which wheel SKIPS this character — turning
+       that wheel won't move it; all other wheels will. */
+    .lt { display: inline-block; }
+    .lt[data-g="0"] { border-bottom: 2px solid rgba(224,80,80,.5); }
+    .lt[data-g="1"] { border-bottom: 2px solid rgba(80,184,208,.5); }
+    .lt[data-g="2"] { border-bottom: 2px solid rgba(208,160,64,.5); }
+    .lt[data-g="3"] { border-bottom: 2px solid rgba(144,80,200,.5); }
+
+    #banner { display: none; margin-bottom: 1rem; padding: .9rem 1rem;
+              border: 1px solid var(--fg); border-radius: 6px;
+              background: var(--solved-bg); font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../index.html">&larr; suite</a>
+    <h1>// CIPHER WHEEL</h1>
+    <span class="share-wrap">share: <input id="shareUrl" readonly onclick="this.select()" /></span>
+    <span id="status">connecting…</span>
+  </header>
+  <main>
+    <div class="howto">
+      Three encrypted signals. Each signal has a set of <b>cipher wheels</b> — turn them
+      until the text becomes readable English. The twist: <b>each wheel skips its own group
+      of letters</b> (shown by the coloured underline). Turning a red-stripe wheel moves every
+      letter <em>except</em> the red-underlined ones. <b>You need all wheels aligned</b> to
+      fully decrypt a signal. The greener the text, the closer the combined shift is to the
+      solution. Any tab can turn any wheel.
+    </div>
+
+    <div class="global-prog">
+      Signals decrypted: <span id="progText">0 / 0</span>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+
+    <div id="banner">✓ ALL SIGNALS DECRYPTED — transmission recovered by the team.</div>
+    <div id="board"></div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script>
+    const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const statusEl = document.getElementById('status');
+    const colourOf = {};
+
+    let playerId, gameId, connection, state;
+
+    // ---- decode ----------------------------------------------------------
+    // Letter at position p in group g = p % N is shifted by every wheel EXCEPT wheel g.
+    // effectiveShift[g] = (totalWheelSum - wheels[g].value) mod 26
+
+    function decodeText(sentence) {
+      const N = sentence.wheels.length;
+      const total = sentence.wheels.reduce((s, w) => s + w.value, 0);
+      return [...sentence.encodedText].map((c, p) => {
+        if (!/[A-Z]/.test(c)) return c;
+        const g = p % N;
+        const shift = ((total - sentence.wheels[g].value) % 26 + 26) % 26;
+        return ALPHA[(ALPHA.indexOf(c) + shift) % 26];
+      }).join('');
+    }
+
+    function textColor(closeness) {
+      const sat   = Math.round(20 + closeness * 80);
+      const light = Math.round(12 + closeness * 43);
+      return `hsl(110,${sat}%,${light}%)`;
+    }
+
+    // ---- render sentence text -------------------------------------------
+    // Builds individual <span> elements so each letter carries its group marker.
+
+    function renderSentenceText(el, sentence, color) {
+      const N       = sentence.wheels.length;
+      const decoded = decodeText(sentence);
+      el.innerHTML  = '';
+      [...decoded].forEach((c, p) => {
+        if (!/[A-Z]/.test(c)) {
+          el.appendChild(document.createTextNode(c === ' ' ? ' ' : c));
+        } else {
+          const span = document.createElement('span');
+          span.className = 'lt';
+          span.dataset.g = p % N;
+          span.textContent = c;
+          span.style.color = color;
+          el.appendChild(span);
+        }
+      });
+    }
+
+    // ---- progress --------------------------------------------------------
+
+    function updateProgress() {
+      const total  = state.sentences.length;
+      const solved = state.sentences.filter(s => s.solved).length;
+      document.getElementById('progText').textContent = `${solved} / ${total}`;
+      document.getElementById('progFill').style.width = `${total ? 100 * solved / total : 0}%`;
+    }
+
+    // ---- full render (initial / reconnect) ------------------------------
+
+    function render() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+
+      state.sentences.forEach((s, si) => {
+        const color = s.solved ? 'var(--fg)' : textColor(s.closeness);
+        const N = s.wheels.length;
+
+        const panel = document.createElement('div');
+        panel.className = 'sentence-panel' + (s.solved ? ' solved' : '');
+        panel.id = `panel-${s.id}`;
+
+        // header
+        const head = document.createElement('div');
+        head.className = 'panel-head';
+        head.innerHTML = `
+          <span class="panel-num">SIGNAL ${String(si + 1).padStart(2,'0')}</span>
+          <span style="font-size:.73rem;color:var(--dim)">${N} wheel${N > 1 ? 's' : ''}</span>
+          <span class="panel-chip">${s.solved ? '✓ DECRYPTED' : 'ENCRYPTED'}</span>`;
+        panel.appendChild(head);
+
+        // wheels
+        const wheelsRow = document.createElement('div');
+        wheelsRow.className = 'wheels-row';
+        s.wheels.forEach((w, wi) => {
+          const dial = document.createElement('div');
+          dial.className = 'dial';
+          dial.id = `dial-${w.id}`;
+          dial.dataset.g = wi; // wheel i skips group i
+          const dot = w.lastTouchedBy ? (colourOf[w.lastTouchedBy] || '#888') : 'transparent';
+          // skip label: "skips 1,4,7…" shows which positions this wheel leaves alone
+          const skipLabel = `skips pos ${wi},${wi + N},…`;
+          dial.innerHTML = `
+            <div class="dial-who" style="background:${dot}"></div>
+            <div class="dial-letter">${ALPHA[w.value]}</div>
+            <div class="dial-num">+${w.value}</div>
+            <div class="dial-btns">
+              <button data-d="-1">‹</button>
+              <button data-d="1">›</button>
+            </div>
+            <div class="dial-skip">${skipLabel}</div>`;
+          dial.querySelectorAll('button').forEach(btn =>
+            btn.addEventListener('click', () => {
+              const next = (w.value + Number(btn.dataset.d) + 26) % 26;
+              connection.invoke('SetWheel', gameId, s.id, w.id, next, playerId);
+            }));
+          wheelsRow.appendChild(dial);
+        });
+        panel.appendChild(wheelsRow);
+
+        // sentence text
+        const txt = document.createElement('div');
+        txt.className = 'sentence-text';
+        txt.id = `txt-${s.id}`;
+        renderSentenceText(txt, s, color);
+        panel.appendChild(txt);
+
+        board.appendChild(panel);
+      });
+
+      updateProgress();
+    }
+
+    // ---- incremental update (on WheelChanged) ---------------------------
+
+    function applyWheelChange(sentenceId, wheelId, newValue, closeness, sentSolved, byPlayer, colour) {
+      colourOf[byPlayer] = colour;
+
+      const s = state.sentences.find(x => x.id === sentenceId);
+      if (!s) return;
+      const w = s.wheels.find(x => x.id === wheelId);
+      if (!w) return;
+
+      w.value = newValue;
+      w.lastTouchedBy = byPlayer;
+      s.closeness = closeness;
+      if (sentSolved) s.solved = true;
+
+      // Update the changed dial
+      const dial = document.getElementById(`dial-${wheelId}`);
+      if (dial) {
+        dial.querySelector('.dial-letter').textContent = ALPHA[newValue];
+        dial.querySelector('.dial-num').textContent    = `+${newValue}`;
+        dial.querySelector('.dial-who').style.background = colour;
+      }
+
+      // Re-render the whole sentence text (every wheel turn changes N-1 groups)
+      const color = s.solved ? 'var(--fg)' : textColor(closeness);
+      const txt = document.getElementById(`txt-${sentenceId}`);
+      if (txt) renderSentenceText(txt, s, color);
+
+      // Panel solved state
+      const panel = document.getElementById(`panel-${sentenceId}`);
+      if (panel) {
+        panel.classList.toggle('solved', s.solved);
+        const chip = panel.querySelector('.panel-chip');
+        if (chip) chip.textContent = s.solved ? '✓ DECRYPTED' : 'ENCRYPTED';
+      }
+
+      updateProgress();
+    }
+
+    // ---- bootstrap -------------------------------------------------------
+
+    async function ensurePlayer() {
+      let id = sessionStorage.getItem('playerId');
+      if (!id) {
+        const j = await (await fetch('../api/session', { method: 'POST' })).json();
+        id = j.playerId;
+        sessionStorage.setItem('playerId', id);
+        sessionStorage.setItem('colour', j.colour);
+      }
+      playerId = id;
+      colourOf[id] = sessionStorage.getItem('colour');
+    }
+
+    async function ensureGame() {
+      gameId = new URLSearchParams(location.search).get('gameId');
+      if (!gameId) {
+        gameId = (await (await fetch('../api/games/cipher-wheel', { method: 'POST' })).json()).gameId;
+        history.replaceState(null, '', `?gameId=${gameId}`);
+      }
+      document.getElementById('shareUrl').value = location.href;
+    }
+
+    function mapDto(dto) {
+      return {
+        sentences: dto.sentences.map(s => ({
+          id:          s.id,
+          encodedText: s.encodedText,
+          wheels:      s.wheelIds.map((id, i) => ({
+                         id, value: s.wheelValues[i], lastTouchedBy: s.lastTouchedBy[i],
+                       })),
+          solved:    s.solved,
+          closeness: s.closeness,
+        })),
+        solved: dto.solved,
+      };
+    }
+
+    async function start() {
+      await ensurePlayer();
+      await ensureGame();
+
+      state = mapDto(await (await fetch(`../api/games/${gameId}/cipher-wheel`)).json());
+      render();
+
+      connection = new signalR.HubConnectionBuilder()
+        .withUrl(`../hub?gameId=${gameId}`)
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('WheelChanged', applyWheelChange);
+
+      connection.on('GameSolved', () => {
+        state.solved = true;
+        state.sentences.forEach(s => s.solved = true);
+        document.getElementById('banner').style.display = 'block';
+        render();
+      });
+
+      connection.onreconnecting(() => { statusEl.textContent = 'reconnecting…'; statusEl.style.color = ''; });
+      connection.onreconnected(async () => {
+        state = mapDto(await (await fetch(`../api/games/${gameId}/cipher-wheel`)).json());
+        render();
+        statusEl.textContent = '● connected';
+        statusEl.style.color = colourOf[playerId] || 'var(--fg)';
+      });
+
+      await connection.start();
+      statusEl.textContent = '● connected';
+      statusEl.style.color = colourOf[playerId] || 'var(--fg)';
+    }
+
+    start().catch(e => { statusEl.textContent = 'error: ' + e.message; });
+  </script>
+</body>
+</html>

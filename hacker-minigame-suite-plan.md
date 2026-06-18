@@ -168,10 +168,41 @@ column simultaneously; verify the result is consistent (not corrupted).
 
 ---
 
-### 3. Memory Leak
+### 3. Memory Leak *(hex XOR nonogram)*
 
-**Concept:** A grid of hex/binary values. Some cells violate a parity rule
-(row XOR should equal zero). Any player can click any cell to patch it.
+**Concept:** A technical-looking nonogram. Every cell shows a **fixed hex byte**
+that never changes. Players **click a cell to toggle it on/off** (highlighted =
+"good / kept", dimmed = "bad / leaked"). Only **highlighted** cells contribute
+their byte to the parity maths.
+
+Each row carries an XOR **clue** at its right edge and each column one along the
+bottom: the running XOR of the bytes currently highlighted in that line. A line
+is satisfied when its clue reads `00`. The board is solved when **every row clue
+AND every column clue equals `00`** at the same time. That is the nonogram loop:
+toggle cells until all the edge numbers fall to zero. Clues not yet at `00` read
+red; clues at `00` read green.
+
+**Pre-defined solvable images (PoC):** boards are **not** randomised. The PoC
+ships a handful of hand-authored 8x8 "images" - the binary pattern of cells that
+must be highlighted in the solved state. Cell bytes are generated *to fit* the
+chosen image so the solution drives every row and column XOR to `00` (see
+*Solvability*). Toggling is fully reversible, so there are no dead-ends.
+
+**Solvability (how a board is built):**
+1. Author a binary image `Solution[r][c]` (1 = highlighted when solved).
+2. Treat the bottom row and right column as a **checksum frame** that is always
+   highlighted in the solution; the interior `(R-1) x (C-1)` holds the picture.
+3. Assign random bytes to interior cells, then:
+   - right-column cell `(r, C-1)` = XOR of highlighted interior bytes in row `r`
+     -> row `r` XOR = `00`;
+   - bottom-row cell `(R-1, c)` = XOR of highlighted interior bytes in column `c`
+     -> column `c` XOR = `00`;
+   - corner `(R-1, C-1)` = XOR of the frame bytes -> closes the last row and
+     last column at `00`.
+
+   This is classic 2-D parity over bytes (XOR instead of a count): the authored
+   image is provably a valid all-zero solution. OFF cells never contribute, so
+   their bytes can be anything.
 
 **State shape:**
 
@@ -179,27 +210,35 @@ column simultaneously; verify the result is consistent (not corrupted).
 record MemoryLeakState(
     int Rows,
     int Cols,
-    bool[] Patched,         // flat array [row * cols + col]
-    string?[] PatchedBy,    // attribution per cell
+    int[][] Values,          // fixed hex bytes, fully visible, never change
+    bool[][] On,             // current toggle state (shared, the only mutable part)
+    string?[][] ToggledBy,   // attribution: who last toggled each cell
     bool Solved
 );
+// Solution[][] is kept server-side only (generation / optional hints); the win
+// check is purely XOR-based and does not need it.
 ```
 
-**Server events (client â†’ server):**
-- `PatchCell(gameId, row, col, playerId)`
+**Server events (client -> server):**
+- `ToggleCell(gameId, row, col, playerId)`
 
-**Server events (server â†’ client):**
-- `CellPatched(row, col, playerId, colour)`
+**Server events (server -> client):**
+- `CellToggled(row, col, isOn, rowXor, colXor, playerId, colour)`
 - `GameSolved()`
 
-**Completion check:** All cells with parity violations are patched.
+**Completion check:** for every row the XOR of highlighted bytes == `0x00`, **and**
+for every column the XOR of highlighted bytes == `0x00`.
 
-**Sync note:** Two tabs patching the same cell simultaneously is idempotent on
-the server (second patch is a no-op). Safe by design.
+**Sync note:** toggling is a pure flip applied server-side, so concurrent toggles
+on different cells are independent. Two tabs flipping the *same* cell just land in
+arrival order - the last flip wins and every tab converges on the same
+authoritative `On` state. No locking needed.
 
-**Multi-tab test:** Two tabs each patch different cells rapidly; verify both
-appear in each other within ~100 ms. Patch the same cell from two tabs
-simultaneously; verify no error and consistent state.
+**Multi-tab test:** two tabs toggle different cells rapidly; verify both states
+appear in each other within ~100 ms and the row/column clues update. Toggle the
+same cell from two tabs simultaneously; verify no error and that all tabs agree
+on the final on/off state. Verify the toggle that zeroes the last clue triggers
+`GameSolved` in every tab.
 
 ---
 
@@ -394,7 +433,7 @@ the timeout.
 |---|------|------------|-----------|
 | 1 | Cipher Wheel | Low | Core move â†’ broadcast â†’ win pipeline end-to-end |
 | 2 | Packet Sequencer | Low | Same pipeline, drag-reorder UI |
-| 3 | Memory Leak | Low | Rapid concurrent patching, idempotency |
+| 3 | Memory Leak | Low | Toggle flip, row+column XOR win check, hex nonogram UI |
 | 4 | Permission Tree | Medium | Tree rendering, flag toggling |
 | 5 | Circuit Tracer | Medium | Server-side logic evaluation |
 | 6 | Frequency Tuner | Medium | Continuous input, waveform rendering |
@@ -489,7 +528,7 @@ public class GameHub : Hub
 |------|---------|----------------|
 | Simultaneous moves on same element | All games | Result is consistent; no torn state |
 | Simultaneous moves on different elements | All games | Both updates reflected in all tabs within ~100 ms |
-| Same-cell double patch | Memory Leak | Idempotent; no error; attribution goes to last writer |
+| Same-cell double toggle | Memory Leak | Last flip wins; no error; all tabs converge on same on/off state |
 | Simultaneous dial movement | Frequency Tuner | Document jitter behaviour for future mitigation |
 | Slice grab collision | Signal Reconstruction | One tab wins; other receives `GrabRejected` |
 | Slice lock timeout | Signal Reconstruction | Crash a tab mid-drag; `SliceReleased` broadcast after 10 s |

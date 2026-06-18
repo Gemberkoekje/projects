@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hacker-minigames
+  labels:
+    app: hacker-minigames
+spec:
+  selector:
+    app: hacker-minigames
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+  type: ClusterIP
+---
+# Ingress via existing wildcard DNS (*.gemberkoekje.nl).
+# Adjust ingressClassName / annotations to match the cluster's controller.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hacker-minigames
+spec:
+  rules:
+    - host: minigames.gemberkoekje.nl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hacker-minigames
+                port:
+                  number: 80

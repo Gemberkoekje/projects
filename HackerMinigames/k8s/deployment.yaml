@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hacker-minigames
+  labels:
+    app: hacker-minigames
+spec:
+  replicas: 1          # Keep at 1 for PoC — SignalR in-memory state is not shared across pods.
+  selector:
+    matchLabels:
+      app: hacker-minigames
+  template:
+    metadata:
+      labels:
+        app: hacker-minigames
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/<your-repo>/hacker-minigames:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: ASPNETCORE_HTTP_PORTS
+              value: "8080"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+# NOTE: If you ever scale past replicas: 1, add a Redis backplane for SignalR
+# (AddStackExchangeRedis) and move game state out of memory.

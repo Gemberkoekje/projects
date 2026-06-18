@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Leak</title>
+  <style>
+    :root {
+      --bg: #070b07; --panel: #0c110c; --border: #172a14;
+      --dim: #1e4a1a; --mid: #39a028; --fg: #39ff14;
+      --bad: #ff4444;
+      --on-bg: rgba(57,255,20,.11); --on-border: rgba(57,255,20,.55);
+      --solved-bg: rgba(57,255,20,.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--fg);
+           font-family: "Cascadia Code","Consolas",monospace; min-height: 100vh; }
+
+    header { padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+             display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
+    a.back { color: var(--dim); text-decoration: none; font-size: .9rem; }
+    a.back:hover { color: var(--fg); }
+    h1 { font-size: 1.1rem; letter-spacing: 2px; white-space: nowrap; }
+    .share-wrap { margin-left: auto; font-size: .75rem; color: var(--dim); }
+    .share-wrap input { background: #000; color: var(--fg); border: 1px solid var(--border);
+                        padding: .2rem .4rem; width: 220px; font-family: inherit; font-size: .75rem; }
+    #status { font-size: .75rem; white-space: nowrap; }
+
+    main { padding: 1.2rem 1.4rem; }
+
+    .howto { background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+             padding: .7rem 1rem; font-size: .8rem; line-height: 1.6; color: #90c486;
+             margin-bottom: 1.2rem; max-width: 860px; }
+    .howto b { color: var(--fg); }
+    .howto code { color: var(--fg); background: rgba(57,255,20,.08);
+                  padding: 0 .25rem; border-radius: 2px; }
+
+    .global-prog { display: flex; align-items: center; gap: .7rem;
+                   font-size: .78rem; color: var(--dim); margin-bottom: 1.2rem; }
+    .prog-track  { flex:1; max-width: 220px; height: 6px; background: #000;
+                   border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+    .prog-fill   { height: 100%; width: 0; background: var(--fg); transition: width .3s; }
+
+    #banner { display: none; margin-bottom: 1rem; padding: .9rem 1rem;
+              border: 1px solid var(--fg); border-radius: 6px;
+              background: var(--solved-bg); font-size: 1rem; max-width: 860px; }
+
+    /* ============================================================
+       NONOGRAM TABLE
+       Columns: ADDR | ROW-CLUE (left fixed) | cells×8
+       Thead:   col-clue row (top fixed, bottom-aligned) + offset header row
+    ============================================================ */
+    .nono-table {
+      border-collapse: separate;
+      border-spacing: 3px;
+      font-size: .82rem;
+    }
+
+    /* ---- header label row ---- */
+    .hdr-addr {
+      color: var(--dim); font-weight: normal; font-size: .7rem;
+      text-align: right; padding: .15rem .5rem .3rem 0;
+    }
+    .hdr-clue {
+      color: var(--dim); font-weight: normal; font-size: .68rem;
+      text-align: right; padding: .15rem .5rem .3rem;
+      background: var(--panel);
+      border-right: 2px solid var(--border);
+    }
+    .hdr-offset {
+      color: var(--dim); font-weight: normal; font-size: .72rem;
+      text-align: center; padding: .15rem .2rem .3rem;
+    }
+
+    /* ---- column clue cells (top, fixed, bottom-aligned) ---- */
+    .col-clue {
+      font-weight: normal; text-align: center;
+      vertical-align: bottom;          /* shorter clues sit at bottom of header */
+      padding: .35rem .2rem .45rem;
+      background: var(--panel);
+      border-bottom: 2px solid var(--border);
+      color: var(--mid);
+      line-height: 1.55;
+      font-size: .78rem;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .col-clue.ok { color: var(--fg); }
+
+    /* ---- address cell ---- */
+    .addr-cell {
+      color: var(--dim); font-size: .72rem;
+      padding: .3rem .5rem .3rem 0;
+      white-space: nowrap; text-align: right;
+      border-right: 1px solid var(--border);
+      user-select: none;
+    }
+
+    /* ---- row clue cell (left, fixed) ---- */
+    .row-clue {
+      font-size: .78rem; text-align: right;
+      padding: .3rem .55rem;
+      background: var(--panel);
+      border-right: 2px solid var(--border);
+      color: var(--mid);
+      white-space: nowrap;
+      min-width: 42px;
+      user-select: none;
+    }
+    .row-clue.ok { color: var(--fg); }
+
+    /* ---- hex byte cells ---- */
+    .cell {
+      width: 44px; height: 32px;
+      text-align: center; vertical-align: middle;
+      border: 1px solid var(--border); border-radius: 4px;
+      cursor: pointer;
+      transition: background .1s, border-color .1s, color .1s, text-shadow .1s;
+      position: relative; user-select: none;
+    }
+    .cell.off {
+      color: var(--dim);
+      background: transparent;
+    }
+    .cell.on {
+      color: var(--fg);
+      background: var(--on-bg);
+      border-color: var(--on-border);
+      text-shadow: 0 0 7px rgba(57,255,20,.55);
+    }
+    .cell.off:hover { border-color: var(--mid); background: rgba(57,160,40,.09); color: var(--mid); }
+    .cell.on:hover  { border-color: var(--fg); background: rgba(57,255,20,.19); }
+
+    /* EXCLUDED: right-click to mark "definitely off" */
+    .cell.excluded {
+      color: rgba(255,68,68,.22);
+      border-color: rgba(255,68,68,.28);
+      background: rgba(255,68,68,.04);
+    }
+    .cell.excluded::before {
+      content: '✕';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: .9rem;
+      color: rgba(255,68,68,.48);
+      pointer-events: none;
+    }
+    .cell.excluded:hover {
+      border-color: rgba(255,68,68,.55);
+      background: rgba(255,68,68,.09);
+    }
+
+    /* attribution dot */
+    .cell::after {
+      content: '';
+      position: absolute; bottom: 3px; right: 3px;
+      width: 4px; height: 4px; border-radius: 50%;
+      background: transparent;
+    }
+    .cell.has-attr::after { background: var(--attr-col, #fff); }
+
+    /* flash animation on toggle */
+    @keyframes flash { 0%{opacity:1} 35%{opacity:.1} 100%{opacity:1} }
+    .cell.flash { animation: flash .28s ease; }
+
+    /* row background tint when satisfied */
+    tr.row-ok .cell.off { background: rgba(57,255,20,.04); }
+    tr.row-ok .cell.on  { background: rgba(57,255,20,.16); }
+
+    /* decorative XOR readout column (right) and row (bottom) */
+    .hdr-xor {
+      color: var(--dim); font-weight: normal; font-size: .68rem;
+      text-align: left; padding: .15rem .4rem .3rem .6rem;
+      border-left: 1px solid var(--border);
+    }
+    .xor-right {
+      padding: .3rem .4rem .3rem .55rem;
+      border-left: 1px solid var(--border);
+      font-size: .75rem; color: var(--dim);
+      white-space: nowrap; min-width: 36px; text-align: left;
+    }
+    .xor-right.ok { color: var(--fg); }
+    .xor-bottom {
+      text-align: center; font-size: .75rem;
+      padding: .3rem .2rem;
+      border-top: 1px solid var(--border);
+      min-width: 44px; color: var(--dim);
+    }
+    .xor-bottom.ok { color: var(--fg); }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="../index.html">&larr; suite</a>
+    <h1>// MEMORY LEAK</h1>
+    <span class="share-wrap">share: <input id="shareUrl" readonly onclick="this.select()" /></span>
+    <span id="status">connecting…</span>
+  </header>
+
+  <main>
+    <div class="howto">
+      A <b>hex nonogram</b>. Read the clues like a standard nonogram: each number is a run of
+      consecutive highlighted cells, separated by at least one gap.
+      <b>Left-click</b> to highlight (bright = ON) or dim (OFF) a cell. Row clues are on the
+      left; column clues are above. Clues turn <span style="color:var(--fg)">green</span>
+      when a line is satisfied. Satisfy every row and column to restore memory integrity.
+      <b>Right-click</b> an OFF cell to stamp it <code>✕</code> as a local-only reminder that
+      it should stay dark.
+    </div>
+
+    <div class="global-prog">
+      Lines satisfied: <span id="progText">0 / 0</span>
+      <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
+    </div>
+
+    <div id="banner">✓ MEMORY INTEGRITY RESTORED — all lines satisfied.</div>
+    <div id="board"></div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const colourOf = {};
+    const excluded = new Set(); // "r-c" keys, client-side right-click marks
+
+    let playerId, gameId, connection, state;
+    // state: { rows, cols, values[][], rowClues[][], colClues[][], on[][], toggledBy[][], solved }
+
+    const hex2 = n => n.toString(16).toUpperCase().padStart(2, '0');
+
+    // ---- XOR helpers (decorative right/bottom readouts) -----------------
+
+    function rowXor(r) {
+      let x = 0;
+      for (let c = 0; c < state.cols; c++)
+        if (state.on[r][c]) x ^= state.values[r][c];
+      return x;
+    }
+
+    function colXor(c) {
+      let x = 0;
+      for (let r = 0; r < state.rows; r++)
+        if (state.on[r][c]) x ^= state.values[r][c];
+      return x;
+    }
+
+    // ---- nonogram helpers -----------------------------------------------
+
+    function computeRuns(line) {
+      const runs = [];
+      let count = 0;
+      for (const v of line) {
+        if (v) count++;
+        else if (count > 0) { runs.push(count); count = 0; }
+      }
+      if (count > 0) runs.push(count);
+      return runs;
+    }
+
+    function runsEqual(a, b) {
+      if (a.length !== b.length) return false;
+      return a.every((v, i) => v === b[i]);
+    }
+
+    function rowSatisfied(r) {
+      return runsEqual(computeRuns(state.on[r]), state.rowClues[r]);
+    }
+
+    function colSatisfied(c) {
+      return runsEqual(computeRuns(state.on.map(row => row[c])), state.colClues[c]);
+    }
+
+    // ---- progress --------------------------------------------------------
+
+    function countSatisfied() {
+      let n = 0;
+      for (let r = 0; r < state.rows; r++) if (rowSatisfied(r)) n++;
+      for (let c = 0; c < state.cols; c++) if (colSatisfied(c)) n++;
+      return n;
+    }
+
+    function updateProgress() {
+      const total = state.rows + state.cols;
+      const sat   = countSatisfied();
+      document.getElementById('progText').textContent = `${sat} / ${total}`;
+      document.getElementById('progFill').style.width = `${100 * sat / total}%`;
+    }
+
+    // ---- clue indicator updates -----------------------------------------
+
+    function applyRowClue(r) {
+      const ok = rowSatisfied(r);
+      const el = document.getElementById(`rclue-${r}`);
+      const tr = document.getElementById(`row-${r}`);
+      if (el) el.className = 'row-clue' + (ok ? ' ok' : '');
+      if (tr) tr.className = ok ? 'row-ok' : '';
+      const xEl = document.getElementById(`rxor-${r}`);
+      if (xEl) {
+        xEl.textContent = ok ? '00' : hex2(rowXor(r));
+        xEl.className = 'xor-right' + (ok ? ' ok' : '');
+      }
+    }
+
+    function applyColClue(c) {
+      const ok = colSatisfied(c);
+      const el = document.getElementById(`cclue-${c}`);
+      if (el) el.className = 'col-clue' + (ok ? ' ok' : '');
+      const xEl = document.getElementById(`cxor-${c}`);
+      if (xEl) {
+        xEl.textContent = ok ? '00' : hex2(colXor(c));
+        xEl.className = 'xor-bottom' + (ok ? ' ok' : '');
+      }
+    }
+
+    // ---- cell class helper -----------------------------------------------
+
+    function cellClass(r, c) {
+      const on   = state.on[r][c];
+      const excl = !on && excluded.has(`${r}-${c}`);
+      const attr = !!state.toggledBy[r][c];
+      return 'cell ' + (on ? 'on' : 'off') + (excl ? ' excluded' : '') + (attr ? ' has-attr' : '');
+    }
+
+    // ---- column clue text -----------------------------------------------
+
+    function colClueHtml(c) {
+      const runs = state.colClues[c];
+      return runs.length ? runs.join('<br>') : '0';
+    }
+
+    function rowClueText(r) {
+      const runs = state.rowClues[r];
+      return runs.length ? runs.join(', ') : '0';
+    }
+
+    // ---- full render -----------------------------------------------------
+
+    function render() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+
+      const table = document.createElement('table');
+      table.className = 'nono-table';
+
+      // === THEAD ===
+      const thead = table.createTHead();
+
+      // Row 1: column clues (fixed, bottom-aligned)
+      const clueRow = thead.insertRow();
+      for (const cls of ['hdr-corner', 'hdr-corner']) {
+        const th = document.createElement('th'); th.className = cls; clueRow.appendChild(th);
+      }
+      for (let c = 0; c < state.cols; c++) {
+        const th = document.createElement('th');
+        th.id        = `cclue-${c}`;
+        th.className = 'col-clue' + (colSatisfied(c) ? ' ok' : '');
+        th.innerHTML = colClueHtml(c);
+        clueRow.appendChild(th);
+      }
+      { const th = document.createElement('th'); th.className = 'hdr-corner'; clueRow.appendChild(th); }
+
+      // Row 2: label headers
+      const labelRow = thead.insertRow();
+      const mkTh = (cls, txt) => {
+        const th = document.createElement('th');
+        th.className = cls; th.textContent = txt; labelRow.appendChild(th);
+      };
+      mkTh('hdr-addr', 'ADDR');
+      mkTh('hdr-clue', 'CLUE');
+      for (let c = 0; c < state.cols; c++) mkTh('hdr-offset', `+${hex2(c)}`);
+      mkTh('hdr-xor', 'XOR');
+
+      // === TBODY ===
+      const tbody = table.createTBody();
+      for (let r = 0; r < state.rows; r++) {
+        const ok = rowSatisfied(r);
+        const tr = tbody.insertRow();
+        tr.id        = `row-${r}`;
+        tr.className = ok ? 'row-ok' : '';
+
+        // address
+        const addrTd = tr.insertCell();
+        addrTd.className   = 'addr-cell';
+        addrTd.textContent = `0x${(r * state.cols).toString(16).padStart(4, '0')}`;
+
+        // row clue (fixed)
+        const rclueTd = tr.insertCell();
+        rclueTd.id          = `rclue-${r}`;
+        rclueTd.className   = 'row-clue' + (ok ? ' ok' : '');
+        rclueTd.textContent = rowClueText(r);
+
+        // hex byte cells
+        for (let c = 0; c < state.cols; c++) {
+          const td = tr.insertCell();
+          td.id          = `cell-${r}-${c}`;
+          td.className   = cellClass(r, c);
+          td.textContent = hex2(state.values[r][c]);
+
+          const by = state.toggledBy[r][c];
+          if (by) td.style.setProperty('--attr-col', colourOf[by] || '#888');
+
+          td.addEventListener('click', () =>
+            connection.invoke('ToggleCell', gameId, r, c, playerId));
+
+          td.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            if (state.on[r][c]) return;
+            const key = `${r}-${c}`;
+            if (excluded.has(key)) excluded.delete(key); else excluded.add(key);
+            td.className = cellClass(r, c);
+          });
+        }
+
+        // right decorative XOR readout
+        const xorTd = tr.insertCell();
+        xorTd.id          = `rxor-${r}`;
+        xorTd.className   = 'xor-right' + (ok ? ' ok' : '');
+        xorTd.textContent = ok ? '00' : hex2(rowXor(r));
+      }
+
+      // === TFOOT: column XOR readouts ===
+      const tfoot = table.createTFoot();
+      const fr    = tfoot.insertRow();
+      fr.insertCell(); // addr spacer
+      fr.insertCell(); // clue spacer
+      for (let c = 0; c < state.cols; c++) {
+        const colOk = colSatisfied(c);
+        const td    = fr.insertCell();
+        td.id          = `cxor-${c}`;
+        td.className   = 'xor-bottom' + (colOk ? ' ok' : '');
+        td.textContent = colOk ? '00' : hex2(colXor(c));
+      }
+      fr.insertCell(); // xor-right spacer
+
+      board.appendChild(table);
+      updateProgress();
+    }
+
+    // ---- incremental update on CellToggled ------------------------------
+
+    function applyCellToggled(row, col, isOn, byPlayer, colour) {
+      colourOf[byPlayer] = colour;
+      state.on[row][col]        = isOn;
+      state.toggledBy[row][col] = byPlayer;
+
+      if (isOn) excluded.delete(`${row}-${col}`);
+
+      const td = document.getElementById(`cell-${row}-${col}`);
+      if (td) {
+        td.className = cellClass(row, col) + ' flash';
+        td.style.setProperty('--attr-col', colour);
+        td.addEventListener('animationend', () => td.classList.remove('flash'), { once: true });
+      }
+
+      applyRowClue(row);
+      applyColClue(col);
+      updateProgress();
+    }
+
+    // ---- bootstrap -------------------------------------------------------
+
+    async function ensurePlayer() {
+      let id = sessionStorage.getItem('playerId');
+      if (!id) {
+        const j = await (await fetch('../api/session', { method: 'POST' })).json();
+        id = j.playerId;
+        sessionStorage.setItem('playerId', id);
+        sessionStorage.setItem('colour', j.colour);
+      }
+      playerId = id;
+      colourOf[id] = sessionStorage.getItem('colour');
+    }
+
+    async function ensureGame() {
+      gameId = new URLSearchParams(location.search).get('gameId');
+      if (!gameId) {
+        gameId = (await (await fetch('../api/games/memory-leak', { method: 'POST' })).json()).gameId;
+        history.replaceState(null, '', `?gameId=${gameId}`);
+      }
+      document.getElementById('shareUrl').value = location.href;
+    }
+
+    async function start() {
+      await ensurePlayer();
+      await ensureGame();
+
+      state = await (await fetch(`../api/games/${gameId}/memory-leak`)).json();
+      render();
+
+      connection = new signalR.HubConnectionBuilder()
+        .withUrl(`../hub?gameId=${gameId}`)
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('CellToggled', applyCellToggled);
+
+      connection.on('GameSolved', () => {
+        state.solved = true;
+        document.getElementById('banner').style.display = 'block';
+        for (let r = 0; r < state.rows; r++) applyRowClue(r);
+        for (let c = 0; c < state.cols; c++) applyColClue(c);
+        updateProgress();
+      });
+
+      connection.onreconnecting(() => {
+        statusEl.textContent = 'reconnecting…';
+        statusEl.style.color = '';
+      });
+      connection.onreconnected(async () => {
+        state = await (await fetch(`../api/games/${gameId}/memory-leak`)).json();
+        render();
+        statusEl.textContent = '● connected';
+        statusEl.style.color = colourOf[playerId] || 'var(--fg)';
+      });
+
+      await connection.start();
+      statusEl.textContent = '● connected';
+      statusEl.style.color = colourOf[playerId] || 'var(--fg)';
+    }
+
+    start().catch(e => { statusEl.textContent = 'error: ' + e.message; });
+  </script>
+</body>
+</html>

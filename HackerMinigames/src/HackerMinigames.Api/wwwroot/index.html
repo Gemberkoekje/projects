@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hacker Minigame Suite</title>
+  <style>
+    :root { --bg:#0a0e0a; --fg:#39ff14; --dim:#1f6f12; --panel:#0f160f; --border:#1c3a16; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg);
+           font-family:"Cascadia Code","Consolas",monospace; }
+    header { padding:2rem 1.5rem 1rem; }
+    h1 { margin:0; letter-spacing:2px; }
+    p.sub { color:var(--dim); margin:.4rem 0 0; }
+    .grid { display:grid; gap:1rem; padding:1.5rem;
+            grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+    .card { background:var(--panel); border:1px solid var(--border);
+            border-radius:6px; padding:1rem 1.1rem; text-decoration:none;
+            color:inherit; display:block; transition:border-color .15s, transform .1s; }
+    .card.enabled:hover { border-color:var(--fg); transform:translateY(-2px); }
+    .card.disabled { opacity:.45; cursor:not-allowed; }
+    .card .num { color:var(--dim); font-size:.8rem; }
+    .card h2 { margin:.2rem 0 .4rem; font-size:1.05rem; }
+    .card .desc { color:var(--dim); font-size:.82rem; line-height:1.4; }
+    .badge { display:inline-block; margin-top:.6rem; font-size:.7rem;
+             border:1px solid var(--border); border-radius:3px; padding:.1rem .4rem; }
+    footer { padding:1rem 1.5rem 2rem; color:var(--dim); font-size:.78rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>// HACKER MINIGAME SUITE</h1>
+    <p class="sub">Collaborative real-time minigames · open in multiple tabs to play together</p>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <footer>PoC · ASP.NET Core + SignalR · in-memory state · one replica</footer>
+
+  <script>
+    const games = [
+      { n:1, slug:"cipher-wheel",          type:"cipher-wheel",          title:"Cipher Wheel",          desc:"Rotate alphabet wheels to decode each word.",                ready:true  },
+      { n:2, slug:"packet-sequencer",      type:"packet-sequencer",      title:"Packet Sequencer",      desc:"Reorder shuffled code fragments into the correct stream.",   ready:true  },
+      { n:3, slug:"memory-leak",           type:"memory-leak",           title:"Memory Leak",           desc:"Toggle hex cells until every row and column XOR clue reads 00.", ready:true  },
+      { n:4, slug:"permission-tree",       type:"permission-tree",       title:"Permission Tree",       desc:"Toggle file flags until every node matches expected.",       ready:false },
+      { n:5, slug:"circuit-tracer",        type:"circuit-tracer",        title:"Circuit Tracer",        desc:"Rewire logic gates so all outputs resolve correctly.",       ready:false },
+      { n:6, slug:"frequency-tuner",       type:"frequency-tuner",       title:"Frequency Tuner",       desc:"Move dials until every frequency is within tolerance.",      ready:false },
+      { n:7, slug:"signal-reconstruction", type:"signal-reconstruction", title:"Signal Reconstruction", desc:"Drag shuffled slices back into their original order.",       ready:false },
+    ];
+
+    const grid = document.getElementById("grid");
+    for (const g of games) {
+      const card = document.createElement(g.ready ? "a" : "div");
+      card.className = "card " + (g.ready ? "enabled" : "disabled");
+      if (g.ready) card.href = `games/${g.slug}.html`;
+      card.innerHTML = `
+        <div class="num">GAME ${String(g.n).padStart(2,"0")}</div>
+        <h2>${g.title}</h2>
+        <div class="desc">${g.desc}</div>
+        <span class="badge">${g.ready ? "PLAYABLE" : "COMING SOON"}</span>`;
+      grid.appendChild(card);
+    }
+  </script>
+</body>
+</html>
