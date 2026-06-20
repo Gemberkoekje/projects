@@ -2,27 +2,39 @@ package dev.gemberkoekje.skyseed.entity;
 
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
-import net.minecraft.core.particles.ItemParticleOption;
+import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 /**
- * The thrown Skyseed. Milestone 2: it flies and despawns like a snowball, carrying its theme id.
- * Germination (timer + island generation) arrives in later milestones — for now {@link #onHit}
- * just puffs and discards.
+ * The thrown Skyseed. It arms for {@link #ARM_DURATION} ticks (~3 s) while flying — or resting, if it
+ * lands first — then {@link #germinate()}s: particles, a sound, and (for now) a placeholder stone
+ * platform. The real procedural island replaces the placeholder in milestone 4; per-theme content
+ * keys off {@link #getTheme()} from milestone 6 on.
  */
 public class IslandSeedEntity extends net.minecraft.world.entity.projectile.ThrowableItemProjectile {
     private static final EntityDataAccessor<String> DATA_THEME =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
+
+    /** Ticks from spawn to germination (~3 s at 20 tps). */
+    public static final int ARM_DURATION = 60;
+
+    private int armTicks = 0;
 
     public IslandSeedEntity(EntityType<? extends IslandSeedEntity> type, Level level) {
         super(type, level);
@@ -54,34 +66,50 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
     }
 
     @Override
-    protected void onHit(HitResult result) {
-        super.onHit(result);
-        if (!this.level().isClientSide) {
-            // Milestone 2: no generation yet — a small puff of dirt particles, then despawn.
-            this.level().broadcastEntityEvent(this, (byte) 3);
-            this.discard();
+    public void tick() {
+        super.tick();
+        if (this.level() instanceof ServerLevel serverLevel) {
+            this.armTicks++;
+            // Sparkle while arming so the countdown reads as "charging".
+            if (this.armTicks < ARM_DURATION && this.armTicks % 4 == 0) {
+                serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER,
+                        this.getX(), this.getY() + 0.1, this.getZ(), 2, 0.15, 0.15, 0.15, 0.0);
+            }
+            if (this.armTicks >= ARM_DURATION) {
+                germinate(serverLevel);
+            }
         }
     }
 
+    /** On hitting a block, stop and rest there — keep arming until the timer fires. */
     @Override
-    public void handleEntityEvent(byte id) {
-        if (id == 3) {
-            ItemParticleOption particle = new ItemParticleOption(ParticleTypes.ITEM, this.getItem());
-            for (int i = 0; i < 8; i++) {
-                this.level().addParticle(particle,
-                        this.getX(), this.getY(), this.getZ(),
-                        (this.random.nextDouble() - 0.5) * 0.2,
-                        (this.random.nextDouble() - 0.5) * 0.2,
-                        (this.random.nextDouble() - 0.5) * 0.2);
-            }
-        } else {
-            super.handleEntityEvent(id);
-        }
+    protected void onHitBlock(BlockHitResult result) {
+        super.onHitBlock(result);
+        this.setDeltaMovement(Vec3.ZERO);
+        this.setNoGravity(true);
+    }
+
+    private void germinate(ServerLevel level) {
+        BlockPos center = this.blockPosition();
+
+        level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.getX(), this.getY(), this.getZ(),
+                50, 1.2, 1.2, 1.2, 0.25);
+        level.sendParticles(ParticleTypes.POOF, this.getX(), this.getY(), this.getZ(),
+                25, 0.7, 0.7, 0.7, 0.05);
+        level.playSound(null, this.getX(), this.getY(), this.getZ(),
+                SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0F, 1.2F);
+
+        // RNG decorrelated per island (worldSeed ^ center); throwCount folds in later (plan §5).
+        RandomSource random = RandomSource.create(level.getSeed() ^ center.asLong());
+        IslandGenerator.generatePlaceholder(level, center, random);
+
+        this.discard();
     }
 
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
+        tag.putInt("ArmTicks", this.armTicks);
         ResourceLocation theme = getTheme();
         if (theme != null) {
             tag.putString("Theme", theme.toString());
@@ -91,6 +119,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        this.armTicks = tag.getInt("ArmTicks");
         if (tag.contains("Theme")) {
             setTheme(ResourceLocation.tryParse(tag.getString("Theme")));
         }
