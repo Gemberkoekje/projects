@@ -46,6 +46,7 @@ public final class SkyseedClientEvents {
         for (WorldCreationUiState.WorldTypeEntry entry : ui.getNormalPresetList()) {
             if (entry.preset().is(SKYBLOCK_PRESET)) {
                 ui.setWorldType(entry);
+                ui.setGenerateStructures(false); // a skyblock void shouldn't have structures floating in it
                 break;
             }
         }
