@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SC",
+    "CS"
+  ],
+  "key": {
+    "S": { "item": "minecraft:stone" },
+    "C": { "item": "minecraft:cobblestone" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:rocky",
+      "minecraft:item_name": "\"Rocky Skyseed\""
+    }
+  }
+}

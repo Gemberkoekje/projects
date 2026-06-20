@@ -1,9 +1,13 @@
 package dev.gemberkoekje.skyseed.entity;
 
+import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
+import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
+import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -101,9 +105,31 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
 
         // RNG decorrelated per island (worldSeed ^ center); throwCount folds in later (plan §5).
         RandomSource random = RandomSource.create(level.getSeed() ^ center.asLong());
-        IslandGenerator.generateIsland(level, center, random);
+        IslandTheme theme = resolveTheme(level);
+        if (theme != null) {
+            IslandGenerator.generateIsland(level, center, theme, random);
+        } else {
+            Skyseed.LOGGER.warn("[skyseed] no island themes are loaded — nothing germinated");
+        }
 
         this.discard();
+    }
+
+    /** Resolve this seed's theme from the datapack registry; fall back to forest, then to any theme. */
+    private IslandTheme resolveTheme(ServerLevel level) {
+        Registry<IslandTheme> themes = level.registryAccess().registryOrThrow(SkyseedRegistries.THEME);
+        ResourceLocation id = getTheme();
+        IslandTheme theme = (id != null) ? themes.get(id) : null;
+        if (theme == null) {
+            ResourceLocation forest = ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "forest");
+            theme = themes.get(forest);
+            if (theme != null && id != null) {
+                Skyseed.LOGGER.warn("[skyseed] unknown theme '{}' — falling back to {}", id, forest);
+            } else if (theme == null && !themes.holders().findAny().isEmpty()) {
+                theme = themes.holders().findFirst().map(h -> h.value()).orElse(null);
+            }
+        }
+        return theme;
     }
 
     @Override

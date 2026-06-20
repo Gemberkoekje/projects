@@ -23,8 +23,9 @@ public final class ModCreativeTabs {
                     .displayItems((parameters, output) -> {
                         // The generic, theme-less seed.
                         output.accept(ModItems.ISLAND_SEED.get());
-                        // The forest variant the basic recipe produces (handy for testing future germination).
+                        // Pre-themed examples (handy for testing germination without crafting).
                         output.accept(themedSeed("forest", "Forest Skyseed"));
+                        output.accept(themedSeed("rocky", "Rocky Skyseed"));
                     })
                     .build());
 
