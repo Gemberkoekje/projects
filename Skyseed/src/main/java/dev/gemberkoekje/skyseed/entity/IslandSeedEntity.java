@@ -41,8 +41,8 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
     private static final EntityDataAccessor<String> DATA_THEME =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
 
-    /** Ticks from spawn to germination (~3 s at 20 tps). */
-    public static final int ARM_DURATION = 60;
+    /** Ticks from spawn to germination (~2 s at 20 tps). */
+    public static final int ARM_DURATION = 40;
 
     /** Upward lifts to try if the rest point's volume is already occupied (overlap safety, §5). */
     private static final int[] NUDGE_STEPS = { 0, 8, 16, 24 };
