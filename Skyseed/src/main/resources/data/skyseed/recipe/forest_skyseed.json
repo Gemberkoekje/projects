@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PD",
+    "DP"
+  ],
+  "key": {
+    "P": { "item": "minecraft:oak_planks" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:forest",
+      "minecraft:item_name": "\"Forest Skyseed\""
+    }
+  }
+}

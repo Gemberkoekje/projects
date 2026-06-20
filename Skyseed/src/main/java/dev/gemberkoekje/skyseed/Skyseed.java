@@ -1,6 +1,9 @@
 package dev.gemberkoekje.skyseed;
 
 import com.mojang.logging.LogUtils;
+import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
+import dev.gemberkoekje.skyseed.registry.ModDataComponents;
+import dev.gemberkoekje.skyseed.registry.ModItems;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -15,6 +18,10 @@ public class Skyseed {
 
     // FML passes in the mod event bus and container automatically.
     public Skyseed(IEventBus modEventBus, ModContainer modContainer) {
-        LOGGER.info("Skyseed loaded (milestone 0 scaffold) — nothing registered yet.");
+        ModDataComponents.register(modEventBus);
+        ModItems.register(modEventBus);
+        ModCreativeTabs.register(modEventBus);
+
+        LOGGER.info("Skyseed loaded — island_seed item + theme component registered.");
     }
 }
