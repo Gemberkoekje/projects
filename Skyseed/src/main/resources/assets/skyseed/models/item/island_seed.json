@@ -4,6 +4,7 @@
     "layer0": "skyseed:item/island_seed"
   },
   "overrides": [
-    { "predicate": { "custom_model_data": 1 }, "model": "skyseed:item/island_seed_rocky" }
+    { "predicate": { "custom_model_data": 1 }, "model": "skyseed:item/island_seed_rocky" },
+    { "predicate": { "custom_model_data": 2 }, "model": "skyseed:item/island_seed_large" }
   ]
 }

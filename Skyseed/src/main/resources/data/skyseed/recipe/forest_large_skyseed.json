@@ -14,7 +14,8 @@
     "id": "skyseed:island_seed",
     "components": {
       "skyseed:theme": "skyseed:forest_large",
-      "minecraft:item_name": "\"Large Forest Skyseed\""
+      "minecraft:item_name": "\"Large Forest Skyseed\"",
+      "minecraft:custom_model_data": 2
     }
   }
 }
