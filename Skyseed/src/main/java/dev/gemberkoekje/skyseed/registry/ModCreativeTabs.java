@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomModelData;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -24,15 +25,18 @@ public final class ModCreativeTabs {
                         // The generic, theme-less seed.
                         output.accept(ModItems.ISLAND_SEED.get());
                         // Pre-themed examples (handy for testing germination without crafting).
-                        output.accept(themedSeed("forest", "Forest Skyseed"));
-                        output.accept(themedSeed("rocky", "Rocky Skyseed"));
+                        output.accept(themedSeed("forest", "Forest Skyseed", 0));
+                        output.accept(themedSeed("rocky", "Rocky Skyseed", 1));
                     })
                     .build());
 
-    private static ItemStack themedSeed(String themePath, String displayName) {
+    private static ItemStack themedSeed(String themePath, String displayName, int customModelData) {
         ItemStack stack = new ItemStack(ModItems.ISLAND_SEED.get());
         stack.set(ModDataComponents.THEME.get(), ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, themePath));
         stack.set(DataComponents.ITEM_NAME, Component.literal(displayName));
+        if (customModelData > 0) {
+            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(customModelData));
+        }
         return stack;
     }
 
