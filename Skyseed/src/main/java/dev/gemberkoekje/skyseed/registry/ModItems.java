@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.item.GuideItem;
 import dev.gemberkoekje.skyseed.item.IslandSeedItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,10 @@ public final class ModItems {
 
     public static final DeferredItem<IslandSeedItem> ISLAND_SEED =
             ITEMS.registerItem("island_seed", IslandSeedItem::new, new Item.Properties().stacksTo(16));
+
+    /** The Skyfarer's Almanac guide book. */
+    public static final DeferredItem<GuideItem> GUIDE =
+            ITEMS.registerItem("guide", GuideItem::new, new Item.Properties().stacksTo(1));
 
     private ModItems() {}
 

@@ -22,6 +22,8 @@ public final class ModCreativeTabs {
                     .title(Component.translatable("itemGroup.skyseed"))
                     .icon(() -> ModItems.ISLAND_SEED.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
+                        // The guide book.
+                        output.accept(ModItems.GUIDE.get());
                         // The generic, theme-less seed.
                         output.accept(ModItems.ISLAND_SEED.get());
                         // Pre-themed examples (handy for testing germination without crafting).
