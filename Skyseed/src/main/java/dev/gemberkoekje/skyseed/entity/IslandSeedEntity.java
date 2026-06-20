@@ -101,7 +101,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
 
         // RNG decorrelated per island (worldSeed ^ center); throwCount folds in later (plan §5).
         RandomSource random = RandomSource.create(level.getSeed() ^ center.asLong());
-        IslandGenerator.generatePlaceholder(level, center, random);
+        IslandGenerator.generateIsland(level, center, random);
 
         this.discard();
     }
