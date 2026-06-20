@@ -1,5 +1,6 @@
 {
   "item.skyseed.island_seed": "Skyseed",
   "entity.skyseed.island_seed": "Skyseed",
-  "itemGroup.skyseed": "Skyseed"
+  "itemGroup.skyseed": "Skyseed",
+  "generator.skyseed.skyblock": "Skyblock"
 }
