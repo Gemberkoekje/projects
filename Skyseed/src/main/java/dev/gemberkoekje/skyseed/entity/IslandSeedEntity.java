@@ -118,7 +118,8 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         for (int lift : NUDGE_STEPS) {
             BlockPos c = base.above(lift);
             RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-            IslandPlan candidate = IslandGenerator.planIsland(level, c, theme, random);
+            // Island look can vary with the biome it lands in (plan: per-biome overrides).
+            IslandPlan candidate = IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
             if (!isTooCrowded(level, candidate)) {
                 plan = candidate;
                 break;

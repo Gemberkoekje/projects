@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed.worldgen;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.BlockPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
+import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
@@ -13,15 +14,18 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.ArrayList;
@@ -34,34 +38,45 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Computes an island (plan §5: irregular teardrop silhouette + layered fill, clustered ore veins,
- * scattered decoration) from an {@link IslandTheme}. Deliberately a near-pure function that does NOT
- * write the world — it returns an {@link IslandPlan} of block placements + tree sites, which a
- * {@link GenerationJob} then drains over several ticks (tick-budget guard, §5). Block/feature ids
- * resolve here so a missing modded id just warns and is skipped/falls back, never hard-fails (§4).
+ * Computes an island (plan §5) from an {@link IslandTheme}, with the theme's base config overlaid by
+ * the first matching {@link BiomeOverride} for the biome the seed landed in. Near-pure: returns an
+ * {@link IslandPlan} without writing the world (a {@link GenerationJob} drains it over ticks).
  */
 public final class IslandGenerator {
+    /** A resolved surface-scatter choice. */
+    private record Scatter(BlockState state, float chance) {}
+
     private IslandGenerator() {}
 
-    public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme, RandomSource random) {
-        final Shape shape = theme.shape();
-        final Palette palette = theme.palette();
-        final Variant variant = pickVariant(theme.variants(), random);
+    public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
+                                        Holder<Biome> biome, RandomSource random) {
+        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome);
 
-        // --- resolve palette (graceful fallback to vanilla defaults) ---
-        ResourceLocation surfaceId = palette.surface();
+        // --- effective config: base theme, overlaid by the matching biome override ---
+        final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get() : theme.shape();
+        final List<OreEntry> ores = (ov != null && ov.ores().isPresent()) ? ov.ores().get() : theme.ores();
+        final List<Variant> variants = (ov != null && ov.variants().isPresent()) ? ov.variants().get() : theme.variants();
+        final Palette pal = theme.palette();
+        final ResourceLocation fillId = (ov != null && ov.fill().isPresent()) ? ov.fill().get() : pal.fill();
+        final ResourceLocation coreId = (ov != null && ov.core().isPresent()) ? ov.core().get() : pal.core();
+        final int baseFill = (ov != null && ov.fillDepth().isPresent()) ? ov.fillDepth().get() : pal.fillDepth();
+        final List<GroundEntry> scatterCfg =
+                (ov != null && ov.surfaceScatter().isPresent()) ? ov.surfaceScatter().get() : pal.surfaceScatter();
+
+        final Variant variant = pickVariant(variants, random);
+        ResourceLocation surfaceId = (ov != null && ov.surface().isPresent()) ? ov.surface().get() : pal.surface();
         if (variant != null && variant.surfaceOverride().isPresent()) {
             surfaceId = variant.surfaceOverride().get();
         }
         final BlockState surface = resolveBlock(surfaceId, Blocks.GRASS_BLOCK).defaultBlockState();
-        final BlockState fill = resolveBlock(palette.fill(), Blocks.DIRT).defaultBlockState();
-        final BlockState core = resolveBlock(palette.core(), Blocks.STONE).defaultBlockState();
+        final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
+        final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
+        final List<Scatter> scatter = resolveScatter(scatterCfg);
 
         // --- shape parameters ---
         final int baseRadius = Math.max(1, shape.radius().sample(random));
         final double rimNoise = shape.rimNoise();
         final int topDome = shape.topDome().sample(random);
-        final int baseFill = palette.fillDepth();
         final double maxDepth = baseRadius * 1.05;
 
         // Irregular rim from a few angular harmonics (decorrelated per island via the RandomSource).
@@ -79,7 +94,6 @@ public final class IslandGenerator {
         }
 
         final int maxR = (int) Math.ceil(baseRadius * (1.0 + rimNoise)) + 1;
-        // insertion-ordered so ore overwrites keep their slot; one entry per position (final state)
         final Map<BlockPos, BlockState> blockMap = new LinkedHashMap<>();
         final List<BlockPos> coreList = new ArrayList<>();
         final List<BlockPos> surfaceList = new ArrayList<>();
@@ -118,7 +132,7 @@ public final class IslandGenerator {
                 for (int y = bottomY; y <= surfaceY; y++) {
                     final BlockPos p = new BlockPos(wx, y, wz);
                     if (y == surfaceY) {
-                        blockMap.put(p, surface);
+                        blockMap.put(p, scatterSurface(surface, scatter, random));
                         surfaceList.add(p);
                     } else if (y >= surfaceY - fillThickness) {
                         blockMap.put(p, fill);
@@ -132,25 +146,61 @@ public final class IslandGenerator {
             }
         }
 
-        // --- pass 2: ores (clustered veins, overwriting core entries) ---
         if (!coreList.isEmpty()) {
-            planOres(blockMap, theme.ores(), coreList, minCoreY, maxCoreY, random);
+            planOres(blockMap, ores, coreList, minCoreY, maxCoreY, random);
         }
 
-        // --- pass 3: decoration (tree sites + ground cover) ---
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
             planDecoration(level, blockMap, trees, surfaceList, variant.decoration(), random);
         }
 
-        // --- assemble: bottom-up order so the island appears to grow upward ---
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
             blocks.add(new BlockPlacement(e.getKey(), e.getValue()));
         }
-        blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY()));
+        blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY())); // bottom-up grow-in
 
         return new IslandPlan(blocks, trees, random);
+    }
+
+    private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome) {
+        for (BiomeOverride o : overrides) {
+            if (o.matches(biome)) {
+                return o;
+            }
+        }
+        return null;
+    }
+
+    private static List<Scatter> resolveScatter(List<GroundEntry> cfg) {
+        if (cfg.isEmpty()) {
+            return List.of();
+        }
+        List<Scatter> out = new ArrayList<>(cfg.size());
+        for (GroundEntry g : cfg) {
+            if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                out.add(new Scatter(BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState(), g.chance()));
+            } else {
+                Skyseed.LOGGER.warn("[skyseed] theme surface_scatter references unknown block '{}' — skipping", g.block());
+            }
+        }
+        return out;
+    }
+
+    /** The surface block for a column: the default, unless a surface-scatter entry rolls in. */
+    private static BlockState scatterSurface(BlockState surface, List<Scatter> scatter, RandomSource random) {
+        if (scatter.isEmpty()) {
+            return surface;
+        }
+        float roll = random.nextFloat();
+        for (Scatter s : scatter) {
+            roll -= s.chance();
+            if (roll < 0) {
+                return s.state();
+            }
+        }
+        return surface;
     }
 
     private static Variant pickVariant(List<Variant> variants, RandomSource random) {
@@ -245,7 +295,6 @@ public final class IslandGenerator {
         final Registry<ConfiguredFeature<?, ?>> features =
                 level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE);
 
-        // Tree sites: count-based, spaced apart. Placed (as features) after the solid blocks land.
         final List<BlockPos> treeBases = new ArrayList<>();
         for (TreeEntry tree : deco.trees()) {
             final Optional<ConfiguredFeature<?, ?>> feature = features.getOptional(tree.feature());
@@ -271,7 +320,6 @@ public final class IslandGenerator {
             }
         }
 
-        // Ground cover: each column rolls once; cumulative chances pick at most one plant (placed on top).
         if (!deco.ground().isEmpty()) {
             for (BlockPos grass : surfaceList) {
                 float roll = random.nextFloat();

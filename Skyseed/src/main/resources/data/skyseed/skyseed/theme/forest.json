@@ -18,5 +18,43 @@
         ]
       }
     }
+  ],
+  "biome_overrides": [
+    {
+      "biomes": [ "#minecraft:is_forest" ],
+      "variants": [
+        { "weight": 3, "name": "oak", "decoration": {
+          "trees": [ { "feature": "minecraft:oak", "tries": 7, "spacing": 2 } ],
+          "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 }, { "block": "minecraft:poppy", "chance": 0.04 }, { "block": "minecraft:dandelion", "chance": 0.04 } ] } },
+        { "weight": 2, "name": "birch", "decoration": {
+          "trees": [ { "feature": "minecraft:birch", "tries": 7, "spacing": 2 } ],
+          "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 } ] } }
+      ]
+    },
+    {
+      "biomes": [ "#minecraft:is_savanna" ],
+      "variants": [
+        { "weight": 1, "name": "acacia", "decoration": {
+          "trees": [ { "feature": "minecraft:acacia", "tries": 4, "spacing": 3 } ],
+          "ground": [ { "block": "minecraft:short_grass", "chance": 0.18 } ] } }
+      ]
+    },
+    {
+      "biomes": [ "minecraft:plains", "minecraft:sunflower_plains", "minecraft:meadow" ],
+      "variants": [
+        { "weight": 1, "name": "open", "decoration": {
+          "trees": [ { "feature": "minecraft:oak", "tries": 1, "spacing": 5 } ],
+          "ground": [ { "block": "minecraft:short_grass", "chance": 0.45 }, { "block": "minecraft:poppy", "chance": 0.05 }, { "block": "minecraft:dandelion", "chance": 0.05 } ] } }
+      ]
+    },
+    {
+      "biomes": [ "minecraft:desert", "#minecraft:is_badlands" ],
+      "surface": "minecraft:dirt",
+      "surface_scatter": [ { "block": "minecraft:sand", "chance": 0.40 } ],
+      "variants": [
+        { "weight": 1, "name": "arid", "decoration": {
+          "ground": [ { "block": "minecraft:dead_bush", "chance": 0.06 } ] } }
+      ]
+    }
   ]
 }
