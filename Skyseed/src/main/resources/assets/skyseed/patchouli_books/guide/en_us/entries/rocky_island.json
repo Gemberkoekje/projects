@@ -1,0 +1,16 @@
+{
+  "name": "Rocky Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:stone",
+  "advancement": "skyseed:craft_rocky",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A bare stone isle with a cobblestone band — no trees, little grass. Built for mining."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Ores$()$(br)Iron is almost guaranteed and plentiful. Gold turns up sometimes, and — deep in the core — the rare diamond."
+    }
+  ]
+}

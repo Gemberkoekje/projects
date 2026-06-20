@@ -1,15 +1,20 @@
 package dev.gemberkoekje.skyseed.item;
 
-import dev.gemberkoekje.skyseed.client.SkyseedGuideClient;
+import dev.gemberkoekje.skyseed.Skyseed;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import vazkii.patchouli.api.PatchouliAPI;
 
-/** The Skyfarer's Almanac — a guide book. Right-click opens it (client-side). */
+/** The Skyfarer's Almanac — right-click opens the Patchouli guide book. */
 public class GuideItem extends Item {
+    private static final ResourceLocation BOOK = ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "guide");
+
     public GuideItem(Properties properties) {
         super(properties);
     }
@@ -17,9 +22,8 @@ public class GuideItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (level.isClientSide) {
-            // Only reached on the client, so the client-only screen class loads lazily and safely here.
-            SkyseedGuideClient.open();
+        if (player instanceof ServerPlayer serverPlayer) {
+            PatchouliAPI.get().openBookGUI(serverPlayer, BOOK);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }

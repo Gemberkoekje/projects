@@ -1,0 +1,20 @@
+{
+  "name": "Welcome, Skyfarer",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:grass_block",
+  "priority": true,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Throw a $(item)Skyseed$() into open air and, after a moment, a brand-new floating island germinates where it settles.$(br2)Craft seeds, harvest islands, craft better seeds, and rise."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Throwing$()$(br)Hold right-click to wind up, then release. A quick tap lobs the island in close; a long hold flings it far.$(br2)It arms for about two seconds, then grows in. An island will never grow into another."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A living world$()$(br)An island's look depends on the biome it lands in. The same Forest Skyseed grows oak in a forest, acacia in a savanna, sparse grass in plains, and dry dirt and sand in the desert.$(br2)See each seed's recipe under $(bold)Recipes$(). Craft one, and its field notes here will unlock."
+    }
+  ]
+}

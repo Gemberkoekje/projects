@@ -1,0 +1,12 @@
+{
+  "name": "Large Forest Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:oak_log",
+  "advancement": "skyseed:craft_large_forest",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The Forest Island writ large — radius 13–17, a deeper core, and a small grove of oaks. More coal and iron to match its size.$(br2)Costs oak logs to craft, so harvest a forest first."
+    }
+  ]
+}

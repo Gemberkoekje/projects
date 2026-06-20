@@ -1,0 +1,31 @@
+{
+  "name": "Recipes",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:crafting_table",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Every Skyseed is crafted, then thrown. Here is how to make each one. Craft a seed to unlock its field notes."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:forest_skyseed",
+      "text": "The $(item)Forest Skyseed$() — dirt and planks."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:forest_large_skyseed",
+      "text": "The $(item)Large Forest Skyseed$() — a pricier, bigger island."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:rocky_skyseed",
+      "text": "The $(item)Rocky Skyseed$() — stone and cobblestone."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:guide",
+      "text": "This Almanac — a book crafted with any Skyseed."
+    }
+  ]
+}

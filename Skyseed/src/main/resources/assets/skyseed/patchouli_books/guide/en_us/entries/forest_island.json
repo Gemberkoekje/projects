@@ -1,0 +1,16 @@
+{
+  "name": "Forest Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:oak_sapling",
+  "advancement": "skyseed:craft_forest",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A grassy isle, radius 7–10, with a flat-ish domed top and a rocky underside. Coal is common in its core; iron a little rarer."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Where it lands matters$()$(br)$(li)Forest: oak and birch.$(li)Savanna: acacia.$(li)Plains: open grass, the odd tree.$(li)Desert / badlands: dirt instead of grass, dusted with sand."
+    }
+  ]
+}
