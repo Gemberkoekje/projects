@@ -1,6 +1,8 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.worldgen.IslandPlan.BlockPlacement;
+import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
@@ -20,31 +22,28 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * Places island blocks into the world. Deliberately a near-pure function of
- * {@code (ServerLevel, BlockPos center, IslandTheme, RandomSource)} — independent of items/entities so
- * it stays reusable (the curated start island can share it) and testable (plan §6).
- *
- * <p>Implements plan §5: irregular teardrop silhouette + layered fill, clustered ore veins, and
- * scattered decoration. All content comes from the {@link IslandTheme} (datapack, §4). Block/feature
- * ids resolve here so a missing modded id just warns and is skipped/falls back, never hard-fails.
- * Tick-budgeted placement is milestone 9.
+ * Computes an island (plan §5: irregular teardrop silhouette + layered fill, clustered ore veins,
+ * scattered decoration) from an {@link IslandTheme}. Deliberately a near-pure function that does NOT
+ * write the world — it returns an {@link IslandPlan} of block placements + tree sites, which a
+ * {@link GenerationJob} then drains over several ticks (tick-budget guard, §5). Block/feature ids
+ * resolve here so a missing modded id just warns and is skipped/falls back, never hard-fails (§4).
  */
 public final class IslandGenerator {
-    private static final int BLOCK_FLAGS = Block.UPDATE_CLIENTS; // show blocks, no neighbour cascades
-
     private IslandGenerator() {}
 
-    public static void generateIsland(ServerLevel level, BlockPos center, IslandTheme theme, RandomSource random) {
+    public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme, RandomSource random) {
         final Shape shape = theme.shape();
         final Palette palette = theme.palette();
         final Variant variant = pickVariant(theme.variants(), random);
@@ -80,7 +79,8 @@ public final class IslandGenerator {
         }
 
         final int maxR = (int) Math.ceil(baseRadius * (1.0 + rimNoise)) + 1;
-        final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        // insertion-ordered so ore overwrites keep their slot; one entry per position (final state)
+        final Map<BlockPos, BlockState> blockMap = new LinkedHashMap<>();
         final List<BlockPos> coreList = new ArrayList<>();
         final List<BlockPos> surfaceList = new ArrayList<>();
         int minCoreY = Integer.MAX_VALUE;
@@ -116,14 +116,15 @@ public final class IslandGenerator {
                 final int fillThickness = baseFill + random.nextInt(3) - 1;
 
                 for (int y = bottomY; y <= surfaceY; y++) {
+                    final BlockPos p = new BlockPos(wx, y, wz);
                     if (y == surfaceY) {
-                        level.setBlock(pos.set(wx, y, wz), surface, BLOCK_FLAGS);
-                        surfaceList.add(new BlockPos(wx, y, wz));
+                        blockMap.put(p, surface);
+                        surfaceList.add(p);
                     } else if (y >= surfaceY - fillThickness) {
-                        level.setBlock(pos.set(wx, y, wz), fill, BLOCK_FLAGS);
+                        blockMap.put(p, fill);
                     } else {
-                        level.setBlock(pos.set(wx, y, wz), core, BLOCK_FLAGS);
-                        coreList.add(new BlockPos(wx, y, wz));
+                        blockMap.put(p, core);
+                        coreList.add(p);
                         minCoreY = Math.min(minCoreY, y);
                         maxCoreY = Math.max(maxCoreY, y);
                     }
@@ -131,15 +132,25 @@ public final class IslandGenerator {
             }
         }
 
-        // --- pass 2: ores ---
+        // --- pass 2: ores (clustered veins, overwriting core entries) ---
         if (!coreList.isEmpty()) {
-            placeOres(level, theme.ores(), coreList, minCoreY, maxCoreY, random);
+            planOres(blockMap, theme.ores(), coreList, minCoreY, maxCoreY, random);
         }
 
-        // --- pass 3: decoration ---
+        // --- pass 3: decoration (tree sites + ground cover) ---
+        final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
-            decorate(level, surfaceList, variant.decoration(), random);
+            planDecoration(level, blockMap, trees, surfaceList, variant.decoration(), random);
         }
+
+        // --- assemble: bottom-up order so the island appears to grow upward ---
+        final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
+        for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
+            blocks.add(new BlockPlacement(e.getKey(), e.getValue()));
+        }
+        blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY()));
+
+        return new IslandPlan(blocks, trees, random);
     }
 
     private static Variant pickVariant(List<Variant> variants, RandomSource random) {
@@ -163,8 +174,8 @@ public final class IslandGenerator {
         return variants.get(variants.size() - 1);
     }
 
-    private static void placeOres(ServerLevel level, List<OreEntry> ores, List<BlockPos> coreList,
-                                  int minCoreY, int maxCoreY, RandomSource random) {
+    private static void planOres(Map<BlockPos, BlockState> blockMap, List<OreEntry> ores, List<BlockPos> coreList,
+                                 int minCoreY, int maxCoreY, RandomSource random) {
         final Set<Long> coreSet = new HashSet<>(coreList.size() * 2);
         for (BlockPos p : coreList) {
             coreSet.add(p.asLong());
@@ -184,7 +195,7 @@ public final class IslandGenerator {
             for (int v = 0; v < veins; v++) {
                 final BlockPos seed = pickSeed(coreList, coreSet, ore.depth(), deepMaxY, random);
                 if (seed != null) {
-                    growVein(level, seed, state, ore.veinSize().sample(random), coreSet, random);
+                    growVein(blockMap, seed, state, ore.veinSize().sample(random), coreSet, random);
                 }
             }
         }
@@ -205,10 +216,10 @@ public final class IslandGenerator {
         return null;
     }
 
-    private static void growVein(ServerLevel level, BlockPos seed, BlockState ore, int size,
+    private static void growVein(Map<BlockPos, BlockState> blockMap, BlockPos seed, BlockState ore, int size,
                                  Set<Long> coreSet, RandomSource random) {
         final List<BlockPos> placed = new ArrayList<>();
-        level.setBlock(seed, ore, BLOCK_FLAGS);
+        blockMap.put(seed, ore);
         coreSet.remove(seed.asLong());
         placed.add(seed);
 
@@ -219,23 +230,23 @@ public final class IslandGenerator {
             final BlockPos nb = from.offset(random.nextInt(3) - 1, random.nextInt(3) - 1, random.nextInt(3) - 1);
             final long key = nb.asLong();
             if (coreSet.contains(key)) {
-                level.setBlock(nb, ore, BLOCK_FLAGS);
+                blockMap.put(nb, ore);
                 coreSet.remove(key);
                 placed.add(nb);
             }
         }
     }
 
-    private static void decorate(ServerLevel level, List<BlockPos> surfaceList, Decoration deco, RandomSource random) {
+    private static void planDecoration(ServerLevel level, Map<BlockPos, BlockState> blockMap, List<TreeSite> trees,
+                                       List<BlockPos> surfaceList, Decoration deco, RandomSource random) {
         if (surfaceList.isEmpty()) {
             return;
         }
-        final ChunkGenerator generator = level.getChunkSource().getGenerator();
         final Registry<ConfiguredFeature<?, ?>> features =
                 level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE);
 
-        // Trees first, so trunks aren't blocked by ground cover.
-        final List<BlockPos> placedTrees = new ArrayList<>();
+        // Tree sites: count-based, spaced apart. Placed (as features) after the solid blocks land.
+        final List<BlockPos> treeBases = new ArrayList<>();
         for (TreeEntry tree : deco.trees()) {
             final Optional<ConfiguredFeature<?, ?>> feature = features.getOptional(tree.feature());
             if (feature.isEmpty()) {
@@ -246,7 +257,7 @@ public final class IslandGenerator {
             for (int i = 0; i < tree.tries(); i++) {
                 final BlockPos grass = surfaceList.get(random.nextInt(surfaceList.size()));
                 boolean tooClose = false;
-                for (BlockPos t : placedTrees) {
+                for (BlockPos t : treeBases) {
                     if (t.distSqr(grass) < spacingSq) {
                         tooClose = true;
                         break;
@@ -255,25 +266,20 @@ public final class IslandGenerator {
                 if (tooClose) {
                     continue;
                 }
-                if (feature.get().place(level, generator, random, grass.above())) {
-                    placedTrees.add(grass);
-                }
+                treeBases.add(grass);
+                trees.add(new TreeSite(feature.get(), grass.above()));
             }
         }
 
-        // Ground cover: each open column rolls once; cumulative chances pick at most one plant.
+        // Ground cover: each column rolls once; cumulative chances pick at most one plant (placed on top).
         if (!deco.ground().isEmpty()) {
             for (BlockPos grass : surfaceList) {
-                final BlockPos above = grass.above();
-                if (!level.getBlockState(above).isAir()) {
-                    continue;
-                }
                 float roll = random.nextFloat();
                 for (GroundEntry g : deco.ground()) {
                     roll -= g.chance();
                     if (roll < 0) {
                         if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                            level.setBlock(above, BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState(), BLOCK_FLAGS);
+                            blockMap.put(grass.above(), BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState());
                         }
                         break;
                     }
