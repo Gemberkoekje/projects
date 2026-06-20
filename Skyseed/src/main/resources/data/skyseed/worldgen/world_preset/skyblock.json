@@ -3,14 +3,12 @@
     "minecraft:overworld": {
       "type": "minecraft:overworld",
       "generator": {
-        "type": "minecraft:flat",
-        "settings": {
-          "biome": "minecraft:plains",
-          "lakes": false,
-          "features": false,
-          "layers": [],
-          "structure_overrides": []
-        }
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:overworld"
+        },
+        "settings": "skyseed:void"
       }
     },
     "minecraft:the_nether": {
