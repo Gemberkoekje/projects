@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed;
 import com.mojang.logging.LogUtils;
 import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
 import dev.gemberkoekje.skyseed.registry.ModDataComponents;
+import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -20,8 +21,9 @@ public class Skyseed {
     public Skyseed(IEventBus modEventBus, ModContainer modContainer) {
         ModDataComponents.register(modEventBus);
         ModItems.register(modEventBus);
+        ModEntities.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
-        LOGGER.info("Skyseed loaded — island_seed item + theme component registered.");
+        LOGGER.info("Skyseed loaded — item, theme component, and throwable entity registered.");
     }
 }
