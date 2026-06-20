@@ -26,6 +26,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.ISLAND_SEED.get());
                         // Pre-themed examples (handy for testing germination without crafting).
                         output.accept(themedSeed("forest", "Forest Skyseed", 0));
+                        output.accept(themedSeed("forest_large", "Large Forest Skyseed", 0));
                         output.accept(themedSeed("rocky", "Rocky Skyseed", 1));
                     })
                     .build());

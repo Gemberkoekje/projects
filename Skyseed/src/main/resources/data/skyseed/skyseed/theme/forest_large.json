@@ -1,0 +1,22 @@
+{
+  "shape": { "radius": { "min": 13, "max": 17 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 3 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 4 },
+  "ores": [
+    { "block": "minecraft:coal_ore", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:iron_ore", "chance": 0.65, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
+  ],
+  "variants": [
+    {
+      "weight": 1,
+      "name": "oak",
+      "decoration": {
+        "trees": [ { "feature": "minecraft:oak", "tries": 9, "spacing": 3 } ],
+        "ground": [
+          { "block": "minecraft:short_grass", "chance": 0.30 },
+          { "block": "minecraft:poppy", "chance": 0.03 },
+          { "block": "minecraft:dandelion", "chance": 0.03 }
+        ]
+      }
+    }
+  ]
+}

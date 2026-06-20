@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "LDL",
+    "DDD",
+    "LDL"
+  ],
+  "key": {
+    "L": { "item": "minecraft:oak_log" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:forest_large",
+      "minecraft:item_name": "\"Large Forest Skyseed\""
+    }
+  }
+}
