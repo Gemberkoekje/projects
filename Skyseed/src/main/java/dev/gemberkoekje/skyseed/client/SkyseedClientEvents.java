@@ -2,21 +2,52 @@ package dev.gemberkoekje.skyseed.client;
 
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.client.renderer.entity.ThrownItemRenderer;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.levelgen.presets.WorldPreset;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
 
-/** Client-only mod-bus event handlers. Registers the renderer for the thrown Skyseed.
- *  (RegisterRenderers is an IModBusEvent, so NeoForge auto-routes it to the mod bus.) */
+import java.lang.ref.WeakReference;
+
+/** Client-only event handlers (NeoForge auto-routes each to the mod or game bus by event type). */
 @EventBusSubscriber(modid = Skyseed.MODID, value = Dist.CLIENT)
 public final class SkyseedClientEvents {
+    private static final ResourceKey<WorldPreset> SKYBLOCK_PRESET =
+            ResourceKey.create(Registries.WORLD_PRESET, ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "skyblock"));
+
+    // Track the last screen we defaulted, so we set the type once per screen (not on every resize).
+    private static WeakReference<Screen> defaulted = new WeakReference<>(null);
+
     private SkyseedClientEvents() {}
 
     @SubscribeEvent
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // ThrownItemRenderer draws the projectile as its item (the dirt-ball icon), like a snowball.
         event.registerEntityRenderer(ModEntities.ISLAND_SEED.get(), ThrownItemRenderer::new);
+    }
+
+    /** Pre-select the Skyblock world type when the create-world screen first opens (still switchable). */
+    @SubscribeEvent
+    static void onCreateWorldScreen(ScreenEvent.Init.Post event) {
+        if (!(event.getScreen() instanceof CreateWorldScreen screen) || defaulted.get() == screen) {
+            return;
+        }
+        defaulted = new WeakReference<>(screen);
+        WorldCreationUiState ui = screen.getUiState();
+        for (WorldCreationUiState.WorldTypeEntry entry : ui.getNormalPresetList()) {
+            if (entry.preset().is(SKYBLOCK_PRESET)) {
+                ui.setWorldType(entry);
+                break;
+            }
+        }
     }
 }
