@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.4.1] - 2026-06-21
+
+### Changed
+- The Almanac's **Recipes** entry now gives a sourcing hint for every seed — where to find what it takes,
+  not just the ingredients. E.g. Ancient = deepslate from a Rocky island thrown deep; Lush = moss from an
+  Ancient island plus azalea from a Forest; Aquatic = clay and sand from a Desert island; Frozen = snow
+  from a snowy island or a Rocky snow-cap.
+
 ## [0.4.0] - 2026-06-21
 
 ### Added

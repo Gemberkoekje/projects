@@ -5,107 +5,107 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Every Skyseed is crafted, then thrown. Here is how to make each one. Craft a seed to unlock its field notes."
+      "text": "Every Skyseed is crafted, then thrown. Here is how to make each one — and where to find what it takes. Craft a seed to unlock its field notes."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:forest_skyseed",
-      "text": "The $(item)Forest Skyseed$() — dirt and planks."
+      "text": "The $(item)Forest Skyseed$() — dirt and planks, both off your $(bold)starter island$(). The first seed you can make."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:forest_large_skyseed",
-      "text": "The $(item)Large Forest Skyseed$() — a pricier, bigger island."
+      "text": "The $(item)Large Forest Skyseed$() — any logs and dirt. Fell a $(item)forest$() first; bigger and pricier."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:rocky_skyseed",
-      "text": "The $(item)Rocky Skyseed$() — stone and cobblestone."
+      "text": "The $(item)Rocky Skyseed$() — stone and cobblestone. Dig into the $(bold)core$() of any grassy island."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:rocky_large_skyseed",
-      "text": "The $(item)Large Rocky Skyseed$() — a tall mountain with emeralds."
+      "text": "The $(item)Large Rocky Skyseed$() — stone and cobblestone from any core. A tall mountain that yields $(item)emeralds$()."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:desert_skyseed",
-      "text": "The $(item)Desert Skyseed$() — sand over sandstone."
+      "text": "The $(item)Desert Skyseed$() — sand and sandstone. Sand comes off a $(bold)beach or desert$() throw; craft it into sandstone."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:desert_large_skyseed",
-      "text": "The $(item)Large Desert Skyseed$() — big dunes with an oasis."
+      "text": "The $(item)Large Desert Skyseed$() — more sand and sandstone. A vast dune field hiding an oasis."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:mushroom_skyseed",
-      "text": "The $(item)Mushroom Skyseed$() — dirt with both mushrooms."
+      "text": "The $(item)Mushroom Skyseed$() — dirt and both mushrooms. They sprout on a $(bold)Forest island's$() shady dark-oak or spruce floor."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:mushroom_large_skyseed",
-      "text": "The $(item)Large Mushroom Skyseed$() — a giant mushroom grove."
+      "text": "The $(item)Large Mushroom Skyseed$() — both mushrooms again, grown into a giant grove."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:frozen_skyseed",
-      "text": "The $(item)Frozen Skyseed$() — snow and ice."
+      "text": "The $(item)Frozen Skyseed$() — snow and ice. Gather them off a $(bold)snowy island$() — or a Rocky island's snow-capped peak (thrown high or over cold)."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:frozen_large_skyseed",
-      "text": "The $(item)Large Frozen Skyseed$() — a glacier with a frozen lake."
+      "text": "The $(item)Large Frozen Skyseed$() — snow and packed ice. Snowy or icy by biome, with a frozen lake over frozen ones."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:meadow_skyseed",
-      "text": "The $(item)Meadow Skyseed$() — dirt and any flower."
+      "text": "The $(item)Meadow Skyseed$() — dirt and any flower. Pick flowers off a $(bold)Forest or flower-forest$() island."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:meadow_large_skyseed",
-      "text": "The $(item)Large Meadow Skyseed$() — a vast flower field with bees."
+      "text": "The $(item)Large Meadow Skyseed$() — dirt and flowers. A vast bloom — the best start for $(item)bees$()."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:badlands_skyseed",
-      "text": "The $(item)Badlands Skyseed$() — red sand and terracotta."
+      "text": "The $(item)Badlands Skyseed$() — red sand and terracotta. Red sand comes from a $(bold)Desert seed thrown over a badlands$(); bake clay into terracotta."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:badlands_large_skyseed",
-      "text": "The $(item)Large Badlands Skyseed$() — a towering banded mesa."
+      "text": "The $(item)Large Badlands Skyseed$() — red sand and terracotta. A towering, banded mesa rich in gold."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:ancient_skyseed",
-      "text": "The $(item)Ancient Skyseed$() — deepslate and cobbled deepslate."
+      "text": "The $(item)Ancient Skyseed$() — deepslate and cobbled deepslate. Dig the core of a $(bold)Rocky island thrown deep$(), down near the world's floor."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:ancient_large_skyseed",
-      "text": "The $(item)Large Ancient Skyseed$() — a deep slab, diamonds and geodes."
+      "text": "The $(item)Large Ancient Skyseed$() — deepslate from a deep Rocky throw. A huge slab of the deep — diamonds and geodes."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:lush_skyseed",
-      "text": "The $(item)Lush Skyseed$() — moss block and azalea."
+      "text": "The $(item)Lush Skyseed$() — moss and azalea. Moss comes from an $(bold)Ancient island$(); the first azalea from a $(bold)Forest's$() bushes."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:lush_large_skyseed",
-      "text": "The $(item)Large Lush Skyseed$() — a bigger lush isle with a deep pool."
+      "text": "The $(item)Large Lush Skyseed$() — moss and azalea, grown into a bigger isle with a deep, glow-squid pool."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:aquatic_skyseed",
-      "text": "The $(item)Aquatic Skyseed$() — clay and sand."
+      "text": "The $(item)Aquatic Skyseed$() — clay and sand. Both come from a $(bold)Desert island$(): clay in its core, sand on top."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:aquatic_large_skyseed",
-      "text": "The $(item)Large Aquatic Skyseed$() — a proper deep lake."
+      "text": "The $(item)Large Aquatic Skyseed$() — clay and sand. A broad island around a proper deep lake."
     },
     {
       "type": "patchouli:crafting",
