@@ -26,6 +26,7 @@ public final class DevStructureGenerator {
             HamletTemplates.generateInto(base.resolve("hamlet"));
             TradePostTemplates.generateInto(base.resolve("trade_post"));
             VillageCenterTemplates.generateInto(base.resolve("village_center"));
+            AnimalTemplates.generateInto(base.resolve("animal"));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] dev structure template generation skipped: {}", e.toString());
         }

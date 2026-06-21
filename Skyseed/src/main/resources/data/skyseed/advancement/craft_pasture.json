@@ -1,0 +1,13 @@
+{
+  "criteria": {
+    "crafted_wool": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": { "recipe_id": "skyseed:pasture_skyseed_wool" }
+    },
+    "crafted_beef": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": { "recipe_id": "skyseed:pasture_skyseed_beef" }
+    }
+  },
+  "requirements": [ [ "crafted_wool", "crafted_beef" ] ]
+}

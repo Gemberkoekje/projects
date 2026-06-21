@@ -1,0 +1,16 @@
+{
+  "name": "Pasture Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:wheat",
+  "advancement": "skyseed:craft_pasture",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A fenced grass field with a hay bale, a water trough, and a small herd inside — the core early farm island. One throw gives you a breeding pair of $(bold)cows$(), $(bold)sheep$() or $(bold)pigs$() (or a mixed pair)."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Two ways to make it$()$(br)Whichever you catch first: $(item)Wool$() (from a sheep) or $(item)Raw Beef$() (from a cow), plus planks and dirt. Then breed the pair with wheat (cows/sheep) or carrots (pigs) and you're self-sufficient for food and leather."
+    }
+  ]
+}

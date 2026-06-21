@@ -1,0 +1,16 @@
+{
+  "name": "Poultry Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:egg",
+  "advancement": "skyseed:craft_poultry",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A little roofed coop — chickens jump fences, so this one is walled in. A small flock of $(bold)chickens$() comes with it, plus a composter for the seeds-and-eggs loop."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Eggs and feathers$()$(br)Made from a $(item)Feather$() and an $(item)Egg$() off a wandering chicken, plus dirt. Eggs throw into more chickens; feathers make arrows. The cheapest animal island, and a fine first one."
+    }
+  ]
+}

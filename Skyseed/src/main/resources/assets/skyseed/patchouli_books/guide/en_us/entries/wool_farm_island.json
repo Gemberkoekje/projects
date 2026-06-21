@@ -1,0 +1,16 @@
+{
+  "name": "Wool Farm Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:shears",
+  "advancement": "skyseed:craft_wool_farm",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A roomy hillside pen with a small flock of $(bold)sheep in assorted wool colours$() — renewable wool of every shade without hunting down dyes. The grass regrows as they graze, so shearing is endless."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Wool, in colour$()$(br)Made from $(item)2 Wool$() and an $(item)Iron Ingot$() (for shears — mine a Rocky island) plus dirt. Breed the colours you want; the colours you got are the luck of the throw, with a rare chance of the elusive pink sheep."
+    }
+  ]
+}

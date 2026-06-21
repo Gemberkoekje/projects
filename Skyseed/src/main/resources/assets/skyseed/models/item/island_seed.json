@@ -25,6 +25,11 @@
     { "predicate": { "custom_model_data": 19 }, "model": "skyseed:item/island_seed_aquatic_large" },
     { "predicate": { "custom_model_data": 20 }, "model": "skyseed:item/island_seed_hamlet" },
     { "predicate": { "custom_model_data": 21 }, "model": "skyseed:item/island_seed_trade_post" },
-    { "predicate": { "custom_model_data": 22 }, "model": "skyseed:item/island_seed_village_center" }
+    { "predicate": { "custom_model_data": 22 }, "model": "skyseed:item/island_seed_village_center" },
+    { "predicate": { "custom_model_data": 23 }, "model": "skyseed:item/island_seed_pasture" },
+    { "predicate": { "custom_model_data": 24 }, "model": "skyseed:item/island_seed_poultry" },
+    { "predicate": { "custom_model_data": 25 }, "model": "skyseed:item/island_seed_wool_farm" },
+    { "predicate": { "custom_model_data": 26 }, "model": "skyseed:item/island_seed_stable" },
+    { "predicate": { "custom_model_data": 27 }, "model": "skyseed:item/island_seed_aquarium" }
   ]
 }

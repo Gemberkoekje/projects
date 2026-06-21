@@ -50,6 +50,11 @@ public final class ModCreativeTabs {
                         output.accept(themedSeed("hamlet", "Hamlet Skyseed", 20));
                         output.accept(themedSeed("trade_post", "Trade Post Skyseed", 21));
                         output.accept(themedSeed("village_center", "Village Center Skyseed", 22));
+                        output.accept(themedSeed("pasture", "Pasture Skyseed", 23));
+                        output.accept(themedSeed("poultry", "Poultry Skyseed", 24));
+                        output.accept(themedSeed("wool_farm", "Wool Farm Skyseed", 25));
+                        output.accept(themedSeed("stable", "Stable Skyseed", 26));
+                        output.accept(themedSeed("aquarium", "Aquarium Skyseed", 27));
                     })
                     .build());
 

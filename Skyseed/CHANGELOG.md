@@ -3,6 +3,29 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.10.0] - 2026-06-21
+
+### Added
+- **Five Animal Islands** — dedicated farm islands, each a fenced enclosure (jigsaw-placed) with a guaranteed
+  pack of animals rolled inside:
+  - **Pasture** (`skyseed:pasture`) — a fenced field with a cow / sheep / pig breeding pair (weighted, sometimes
+    mixed), a hay bale and a water trough. Two unlock paths: wool OR raw beef, + planks + dirt.
+  - **Poultry** (`skyseed:poultry`) — a walled coop of four chickens with a composter. Feather + egg + dirt.
+  - **Wool Farm** (`skyseed:wool_farm`) — a roomy pen of five assorted-colour sheep. 2 wool + iron + dirt.
+  - **Stable** (`skyseed:stable`) — a three-stall stable of horses / donkeys (rare mule) plus a loot chest
+    with a chance of a saddle or horse armour. Leather + gold + planks.
+  - **Aquarium** (`skyseed:aquarium`) — a glass tank of turtles, axolotls, a squid and tropical fish over a
+    coral-and-sea-lantern floor. Turtle scute + prismarine shard + sand.
+  Each ships theme, recipe, advancement, guide entry and icon. Verified via RCON: correct packs, babies,
+  4-colour sheep spreads, stable loot chest, and submerged aquarium life.
+- **`animals` theme field** — a weighted list of packs; exactly one is rolled into the enclosure centre at
+  generation time. Each entry spawns N adults + N babies, sheep are given a random wool colour, and aquatic
+  animals are spawned submerged. The enclosure itself is the theme's `jigsaw` structure.
+
+### Changed
+- `levelStructurePad` now lays the foundation in the theme's own surface/fill blocks (so the sand Aquarium
+  gets a sand pad rather than a grass ring) instead of always grass over dirt.
+
 ## [0.9.0] - 2026-06-21
 
 ### Added

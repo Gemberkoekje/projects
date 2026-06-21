@@ -125,6 +125,36 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:pasture_skyseed_wool",
+      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$(), planks and dirt. A fenced field of cows, sheep or pigs."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:pasture_skyseed_beef",
+      "text": "$(italic)Same Pasture Skyseed$(), the other way: $(item)Raw Beef$() instead of wool. Whichever animal you caught first."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:poultry_skyseed",
+      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$(), an $(item)Egg$() and dirt. A walled coop of chickens."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:wool_farm_skyseed",
+      "text": "The $(item)Wool Farm Skyseed$() — $(item)2 Wool$(), an iron ingot and dirt. A flock in every colour."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:stable_skyseed",
+      "text": "The $(item)Stable Skyseed$() — $(item)Leather$(), a $(item)Gold Ingot$() and planks. Horses, and a chest that might hold a saddle."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:aquarium_skyseed",
+      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$(), a $(item)Prismarine Shard$() and sand. A glass tank of turtles, axolotls and fish."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

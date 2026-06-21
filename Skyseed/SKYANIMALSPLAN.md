@@ -13,8 +13,13 @@ blocks above, so flowers/grass don't prevent it). Applied across Forest, Meadow,
 Frozen, Badlands, and Aquatic (and the Forest biome specials: taiga fox/wolf, jungle parrot, savanna
 horse/llama/armadillo, mushroom-fields mooshroom, desert rabbit).
 
-**Not yet built:** the dedicated **Animal Islands** (Pasture, Poultry, Wool Farm, Stable, Aquarium) and
-their fenced-enclosure structures; 1.21.5 biome mob variants (target is 1.21.1).
+**Built (v0.10.0):** all five dedicated **Animal Islands** — Pasture, Poultry, Wool Farm, Stable, Aquarium.
+Each is a jigsaw-placed fenced enclosure plus a guaranteed pack of animals rolled in via the new `animals`
+theme field (weighted packs → N adults + N babies; sheep get random wool colours; aquarium life spawns
+submerged in the glass tank; the Stable carries a `skyseed:chests/stable` loot chest). See the
+[Animal Islands](#animal-islands) section below for per-island detail.
+
+**Not yet built:** 1.21.5 biome mob variants (target is 1.21.1).
 
 (As of v0.2.1, Meadow bee nests are populated with bees — they emerge to pollinate and return home.
 As of v0.2.2, **water-spawned mobs** are in via a `pond.water_mobs` list: squid in Aquatic freshwater,

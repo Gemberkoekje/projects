@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:beef" },
+    { "tag": "minecraft:planks" },
+    { "item": "minecraft:dirt" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:pasture",
+      "minecraft:item_name": "\"Pasture Skyseed\"",
+      "minecraft:custom_model_data": 23
+    }
+  }
+}

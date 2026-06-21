@@ -1,0 +1,17 @@
+{
+  "shape": { "radius": { "min": 8, "max": 10 }, "rim_noise": 0.18, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3,
+    "surface_scatter": [ { "block": "minecraft:coarse_dirt", "chance": 0.12 } ] },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:animal/wool_pen", "target": "minecraft:bottom", "depth": 1, "pad": 6 },
+  "animals": [
+    { "weight": 1, "entries": [ { "entity": "minecraft:sheep", "adults": 5, "babies": 0 } ] }
+  ],
+  "variants": [
+    { "weight": 1, "name": "pasture", "decoration": {
+      "ground": [
+        { "block": "minecraft:short_grass", "chance": 0.20 },
+        { "block": "minecraft:dandelion", "chance": 0.03 }
+      ] } }
+  ]
+}

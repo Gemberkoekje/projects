@@ -1,0 +1,20 @@
+{
+  "shape": { "radius": { "min": 8, "max": 10 }, "rim_noise": 0.15, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:animal/aquarium", "target": "minecraft:bottom", "depth": 1, "pad": 6 },
+  "animals": [
+    { "weight": 1, "entries": [
+      { "entity": "minecraft:turtle", "adults": 2 },
+      { "entity": "minecraft:axolotl", "adults": 2 },
+      { "entity": "minecraft:squid", "adults": 1 },
+      { "entity": "minecraft:tropical_fish", "adults": 2 }
+    ] }
+  ],
+  "variants": [
+    { "weight": 1, "name": "shore", "decoration": {
+      "ground": [
+        { "block": "minecraft:dead_bush", "chance": 0.04 }
+      ] } }
+  ]
+}

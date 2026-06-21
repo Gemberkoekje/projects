@@ -1,0 +1,21 @@
+{
+  "shape": { "radius": { "min": 6, "max": 8 }, "rim_noise": 0.12, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:animal/pasture_pen", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+  "animals": [
+    { "weight": 4, "entries": [ { "entity": "minecraft:cow", "adults": 1, "babies": 1 } ] },
+    { "weight": 3, "entries": [ { "entity": "minecraft:sheep", "adults": 1, "babies": 1 } ] },
+    { "weight": 2, "entries": [ { "entity": "minecraft:pig", "adults": 1, "babies": 1 } ] },
+    { "weight": 1, "entries": [ { "entity": "minecraft:cow", "adults": 1 }, { "entity": "minecraft:sheep", "adults": 1 } ] }
+  ],
+  "variants": [
+    { "weight": 1, "name": "field", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 1, "spacing": 3 } ],
+      "ground": [
+        { "block": "minecraft:short_grass", "chance": 0.18 },
+        { "block": "minecraft:dandelion", "chance": 0.03 },
+        { "block": "minecraft:poppy", "chance": 0.02 }
+      ] } }
+  ]
+}

@@ -19,10 +19,12 @@ import java.util.List;
  * @param hives  bee-nest positions to populate with bees once placed
  * @param jigsaws jigsaw structures to assemble on the island once the terrain has landed; a villager is
  *                spawned at every bed found in each one
+ * @param animals dedicated Animal Island spawns — a rolled pack of farm animals placed in the enclosure
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
-                         List<BlockPos> hives, List<JigsawSite> jigsaws, RandomSource random) {
+                         List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
+                         RandomSource random) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}
@@ -32,6 +34,12 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      * spawns on top); for a water mob ({@code inWater}) {@code pos} is a pond water block (it spawns there).
      */
     public record MobSpawn(EntityType<?> type, BlockPos pos, boolean inWater) {}
+
+    /**
+     * A guaranteed Animal Island spawn placed in the enclosure. {@code baby} ages it down; {@code inWater}
+     * spawns it submerged (Aquarium). Sheep are given a random wool colour at spawn.
+     */
+    public record AnimalSpawn(EntityType<?> type, BlockPos pos, boolean baby, boolean inWater) {}
 
     /**
      * A jigsaw structure to assemble at {@code origin} (the anchor tile) once the terrain is down.

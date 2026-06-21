@@ -12,10 +12,12 @@ import java.util.Optional;
  * generator all key off the same theme ids. Loaded as the {@code skyseed:theme} datapack registry.
  * {@code jigsaw} optionally assembles a building (or cluster) on the surface from a jigsaw template pool,
  * like a vanilla village — e.g. a villager island's cottage — see {@code SKYVILLAGESPLAN.md}.
+ * {@code animals} optionally rolls one weighted pack of farm animals into the jigsaw enclosure's centre,
+ * for the dedicated Animal Islands — see {@code SKYANIMALSPLAN.md}.
  */
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
-                          Optional<JigsawConfig> jigsaw) {
+                          Optional<JigsawConfig> jigsaw, List<AnimalPack> animals) {
     public static final Codec<IslandTheme> CODEC = RecordCodecBuilder.create(i -> i.group(
             Shape.CODEC.fieldOf("shape").forGetter(IslandTheme::shape),
             Palette.CODEC.fieldOf("palette").forGetter(IslandTheme::palette),
@@ -24,6 +26,7 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             BiomeOverride.CODEC.listOf().optionalFieldOf("biome_overrides", List.of()).forGetter(IslandTheme::biomeOverrides),
             Pond.CODEC.optionalFieldOf("pond").forGetter(IslandTheme::pond),
             MobEntry.CODEC.listOf().optionalFieldOf("mobs", List.of()).forGetter(IslandTheme::mobs),
-            JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(IslandTheme::jigsaw)
+            JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(IslandTheme::jigsaw),
+            AnimalPack.CODEC.listOf().optionalFieldOf("animals", List.of()).forGetter(IslandTheme::animals)
     ).apply(i, IslandTheme::new));
 }

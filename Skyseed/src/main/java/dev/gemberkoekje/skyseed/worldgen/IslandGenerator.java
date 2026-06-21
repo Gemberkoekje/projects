@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed.worldgen;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.BlockPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
+import dev.gemberkoekje.skyseed.worldgen.theme.AnimalPack;
 import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
@@ -186,12 +187,17 @@ public final class IslandGenerator {
         // building (or cluster) is assembled centred on the island after the terrain lands (GenerationJob),
         // and a villager is spawned at every bed in it.
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
+        final List<IslandPlan.AnimalSpawn> animals = new ArrayList<>();
         if (theme.jigsaw().isPresent()) {
             final JigsawConfig jc = theme.jigsaw().get();
             final int gy = center.getY() + topDome;
-            levelStructurePad(blockMap, surfaceList, center, gy, jc.pad());
+            levelStructurePad(blockMap, surfaceList, center, gy, jc.pad(), surface, fill);
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy, center.getZ())));
+            // Dedicated Animal Islands: roll one weighted pack into the enclosure centre.
+            if (!theme.animals().isEmpty()) {
+                rollAnimals(theme.animals(), new BlockPos(center.getX(), gy, center.getZ()), animals, random);
+            }
         }
 
         final List<TreeSite> trees = new ArrayList<>();
@@ -230,14 +236,48 @@ public final class IslandGenerator {
             }
         }
 
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, random);
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random);
+    }
+
+    /** Entity types that must be spawned submerged (Aquarium) — they die if placed on dry land. */
+    private static final java.util.Set<EntityType<?>> AQUATIC = java.util.Set.of(
+            EntityType.AXOLOTL, EntityType.SQUID, EntityType.GLOW_SQUID, EntityType.TURTLE,
+            EntityType.TROPICAL_FISH, EntityType.COD, EntityType.SALMON, EntityType.PUFFERFISH, EntityType.DOLPHIN);
+
+    /** Pick one weighted pack and expand it into concrete animal spawns jittered around the enclosure centre. */
+    private static void rollAnimals(List<AnimalPack> packs, BlockPos center, List<IslandPlan.AnimalSpawn> out, RandomSource random) {
+        final int total = packs.stream().mapToInt(AnimalPack::weight).sum();
+        if (total <= 0) {
+            return;
+        }
+        int roll = random.nextInt(total);
+        AnimalPack chosen = packs.get(0);
+        for (AnimalPack p : packs) {
+            if (roll < p.weight()) {
+                chosen = p;
+                break;
+            }
+            roll -= p.weight();
+        }
+        for (AnimalPack.Entry e : chosen.entries()) {
+            final EntityType<?> type = resolveEntity(e.entity());
+            if (type == null) {
+                continue;
+            }
+            final boolean water = AQUATIC.contains(type);
+            for (int i = 0; i < e.adults() + e.babies(); i++) {
+                final int dx = random.nextInt(3) - 1;
+                final int dz = random.nextInt(3) - 1;
+                // Land: stand on the pad (pos = surface, spawn goes on top). Water: a block up, inside the tank.
+                final BlockPos pos = new BlockPos(center.getX() + dx, center.getY() + (water ? 1 : 0), center.getZ() + dz);
+                out.add(new IslandPlan.AnimalSpawn(type, pos, i >= e.adults(), water));
+            }
+        }
     }
 
     /** Flatten a {@code pad}-radius square to {@code gy} for a building: clear above, solid below, no decoration. */
     private static void levelStructurePad(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
-                                          BlockPos center, int gy, int pad) {
-        final BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
-        final BlockState dirt = Blocks.DIRT.defaultBlockState();
+                                          BlockPos center, int gy, int pad, BlockState surface, BlockState fill) {
         final int pad2 = pad * pad;
         // A disc, not a square: the village footprints are plus-shaped (corners empty), so a round pad
         // covers them while staying inside a round island's rim — square corners would float past the edge.
@@ -251,9 +291,9 @@ public final class IslandGenerator {
                 for (int y = gy + 1; y <= gy + 10; y++) {
                     blockMap.remove(new BlockPos(wx, y, wz));
                 }
-                blockMap.put(new BlockPos(wx, gy, wz), grass);
-                blockMap.put(new BlockPos(wx, gy - 1, wz), dirt);
-                blockMap.put(new BlockPos(wx, gy - 2, wz), dirt);
+                blockMap.put(new BlockPos(wx, gy, wz), surface);
+                blockMap.put(new BlockPos(wx, gy - 1, wz), fill);
+                blockMap.put(new BlockPos(wx, gy - 2, wz), fill);
             }
         }
         surfaceList.removeIf(p -> {

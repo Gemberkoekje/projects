@@ -1,0 +1,16 @@
+{
+  "name": "Stable Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:saddle",
+  "advancement": "skyseed:craft_stable",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A roofed three-stall stable with $(bold)horses$(), $(bold)donkeys$(), or — rarely — a $(bold)mule$() inside. A source of leather, and mounts for crossing between your larger islands."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Check the chest$()$(br)There's a chest in the stable with a chance of a $(item)Saddle$() or $(item)Horse Armor$() — neither of which you can craft, so this is the main reason to make one. Made from $(item)Leather$(), a $(item)Gold Ingot$() and planks."
+    }
+  ]
+}

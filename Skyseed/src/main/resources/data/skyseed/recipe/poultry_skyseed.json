@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:feather" },
+    { "item": "minecraft:egg" },
+    { "item": "minecraft:dirt" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:poultry",
+      "minecraft:item_name": "\"Poultry Skyseed\"",
+      "minecraft:custom_model_data": 24
+    }
+  }
+}
