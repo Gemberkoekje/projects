@@ -1,6 +1,6 @@
 # Skyseed — Sky Animals Content Plan
 
-This document covers all vanilla overworld passive and neutral mobs, their assignment to existing island types as sprinkles, and the dedicated **Animal Skyseed** island types. It is a content plan — see `skyseed.md` for architecture and `SKYISLANDSPLAN.md` for block/biome coverage.
+This document covers all vanilla overworld passive and neutral mobs, their assignment to existing island types as sprinkles, and the dedicated **Animal Skyseed** island types. It is a content plan — see [README.md](README.md) for architecture and `SKYISLANDSPLAN.md` for block/biome coverage.
 
 ---
 

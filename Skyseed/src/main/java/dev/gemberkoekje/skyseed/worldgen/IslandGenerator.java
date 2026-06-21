@@ -165,7 +165,10 @@ public final class IslandGenerator {
 
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
         final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
-        pondCfg.ifPresent(pond -> carvePond(blockMap, surfaceList, center, topDome, pond));
+        pondCfg.ifPresent(pond -> {
+            carvePond(blockMap, surfaceList, center, topDome, pond);
+            placePondPlants(blockMap, center, pond, random);
+        });
 
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
@@ -607,6 +610,62 @@ public final class IslandGenerator {
             int dz = p.getZ() - center.getZ();
             return dx * dx + dz * dz <= r2;
         });
+    }
+
+    /** Scatter water plants through a carved pond: lily pads on the surface, kelp/seagrass/coral on the floor. */
+    private static void placePondPlants(Map<BlockPos, BlockState> blockMap, BlockPos center, Pond pond, RandomSource random) {
+        if (pond.plants().isEmpty()) {
+            return;
+        }
+        final int r = Math.max(1, pond.radius());
+        final int r2 = r * r;
+        final int waterY = center.getY();
+        final int bottomY = waterY - Math.max(0, pond.depth() - 1);
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (dx * dx + dz * dz > r2) {
+                    continue;
+                }
+                final int wx = center.getX() + dx;
+                final int wz = center.getZ() + dz;
+                float roll = random.nextFloat();
+                for (GroundEntry g : pond.plants()) {
+                    roll -= g.chance();
+                    if (roll < 0) {
+                        if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                            plantInPond(blockMap, wx, wz, waterY, bottomY, g.block());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /** Place one water plant in a pond column; type decides placement (surface lily vs floor-rooted vs coral). */
+    private static void plantInPond(Map<BlockPos, BlockState> blockMap, int wx, int wz, int waterY, int bottomY, ResourceLocation id) {
+        final BlockPos floor = new BlockPos(wx, bottomY, wz); // lowest water block, resting on the island body
+        switch (id.getPath()) {
+            case "lily_pad" -> blockMap.put(new BlockPos(wx, waterY + 1, wz), Blocks.LILY_PAD.defaultBlockState());
+            case "kelp", "kelp_plant" -> {
+                for (int y = bottomY; y <= waterY; y++) {
+                    blockMap.put(new BlockPos(wx, y, wz), (y == waterY ? Blocks.KELP : Blocks.KELP_PLANT).defaultBlockState());
+                }
+            }
+            case "tall_seagrass" -> {
+                blockMap.put(floor, Blocks.TALL_SEAGRASS.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.LOWER));
+                if (bottomY + 1 <= waterY) {
+                    blockMap.put(floor.above(), Blocks.TALL_SEAGRASS.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.UPPER));
+                }
+            }
+            default -> {
+                BlockState st = BuiltInRegistries.BLOCK.get(id).defaultBlockState();
+                if (st.hasProperty(BlockStateProperties.WATERLOGGED)) {
+                    st = st.setValue(BlockStateProperties.WATERLOGGED, Boolean.TRUE); // coral fans, sea pickle, …
+                }
+                blockMap.put(floor, st);
+            }
+        }
     }
 
     private static Block resolveBlock(ResourceLocation id, Block fallback) {

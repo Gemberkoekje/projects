@@ -1,0 +1,20 @@
+{
+  "name": "Aquatic Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:lily_pad",
+  "advancement": "skyseed:craft_aquatic",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Half land, half floating lake. A pool sits in its centre, fed with whatever grows in the water it lands over."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(). Over an ocean it becomes a warm reef — $(item)coral$(), sea pickles, even a rare $(item)sponge$()."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Mud & banks$()$(br)Over a swamp or mangrove it grows $(item)mud$() and mangroves. The bed is thick with $(item)clay$() and gravel — the point of the island."
+    }
+  ]
+}

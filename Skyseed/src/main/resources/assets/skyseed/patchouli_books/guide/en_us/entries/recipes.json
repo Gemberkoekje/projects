@@ -59,6 +59,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:aquatic_skyseed",
+      "text": "The $(item)Aquatic Skyseed$() — clay and sand."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

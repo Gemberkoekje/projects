@@ -29,11 +29,12 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Area | Built |
 |---|---|
 | Core loop | Throwable charge-to-launch seed → arm timer → germinate → tick-budgeted grow-in |
-| Themes (seeds) | **Forest** (`skyseed:forest`), **Large Forest** (`skyseed:forest_large`), **Rocky** (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`), **Ancient** (`skyseed:ancient`), **Lush** (`skyseed:lush`) |
+| Themes (seeds) | All 11 planned island types: **Forest**, **Large Forest**, **Rocky**, **Desert**, **Mushroom**, **Frozen**, **Meadow**, **Badlands**, **Ancient**, **Lush**, **Aquatic** (`skyseed:*`) |
 | Banded fill | `fill_bands` palette option: a Y-cycled body palette for badlands-style strata |
 | Underside decor | per-variant `underside` list: hanging dripstone, cave vines, spore blossoms, roots from the island's bottom |
 | Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
 | Hand-built trees | `skyseed:mangrove`, `skyseed:azalea` — trees whose vanilla features won't place on floating islands |
+| Pond water plants | `pond.plants` list: lily pads on the surface, kelp / seagrass / coral / sea pickle / wet sponge on the floor |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
@@ -44,7 +45,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | Patchouli book (Forest / Rocky / Large Forest entries, advancement-gated to "crafted it once") |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
-**Not built:** the final island type in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) — **Aquatic** (water-plant placement: kelp, coral, lily pads). Nether/End skyblock dimensions are a long-term goal.
+**All 11 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining work is polish (e.g. per-Y-band deepslate ores on Ancient, two-tall flowers on Meadow, sugar cane, bees-in-nests) and content beyond the island set — see the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
 
 ---
 
@@ -111,7 +112,7 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 
 **GroundEntry** — `block` id (required) · `chance` float per-column (required).
 
-**Pond** — `block` fluid id (`minecraft:water`) · `radius` int (3) · `depth` int (2). Walled by the domed rim and placed without block updates, so it stays still and never spills into the void.
+**Pond** — `block` fluid id (`minecraft:water`) · `radius` int (3) · `depth` int (2) · `plants` GroundEntry[] (`[]`; per-column water plants — `lily_pad` floats on the surface, `kelp` fills a column, `tall_seagrass` places both halves, and anything else roots on the floor, waterlogged if it can be). Walled by the domed rim and placed without block updates, so it stays still and never spills into the void.
 
 ### Biome overrides
 

@@ -1,0 +1,58 @@
+{
+  "shape": { "radius": { "min": 8, "max": 11 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [
+    { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 8, "max": 12 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:gravel", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
+  ],
+  "pond": {
+    "block": "minecraft:water", "radius": 4, "depth": 3,
+    "plants": [
+      { "block": "minecraft:lily_pad", "chance": 0.12 },
+      { "block": "minecraft:kelp", "chance": 0.15 },
+      { "block": "minecraft:seagrass", "chance": 0.18 },
+      { "block": "minecraft:tall_seagrass", "chance": 0.06 }
+    ]
+  },
+  "variants": [
+    { "weight": 1, "name": "freshwater", "decoration": {
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.03 } ] } }
+  ],
+  "biome_overrides": [
+    { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean" ], "surface": "minecraft:sand", "fill": "minecraft:sand",
+      "pond": {
+        "block": "minecraft:water", "radius": 4, "depth": 3,
+        "plants": [
+          { "block": "minecraft:tube_coral_block", "chance": 0.07 },
+          { "block": "minecraft:brain_coral_block", "chance": 0.06 },
+          { "block": "minecraft:bubble_coral_block", "chance": 0.06 },
+          { "block": "minecraft:fire_coral_block", "chance": 0.06 },
+          { "block": "minecraft:horn_coral_block", "chance": 0.06 },
+          { "block": "minecraft:tube_coral_fan", "chance": 0.05 },
+          { "block": "minecraft:fire_coral_fan", "chance": 0.04 },
+          { "block": "minecraft:sea_pickle", "chance": 0.08 },
+          { "block": "minecraft:kelp", "chance": 0.10 },
+          { "block": "minecraft:wet_sponge", "chance": 0.03 }
+        ]
+      },
+      "variants": [ { "weight": 1, "name": "warm", "decoration": {} } ] },
+
+    { "biomes": [ "minecraft:mangrove_swamp" ], "surface": "minecraft:mud",
+      "pond": {
+        "block": "minecraft:water", "radius": 4, "depth": 3,
+        "plants": [ { "block": "minecraft:seagrass", "chance": 0.15 }, { "block": "minecraft:lily_pad", "chance": 0.10 } ]
+      },
+      "variants": [ { "weight": 1, "name": "mangrove", "decoration": {
+        "trees": [ { "feature": "skyseed:mangrove", "tries": 5, "spacing": 2 } ],
+        "ground": [ { "block": "minecraft:short_grass", "chance": 0.08 } ] } } ] },
+
+    { "biomes": [ "minecraft:swamp" ], "surface": "minecraft:grass_block", "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.25 } ],
+      "pond": {
+        "block": "minecraft:water", "radius": 4, "depth": 3,
+        "plants": [ { "block": "minecraft:lily_pad", "chance": 0.18 }, { "block": "minecraft:seagrass", "chance": 0.10 } ]
+      },
+      "variants": [ { "weight": 1, "name": "swamp", "decoration": {
+        "trees": [ { "feature": "minecraft:swamp_oak", "tries": 3, "spacing": 3 } ],
+        "ground": [ { "block": "minecraft:blue_orchid", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 } ] } } ] }
+  ]
+}

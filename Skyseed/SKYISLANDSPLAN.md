@@ -8,7 +8,7 @@ This document covers all planned island types, their blocks, variants, Y-level o
 
 > This section reconciles the plan below with what is actually built. Everything after it is the **design target**; only a subset is live, and the build made one structural choice that reframes much of what follows.
 
-**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`, `fill_bands` strata), **Ancient** (`skyseed:ancient`), and **Lush** (`skyseed:lush`) — the last two using the new `underside` hanging-decoration feature. Only **Aquatic** remains (water-plant placement).
+**Seeds built — all 11:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large`), Rocky (`skyseed:rocky`), Desert (`skyseed:desert`), Mushroom (`skyseed:mushroom`), Frozen (`skyseed:frozen`), Meadow (`skyseed:meadow`), Badlands (`skyseed:badlands`, `fill_bands` strata), Ancient (`skyseed:ancient`) + Lush (`skyseed:lush`) (`underside` hanging decoration), and **Aquatic** (`skyseed:aquatic`, `pond.plants` water plants). The full island set is complete; remaining work is polish (see the per-island "As built" notes) and the sibling plans (`SKYANIMALSPLAN.md`, `THROWMODEPLAN.md`).
 
 **Engine features built:** datapack theme codec; biome-aware generation; Y-band overrides (`min_y`/`max_y`); contained ponds; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-column `surface_scatter`; snow peaks; curated start island; void world preset with multi-noise biomes; structures disabled; tick-budgeted placement; overlap safety; charge-to-throw distance; Patchouli guide (Forest / Rocky / Large Forest entries, advancement-gated).
 
@@ -312,6 +312,8 @@ I N
 ### 🌊 Aquatic ✨
 
 **Character:** A water-body island — part floating land, part floating lake. Primary source of clay, kelp, seagrass, coral, lily pads, and mangrove wood. Two distinct sub-identities: freshwater and warm ocean.
+
+> **As built (`skyseed:aquatic`):** a central pond (the new `pond.plants` feature) with clay- and gravel-rich beds. Sub-types are biome-overrides: **freshwater** (grass, lily pads + kelp + seagrass), **warm** over `#is_ocean` (sand, all five coral blocks + fans + sea pickle + a rare wet sponge), **mangrove** over mangrove swamp (mud + hand-built mangroves), and **swamp** (grass/mud + swamp oak + blue orchid). Recipe clay + sand. **Not done:** water-edge sugar cane (needs land-adjacent-to-water detection — deferred here and on Desert).
 
 **Unlocked by:** Clay (sprinkle from Desert island) + Sand or Gravel.
 
