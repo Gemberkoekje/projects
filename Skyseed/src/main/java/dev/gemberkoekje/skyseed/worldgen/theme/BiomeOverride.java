@@ -26,7 +26,8 @@ public record BiomeOverride(
         Optional<List<GroundEntry>> surfaceScatter,
         Optional<Shape> shape,
         Optional<List<OreEntry>> ores,
-        Optional<List<Variant>> variants) {
+        Optional<List<Variant>> variants,
+        Optional<Pond> pond) {
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().fieldOf("biomes").forGetter(BiomeOverride::biomes),
@@ -37,7 +38,8 @@ public record BiomeOverride(
             GroundEntry.CODEC.listOf().optionalFieldOf("surface_scatter").forGetter(BiomeOverride::surfaceScatter),
             Shape.CODEC.optionalFieldOf("shape").forGetter(BiomeOverride::shape),
             OreEntry.CODEC.listOf().optionalFieldOf("ores").forGetter(BiomeOverride::ores),
-            Variant.CODEC.listOf().optionalFieldOf("variants").forGetter(BiomeOverride::variants)
+            Variant.CODEC.listOf().optionalFieldOf("variants").forGetter(BiomeOverride::variants),
+            Pond.CODEC.optionalFieldOf("pond").forGetter(BiomeOverride::pond)
     ).apply(i, BiomeOverride::new));
 
     /** True if {@code biome} matches any of this override's biome ids/tags. */

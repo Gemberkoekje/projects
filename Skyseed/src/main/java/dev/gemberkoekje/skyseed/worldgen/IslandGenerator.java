@@ -10,6 +10,7 @@ import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreDepth;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Palette;
+import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
@@ -149,6 +150,10 @@ public final class IslandGenerator {
         if (!coreList.isEmpty()) {
             planOres(blockMap, ores, coreList, minCoreY, maxCoreY, random);
         }
+
+        // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
+        final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
+        pondCfg.ifPresent(pond -> carvePond(blockMap, surfaceList, center, topDome, pond));
 
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
@@ -334,6 +339,38 @@ public final class IslandGenerator {
                 }
             }
         }
+    }
+
+    /** Carve a contained pool into the island's top centre and keep decoration off those columns. */
+    private static void carvePond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
+                                  BlockPos center, int topDome, Pond pond) {
+        final BlockState water = resolveBlock(pond.block(), Blocks.WATER).defaultBlockState();
+        final int r = Math.max(1, pond.radius());
+        final int r2 = r * r;
+        final int waterY = center.getY();
+        final int bottomY = waterY - Math.max(0, pond.depth() - 1);
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (dx * dx + dz * dz > r2) {
+                    continue;
+                }
+                final int wx = center.getX() + dx;
+                final int wz = center.getZ() + dz;
+                // open the dome above the water surface
+                for (int y = waterY + 1; y <= center.getY() + topDome + 1; y++) {
+                    blockMap.remove(new BlockPos(wx, y, wz));
+                }
+                // fill the pool; blocks below the floor stay as the island body
+                for (int y = bottomY; y <= waterY; y++) {
+                    blockMap.put(new BlockPos(wx, y, wz), water);
+                }
+            }
+        }
+        surfaceList.removeIf(p -> {
+            int dx = p.getX() - center.getX();
+            int dz = p.getZ() - center.getZ();
+            return dx * dx + dz * dz <= r2;
+        });
     }
 
     private static Block resolveBlock(ResourceLocation id, Block fallback) {
