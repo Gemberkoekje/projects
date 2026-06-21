@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:deepslate" },
+    { "item": "minecraft:cobbled_deepslate" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:ancient",
+      "minecraft:item_name": "\"Ancient Skyseed\"",
+      "minecraft:custom_model_data": 8
+    }
+  }
+}

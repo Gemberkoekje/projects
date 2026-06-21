@@ -1,0 +1,20 @@
+{
+  "name": "Lush Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:flowering_azalea",
+  "advancement": "skyseed:craft_lush",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A cave garden afloat. Moss over rooted dirt, azalea trees above, and a tangle of roots, vines, and spore blossoms hanging beneath."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Greenery$()$(br)Big and small $(item)dripleaves$(), $(item)moss$(), $(item)glow berries$() on the underside, and the two sniffer plants — $(item)torchflower$() and $(item)pitcher plant$()."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Looks$()$(br)Garden, glow (berry-laden underside), and ancient-garden (spore blossoms). Moss comes from an Ancient island; the first azalea from a Forest sprinkle."
+    }
+  ]
+}

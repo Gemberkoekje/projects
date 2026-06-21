@@ -49,6 +49,16 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:ancient_skyseed",
+      "text": "The $(item)Ancient Skyseed$() — deepslate and cobbled deepslate."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:lush_skyseed",
+      "text": "The $(item)Lush Skyseed$() — moss block and azalea."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

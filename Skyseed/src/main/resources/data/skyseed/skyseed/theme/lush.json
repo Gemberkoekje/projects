@@ -1,0 +1,33 @@
+{
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": {
+    "surface": "minecraft:moss_block",
+    "fill": "minecraft:rooted_dirt",
+    "core": "minecraft:stone",
+    "fill_depth": 3
+  },
+  "ores": [],
+  "variants": [
+    { "weight": 3, "name": "garden", "decoration": {
+      "trees": [ { "feature": "skyseed:azalea", "tries": 4, "spacing": 3 } ],
+      "ground": [
+        { "block": "minecraft:moss_carpet", "chance": 0.45 },
+        { "block": "minecraft:big_dripleaf", "chance": 0.05 },
+        { "block": "minecraft:small_dripleaf", "chance": 0.07 },
+        { "block": "minecraft:torchflower", "chance": 0.02 },
+        { "block": "minecraft:pitcher_plant", "chance": 0.015 }
+      ],
+      "underside": [
+        { "block": "minecraft:hanging_roots", "chance": 0.15 },
+        { "block": "minecraft:cave_vines", "chance": 0.10 },
+        { "block": "minecraft:spore_blossom", "chance": 0.05 }
+      ] } },
+    { "weight": 2, "name": "glow", "decoration": {
+      "trees": [ { "feature": "skyseed:azalea", "tries": 2, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.40 }, { "block": "minecraft:small_dripleaf", "chance": 0.05 } ],
+      "underside": [ { "block": "minecraft:cave_vines", "chance": 0.30 }, { "block": "minecraft:hanging_roots", "chance": 0.05 } ] } },
+    { "weight": 1, "name": "ancient_garden", "decoration": {
+      "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.50 }, { "block": "minecraft:small_dripleaf", "chance": 0.04 } ],
+      "underside": [ { "block": "minecraft:spore_blossom", "chance": 0.12 }, { "block": "minecraft:hanging_roots", "chance": 0.10 } ] } }
+  ]
+}

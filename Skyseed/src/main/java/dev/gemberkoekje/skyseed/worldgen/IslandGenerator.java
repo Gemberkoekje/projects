@@ -15,6 +15,7 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -25,9 +26,13 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.block.state.properties.DripstoneThickness;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
@@ -103,6 +108,7 @@ public final class IslandGenerator {
         final Map<BlockPos, BlockState> blockMap = new LinkedHashMap<>();
         final List<BlockPos> coreList = new ArrayList<>();
         final List<BlockPos> surfaceList = new ArrayList<>();
+        final List<BlockPos> bottomList = new ArrayList<>(); // lowest block of each column, for underside hangs
         int minCoreY = Integer.MAX_VALUE;
         int maxCoreY = Integer.MIN_VALUE;
 
@@ -149,6 +155,7 @@ public final class IslandGenerator {
                         maxCoreY = Math.max(maxCoreY, y);
                     }
                 }
+                bottomList.add(new BlockPos(wx, bottomY, wz));
             }
         }
 
@@ -162,7 +169,7 @@ public final class IslandGenerator {
 
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
-            planDecoration(level, blockMap, trees, surfaceList, variant.decoration(), random);
+            planDecoration(level, blockMap, trees, surfaceList, bottomList, variant.decoration(), random);
         }
 
         // Waterfalls: short static cascades off the rim (block placements, no flow physics).
@@ -324,7 +331,8 @@ public final class IslandGenerator {
     }
 
     private static void planDecoration(ServerLevel level, Map<BlockPos, BlockState> blockMap, List<TreeSite> trees,
-                                       List<BlockPos> surfaceList, Decoration deco, RandomSource random) {
+                                       List<BlockPos> surfaceList, List<BlockPos> bottomList, Decoration deco,
+                                       RandomSource random) {
         if (surfaceList.isEmpty()) {
             return;
         }
@@ -338,7 +346,8 @@ public final class IslandGenerator {
             final boolean custom = tree.feature().getNamespace().equals(Skyseed.MODID);
             ConfiguredFeature<?, ?> feature = null;
             if (custom) {
-                if (!tree.feature().getPath().equals("mangrove")) {
+                final String path = tree.feature().getPath();
+                if (!path.equals("mangrove") && !path.equals("azalea")) {
                     Skyseed.LOGGER.warn("[skyseed] unknown built-in tree '{}' — skipping", tree.feature());
                     continue;
                 }
@@ -365,7 +374,12 @@ public final class IslandGenerator {
                 }
                 treeBases.add(base);
                 if (custom) {
-                    buildMangrove(blockMap, base, random); // hand-built into the streamed block list
+                    // hand-built into the streamed block list (vanilla features that won't place here)
+                    if (tree.feature().getPath().equals("azalea")) {
+                        buildAzalea(blockMap, base, random);
+                    } else {
+                        buildMangrove(blockMap, base, random);
+                    }
                 } else {
                     trees.add(new TreeSite(feature, base.above()));
                 }
@@ -383,12 +397,74 @@ public final class IslandGenerator {
                     roll -= g.chance();
                     if (roll < 0) {
                         if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                            blockMap.put(above, BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState());
+                            placeGround(blockMap, above, BuiltInRegistries.BLOCK.get(g.block()));
                         }
                         break;
                     }
                 }
             }
+        }
+
+        planUnderside(blockMap, bottomList, deco.underside(), random);
+    }
+
+    /** Place a ground plant, expanding two-tall plants (dripleaves, pitcher plant, tall flowers) into both halves. */
+    private static void placeGround(Map<BlockPos, BlockState> blockMap, BlockPos above, Block block) {
+        if (block instanceof DoublePlantBlock) {
+            blockMap.put(above, block.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.LOWER));
+            blockMap.put(above.above(), block.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.UPPER));
+        } else {
+            blockMap.put(above, block.defaultBlockState());
+        }
+    }
+
+    /** Hang per-column features from the island's underside: dripstone, cave vines, spore blossoms, roots. */
+    private static void planUnderside(Map<BlockPos, BlockState> blockMap, List<BlockPos> bottomList,
+                                      List<GroundEntry> cfg, RandomSource random) {
+        if (cfg.isEmpty() || bottomList.isEmpty()) {
+            return;
+        }
+        for (BlockPos bottom : bottomList) {
+            float roll = random.nextFloat();
+            for (GroundEntry g : cfg) {
+                roll -= g.chance();
+                if (roll < 0) {
+                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                        hangUnder(blockMap, bottom, g.block(), random);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    /** Build a single hanging feature under {@code bottom} (a column's lowest block). */
+    private static void hangUnder(Map<BlockPos, BlockState> blockMap, BlockPos bottom, ResourceLocation id, RandomSource random) {
+        final BlockPos first = bottom.below();
+        if (blockMap.containsKey(first)) {
+            return;
+        }
+        switch (id.getPath()) {
+            case "pointed_dripstone" -> {
+                final int len = 1 + random.nextInt(3); // 1-3 tall stalactite
+                for (int i = 0; i < len; i++) {
+                    final DripstoneThickness th = (len == 1 || i == len - 1) ? DripstoneThickness.TIP
+                            : (i == 0) ? (len >= 3 ? DripstoneThickness.BASE : DripstoneThickness.FRUSTUM)
+                            : DripstoneThickness.MIDDLE;
+                    blockMap.put(bottom.below(i + 1), Blocks.POINTED_DRIPSTONE.defaultBlockState()
+                            .setValue(BlockStateProperties.VERTICAL_DIRECTION, Direction.DOWN)
+                            .setValue(BlockStateProperties.DRIPSTONE_THICKNESS, th));
+                }
+            }
+            case "cave_vines", "cave_vines_plant" -> {
+                final int len = 1 + random.nextInt(4); // 1-4 trailing vine, berries lit
+                for (int i = 0; i < len; i++) {
+                    final boolean tip = i == len - 1;
+                    blockMap.put(bottom.below(i + 1), (tip ? Blocks.CAVE_VINES : Blocks.CAVE_VINES_PLANT)
+                            .defaultBlockState().setValue(BlockStateProperties.BERRIES, Boolean.TRUE));
+                }
+            }
+            default -> blockMap.put(first, BuiltInRegistries.BLOCK.get(id).defaultBlockState());
         }
     }
 
@@ -429,6 +505,37 @@ public final class IslandGenerator {
                     continue; // trim corners
                 }
                 blockMap.putIfAbsent(new BlockPos(gx + dx, y, gz + dz), leaves);
+            }
+        }
+    }
+
+    /** A hand-built azalea tree (oak trunk + persistent azalea / flowering-azalea canopy). */
+    private static void buildAzalea(Map<BlockPos, BlockState> blockMap, BlockPos ground, RandomSource random) {
+        final BlockState log = Blocks.OAK_LOG.defaultBlockState();
+        final BlockState leaves = Blocks.AZALEA_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, Boolean.TRUE);
+        final BlockState flowering = Blocks.FLOWERING_AZALEA_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, Boolean.TRUE);
+        final int gx = ground.getX(), gy = ground.getY(), gz = ground.getZ();
+        final int trunk = 2 + random.nextInt(2); // 2-3 logs
+        for (int i = 1; i <= trunk; i++) {
+            blockMap.put(new BlockPos(gx, gy + i, gz), log);
+        }
+        final int topY = gy + trunk;
+        azaleaLayer(blockMap, gx, topY, gz, 2, true, leaves, flowering, random);
+        azaleaLayer(blockMap, gx, topY + 1, gz, 1, false, leaves, flowering, random);
+        blockMap.putIfAbsent(new BlockPos(gx, topY + 2, gz), random.nextInt(3) == 0 ? flowering : leaves);
+    }
+
+    private static void azaleaLayer(Map<BlockPos, BlockState> blockMap, int gx, int y, int gz, int radius,
+                                    boolean skipCenter, BlockState leaves, BlockState flowering, RandomSource random) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (skipCenter && dx == 0 && dz == 0) {
+                    continue; // trunk
+                }
+                if (Math.abs(dx) == radius && Math.abs(dz) == radius) {
+                    continue; // trim corners
+                }
+                blockMap.putIfAbsent(new BlockPos(gx + dx, y, gz + dz), random.nextInt(4) == 0 ? flowering : leaves);
             }
         }
     }

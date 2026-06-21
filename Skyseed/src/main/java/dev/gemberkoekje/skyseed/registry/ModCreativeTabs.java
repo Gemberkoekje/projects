@@ -35,6 +35,8 @@ public final class ModCreativeTabs {
                         output.accept(themedSeed("frozen", "Frozen Skyseed", 5));
                         output.accept(themedSeed("meadow", "Meadow Skyseed", 6));
                         output.accept(themedSeed("badlands", "Badlands Skyseed", 7));
+                        output.accept(themedSeed("ancient", "Ancient Skyseed", 8));
+                        output.accept(themedSeed("lush", "Lush Skyseed", 9));
                     })
                     .build());
 

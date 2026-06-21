@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:moss_block" },
+    { "item": "minecraft:azalea" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:lush",
+      "minecraft:item_name": "\"Lush Skyseed\"",
+      "minecraft:custom_model_data": 9
+    }
+  }
+}

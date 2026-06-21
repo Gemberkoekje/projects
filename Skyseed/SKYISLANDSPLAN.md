@@ -8,7 +8,7 @@ This document covers all planned island types, their blocks, variants, Y-level o
 
 > This section reconciles the plan below with what is actually built. Everything after it is the **design target**; only a subset is live, and the build made one structural choice that reframes much of what follows.
 
-**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), and **Badlands** (`skyseed:badlands`, using the new `fill_bands` strata feature). The remaining three (Aquatic, Ancient, Lush) are **not yet built** — each still needs engine work (underside decoration, or water-plant placement).
+**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`, `fill_bands` strata), **Ancient** (`skyseed:ancient`), and **Lush** (`skyseed:lush`) — the last two using the new `underside` hanging-decoration feature. Only **Aquatic** remains (water-plant placement).
 
 **Engine features built:** datapack theme codec; biome-aware generation; Y-band overrides (`min_y`/`max_y`); contained ponds; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-column `surface_scatter`; snow peaks; curated start island; void world preset with multi-noise biomes; structures disabled; tick-budgeted placement; overlap safety; charge-to-throw distance; Patchouli guide (Forest / Rocky / Large Forest entries, advancement-gated).
 
@@ -358,6 +358,8 @@ _ _
 
 **Character:** The deep/cave island. Deepslate, tuff, moss, amethyst geode pockets, dripstone stalactites, sculk. Feels like a piece of the deep underground suspended in sky. High value ores in deepslate form, plus sculk components for redstone.
 
+> **As built (`skyseed:ancient`):** mossy-deepslate body (moss surface + deepslate scatter / tuff fill / deepslate core) with the full deepslate ore suite (coal→diamond + emerald) plus dripstone/calcite/amethyst/budding-amethyst clusters (amethyst clusters grow from budding over time). Deep-cave (dripstone + cave vines + hanging roots underside, moss carpet), geode (calcite surface), and deep-dark (sculk surface + catalyst/sensor/shrieker) variants. Recipe deepslate + cobbled deepslate (the moss gateway to Lush). **Not done:** the per-Y-band deepslate ore tables (single table for now, like the plan notes for Rocky), sculk veins (need a face).
+
 **Unlocked by:** Deepslate + Cobbled Deepslate — both from a deep-thrown Rocky island (Y ≤ 8). **No Lush dependency.** Ancient is the *gateway* that introduces moss into the progression: it generates a moss surface, and that moss is what later unlocks Lush. (This resolves the Lush ↔ Ancient moss deadlock — see Progression sketch.)
 
 **Recipe:** Deepslate + Cobbled Deepslate *(parallels Rocky's stone+cobblestone; if Ancient should demand actually reaching the abyss, swap one ingredient for an abyss-Rocky drop such as Redstone)*
@@ -446,6 +448,8 @@ Ancient gives slightly better odds than Rocky at equivalent Y bands — reward f
 ### 🌿 Lush ✨
 
 **Character:** The cave garden island. Moss, azalea trees, dripleaves, spore blossoms on the underside, glow berries trailing off the bottom. The most visually unique island — it grows *downward* as much as upward. Primary source of all lush cave blocks and the two sniffer plants.
+
+> **As built (`skyseed:lush`):** moss surface / rooted-dirt fill / stone core; hand-built azalea trees (`skyseed:azalea` — vanilla's `rooted_azalea_tree` feature refuses to place on floating islands); big + small dripleaf, moss carpet, torchflower, and pitcher plant on top; hanging roots, berry-laden cave vines, and spore blossoms on the underside. Garden, glow (berry-heavy underside), and ancient-garden variants. Recipe moss block + azalea. **Not done:** side vines (need a face).
 
 **Unlocked by:** Moss Block (from Ancient island — Ancient is the gateway; see its entry) + Azalea. ✅ **Azalea bootstrap resolved:** the first azalea comes from a low-chance **Forest** sprinkle (see Forest → Sprinkles), so Lush never depends on a prior Lush. (Villager trade remains a fallback.)
 

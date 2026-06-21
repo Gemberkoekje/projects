@@ -29,8 +29,11 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Area | Built |
 |---|---|
 | Core loop | Throwable charge-to-launch seed → arm timer → germinate → tick-budgeted grow-in |
-| Themes (seeds) | **Forest** (`skyseed:forest`), **Large Forest** (`skyseed:forest_large`), **Rocky** (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`) |
+| Themes (seeds) | **Forest** (`skyseed:forest`), **Large Forest** (`skyseed:forest_large`), **Rocky** (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`), **Ancient** (`skyseed:ancient`), **Lush** (`skyseed:lush`) |
 | Banded fill | `fill_bands` palette option: a Y-cycled body palette for badlands-style strata |
+| Underside decor | per-variant `underside` list: hanging dripstone, cave vines, spore blossoms, roots from the island's bottom |
+| Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
+| Hand-built trees | `skyseed:mangrove`, `skyseed:azalea` — trees whose vanilla features won't place on floating islands |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
@@ -41,7 +44,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | Patchouli book (Forest / Rocky / Large Forest entries, advancement-gated to "crafted it once") |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
-**Not built:** the other 3 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) (Aquatic, Ancient, Lush) — these still need engine work (underside-hanging decoration for Ancient/Lush; water-plant placement for Aquatic). Nether/End skyblock dimensions are a long-term goal.
+**Not built:** the final island type in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) — **Aquatic** (water-plant placement: kelp, coral, lily pads). Nether/End skyblock dimensions are a long-term goal.
 
 ---
 
@@ -102,9 +105,9 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 
 **OreEntry** — `block` (required) · `chance` float presence-roll (required) · `count` `{min,max}` veins (required) · `vein_size` `{min,max}` (required) · `depth` (`core` | `deep_core`; deep = lower ~40% of the core).
 
-**Variant** — `weight` int (1) · `name` string · `surface_override` block id · `decoration` { `trees`: TreeEntry[], `ground`: GroundEntry[] }.
+**Variant** — `weight` int (1) · `name` string · `surface_override` block id · `decoration` { `trees`: TreeEntry[], `ground`: GroundEntry[], `underside`: GroundEntry[] }. `underside` entries hang from each column's bottom face — `pointed_dripstone` and `cave_vines` build multi-block strands; others (spore blossom, hanging roots, …) hang one block. A `ground` entry that resolves to a two-tall plant (dripleaf, pitcher plant, tall flower) places both halves.
 
-**TreeEntry** — `feature` id (required; a vanilla configured feature, or **`skyseed:mangrove`** for the hand-built mangrove) · `tries` int (3) · `spacing` int (3).
+**TreeEntry** — `feature` id (required; a vanilla configured feature, or a built-in hand-built tree: **`skyseed:mangrove`**, **`skyseed:azalea`**) · `tries` int (3) · `spacing` int (3).
 
 **GroundEntry** — `block` id (required) · `chance` float per-column (required).
 
