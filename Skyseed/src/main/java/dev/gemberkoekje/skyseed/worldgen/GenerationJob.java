@@ -12,6 +12,8 @@ import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 /**
  * Drains an {@link IslandPlan} into the world a bounded number of blocks per tick, so an island never
@@ -61,12 +63,22 @@ public final class GenerationJob {
         }
 
         if (!mobsSpawned) {
+            placeStructures();
             spawnMobs();
             populateHives();
             spawnVillagers();
             mobsSpawned = true;
         }
         return true;
+    }
+
+    /** Stamp the planned NBT building templates onto the terrain once it has all landed. */
+    private void placeStructures() {
+        for (IslandPlan.StructurePlacement sp : plan.structures()) {
+            StructureTemplate template = level.getStructureManager().getOrCreate(sp.template());
+            StructurePlaceSettings settings = new StructurePlaceSettings();
+            template.placeInWorld(level, sp.origin(), sp.origin(), settings, plan.random(), Block.UPDATE_CLIENTS);
+        }
     }
 
     /** Spawn curated villagers (e.g. a Hamlet's resident) — adult, dressed for the biome, with a bed nearby to claim. */

@@ -18,10 +18,12 @@ import java.util.List;
  * @param mobs   animals to spawn on the surface once the island is fully placed
  * @param hives  bee-nest positions to populate with bees once placed
  * @param villagers villagers to spawn once placed (for the village islands' curated structures)
+ * @param structures NBT building templates to stamp on the island once the terrain has landed
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
-                         List<BlockPos> hives, List<VillagerSpawn> villagers, RandomSource random) {
+                         List<BlockPos> hives, List<VillagerSpawn> villagers,
+                         List<StructurePlacement> structures, RandomSource random) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}
@@ -34,4 +36,7 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
 
     /** A villager to spawn inside a curated structure. {@code profession} empty = unemployed (player assigns it). */
     public record VillagerSpawn(BlockPos pos, String profession) {}
+
+    /** An NBT structure template to place at {@code origin} (its 0,0,0 corner) once the terrain is down. */
+    public record StructurePlacement(net.minecraft.resources.ResourceLocation template, BlockPos origin) {}
 }

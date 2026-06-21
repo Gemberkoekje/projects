@@ -7,6 +7,7 @@ import dev.gemberkoekje.skyseed.registry.ModDataComponents;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
+import dev.gemberkoekje.skyseed.worldgen.structure.DevStructureGenerator;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -28,6 +29,7 @@ public class Skyseed {
         ModCreativeTabs.register(modEventBus);
         modEventBus.addListener(SkyseedRegistries::onNewDataPackRegistry);
         SkyseedNetwork.register(modEventBus);
+        modEventBus.addListener(DevStructureGenerator::onCommonSetup); // dev-only: emits building .nbt templates
         modContainer.registerConfig(ModConfig.Type.CLIENT, SkyseedClientConfig.SPEC);
 
         LOGGER.info("Skyseed loaded — item, theme component, throwable entity, and theme registry registered.");

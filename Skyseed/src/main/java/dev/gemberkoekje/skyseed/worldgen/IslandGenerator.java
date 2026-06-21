@@ -13,11 +13,13 @@ import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Palette;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
+import dev.gemberkoekje.skyseed.worldgen.theme.StructureChoice;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Vec3i;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -37,6 +39,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.DripstoneThickness;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -181,13 +184,21 @@ public final class IslandGenerator {
         }
         final int pondSurfaceY = pondSurfaceTmp;
 
-        // Curated structure (e.g. a Hamlet cottage): stamped before decoration so trees/ground skip it.
+        // Curated structure: pick one from the theme's weighted pool, level a pad and reserve its footprint
+        // now (so trees/ground skip it); the NBT template is stamped after the terrain lands (GenerationJob),
+        // with a villager on the centre tile.
         final List<IslandPlan.VillagerSpawn> villagers = new ArrayList<>();
-        if (theme.structure().isPresent()) {
-            final ResourceLocation st = theme.structure().get();
-            if (st.equals(ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "hamlet"))) {
-                final BlockPos villagerPos = HamletStructure.plan(blockMap, surfaceList, center, topDome);
-                villagers.add(new IslandPlan.VillagerSpawn(villagerPos, ""));
+        final List<IslandPlan.StructurePlacement> structures = new ArrayList<>();
+        if (!theme.structures().isEmpty()) {
+            final StructureChoice choice = pickStructure(theme.structures(), random);
+            final Optional<StructureTemplate> tmpl = level.getStructureManager().get(choice.template());
+            if (tmpl.isPresent() && tmpl.get().getSize().getX() > 0 && tmpl.get().getSize().getZ() > 0) {
+                final Vec3i size = tmpl.get().getSize();
+                final int gy = center.getY() + topDome;
+                final BlockPos origin = new BlockPos(center.getX() - size.getX() / 2, gy, center.getZ() - size.getZ() / 2);
+                levelStructurePad(blockMap, surfaceList, center, gy, size);
+                structures.add(new IslandPlan.StructurePlacement(choice.template(), origin));
+                villagers.add(new IslandPlan.VillagerSpawn(new BlockPos(center.getX(), gy + 1, center.getZ()), ""));
             }
         }
 
@@ -227,7 +238,49 @@ public final class IslandGenerator {
             }
         }
 
-        return new IslandPlan(blocks, trees, mobs, hives, villagers, random);
+        return new IslandPlan(blocks, trees, mobs, hives, villagers, structures, random);
+    }
+
+    /** Pick a building template from a theme's weighted pool. */
+    private static StructureChoice pickStructure(List<StructureChoice> choices, RandomSource random) {
+        int total = 0;
+        for (StructureChoice c : choices) {
+            total += Math.max(0, c.weight());
+        }
+        if (total <= 0) {
+            return choices.get(0);
+        }
+        int r = random.nextInt(total);
+        for (StructureChoice c : choices) {
+            r -= Math.max(0, c.weight());
+            if (r < 0) {
+                return c;
+            }
+        }
+        return choices.get(choices.size() - 1);
+    }
+
+    /** Flatten a pad (footprint + a 1-block yard) to {@code gy} for a building: clear above, solid below. */
+    private static void levelStructurePad(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
+                                          BlockPos center, int gy, Vec3i size) {
+        final BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
+        final BlockState dirt = Blocks.DIRT.defaultBlockState();
+        final int hx = size.getX() / 2 + 1;
+        final int hz = size.getZ() / 2 + 1;
+        final int top = gy + size.getY() + 2;
+        for (int dx = -hx; dx <= hx; dx++) {
+            for (int dz = -hz; dz <= hz; dz++) {
+                final int wx = center.getX() + dx;
+                final int wz = center.getZ() + dz;
+                for (int y = gy + 1; y <= top; y++) {
+                    blockMap.remove(new BlockPos(wx, y, wz));
+                }
+                blockMap.put(new BlockPos(wx, gy, wz), grass);
+                blockMap.put(new BlockPos(wx, gy - 1, wz), dirt);
+                blockMap.put(new BlockPos(wx, gy - 2, wz), dirt);
+            }
+        }
+        surfaceList.removeIf(p -> Math.abs(p.getX() - center.getX()) <= hx && Math.abs(p.getZ() - center.getZ()) <= hz);
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {

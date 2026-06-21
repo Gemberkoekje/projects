@@ -2,7 +2,11 @@
   "shape": { "radius": { "min": 9, "max": 11 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
-  "structure": "skyseed:hamlet",
+  "structures": [
+    { "template": "skyseed:hamlet/cottage_oak", "weight": 3 },
+    { "template": "skyseed:hamlet/cottage_spruce", "weight": 2 },
+    { "template": "skyseed:hamlet/cottage_small", "weight": 1 }
+  ],
   "variants": [
     { "weight": 1, "name": "yard", "decoration": {
       "ground": [

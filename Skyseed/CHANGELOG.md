@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.6.0] - 2026-06-21
+
+### Added
+- **NBT structure templating.** Buildings are now placed from `.nbt` structure templates (the standard
+  structure-block format) loaded at generation time and stamped onto a levelled pad. A theme carries a
+  weighted `structures` pool, so one of several buildings is chosen per island. This is the reusable
+  foundation for the larger village islands (Trade Post, Village Center) and future structure islands —
+  and you can drop in a structure-block-authored `.nbt` and add it to the pool.
+
+### Changed
+- **The Hamlet now varies.** Its cottage is picked from **three templates** (oak, spruce, and a small
+  cabin), so no two hamlets look quite alike — replacing the single hand-built cottage. The villager,
+  bed, recipe, and raid handling are unchanged.
+
 ## [0.5.2] - 2026-06-21
 
 ### Changed

@@ -18,9 +18,10 @@ The solution is to break the village into its constituent parts and spread them 
 
 ### 🏡 Hamlet Island ✨ (base villager island)
 
-> **Built (v0.5.0)** — `skyseed:hamlet`: a hand-built 7×7 oak cottage (bed, crafting table, torch,
-> windows, door) on a grassy isle, one unemployed villager dressed for the germination biome, recipe
-> planks + cobblestone + emerald. The villager claims the bed; raids are off (global gamerule).
+> **Built (v0.5.0, NBT templates in v0.6.0)** — `skyseed:hamlet`: a cottage on a grassy isle with one
+> unemployed villager dressed for the germination biome; recipe planks + cobblestone + emerald; the
+> villager claims the bed; raids are off (global gamerule). The cottage is one of **three NBT building
+> templates** (oak / spruce / small), picked per island from a weighted pool, so hamlets vary.
 
 **Character:** The starting point for the villager system. A small cobblestone-and-wood cottage — one building, one bed, one villager. The villager spawns as **Unemployed**, ready to take any profession the player provides via a job site block. No iron golem. No raids (see Raids section).
 
@@ -199,7 +200,14 @@ Rocky Island (mountain variant)
 ## Implementation notes
 
 - **Village islands are curated structures**, not procedurally generated. The terrain generates normally (grass/cobblestone palette), and the buildings are placed on top using the same "curated structure on generated terrain" path as Animal Islands.
-- **Structure placement (v0.5.0):** a theme can name a `structure`; the generator stamps it into the block plan before decoration. The Hamlet cottage is **hand-built** (`HamletStructure`, like the start island / trees) on a levelled 9×9 pad. The originally-planned **NBT `StructureTemplate`** loader is still the goal for the larger multi-building **Trade Post** and **Village Center** (and Animal/Structure Islands) — hand-coding those would be unwieldy — but a single small cottage was quicker to hand-build and let the villager/raid mechanics be validated first.
+- **Structure placement (NBT templates, v0.6.0):** a theme carries a weighted `structures` pool of building
+  templates (`StructureChoice` = template id + weight). At plan time the generator picks one, loads it via
+  `level.getStructureManager()`, levels a pad and reserves the footprint (so trees/ground skip it), then
+  `GenerationJob` stamps it with `StructureTemplate.placeInWorld`. Templates live at
+  `data/skyseed/structure/<path>.nbt` — standard structure-block format, so a structure-block-authored
+  `.nbt` drops straight in. Skyseed's own cottages are authored in code and emitted to `.nbt` at dev time
+  (`StructureWriter` + `HamletTemplates` + `DevStructureGenerator`); replace any file to override it. This
+  loader is the shared foundation for the **Trade Post** and **Village Center** (and Animal/Structure Islands).
 - **Villagers** are spawned from a new `IslandPlan.VillagerSpawn` step in `GenerationJob` (adult, biome-typed, persistence-required); the Hamlet's bed is a real POI the villager claims for restock/breeding.
 - **Villagers are spawned inside their buildings** at generation time, already assigned to their job site blocks (for Trade Post and Village Center). The Hamlet Island spawns an Unemployed Villager.
 - **No vanilla village POI registration** — don't register these as vanilla villages. This avoids raids, avoids iron golem overgeneration, and avoids the vanilla village-detection system making assumptions about the island layout.
