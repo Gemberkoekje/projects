@@ -24,6 +24,13 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🧟 Dungeon (Monster Room)
 
+> **Built (v0.13.0).** `skyseed:dungeon` — a small mossy cobblestone island carrying a sealed 5×5×5 cube:
+> a vanilla mob spawner (zombie/skeleton/spider via three weighted jigsaw variants) and two chests on the
+> vanilla `minecraft:chests/simple_dungeon` table. Sealed/dark so the spawner runs day and night. Built on
+> the existing jigsaw system (no new engine code) — spawner + chest are block-entity NBT in the `.nbt`.
+> Recipe: cobblestone ring around rotten flesh. **Deviation from "open top" below:** the cube is sealed so
+> the spawner stays dark and functional (an open-top spawner won't spawn in daylight); you break in instead.
+
 **Vanilla:** Underground cobblestone room with a mob spawner and 1–2 chests. Spawns zombies, skeletons, or spiders.
 
 **Skyblock translation:** A direct fit. A small cobblestone cube island with a spawner at its center and a chest on each side. The open-air context makes it more dangerous than vanilla (no walls to hide behind, mobs push you off) but the island is deliberately small to keep fights contained.
@@ -306,7 +313,7 @@ Dark Oak from Forest variant + Dungeon/Rocky progression
 - **Loot tables** should reuse vanilla loot table IDs where possible rather than reimplementing them — `minecraft:chests/simple_dungeon`, `minecraft:chests/desert_pyramid`, etc. are already defined and balanced.
 - **Trial spawners** scale to player count via vanilla mechanics — no custom implementation needed, just place the trial spawner block via structure placement.
 - **Mob spawner type** for Dungeon Island uses the vanilla dungeon spawner mechanic (random mob type on placement) — no need to hardcode a specific mob.
-- **A `structures` field on the theme codec** (not yet implemented) would connect island generation to structure placement. Structure islands are themes where the structure IS the island rather than a feature on top of it. The current codec has no such field — adding it is the first engine task for this plan.
+- **Structure placement reuses the existing `jigsaw` theme field** (added for the village/animal islands) — no separate `structures` field was needed. A structure island is a theme whose `jigsaw` pool *is* the structure: the generator levels a disc pad and assembles the `.nbt` at the centre. Loot chests and mob spawners are just block-entity NBT baked into the `.nbt` (the dungeon's spawner mob is chosen via three weighted pool variants; the Stable proved loot chests). Initial-mob spawns, if a structure wants them, can reuse the `animals` pack field. So the "first engine task" is already done — new structure islands are pure data + a code-authored `.nbt`.
 
 ---
 

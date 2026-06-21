@@ -1,0 +1,11 @@
+{
+  "shape": { "radius": { "min": 6, "max": 8 }, "rim_noise": 0.20, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:cobblestone", "fill": "minecraft:cobblestone", "core": "minecraft:stone", "fill_depth": 3,
+    "surface_scatter": [ { "block": "minecraft:mossy_cobblestone", "chance": 0.22 } ] },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:dungeon/rooms", "target": "minecraft:bottom", "depth": 1, "pad": 4 },
+  "variants": [
+    { "weight": 1, "name": "ruin", "decoration": {
+      "ground": [ { "block": "minecraft:cobweb", "chance": 0.05 } ] } }
+  ]
+}

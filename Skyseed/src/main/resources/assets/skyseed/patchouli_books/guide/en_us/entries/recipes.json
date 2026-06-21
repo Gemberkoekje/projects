@@ -154,6 +154,11 @@
       "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$(), a $(item)Prismarine Shard$() and sand. A glass tank of turtles, axolotls and fish."
     },
     {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:dungeon_skyseed",
+      "text": "The $(item)Dungeon Skyseed$() — cobblestone around a piece of $(item)rotten flesh$(). A sealed spawner cube with two loot chests."
+    },
+    {
       "type": "patchouli:text",
       "text": "$(bold)This Almanac$()$(br)Craft any single Skyseed on its own to turn it back into this book — so you'll never lose your way."
     }

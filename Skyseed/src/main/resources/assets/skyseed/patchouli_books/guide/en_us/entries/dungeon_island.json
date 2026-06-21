@@ -1,0 +1,20 @@
+{
+  "name": "Dungeon Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:spawner",
+  "advancement": "skyseed:craft_dungeon",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sealed, mossy cobblestone cube with a $(item)mob spawner$() humming in the dark and a loot chest on either wall. Break in, clear it out, and grab the chests before the spawns overwhelm you."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)What's inside$()$(br)The spawner runs zombies, skeletons or spiders — the luck of the throw. The chests hold the classic dungeon haul: saddles, iron, redstone, enchanted books, and the music discs $(italic)Cat$() and $(italic)13$() found nowhere else."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A mob farm in a box$()$(br)Sealed and dark, the spawner keeps producing — light it up to stop it, or build around it for a steady supply of drops. Made from cobblestone around a piece of $(item)rotten flesh$()."
+    }
+  ]
+}

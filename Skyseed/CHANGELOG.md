@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.13.0] - 2026-06-21
+
+### Added
+- **Dungeon Island** (`skyseed:dungeon`) — the first structure island (see `SKYSTRUCTURESPLAN.md`). A small
+  mossy cobblestone island carrying a sealed 5×5×5 cube: a vanilla mob spawner (zombie / skeleton / spider,
+  the luck of the throw) and two loot chests on the vanilla `minecraft:chests/simple_dungeon` table. Sealed
+  and dark so the spawner keeps running — break in, clear it, loot it (the music discs Cat and 13 are
+  dungeon-only). Crafted from cobblestone around a piece of rotten flesh. Ships theme, recipe, advancement,
+  guide entry and icon.
+  - Structure islands reuse the existing **jigsaw** system — no new engine field needed. The spawner and the
+    loot chests are block-entity NBT baked into the structure `.nbt` (the spawner's mob via three weighted
+    pool variants), and the loot reuses the vanilla table by id.
+
 ## [0.12.0] - 2026-06-21
 
 ### Changed
