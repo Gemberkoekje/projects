@@ -25,6 +25,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
@@ -158,6 +160,12 @@ public final class IslandGenerator {
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
             planDecoration(level, blockMap, trees, surfaceList, variant.decoration(), random);
+        }
+
+        // Waterfalls: short static cascades off the rim (block placements, no flow physics).
+        final int waterfalls = (ov != null && ov.waterfalls().isPresent()) ? ov.waterfalls().get() : 0;
+        if (waterfalls > 0) {
+            placeWaterfalls(blockMap, surfaceList, center, baseRadius, waterfalls, random);
         }
 
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
@@ -302,17 +310,29 @@ public final class IslandGenerator {
 
         final List<BlockPos> treeBases = new ArrayList<>();
         for (TreeEntry tree : deco.trees()) {
-            final Optional<ConfiguredFeature<?, ?>> feature = features.getOptional(tree.feature());
-            if (feature.isEmpty()) {
-                Skyseed.LOGGER.warn("[skyseed] theme references unknown feature '{}' — skipping", tree.feature());
-                continue;
+            // skyseed:* "features" are built-in hand-built trees (vanilla features that won't place
+            // dry, like mangroves); anything else is a vanilla configured feature placed afterwards.
+            final boolean custom = tree.feature().getNamespace().equals(Skyseed.MODID);
+            ConfiguredFeature<?, ?> feature = null;
+            if (custom) {
+                if (!tree.feature().getPath().equals("mangrove")) {
+                    Skyseed.LOGGER.warn("[skyseed] unknown built-in tree '{}' — skipping", tree.feature());
+                    continue;
+                }
+            } else {
+                Optional<ConfiguredFeature<?, ?>> resolved = features.getOptional(tree.feature());
+                if (resolved.isEmpty()) {
+                    Skyseed.LOGGER.warn("[skyseed] theme references unknown feature '{}' — skipping", tree.feature());
+                    continue;
+                }
+                feature = resolved.get();
             }
             final int spacingSq = tree.spacing() * tree.spacing();
             for (int i = 0; i < tree.tries(); i++) {
-                final BlockPos grass = surfaceList.get(random.nextInt(surfaceList.size()));
+                final BlockPos base = surfaceList.get(random.nextInt(surfaceList.size()));
                 boolean tooClose = false;
                 for (BlockPos t : treeBases) {
-                    if (t.distSqr(grass) < spacingSq) {
+                    if (t.distSqr(base) < spacingSq) {
                         tooClose = true;
                         break;
                     }
@@ -320,23 +340,109 @@ public final class IslandGenerator {
                 if (tooClose) {
                     continue;
                 }
-                treeBases.add(grass);
-                trees.add(new TreeSite(feature.get(), grass.above()));
+                treeBases.add(base);
+                if (custom) {
+                    buildMangrove(blockMap, base, random); // hand-built into the streamed block list
+                } else {
+                    trees.add(new TreeSite(feature, base.above()));
+                }
             }
         }
 
         if (!deco.ground().isEmpty()) {
             for (BlockPos grass : surfaceList) {
+                final BlockPos above = grass.above();
+                if (blockMap.containsKey(above)) {
+                    continue; // already a trunk/leaf/etc. from a hand-built tree
+                }
                 float roll = random.nextFloat();
                 for (GroundEntry g : deco.ground()) {
                     roll -= g.chance();
                     if (roll < 0) {
                         if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                            blockMap.put(grass.above(), BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState());
+                            blockMap.put(above, BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState());
                         }
                         break;
                     }
                 }
+            }
+        }
+    }
+
+    /** A hand-built mangrove (logs + roots + persistent leaves) added straight into the block plan. */
+    private static void buildMangrove(Map<BlockPos, BlockState> blockMap, BlockPos ground, RandomSource random) {
+        final BlockState log = Blocks.MANGROVE_LOG.defaultBlockState();
+        final BlockState leaves = Blocks.MANGROVE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, Boolean.TRUE);
+        final BlockState roots = Blocks.MANGROVE_ROOTS.defaultBlockState();
+        final BlockState muddy = Blocks.MUDDY_MANGROVE_ROOTS.defaultBlockState();
+        final int gx = ground.getX(), gy = ground.getY(), gz = ground.getZ();
+        final int trunk = 4 + random.nextInt(2); // 4-5 logs
+
+        blockMap.put(new BlockPos(gx, gy, gz), roots);
+        blockMap.put(new BlockPos(gx, gy - 1, gz), muddy);
+        for (int[] d : new int[][]{ {1, 0}, {-1, 0}, {0, 1}, {0, -1} }) {
+            if (random.nextInt(3) != 0) {
+                blockMap.put(new BlockPos(gx + d[0], gy, gz + d[1]), roots);
+            }
+        }
+        for (int i = 1; i <= trunk; i++) {
+            blockMap.put(new BlockPos(gx, gy + i, gz), log);
+        }
+        leafBlob(blockMap, gx, gy + trunk - 1, gz, 2, leaves);
+        leafBlob(blockMap, gx, gy + trunk, gz, 1, leaves);
+        blockMap.put(new BlockPos(gx, gy + trunk + 1, gz), leaves);
+        for (int[] d : new int[][]{ {1, 0}, {-1, 0}, {0, 1}, {0, -1} }) {
+            blockMap.put(new BlockPos(gx + d[0], gy + trunk + 1, gz + d[1]), leaves);
+        }
+    }
+
+    private static void leafBlob(Map<BlockPos, BlockState> blockMap, int gx, int y, int gz, int radius, BlockState leaves) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue; // trunk
+                }
+                if (Math.abs(dx) == radius && Math.abs(dz) == radius) {
+                    continue; // trim corners
+                }
+                blockMap.putIfAbsent(new BlockPos(gx + dx, y, gz + dz), leaves);
+            }
+        }
+    }
+
+    /** Short static cascades off the rim — a spring at the lip + a falling-water column down the side. */
+    private static void placeWaterfalls(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
+                                        BlockPos center, int baseRadius, int count, RandomSource random) {
+        final BlockState source = Blocks.WATER.defaultBlockState();
+        final BlockState falling = Blocks.WATER.defaultBlockState().setValue(LiquidBlock.LEVEL, 8);
+        final int minEdgeSq = (int) ((baseRadius * 0.6) * (baseRadius * 0.6));
+        final List<BlockPos> edges = new ArrayList<>();
+        for (BlockPos p : surfaceList) {
+            int dx = p.getX() - center.getX();
+            int dz = p.getZ() - center.getZ();
+            if (dx * dx + dz * dz >= minEdgeSq) {
+                edges.add(p);
+            }
+        }
+        final List<BlockPos> pick = edges.isEmpty() ? surfaceList : edges;
+        for (int n = 0; n < count; n++) {
+            final BlockPos c = pick.get(random.nextInt(pick.size()));
+            int dx = c.getX() - center.getX();
+            int dz = c.getZ() - center.getZ();
+            int ox = 0;
+            int oz = 0;
+            if (Math.abs(dx) >= Math.abs(dz)) {
+                ox = Integer.signum(dx);
+            } else {
+                oz = Integer.signum(dz);
+            }
+            if (ox == 0 && oz == 0) {
+                ox = 1;
+            }
+            final int topY = c.getY();
+            blockMap.put(new BlockPos(c.getX(), topY, c.getZ()), source); // spring at the lip
+            for (int k = 0; k <= 6; k++) {
+                blockMap.put(new BlockPos(c.getX() + ox, topY - k, c.getZ() + oz), falling); // cascade down the face
             }
         }
     }

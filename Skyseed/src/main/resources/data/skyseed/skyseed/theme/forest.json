@@ -32,10 +32,10 @@
       "ground": [ { "block": "minecraft:snow", "chance": 0.80 } ] } } ] },
 
     { "biomes": [ "minecraft:mangrove_swamp" ], "surface": "minecraft:mud", "pond": { "block": "minecraft:water", "radius": 3, "depth": 2 }, "variants": [ { "weight": 1, "decoration": {
-      "trees": [ { "feature": "minecraft:mangrove", "tries": 4, "spacing": 2 } ],
+      "trees": [ { "feature": "skyseed:mangrove", "tries": 4, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.10 } ] } } ] },
 
-    { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean", "#minecraft:is_river" ], "pond": { "block": "minecraft:water", "radius": 3, "depth": 2 }, "variants": [ { "weight": 1, "name": "lake", "decoration": {
+    { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean", "#minecraft:is_river" ], "pond": { "block": "minecraft:water", "radius": 3, "depth": 2 }, "waterfalls": 2, "variants": [ { "weight": 1, "name": "lake", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 2, "spacing": 4 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:blue_orchid", "chance": 0.03 } ] } } ] },
 
