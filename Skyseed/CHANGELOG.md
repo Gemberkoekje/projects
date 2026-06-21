@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.1] - 2026-06-21
+
+### Changed
+- Skyseed recipes now accept generic material groups where it makes sense, so you aren't forced to use
+  one specific variant:
+  - **Forest** — any planks (was oak planks).
+  - **Large Forest** — any logs, i.e. any tree (was oak logs).
+  - **Frozen** / **Large Frozen** — any ice (ice / packed ice / blue ice).
+  - **Lush** / **Large Lush** — azalea *or* flowering azalea.
+  Recipes that are intentionally variant-specific are unchanged (Rocky, Desert, Mushroom, Badlands,
+  Ancient, Aquatic) — e.g. red sand stays the Badlands signature and the two mushrooms stay required.
+
 ## [0.3.0] - 2026-06-21
 
 ### Added

@@ -6,7 +6,7 @@
     "DP"
   ],
   "key": {
-    "P": { "item": "minecraft:oak_planks" },
+    "P": { "tag": "minecraft:planks" },
     "D": { "item": "minecraft:dirt" }
   },
   "result": {

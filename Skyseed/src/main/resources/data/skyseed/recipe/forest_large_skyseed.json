@@ -7,7 +7,7 @@
     "LDL"
   ],
   "key": {
-    "L": { "item": "minecraft:oak_log" },
+    "L": { "tag": "minecraft:logs_that_burn" },
     "D": { "item": "minecraft:dirt" }
   },
   "result": {

@@ -7,7 +7,7 @@
   ],
   "key": {
     "N": { "item": "minecraft:snow_block" },
-    "I": { "item": "minecraft:ice" }
+    "I": { "tag": "minecraft:ice" }
   },
   "result": {
     "id": "skyseed:island_seed",
