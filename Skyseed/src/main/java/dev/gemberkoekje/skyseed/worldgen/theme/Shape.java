@@ -3,7 +3,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-/** Silhouette + vertical profile parameters (plan §5 step 1). */
+/** Silhouette + vertical profile parameters (README → Generation algorithm). */
 public record Shape(IntRange radius, float rimNoise, Underside underside, IntRange topDome) {
     public static final Codec<Shape> CODEC = RecordCodecBuilder.create(i -> i.group(
             IntRange.CODEC.fieldOf("radius").forGetter(Shape::radius),

@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 
 /**
- * The three layered blocks plus the dirt-band thickness (plan §5 step 2). {@code surface_scatter}
+ * The three layered blocks plus the dirt-band thickness (README → Generation algorithm). {@code surface_scatter}
  * optionally mixes other blocks into the surface per column (e.g. some sand among dirt). Block ids
  * resolved at gen time.
  */

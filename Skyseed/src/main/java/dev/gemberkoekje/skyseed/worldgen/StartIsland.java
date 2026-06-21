@@ -8,7 +8,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * The curated starting island (plan §6/§8): hand-authored block-by-block so it is soft-lock-proof by
+ * The curated starting island (README → World & progression setup): hand-authored block-by-block so it is soft-lock-proof by
  * construction — a small grass/dirt teardrop with one guaranteed oak tree. From this a player can
  * always craft the first (2×2, no table) Forest Skyseed: chop the tree → planks, dig the island →
  * dirt. Deliberately NOT procedural, so it can never roll without wood.

@@ -8,7 +8,7 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import java.util.List;
 
 /**
- * A fully computed island, ready to be placed into the world over several ticks (plan §5 tick-budget
+ * A fully computed island, ready to be placed into the world over several ticks (README → Generation algorithm tick-budget
  * guard). Produced by {@link IslandGenerator#planIsland} without touching the world, so it can be
  * overlap-checked and then drained by a {@link GenerationJob}.
  *

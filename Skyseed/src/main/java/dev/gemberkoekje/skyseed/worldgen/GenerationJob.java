@@ -6,7 +6,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 
 /**
  * Drains an {@link IslandPlan} into the world a bounded number of blocks per tick, so an island never
- * places thousands of blocks in a single tick (plan §5). The gradual fill doubles as a "grows in"
+ * places thousands of blocks in a single tick (README → Generation algorithm). The gradual fill doubles as a "grows in"
  * animation. Trees (configured features) are heavier than a setBlock, so they go a couple per tick
  * once the solid blocks have landed.
  */

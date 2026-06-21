@@ -10,7 +10,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * Mod items. There is a single Skyseed item ({@link #ISLAND_SEED}); themes are differentiated by the
- * {@link ModDataComponents#THEME} component, not by separate items — see plan §3.
+ * {@link ModDataComponents#THEME} component, not by separate items — see README → The Skyseed item.
  */
 public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Skyseed.MODID);

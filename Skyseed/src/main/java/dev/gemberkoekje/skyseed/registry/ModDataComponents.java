@@ -11,7 +11,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * Custom data components. The keystone is {@link #THEME}: a single id carried on every Skyseed item,
  * set by whichever recipe crafted it, and read later when the seed germinates. It keys off the same
- * theme-id namespace as recipes and (eventually) the theme datapack registry — see plan §3/§4.
+ * theme-id namespace as recipes and the theme datapack registry — see README → The Skyseed item / Configuration.
  */
 public final class ModDataComponents {
     public static final DeferredRegister.DataComponents DATA_COMPONENTS =

@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * A datapack-defined island theme: shape, palette, ore table, and weighted decoration variants.
- * This codec is the keystone (plan §4) — recipes, the {@code skyseed:theme} component, and the
+ * This codec is the keystone (README → Configuration) — recipes, the {@code skyseed:theme} component, and the
  * generator all key off the same theme ids. Loaded as the {@code skyseed:theme} datapack registry.
  */
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,

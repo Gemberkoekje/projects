@@ -44,7 +44,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
     /** Ticks from spawn to germination (~2 s at 20 tps). */
     public static final int ARM_DURATION = 40;
 
-    /** Upward lifts to try if the rest point's volume is already occupied (overlap safety, §5). */
+    /** Upward lifts to try if the rest point's volume is already occupied (overlap safety — see README → Generation algorithm). */
     private static final int[] NUDGE_STEPS = { 0, 8, 16, 24 };
 
     private int armTicks = 0;
@@ -112,13 +112,13 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         }
 
         // Overlap safety: try the rest point, then a few lifts, until the volume is clear enough.
-        // RNG decorrelated per island (worldSeed ^ center); throwCount folds in later (plan §5).
+        // RNG decorrelated per island (worldSeed ^ center) — see README → Generation algorithm.
         final BlockPos base = this.blockPosition();
         IslandPlan plan = null;
         for (int lift : NUDGE_STEPS) {
             BlockPos c = base.above(lift);
             RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-            // Island look can vary with the biome it lands in (plan: per-biome overrides).
+            // Island look can vary with the biome it lands in (README → Configuration → Biome overrides).
             IslandPlan candidate = IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
             if (!isTooCrowded(level, candidate)) {
                 plan = candidate;
@@ -138,7 +138,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         level.playSound(null, this.getX(), this.getY(), this.getZ(),
                 SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0F, 1.2F);
 
-        // Tick-budgeted placement: the scheduler grows the island in over the next ticks (plan §5).
+        // Tick-budgeted placement: the scheduler grows the island in over the next ticks (README → Generation algorithm).
         IslandGrowth.enqueue(new GenerationJob(level, plan));
 
         this.discard();

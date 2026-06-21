@@ -11,7 +11,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
-/** Places the curated starting island once, when a brand-new world is first created (plan §8). */
+/** Places the curated starting island once, when a brand-new world is first created (README → World & progression setup). */
 @EventBusSubscriber(modid = Skyseed.MODID)
 public final class WorldSetupEvents {
     private static final BlockPos FALLBACK_CENTER = new BlockPos(8, 100, 8);

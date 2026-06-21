@@ -41,7 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Computes an island (plan §5) from an {@link IslandTheme}, with the theme's base config overlaid by
+ * Computes an island (README → Generation algorithm) from an {@link IslandTheme}, with the theme's base config overlaid by
  * the first matching {@link BiomeOverride} for the biome the seed landed in. Near-pure: returns an
  * {@link IslandPlan} without writing the world (a {@link GenerationJob} drains it over ticks).
  */

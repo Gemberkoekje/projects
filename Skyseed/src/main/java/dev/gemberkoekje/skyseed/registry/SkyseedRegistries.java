@@ -9,7 +9,7 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
 
 /**
  * Custom datapack registries. {@link #THEME} holds {@link IslandTheme}s loaded from
- * {@code data/<namespace>/skyseed/theme/*.json}. Server-side only (generation is server-side, §10),
+ * {@code data/<namespace>/skyseed/theme/*.json}. Server-side only (generation is server-side — see README → Design decisions),
  * so no network codec is supplied.
  */
 public final class SkyseedRegistries {
