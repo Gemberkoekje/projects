@@ -21,9 +21,10 @@ public final class DevStructureGenerator {
         }
         try {
             // runServer/runClient working dir is the `run/` folder, a sibling of `src/`.
-            final Path dir = Path.of(System.getProperty("user.dir"))
-                    .resolveSibling("src").resolve("main/resources/data/skyseed/structure/hamlet");
-            HamletTemplates.generateInto(dir);
+            final Path base = Path.of(System.getProperty("user.dir"))
+                    .resolveSibling("src").resolve("main/resources/data/skyseed/structure");
+            HamletTemplates.generateInto(base.resolve("hamlet"));
+            TradePostTemplates.generateInto(base.resolve("trade_post"));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] dev structure template generation skipped: {}", e.toString());
         }

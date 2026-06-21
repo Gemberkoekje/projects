@@ -183,17 +183,15 @@ public final class IslandGenerator {
         final int pondSurfaceY = pondSurfaceTmp;
 
         // Curated structure: level a pad and reserve the footprint now (so trees/ground skip it); a jigsaw
-        // building is assembled centred on the island after the terrain lands (GenerationJob), with a
-        // villager on the centre tile (the cottage's anchor centres it there regardless of rotation).
-        final List<IslandPlan.VillagerSpawn> villagers = new ArrayList<>();
+        // building (or cluster) is assembled centred on the island after the terrain lands (GenerationJob),
+        // and a villager is spawned at every bed in it.
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
         if (theme.jigsaw().isPresent()) {
             final JigsawConfig jc = theme.jigsaw().get();
             final int gy = center.getY() + topDome;
             levelStructurePad(blockMap, surfaceList, center, gy, jc.pad());
-            jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(),
+            jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(),
                     new BlockPos(center.getX(), gy, center.getZ())));
-            villagers.add(new IslandPlan.VillagerSpawn(new BlockPos(center.getX(), gy + 1, center.getZ()), ""));
         }
 
         final List<TreeSite> trees = new ArrayList<>();
@@ -232,7 +230,7 @@ public final class IslandGenerator {
             }
         }
 
-        return new IslandPlan(blocks, trees, mobs, hives, villagers, jigsaws, random);
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, random);
     }
 
     /** Flatten a {@code pad}-radius square to {@code gy} for a building: clear above, solid below, no decoration. */

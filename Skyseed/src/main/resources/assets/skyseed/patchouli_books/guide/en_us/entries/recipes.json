@@ -115,6 +115,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:trade_post_skyseed",
+      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A plaza of shops, several trades in one throw."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

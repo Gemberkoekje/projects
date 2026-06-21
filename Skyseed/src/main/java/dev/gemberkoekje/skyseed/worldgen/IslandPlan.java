@@ -17,13 +17,12 @@ import java.util.List;
  * @param trees  configured features to place after the solid blocks land
  * @param mobs   animals to spawn on the surface once the island is fully placed
  * @param hives  bee-nest positions to populate with bees once placed
- * @param villagers villagers to spawn once placed (for the village islands' curated structures)
- * @param jigsaws jigsaw structures to assemble on the island once the terrain has landed
+ * @param jigsaws jigsaw structures to assemble on the island once the terrain has landed; a villager is
+ *                spawned at every bed found in each one
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
-                         List<BlockPos> hives, List<VillagerSpawn> villagers,
-                         List<JigsawSite> jigsaws, RandomSource random) {
+                         List<BlockPos> hives, List<JigsawSite> jigsaws, RandomSource random) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}
@@ -34,10 +33,10 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      */
     public record MobSpawn(EntityType<?> type, BlockPos pos, boolean inWater) {}
 
-    /** A villager to spawn inside a curated structure. {@code profession} empty = unemployed (player assigns it). */
-    public record VillagerSpawn(BlockPos pos, String profession) {}
-
-    /** A jigsaw structure to assemble at {@code origin} (the anchor tile) once the terrain is down. */
+    /**
+     * A jigsaw structure to assemble at {@code origin} (the anchor tile) once the terrain is down.
+     * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed).
+     */
     public record JigsawSite(net.minecraft.resources.ResourceLocation pool, net.minecraft.resources.ResourceLocation target,
-                             int depth, BlockPos origin) {}
+                             int depth, int pad, BlockPos origin) {}
 }

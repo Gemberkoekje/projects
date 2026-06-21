@@ -43,6 +43,14 @@ The solution is to break the village into its constituent parts and spread them 
 
 ### 🏪 Trade Post Island ✨ (multi-profession, mid-tier)
 
+> **Built (v0.8.0).** `skyseed:trade_post` — a lantern-lit cobblestone plaza with shops branching off its
+> four sides, assembled by the jigsaw system (a plaza piece with outward connectors pulls buildings from
+> `worldgen/template_pool/trade_post/buildings`). Five shop types ship today: farmer (composter), librarian
+> (lectern), fisherman (barrel), fletcher (fletching table), toolsmith (smithing table); a villager spawns at
+> every bed and claims its nearby job site on its own. Random assortment + rotation per throw. The curated
+> profession *sets* below are a future refinement (the pool currently picks each shop independently, so
+> repeats can happen — a village can have two of a trade, which is fine).
+
 **Character:** A slightly larger island with two or three buildings and 2–3 villagers, each with their own job site block pre-placed. The "small commercial district" version — saves the player from crafting many individual Hamlet Islands.
 
 **Recipe:** Oak Planks + Cobblestone + 3× Emerald  
@@ -208,12 +216,18 @@ Rocky Island (mountain variant)
   **random rotation** and per-element **structure processors** for free (the Hamlet's `hamlet_weathering`
   rule processor mosses cobblestone / strips oak logs). Building `.nbt` live at `data/skyseed/structure/...`
   in standard structure-block format (so structure-block-authored files drop in) and need a "bottom" anchor
-  jigsaw so the placer can position+rotate them; Skyseed's cottages are authored in code and emitted at dev
-  time (`StructureWriter` now writes block-entity NBT for the jigsaw; `HamletTemplates`; `DevStructureGenerator`).
-  This is the foundation for the **Trade Post** and **Village Center** — multi-building layouts assembled by
-  branching pieces off jigsaw connectors, exactly like a vanilla village.
-- **Villagers** are spawned from a new `IslandPlan.VillagerSpawn` step in `GenerationJob` (adult, biome-typed, persistence-required); the Hamlet's bed is a real POI the villager claims for restock/breeding.
-- **Villagers are spawned inside their buildings** at generation time, already assigned to their job site blocks (for Trade Post and Village Center). The Hamlet Island spawns an Unemployed Villager.
+  jigsaw so the placer can position+rotate them; Skyseed's pieces are authored in code and emitted at dev
+  time (`StructureWriter` writes block-entity NBT for the jigsaw; `HamletTemplates`/`TradePostTemplates`; `DevStructureGenerator`).
+- **Multi-piece assembly (v0.8.0):** the Trade Post proves the connector path — a `plaza` start piece carries
+  four **outward** connectors (`name: skyseed:plaza_edge`, `pool: skyseed:trade_post/buildings`), and each
+  shop carries one **inward** connector (`name: skyseed:building_door`) at its door, so the jigsaw branches a
+  shop onto each plaza side (`depth: 2`). Same path scales to the **Village Center** (more connectors / deeper
+  trees, streets + decoration pools).
+- **Villagers** are spawned by `GenerationJob` scanning the assembled structure's footprint (origin ± `pad`)
+  for bed feet — one adult, biome-typed, persistence-required villager per bed. They arrive **unemployed**;
+  a villager beside an unclaimed job-site block claims it and takes up that profession on its own (verified:
+  farmer/fletcher/etc. assigned within ~10 s headless), exactly like a natural village. The Hamlet's single
+  cottage → one villager; the Trade Post's four shops → four professioned villagers, with no per-island code.
 - **No vanilla village POI registration** — don't register these as vanilla villages. This avoids raids, avoids iron golem overgeneration, and avoids the vanilla village-detection system making assumptions about the island layout.
 - **Bed placement is inside each building** — villagers path to beds normally. Ensure beds are accessible (no blocks in the way) so the villager links to their bed correctly and restocks function.
 - **The `mobs` sprinkle field** (the implemented theme mob list) is not used here — villagers are placed as part of the structure placement step, not as random sprinkles.

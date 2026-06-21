@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.7.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.8.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -38,8 +38,8 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Throw modes | Classic (charged physics arc) + Precise (direct placement along the look vector); toggle keybind (default **V**), persisted in client config |
 | Mob sprinkles | `mobs` list (theme / override / variant): animals spawned directly when an island finishes generating |
 | Water mobs | `pond.water_mobs`: animals spawned submerged in the pool (squid, axolotls, fish, glow squid) |
-| Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager — the start of the trading economy (see `SKYVILLAGESPLAN.md`). Raids disabled on Skyseed worlds |
-| Jigsaw buildings | A theme's `jigsaw` config assembles buildings from a vanilla `worldgen/template_pool` via `JigsawPlacement` — random rotation + structure-processor variation, exactly like vanilla villages (the Hamlet ships three weathered cottage variants). The base for multi-building village islands; drop in structure-block-authored `.nbt` to extend the pool |
+| Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager. **Trade Post** (`skyseed:trade_post`): a plaza ringed by shops, each with a job-site block + bed, so its villager takes up a trade (farmer/librarian/fisherman/fletcher/toolsmith). See `SKYVILLAGESPLAN.md`. Raids disabled on Skyseed worlds |
+| Jigsaw buildings | A theme's `jigsaw` config assembles buildings from a vanilla `worldgen/template_pool` via `JigsawPlacement` — random rotation + structure-processor variation, exactly like vanilla villages. Single-piece (the Hamlet's three weathered cottages) or **multi-piece** (the Trade Post's plaza branches shops off jigsaw connectors). A villager spawns at every bed; drop in structure-block-authored `.nbt` to extend a pool |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |

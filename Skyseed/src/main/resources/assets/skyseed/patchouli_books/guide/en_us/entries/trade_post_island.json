@@ -1,0 +1,20 @@
+{
+  "name": "Trade Post Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:emerald_block",
+  "advancement": "skyseed:craft_trade_post",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A small commercial district — a lantern-lit plaza ringed by shops, each with its own villager. The mid-tier village island: one throw, several trades."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The shops$()$(br)Each cabin comes with a $(item)job-site block$() and a bed, so its villager takes up that trade and settles in — farmer, librarian, fisherman, fletcher, toolsmith, and more. Which shops you get is the luck of the throw."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Assembled by jigsaw$()$(br)The plaza and its shops are pieced together like a real village, so no two trade posts share a layout. Costs planks, cobblestone, and $(item)3 emeralds$() — bring a mountain's worth of mining."
+    }
+  ]
+}

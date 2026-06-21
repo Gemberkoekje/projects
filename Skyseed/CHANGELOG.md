@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.8.0] - 2026-06-21
+
+### Added
+- **Trade Post Island** (`skyseed:trade_post`) — the mid-tier village island. A lantern-lit cobblestone
+  plaza with shops branching off its four sides, assembled by the jigsaw system: a central plaza piece
+  carries outward connectors that pull buildings from a pool — real vanilla-village-style, multi-piece
+  assembly (the payoff of the v0.7.0 jigsaw pivot). Each shop holds a job-site block and a bed, so its
+  villager moves in and takes up that trade on its own — farmer, librarian, fisherman, fletcher, or
+  toolsmith — and no two trade posts share a layout. Crafted from planks + cobblestone + 3 emeralds;
+  ships with theme, recipe, advancement, guide entry, and icon.
+
+### Changed
+- **Villagers are now placed by scanning the assembled structure for beds** (one villager per bed), so the
+  same code serves the Hamlet's single cottage and the Trade Post's plaza of shops. They arrive unemployed
+  and claim the nearby job sites themselves, exactly as in a natural village.
+
 ## [0.7.0] - 2026-06-21
 
 ### Changed

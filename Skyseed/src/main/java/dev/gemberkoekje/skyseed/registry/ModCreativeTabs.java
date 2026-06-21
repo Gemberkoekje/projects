@@ -48,6 +48,7 @@ public final class ModCreativeTabs {
                         output.accept(themedSeed("aquatic", "Aquatic Skyseed", 10));
                         output.accept(themedSeed("aquatic_large", "Large Aquatic Skyseed", 19));
                         output.accept(themedSeed("hamlet", "Hamlet Skyseed", 20));
+                        output.accept(themedSeed("trade_post", "Trade Post Skyseed", 21));
                     })
                     .build());
 

@@ -9,11 +9,15 @@ import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerType;
+import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
@@ -69,33 +73,46 @@ public final class GenerationJob {
             placeStructures();
             spawnMobs();
             populateHives();
-            spawnVillagers();
             mobsSpawned = true;
         }
         return true;
     }
 
-    /** Assemble the planned jigsaw structures (villager cottages, …) onto the terrain once it has landed. */
+    /** Assemble the planned jigsaw structures, then spawn a villager at every bed they placed. */
     private void placeStructures() {
         for (IslandPlan.JigsawSite js : plan.jigsaws()) {
             final Holder<StructureTemplatePool> pool = level.registryAccess()
                     .lookupOrThrow(Registries.TEMPLATE_POOL)
                     .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, js.pool()));
             JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
+            spawnVillagersAtBeds(js.origin(), js.pad());
         }
     }
 
-    /** Spawn curated villagers (e.g. a Hamlet's resident) — adult, dressed for the biome, with a bed nearby to claim. */
-    private void spawnVillagers() {
-        for (IslandPlan.VillagerSpawn vs : plan.villagers()) {
-            Villager villager = EntityType.VILLAGER.create(level);
-            if (villager == null) {
-                continue;
+    /**
+     * One villager per bed in the assembled structure — adult, dressed for the biome, persistent. They
+     * arrive unemployed; a villager beside an unclaimed job-site block (the shops carry them) takes up
+     * that profession on its own, exactly as in a natural village.
+     */
+    private void spawnVillagersAtBeds(BlockPos origin, int pad) {
+        final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int dx = -pad; dx <= pad; dx++) {
+            for (int dz = -pad; dz <= pad; dz++) {
+                for (int dy = -1; dy <= 6; dy++) {
+                    p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
+                    final BlockState state = level.getBlockState(p);
+                    if (!state.is(Blocks.RED_BED) || state.getValue(BedBlock.PART) != BedPart.FOOT) {
+                        continue;
+                    }
+                    final Villager villager = EntityType.VILLAGER.create(level);
+                    if (villager != null) {
+                        villager.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, 0.0F, 0.0F);
+                        villager.setVillagerData(villager.getVillagerData().setType(VillagerType.byBiome(level.getBiome(p))));
+                        villager.setPersistenceRequired();
+                        level.addFreshEntity(villager);
+                    }
+                }
             }
-            villager.moveTo(vs.pos().getX() + 0.5, vs.pos().getY(), vs.pos().getZ() + 0.5, 0.0F, 0.0F);
-            villager.setVillagerData(villager.getVillagerData().setType(VillagerType.byBiome(level.getBiome(vs.pos()))));
-            villager.setPersistenceRequired();
-            level.addFreshEntity(villager);
         }
     }
 
