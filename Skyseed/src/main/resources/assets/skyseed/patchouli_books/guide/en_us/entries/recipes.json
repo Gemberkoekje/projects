@@ -29,6 +29,21 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:mushroom_skyseed",
+      "text": "The $(item)Mushroom Skyseed$() — dirt with both mushrooms."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:frozen_skyseed",
+      "text": "The $(item)Frozen Skyseed$() — snow and ice."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:meadow_skyseed",
+      "text": "The $(item)Meadow Skyseed$() — dirt and any flower."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

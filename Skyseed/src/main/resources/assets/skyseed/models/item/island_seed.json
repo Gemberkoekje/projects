@@ -6,6 +6,9 @@
   "overrides": [
     { "predicate": { "custom_model_data": 1 }, "model": "skyseed:item/island_seed_rocky" },
     { "predicate": { "custom_model_data": 2 }, "model": "skyseed:item/island_seed_large" },
-    { "predicate": { "custom_model_data": 3 }, "model": "skyseed:item/island_seed_desert" }
+    { "predicate": { "custom_model_data": 3 }, "model": "skyseed:item/island_seed_desert" },
+    { "predicate": { "custom_model_data": 4 }, "model": "skyseed:item/island_seed_mushroom" },
+    { "predicate": { "custom_model_data": 5 }, "model": "skyseed:item/island_seed_frozen" },
+    { "predicate": { "custom_model_data": 6 }, "model": "skyseed:item/island_seed_meadow" }
   ]
 }

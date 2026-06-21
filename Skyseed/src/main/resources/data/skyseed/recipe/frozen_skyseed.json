@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NI",
+    "IN"
+  ],
+  "key": {
+    "N": { "item": "minecraft:snow_block" },
+    "I": { "item": "minecraft:ice" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:frozen",
+      "minecraft:item_name": "\"Frozen Skyseed\"",
+      "minecraft:custom_model_data": 5
+    }
+  }
+}

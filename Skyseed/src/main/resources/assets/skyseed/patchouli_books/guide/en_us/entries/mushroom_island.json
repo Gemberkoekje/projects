@@ -1,0 +1,16 @@
+{
+  "name": "Mushroom Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:red_mushroom",
+  "advancement": "skyseed:craft_mushroom",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A mycelium isle crowned with huge mushrooms. Hostile mobs won't spawn on mycelium, so it's a safe place to build."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Fungus$()$(br)Red and brown $(item)huge mushrooms$() give mushroom blocks and stems; small mushrooms dot the floor. Roll a red, brown, or mixed isle."
+    }
+  ]
+}

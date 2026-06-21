@@ -1,0 +1,16 @@
+{
+  "name": "Frozen Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:ice",
+  "advancement": "skyseed:craft_frozen",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A snow-and-ice isle. Snowy, glacier, and deep-freeze looks; spruce trees on the snowy kind. Mind the hidden $(item)powder snow$() pockets."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Cold goods$()$(br)$(item)Packed ice$() runs through the core, with rare $(item)blue ice$() deep down. A little iron and coal too."
+    }
+  ]
+}

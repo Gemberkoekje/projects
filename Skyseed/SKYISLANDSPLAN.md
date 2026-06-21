@@ -8,7 +8,7 @@ This document covers all planned island types, their blocks, variants, Y-level o
 
 > This section reconciles the plan below with what is actually built. Everything after it is the **design target**; only a subset is live, and the build made one structural choice that reframes much of what follows.
 
-**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), and **Desert** (`skyseed:desert`). The remaining seven (Mushroom, Frozen, Meadow, Aquatic, Ancient, Badlands, Lush) are **not yet built**.
+**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), and **Meadow** (`skyseed:meadow`). The remaining four (Aquatic, Ancient, Badlands, Lush) are **not yet built** — each needs engine work (banded fill, underside decoration, or water-plant placement).
 
 **Engine features built:** datapack theme codec; biome-aware generation; Y-band overrides (`min_y`/`max_y`); contained ponds; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-column `surface_scatter`; snow peaks; curated start island; void world preset with multi-noise biomes; structures disabled; tick-budgeted placement; overlap safety; charge-to-throw distance; Patchouli guide (Forest / Rocky / Large Forest entries, advancement-gated).
 
@@ -198,6 +198,8 @@ S _
 
 **Character:** Mycelium surface, huge mushrooms, no hostile mobs spawn (vanilla mycelium rule). A safe island. Primary source of mushroom blocks, mycelium, and mooshroom spawning.
 
+> **As built (`skyseed:mushroom`):** mycelium / dirt / stone with red, brown, and mixed variants placing huge mushrooms (caps + stems via the vanilla features) plus small mushrooms. **Not done:** the "giant" single-mushroom variant and exposed underside stems.
+
 **Unlocked by:** Red + Brown Mushroom, both of which sprinkle onto the dark-oak and spruce **Forest** variants (see Forest → Sprinkles) — the same biomes mushrooms grow in vanilla. No Mushroom island is required to craft the first one. *Note: a Mushroom flavor also already exists in the build as a Forest biome-override (`mushroom_fields` → mycelium + huge mushrooms); this entry is the planned dedicated seed.*
 
 **Recipe:** Dirt + Red Mushroom + Brown Mushroom (shapeless, or shaped with mushrooms flanking dirt)
@@ -231,6 +233,8 @@ S _
 ### ❄️ Frozen ✨
 
 **Character:** Snow and ice surface. Cold, treacherous (powder snow pockets), but contains packed ice and rare blue ice — both high-value materials unavailable elsewhere.
+
+> **As built (`skyseed:frozen`):** snow-block surface over a stone core, with packed ice / ice / blue ice / powder-snow / iron / coal as core clusters (powder snow = the hidden traps). Snowy (spruce trees), glacier (packed-ice surface), and deep-freeze (blue-ice surface) variants. **Not done:** the rare ice-spike feature. *Note: the snow+ice recipe assumes ice is obtainable (freeze water on a snowy-biome island) — worth a balance check, like the moss/azalea bootstraps.*
 
 **Unlocked by:** Collecting snow from Rocky island peaks.
 
@@ -272,6 +276,8 @@ I N
 ### 🌸 Meadow ✨
 
 **Character:** The flower and bee island. Dense flower coverage, cherry trees, high bee nest chance. Primary source of honey, honeycomb, wax, and all dye-producing flowers. Visually the most colorful island.
+
+> **As built (`skyseed:meadow`):** grass over dirt/stone; wildflower, tulip, cornflower, and cherry variants placing every single dye-flower (dandelion, poppy, allium, azure bluet, oxeye daisy, cornflower, lily of the valley, all four tulips) plus pink petals, with an occasional bee nest. **Deferred:** two-tall flowers (sunflower, lilac, rose bush, peony — need 2-block placement) and the sunflower variant; bee nests are placed **empty** (no bees inside — entity spawning isn't supported by the generator yet).
 
 **Unlocked by:** Any flower (available from Forest island decoration).
 

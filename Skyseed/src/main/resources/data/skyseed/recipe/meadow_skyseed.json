@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:dirt" },
+    { "tag": "minecraft:small_flowers" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:meadow",
+      "minecraft:item_name": "\"Meadow Skyseed\"",
+      "minecraft:custom_model_data": 6
+    }
+  }
+}

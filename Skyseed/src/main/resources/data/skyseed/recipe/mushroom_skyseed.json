@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:dirt" },
+    { "item": "minecraft:red_mushroom" },
+    { "item": "minecraft:brown_mushroom" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:mushroom",
+      "minecraft:item_name": "\"Mushroom Skyseed\"",
+      "minecraft:custom_model_data": 4
+    }
+  }
+}

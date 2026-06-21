@@ -1,0 +1,16 @@
+{
+  "name": "Meadow Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:poppy",
+  "advancement": "skyseed:craft_meadow",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The flower isle — grass smothered in blooms. Wildflower, tulip, cornflower, and cherry-blossom looks, every dye-flower among them."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Bees$()$(br)Wildflower meadows sometimes carry a $(item)bee nest$() — the start of honey, wax, and honeycomb."
+    }
+  ]
+}
