@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "A",
+    "S"
+  ],
+  "key": {
+    "A": { "item": "minecraft:sand" },
+    "S": { "item": "minecraft:sandstone" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:desert",
+      "minecraft:item_name": "\"Desert Skyseed\"",
+      "minecraft:custom_model_data": 3
+    }
+  }
+}

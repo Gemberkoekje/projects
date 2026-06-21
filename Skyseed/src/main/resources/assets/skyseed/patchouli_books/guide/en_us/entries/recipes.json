@@ -24,6 +24,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_skyseed",
+      "text": "The $(item)Desert Skyseed$() — sand over sandstone."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

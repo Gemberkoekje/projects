@@ -1,0 +1,22 @@
+{
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" },
+  "palette": { "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:smooth_sandstone", "fill_depth": 3 },
+  "ores": [
+    { "block": "minecraft:clay", "chance": 0.70, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:gold_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" },
+    { "block": "minecraft:bone_block", "chance": 0.10, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 3, "max": 7 }, "depth": "deep_core" }
+  ],
+  "variants": [
+    { "weight": 1, "name": "standard", "decoration": {
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 }, { "block": "minecraft:cactus", "chance": 0.06 } ] } }
+  ],
+  "biome_overrides": [
+    { "biomes": [ "#minecraft:is_badlands" ], "surface": "minecraft:red_sand", "fill": "minecraft:red_sandstone", "core": "minecraft:smooth_red_sandstone",
+      "ores": [
+        { "block": "minecraft:gold_ore", "chance": 0.40, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:clay", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
+      ],
+      "variants": [ { "weight": 1, "name": "red", "decoration": {
+        "ground": [ { "block": "minecraft:dead_bush", "chance": 0.14 }, { "block": "minecraft:cactus", "chance": 0.05 } ] } } ] }
+  ]
+}

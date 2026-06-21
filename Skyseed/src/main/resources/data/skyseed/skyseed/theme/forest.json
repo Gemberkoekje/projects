@@ -11,7 +11,7 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } }
   ],
   "biome_overrides": [
-    { "biomes": [ "minecraft:dark_forest" ], "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "minecraft:dark_forest" ], "surface_scatter": [ { "block": "minecraft:coarse_dirt", "chance": 0.25 } ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:dark_oak", "tries": 5, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ] } } ] },
 
@@ -51,9 +51,9 @@
       "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:snow", "chance": 0.90 } ] } } ] },
 
-    { "biomes": [ "#minecraft:is_taiga" ], "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "#minecraft:is_taiga" ], "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.30 } ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 5, "spacing": 2 } ],
-      "ground": [ { "block": "minecraft:fern", "chance": 0.25 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ] } } ] },
+      "ground": [ { "block": "minecraft:fern", "chance": 0.25 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.06 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ] } } ] },
 
     { "biomes": [ "#minecraft:is_jungle" ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:jungle_tree", "tries": 5, "spacing": 2 }, { "feature": "minecraft:jungle_bush", "tries": 3, "spacing": 1 } ],

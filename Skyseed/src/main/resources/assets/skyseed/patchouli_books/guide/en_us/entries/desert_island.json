@@ -1,0 +1,20 @@
+{
+  "name": "Desert Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:sand",
+  "advancement": "skyseed:craft_desert",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sun-baked isle of sand over sandstone, cored with smooth sandstone. Dead bushes and the odd cactus dot the surface."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Buried treasure$()$(br)Dig the core for $(item)clay$(), the occasional $(item)gold$(), and rare buried $(item)bone$() — a fossil to find."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Red dunes$()$(br)Throw a Desert Skyseed over a badlands and it grows from $(item)red sand$() and $(item)red sandstone$() instead — and carries badlands' richer gold."
+    }
+  ]
+}
