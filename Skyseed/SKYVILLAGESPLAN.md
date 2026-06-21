@@ -119,6 +119,8 @@ Emeralds are the currency for the entire trading system, so their availability i
 
 This is a balance decision to make before implementing recipes. The first option is recommended — it keeps the "mine to unlock trading" narrative intact.
 
+> **Resolved (v0.3.0):** the **Large Rocky** seed (`skyseed:rocky_large`) now exists — it is crafted from just **stone + cobblestone** (no emerald gate) and reliably carries **emerald ore** (~0.40/island, verified). That gives a clean first-emerald path without a chicken-and-egg, so the chosen approach is to **gate the Hamlet recipe behind 1 emerald**. Base Rocky still has no emerald; emeralds come from the (cheaply craftable) mountain.
+
 ---
 
 ## Raids and iron golems
@@ -131,6 +133,8 @@ Raids are triggered when a player with Bad Omen (obtained from Ominous Bottles i
 - Neither is the intended experience.
 
 **Recommended handling:** Disable raid triggers for Skyseed village islands entirely, at least for v1. This can be done by not registering the island's villagers as part of a vanilla "village" POI cluster (they live on the island, but the game doesn't recognize it as a raid-eligible village). This is a consequence of not using vanilla village generation — the POI/village detection system won't see these as a real village unless you explicitly set that up, which you're not doing.
+
+> **⚠ Verify before designing around this.** The above is an assumption, and a risky one: beds and workstations placed in the world **are** POIs, and a villager near claimed beds + a workstation is exactly how vanilla forms a village (and enables raids / iron-golem spawns) — no explicit registration required. Spike this first: place beds + a workstation + a villager on a generated island, give a nearby player Bad Omen, and confirm whether a raid starts. If it does, we need an explicit suppression (e.g. `doPatrolSpawning` is unrelated; the lever is the `point_of_interest_type` / village detection, or keeping villagers/beds/workstations out of POI range of each other). This is the single biggest unknown in this plan.
 
 **Iron Golems** on the Village Center Island are cosmetic/protective against natural hostile mob spawns, not raid defense. They work normally.
 
@@ -191,6 +195,7 @@ Rocky Island (mountain variant)
 ## Implementation notes
 
 - **Village islands are curated structures**, not procedurally generated. The terrain generates normally (grass/cobblestone palette), and the buildings are placed on top using the same "curated structure on generated terrain" path as Animal Islands.
+- **Structure placement uses NBT `StructureTemplate` files** (decided 2026-06-21), authored in-game with structure blocks and stamped onto the island at generation. This is a new engine capability — the codebase currently has **no** structure-placement system (the start island and trees are hand-coded `setBlock` builders). Building the template loader is the first task here and is shared with Animal Islands and Structure Islands. Buildings also need a **flat pad / flattest-region** step, since the generated terrain has rim noise and a top dome.
 - **Villagers are spawned inside their buildings** at generation time, already assigned to their job site blocks (for Trade Post and Village Center). The Hamlet Island spawns an Unemployed Villager.
 - **No vanilla village POI registration** — don't register these as vanilla villages. This avoids raids, avoids iron golem overgeneration, and avoids the vanilla village-detection system making assumptions about the island layout.
 - **Bed placement is inside each building** — villagers path to beds normally. Ensure beds are accessible (no blocks in the way) so the villager links to their bed correctly and restocks function.
