@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.2.1] - 2026-06-21
+
+### Added
+- **Bees** — Meadow bee nests now come **populated with bees** (3 per nest); they emerge to pollinate
+  the flowers and return home, so the bee island finally has its bees.
+- **Sugar cane** on Aquatic pond banks — grows at the water's edge (freshwater, swamp, mangrove pools).
+- **Ice spikes** on Frozen islands — hand-built packed-ice spires on the glacier and deep-freeze variants.
+
+### Fixed
+- Mob sprinkles now spawn reliably on decorated islands. The 0.2.0 spawn check required the block
+  above the surface to be air, so flowers/grass/mushrooms blocked most spawns; it now allows any
+  non-motion-blocking block there.
+
+### Added (branding)
+- `icon.png` (CurseForge mod icon) and `description.md` (store description).
+
 ## [0.2.0] - 2026-06-21
 
 ### Added

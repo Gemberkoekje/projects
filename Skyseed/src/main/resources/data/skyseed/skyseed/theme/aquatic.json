@@ -12,7 +12,8 @@
       { "block": "minecraft:kelp", "chance": 0.15 },
       { "block": "minecraft:seagrass", "chance": 0.18 },
       { "block": "minecraft:tall_seagrass", "chance": 0.06 }
-    ]
+    ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.60 } ]
   },
   "variants": [
     { "weight": 1, "name": "freshwater", "decoration": {
@@ -41,7 +42,8 @@
     { "biomes": [ "minecraft:mangrove_swamp" ], "surface": "minecraft:mud",
       "pond": {
         "block": "minecraft:water", "radius": 4, "depth": 3,
-        "plants": [ { "block": "minecraft:seagrass", "chance": 0.15 }, { "block": "minecraft:lily_pad", "chance": 0.10 } ]
+        "plants": [ { "block": "minecraft:seagrass", "chance": 0.15 }, { "block": "minecraft:lily_pad", "chance": 0.10 } ],
+        "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.60 } ]
       },
       "mobs": [ { "entity": "minecraft:frog", "chance": 0.20, "count": { "min": 2, "max": 3 } } ],
       "variants": [ { "weight": 1, "name": "mangrove", "decoration": {
@@ -51,7 +53,8 @@
     { "biomes": [ "minecraft:swamp" ], "surface": "minecraft:grass_block", "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.25 } ],
       "pond": {
         "block": "minecraft:water", "radius": 4, "depth": 3,
-        "plants": [ { "block": "minecraft:lily_pad", "chance": 0.18 }, { "block": "minecraft:seagrass", "chance": 0.10 } ]
+        "plants": [ { "block": "minecraft:lily_pad", "chance": 0.18 }, { "block": "minecraft:seagrass", "chance": 0.10 } ],
+        "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.65 } ]
       },
       "mobs": [ { "entity": "minecraft:frog", "chance": 0.20, "count": { "min": 2, "max": 3 } }, { "entity": "minecraft:cat", "chance": 0.15, "count": { "min": 1, "max": 1 } } ],
       "variants": [ { "weight": 1, "name": "swamp", "decoration": {

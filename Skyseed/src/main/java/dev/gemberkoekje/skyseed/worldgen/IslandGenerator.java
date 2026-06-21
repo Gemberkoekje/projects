@@ -170,6 +170,7 @@ public final class IslandGenerator {
         pondCfg.ifPresent(pond -> {
             carvePond(blockMap, surfaceList, center, topDome, pond);
             placePondPlants(blockMap, center, pond, random);
+            placePondBanks(blockMap, surfaceList, center, pond, random);
         });
 
         final List<TreeSite> trees = new ArrayList<>();
@@ -197,7 +198,15 @@ public final class IslandGenerator {
         }
         blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY())); // bottom-up grow-in
 
-        return new IslandPlan(blocks, trees, mobs, random);
+        // Bee nests are populated with bees once placed (they need a real block entity in the world).
+        final List<BlockPos> hives = new ArrayList<>();
+        for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
+            if (e.getValue().is(Blocks.BEE_NEST) || e.getValue().is(Blocks.BEEHIVE)) {
+                hives.add(e.getKey());
+            }
+        }
+
+        return new IslandPlan(blocks, trees, mobs, hives, random);
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {
@@ -390,7 +399,7 @@ public final class IslandGenerator {
             ConfiguredFeature<?, ?> feature = null;
             if (custom) {
                 final String path = tree.feature().getPath();
-                if (!path.equals("mangrove") && !path.equals("azalea")) {
+                if (!path.equals("mangrove") && !path.equals("azalea") && !path.equals("ice_spike")) {
                     Skyseed.LOGGER.warn("[skyseed] unknown built-in tree '{}' — skipping", tree.feature());
                     continue;
                 }
@@ -418,8 +427,11 @@ public final class IslandGenerator {
                 treeBases.add(base);
                 if (custom) {
                     // hand-built into the streamed block list (vanilla features that won't place here)
-                    if (tree.feature().getPath().equals("azalea")) {
+                    final String path = tree.feature().getPath();
+                    if (path.equals("azalea")) {
                         buildAzalea(blockMap, base, random);
+                    } else if (path.equals("ice_spike")) {
+                        buildIceSpike(blockMap, base, random);
                     } else {
                         buildMangrove(blockMap, base, random);
                     }
@@ -583,6 +595,23 @@ public final class IslandGenerator {
         }
     }
 
+    /** A hand-built ice spike — a packed-ice spire with a flared base (vanilla's feature won't place here). */
+    private static void buildIceSpike(Map<BlockPos, BlockState> blockMap, BlockPos ground, RandomSource random) {
+        final BlockState ice = Blocks.PACKED_ICE.defaultBlockState();
+        final int gx = ground.getX(), gy = ground.getY(), gz = ground.getZ();
+        final int h = 5 + random.nextInt(5); // 5-9 tall
+        for (int i = 0; i < h; i++) {
+            blockMap.put(new BlockPos(gx, gy + 1 + i, gz), ice);
+            if (i < 2) { // flared base
+                for (int[] d : new int[][]{ {1, 0}, {-1, 0}, {0, 1}, {0, -1} }) {
+                    if (random.nextInt(3) != 0) {
+                        blockMap.putIfAbsent(new BlockPos(gx + d[0], gy + 1 + i, gz + d[1]), ice);
+                    }
+                }
+            }
+        }
+    }
+
     /** Short static cascades off the rim — a spring at the lip + a falling-water column down the side. */
     private static void placeWaterfalls(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
                                         BlockPos center, int baseRadius, int count, RandomSource random) {
@@ -705,6 +734,58 @@ public final class IslandGenerator {
                 }
                 blockMap.put(floor, st);
             }
+        }
+    }
+
+    /** Grow shore plants (e.g. sugar cane) on the ring of land just outside the pond. */
+    private static void placePondBanks(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
+                                       BlockPos center, Pond pond, RandomSource random) {
+        if (pond.bank().isEmpty() || surfaceList.isEmpty()) {
+            return;
+        }
+        final int r = Math.max(1, pond.radius());
+        final int innerSq = r * r; // a column inside this is water (already carved)
+        for (BlockPos col : surfaceList) {
+            final int dx = col.getX() - center.getX();
+            final int dz = col.getZ() - center.getZ();
+            if (dx * dx + dz * dz <= innerSq) {
+                continue; // inside the pond
+            }
+            // Only the immediate water's-edge — a horizontal neighbour must be a pond water column —
+            // so the cane stays put (sugar cane needs water beside it or it pops on the first update).
+            final boolean waterAdjacent =
+                    (dx + 1) * (dx + 1) + dz * dz <= innerSq || (dx - 1) * (dx - 1) + dz * dz <= innerSq
+                            || dx * dx + (dz + 1) * (dz + 1) <= innerSq || dx * dx + (dz - 1) * (dz - 1) <= innerSq;
+            if (!waterAdjacent) {
+                continue;
+            }
+            final BlockPos above = col.above();
+            if (blockMap.containsKey(above)) {
+                continue;
+            }
+            float roll = random.nextFloat();
+            for (GroundEntry g : pond.bank()) {
+                roll -= g.chance();
+                if (roll < 0) {
+                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                        bankPlant(blockMap, above, g.block(), random);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    /** Place a bank plant; sugar cane stacks 1-3 tall, everything else is a single block. */
+    private static void bankPlant(Map<BlockPos, BlockState> blockMap, BlockPos above, ResourceLocation id, RandomSource random) {
+        final BlockState state = BuiltInRegistries.BLOCK.get(id).defaultBlockState();
+        if (id.getPath().equals("sugar_cane")) {
+            final int h = 1 + random.nextInt(3); // 1-3 tall
+            for (int i = 0; i < h; i++) {
+                blockMap.put(above.above(i), state);
+            }
+        } else {
+            blockMap.put(above, state);
         }
     }
 

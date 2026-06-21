@@ -15,8 +15,8 @@ horse/llama/armadillo, mushroom-fields mooshroom, desert rabbit).
 
 **Not yet built:** the dedicated **Animal Islands** (Pasture, Poultry, Wool Farm, Stable, Aquarium) and
 their fenced-enclosure structures; **water-spawned mobs** (squid, axolotl, glow squid, turtles in the
-pond — need in-water positioning); 1.21.5 biome mob variants (target is 1.21.1). Bee nests on Meadow
-are still placed empty (no bees inside yet).
+pond — need in-water positioning); 1.21.5 biome mob variants (target is 1.21.1). (As of v0.2.1, Meadow
+bee nests are populated with bees — they emerge to pollinate and return home.)
 
 ---
 

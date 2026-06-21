@@ -18,8 +18,10 @@
       "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } },
     { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 2, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:snow", "chance": 0.30 } ] } },
     { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:snow", "chance": 0.20 } ] } }
   ]
 }

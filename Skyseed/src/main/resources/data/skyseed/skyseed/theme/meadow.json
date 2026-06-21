@@ -32,7 +32,7 @@
       ] } },
     { "weight": 1, "name": "cherry", "decoration": {
       "trees": [ { "feature": "minecraft:cherry", "tries": 3, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:pink_petals", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 } ] } },
+      "ground": [ { "block": "minecraft:pink_petals", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:bee_nest", "chance": 0.02 } ] } },
     { "weight": 1, "name": "cornflower", "decoration": {
       "ground": [ { "block": "minecraft:cornflower", "chance": 0.18 }, { "block": "minecraft:oxeye_daisy", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.12 } ] } }
   ]

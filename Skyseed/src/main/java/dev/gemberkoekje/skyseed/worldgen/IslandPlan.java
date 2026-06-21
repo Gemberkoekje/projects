@@ -16,9 +16,11 @@ import java.util.List;
  * @param blocks ordered block placements (bottom-up, for a tidy "grows in" animation)
  * @param trees  configured features to place after the solid blocks land
  * @param mobs   animals to spawn on the surface once the island is fully placed
+ * @param hives  bee-nest positions to populate with bees once placed
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  */
-public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs, RandomSource random) {
+public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
+                         List<BlockPos> hives, RandomSource random) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}

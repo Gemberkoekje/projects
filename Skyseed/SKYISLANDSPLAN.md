@@ -234,7 +234,7 @@ S _
 
 **Character:** Snow and ice surface. Cold, treacherous (powder snow pockets), but contains packed ice and rare blue ice — both high-value materials unavailable elsewhere.
 
-> **As built (`skyseed:frozen`):** snow-block surface over a stone core, with packed ice / ice / blue ice / powder-snow / iron / coal as core clusters (powder snow = the hidden traps). Snowy (spruce trees), glacier (packed-ice surface), and deep-freeze (blue-ice surface) variants. **Not done:** the rare ice-spike feature. *Note: the snow+ice recipe assumes ice is obtainable (freeze water on a snowy-biome island) — worth a balance check, like the moss/azalea bootstraps.*
+> **As built (`skyseed:frozen`):** snow-block surface over a stone core, with packed ice / ice / blue ice / powder-snow / iron / coal as core clusters (powder snow = the hidden traps). Snowy (spruce trees), glacier (packed-ice surface), and deep-freeze (blue-ice surface) variants, the icy two with hand-built **ice spikes** (v0.2.1). *Note: the snow+ice recipe assumes ice is obtainable (freeze water on a snowy-biome island) — worth a balance check, like the moss/azalea bootstraps.*
 
 **Unlocked by:** Collecting snow from Rocky island peaks.
 
@@ -277,7 +277,7 @@ I N
 
 **Character:** The flower and bee island. Dense flower coverage, cherry trees, high bee nest chance. Primary source of honey, honeycomb, wax, and all dye-producing flowers. Visually the most colorful island.
 
-> **As built (`skyseed:meadow`):** grass over dirt/stone; wildflower, tulip, cornflower, and cherry variants placing every single dye-flower (dandelion, poppy, allium, azure bluet, oxeye daisy, cornflower, lily of the valley, all four tulips) plus pink petals, with an occasional bee nest. A **sunflower** variant and two-tall flowers (sunflower, lilac, rose bush, peony) are now placed too (via the double-plant support). **Deferred:** bee nests are placed **empty** (no bees inside — entity spawning isn't supported by the generator yet).
+> **As built (`skyseed:meadow`):** grass over dirt/stone; wildflower, tulip, cornflower, and cherry variants placing every single dye-flower (dandelion, poppy, allium, azure bluet, oxeye daisy, cornflower, lily of the valley, all four tulips) plus pink petals, with an occasional bee nest. A **sunflower** variant and two-tall flowers (sunflower, lilac, rose bush, peony) are now placed too (via the double-plant support). Bee nests are **populated with bees** (v0.2.1) — they emerge to pollinate the flowers and return home.
 
 **Unlocked by:** Any flower (available from Forest island decoration).
 
@@ -313,7 +313,7 @@ I N
 
 **Character:** A water-body island — part floating land, part floating lake. Primary source of clay, kelp, seagrass, coral, lily pads, and mangrove wood. Two distinct sub-identities: freshwater and warm ocean.
 
-> **As built (`skyseed:aquatic`):** a central pond (the new `pond.plants` feature) with clay- and gravel-rich beds. Sub-types are biome-overrides: **freshwater** (grass, lily pads + kelp + seagrass), **warm** over `#is_ocean` (sand, all five coral blocks + fans + sea pickle + a rare wet sponge), **mangrove** over mangrove swamp (mud + hand-built mangroves), and **swamp** (grass/mud + swamp oak + blue orchid). Recipe clay + sand. **Not done:** water-edge sugar cane (needs land-adjacent-to-water detection — deferred here and on Desert).
+> **As built (`skyseed:aquatic`):** a central pond (the new `pond.plants` feature) with clay- and gravel-rich beds. Sub-types are biome-overrides: **freshwater** (grass, lily pads + kelp + seagrass), **warm** over `#is_ocean` (sand, all five coral blocks + fans + sea pickle + a rare wet sponge), **mangrove** over mangrove swamp (mud + hand-built mangroves), and **swamp** (grass/mud + swamp oak + blue orchid). Recipe clay + sand. Sugar cane now grows along the pond's water edge (v0.2.1; sparse — only the flush, water-adjacent rim columns hold it). **Not done:** water-spawned mobs (squid/axolotl); Desert sugar cane (no pond there).
 
 **Unlocked by:** Clay (sprinkle from Desert island) + Sand or Gravel.
 

@@ -2,8 +2,11 @@ package dev.gemberkoekje.skyseed.worldgen;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 
 /**
@@ -55,12 +58,31 @@ public final class GenerationJob {
 
         if (!mobsSpawned) {
             spawnMobs();
+            populateHives();
             mobsSpawned = true;
         }
         return true;
     }
 
+    /** Fill any bee nests on the island with a few bees (they emerge to pollinate, then return home). */
+    @SuppressWarnings({"deprecation", "removal"}) // BeehiveBlockEntity#addOccupant: the simplest worldgen-time way to seed a hive
+    private void populateHives() {
+        for (BlockPos hive : plan.hives()) {
+            if (!(level.getBlockEntity(hive) instanceof BeehiveBlockEntity beehive)) {
+                continue;
+            }
+            for (int i = 0; i < 3; i++) {
+                Bee bee = EntityType.BEE.create(level);
+                if (bee != null) {
+                    bee.moveTo(hive.getX() + 0.5, hive.getY() + 0.5, hive.getZ() + 0.5, 0.0F, 0.0F);
+                    beehive.addOccupant(bee);
+                }
+            }
+        }
+    }
+
     /** Spawn the planned mobs on top of their surface block, skipping spots that aren't clear. */
+    @SuppressWarnings({"deprecation", "removal"}) // EntityType#spawn convenience overload
     private void spawnMobs() {
         for (IslandPlan.MobSpawn ms : plan.mobs()) {
             final BlockPos surface = ms.pos();
