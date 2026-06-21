@@ -11,14 +11,17 @@ import java.util.List;
  * fluid (default water), resolved at gen time. The pool is walled by the island's domed rim, and is
  * placed without block updates so it stays still and never spills into the void. {@code plants} are
  * per-column water plants scattered through it (lily pads on the surface, kelp/seagrass/coral on the floor);
- * {@code bank} plants grow on the shore ring just outside the pool (e.g. sugar cane), stacked 1-3 tall.
+ * {@code bank} plants grow on the shore ring just outside the pool (e.g. sugar cane), stacked 1-3 tall;
+ * {@code water_mobs} are spawned inside the water (squid, axolotls, fish).
  */
-public record Pond(ResourceLocation block, int radius, int depth, List<GroundEntry> plants, List<GroundEntry> bank) {
+public record Pond(ResourceLocation block, int radius, int depth, List<GroundEntry> plants,
+                   List<GroundEntry> bank, List<MobEntry> waterMobs) {
     public static final Codec<Pond> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.optionalFieldOf("block", ResourceLocation.withDefaultNamespace("water")).forGetter(Pond::block),
             Codec.INT.optionalFieldOf("radius", 3).forGetter(Pond::radius),
             Codec.INT.optionalFieldOf("depth", 2).forGetter(Pond::depth),
             GroundEntry.CODEC.listOf().optionalFieldOf("plants", List.of()).forGetter(Pond::plants),
-            GroundEntry.CODEC.listOf().optionalFieldOf("bank", List.of()).forGetter(Pond::bank)
+            GroundEntry.CODEC.listOf().optionalFieldOf("bank", List.of()).forGetter(Pond::bank),
+            MobEntry.CODEC.listOf().optionalFieldOf("water_mobs", List.of()).forGetter(Pond::waterMobs)
     ).apply(i, Pond::new));
 }

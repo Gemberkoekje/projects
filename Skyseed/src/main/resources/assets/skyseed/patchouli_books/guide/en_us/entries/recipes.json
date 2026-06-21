@@ -59,6 +59,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:lush_large_skyseed",
+      "text": "The $(item)Large Lush Skyseed$() — a bigger lush isle with a deep pool."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:aquatic_skyseed",
       "text": "The $(item)Aquatic Skyseed$() — clay and sand."
     },

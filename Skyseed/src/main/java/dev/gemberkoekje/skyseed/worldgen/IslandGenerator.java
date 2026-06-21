@@ -190,7 +190,8 @@ public final class IslandGenerator {
         if (variant != null) {
             mobCfg.addAll(variant.decoration().mobs());
         }
-        final List<IslandPlan.MobSpawn> mobs = planMobs(mobCfg, surfaceList, random);
+        final List<IslandPlan.MobSpawn> mobs = new ArrayList<>(planMobs(mobCfg, surfaceList, random));
+        pondCfg.ifPresent(pond -> mobs.addAll(planPondMobs(center, pond, random)));
 
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
@@ -249,7 +250,47 @@ public final class IslandGenerator {
             }
             final int n = m.count().sample(random);
             for (int i = 0; i < n; i++) {
-                out.add(new IslandPlan.MobSpawn(type, surfaceList.get(random.nextInt(surfaceList.size()))));
+                out.add(new IslandPlan.MobSpawn(type, surfaceList.get(random.nextInt(surfaceList.size())), false));
+            }
+        }
+        return out;
+    }
+
+    /** Roll each pond water mob and pick random submerged positions inside the carved pool. */
+    private static List<IslandPlan.MobSpawn> planPondMobs(BlockPos center, Pond pond, RandomSource random) {
+        final List<IslandPlan.MobSpawn> out = new ArrayList<>();
+        if (pond.waterMobs().isEmpty()) {
+            return out;
+        }
+        final int r = Math.max(1, pond.radius());
+        final int r2 = r * r;
+        final int waterY = center.getY();
+        final int bottomY = waterY - Math.max(0, pond.depth() - 1);
+        final List<int[]> cols = new ArrayList<>();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (dx * dx + dz * dz <= r2) {
+                    cols.add(new int[]{dx, dz});
+                }
+            }
+        }
+        if (cols.isEmpty()) {
+            return out;
+        }
+        for (MobEntry m : pond.waterMobs()) {
+            if (random.nextFloat() >= m.chance()) {
+                continue;
+            }
+            final EntityType<?> type = resolveEntity(m.entity());
+            if (type == null) {
+                continue;
+            }
+            final int n = m.count().sample(random);
+            for (int i = 0; i < n; i++) {
+                final int[] c = cols.get(random.nextInt(cols.size()));
+                // Spawn below the surface (water above them) so squid/glow squid stay submerged.
+                final int y = bottomY + random.nextInt(Math.max(1, waterY - bottomY));
+                out.add(new IslandPlan.MobSpawn(type, new BlockPos(center.getX() + c[0], y, center.getZ() + c[1]), true));
             }
         }
         return out;

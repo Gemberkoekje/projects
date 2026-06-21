@@ -1,0 +1,20 @@
+{
+  "name": "Large Lush Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:flowering_azalea",
+  "advancement": "skyseed:craft_lush_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A grand cave garden — a bigger, pricier Lush island built around a deep central pool."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Deep water$()$(br)The large pool runs deep enough for $(item)glow squid$() as well as $(item)axolotls$() — the glow squid won't settle in a small Lush pond, so this is the island to grow for them."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Everything Lush, more of it$()$(br)Azalea trees, dripleaves, moss, sniffer plants, and the hanging roots, vines, and spore blossoms beneath — all on a larger canvas."
+    }
+  ]
+}

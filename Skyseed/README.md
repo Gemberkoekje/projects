@@ -24,12 +24,12 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.2.1** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.2.2** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
 | Core loop | Throwable charge-to-launch seed → arm timer → germinate → tick-budgeted grow-in |
-| Themes (seeds) | All 11 planned island types: **Forest**, **Large Forest**, **Rocky**, **Desert**, **Mushroom**, **Frozen**, **Meadow**, **Badlands**, **Ancient**, **Lush**, **Aquatic** (`skyseed:*`) |
+| Themes (seeds) | All 11 planned island types — **Forest**, **Rocky**, **Desert**, **Mushroom**, **Frozen**, **Meadow**, **Badlands**, **Ancient**, **Lush**, **Aquatic** — plus **Large Forest** and **Large Lush** size variants (`skyseed:*`) |
 | Banded fill | `fill_bands` palette option: a Y-cycled body palette for badlands-style strata |
 | Underside decor | per-variant `underside` list: hanging dripstone, cave vines, spore blossoms, roots from the island's bottom |
 | Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
@@ -37,6 +37,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Pond water plants | `pond.plants` list: lily pads on the surface, kelp / seagrass / coral / sea pickle / wet sponge on the floor |
 | Throw modes | Classic (charged physics arc) + Precise (direct placement along the look vector); toggle keybind (default **V**), persisted in client config |
 | Mob sprinkles | `mobs` list (theme / override / variant): animals spawned directly when an island finishes generating |
+| Water mobs | `pond.water_mobs`: animals spawned submerged in the pool (squid, axolotls, fish, glow squid) |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |

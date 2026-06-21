@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.2.2] - 2026-06-21
+
+### Added
+- **Water-spawned mobs** — a `water_mobs` list on a pond spawns animals submerged inside the pool
+  (placed below the surface so they don't beach). Aquatic freshwater pools get **squid**; the warm
+  reef gets **tropical fish**; Lush pools get **axolotls**.
+- **Large Lush island** (`skyseed:lush_large`) — a bigger, pricier Lush isle built around a deep
+  central pool, home to **glow squid** (which won't settle in a small Lush pond) as well as axolotls.
+  Full pattern: recipe (moss + azalea), advancement, guide entry, creative-tab example, disk icon.
+
 ## [0.2.1] - 2026-06-21
 
 ### Added

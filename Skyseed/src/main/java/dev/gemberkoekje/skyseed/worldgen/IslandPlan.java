@@ -25,6 +25,9 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}
 
-    /** A mob to spawn at {@code pos} (the surface block) once generation finishes. */
-    public record MobSpawn(EntityType<?> type, BlockPos pos) {}
+    /**
+     * A mob to spawn once generation finishes. For a land mob {@code pos} is the surface block (it
+     * spawns on top); for a water mob ({@code inWater}) {@code pos} is a pond water block (it spawns there).
+     */
+    public record MobSpawn(EntityType<?> type, BlockPos pos, boolean inWater) {}
 }

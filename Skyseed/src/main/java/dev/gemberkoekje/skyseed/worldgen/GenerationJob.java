@@ -2,7 +2,9 @@ package dev.gemberkoekje.skyseed.worldgen;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.level.block.Block;
@@ -81,10 +83,25 @@ public final class GenerationJob {
         }
     }
 
-    /** Spawn the planned mobs on top of their surface block, skipping spots that aren't clear. */
+    /** Spawn the planned mobs: land mobs on top of their surface block, water mobs inside the pond. */
     @SuppressWarnings({"deprecation", "removal"}) // EntityType#spawn convenience overload
     private void spawnMobs() {
         for (IslandPlan.MobSpawn ms : plan.mobs()) {
+            if (ms.inWater()) {
+                final BlockPos wp = ms.pos();
+                if (level.getFluidState(wp).isEmpty()) {
+                    continue; // the pond water at this spot got displaced (e.g. by a plant block)
+                }
+                // Place submerged, centred in the water block — EntityType#spawn aligns to the block top,
+                // which would leave a squid/axolotl out of the water and they'd promptly die.
+                final Entity e = ms.type().create(level);
+                if (e instanceof Mob mob) {
+                    mob.moveTo(wp.getX() + 0.5, wp.getY() + 0.5, wp.getZ() + 0.5, plan.random().nextFloat() * 360.0F, 0.0F);
+                    mob.finalizeSpawn(level, level.getCurrentDifficultyAt(wp), MobSpawnType.SPAWNER, null);
+                    level.addFreshEntity(mob);
+                }
+                continue;
+            }
             final BlockPos surface = ms.pos();
             final BlockPos spawnPos = surface.above();
             // Need solid ground and two blocks of standing room — but plants (flowers, grass, mushrooms)

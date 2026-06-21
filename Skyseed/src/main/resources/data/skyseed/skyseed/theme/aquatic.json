@@ -13,7 +13,8 @@
       { "block": "minecraft:seagrass", "chance": 0.18 },
       { "block": "minecraft:tall_seagrass", "chance": 0.06 }
     ],
-    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.60 } ]
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.60 } ],
+    "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.30, "count": { "min": 1, "max": 2 } } ]
   },
   "variants": [
     { "weight": 1, "name": "freshwater", "decoration": {
@@ -34,7 +35,8 @@
           { "block": "minecraft:sea_pickle", "chance": 0.08 },
           { "block": "minecraft:kelp", "chance": 0.10 },
           { "block": "minecraft:wet_sponge", "chance": 0.03 }
-        ]
+        ],
+        "water_mobs": [ { "entity": "minecraft:tropical_fish", "chance": 0.50, "count": { "min": 2, "max": 4 } } ]
       },
       "mobs": [ { "entity": "minecraft:turtle", "chance": 0.10, "count": { "min": 1, "max": 2 } } ],
       "variants": [ { "weight": 1, "name": "warm", "decoration": {} } ] },

@@ -38,6 +38,7 @@ public final class ModCreativeTabs {
                         output.accept(themedSeed("ancient", "Ancient Skyseed", 8));
                         output.accept(themedSeed("lush", "Lush Skyseed", 9));
                         output.accept(themedSeed("aquatic", "Aquatic Skyseed", 10));
+                        output.accept(themedSeed("lush_large", "Large Lush Skyseed", 11));
                     })
                     .build());
 

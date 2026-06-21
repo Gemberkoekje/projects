@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "AMA",
+    "MMM"
+  ],
+  "key": {
+    "M": { "item": "minecraft:moss_block" },
+    "A": { "item": "minecraft:azalea" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:lush_large",
+      "minecraft:item_name": "\"Large Lush Skyseed\"",
+      "minecraft:custom_model_data": 11
+    }
+  }
+}
