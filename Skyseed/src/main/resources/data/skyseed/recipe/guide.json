@@ -1,10 +1,4 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "category": "misc",
-  "ingredients": [
-    { "tag": "skyseed:skyseeds" }
-  ],
-  "result": {
-    "id": "skyseed:guide"
-  }
+  "type": "skyseed:guide",
+  "category": "misc"
 }

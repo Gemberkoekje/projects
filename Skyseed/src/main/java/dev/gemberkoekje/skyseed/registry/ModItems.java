@@ -1,9 +1,10 @@
 package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
-import dev.gemberkoekje.skyseed.item.GuideItem;
 import dev.gemberkoekje.skyseed.item.IslandSeedItem;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -44,9 +45,9 @@ public final class ModItems {
     /** The canonical seed, used as the fallback display item for the thrown entity. */
     public static final DeferredItem<IslandSeedItem> DEFAULT_SEED = SEEDS.get("forest");
 
-    /** The Skyfarer's Almanac guide book. */
-    public static final DeferredItem<GuideItem> GUIDE =
-            ITEMS.registerItem("guide", GuideItem::new, new Item.Properties().stacksTo(1));
+    /** Every Skyseed item — the guide recipe accepts any one of these; add-on seeds should join this tag. */
+    public static final TagKey<Item> SKYSEEDS =
+            TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "skyseeds"));
 
     private ModItems() {}
 

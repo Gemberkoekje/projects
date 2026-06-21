@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.item.SkyseedGuide;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -18,7 +19,7 @@ public final class ModCreativeTabs {
                     .title(Component.translatable("itemGroup.skyseed"))
                     .icon(() -> ModItems.DEFAULT_SEED.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
-                        output.accept(ModItems.GUIDE.get());
+                        output.accept(SkyseedGuide.book());
                         ModItems.SEED_THEMES.forEach(theme -> output.accept(ModItems.SEEDS.get(theme).get()));
                     })
                     .build());

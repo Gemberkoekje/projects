@@ -5,6 +5,7 @@ import dev.gemberkoekje.skyseed.network.SkyseedNetwork;
 import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
+import dev.gemberkoekje.skyseed.registry.ModRecipes;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.structure.DevStructureGenerator;
 import net.neoforged.bus.api.IEventBus;
@@ -24,6 +25,7 @@ public class Skyseed {
     public Skyseed(IEventBus modEventBus, ModContainer modContainer) {
         ModItems.register(modEventBus);
         ModEntities.register(modEventBus);
+        ModRecipes.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         modEventBus.addListener(SkyseedRegistries::onNewDataPackRegistry);
         SkyseedNetwork.register(modEventBus);

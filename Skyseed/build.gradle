@@ -119,8 +119,11 @@ configurations {
 }
 
 dependencies {
-    // Patchouli — data-driven guide book (the Skyfarer's Almanac).
-    implementation "vazkii.patchouli:Patchouli:1.21.1-93-NEOFORGE"
+    // Patchouli — OPTIONAL: it provides the rich illustrated guide book. We compile against it and load it in
+    // dev for testing, but the published mod does not require it (without Patchouli the guide is a plain
+    // vanilla written book). compileOnly + localRuntime = present here, not forced on dependents.
+    compileOnly "vazkii.patchouli:Patchouli:1.21.1-93-NEOFORGE"
+    localRuntime "vazkii.patchouli:Patchouli:1.21.1-93-NEOFORGE"
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

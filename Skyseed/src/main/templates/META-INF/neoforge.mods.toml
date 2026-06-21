@@ -88,10 +88,11 @@ A terraforming skyblock. Craft and throw a Skyseed to germinate a new, procedura
     ordering="NONE"
     side="BOTH"
 
-# Patchouli provides the in-game guide book (the Skyfarer's Almanac).
+# Patchouli is OPTIONAL: when present it upgrades the Skyfarer's Almanac to the rich illustrated book;
+# without it the guide is a plain vanilla written book. Load AFTER it so the swap can detect it.
 [[dependencies.${mod_id}]]
     modId="patchouli"
-    type="required"
+    type="optional"
     versionRange="[1.21,)"
     ordering="AFTER"
     side="BOTH"

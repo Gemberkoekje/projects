@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.11.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.12.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -48,7 +48,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Surface | Per-column `surface_scatter` (block mixes); snow-capped peaks (taller shape + snow) |
 | World | Void world preset with multi-noise overworld biomes; structures disabled |
 | Start | Curated start island; safe spawn (valid biome, on island not in a tree); first-join guide book |
-| Guide | Patchouli book (Forest / Rocky / Large Forest entries, advancement-gated to "crafted it once") |
+| Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
 **All 11 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
@@ -152,7 +152,7 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 
 - **World preset `skyseed:skyblock`** — a void `noise_settings` (final density 0, air blocks, `sea_level: -64` to dodge the hardcoded lava floor) with a **multi-noise overworld biome source**, so F3 shows real, varied biomes over empty sky. Selectable as a world type and defaulted on the create-world screen, with structure generation turned off.
 - **Start island** — a curated build placed at world creation (guarded by a new-world check), with spawn forced onto a valid land biome and onto the island surface (not into a tree).
-- **First join** — the player is teleported to the start island and given the Patchouli guide.
+- **First join** — the player is teleported to the start island and given the guide (the Patchouli book if installed, otherwise a vanilla written book). Tracked per-UUID in the world `SavedData`, so it's granted only once.
 
 ---
 
@@ -162,7 +162,7 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 
 - **`Skyseed`** — `@Mod` entry point; registers everything below. `MODID = "skyseed"`.
 - **`registry/`** — `DeferredRegister`s for the per-theme seed items (`ModItems.SEED_THEMES`), throwable entity type, creative tab; and `SkyseedRegistries` (the `skyseed:theme` datapack registry, via `DataPackRegistryEvent`).
-- **`item/`** — `IslandSeedItem` (charge-to-throw) and `GuideItem` (opens the Patchouli book).
+- **`item/`** — `IslandSeedItem` (charge-to-throw, one per theme) and `SkyseedGuide` (builds the guide book: Patchouli if present via the isolated `compat/PatchouliCompat`, else a vanilla written book).
 - **`entity/IslandSeedEntity`** — `ThrowableItemProjectile` carrying the theme; arms `ARM_DURATION = 40` ticks (~2 s), rests on block-hit, then `germinate()`s (overlap loop → enqueue plan).
 - **`worldgen/`** — `IslandGenerator` (the algorithm) → `IslandPlan`; `GenerationJob` + `IslandGrowth` (the tick-budget scheduler on `ServerTickEvent.Post`); `StartIsland`; `SkyseedWorldData` (`SavedData`); `WorldSetupEvents`; `event/PlayerEvents`.
 - **`worldgen/theme/`** — the codec records: `IslandTheme`, `Shape`, `Palette`, `OreEntry`, `Variant`, `Decoration`, `TreeEntry`, `GroundEntry`, `Pond`, `BiomeOverride`, plus `IntRange`, `OreDepth`, `Underside`.
@@ -215,7 +215,7 @@ The first invocation downloads Gradle, NeoForge, and Minecraft, so it takes a wh
 - `src/main/java/dev/gemberkoekje/skyseed/` — mod sources (`Skyseed.java` is the `@Mod` entry point).
 - `src/main/resources/data/skyseed/skyseed/theme/` — the theme JSONs (`forest`, `forest_large`, `rocky`).
 - `src/main/resources/` — assets, recipes, advancements, the Patchouli book, and the world preset.
-- `src/main/templates/` — `META-INF/neoforge.mods.toml` source (Patchouli is a required dep).
+- `src/main/templates/` — `META-INF/neoforge.mods.toml` source (Patchouli is an *optional* dep).
 - `gradle.properties` — mod id/version and Minecraft/NeoForge versions.
 
 Scaffolded from the [NeoForge ModDevGradle MDK](https://github.com/NeoForgeMDKs/MDK-1.21.1-ModDevGradle).

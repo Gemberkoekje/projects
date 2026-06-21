@@ -1,7 +1,7 @@
 package dev.gemberkoekje.skyseed.event;
 
 import dev.gemberkoekje.skyseed.Skyseed;
-import dev.gemberkoekje.skyseed.registry.ModItems;
+import dev.gemberkoekje.skyseed.item.SkyseedGuide;
 import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
@@ -32,7 +32,7 @@ public final class PlayerEvents {
                 .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
 
         if (!world.hasGuided(player.getUUID())) {
-            ItemStack guide = new ItemStack(ModItems.GUIDE.get());
+            ItemStack guide = SkyseedGuide.book();
             if (!player.getInventory().add(guide)) {
                 player.drop(guide, false);
             }

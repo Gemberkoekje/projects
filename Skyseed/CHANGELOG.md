@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.12.0] - 2026-06-21
+
+### Changed
+- **Patchouli is now optional.** With Patchouli installed, the Skyfarer's Almanac is the rich illustrated book
+  as before; without it, the guide is a plain vanilla written book carrying a short text edition. The mod
+  loads and plays fully without Patchouli (verified by booting with it removed). The single Patchouli API
+  call is isolated in a `PatchouliCompat` class that only loads when Patchouli is present; the dependency is
+  `optional` in the mod metadata and compile-only in the build.
+- **The guide is granted and crafted via one helper, `SkyseedGuide.book()`** (Patchouli book or written
+  book), so the first-join grant and the craft recipe always match. Crafting is now a small code recipe
+  (`skyseed:guide`) that turns any one `#skyseed:skyseeds` item into the Almanac.
+
+### Removed
+- The custom `skyseed:guide` item — the guide is now a real written book (or the Patchouli book), not a
+  bespoke item.
+
 ## [0.11.0] - 2026-06-21
 
 ### Changed
