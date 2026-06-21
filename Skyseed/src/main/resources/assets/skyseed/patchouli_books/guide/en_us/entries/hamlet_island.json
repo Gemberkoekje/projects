@@ -1,0 +1,20 @@
+{
+  "name": "Hamlet Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:emerald",
+  "advancement": "skyseed:craft_hamlet",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A little cottage on a grassy isle, home to one villager — the seed of a whole trading economy. The first of the village islands."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Put them to work$()$(br)The villager arrives $(item)unemployed$(). Set a job-site block beside them — a $(item)composter$(), $(item)lectern$(), $(item)cauldron$(), and so on — and they take up that trade. They dress to match the biome you grew them over."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A home$()$(br)The cottage has a bed they will claim, so they restock and can breed (add more beds and food). $(br)Raids are switched off on Skyseed worlds — illagers would only path into the void — but $(item)iron golems$() still appear once a village grows large enough."
+    }
+  ]
+}

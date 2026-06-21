@@ -7,6 +7,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.animal.Bee;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -61,9 +63,24 @@ public final class GenerationJob {
         if (!mobsSpawned) {
             spawnMobs();
             populateHives();
+            spawnVillagers();
             mobsSpawned = true;
         }
         return true;
+    }
+
+    /** Spawn curated villagers (e.g. a Hamlet's resident) — adult, dressed for the biome, with a bed nearby to claim. */
+    private void spawnVillagers() {
+        for (IslandPlan.VillagerSpawn vs : plan.villagers()) {
+            Villager villager = EntityType.VILLAGER.create(level);
+            if (villager == null) {
+                continue;
+            }
+            villager.moveTo(vs.pos().getX() + 0.5, vs.pos().getY(), vs.pos().getZ() + 0.5, 0.0F, 0.0F);
+            villager.setVillagerData(villager.getVillagerData().setType(VillagerType.byBiome(level.getBiome(vs.pos()))));
+            villager.setPersistenceRequired();
+            level.addFreshEntity(villager);
+        }
     }
 
     /** Fill any bee nests on the island with a few bees (they emerge to pollinate, then return home). */

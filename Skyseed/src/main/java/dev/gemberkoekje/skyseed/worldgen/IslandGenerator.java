@@ -181,6 +181,16 @@ public final class IslandGenerator {
         }
         final int pondSurfaceY = pondSurfaceTmp;
 
+        // Curated structure (e.g. a Hamlet cottage): stamped before decoration so trees/ground skip it.
+        final List<IslandPlan.VillagerSpawn> villagers = new ArrayList<>();
+        if (theme.structure().isPresent()) {
+            final ResourceLocation st = theme.structure().get();
+            if (st.equals(ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "hamlet"))) {
+                final BlockPos villagerPos = HamletStructure.plan(blockMap, surfaceList, center, topDome);
+                villagers.add(new IslandPlan.VillagerSpawn(villagerPos, ""));
+            }
+        }
+
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
             planDecoration(level, blockMap, trees, surfaceList, bottomList, variant.decoration(), random);
@@ -217,7 +227,7 @@ public final class IslandGenerator {
             }
         }
 
-        return new IslandPlan(blocks, trees, mobs, hives, random);
+        return new IslandPlan(blocks, trees, mobs, hives, villagers, random);
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {

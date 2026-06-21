@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "tag": "minecraft:planks" },
+    { "item": "minecraft:cobblestone" },
+    { "item": "minecraft:emerald" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:hamlet",
+      "minecraft:item_name": "\"Hamlet Skyseed\"",
+      "minecraft:custom_model_data": 20
+    }
+  }
+}

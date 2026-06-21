@@ -109,6 +109,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:hamlet_skyseed",
+      "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

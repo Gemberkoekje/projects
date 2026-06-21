@@ -18,6 +18,10 @@ The solution is to break the village into its constituent parts and spread them 
 
 ### 🏡 Hamlet Island ✨ (base villager island)
 
+> **Built (v0.5.0)** — `skyseed:hamlet`: a hand-built 7×7 oak cottage (bed, crafting table, torch,
+> windows, door) on a grassy isle, one unemployed villager dressed for the germination biome, recipe
+> planks + cobblestone + emerald. The villager claims the bed; raids are off (global gamerule).
+
 **Character:** The starting point for the villager system. A small cobblestone-and-wood cottage — one building, one bed, one villager. The villager spawns as **Unemployed**, ready to take any profession the player provides via a job site block. No iron golem. No raids (see Raids section).
 
 **Recipe:** Oak Planks + Cobblestone + Emerald  
@@ -134,7 +138,7 @@ Raids are triggered when a player with Bad Omen (obtained from Ominous Bottles i
 
 **Recommended handling:** Disable raid triggers for Skyseed village islands entirely, at least for v1. This can be done by not registering the island's villagers as part of a vanilla "village" POI cluster (they live on the island, but the game doesn't recognize it as a raid-eligible village). This is a consequence of not using vanilla village generation — the POI/village detection system won't see these as a real village unless you explicitly set that up, which you're not doing.
 
-> **⚠ Verify before designing around this.** The above is an assumption, and a risky one: beds and workstations placed in the world **are** POIs, and a villager near claimed beds + a workstation is exactly how vanilla forms a village (and enables raids / iron-golem spawns) — no explicit registration required. Spike this first: place beds + a workstation + a villager on a generated island, give a nearby player Bad Omen, and confirm whether a raid starts. If it does, we need an explicit suppression (e.g. `doPatrolSpawning` is unrelated; the lever is the `point_of_interest_type` / village detection, or keeping villagers/beds/workstations out of POI range of each other). This is the single biggest unknown in this plan.
+> **Resolved (v0.5.0):** rather than fight POI/village detection (beds + workstations + a villager *do* form a raid-eligible village automatically), Skyseed worlds simply set the **`disableRaids` gamerule** on world setup. No raids can start anywhere; villagers still trade, breed, and spawn iron golems normally. Set in `WorldSetupEvents` for any Skyseed world (new or existing).
 
 **Iron Golems** on the Village Center Island are cosmetic/protective against natural hostile mob spawns, not raid defense. They work normally.
 
@@ -195,7 +199,8 @@ Rocky Island (mountain variant)
 ## Implementation notes
 
 - **Village islands are curated structures**, not procedurally generated. The terrain generates normally (grass/cobblestone palette), and the buildings are placed on top using the same "curated structure on generated terrain" path as Animal Islands.
-- **Structure placement uses NBT `StructureTemplate` files** (decided 2026-06-21), authored in-game with structure blocks and stamped onto the island at generation. This is a new engine capability — the codebase currently has **no** structure-placement system (the start island and trees are hand-coded `setBlock` builders). Building the template loader is the first task here and is shared with Animal Islands and Structure Islands. Buildings also need a **flat pad / flattest-region** step, since the generated terrain has rim noise and a top dome.
+- **Structure placement (v0.5.0):** a theme can name a `structure`; the generator stamps it into the block plan before decoration. The Hamlet cottage is **hand-built** (`HamletStructure`, like the start island / trees) on a levelled 9×9 pad. The originally-planned **NBT `StructureTemplate`** loader is still the goal for the larger multi-building **Trade Post** and **Village Center** (and Animal/Structure Islands) — hand-coding those would be unwieldy — but a single small cottage was quicker to hand-build and let the villager/raid mechanics be validated first.
+- **Villagers** are spawned from a new `IslandPlan.VillagerSpawn` step in `GenerationJob` (adult, biome-typed, persistence-required); the Hamlet's bed is a real POI the villager claims for restock/breeding.
 - **Villagers are spawned inside their buildings** at generation time, already assigned to their job site blocks (for Trade Post and Village Center). The Hamlet Island spawns an Unemployed Villager.
 - **No vanilla village POI registration** — don't register these as vanilla villages. This avoids raids, avoids iron golem overgeneration, and avoids the vanilla village-detection system making assumptions about the island layout.
 - **Bed placement is inside each building** — villagers path to beds normally. Ensure beds are accessible (no blocks in the way) so the villager links to their bed correctly and restocks function.

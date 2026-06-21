@@ -22,6 +22,7 @@
     { "predicate": { "custom_model_data": 16 }, "model": "skyseed:item/island_seed_meadow_large" },
     { "predicate": { "custom_model_data": 17 }, "model": "skyseed:item/island_seed_badlands_large" },
     { "predicate": { "custom_model_data": 18 }, "model": "skyseed:item/island_seed_ancient_large" },
-    { "predicate": { "custom_model_data": 19 }, "model": "skyseed:item/island_seed_aquatic_large" }
+    { "predicate": { "custom_model_data": 19 }, "model": "skyseed:item/island_seed_aquatic_large" },
+    { "predicate": { "custom_model_data": 20 }, "model": "skyseed:item/island_seed_hamlet" }
   ]
 }

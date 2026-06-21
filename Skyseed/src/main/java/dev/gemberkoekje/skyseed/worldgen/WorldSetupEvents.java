@@ -4,8 +4,10 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.biome.Biome;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -26,6 +28,10 @@ public final class WorldSetupEvents {
         SkyseedWorldData data = overworld.getDataStorage()
                 .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
         if (data.isStartPlaced()) {
+            // Existing world: keep raids off if this is a Skyseed world (it has a curated start island).
+            if (data.getStartSpawn() != null) {
+                disableRaids(event.getServer(), overworld);
+            }
             return;
         }
         // Only a brand-new world (no ticks elapsed yet) — never retrofit an existing save.
@@ -34,10 +40,20 @@ public final class WorldSetupEvents {
             BlockPos spawn = StartIsland.build(overworld, center);
             overworld.setDefaultSpawnPos(spawn, 0.0F);
             data.markStartPlaced(spawn);
+            disableRaids(event.getServer(), overworld);
             Skyseed.LOGGER.info("[skyseed] placed curated starting island at {}; spawn {}", center, spawn);
         } else {
             data.markStartPlaced(null); // existing world: leave spawn untouched
         }
+    }
+
+    /**
+     * Raids don't work on tiny floating islands (illagers path into the void), so they're disabled on
+     * Skyseed worlds — villager islands still trade, breed and spawn iron golems as normal
+     * (SKYVILLAGESPLAN → Raids).
+     */
+    private static void disableRaids(MinecraftServer server, ServerLevel overworld) {
+        overworld.getGameRules().getRule(GameRules.RULE_DISABLE_RAIDS).set(true, server);
     }
 
     /**

@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.5.0] - 2026-06-21
+
+### Added
+- **Villager progression — the Hamlet Island.** The first village island: a grassy isle with a
+  hand-built oak cottage (bed, crafting table, torch, windows, door) and one resident **villager**. The
+  villager arrives **unemployed** — place a job-site block (composter, lectern, cauldron, …) to give it a
+  trade — and is dressed for the biome it grew over; its bed gives it a home to claim, restock and breed
+  from. Crafted from planks + cobblestone + an **emerald** (mine a Rocky mountain for emeralds). Full
+  pattern: theme, recipe, advancement, guide entry, icon.
+- **Curated structures.** A theme can name a `structure` to stamp onto the island surface (the Hamlet's
+  cottage is the first); a new plan step spawns villagers once the island lands.
+- **Raids disabled on Skyseed worlds** (`disableRaids` gamerule) — illagers would only path into the
+  void. Villager islands still trade, breed and spawn iron golems normally.
+
 ## [0.4.1] - 2026-06-21
 
 ### Changed

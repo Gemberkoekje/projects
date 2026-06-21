@@ -17,10 +17,11 @@ import java.util.List;
  * @param trees  configured features to place after the solid blocks land
  * @param mobs   animals to spawn on the surface once the island is fully placed
  * @param hives  bee-nest positions to populate with bees once placed
+ * @param villagers villagers to spawn once placed (for the village islands' curated structures)
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
-                         List<BlockPos> hives, RandomSource random) {
+                         List<BlockPos> hives, List<VillagerSpawn> villagers, RandomSource random) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}
@@ -30,4 +31,7 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      * spawns on top); for a water mob ({@code inWater}) {@code pos} is a pond water block (it spawns there).
      */
     public record MobSpawn(EntityType<?> type, BlockPos pos, boolean inWater) {}
+
+    /** A villager to spawn inside a curated structure. {@code profession} empty = unemployed (player assigns it). */
+    public record VillagerSpawn(BlockPos pos, String profession) {}
 }
