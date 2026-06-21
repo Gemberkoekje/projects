@@ -14,7 +14,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Snow-capped$()$(br)Thrown high or over a snowy biome it generates as a snow-capped alpine peak; otherwise bare stone and scree."
+      "text": "$(bold)Height matters$()$(br)Thrown high, or over a snowy biome, it caps with snow as an alpine peak; thrown deep near the world's floor it forms from $(item)deepslate$(), rich in diamond; in between, bare stone and scree."
     }
   ]
 }

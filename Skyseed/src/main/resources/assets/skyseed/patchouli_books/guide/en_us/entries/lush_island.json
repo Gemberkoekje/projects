@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Greenery$()$(br)Big and small $(item)dripleaves$(), $(item)moss$(), $(item)glow berries$() on the underside, and the two sniffer plants — $(item)torchflower$() and $(item)pitcher plant$()."
+      "text": "$(bold)Greenery$()$(br)Big and small $(item)dripleaves$(), $(item)moss$(), $(item)glow berries$() on the underside, and the two sniffer plants — $(item)torchflower$() and $(item)pitcher plant$(). A small pool collects in the moss, where $(item)axolotls$() swim."
     },
     {
       "type": "patchouli:text",

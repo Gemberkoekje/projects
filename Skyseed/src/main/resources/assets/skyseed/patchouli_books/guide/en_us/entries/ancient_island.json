@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Riches$()$(br)Every deepslate ore lives here, down to diamond and emerald, plus $(item)amethyst$() geodes and $(item)dripstone$()."
+      "text": "$(bold)Riches$()$(br)Every deepslate ore lives here, down to diamond and emerald, plus $(item)amethyst$() geodes and $(item)dripstone$(). Like Rocky, height matters: grow it deep — low, toward the world's floor — and the diamond and emerald come thicker."
     },
     {
       "type": "patchouli:text",

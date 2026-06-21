@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Throwing$()$(br)Hold right-click to wind up, then release. A quick tap lobs the island in close; a long hold flings it far.$(br2)It arms for about two seconds, then grows in. An island will never grow into another."
+      "text": "$(bold)Throwing$()$(br)Hold right-click to wind up, then release. A quick tap lobs the island in close; a long hold flings it far.$(br2)It arms for about two seconds, then grows in. An island will never grow into another.$(br2)Height matters too: some islands — the mining ones especially — form differently up high than deep down, so aim with care."
     },
     {
       "type": "patchouli:text",

@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A mycelium isle crowned with huge mushrooms. Hostile mobs won't spawn on mycelium, so it's a safe place to build."
+      "text": "A mycelium isle crowned with huge mushrooms. Unlike on dirt, mushrooms stay put and spread on mycelium in any light, so it makes a tidy fungus farm. (It takes the biome it lands in, though — so it isn't mob-proof unless grown over mushroom fields.)"
     },
     {
       "type": "patchouli:text",

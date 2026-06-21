@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.2] - 2026-06-21
+
+### Fixed (guidebook)
+- Corrected Skyfarer's Almanac text to match actual generation, and added throw-height hints:
+  - **Rocky** — dropped "iron is guaranteed and plentiful" (really ~80%, small veins) and the "rare
+    diamond in the core" claim (a normally-thrown Rocky has *no* diamond). Added a **Height is
+    everything** page: ore depends on the altitude the island forms at — high → coal/iron + a chance of
+    emerald (snow-capped); mid → the broad iron/copper/coal/lapis/gold spread; deep (y ≤ 8) → deepslate
+    rich in diamond/redstone/lapis/gold.
+  - **Ancient** — noted the same height effect (grow it deep for thicker diamond/emerald).
+  - **Large Rocky** — added the deep-throw deepslate/diamond case alongside the snow cap.
+  - **Mushroom** — removed the false "hostile mobs won't spawn on mycelium" claim (islands take their
+    germination biome); now describes mycelium's any-light mushroom farming.
+  - **Lush / Aquatic** — mention the pool axolotls and the squid / tropical fish added in 0.2.2.
+  - **Introduction** — added a note that throw height matters for some islands.
+
 ## [0.3.1] - 2026-06-21
 
 ### Changed

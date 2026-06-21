@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(). Over an ocean it becomes a warm reef — $(item)coral$(), sea pickles, even a rare $(item)sponge$()."
+      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(). Over an ocean it becomes a warm reef — $(item)coral$(), sea pickles, even a rare $(item)sponge$(). $(item)Squid$() swim the freshwater; the warm reef brings $(item)tropical fish$()."
     },
     {
       "type": "patchouli:text",
