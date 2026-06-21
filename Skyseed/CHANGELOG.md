@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.6] - 2026-06-21
+
+### Changed
+- **Forest & Large Forest stay a forest in every biome.** The biome overrides used to *replace* the
+  forest — beaches and deserts became treeless sand/dirt patches, oceans a near-empty lake, mushroom
+  fields a mushroom island. They now keep grass and trees everywhere and only add the biome accent:
+  a pond in watery biomes (ocean / river / swamp / mangrove), sandy ground on beaches and in deserts,
+  mycelium patches with a couple of giant mushrooms over mushroom fields, and the local tree species
+  elsewhere. Plains is a lighter wood rather than near-empty grass. Guide text updated to match.
+
 ## [0.3.5] - 2026-06-21
 
 ### Fixed
