@@ -159,6 +159,26 @@
       "text": "The $(item)Dungeon Skyseed$() — cobblestone around a piece of $(item)rotten flesh$(). A sealed spawner cube with two loot chests."
     },
     {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ruined_portal_skyseed",
+      "text": "The $(item)Ruined Portal Skyseed$() — $(item)obsidian$() and a $(item)gold ingot$(). A broken portal with a chest of Nether spoils."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_temple_skyseed",
+      "text": "The $(item)Desert Temple Skyseed$() — $(item)sand$(), $(item)sandstone$() and $(item)TNT$(). Four chests over a pressure-plate trap."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:jungle_temple_skyseed",
+      "text": "The $(item)Jungle Temple Skyseed$() — $(item)jungle planks$(), $(item)mossy cobblestone$() and a $(item)tripwire hook$(). A trapped puzzle room."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:witch_hut_skyseed",
+      "text": "The $(item)Witch Hut Skyseed$() — $(item)oak planks$(), a $(item)brown mushroom$() and a $(item)cauldron$(). A witch, a cat, and brewing drops."
+    },
+    {
       "type": "patchouli:text",
       "text": "$(bold)This Almanac$()$(br)Craft any single Skyseed on its own to turn it back into this book — so you'll never lose your way."
     }

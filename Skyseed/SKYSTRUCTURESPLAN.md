@@ -46,6 +46,11 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🏜️ Desert Temple
 
+> **Built (v0.14.0).** `skyseed:desert_temple` — a sealed sandstone chamber, four
+> `minecraft:chests/desert_pyramid` chests over a buried 3×3 TNT cache. Sand + sandstone + TNT. **The
+> pressure-plate trap is omitted** (fragile/support-dependent blocks don't survive the jigsaw placement path);
+> the TNT is reframed as a minable cache. Archaeology not yet included.
+
 **Vanilla:** Sandstone pyramid with 4 treasure chests below a pressure-plate TNT trap. Archaeology added dig sites in 1.20.
 
 **Skyblock translation:** The buried chamber only — the pyramid above is more architecture than gameplay. A sandstone platform island with a sealed-floor TNT trap chamber underneath, accessible by digging through the floor. Full vanilla loot tables including archaeology.
@@ -61,6 +66,11 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🌿 Jungle Temple
 
+> **Built (v0.14.0).** `skyseed:jungle_temple` — a sealed mossy-cobblestone room, two
+> `minecraft:chests/jungle_temple` chests and a lootable `minecraft:chests/jungle_temple_dispenser`. Jungle
+> planks + mossy cobblestone + tripwire hook. **The tripwire trap + lever puzzle are omitted** (fragile blocks
+> don't survive jigsaw placement); the dispenser is left as plain loot.
+
 **Vanilla:** Mossy cobblestone structure with tripwire traps, a puzzle dispenser, and 2 chests.
 
 **Skyblock translation:** The puzzle room only — one room, two chests, the tripwire trap intact. Solving the lever puzzle (vanilla mechanic) is more rewarding in skyblock where loot scarcity makes every chest matter.
@@ -74,6 +84,11 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 ---
 
 ### 🧙 Witch Hut (Swamp Hut)
+
+> **Built (v0.14.0).** `skyseed:witch_hut` — a spruce hut on a muddy island with a water cauldron, a crafting
+> table and a potted mushroom; a witch and a cat spawn inside via the theme's `animals` pack (now
+> `setPersistenceRequired`, so the witch stays). No chest — the witch's drops are the reward. Oak planks +
+> brown mushroom + cauldron. (The cat is a random variant, not specifically black; the witch doesn't respawn.)
 
 **Vanilla:** Small oak platform in swamps with a witch and a black cat.
 
@@ -133,6 +148,10 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 ---
 
 ### 🪨 Ruined Portal
+
+> **Built (v0.14.0).** `skyseed:ruined_portal` — a basalt/blackstone island with a broken obsidian +
+> crying-obsidian frame, a gold block, magma and netherrack accents, and a `minecraft:chests/ruined_portal`
+> chest. Obsidian + gold ingot. Crying obsidian is the signature reward.
 
 **Vanilla:** A broken Nether portal (obsidian frame, partially missing) with a chest containing gold items and sometimes crying obsidian.
 

@@ -115,6 +115,11 @@ public final class GenerationJob {
         if (e instanceof Sheep sheep) {
             sheep.setColor(DyeColor.byId(plan.random().nextInt(DyeColor.values().length)));
         }
+        // Persist so curated spawns stay put — harmless for farm animals (they don't despawn), and it keeps
+        // structure-island mobs (a Witch Hut's witch, an Outpost's pillagers) from despawning when unattended.
+        if (e instanceof Mob mob) {
+            mob.setPersistenceRequired();
+        }
     }
 
     /** Assemble the planned jigsaw structures, then spawn a villager at every bed they placed. */

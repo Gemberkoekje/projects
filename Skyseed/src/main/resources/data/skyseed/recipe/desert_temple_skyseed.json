@@ -1,0 +1,6 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [ { "item": "minecraft:sand" }, { "item": "minecraft:sandstone" }, { "item": "minecraft:tnt" } ],
+  "result": { "id": "skyseed:desert_temple_skyseed" }
+}

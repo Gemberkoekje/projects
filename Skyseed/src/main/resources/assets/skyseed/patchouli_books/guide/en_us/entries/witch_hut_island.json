@@ -1,0 +1,16 @@
+{
+  "name": "Witch Hut Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:cauldron",
+  "advancement": "skyseed:craft_witch_hut",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A little spruce hut on a muddy island, home to a $(item)witch$() and a stray $(item)cat$(). No chest here — the witch is the reward, dropping brewing ingredients when killed."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A brewer's bounty$()$(br)Witch drops — redstone, glowstone dust, spider eye, sugar, sticks, glass bottles, gunpowder — are exactly the mid-game brewing kit. The cat scares off creepers and phantoms, and tames with raw fish. Crafted from $(item)oak planks$(), a $(item)brown mushroom$() and a $(item)cauldron$()."
+    }
+  ]
+}

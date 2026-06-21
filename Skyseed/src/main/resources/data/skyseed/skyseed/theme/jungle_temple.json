@@ -1,0 +1,11 @@
+{
+  "shape": { "radius": { "min": 6, "max": 8 }, "rim_noise": 0.20, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3,
+    "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.18 } ] },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:jungle_temple/temple", "target": "minecraft:bottom", "depth": 1, "pad": 4 },
+  "variants": [
+    { "weight": 1, "name": "overgrown", "decoration": {
+      "ground": [ { "block": "minecraft:fern", "chance": 0.12 }, { "block": "minecraft:short_grass", "chance": 0.20 } ] } }
+  ]
+}

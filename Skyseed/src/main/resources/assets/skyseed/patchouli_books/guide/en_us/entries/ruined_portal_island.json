@@ -1,0 +1,16 @@
+{
+  "name": "Ruined Portal Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:crying_obsidian",
+  "advancement": "skyseed:craft_ruined_portal",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A scorched basalt platform with a broken Nether portal frame and a loot chest. The reward worth the throw: $(item)crying obsidian$() — the seed of a respawn anchor, and otherwise unobtainable up here."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Nether-adjacent spoils$()$(br)The chest holds the vanilla ruined-portal haul: golden gear, flint and steel, fire charges, obsidian and crying obsidian. Crafted from $(item)obsidian$() and a $(item)gold ingot$()."
+    }
+  ]
+}

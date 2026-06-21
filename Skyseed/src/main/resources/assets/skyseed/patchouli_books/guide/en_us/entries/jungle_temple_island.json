@@ -1,0 +1,16 @@
+{
+  "name": "Jungle Temple Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:mossy_cobblestone",
+  "advancement": "skyseed:craft_jungle_temple",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sealed mossy cobblestone room with two loot chests and an arrow $(item)dispenser$() set into the wall. Break in and clear it out."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Two chests and a dispenser$()$(br)The chests hold diamonds, emerald, gold and iron, bamboo and enchanted books; the dispenser is worth breaking for its arrows. Crafted from $(item)jungle planks$(), $(item)mossy cobblestone$() and a $(item)tripwire hook$()."
+    }
+  ]
+}

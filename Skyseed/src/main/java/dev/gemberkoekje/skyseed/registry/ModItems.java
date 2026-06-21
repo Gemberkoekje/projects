@@ -29,7 +29,8 @@ public final class ModItems {
             "mushroom", "mushroom_large", "frozen", "frozen_large", "meadow", "meadow_large",
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
             "aquatic", "aquatic_large", "hamlet", "trade_post", "village_center",
-            "pasture", "poultry", "wool_farm", "stable", "aquarium", "dungeon");
+            "pasture", "poultry", "wool_farm", "stable", "aquarium",
+            "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut");
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();

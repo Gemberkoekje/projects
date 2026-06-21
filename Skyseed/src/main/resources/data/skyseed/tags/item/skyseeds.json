@@ -28,6 +28,10 @@
     "skyseed:wool_farm_skyseed",
     "skyseed:stable_skyseed",
     "skyseed:aquarium_skyseed",
-    "skyseed:dungeon_skyseed"
+    "skyseed:dungeon_skyseed",
+    "skyseed:ruined_portal_skyseed",
+    "skyseed:desert_temple_skyseed",
+    "skyseed:jungle_temple_skyseed",
+    "skyseed:witch_hut_skyseed"
   ]
 }

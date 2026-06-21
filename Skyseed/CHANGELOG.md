@@ -3,6 +3,33 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.14.0] - 2026-06-21
+
+### Added
+- **Four more structure islands** (see `SKYSTRUCTURESPLAN.md`), all built on the jigsaw system:
+  - **Ruined Portal** (`skyseed:ruined_portal`) — a scorched basalt scene with a broken obsidian /
+    crying-obsidian frame and a `minecraft:chests/ruined_portal` chest (crying obsidian is otherwise
+    unobtainable up here). Obsidian + gold ingot.
+  - **Desert Temple** (`skyseed:desert_temple`) — a sealed sandstone chamber, four
+    `minecraft:chests/desert_pyramid` chests over a buried 3×3 cache of TNT. Sand + sandstone + TNT.
+  - **Jungle Temple** (`skyseed:jungle_temple`) — a mossy-cobblestone room with two
+    `minecraft:chests/jungle_temple` chests and a lootable arrow dispenser. Jungle planks + mossy
+    cobblestone + tripwire hook.
+  - **Witch Hut** (`skyseed:witch_hut`) — a spruce hut with a witch and a cat (via the `animals` pack) and a
+    water cauldron; no chest, the witch's drops are the reward. Oak planks + brown mushroom + cauldron.
+  - Each ships theme, recipe, advancement, guide entry, icon, and item + `#skyseed:skyseeds` tag entry.
+
+### Changed
+- Mobs spawned via the `animals` pack are now `setPersistenceRequired` — harmless for farm animals, but it
+  keeps structure-island mobs (the Witch Hut's witch) from despawning. A shared `StructureParts` helper now
+  holds the jigsaw anchor + loot-chest block-entity NBT used by the structure templates.
+
+### Known limitation
+- Support-dependent "trap trigger" blocks (a desert temple's pressure plate, a jungle temple's tripwire) do
+  not survive the jigsaw structure-placement path, so they're omitted for now: the desert's TNT is reframed as
+  a minable cache and the jungle's dispenser is left lootable. Restoring live traps would need a
+  post-placement fragile-block pass.
+
 ## [0.13.0] - 2026-06-21
 
 ### Added

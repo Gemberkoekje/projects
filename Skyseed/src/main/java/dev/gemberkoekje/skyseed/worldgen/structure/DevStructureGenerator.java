@@ -28,6 +28,10 @@ public final class DevStructureGenerator {
             VillageCenterTemplates.generateInto(base.resolve("village_center"));
             AnimalTemplates.generateInto(base.resolve("animal"));
             DungeonTemplates.generateInto(base.resolve("dungeon"));
+            RuinedPortalTemplates.generateInto(base.resolve("ruined_portal"));
+            DesertTempleTemplates.generateInto(base.resolve("desert_temple"));
+            JungleTempleTemplates.generateInto(base.resolve("jungle_temple"));
+            WitchHutTemplates.generateInto(base.resolve("witch_hut"));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] dev structure template generation skipped: {}", e.toString());
         }

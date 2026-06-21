@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.13.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.14.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -41,7 +41,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager. **Trade Post** (`skyseed:trade_post`): a plaza ringed by shops, each villager takes up a trade. **Village Center** (`skyseed:village_center`): a bell plaza + four trading halls with **all 13 professions** + an iron golem. See `SKYVILLAGESPLAN.md`. Raids disabled on Skyseed worlds |
 | Jigsaw buildings | A theme's `jigsaw` config assembles buildings from a vanilla `worldgen/template_pool` via `JigsawPlacement` — random rotation + structure-processor variation, exactly like vanilla villages. Single-piece (the Hamlet's three weathered cottages) or **multi-piece** (the Trade Post's plaza branches shops off jigsaw connectors). A villager spawns at every bed; drop in structure-block-authored `.nbt` to extend a pool |
 | Animal islands | **Pasture / Poultry / Wool Farm / Stable / Aquarium** — a fenced enclosure + a guaranteed pack of animals via the `animals` theme field (weighted packs, babies, random sheep colours, submerged aquarium life; the Stable carries a loot chest). See `SKYANIMALSPLAN.md` |
-| Structure islands | **Dungeon** (`skyseed:dungeon`): a sealed cobblestone cube with a vanilla mob spawner (zombie/skeleton/spider) + two `minecraft:chests/simple_dungeon` chests. Built on the jigsaw system — spawner & loot chests are block-entity NBT in the structure `.nbt`. See `SKYSTRUCTURESPLAN.md` |
+| Structure islands | **Dungeon** (spawner cube + `simple_dungeon` chests), **Ruined Portal** (broken frame + crying obsidian + `ruined_portal` chest), **Desert Temple** (4 `desert_pyramid` chests + buried TNT), **Jungle Temple** (2 `jungle_temple` chests + dispenser), **Witch Hut** (witch + cat + cauldron). Built on the jigsaw system — loot chests, spawners and vanilla loot tables are block-entity NBT in the structure `.nbt`. See `SKYSTRUCTURESPLAN.md` |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |

@@ -1,0 +1,20 @@
+{
+  "name": "Desert Temple Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:tnt",
+  "advancement": "skyseed:craft_desert_temple",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sealed sandstone chamber with four treasure chests — and a hidden 3×3 cache of $(item)TNT$() buried in the floor beneath them. Break in from above and loot the chests; mine the TNT out from the side if you want it."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The haul$()$(br)Vanilla desert-pyramid loot: diamonds, gold, emerald, enchanted books, a golden apple — plus nine TNT for the taking. Keep open flame well away from that floor."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Crafted from $(item)sand$(), $(item)sandstone$() and $(item)TNT$() — the TNT a fair warning of what's inside."
+    }
+  ]
+}
