@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.7.0] - 2026-06-21
+
+### Changed
+- **Buildings now use the vanilla jigsaw system.** Placement moved from "load one `.nbt` and stamp it" to
+  real jigsaw assembly: a theme's `jigsaw` config points at a `worldgen/template_pool`, and the generator
+  levels a pad and runs `JigsawPlacement.generateJigsaw` at the island centre — the same machinery vanilla
+  villages use. This brings, for free:
+  - **Random rotation** — cottages now face any direction.
+  - **Structure processors** for organic variation — the Hamlet's `hamlet_weathering` processor mosses
+    cobblestone and strips the odd oak log, so even same-style cottages differ.
+  - A **weighted pool** of the three cottages, now a standard template pool, and the foundation for
+    multi-building islands (Trade Post, Village Center) that branch pieces off jigsaw connectors.
+  Cottage `.nbt` carry a "bottom" anchor jigsaw (emitted by the dev-time writer); drop in your own
+  structure-block-authored `.nbt` and add it to the pool to extend it.
+
 ## [0.6.0] - 2026-06-21
 
 ### Added

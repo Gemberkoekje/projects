@@ -28,6 +28,11 @@ public final class StructureWriter {
     private StructureWriter() {}
 
     public static void write(Map<BlockPos, BlockState> blocks, Path file) throws IOException {
+        write(blocks, Map.of(), file);
+    }
+
+    /** As {@link #write(Map, Path)}, but {@code blockEntities} attaches block-entity NBT (e.g. jigsaw blocks). */
+    public static void write(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities, Path file) throws IOException {
         int sx = 0, sy = 0, sz = 0;
         for (BlockPos p : blocks.keySet()) {
             sx = Math.max(sx, p.getX());
@@ -59,6 +64,10 @@ public final class StructureWriter {
             pos.add(IntTag.valueOf(e.getKey().getZ()));
             b.put("pos", pos);
             b.putInt("state", idx);
+            final CompoundTag be = blockEntities.get(e.getKey());
+            if (be != null) {
+                b.put("nbt", be.copy());
+            }
             blocksTag.add(b);
         }
 

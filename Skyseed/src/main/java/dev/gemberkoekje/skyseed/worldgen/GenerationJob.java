@@ -10,10 +10,13 @@ import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement;
+import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
 
 /**
  * Drains an {@link IslandPlan} into the world a bounded number of blocks per tick, so an island never
@@ -72,12 +75,13 @@ public final class GenerationJob {
         return true;
     }
 
-    /** Stamp the planned NBT building templates onto the terrain once it has all landed. */
+    /** Assemble the planned jigsaw structures (villager cottages, …) onto the terrain once it has landed. */
     private void placeStructures() {
-        for (IslandPlan.StructurePlacement sp : plan.structures()) {
-            StructureTemplate template = level.getStructureManager().getOrCreate(sp.template());
-            StructurePlaceSettings settings = new StructurePlaceSettings();
-            template.placeInWorld(level, sp.origin(), sp.origin(), settings, plan.random(), Block.UPDATE_CLIENTS);
+        for (IslandPlan.JigsawSite js : plan.jigsaws()) {
+            final Holder<StructureTemplatePool> pool = level.registryAccess()
+                    .lookupOrThrow(Registries.TEMPLATE_POOL)
+                    .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, js.pool()));
+            JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
         }
     }
 
