@@ -51,7 +51,7 @@ public final class IslandGenerator {
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
-        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome);
+        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY());
 
         // --- effective config: base theme, overlaid by the matching biome override ---
         final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get() : theme.shape();
@@ -169,9 +169,9 @@ public final class IslandGenerator {
         return new IslandPlan(blocks, trees, random);
     }
 
-    private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome) {
+    private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {
         for (BiomeOverride o : overrides) {
-            if (o.matches(biome)) {
+            if (o.matches(biome, y)) {
                 return o;
             }
         }

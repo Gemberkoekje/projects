@@ -12,13 +12,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A per-biome tweak applied on top of a theme's base config when a seed germinates in a matching
- * biome (plan: "set up biomes to be (slightly) different"). {@code biomes} entries are either a biome
- * id ({@code minecraft:plains}) or a biome tag ({@code #minecraft:is_savanna}). Every other field is
- * optional and, when present, replaces the base theme's corresponding field for that island.
+ * A conditional tweak applied on top of a theme's base config when a seed germinates somewhere that
+ * matches. A match requires the biome to be in {@code biomes} (empty = any biome) AND the germination
+ * Y to be within {@code min_y}..{@code max_y} (each optional). Every other field is optional and, when
+ * present, replaces the base theme's corresponding field for that island. First matching override wins.
  */
 public record BiomeOverride(
         List<String> biomes,
+        Optional<Integer> minY,
+        Optional<Integer> maxY,
         Optional<ResourceLocation> surface,
         Optional<ResourceLocation> fill,
         Optional<ResourceLocation> core,
@@ -30,7 +32,9 @@ public record BiomeOverride(
         Optional<Pond> pond) {
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
-            Codec.STRING.listOf().fieldOf("biomes").forGetter(BiomeOverride::biomes),
+            Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
+            Codec.INT.optionalFieldOf("min_y").forGetter(BiomeOverride::minY),
+            Codec.INT.optionalFieldOf("max_y").forGetter(BiomeOverride::maxY),
             ResourceLocation.CODEC.optionalFieldOf("surface").forGetter(BiomeOverride::surface),
             ResourceLocation.CODEC.optionalFieldOf("fill").forGetter(BiomeOverride::fill),
             ResourceLocation.CODEC.optionalFieldOf("core").forGetter(BiomeOverride::core),
@@ -42,8 +46,18 @@ public record BiomeOverride(
             Pond.CODEC.optionalFieldOf("pond").forGetter(BiomeOverride::pond)
     ).apply(i, BiomeOverride::new));
 
-    /** True if {@code biome} matches any of this override's biome ids/tags. */
-    public boolean matches(Holder<Biome> biome) {
+    /** True if {@code biome} (when biomes is set) and {@code y} (when a range is set) both match. */
+    public boolean matches(Holder<Biome> biome, int y) {
+        if (!biomes.isEmpty() && !matchesBiome(biome)) {
+            return false;
+        }
+        if (minY.isPresent() && y < minY.get()) {
+            return false;
+        }
+        return maxY.isEmpty() || y <= maxY.get();
+    }
+
+    private boolean matchesBiome(Holder<Biome> biome) {
         for (String entry : biomes) {
             if (entry.startsWith("#")) {
                 ResourceLocation tagId = ResourceLocation.tryParse(entry.substring(1));
