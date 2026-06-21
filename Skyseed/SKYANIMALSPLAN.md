@@ -4,7 +4,7 @@ This document covers all vanilla overworld passive and neutral mobs, their assig
 
 ---
 
-## Status — partially implemented (v0.2.0, 2026-06-21)
+## Status — implemented (sprinkles v0.2.0, Animal Islands v0.10.0)
 
 The **mob-spawning capability** and the **sprinkle animals** on existing islands are built. A theme `mobs`
 list (`{ "entity", "chance", "count" }`) — at theme, biome-override, and per-variant level — spawns
