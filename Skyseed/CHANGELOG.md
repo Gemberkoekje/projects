@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.3] - 2026-06-21
+
+### Fixed (guidebook)
+- **Forest / Large Forest** entries no longer imply they always grow an oak forest. Both now lead with
+  the biome dependence — a Forest Skyseed thrown over a desert is a treeless dirt-and-sand patch, not a
+  grove. Large Forest also dropped the stale "costs oak logs" line (the recipe takes any log as of 0.3.1).
+
 ## [0.3.2] - 2026-06-21
 
 ### Fixed (guidebook)

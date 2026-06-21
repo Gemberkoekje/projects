@@ -6,11 +6,11 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A grassy isle, radius 7–10, with a flat-ish domed top and a rocky underside. Coal is common in its core; iron a little rarer."
+      "text": "A Forest Skyseed takes after the biome it lands in — grassy and wooded over temperate land, but open grass over plains, and even a treeless dirt-and-sand patch over a desert. Radius 7–10, flat-ish domed top, rocky underside. Coal is common in its core; iron a little rarer."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Where it lands matters$()$(br)$(li)Forest: oak and birch.$(li)Savanna: acacia.$(li)Plains: open grass, the odd tree.$(li)Desert / badlands: dirt instead of grass, dusted with sand."
+      "text": "$(bold)Where it lands matters$()$(br)$(li)Forest: oak and birch.$(li)Savanna: acacia.$(li)Plains: open grass, the odd tree.$(li)Desert / badlands: dirt and sand, dead bushes — no trees."
     }
   ]
 }

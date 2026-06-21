@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The Forest Island writ large — radius 13–17, a deeper core, and a small grove of oaks. More coal and iron to match its size.$(br2)Costs oak logs to craft, so harvest a forest first."
+      "text": "The Forest Island writ large — radius 13–17, a deeper core, more coal and iron to match its size. Like the small one it takes after the biome it lands in: a grove of trees over forest (oak, birch, spruce, and the rest), open grass over plains, or a treeless dirt-and-sand patch over a desert.$(br2)Crafted from any logs — any tree — so harvest a tree first."
     }
   ]
 }
