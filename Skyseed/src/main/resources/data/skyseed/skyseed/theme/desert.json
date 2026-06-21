@@ -6,6 +6,9 @@
     { "block": "minecraft:gold_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" },
     { "block": "minecraft:bone_block", "chance": 0.10, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 3, "max": 7 }, "depth": "deep_core" }
   ],
+  "mobs": [
+    { "entity": "minecraft:rabbit", "chance": 0.18, "count": { "min": 1, "max": 2 } }
+  ],
   "variants": [
     { "weight": 1, "name": "standard", "decoration": {
       "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 }, { "block": "minecraft:cactus", "chance": 0.06 } ] } }

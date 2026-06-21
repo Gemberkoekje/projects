@@ -4,6 +4,22 @@ This document covers all vanilla overworld passive and neutral mobs, their assig
 
 ---
 
+## Status — partially implemented (v0.2.0, 2026-06-21)
+
+The **mob-spawning capability** and the **sprinkle animals** on existing islands are built. A theme `mobs`
+list (`{ "entity", "chance", "count" }`) — at theme, biome-override, and per-variant level — spawns
+animals directly when an island finishes generating (any spot with solid ground and two non-blocking
+blocks above, so flowers/grass don't prevent it). Applied across Forest, Meadow, Mushroom, Desert,
+Frozen, Badlands, and Aquatic (and the Forest biome specials: taiga fox/wolf, jungle parrot, savanna
+horse/llama/armadillo, mushroom-fields mooshroom, desert rabbit).
+
+**Not yet built:** the dedicated **Animal Islands** (Pasture, Poultry, Wool Farm, Stable, Aquarium) and
+their fenced-enclosure structures; **water-spawned mobs** (squid, axolotl, glow squid, turtles in the
+pond — need in-water positioning); 1.21.5 biome mob variants (target is 1.21.1). Bee nests on Meadow
+are still placed empty (no bees inside yet).
+
+---
+
 ## Design principles
 
 - **Sprinkle animals appear on generation.** Mobs are spawned server-side when the island germinates, not via the vanilla ambient spawn system. This means they appear regardless of light level or time of day, and the player gets the "catch it before it wanders off" moment on every relevant island.

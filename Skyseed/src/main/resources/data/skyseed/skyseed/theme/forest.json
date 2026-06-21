@@ -5,6 +5,12 @@
     { "block": "minecraft:coal_ore", "chance": 0.85, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
     { "block": "minecraft:iron_ore", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
+  "mobs": [
+    { "entity": "minecraft:cow", "chance": 0.20, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:pig", "chance": 0.20, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:sheep", "chance": 0.25, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:chicken", "chance": 0.30, "count": { "min": 1, "max": 3 } }
+  ],
   "variants": [
     { "weight": 1, "name": "oak", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 4, "spacing": 3 } ],
@@ -43,7 +49,7 @@
       "trees": [ { "feature": "minecraft:swamp_oak", "tries": 3, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:fern", "chance": 0.20 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:blue_orchid", "chance": 0.03 } ] } } ] },
 
-    { "biomes": [ "minecraft:mushroom_fields" ], "surface": "minecraft:mycelium", "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "minecraft:mushroom_fields" ], "surface": "minecraft:mycelium", "mobs": [ { "entity": "minecraft:mooshroom", "chance": 0.50, "count": { "min": 1, "max": 2 } } ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:huge_red_mushroom", "tries": 2, "spacing": 3 }, { "feature": "minecraft:huge_brown_mushroom", "tries": 2, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:red_mushroom", "chance": 0.05 }, { "block": "minecraft:brown_mushroom", "chance": 0.05 } ] } } ] },
 
@@ -53,15 +59,18 @@
 
     { "biomes": [ "#minecraft:is_taiga" ], "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.30 } ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 5, "spacing": 2 } ],
-      "ground": [ { "block": "minecraft:fern", "chance": 0.25 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.06 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ] } } ] },
+      "ground": [ { "block": "minecraft:fern", "chance": 0.25 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.06 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ],
+      "mobs": [ { "entity": "minecraft:fox", "chance": 0.10, "count": { "min": 1, "max": 1 } }, { "entity": "minecraft:wolf", "chance": 0.10, "count": { "min": 1, "max": 1 } } ] } } ] },
 
     { "biomes": [ "#minecraft:is_jungle" ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:jungle_tree", "tries": 5, "spacing": 2 }, { "feature": "minecraft:jungle_bush", "tries": 3, "spacing": 1 } ],
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.40 }, { "block": "minecraft:fern", "chance": 0.10 } ] } } ] },
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.40 }, { "block": "minecraft:fern", "chance": 0.10 } ],
+      "mobs": [ { "entity": "minecraft:parrot", "chance": 0.05, "count": { "min": 1, "max": 1 } } ] } } ] },
 
     { "biomes": [ "#minecraft:is_savanna" ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:acacia", "tries": 4, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.18 } ] } } ] },
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.18 } ],
+      "mobs": [ { "entity": "minecraft:horse", "chance": 0.08, "count": { "min": 1, "max": 1 } }, { "entity": "minecraft:llama", "chance": 0.08, "count": { "min": 1, "max": 2 } }, { "entity": "minecraft:armadillo", "chance": 0.08, "count": { "min": 1, "max": 2 } } ] } } ] },
 
     { "biomes": [ "minecraft:windswept_hills", "minecraft:windswept_forest", "minecraft:windswept_gravelly_hills" ], "surface_scatter": [ { "block": "minecraft:stone", "chance": 0.25 } ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 2, "spacing": 3 }, { "feature": "minecraft:oak", "tries": 2, "spacing": 3 } ],
@@ -74,7 +83,7 @@
       "trees": [ { "feature": "minecraft:oak", "tries": 1, "spacing": 5 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.45 }, { "block": "minecraft:poppy", "chance": 0.05 }, { "block": "minecraft:dandelion", "chance": 0.05 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } } ] },
 
-    { "biomes": [ "minecraft:desert", "#minecraft:is_badlands" ], "surface": "minecraft:dirt", "surface_scatter": [ { "block": "minecraft:sand", "chance": 0.40 } ], "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "minecraft:desert", "#minecraft:is_badlands" ], "surface": "minecraft:dirt", "surface_scatter": [ { "block": "minecraft:sand", "chance": 0.40 } ], "mobs": [ { "entity": "minecraft:rabbit", "chance": 0.15, "count": { "min": 1, "max": 2 } } ], "variants": [ { "weight": 1, "decoration": {
       "ground": [ { "block": "minecraft:dead_bush", "chance": 0.06 } ] } } ] },
 
     { "biomes": [ "#minecraft:is_forest" ], "variants": [

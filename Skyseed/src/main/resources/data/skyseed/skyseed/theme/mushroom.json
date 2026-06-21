@@ -2,6 +2,9 @@
   "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" },
   "palette": { "surface": "minecraft:mycelium", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
+  "mobs": [
+    { "entity": "minecraft:mooshroom", "chance": 0.60, "count": { "min": 1, "max": 2 } }
+  ],
   "variants": [
     { "weight": 3, "name": "red", "decoration": {
       "trees": [ { "feature": "minecraft:huge_red_mushroom", "tries": 5, "spacing": 3 } ],

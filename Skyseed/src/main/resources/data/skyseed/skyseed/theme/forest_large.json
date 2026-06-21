@@ -5,6 +5,12 @@
     { "block": "minecraft:coal_ore", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
     { "block": "minecraft:iron_ore", "chance": 0.65, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
+  "mobs": [
+    { "entity": "minecraft:cow", "chance": 0.30, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:pig", "chance": 0.25, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:sheep", "chance": 0.30, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:chicken", "chance": 0.35, "count": { "min": 1, "max": 3 } }
+  ],
   "variants": [
     { "weight": 1, "name": "oak", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 9, "spacing": 3 } ],

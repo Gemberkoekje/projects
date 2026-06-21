@@ -7,6 +7,7 @@ import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
+import dev.gemberkoekje.skyseed.worldgen.theme.MobEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreDepth;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Palette;
@@ -23,6 +24,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -181,13 +183,21 @@ public final class IslandGenerator {
             placeWaterfalls(blockMap, surfaceList, center, baseRadius, waterfalls, random);
         }
 
+        // Mobs: theme/override sprinkles plus any variant-specific ones, spawned after the island lands.
+        final List<MobEntry> baseMobs = (ov != null && ov.mobs().isPresent()) ? ov.mobs().get() : theme.mobs();
+        final List<MobEntry> mobCfg = new ArrayList<>(baseMobs);
+        if (variant != null) {
+            mobCfg.addAll(variant.decoration().mobs());
+        }
+        final List<IslandPlan.MobSpawn> mobs = planMobs(mobCfg, surfaceList, random);
+
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
             blocks.add(new BlockPlacement(e.getKey(), e.getValue()));
         }
         blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY())); // bottom-up grow-in
 
-        return new IslandPlan(blocks, trees, random);
+        return new IslandPlan(blocks, trees, mobs, random);
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {
@@ -212,6 +222,36 @@ public final class IslandGenerator {
             }
         }
         return out;
+    }
+
+    /** Roll each configured mob and pick random surface columns to spawn them on (after generation). */
+    private static List<IslandPlan.MobSpawn> planMobs(List<MobEntry> cfg, List<BlockPos> surfaceList, RandomSource random) {
+        final List<IslandPlan.MobSpawn> out = new ArrayList<>();
+        if (cfg.isEmpty() || surfaceList.isEmpty()) {
+            return out;
+        }
+        for (MobEntry m : cfg) {
+            if (random.nextFloat() >= m.chance()) {
+                continue;
+            }
+            final EntityType<?> type = resolveEntity(m.entity());
+            if (type == null) {
+                continue;
+            }
+            final int n = m.count().sample(random);
+            for (int i = 0; i < n; i++) {
+                out.add(new IslandPlan.MobSpawn(type, surfaceList.get(random.nextInt(surfaceList.size()))));
+            }
+        }
+        return out;
+    }
+
+    private static EntityType<?> resolveEntity(ResourceLocation id) {
+        if (BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
+            return BuiltInRegistries.ENTITY_TYPE.get(id);
+        }
+        Skyseed.LOGGER.warn("[skyseed] theme references unknown entity '{}' — skipping", id);
+        return null;
     }
 
     private static List<BlockState> resolveBands(List<ResourceLocation> ids) {

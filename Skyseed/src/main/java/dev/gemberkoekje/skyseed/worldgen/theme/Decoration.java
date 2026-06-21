@@ -10,12 +10,13 @@ import java.util.List;
  * features that hang from the island's bottom (dripstone, cave vines, spore blossoms, hanging roots).
  * (README → Generation algorithm.)
  */
-public record Decoration(List<TreeEntry> trees, List<GroundEntry> ground, List<GroundEntry> underside) {
-    public static final Decoration EMPTY = new Decoration(List.of(), List.of(), List.of());
+public record Decoration(List<TreeEntry> trees, List<GroundEntry> ground, List<GroundEntry> underside, List<MobEntry> mobs) {
+    public static final Decoration EMPTY = new Decoration(List.of(), List.of(), List.of(), List.of());
 
     public static final Codec<Decoration> CODEC = RecordCodecBuilder.create(i -> i.group(
             TreeEntry.CODEC.listOf().optionalFieldOf("trees", List.of()).forGetter(Decoration::trees),
             GroundEntry.CODEC.listOf().optionalFieldOf("ground", List.of()).forGetter(Decoration::ground),
-            GroundEntry.CODEC.listOf().optionalFieldOf("underside", List.of()).forGetter(Decoration::underside)
+            GroundEntry.CODEC.listOf().optionalFieldOf("underside", List.of()).forGetter(Decoration::underside),
+            MobEntry.CODEC.listOf().optionalFieldOf("mobs", List.of()).forGetter(Decoration::mobs)
     ).apply(i, Decoration::new));
 }
