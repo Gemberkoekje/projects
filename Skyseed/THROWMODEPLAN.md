@@ -4,6 +4,20 @@ This document covers the planned dual throw-mode system for the Skyseed item. Se
 
 ---
 
+## Status — implemented (2026-06-21)
+
+Built per this plan (Option A). Chosen values:
+
+- **Keybind:** `V` (`key.skyseed.toggle_throw_mode`, category "Skyseed"), remappable. Toggles Classic ↔ Precise; an actionbar message confirms ("Throw mode: Classic/Precise"). Mode persists in the client config (`config/skyseed-client.toml`, `preciseThrowMode`).
+- **On release**, the client sends a `ThrowSeedPayload` (mode, held ticks, target, hand) to the server, which validates and spawns the seed (single path for both modes). The server clamps a Precise target to `MAX_DISTANCE` (anti-cheat).
+- **Precise distances:** `MIN_DISTANCE = 5`, `MAX_DISTANCE = 40` blocks (charge-scaled). The seed is lobbed with a gravity-corrected initial velocity (capped at 4.0 so near-vertical throws don't fling it) and **germinates exactly at the target** — it ignores collisions in flight and snaps to the target on germination, so the arc is purely visual. Overlap safety (nudge/fizzle) still runs at the target.
+- **Classic** is unchanged (charged arc, germinate where physics leaves it).
+- **Not done:** the charge/distance HUD readout (the existing arming sparkle is the only indicator for now). Vertical extreme angles are handled by the velocity cap rather than a hard look-angle clamp.
+
+Server-side germination-at-target verified over RCON; the keybind/packet round-trip is client-driven (verify in-game).
+
+---
+
 ## Current system (Default mode)
 
 - Right-click and hold charges throw power.

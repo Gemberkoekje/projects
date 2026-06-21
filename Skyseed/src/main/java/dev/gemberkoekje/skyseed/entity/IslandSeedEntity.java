@@ -29,6 +29,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -48,6 +49,12 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
     private static final int[] NUDGE_STEPS = { 0, 8, 16, 24 };
 
     private int armTicks = 0;
+
+    // Precise mode: fly through everything and germinate at this exact point (see IslandSeedItem).
+    private boolean precise = false;
+    private double targetX;
+    private double targetY;
+    private double targetZ;
 
     public IslandSeedEntity(EntityType<? extends IslandSeedEntity> type, Level level) {
         super(type, level);
@@ -78,6 +85,14 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         return s.isEmpty() ? null : ResourceLocation.tryParse(s);
     }
 
+    /** Mark this a Precise-mode throw: it flies through everything and germinates at {@code target}. */
+    public void setPreciseTarget(Vec3 target) {
+        this.precise = true;
+        this.targetX = target.x;
+        this.targetY = target.y;
+        this.targetZ = target.z;
+    }
+
     @Override
     public void tick() {
         super.tick();
@@ -92,6 +107,15 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
                 germinate(serverLevel);
             }
         }
+    }
+
+    /** Precise seeds pass through everything and germinate at their target; Classic uses block-hit resting. */
+    @Override
+    protected void onHit(HitResult result) {
+        if (this.precise) {
+            return;
+        }
+        super.onHit(result);
     }
 
     /** On hitting a block, stop and rest there — keep arming until the timer fires. */
@@ -109,6 +133,11 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
             fizzle(level);
             this.discard();
             return;
+        }
+
+        // Precise mode: germinate exactly at the chosen target, regardless of where the arc carried us.
+        if (precise) {
+            this.setPos(targetX, targetY, targetZ);
         }
 
         // Overlap safety: try the rest point, then a few lifts, until the volume is clear enough.
@@ -197,6 +226,12 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         if (theme != null) {
             tag.putString("Theme", theme.toString());
         }
+        tag.putBoolean("Precise", this.precise);
+        if (this.precise) {
+            tag.putDouble("TX", this.targetX);
+            tag.putDouble("TY", this.targetY);
+            tag.putDouble("TZ", this.targetZ);
+        }
     }
 
     @Override
@@ -205,6 +240,12 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         this.armTicks = tag.getInt("ArmTicks");
         if (tag.contains("Theme")) {
             setTheme(ResourceLocation.tryParse(tag.getString("Theme")));
+        }
+        this.precise = tag.getBoolean("Precise");
+        if (this.precise) {
+            this.targetX = tag.getDouble("TX");
+            this.targetY = tag.getDouble("TY");
+            this.targetZ = tag.getDouble("TZ");
         }
     }
 }

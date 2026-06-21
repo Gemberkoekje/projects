@@ -35,6 +35,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
 | Hand-built trees | `skyseed:mangrove`, `skyseed:azalea` — trees whose vanilla features won't place on floating islands |
 | Pond water plants | `pond.plants` list: lily pads on the surface, kelp / seagrass / coral / sea pickle / wet sponge on the floor |
+| Throw modes | Classic (charged physics arc) + Precise (direct placement along the look vector); toggle keybind (default **V**), persisted in client config |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
@@ -53,7 +54,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 **One item, `skyseed:island_seed`.** It is *not* one item per theme — every Skyseed is the same item carrying a different `skyseed:theme` data component (a `ResourceLocation`), set by the recipe that crafted it. A `minecraft:item_name` component gives each its display name ("Forest Skyseed"). An optional `minecraft:custom_model_data` int selects a distinct per-theme icon via a client model (e.g. Rocky); without it the default Skyseed model is used.
 
-- **Throwing.** Hold right-click to wind up, release to throw — a tap lobs it in close (`MIN_VELOCITY`), a full ~1.25 s charge launches it far (`MAX_VELOCITY`). Throw height and distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
+- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands; **Precise** places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there. On release the client sends a packet; the server validates and spawns the seed. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
 - Recipe *inputs* can't match on item components, so a Skyseed can't be crafted from another Skyseed; crafting from ordinary/modded items is unaffected.
 
 This is what makes the data-driven model possible: a new Skyseed is one recipe JSON pointing at one theme JSON. No new item, no Java.

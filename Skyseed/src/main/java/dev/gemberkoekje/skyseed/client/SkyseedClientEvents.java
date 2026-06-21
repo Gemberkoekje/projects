@@ -1,19 +1,24 @@
 package dev.gemberkoekje.skyseed.client;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.SkyseedClientConfig;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.presets.WorldPreset;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 
 import java.lang.ref.WeakReference;
@@ -33,6 +38,25 @@ public final class SkyseedClientEvents {
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // ThrownItemRenderer draws the projectile as its item (the dirt-ball icon), like a snowball.
         event.registerEntityRenderer(ModEntities.ISLAND_SEED.get(), ThrownItemRenderer::new);
+    }
+
+    @SubscribeEvent
+    static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
+        event.register(SkyseedKeyMappings.TOGGLE_THROW_MODE);
+    }
+
+    /** Toggle Classic <-> Precise throw mode on keypress, persist it, and confirm via the actionbar. */
+    @SubscribeEvent
+    static void onClientTick(ClientTickEvent.Post event) {
+        while (SkyseedKeyMappings.TOGGLE_THROW_MODE.consumeClick()) {
+            final boolean precise = !SkyseedClientConfig.PRECISE_THROW.get();
+            SkyseedClientConfig.PRECISE_THROW.set(precise); // persisted by the config system
+            final Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                        Component.translatable(precise ? "skyseed.throw_mode.precise" : "skyseed.throw_mode.classic"), true);
+            }
+        }
     }
 
     /** Pre-select the Skyblock world type when the create-world screen first opens (still switchable). */

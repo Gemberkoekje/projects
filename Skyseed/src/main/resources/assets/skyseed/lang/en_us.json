@@ -3,5 +3,9 @@
   "item.skyseed.guide": "Skyfarer's Almanac",
   "entity.skyseed.island_seed": "Skyseed",
   "itemGroup.skyseed": "Skyseed",
-  "generator.skyseed.skyblock": "Skyblock"
+  "generator.skyseed.skyblock": "Skyblock",
+  "key.category.skyseed": "Skyseed",
+  "key.skyseed.toggle_throw_mode": "Toggle Throw Mode",
+  "skyseed.throw_mode.classic": "Throw mode: Classic",
+  "skyseed.throw_mode.precise": "Throw mode: Precise"
 }

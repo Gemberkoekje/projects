@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed;
 
 import com.mojang.logging.LogUtils;
+import dev.gemberkoekje.skyseed.network.SkyseedNetwork;
 import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
 import dev.gemberkoekje.skyseed.registry.ModDataComponents;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
@@ -9,6 +10,7 @@ import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import org.slf4j.Logger;
 
 // The value here must match an entry in the META-INF/neoforge.mods.toml file.
@@ -25,6 +27,8 @@ public class Skyseed {
         ModEntities.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         modEventBus.addListener(SkyseedRegistries::onNewDataPackRegistry);
+        SkyseedNetwork.register(modEventBus);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, SkyseedClientConfig.SPEC);
 
         LOGGER.info("Skyseed loaded — item, theme component, throwable entity, and theme registry registered.");
     }
