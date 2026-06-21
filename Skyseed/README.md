@@ -45,7 +45,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | Patchouli book (Forest / Rocky / Large Forest entries, advancement-gated to "crafted it once") |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
-**All 11 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining work is polish (e.g. per-Y-band deepslate ores on Ancient, two-tall flowers on Meadow, sugar cane, bees-in-nests) and content beyond the island set — see the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
+**All 11 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
 
 ---
 

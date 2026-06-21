@@ -277,7 +277,7 @@ I N
 
 **Character:** The flower and bee island. Dense flower coverage, cherry trees, high bee nest chance. Primary source of honey, honeycomb, wax, and all dye-producing flowers. Visually the most colorful island.
 
-> **As built (`skyseed:meadow`):** grass over dirt/stone; wildflower, tulip, cornflower, and cherry variants placing every single dye-flower (dandelion, poppy, allium, azure bluet, oxeye daisy, cornflower, lily of the valley, all four tulips) plus pink petals, with an occasional bee nest. **Deferred:** two-tall flowers (sunflower, lilac, rose bush, peony — need 2-block placement) and the sunflower variant; bee nests are placed **empty** (no bees inside — entity spawning isn't supported by the generator yet).
+> **As built (`skyseed:meadow`):** grass over dirt/stone; wildflower, tulip, cornflower, and cherry variants placing every single dye-flower (dandelion, poppy, allium, azure bluet, oxeye daisy, cornflower, lily of the valley, all four tulips) plus pink petals, with an occasional bee nest. A **sunflower** variant and two-tall flowers (sunflower, lilac, rose bush, peony) are now placed too (via the double-plant support). **Deferred:** bee nests are placed **empty** (no bees inside — entity spawning isn't supported by the generator yet).
 
 **Unlocked by:** Any flower (available from Forest island decoration).
 
@@ -360,7 +360,7 @@ _ _
 
 **Character:** The deep/cave island. Deepslate, tuff, moss, amethyst geode pockets, dripstone stalactites, sculk. Feels like a piece of the deep underground suspended in sky. High value ores in deepslate form, plus sculk components for redstone.
 
-> **As built (`skyseed:ancient`):** mossy-deepslate body (moss surface + deepslate scatter / tuff fill / deepslate core) with the full deepslate ore suite (coal→diamond + emerald) plus dripstone/calcite/amethyst/budding-amethyst clusters (amethyst clusters grow from budding over time). Deep-cave (dripstone + cave vines + hanging roots underside, moss carpet), geode (calcite surface), and deep-dark (sculk surface + catalyst/sensor/shrieker) variants. Recipe deepslate + cobbled deepslate (the moss gateway to Lush). **Not done:** the per-Y-band deepslate ore tables (single table for now, like the plan notes for Rocky), sculk veins (need a face).
+> **As built (`skyseed:ancient`):** mossy-deepslate body (moss surface + deepslate scatter / tuff fill / deepslate core) with the full deepslate ore suite (coal→diamond + emerald) plus dripstone/calcite/amethyst/budding-amethyst clusters (amethyst clusters grow from budding over time). Deep-cave (dripstone + cave vines + hanging roots underside, moss carpet), geode (calcite surface), and deep-dark (sculk surface + catalyst/sensor/shrieker) variants. Recipe deepslate + cobbled deepslate (the moss gateway to Lush). Ores are now **Y-banded** like Rocky (`min_y`/`max_y`): throw low (≤20) for diamond/emerald/redstone, high (≥96) for coal/iron/copper — amethyst/dripstone/calcite appear at every band. **Not done:** sculk veins (need a face).
 
 **Unlocked by:** Deepslate + Cobbled Deepslate — both from a deep-thrown Rocky island (Y ≤ 8). **No Lush dependency.** Ancient is the *gateway* that introduces moss into the progression: it generates a moss surface, and that moss is what later unlocks Lush. (This resolves the Lush ↔ Ancient moss deadlock — see Progression sketch.)
 
