@@ -6,15 +6,14 @@
     "II"
   ],
   "key": {
-    "N": { "item": "minecraft:snow_block" },
-    "I": { "tag": "minecraft:ice" }
+    "N": {
+      "item": "minecraft:snow_block"
+    },
+    "I": {
+      "tag": "minecraft:ice"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:frozen",
-      "minecraft:item_name": "\"Frozen Skyseed\"",
-      "minecraft:custom_model_data": 5
-    }
+    "id": "skyseed:frozen_skyseed"
   }
 }

@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.10.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.11.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -57,12 +57,12 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## The Skyseed item
 
-**One item, `skyseed:island_seed`.** It is *not* one item per theme — every Skyseed is the same item carrying a different `skyseed:theme` data component (a `ResourceLocation`), set by the recipe that crafted it. A `minecraft:item_name` component gives each its display name ("Forest Skyseed"). An optional `minecraft:custom_model_data` int selects a distinct per-theme icon via a client model (e.g. Rocky); without it the default Skyseed model is used.
+**One item per theme, `skyseed:<theme>_skyseed`** (e.g. `skyseed:forest_skyseed`). Each is an `IslandSeedItem` instance carrying a fixed `theme()` id; all are registered from `ModItems.SEED_THEMES` and named in the `lang` file ("Forest Skyseed"). Distinct items mean each shows up individually in JEI/REI, and add-on mods can register their own seed item (pointed at their own theme) and add it to the `#skyseed:skyseeds` item tag. Every seed's icon is its own client model under `models/item/<theme>_skyseed.json`.
 
-- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands; **Precise** places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there. On release the client sends a packet; the server validates and spawns the seed. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
-- Recipe *inputs* can't match on item components, so a Skyseed can't be crafted from another Skyseed; crafting from ordinary/modded items is unaffected.
+- **The `#skyseed:skyseeds` tag** holds every seed item — the guide recipe (any one skyseed → the Almanac) keys off it, and it's the integration point for add-on seeds.
+- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands; **Precise** places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there. On release the client sends a packet; the server reads the held seed's `theme()`, then validates and spawns the entity. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
 
-This is what makes the data-driven model possible: a new Skyseed is one recipe JSON pointing at one theme JSON. No new item, no Java.
+A new Skyseed is one recipe JSON + one theme JSON + a one-line entry in `ModItems.SEED_THEMES` (plus an icon/model and a lang name). The theme content itself stays fully data-driven.
 
 ---
 
@@ -72,24 +72,16 @@ The dividing line: **config owns the *what & how much*** (recipes, palettes, ore
 
 ### Recipe (data)
 
-A normal datapack shaped-crafting recipe whose `result` is the seed item plus components. The Forest seed — planks + dirt checkerboard:
+A normal datapack shaped-crafting recipe whose `result` is the theme's seed item. The Forest seed — planks + dirt checkerboard:
 
 ```json
 {
   "type": "minecraft:crafting_shaped",
   "pattern": ["PD", "DP"],
   "key": { "P": { "item": "minecraft:oak_planks" }, "D": { "item": "minecraft:dirt" } },
-  "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:forest",
-      "minecraft:item_name": "\"Forest Skyseed\""
-    }
-  }
+  "result": { "id": "skyseed:forest_skyseed" }
 }
 ```
-
-> **Gotcha:** `item_name` in a recipe result uses the legacy string-component serializer — the value must be a **JSON-escaped string** (`"\"Forest Skyseed\""`), not a bare string.
 
 ### Theme (data)
 
@@ -169,7 +161,7 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 `dev.gemberkoekje.skyseed`:
 
 - **`Skyseed`** — `@Mod` entry point; registers everything below. `MODID = "skyseed"`.
-- **`registry/`** — `DeferredRegister`s for the item, throwable entity type, the `skyseed:theme` data component, creative tab; and `SkyseedRegistries` (the `skyseed:theme` datapack registry, via `DataPackRegistryEvent`).
+- **`registry/`** — `DeferredRegister`s for the per-theme seed items (`ModItems.SEED_THEMES`), throwable entity type, creative tab; and `SkyseedRegistries` (the `skyseed:theme` datapack registry, via `DataPackRegistryEvent`).
 - **`item/`** — `IslandSeedItem` (charge-to-throw) and `GuideItem` (opens the Patchouli book).
 - **`entity/IslandSeedEntity`** — `ThrowableItemProjectile` carrying the theme; arms `ARM_DURATION = 40` ticks (~2 s), rests on block-hit, then `germinate()`s (overlap loop → enqueue plan).
 - **`worldgen/`** — `IslandGenerator` (the algorithm) → `IslandPlan`; `GenerationJob` + `IslandGrowth` (the tick-budget scheduler on `ServerTickEvent.Post`); `StartIsland`; `SkyseedWorldData` (`SavedData`); `WorldSetupEvents`; `event/PlayerEvents`.

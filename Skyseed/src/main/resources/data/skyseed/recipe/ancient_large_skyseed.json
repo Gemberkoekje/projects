@@ -7,15 +7,14 @@
     "DCD"
   ],
   "key": {
-    "D": { "item": "minecraft:deepslate" },
-    "C": { "item": "minecraft:cobbled_deepslate" }
+    "D": {
+      "item": "minecraft:deepslate"
+    },
+    "C": {
+      "item": "minecraft:cobbled_deepslate"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:ancient_large",
-      "minecraft:item_name": "\"Large Ancient Skyseed\"",
-      "minecraft:custom_model_data": 18
-    }
+    "id": "skyseed:ancient_large_skyseed"
   }
 }

@@ -7,15 +7,14 @@
     "SCS"
   ],
   "key": {
-    "S": { "item": "minecraft:stone" },
-    "C": { "item": "minecraft:cobblestone" }
+    "S": {
+      "item": "minecraft:stone"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:rocky_large",
-      "minecraft:item_name": "\"Large Rocky Skyseed\"",
-      "minecraft:custom_model_data": 12
-    }
+    "id": "skyseed:rocky_large_skyseed"
   }
 }

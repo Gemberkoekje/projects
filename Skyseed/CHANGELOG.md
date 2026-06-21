@@ -3,6 +3,28 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.11.0] - 2026-06-21
+
+### Changed
+- **Each Skyseed is now its own item** (`skyseed:<theme>_skyseed`, e.g. `skyseed:forest_skyseed`) instead of a
+  single `skyseed:island_seed` carrying a `skyseed:theme` data component. 28 distinct items, registered from
+  `ModItems.SEED_THEMES`, each with its own model and lang name — so every seed shows up individually in
+  JEI/REI, and add-on mods can register their own seed (pointed at their own theme). All seeds share the new
+  `#skyseed:skyseeds` item tag; the thrown seed reads its item's fixed theme. The `skyseed:theme` data
+  component and the generic item are removed.
+- **The guide book recipe is now "any single Skyseed → the Almanac"** (shapeless, keyed off
+  `#skyseed:skyseeds`), replacing the vanilla-book + seed recipe — a vanilla book was awkward to obtain in skyblock.
+
+### Fixed
+- **The guide book is granted only on first join**, not every login. The "guide given" and "start-island
+  placed" flags now live in the world `SavedData` keyed by player UUID, so they survive relogs reliably (the
+  previous player-persistent-data flag did not).
+
+### Migration
+- Breaking: old `skyseed:island_seed` items (and the `skyseed:theme` component) no longer exist. Generated
+  islands are unaffected; any uncrafted seeds sitting in inventories/chests are lost. Re-craft from the
+  (unchanged) recipes — each now yields its own distinct item.
+
 ## [0.10.0] - 2026-06-21
 
 ### Added

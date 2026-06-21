@@ -6,15 +6,14 @@
     "CC"
   ],
   "key": {
-    "S": { "item": "minecraft:sand" },
-    "C": { "item": "minecraft:clay" }
+    "S": {
+      "item": "minecraft:sand"
+    },
+    "C": {
+      "item": "minecraft:clay"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:aquatic",
-      "minecraft:item_name": "\"Aquatic Skyseed\"",
-      "minecraft:custom_model_data": 10
-    }
+    "id": "skyseed:aquatic_skyseed"
   }
 }

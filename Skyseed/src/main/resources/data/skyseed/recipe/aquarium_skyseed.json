@@ -2,16 +2,17 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    { "item": "minecraft:turtle_scute" },
-    { "item": "minecraft:prismarine_shard" },
-    { "item": "minecraft:sand" }
+    {
+      "item": "minecraft:turtle_scute"
+    },
+    {
+      "item": "minecraft:prismarine_shard"
+    },
+    {
+      "item": "minecraft:sand"
+    }
   ],
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:aquarium",
-      "minecraft:item_name": "\"Aquarium Skyseed\"",
-      "minecraft:custom_model_data": 27
-    }
+    "id": "skyseed:aquarium_skyseed"
   }
 }

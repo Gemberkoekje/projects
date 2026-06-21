@@ -2,8 +2,7 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    { "item": "minecraft:book" },
-    { "item": "skyseed:island_seed" }
+    { "tag": "skyseed:skyseeds" }
   ],
   "result": {
     "id": "skyseed:guide"

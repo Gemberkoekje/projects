@@ -6,16 +6,17 @@
     "DD"
   ],
   "key": {
-    "R": { "item": "minecraft:red_mushroom" },
-    "B": { "item": "minecraft:brown_mushroom" },
-    "D": { "item": "minecraft:dirt" }
+    "R": {
+      "item": "minecraft:red_mushroom"
+    },
+    "B": {
+      "item": "minecraft:brown_mushroom"
+    },
+    "D": {
+      "item": "minecraft:dirt"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:mushroom",
-      "minecraft:item_name": "\"Mushroom Skyseed\"",
-      "minecraft:custom_model_data": 4
-    }
+    "id": "skyseed:mushroom_skyseed"
   }
 }

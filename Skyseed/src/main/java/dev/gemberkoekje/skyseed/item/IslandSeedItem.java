@@ -7,6 +7,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
@@ -19,6 +20,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * preference, see {@link SkyseedClientConfig}): <b>Classic</b> launches a charged physics arc;
  * <b>Precise</b> places the island directly along the look vector at a charge-scaled distance. On
  * release the client sends a {@link ThrowSeedPayload}; the server spawns the entity.
+ * <p>Each theme is its own item (better JEI/REI visibility, and add-on mods can register more); the
+ * island it germinates into is fixed per item via {@link #theme()}. Add-ons should also add their seed
+ * to the {@code skyseed:skyseeds} item tag so it converts into the guide.
  */
 public class IslandSeedItem extends Item {
     public static final int CHARGE_TICKS = 25;      // hold time to reach full power (~1.25 s)
@@ -27,8 +31,16 @@ public class IslandSeedItem extends Item {
     public static final double MIN_DISTANCE = 5.0;  // Precise: a tap places the island this near
     public static final double MAX_DISTANCE = 40.0; // Precise: a full charge places it this far
 
-    public IslandSeedItem(Properties properties) {
+    private final ResourceLocation theme;
+
+    public IslandSeedItem(Properties properties, ResourceLocation theme) {
         super(properties);
+        this.theme = theme;
+    }
+
+    /** The island theme this seed germinates into (a {@code skyseed:theme} datapack-registry id). */
+    public ResourceLocation theme() {
+        return theme;
     }
 
     @Override

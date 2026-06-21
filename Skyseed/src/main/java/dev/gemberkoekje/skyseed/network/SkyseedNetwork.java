@@ -2,8 +2,6 @@ package dev.gemberkoekje.skyseed.network;
 
 import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
 import dev.gemberkoekje.skyseed.item.IslandSeedItem;
-import dev.gemberkoekje.skyseed.registry.ModDataComponents;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -37,17 +35,14 @@ public final class SkyseedNetwork {
             }
             final InteractionHand hand = pkt.hand() == 1 ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
             final ItemStack stack = player.getItemInHand(hand);
-            if (!(stack.getItem() instanceof IslandSeedItem)) {
+            if (!(stack.getItem() instanceof IslandSeedItem seedItem)) {
                 return; // the player isn't holding a seed in that hand any more — ignore
             }
             final float power = Math.min(1.0F, pkt.heldTicks() / (float) IslandSeedItem.CHARGE_TICKS);
 
             final IslandSeedEntity seed = new IslandSeedEntity(level, player);
             seed.setItem(stack);
-            final ResourceLocation theme = stack.get(ModDataComponents.THEME.get());
-            if (theme != null) {
-                seed.setTheme(theme);
-            }
+            seed.setTheme(seedItem.theme());
 
             if (pkt.precise()) {
                 final Vec3 eye = player.getEyePosition();

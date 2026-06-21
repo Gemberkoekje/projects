@@ -6,14 +6,14 @@
     "DD"
   ],
   "key": {
-    "P": { "tag": "minecraft:planks" },
-    "D": { "item": "minecraft:dirt" }
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "D": {
+      "item": "minecraft:dirt"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:forest",
-      "minecraft:item_name": "\"Forest Skyseed\""
-    }
+    "id": "skyseed:forest_skyseed"
   }
 }

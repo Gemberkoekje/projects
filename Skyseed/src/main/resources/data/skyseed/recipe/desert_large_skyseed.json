@@ -7,15 +7,14 @@
     "ZSZ"
   ],
   "key": {
-    "Z": { "item": "minecraft:sandstone" },
-    "S": { "item": "minecraft:sand" }
+    "Z": {
+      "item": "minecraft:sandstone"
+    },
+    "S": {
+      "item": "minecraft:sand"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:desert_large",
-      "minecraft:item_name": "\"Large Desert Skyseed\"",
-      "minecraft:custom_model_data": 13
-    }
+    "id": "skyseed:desert_large_skyseed"
   }
 }

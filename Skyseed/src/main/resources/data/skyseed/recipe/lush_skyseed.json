@@ -6,15 +6,19 @@
     "MM"
   ],
   "key": {
-    "A": [ { "item": "minecraft:azalea" }, { "item": "minecraft:flowering_azalea" } ],
-    "M": { "item": "minecraft:moss_block" }
+    "A": [
+      {
+        "item": "minecraft:azalea"
+      },
+      {
+        "item": "minecraft:flowering_azalea"
+      }
+    ],
+    "M": {
+      "item": "minecraft:moss_block"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:lush",
-      "minecraft:item_name": "\"Lush Skyseed\"",
-      "minecraft:custom_model_data": 9
-    }
+    "id": "skyseed:lush_skyseed"
   }
 }

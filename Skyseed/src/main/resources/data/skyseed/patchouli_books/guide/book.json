@@ -1,7 +1,7 @@
 {
   "name": "Skyfarer's Almanac",
   "landing_text": "A field guide to terraforming the open sky. Craft a Skyseed, throw it, and watch an island grow.",
-  "icon": "skyseed:island_seed",
+  "icon": "skyseed:forest_skyseed",
   "show_progress": false,
   "use_resource_pack": true
 }

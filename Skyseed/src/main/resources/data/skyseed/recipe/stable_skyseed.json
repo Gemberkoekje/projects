@@ -2,16 +2,17 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    { "item": "minecraft:leather" },
-    { "item": "minecraft:gold_ingot" },
-    { "tag": "minecraft:planks" }
+    {
+      "item": "minecraft:leather"
+    },
+    {
+      "item": "minecraft:gold_ingot"
+    },
+    {
+      "tag": "minecraft:planks"
+    }
   ],
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:stable",
-      "minecraft:item_name": "\"Stable Skyseed\"",
-      "minecraft:custom_model_data": 26
-    }
+    "id": "skyseed:stable_skyseed"
   }
 }

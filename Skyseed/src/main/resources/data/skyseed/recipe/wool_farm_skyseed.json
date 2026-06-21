@@ -2,17 +2,20 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    { "tag": "minecraft:wool" },
-    { "tag": "minecraft:wool" },
-    { "item": "minecraft:iron_ingot" },
-    { "item": "minecraft:dirt" }
+    {
+      "tag": "minecraft:wool"
+    },
+    {
+      "tag": "minecraft:wool"
+    },
+    {
+      "item": "minecraft:iron_ingot"
+    },
+    {
+      "item": "minecraft:dirt"
+    }
   ],
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:wool_farm",
-      "minecraft:item_name": "\"Wool Farm Skyseed\"",
-      "minecraft:custom_model_data": 25
-    }
+    "id": "skyseed:wool_farm_skyseed"
   }
 }

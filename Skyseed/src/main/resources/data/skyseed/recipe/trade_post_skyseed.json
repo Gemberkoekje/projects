@@ -7,16 +7,17 @@
     " E "
   ],
   "key": {
-    "E": { "item": "minecraft:emerald" },
-    "P": { "tag": "minecraft:planks" },
-    "C": { "item": "minecraft:cobblestone" }
+    "E": {
+      "item": "minecraft:emerald"
+    },
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:trade_post",
-      "minecraft:item_name": "\"Trade Post Skyseed\"",
-      "minecraft:custom_model_data": 21
-    }
+    "id": "skyseed:trade_post_skyseed"
   }
 }

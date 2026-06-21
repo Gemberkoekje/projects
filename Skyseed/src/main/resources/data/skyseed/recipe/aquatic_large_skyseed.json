@@ -7,15 +7,14 @@
     "KSK"
   ],
   "key": {
-    "K": { "item": "minecraft:clay" },
-    "S": { "item": "minecraft:sand" }
+    "K": {
+      "item": "minecraft:clay"
+    },
+    "S": {
+      "item": "minecraft:sand"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:aquatic_large",
-      "minecraft:item_name": "\"Large Aquatic Skyseed\"",
-      "minecraft:custom_model_data": 19
-    }
+    "id": "skyseed:aquatic_large_skyseed"
   }
 }

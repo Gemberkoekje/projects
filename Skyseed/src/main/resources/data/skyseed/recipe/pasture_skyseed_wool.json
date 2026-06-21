@@ -2,16 +2,17 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    { "tag": "minecraft:wool" },
-    { "tag": "minecraft:planks" },
-    { "item": "minecraft:dirt" }
+    {
+      "tag": "minecraft:wool"
+    },
+    {
+      "tag": "minecraft:planks"
+    },
+    {
+      "item": "minecraft:dirt"
+    }
   ],
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:pasture",
-      "minecraft:item_name": "\"Pasture Skyseed\"",
-      "minecraft:custom_model_data": 23
-    }
+    "id": "skyseed:pasture_skyseed"
   }
 }

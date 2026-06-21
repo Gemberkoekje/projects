@@ -6,16 +6,17 @@
     "CE"
   ],
   "key": {
-    "P": { "tag": "minecraft:planks" },
-    "C": { "item": "minecraft:cobblestone" },
-    "E": { "item": "minecraft:emerald" }
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
+    },
+    "E": {
+      "item": "minecraft:emerald"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:hamlet",
-      "minecraft:item_name": "\"Hamlet Skyseed\"",
-      "minecraft:custom_model_data": 20
-    }
+    "id": "skyseed:hamlet_skyseed"
   }
 }

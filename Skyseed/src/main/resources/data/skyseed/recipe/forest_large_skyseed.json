@@ -7,15 +7,14 @@
     "LDL"
   ],
   "key": {
-    "L": { "tag": "minecraft:logs_that_burn" },
-    "D": { "item": "minecraft:dirt" }
+    "L": {
+      "tag": "minecraft:logs_that_burn"
+    },
+    "D": {
+      "item": "minecraft:dirt"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:forest_large",
-      "minecraft:item_name": "\"Large Forest Skyseed\"",
-      "minecraft:custom_model_data": 2
-    }
+    "id": "skyseed:forest_large_skyseed"
   }
 }

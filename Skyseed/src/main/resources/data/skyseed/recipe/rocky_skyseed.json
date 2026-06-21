@@ -6,15 +6,14 @@
     "CC"
   ],
   "key": {
-    "S": { "item": "minecraft:stone" },
-    "C": { "item": "minecraft:cobblestone" }
+    "S": {
+      "item": "minecraft:stone"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:rocky",
-      "minecraft:item_name": "\"Rocky Skyseed\"",
-      "minecraft:custom_model_data": 1
-    }
+    "id": "skyseed:rocky_skyseed"
   }
 }

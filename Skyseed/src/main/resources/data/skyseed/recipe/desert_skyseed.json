@@ -6,15 +6,14 @@
     "ZZ"
   ],
   "key": {
-    "S": { "item": "minecraft:sand" },
-    "Z": { "item": "minecraft:sandstone" }
+    "S": {
+      "item": "minecraft:sand"
+    },
+    "Z": {
+      "item": "minecraft:sandstone"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:desert",
-      "minecraft:item_name": "\"Desert Skyseed\"",
-      "minecraft:custom_model_data": 3
-    }
+    "id": "skyseed:desert_skyseed"
   }
 }

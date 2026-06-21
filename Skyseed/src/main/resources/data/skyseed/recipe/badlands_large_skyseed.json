@@ -7,15 +7,14 @@
     "TRT"
   ],
   "key": {
-    "T": { "item": "minecraft:terracotta" },
-    "R": { "item": "minecraft:red_sand" }
+    "T": {
+      "item": "minecraft:terracotta"
+    },
+    "R": {
+      "item": "minecraft:red_sand"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:badlands_large",
-      "minecraft:item_name": "\"Large Badlands Skyseed\"",
-      "minecraft:custom_model_data": 17
-    }
+    "id": "skyseed:badlands_large_skyseed"
   }
 }

@@ -67,7 +67,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
 
     @Override
     protected Item getDefaultItem() {
-        return ModItems.ISLAND_SEED.get();
+        return ModItems.DEFAULT_SEED.get(); // fallback only — the thrown item is set per seed in the network handler
     }
 
     @Override

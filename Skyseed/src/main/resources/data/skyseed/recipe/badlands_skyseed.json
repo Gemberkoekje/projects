@@ -6,15 +6,14 @@
     "TT"
   ],
   "key": {
-    "R": { "item": "minecraft:red_sand" },
-    "T": { "item": "minecraft:terracotta" }
+    "R": {
+      "item": "minecraft:red_sand"
+    },
+    "T": {
+      "item": "minecraft:terracotta"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:badlands",
-      "minecraft:item_name": "\"Badlands Skyseed\"",
-      "minecraft:custom_model_data": 7
-    }
+    "id": "skyseed:badlands_skyseed"
   }
 }

@@ -1,0 +1,32 @@
+{
+  "values": [
+    "skyseed:forest_skyseed",
+    "skyseed:forest_large_skyseed",
+    "skyseed:rocky_skyseed",
+    "skyseed:rocky_large_skyseed",
+    "skyseed:desert_skyseed",
+    "skyseed:desert_large_skyseed",
+    "skyseed:mushroom_skyseed",
+    "skyseed:mushroom_large_skyseed",
+    "skyseed:frozen_skyseed",
+    "skyseed:frozen_large_skyseed",
+    "skyseed:meadow_skyseed",
+    "skyseed:meadow_large_skyseed",
+    "skyseed:badlands_skyseed",
+    "skyseed:badlands_large_skyseed",
+    "skyseed:ancient_skyseed",
+    "skyseed:ancient_large_skyseed",
+    "skyseed:lush_skyseed",
+    "skyseed:lush_large_skyseed",
+    "skyseed:aquatic_skyseed",
+    "skyseed:aquatic_large_skyseed",
+    "skyseed:hamlet_skyseed",
+    "skyseed:trade_post_skyseed",
+    "skyseed:village_center_skyseed",
+    "skyseed:pasture_skyseed",
+    "skyseed:poultry_skyseed",
+    "skyseed:wool_farm_skyseed",
+    "skyseed:stable_skyseed",
+    "skyseed:aquarium_skyseed"
+  ]
+}

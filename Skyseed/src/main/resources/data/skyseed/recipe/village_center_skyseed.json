@@ -7,17 +7,20 @@
     "PIP"
   ],
   "key": {
-    "E": { "item": "minecraft:emerald" },
-    "C": { "item": "minecraft:cobblestone" },
-    "P": { "tag": "minecraft:planks" },
-    "I": { "item": "minecraft:iron_ingot" }
+    "E": {
+      "item": "minecraft:emerald"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
+    },
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:village_center",
-      "minecraft:item_name": "\"Village Center Skyseed\"",
-      "minecraft:custom_model_data": 22
-    }
+    "id": "skyseed:village_center_skyseed"
   }
 }

@@ -7,15 +7,14 @@
     "PSP"
   ],
   "key": {
-    "P": { "tag": "minecraft:ice" },
-    "S": { "item": "minecraft:snow_block" }
+    "P": {
+      "tag": "minecraft:ice"
+    },
+    "S": {
+      "item": "minecraft:snow_block"
+    }
   },
   "result": {
-    "id": "skyseed:island_seed",
-    "components": {
-      "skyseed:theme": "skyseed:frozen_large",
-      "minecraft:item_name": "\"Large Frozen Skyseed\"",
-      "minecraft:custom_model_data": 15
-    }
+    "id": "skyseed:frozen_large_skyseed"
   }
 }
