@@ -29,7 +29,8 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Area | Built |
 |---|---|
 | Core loop | Throwable charge-to-launch seed → arm timer → germinate → tick-budgeted grow-in |
-| Themes (seeds) | **Forest** (`skyseed:forest`), **Large Forest** (`skyseed:forest_large`), **Rocky** (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`) |
+| Themes (seeds) | **Forest** (`skyseed:forest`), **Large Forest** (`skyseed:forest_large`), **Rocky** (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), **Badlands** (`skyseed:badlands`) |
+| Banded fill | `fill_bands` palette option: a Y-cycled body palette for badlands-style strata |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
@@ -40,7 +41,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | Patchouli book (Forest / Rocky / Large Forest entries, advancement-gated to "crafted it once") |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
-**Not built:** the other 4 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) (Aquatic, Ancient, Badlands, Lush) — these need engine work (banded fill for Badlands; underside-hanging decoration for Ancient/Lush; water-plant placement for Aquatic). Nether/End skyblock dimensions are a long-term goal.
+**Not built:** the other 3 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) (Aquatic, Ancient, Lush) — these still need engine work (underside-hanging decoration for Ancient/Lush; water-plant placement for Aquatic). Nether/End skyblock dimensions are a long-term goal.
 
 ---
 
@@ -97,7 +98,7 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 
 **Shape** — `radius` `{min,max}` (required) · `rim_noise` float (0.40) · `underside` (`teardrop`) · `top_dome` `{min,max}` (`{1,2}`; raise for peaks).
 
-**Palette** — `surface`, `fill`, `core` block ids (required) · `fill_depth` int (3) · `surface_scatter` GroundEntry[] (`[]`, mixes blocks into the surface per column).
+**Palette** — `surface`, `fill`, `core` block ids (required) · `fill_depth` int (3) · `surface_scatter` GroundEntry[] (`[]`, mixes blocks into the surface per column) · `fill_bands` block-id[] (`[]`; when set, the body (fill + core) becomes a Y-cycled list of strata — badlands cliffs; core still seeds ores) · `band_thickness` int (2; blocks per band).
 
 **OreEntry** — `block` (required) · `chance` float presence-roll (required) · `count` `{min,max}` veins (required) · `vein_size` `{min,max}` (required) · `depth` (`core` | `deep_core`; deep = lower ~40% of the core).
 

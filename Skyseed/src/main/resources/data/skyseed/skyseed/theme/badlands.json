@@ -1,0 +1,32 @@
+{
+  "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.42, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": {
+    "surface": "minecraft:red_sand",
+    "fill": "minecraft:orange_terracotta",
+    "core": "minecraft:terracotta",
+    "fill_depth": 3,
+    "fill_bands": [
+      "minecraft:orange_terracotta",
+      "minecraft:terracotta",
+      "minecraft:yellow_terracotta",
+      "minecraft:white_terracotta",
+      "minecraft:light_gray_terracotta",
+      "minecraft:red_terracotta",
+      "minecraft:brown_terracotta"
+    ],
+    "band_thickness": 1
+  },
+  "ores": [
+    { "block": "minecraft:gold_ore", "chance": 0.90, "count": { "min": 3, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+    { "block": "minecraft:redstone_ore", "chance": 0.25, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
+  ],
+  "variants": [
+    { "weight": 3, "name": "mesa", "decoration": {
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.08 }, { "block": "minecraft:cactus", "chance": 0.02 } ] } },
+    { "weight": 2, "name": "eroded", "surface_override": "minecraft:terracotta", "decoration": {
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.10 }, { "block": "minecraft:cactus", "chance": 0.03 } ] } },
+    { "weight": 1, "name": "wooded", "surface_override": "minecraft:grass_block", "decoration": {
+      "trees": [ { "feature": "minecraft:dark_oak", "tries": 4, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.12 }, { "block": "minecraft:dead_bush", "chance": 0.04 } ] } }
+  ]
+}

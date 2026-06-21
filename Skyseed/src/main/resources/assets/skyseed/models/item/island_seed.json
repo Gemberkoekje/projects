@@ -9,6 +9,7 @@
     { "predicate": { "custom_model_data": 3 }, "model": "skyseed:item/island_seed_desert" },
     { "predicate": { "custom_model_data": 4 }, "model": "skyseed:item/island_seed_mushroom" },
     { "predicate": { "custom_model_data": 5 }, "model": "skyseed:item/island_seed_frozen" },
-    { "predicate": { "custom_model_data": 6 }, "model": "skyseed:item/island_seed_meadow" }
+    { "predicate": { "custom_model_data": 6 }, "model": "skyseed:item/island_seed_meadow" },
+    { "predicate": { "custom_model_data": 7 }, "model": "skyseed:item/island_seed_badlands" }
   ]
 }

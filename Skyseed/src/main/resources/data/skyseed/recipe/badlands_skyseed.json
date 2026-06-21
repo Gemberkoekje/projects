@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "minecraft:red_sand" },
+    { "item": "minecraft:terracotta" }
+  ],
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:badlands",
+      "minecraft:item_name": "\"Badlands Skyseed\"",
+      "minecraft:custom_model_data": 7
+    }
+  }
+}

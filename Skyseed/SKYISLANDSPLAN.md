@@ -8,7 +8,7 @@ This document covers all planned island types, their blocks, variants, Y-level o
 
 > This section reconciles the plan below with what is actually built. Everything after it is the **design target**; only a subset is live, and the build made one structural choice that reframes much of what follows.
 
-**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), and **Meadow** (`skyseed:meadow`). The remaining four (Aquatic, Ancient, Badlands, Lush) are **not yet built** — each needs engine work (banded fill, underside decoration, or water-plant placement).
+**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), **Desert** (`skyseed:desert`), **Mushroom** (`skyseed:mushroom`), **Frozen** (`skyseed:frozen`), **Meadow** (`skyseed:meadow`), and **Badlands** (`skyseed:badlands`, using the new `fill_bands` strata feature). The remaining three (Aquatic, Ancient, Lush) are **not yet built** — each still needs engine work (underside decoration, or water-plant placement).
 
 **Engine features built:** datapack theme codec; biome-aware generation; Y-band overrides (`min_y`/`max_y`); contained ponds; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-column `surface_scatter`; snow peaks; curated start island; void world preset with multi-noise biomes; structures disabled; tick-budgeted placement; overlap safety; charge-to-throw distance; Patchouli guide (Forest / Rocky / Large Forest entries, advancement-gated).
 
@@ -407,6 +407,8 @@ Ancient gives slightly better odds than Rocky at equivalent Y bands — reward f
 ### 🌵 Badlands ✨
 
 **Character:** Red sand surface, banded terracotta layers in the fill — orange, yellow, white, red, brown cycling through the island's vertical cross-section, like a mesa cliff translated into a floating island. Visually the most striking island when viewed from the side.
+
+> **As built (`skyseed:badlands`):** red-sand surface over a body of `fill_bands` strata (orange / terracotta / yellow / white / light-gray / red / brown terracotta, `band_thickness: 1` so all colours show on every island), rich gold + some redstone. Mesa (red sand), eroded (terracotta top), and wooded (grass top + dark oak) variants. This is the first use of the new banded-fill engine feature. **Not done:** the mineshaft-fragment flavour sprinkle (embedded planks/rails — would need a small structure stamp).
 
 **Unlocked by:** Red Sand (Desert red variant sprinkle) + any Terracotta.
 

@@ -44,6 +44,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:badlands_skyseed",
+      "text": "The $(item)Badlands Skyseed$() — red sand and terracotta."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }

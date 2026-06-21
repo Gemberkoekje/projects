@@ -75,6 +75,9 @@ public final class IslandGenerator {
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
         final List<Scatter> scatter = resolveScatter(scatterCfg);
+        // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core.
+        final List<BlockState> bands = resolveBands(pal.fillBands());
+        final int bandThickness = Math.max(1, pal.bandThickness());
 
         // --- shape parameters ---
         final int baseRadius = Math.max(1, shape.radius().sample(random));
@@ -138,9 +141,9 @@ public final class IslandGenerator {
                         blockMap.put(p, scatterSurface(surface, scatter, random));
                         surfaceList.add(p);
                     } else if (y >= surfaceY - fillThickness) {
-                        blockMap.put(p, fill);
+                        blockMap.put(p, bands.isEmpty() ? fill : bandAt(bands, y, bandThickness));
                     } else {
-                        blockMap.put(p, core);
+                        blockMap.put(p, bands.isEmpty() ? core : bandAt(bands, y, bandThickness));
                         coreList.add(p);
                         minCoreY = Math.min(minCoreY, y);
                         maxCoreY = Math.max(maxCoreY, y);
@@ -199,6 +202,26 @@ public final class IslandGenerator {
             }
         }
         return out;
+    }
+
+    private static List<BlockState> resolveBands(List<ResourceLocation> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<BlockState> out = new ArrayList<>(ids.size());
+        for (ResourceLocation id : ids) {
+            if (BuiltInRegistries.BLOCK.containsKey(id)) {
+                out.add(BuiltInRegistries.BLOCK.get(id).defaultBlockState());
+            } else {
+                Skyseed.LOGGER.warn("[skyseed] theme fill_bands references unknown block '{}' — skipping", id);
+            }
+        }
+        return out;
+    }
+
+    /** The band block for a given world Y: strata {@code thickness} tall, cycling through the list. */
+    private static BlockState bandAt(List<BlockState> bands, int y, int thickness) {
+        return bands.get(Math.floorMod(Math.floorDiv(y, thickness), bands.size()));
     }
 
     /** The surface block for a column: the default, unless a surface-scatter entry rolls in. */

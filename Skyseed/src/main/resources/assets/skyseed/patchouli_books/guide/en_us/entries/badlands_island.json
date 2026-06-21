@@ -1,0 +1,20 @@
+{
+  "name": "Badlands Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:terracotta",
+  "advancement": "skyseed:craft_badlands",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A mesa isle. Red sand over a striped body of $(item)terracotta$() — orange, yellow, white, gray, red, and brown bands cross its cliffs."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Looks$()$(br)Mesa (red sand), eroded (terracotta top), and wooded (a green, dark-oak-topped plateau) variants."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Gold$()$(br)Badlands run rich with $(item)gold$(), as in the vanilla mesa, with a little redstone besides."
+    }
+  ]
+}
