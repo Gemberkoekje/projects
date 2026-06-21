@@ -8,7 +8,7 @@
   },
   "ores": [],
   "pond": {
-    "block": "minecraft:water", "radius": 6, "depth": 5,
+    "block": "minecraft:water", "radius": 6, "depth": 4,
     "plants": [
       { "block": "minecraft:lily_pad", "chance": 0.10 },
       { "block": "minecraft:seagrass", "chance": 0.12 }

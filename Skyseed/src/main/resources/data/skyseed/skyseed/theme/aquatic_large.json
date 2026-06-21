@@ -6,7 +6,7 @@
     { "block": "minecraft:gravel", "chance": 0.90, "count": { "min": 4, "max": 8 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
   ],
   "pond": {
-    "block": "minecraft:water", "radius": 8, "depth": 7,
+    "block": "minecraft:water", "radius": 8, "depth": 5,
     "plants": [
       { "block": "minecraft:lily_pad", "chance": 0.08 },
       { "block": "minecraft:kelp", "chance": 0.15 },
@@ -28,7 +28,7 @@
   "biome_overrides": [
     { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean" ], "surface": "minecraft:sand", "fill": "minecraft:sand",
       "pond": {
-        "block": "minecraft:water", "radius": 8, "depth": 7,
+        "block": "minecraft:water", "radius": 8, "depth": 5,
         "plants": [
           { "block": "minecraft:tube_coral_block", "chance": 0.07 },
           { "block": "minecraft:brain_coral_block", "chance": 0.06 },
@@ -53,7 +53,7 @@
 
     { "biomes": [ "minecraft:swamp" ], "surface": "minecraft:grass_block", "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.25 } ],
       "pond": {
-        "block": "minecraft:water", "radius": 7, "depth": 6,
+        "block": "minecraft:water", "radius": 7, "depth": 5,
         "plants": [ { "block": "minecraft:lily_pad", "chance": 0.18 }, { "block": "minecraft:seagrass", "chance": 0.10 } ],
         "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.60 } ],
         "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.50, "count": { "min": 2, "max": 3 } } ]

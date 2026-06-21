@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.5] - 2026-06-21
+
+### Fixed
+- **Ponds now sit flush with the island surface instead of recessed in a pit.** The water level used the
+  island's un-domed base height, so on domed islands — the large variants especially — the pool sat 2–3
+  blocks below the surrounding ground. Water now fills to the island top at the pond's rim. Large pond
+  depths trimmed to suit (Large Aquatic 7→5, Large Lush 5→4). Bonus: sugar-cane banks survive better now
+  that the shore sits at the water's edge.
+
 ## [0.3.4] - 2026-06-21
 
 ### Fixed

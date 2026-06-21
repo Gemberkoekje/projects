@@ -168,8 +168,9 @@ public final class IslandGenerator {
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
         final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
         pondCfg.ifPresent(pond -> {
-            carvePond(blockMap, surfaceList, center, topDome, pond);
-            placePondPlants(blockMap, center, pond, random);
+            final int waterY = pondWaterY(center, topDome, baseRadius, pond);
+            carvePond(blockMap, surfaceList, center, topDome, waterY, pond);
+            placePondPlants(blockMap, center, waterY, pond, random);
             placePondBanks(blockMap, surfaceList, center, pond, random);
         });
 
@@ -191,7 +192,7 @@ public final class IslandGenerator {
             mobCfg.addAll(variant.decoration().mobs());
         }
         final List<IslandPlan.MobSpawn> mobs = new ArrayList<>(planMobs(mobCfg, surfaceList, random));
-        pondCfg.ifPresent(pond -> mobs.addAll(planPondMobs(center, pond, random)));
+        pondCfg.ifPresent(pond -> mobs.addAll(planPondMobs(center, pondWaterY(center, topDome, baseRadius, pond), pond, random)));
 
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
@@ -257,14 +258,13 @@ public final class IslandGenerator {
     }
 
     /** Roll each pond water mob and pick random submerged positions inside the carved pool. */
-    private static List<IslandPlan.MobSpawn> planPondMobs(BlockPos center, Pond pond, RandomSource random) {
+    private static List<IslandPlan.MobSpawn> planPondMobs(BlockPos center, int waterY, Pond pond, RandomSource random) {
         final List<IslandPlan.MobSpawn> out = new ArrayList<>();
         if (pond.waterMobs().isEmpty()) {
             return out;
         }
         final int r = Math.max(1, pond.radius());
         final int r2 = r * r;
-        final int waterY = center.getY();
         final int bottomY = waterY - Math.max(0, pond.depth() - 1);
         final List<int[]> cols = new ArrayList<>();
         for (int dx = -r; dx <= r; dx++) {
@@ -690,13 +690,25 @@ public final class IslandGenerator {
         }
     }
 
+    /**
+     * Water surface for a pond: flush with the island's top at the pond's rim, not the un-domed base
+     * ({@code center.getY()}). The top is domed up by {@code topDome} at the centre, so filling to the
+     * base would leave the pool recessed several blocks below the surface; this lifts it to the surface
+     * and only digs {@code depth} down from there.
+     */
+    private static int pondWaterY(BlockPos center, int topDome, int baseRadius, Pond pond) {
+        final int r = Math.max(1, pond.radius());
+        final double t = Math.min(1.0, (double) r / Math.max(1, baseRadius));
+        final double bulge = Math.max(0.0, 1.0 - t * t);
+        return center.getY() + (int) Math.round(topDome * bulge);
+    }
+
     /** Carve a contained pool into the island's top centre and keep decoration off those columns. */
     private static void carvePond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
-                                  BlockPos center, int topDome, Pond pond) {
+                                  BlockPos center, int topDome, int waterY, Pond pond) {
         final BlockState water = resolveBlock(pond.block(), Blocks.WATER).defaultBlockState();
         final int r = Math.max(1, pond.radius());
         final int r2 = r * r;
-        final int waterY = center.getY();
         final int bottomY = waterY - Math.max(0, pond.depth() - 1);
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
@@ -723,13 +735,12 @@ public final class IslandGenerator {
     }
 
     /** Scatter water plants through a carved pond: lily pads on the surface, kelp/seagrass/coral on the floor. */
-    private static void placePondPlants(Map<BlockPos, BlockState> blockMap, BlockPos center, Pond pond, RandomSource random) {
+    private static void placePondPlants(Map<BlockPos, BlockState> blockMap, BlockPos center, int waterY, Pond pond, RandomSource random) {
         if (pond.plants().isEmpty()) {
             return;
         }
         final int r = Math.max(1, pond.radius());
         final int r2 = r * r;
-        final int waterY = center.getY();
         final int bottomY = waterY - Math.max(0, pond.depth() - 1);
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
