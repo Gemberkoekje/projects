@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.15.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.16.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -103,7 +103,7 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 
 **Palette** — `surface`, `fill`, `core` block ids (required) · `fill_depth` int (3) · `surface_scatter` GroundEntry[] (`[]`, mixes blocks into the surface per column) · `fill_bands` block-id[] (`[]`; when set, the body (fill + core) becomes a Y-cycled list of strata — badlands cliffs; core still seeds ores) · `band_thickness` int (2; blocks per band).
 
-**OreEntry** — `block` (required) · `chance` float presence-roll (required) · `count` `{min,max}` veins (required) · `vein_size` `{min,max}` (required) · `depth` (`core` | `deep_core`; deep = lower ~40% of the core).
+**OreEntry** — `block` (required) · `chance` float presence-roll (required) · `count` `{min,max}` veins (required) · `vein_size` `{min,max}` (required) · `depth` (`core` | `deep_core`; deep = lower ~40% of the core). The generator scales the sampled `vein_size` up (≈1.4–1.9×, biggest for high-`chance` ores) and grows each vein favouring face-adjacent steps over diagonals, so patches come out as solid clusters.
 
 **Variant** — `weight` int (1) · `name` string · `surface_override` block id · `decoration` { `trees`: TreeEntry[], `ground`: GroundEntry[], `underside`: GroundEntry[] }. `underside` entries hang from each column's bottom face — `pointed_dripstone` and `cave_vines` build multi-block strands; others (spore blossom, hanging roots, …) hang one block. A `ground` entry that resolves to a two-tall plant (dripleaf, pitcher plant, tall flower) places both halves.
 
@@ -141,7 +141,7 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 1. **Match** the first applicable `biome_override` (biome + germination Y), producing the effective shape/palette/ores/variants/pond/waterfalls.
 2. **Silhouette.** A 2D rim-radius **noise field** (never a clean sphere) extruded with a **teardrop** profile — flat-ish domed top, tapering underside.
 3. **Layered fill.** surface → fill band (`fill_depth`) → core, with jitter.
-4. **Ores.** Per entry: roll `chance`, then place `count` clustered **veins** (random-walk of `vein_size`) within the core, weighted by `depth`.
+4. **Ores.** Per entry: roll `chance`, then place `count` clustered **veins** within the core, weighted by `depth`. Vein size is scaled up (common ores most), and the random-walk strongly prefers orthogonal (face) steps so veins are compact, not diagonal specks.
 5. **Pond / waterfalls / decoration.** Carve the pond; pick weighted variant; place trees (vanilla features queued, or `skyseed:mangrove` hand-built into the plan) and per-column ground cover; add rim cascades.
 6. **RNG.** `RandomSource.create(worldSeed ^ center.asLong())` — unique per island, reproducible, decorrelated from neighbours.
 

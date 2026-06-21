@@ -468,7 +468,9 @@ public final class IslandGenerator {
             for (int v = 0; v < veins; v++) {
                 final BlockPos seed = pickSeed(coreList, coreSet, ore.depth(), deepMaxY, random);
                 if (seed != null) {
-                    growVein(blockMap, seed, state, ore.veinSize().sample(random), coreSet, random);
+                    // Scale veins up — all a bit bigger, the common ores (high chance) most of all.
+                    final int size = Math.max(1, Math.round(ore.veinSize().sample(random) * (1.4f + 0.5f * ore.chance())));
+                    growVein(blockMap, seed, state, size, coreSet, random);
                 }
             }
         }
@@ -497,10 +499,22 @@ public final class IslandGenerator {
         placed.add(seed);
 
         int attempts = 0;
-        while (placed.size() < size && attempts < size * 8) {
+        while (placed.size() < size && attempts < size * 10) {
             attempts++;
             final BlockPos from = placed.get(random.nextInt(placed.size()));
-            final BlockPos nb = from.offset(random.nextInt(3) - 1, random.nextInt(3) - 1, random.nextInt(3) - 1);
+            // Favour growing to a face neighbour (compact, vanilla-looking veins); allow diagonals, but rarely.
+            final BlockPos nb;
+            if (random.nextFloat() < 0.80f) {
+                nb = from.relative(Direction.values()[random.nextInt(Direction.values().length)]);
+            } else {
+                int dx, dy, dz; // a real diagonal step: at least two axes off
+                do {
+                    dx = random.nextInt(3) - 1;
+                    dy = random.nextInt(3) - 1;
+                    dz = random.nextInt(3) - 1;
+                } while (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) < 2);
+                nb = from.offset(dx, dy, dz);
+            }
             final long key = nb.asLong();
             if (coreSet.contains(key)) {
                 blockMap.put(nb, ore);

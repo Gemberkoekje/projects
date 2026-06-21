@@ -3,7 +3,7 @@
   "palette": { "surface": "minecraft:stone", "fill": "minecraft:cobblestone", "core": "minecraft:stone", "fill_depth": 2 },
   "ores": [
     { "block": "minecraft:iron_ore", "chance": 0.80, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
-    { "block": "minecraft:copper_ore", "chance": 0.50, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:copper_ore", "chance": 0.80, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
     { "block": "minecraft:coal_ore", "chance": 0.40, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 5 }, "depth": "core" },
     { "block": "minecraft:gold_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
     { "block": "minecraft:lapis_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" }
@@ -46,7 +46,7 @@
       "ores": [
         { "block": "minecraft:coal_ore", "chance": 0.95, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
         { "block": "minecraft:iron_ore", "chance": 0.70, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
-        { "block": "minecraft:copper_ore", "chance": 0.40, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:copper_ore", "chance": 0.70, "count": { "min": 1, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
         { "block": "minecraft:emerald_ore", "chance": 0.04, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
       ] }
   ]

@@ -10,7 +10,7 @@
   "ores": [
     { "block": "minecraft:deepslate_iron_ore", "chance": 0.70, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
     { "block": "minecraft:deepslate_coal_ore", "chance": 0.50, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
-    { "block": "minecraft:deepslate_copper_ore", "chance": 0.40, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:deepslate_copper_ore", "chance": 0.70, "count": { "min": 1, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
     { "block": "minecraft:deepslate_redstone_ore", "chance": 0.55, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
     { "block": "minecraft:deepslate_gold_ore", "chance": 0.30, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
     { "block": "minecraft:deepslate_lapis_ore", "chance": 0.35, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
@@ -55,7 +55,7 @@
     { "min_y": 96, "ores": [
       { "block": "minecraft:deepslate_coal_ore", "chance": 0.85, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
       { "block": "minecraft:deepslate_iron_ore", "chance": 0.75, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
-      { "block": "minecraft:deepslate_copper_ore", "chance": 0.50, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+      { "block": "minecraft:deepslate_copper_ore", "chance": 0.80, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
       { "block": "minecraft:deepslate_gold_ore", "chance": 0.15, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "core" },
       { "block": "minecraft:deepslate_diamond_ore", "chance": 0.06, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 1 }, "depth": "deep_core" },
       { "block": "minecraft:dripstone_block", "chance": 0.50, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },

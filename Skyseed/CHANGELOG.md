@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.16.0] - 2026-06-21
+
+### Changed
+- **Ore veins are bigger.** The generator scales each sampled vein up (≈1.4–1.9×), with the common ores
+  (higher presence chance) growing the most — so patches read as proper deposits.
+- **Veins grow compactly.** Vein growth now strongly favours face-adjacent steps (up/down/N/S/E/W) over
+  diagonals (~80/20), so ore looks like solid clusters rather than scattered diagonal specks. Diagonal steps
+  still happen, just rarely.
+- **Copper is now a common ore** on Rocky and Ancient islands (and their Large variants): presence chance and
+  vein count bumped to roughly iron-level (≈0.7–0.85 per island), so it shows up reliably. Copper has existed
+  since MC 1.17 and was already present, but only at ~50% per island.
+
 ## [0.15.0] - 2026-06-21
 
 ### Fixed
