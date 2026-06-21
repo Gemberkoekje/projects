@@ -6,11 +6,11 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A grand glacier — a tall, broad ice island with a frozen lake set into its surface."
+      "text": "A grand frozen isle — tall and broad. It takes after the cold it lands in: deep powder snow and spruce over snowy lands, bare packed and blue ice with ice spikes over frozen ones."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The frozen lake$()$(br)A sheet of solid ice rests in the centre. Packed ice, blue ice, and the hidden $(item)powder snow$() traps run through the core; ice spikes crown the glacier and deep-freeze variants."
+      "text": "$(bold)Snow or ice$()$(br)Packed ice, blue ice, and the hidden $(item)powder snow$() traps run through the core. Over a frozen biome — frozen ocean, peaks, ice spikes — it turns properly icy and a sheet-ice $(bold)frozen lake$() sets into its surface; over snowy biomes it stays deep powder and spruce, with no lake."
     },
     {
       "type": "patchouli:text",

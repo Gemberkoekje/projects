@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.7] - 2026-06-21
+
+### Changed
+- **Large Frozen no longer always has a frozen lake — it's biome-driven.** The ice lake used to be an
+  unconditional feature. Now it only forms over frozen biomes (frozen ocean/river, frozen & jagged
+  peaks, ice spikes, snowy slopes), where the island also turns properly icy — packed/blue-ice surface
+  and more ice spikes. Over snowy biomes (snowy plains/taiga/beach, grove) it's deep powder snow and
+  spruce with no lake; elsewhere a snowy-leaning mix. Guide text updated.
+
 ## [0.3.6] - 2026-06-21
 
 ### Changed

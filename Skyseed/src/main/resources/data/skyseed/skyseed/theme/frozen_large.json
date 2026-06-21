@@ -9,7 +9,6 @@
     { "block": "minecraft:iron_ore", "chance": 0.60, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
     { "block": "minecraft:coal_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
-  "pond": { "block": "minecraft:ice", "radius": 5, "depth": 2 },
   "mobs": [
     { "entity": "minecraft:rabbit", "chance": 0.18, "count": { "min": 1, "max": 2 } },
     { "entity": "minecraft:polar_bear", "chance": 0.25, "count": { "min": 1, "max": 2 } },
@@ -25,5 +24,27 @@
     { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
       "trees": [ { "feature": "skyseed:ice_spike", "tries": 4, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:snow", "chance": 0.20 } ] } }
+  ],
+  "biome_overrides": [
+    { "biomes": [ "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_ocean", "minecraft:deep_frozen_ocean", "minecraft:frozen_river" ],
+      "pond": { "block": "minecraft:ice", "radius": 5, "depth": 2 },
+      "variants": [
+        { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
+          "trees": [ { "feature": "skyseed:ice_spike", "tries": 5, "spacing": 2 } ],
+          "ground": [ { "block": "minecraft:snow", "chance": 0.25 } ] } },
+        { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
+          "trees": [ { "feature": "skyseed:ice_spike", "tries": 6, "spacing": 2 } ],
+          "ground": [ { "block": "minecraft:snow", "chance": 0.15 } ] } }
+      ] },
+
+    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:snowy_beach", "minecraft:grove" ],
+      "variants": [
+        { "weight": 3, "name": "snowy", "decoration": {
+          "trees": [ { "feature": "minecraft:spruce", "tries": 6, "spacing": 2 } ],
+          "ground": [ { "block": "minecraft:snow", "chance": 0.90 } ] } },
+        { "weight": 1, "name": "powdery", "decoration": {
+          "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+          "ground": [ { "block": "minecraft:snow", "chance": 0.95 } ] } }
+      ] }
   ]
 }
