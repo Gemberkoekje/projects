@@ -25,21 +25,26 @@
       "pond": {
         "block": "minecraft:water", "radius": 4, "depth": 3,
         "plants": [
-          { "block": "minecraft:tube_coral_block", "chance": 0.07 },
-          { "block": "minecraft:brain_coral_block", "chance": 0.06 },
-          { "block": "minecraft:bubble_coral_block", "chance": 0.06 },
-          { "block": "minecraft:fire_coral_block", "chance": 0.06 },
-          { "block": "minecraft:horn_coral_block", "chance": 0.06 },
-          { "block": "minecraft:tube_coral_fan", "chance": 0.05 },
-          { "block": "minecraft:fire_coral_fan", "chance": 0.04 },
-          { "block": "minecraft:sea_pickle", "chance": 0.08 },
+          { "block": "minecraft:tube_coral_block", "chance": 0.05 },
+          { "block": "minecraft:brain_coral_block", "chance": 0.04 },
+          { "block": "minecraft:sea_pickle", "chance": 0.06 },
           { "block": "minecraft:kelp", "chance": 0.10 },
-          { "block": "minecraft:wet_sponge", "chance": 0.03 }
+          { "block": "minecraft:seagrass", "chance": 0.12 }
         ],
-        "water_mobs": [ { "entity": "minecraft:tropical_fish", "chance": 0.50, "count": { "min": 2, "max": 4 } } ]
+        "water_mobs": [ { "entity": "minecraft:tropical_fish", "chance": 0.40, "count": { "min": 1, "max": 3 } } ]
       },
-      "mobs": [ { "entity": "minecraft:turtle", "chance": 0.10, "count": { "min": 1, "max": 2 } } ],
+      "mobs": [ { "entity": "minecraft:turtle", "chance": 0.10, "count": { "min": 1, "max": 1 } } ],
       "variants": [ { "weight": 1, "name": "warm", "decoration": {} } ] },
+
+    { "biomes": [ "#minecraft:is_river" ],
+      "pond": {
+        "block": "minecraft:water", "radius": 2, "depth": 3, "style": "river",
+        "plants": [ { "block": "minecraft:seagrass", "chance": 0.12 }, { "block": "minecraft:kelp", "chance": 0.08 } ],
+        "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.50 } ],
+        "water_mobs": [ { "entity": "minecraft:salmon", "chance": 0.50, "count": { "min": 1, "max": 3 } } ]
+      },
+      "variants": [ { "weight": 1, "name": "river", "decoration": {
+        "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:blue_orchid", "chance": 0.03 } ] } } ] },
 
     { "biomes": [ "minecraft:mangrove_swamp" ], "surface": "minecraft:mud",
       "pond": {

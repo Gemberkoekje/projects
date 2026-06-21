@@ -6,11 +6,11 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Half land, half floating lake. A pool sits in its centre, fed with whatever grows in the water it lands over."
+      "text": "Half land, half water. An irregular pool sits in its centre — never a perfect circle — fed with whatever grows in the water it lands over. Thrown over a $(item)river$() it instead cuts a winding channel clean across the island."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(). Over an ocean it becomes a warm reef — $(item)coral$(), sea pickles, even a rare $(item)sponge$(). $(item)Squid$() swim the freshwater; the warm reef brings $(item)tropical fish$()."
+      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(); over an ocean, a small reef of $(item)coral$(), sea pickles and seagrass. $(item)Squid$() swim the freshwater, $(item)tropical fish$() the reef, and $(item)salmon$() a river."
     },
     {
       "type": "patchouli:text",

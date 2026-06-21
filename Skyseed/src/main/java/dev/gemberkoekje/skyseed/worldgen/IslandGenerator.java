@@ -167,12 +167,19 @@ public final class IslandGenerator {
 
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
         final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
-        pondCfg.ifPresent(pond -> {
-            final int waterY = pondWaterY(center, topDome, baseRadius, pond);
-            carvePond(blockMap, surfaceList, center, topDome, waterY, pond);
-            placePondPlants(blockMap, center, waterY, pond, random);
-            placePondBanks(blockMap, surfaceList, center, pond, random);
-        });
+        final Set<Long> pondColumns = new HashSet<>();
+        int pondSurfaceTmp = center.getY();
+        if (pondCfg.isPresent()) {
+            final Pond pond = pondCfg.get();
+            // Ponds sit flush with the surface; rivers cut a channel down through it.
+            final int waterY = pond.isRiver() ? center.getY() : pondWaterY(center, topDome, baseRadius, pond);
+            pondSurfaceTmp = waterY;
+            final Set<Long> carved = carvePond(blockMap, surfaceList, center, topDome, waterY, baseRadius, pond, random);
+            placePondPlants(blockMap, center, waterY, pond, carved, random);
+            placePondBanks(blockMap, surfaceList, center, pond, carved, random);
+            pondColumns.addAll(carved);
+        }
+        final int pondSurfaceY = pondSurfaceTmp;
 
         final List<TreeSite> trees = new ArrayList<>();
         if (variant != null) {
@@ -192,7 +199,9 @@ public final class IslandGenerator {
             mobCfg.addAll(variant.decoration().mobs());
         }
         final List<IslandPlan.MobSpawn> mobs = new ArrayList<>(planMobs(mobCfg, surfaceList, random));
-        pondCfg.ifPresent(pond -> mobs.addAll(planPondMobs(center, pondWaterY(center, topDome, baseRadius, pond), pond, random)));
+        if (pondCfg.isPresent() && !pondColumns.isEmpty()) {
+            mobs.addAll(planPondMobs(center, pondSurfaceY, pondCfg.get(), pondColumns, random));
+        }
 
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
@@ -257,25 +266,16 @@ public final class IslandGenerator {
         return out;
     }
 
-    /** Roll each pond water mob and pick random submerged positions inside the carved pool. */
-    private static List<IslandPlan.MobSpawn> planPondMobs(BlockPos center, int waterY, Pond pond, RandomSource random) {
+    /** Roll each pond water mob and pick random submerged positions inside the carved water columns. */
+    private static List<IslandPlan.MobSpawn> planPondMobs(BlockPos center, int waterY, Pond pond, Set<Long> carved, RandomSource random) {
         final List<IslandPlan.MobSpawn> out = new ArrayList<>();
-        if (pond.waterMobs().isEmpty()) {
+        if (pond.waterMobs().isEmpty() || carved.isEmpty()) {
             return out;
         }
-        final int r = Math.max(1, pond.radius());
-        final int r2 = r * r;
         final int bottomY = waterY - Math.max(0, pond.depth() - 1);
         final List<int[]> cols = new ArrayList<>();
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz <= r2) {
-                    cols.add(new int[]{dx, dz});
-                }
-            }
-        }
-        if (cols.isEmpty()) {
-            return out;
+        for (long k : carved) {
+            cols.add(new int[]{(int) (k >> 32), (int) k});
         }
         for (MobEntry m : pond.waterMobs()) {
             if (random.nextFloat() >= m.chance()) {
@@ -703,61 +703,110 @@ public final class IslandGenerator {
         return center.getY() + (int) Math.round(topDome * bulge);
     }
 
-    /** Carve a contained pool into the island's top centre and keep decoration off those columns. */
-    private static void carvePond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
-                                  BlockPos center, int topDome, int waterY, Pond pond) {
-        final BlockState water = resolveBlock(pond.block(), Blocks.WATER).defaultBlockState();
-        final int r = Math.max(1, pond.radius());
-        final int r2 = r * r;
-        final int bottomY = waterY - Math.max(0, pond.depth() - 1);
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz > r2) {
-                    continue;
-                }
-                final int wx = center.getX() + dx;
-                final int wz = center.getZ() + dz;
-                // open the dome above the water surface
-                for (int y = waterY + 1; y <= center.getY() + topDome + 1; y++) {
-                    blockMap.remove(new BlockPos(wx, y, wz));
-                }
-                // fill the pool; blocks below the floor stay as the island body
-                for (int y = bottomY; y <= waterY; y++) {
-                    blockMap.put(new BlockPos(wx, y, wz), water);
-                }
-            }
-        }
-        surfaceList.removeIf(p -> {
-            int dx = p.getX() - center.getX();
-            int dz = p.getZ() - center.getZ();
-            return dx * dx + dz * dz <= r2;
-        });
+    private static long colKey(int dx, int dz) {
+        return (((long) dx) << 32) | (dz & 0xffffffffL);
     }
 
-    /** Scatter water plants through a carved pond: lily pads on the surface, kelp/seagrass/coral on the floor. */
-    private static void placePondPlants(Map<BlockPos, BlockState> blockMap, BlockPos center, int waterY, Pond pond, RandomSource random) {
+    /**
+     * Carve a contained water feature. A {@code pond} is an irregular blob in the centre; a
+     * {@code river} is a meandering channel across the island. Each candidate column is only carved
+     * where the island body reaches below the pool floor, so the water can never hang off the rim
+     * (the fix for islands losing a side). Returns the carved columns (packed dx,dz) so plants, banks
+     * and water mobs match the exact carved shape.
+     */
+    private static Set<Long> carvePond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
+                                       BlockPos center, int topDome, int waterY, int baseRadius, Pond pond, RandomSource random) {
+        final BlockState water = resolveBlock(pond.block(), Blocks.WATER).defaultBlockState();
+        final int bottomY = waterY - Math.max(0, pond.depth() - 1);
+        final int ceil = center.getY() + topDome + 1; // strip the dome cap above the water surface
+        final Set<Long> carved = new HashSet<>();
+
+        final List<int[]> candidates = pond.isRiver()
+                ? riverColumns(pond, baseRadius, random)
+                : pondColumns(pond, baseRadius, random);
+
+        for (int[] c : candidates) {
+            final int wx = center.getX() + c[0];
+            final int wz = center.getZ() + c[1];
+            // Containment: only carve where the island body sits below the floor, so water always rests
+            // on solid ground (no carving past the rim, no floating slabs).
+            if (!blockMap.containsKey(new BlockPos(wx, bottomY - 1, wz))) {
+                continue;
+            }
+            for (int y = waterY + 1; y <= ceil; y++) {
+                blockMap.remove(new BlockPos(wx, y, wz));
+            }
+            for (int y = bottomY; y <= waterY; y++) {
+                blockMap.put(new BlockPos(wx, y, wz), water);
+            }
+            carved.add(colKey(c[0], c[1]));
+        }
+        surfaceList.removeIf(p -> carved.contains(colKey(p.getX() - center.getX(), p.getZ() - center.getZ())));
+        return carved;
+    }
+
+    /** Candidate columns for an irregular radial pond — a few angular harmonics give it a blobby, non-round edge. */
+    private static List<int[]> pondColumns(Pond pond, int baseRadius, RandomSource random) {
+        final List<int[]> out = new ArrayList<>();
+        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * 0.62)));
+        final int[] freq = { 2, 3, 5 };
+        final double[] amp = new double[freq.length];
+        final double[] phase = new double[freq.length];
+        double sum = 0;
+        for (int k = 0; k < freq.length; k++) { amp[k] = 0.3 + random.nextDouble(); sum += amp[k]; phase[k] = random.nextDouble() * Math.PI * 2; }
+        for (int k = 0; k < freq.length; k++) { amp[k] = amp[k] / sum * 0.35; } // wobble the edge by up to ~35%
+        final int maxR = (int) Math.ceil(r * 1.4) + 1;
+        for (int dx = -maxR; dx <= maxR; dx++) {
+            for (int dz = -maxR; dz <= maxR; dz++) {
+                final double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
+                final double angle = Math.atan2(dz, dx);
+                double rim = r;
+                for (int k = 0; k < freq.length; k++) { rim += r * amp[k] * Math.sin(freq[k] * angle + phase[k]); }
+                if (dist <= rim) { out.add(new int[]{dx, dz}); }
+            }
+        }
+        return out;
+    }
+
+    /** Candidate columns for a meandering river channel cut across the island ({@code radius} = half-width). */
+    private static List<int[]> riverColumns(Pond pond, int baseRadius, RandomSource random) {
+        final List<int[]> out = new ArrayList<>();
+        final double half = Math.max(1.0, pond.radius());
+        final double phi = random.nextDouble() * Math.PI * 2;
+        final double dirX = Math.cos(phi), dirZ = Math.sin(phi);
+        final double perpX = -dirZ, perpZ = dirX;
+        final double mAmp = half * 1.6;
+        final double mFreq = 0.16 + random.nextDouble() * 0.12;
+        final double mPhase = random.nextDouble() * Math.PI * 2;
+        final int maxR = (int) Math.ceil(baseRadius * 1.5) + 2;
+        for (int dx = -maxR; dx <= maxR; dx++) {
+            for (int dz = -maxR; dz <= maxR; dz++) {
+                final double along = dx * dirX + dz * dirZ;
+                final double perp = dx * perpX + dz * perpZ;
+                final double centerline = mAmp * Math.sin(along * mFreq + mPhase);
+                if (Math.abs(perp - centerline) <= half) { out.add(new int[]{dx, dz}); }
+            }
+        }
+        return out;
+    }
+
+    /** Scatter water plants through the carved water columns: lily pads on the surface, kelp/seagrass/coral on the floor. */
+    private static void placePondPlants(Map<BlockPos, BlockState> blockMap, BlockPos center, int waterY, Pond pond, Set<Long> carved, RandomSource random) {
         if (pond.plants().isEmpty()) {
             return;
         }
-        final int r = Math.max(1, pond.radius());
-        final int r2 = r * r;
         final int bottomY = waterY - Math.max(0, pond.depth() - 1);
-        for (int dx = -r; dx <= r; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx * dx + dz * dz > r2) {
-                    continue;
-                }
-                final int wx = center.getX() + dx;
-                final int wz = center.getZ() + dz;
-                float roll = random.nextFloat();
-                for (GroundEntry g : pond.plants()) {
-                    roll -= g.chance();
-                    if (roll < 0) {
-                        if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                            plantInPond(blockMap, wx, wz, waterY, bottomY, g.block());
-                        }
-                        break;
+        for (long k : carved) {
+            final int wx = center.getX() + (int) (k >> 32);
+            final int wz = center.getZ() + (int) k;
+            float roll = random.nextFloat();
+            for (GroundEntry g : pond.plants()) {
+                roll -= g.chance();
+                if (roll < 0) {
+                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                        plantInPond(blockMap, wx, wz, waterY, bottomY, g.block());
                     }
+                    break;
                 }
             }
         }
@@ -789,25 +838,19 @@ public final class IslandGenerator {
         }
     }
 
-    /** Grow shore plants (e.g. sugar cane) on the ring of land just outside the pond. */
+    /** Grow shore plants (e.g. sugar cane) on the ring of land right at the carved water's edge. */
     private static void placePondBanks(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList,
-                                       BlockPos center, Pond pond, RandomSource random) {
-        if (pond.bank().isEmpty() || surfaceList.isEmpty()) {
+                                       BlockPos center, Pond pond, Set<Long> carved, RandomSource random) {
+        if (pond.bank().isEmpty() || carved.isEmpty()) {
             return;
         }
-        final int r = Math.max(1, pond.radius());
-        final int innerSq = r * r; // a column inside this is water (already carved)
-        for (BlockPos col : surfaceList) {
+        for (BlockPos col : surfaceList) { // carved columns were already removed from surfaceList
             final int dx = col.getX() - center.getX();
             final int dz = col.getZ() - center.getZ();
-            if (dx * dx + dz * dz <= innerSq) {
-                continue; // inside the pond
-            }
-            // Only the immediate water's-edge — a horizontal neighbour must be a pond water column —
-            // so the cane stays put (sugar cane needs water beside it or it pops on the first update).
-            final boolean waterAdjacent =
-                    (dx + 1) * (dx + 1) + dz * dz <= innerSq || (dx - 1) * (dx - 1) + dz * dz <= innerSq
-                            || dx * dx + (dz + 1) * (dz + 1) <= innerSq || dx * dx + (dz - 1) * (dz - 1) <= innerSq;
+            // Only the immediate water's-edge — a 4-neighbour must be a carved water column — so the cane
+            // stays put (sugar cane needs water beside it or it pops on the first update).
+            final boolean waterAdjacent = carved.contains(colKey(dx + 1, dz)) || carved.contains(colKey(dx - 1, dz))
+                    || carved.contains(colKey(dx, dz + 1)) || carved.contains(colKey(dx, dz - 1));
             if (!waterAdjacent) {
                 continue;
             }

@@ -3,6 +3,23 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.4.0] - 2026-06-21
+
+### Added
+- **Rivers.** A pond can now have `"style": "river"` — instead of a central pool it cuts a meandering
+  channel across the island (`radius` = half-width). River biomes use it: a Forest Skyseed over a river
+  grows a wood with a river running through it; an Aquatic Skyseed cuts a salmon-stocked channel.
+
+### Changed
+- **Water carving has variety.** Ponds are no longer perfect circles — their edge is wobbled with a few
+  angular harmonics, so each pool is a unique blob.
+- **Water features are properly contained.** Every water column is only carved where the island body
+  reaches below the pool floor, so water can never hang off the rim or take a slab of the island with it
+  (fixes aquatic islands losing a side). Large Aquatic's lake radius trimmed 8→6 for extra margin.
+- **Small Aquatic ocean reef toned down.** A small island no longer gets the full ten-piece reef (which
+  looked silly at that scale) — just a couple of corals, sea pickles, seagrass, and a turtle. The Large
+  Aquatic island keeps the full reef.
+
 ## [0.3.7] - 2026-06-21
 
 ### Changed
