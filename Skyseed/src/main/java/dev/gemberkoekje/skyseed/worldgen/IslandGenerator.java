@@ -468,9 +468,7 @@ public final class IslandGenerator {
             for (int v = 0; v < veins; v++) {
                 final BlockPos seed = pickSeed(coreList, coreSet, ore.depth(), deepMaxY, random);
                 if (seed != null) {
-                    // Scale veins up — all a bit bigger, the common ores (high chance) most of all.
-                    final int size = Math.max(1, Math.round(ore.veinSize().sample(random) * (1.4f + 0.5f * ore.chance())));
-                    growVein(blockMap, seed, state, size, coreSet, random);
+                    growVein(blockMap, seed, state, ore.veinSize().sample(random), coreSet, random);
                 }
             }
         }

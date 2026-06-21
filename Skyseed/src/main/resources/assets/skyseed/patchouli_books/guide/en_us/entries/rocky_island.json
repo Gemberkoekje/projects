@@ -10,11 +10,11 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Ores$()$(br)A mining isle through and through. Iron shows on most — roughly four in five — in a handful of small veins, with copper, coal and a little lapis, and gold deeper down. Which ores you get depends on where it forms (next page); nothing is guaranteed, and a lean isle happens."
+      "text": "$(bold)Ores$()$(br)A mining isle through and through. $(item)Iron$() and $(item)copper$() turn up on nearly every one, in generous veins, alongside coal and lapis and a little gold. Which ores — and how rich — depends on the height it forms at (next page); nothing is fully guaranteed, and a lean isle happens."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Height is everything$()$(br)A Rocky isle takes after the altitude it grows at, like the real underground — so aim your throw.$(br)$(li)High up: coal and iron, with a chance of $(item)emerald$() — snow-capped if very high or grown in the cold.$(li)Mid-air: the broad spread — iron, copper, coal, lapis, gold.$(li)Deep, near the world's floor: $(item)deepslate$(), rich in $(item)diamond$(), redstone, lapis and gold."
+      "text": "$(bold)Throw high or low$()$(br)A Rocky isle takes after the altitude it grows at, like the real underground — so aim your throw. $(bold)Deeper is richer.$()$(br)$(li)$(bold)Deep$(), near the world's floor: $(item)deepslate$() laced with $(item)diamond$(), redstone, gold and lapis — the best haul.$(li)$(bold)Mid-air$(): the broad spread — iron and copper aplenty, plus coal, lapis and gold.$(li)$(bold)High up$(): mostly coal and iron (and a chance of $(item)emerald$()), but none of the deep treasures — so a high isle gives less than one thrown low. Snow-capped if very high or grown in the cold."
     }
   ]
 }

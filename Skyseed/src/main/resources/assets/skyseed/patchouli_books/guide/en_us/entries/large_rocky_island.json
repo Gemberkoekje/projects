@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Mountain riches$()$(br)The deep core carries the full Rocky ore suite, and being a mountain it also yields $(item)emerald ore$() — the reliable source for the trading economy. Goats roam the heights."
+      "text": "$(bold)Mountain riches$()$(br)The deep core carries the full Rocky ore suite — $(item)iron$() and $(item)copper$() in abundance, coal, lapis and gold — and being a mountain it also yields $(item)emerald ore$(), the reliable source for the trading economy. Goats roam the heights."
     },
     {
       "type": "patchouli:text",

@@ -3,6 +3,26 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.17.0] - 2026-06-21
+
+### Changed
+- **Vein sizes moved from a generator multiplier into the theme JSONs.** The v0.16.0 in-code vein scaling was
+  reverted; the Rocky/Ancient ore tables now set sizes directly — **iron, coal and copper are veins of 4–8**
+  at normal throw heights. (The orthogonal vein growth from v0.16.0 stays.)
+- **Rocky & Ancient ore tables reworked to track the vanilla ore-by-depth curve** (a simplified per-Y-band
+  heuristic): thrown **deep** → deepslate diamond / redstone / gold / lapis (the richest haul); **mid-air** →
+  an iron & copper peak with coal; **high / peak** → coal- and iron-heavy with none of the deep treasures —
+  so a high island gives less than one thrown low. Copper is reliably common at mid heights, and deepslate
+  copper now appears in the deep bands. Verified via RCON across deep/mid/high/peak throws.
+
+### Fixed
+- **The guide book shows its custom cover again.** Making Patchouli optional had dropped the custom item
+  texture; the book now points its Patchouli `model` at the restored `skyseed:guide` texture.
+
+### Guide
+- Rocky and Ancient entries (and their Large variants) now name **copper** explicitly and spell out that
+  **deeper throws are richer** — high islands yield coal and iron but not the deep treasures.
+
 ## [0.16.0] - 2026-06-21
 
 ### Changed
