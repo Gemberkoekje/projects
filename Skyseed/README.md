@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.14.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.15.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -45,7 +45,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
-| Water | Contained ponds; off-rim static waterfall cascades; hand-built mangroves (`skyseed:mangrove`) |
+| Water | Contained ponds (a containment ring walls the rim up to the water before decoration), sand/clay/gravel beds and shores; off-rim static waterfall cascades; hand-built mangroves (`skyseed:mangrove`) |
 | Surface | Per-column `surface_scatter` (block mixes); snow-capped peaks (taller shape + snow) |
 | World | Void world preset with multi-noise overworld biomes; structures disabled |
 | Start | Curated start island; safe spawn (valid biome, on island not in a tree); first-join guide book |
@@ -111,7 +111,7 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 
 **GroundEntry** — `block` id (required) · `chance` float per-column (required).
 
-**Pond** — `block` fluid id (`minecraft:water`) · `radius` int (3) · `depth` int (2) · `plants` GroundEntry[] (`[]`; per-column water plants — `lily_pad` floats on the surface, `kelp` fills a column, `tall_seagrass` places both halves, and anything else roots on the floor, waterlogged if it can be). Walled by the domed rim and placed without block updates, so it stays still and never spills into the void.
+**Pond** — `block` fluid id (`minecraft:water`) · `radius` int (3) · `depth` int (2) · `plants` GroundEntry[] (`[]`; per-column water plants — `lily_pad` floats on the surface, `kelp` fills a column, `tall_seagrass` places both halves, and anything else roots on the floor, waterlogged if it can be). Kept within ≈0.62× the island radius, then a **containment ring** walls every land column touching the water up to the surface (the island's fill/surface block), and the bed/shore are dressed with sand, clay and gravel — all before decoration, so it stays still and never spills off the rim (where the very edge can't be walled, a small waterfall is left as variety).
 
 ### Biome overrides
 

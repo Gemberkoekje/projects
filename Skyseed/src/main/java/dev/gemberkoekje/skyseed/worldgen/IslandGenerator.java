@@ -176,7 +176,11 @@ public final class IslandGenerator {
             // Ponds sit flush with the surface; rivers cut a channel down through it.
             final int waterY = pond.isRiver() ? center.getY() : pondWaterY(center, topDome, baseRadius, pond);
             pondSurfaceTmp = waterY;
+            final int bottomY = waterY - Math.max(0, pond.depth() - 1);
             final Set<Long> carved = carvePond(blockMap, surfaceList, center, topDome, waterY, baseRadius, pond, random);
+            // Wall up any open edge to the water surface (a containing ring) and dress the bed/shore with
+            // sand/clay/gravel — before decorations, so cane and lily pads sit on contained ground.
+            containPond(blockMap, surfaceList, center, waterY, bottomY, surface, fill, carved, random);
             placePondPlants(blockMap, center, waterY, pond, carved, random);
             placePondBanks(blockMap, surfaceList, center, pond, carved, random);
             pondColumns.addAll(carved);
@@ -828,17 +832,101 @@ public final class IslandGenerator {
         return carved;
     }
 
+    private static final int[][] NEIGHBORS_8 = {
+            {1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+    };
+
+    /**
+     * Contain a carved pool and dress it with water-side materials. Every land column touching the water has
+     * any gap below the surface walled up to {@code waterY} (the "ring of dirt" that keeps the pool from
+     * sheeting off the edge); the bed gets sand/clay/gravel, and the shore gets sandy/gravelly patches. Runs
+     * before plants and banks so decorations sit on the finished, contained edge.
+     */
+    private static void containPond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList, BlockPos center,
+                                    int waterY, int bottomY, BlockState surface, BlockState fill, Set<Long> carved, RandomSource random) {
+        // 1) Pond bed: the block the water rests on, seen through the surface.
+        for (long k : carved) {
+            final BlockPos floor = new BlockPos(center.getX() + (int) (k >> 32), bottomY - 1, center.getZ() + (int) k);
+            if (blockMap.containsKey(floor)) {
+                final BlockState bed = pondBed(random);
+                if (bed != null) {
+                    blockMap.put(floor, bed);
+                }
+            }
+        }
+        // 2) Containing ring + shore: every land column touching the water.
+        final Set<Long> handled = new HashSet<>();
+        final List<BlockPos> newRim = new ArrayList<>();
+        for (long k : carved) {
+            final int dx = (int) (k >> 32);
+            final int dz = (int) k;
+            for (int[] n : NEIGHBORS_8) {
+                final int ndx = dx + n[0];
+                final int ndz = dz + n[1];
+                final long nk = colKey(ndx, ndz);
+                if (carved.contains(nk) || !handled.add(nk)) {
+                    continue;
+                }
+                final int nx = center.getX() + ndx;
+                final int nz = center.getZ() + ndz;
+                // The ring needs island body beneath the floor to rest on; with none, leave it open (a small
+                // waterfall is acceptable variety) rather than hang a wall in the void.
+                if (!blockMap.containsKey(new BlockPos(nx, bottomY - 1, nz))) {
+                    continue;
+                }
+                final BlockPos top = new BlockPos(nx, waterY, nz);
+                if (blockMap.containsKey(top)) {
+                    // A flush/higher bank — already contains the water; just give the waterline a sandy touch.
+                    final BlockState shore = pondShore(random, null);
+                    if (shore != null) {
+                        blockMap.put(top, shore);
+                    }
+                    continue;
+                }
+                // An open, lower edge: wall it up to the water surface so the pool can't spill here.
+                for (int y = bottomY; y < waterY; y++) {
+                    final BlockPos p = new BlockPos(nx, y, nz);
+                    if (!blockMap.containsKey(p)) {
+                        blockMap.put(p, fill);
+                    }
+                }
+                blockMap.put(top, pondShore(random, surface));
+                newRim.add(top);
+            }
+        }
+        surfaceList.addAll(newRim); // decorations may grow on the new ring; stale lower entries are skipped (now buried)
+    }
+
+    /** Pond-bed material: mostly sand, some gravel and clay, otherwise the island's own block. */
+    private static BlockState pondBed(RandomSource random) {
+        final float x = random.nextFloat();
+        if (x < 0.30f) return Blocks.SAND.defaultBlockState();
+        if (x < 0.50f) return Blocks.GRAVEL.defaultBlockState();
+        if (x < 0.62f) return Blocks.CLAY.defaultBlockState();
+        return null; // keep the existing island body
+    }
+
+    /** Shore material at the waterline: sandy/gravelly patches, otherwise {@code fallback} (null = leave as-is). */
+    private static BlockState pondShore(RandomSource random, BlockState fallback) {
+        final float x = random.nextFloat();
+        if (x < 0.22f) return Blocks.SAND.defaultBlockState();
+        if (x < 0.35f) return Blocks.GRAVEL.defaultBlockState();
+        return fallback;
+    }
+
     /** Candidate columns for an irregular radial pond — a few angular harmonics give it a blobby, non-round edge. */
     private static List<int[]> pondColumns(Pond pond, int baseRadius, RandomSource random) {
         final List<int[]> out = new ArrayList<>();
-        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * 0.62)));
+        // Keep the pool well inside the island (extent ≈ 0.62·baseRadius after wobble) so its rim always has
+        // solid ground for the containment ring to wall against — overshooting the rim is what made it overflow.
+        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * 0.5)));
         final int[] freq = { 2, 3, 5 };
         final double[] amp = new double[freq.length];
         final double[] phase = new double[freq.length];
         double sum = 0;
         for (int k = 0; k < freq.length; k++) { amp[k] = 0.3 + random.nextDouble(); sum += amp[k]; phase[k] = random.nextDouble() * Math.PI * 2; }
-        for (int k = 0; k < freq.length; k++) { amp[k] = amp[k] / sum * 0.35; } // wobble the edge by up to ~35%
-        final int maxR = (int) Math.ceil(r * 1.4) + 1;
+        for (int k = 0; k < freq.length; k++) { amp[k] = amp[k] / sum * 0.28; } // wobble the edge by up to ~28%
+        final int maxR = (int) Math.ceil(r * 1.25) + 1;
         for (int dx = -maxR; dx <= maxR; dx++) {
             for (int dz = -maxR; dz <= maxR; dz++) {
                 final double dist = Math.sqrt((double) dx * dx + (double) dz * dz);

@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.15.0] - 2026-06-21
+
+### Fixed
+- **Ponds no longer overflow off the island.** A carved pool now gets a **containment ring** — every land
+  column touching the water is walled up to the surface with the island's own fill/surface block (the "ring
+  of dirt"), placed *before* decorations — so the water can't sheet over a low edge. Pools are also kept a
+  little smaller (extent ≈ 0.62× the island radius, down from ≈0.87×) so the rim always has solid ground to
+  wall against; where the pool genuinely sits against the very edge, a small waterfall is left as variety.
+  (Verified: pond water now spans only its own depth, ~3–5 blocks, instead of cascading down the island.)
+
+### Added
+- **Water features carry sand, clay and gravel.** Every pond/river/lake bed is dressed with sandy / gravelly
+  / clay patches, and the shore gets sandy and gravelly edges — the materials you'd expect in and around
+  water.
+
 ## [0.14.0] - 2026-06-21
 
 ### Added
