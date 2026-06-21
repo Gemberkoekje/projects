@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.5.2] - 2026-06-21
+
+### Changed
+- The Almanac's **Recipes** chapter is pinned to the front of the book (a priority entry) so it's easy
+  to find instead of buried among the island entries. Added a note that a small island is a 2x2 of four
+  blocks and a large one a 3x3.
+
 ## [0.5.1] - 2026-06-21
 
 ### Changed

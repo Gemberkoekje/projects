@@ -2,10 +2,11 @@
   "name": "Recipes",
   "category": "skyseed:skyseeds",
   "icon": "minecraft:crafting_table",
+  "priority": true,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Every Skyseed is crafted, then thrown. Here is how to make each one — and where to find what it takes. Craft a seed to unlock its field notes."
+      "text": "Every Skyseed is crafted, then thrown. Each small island stacks four blocks — a 2x2 of surface over base; the larger isles take a 3x3. Here is how to make each one, and where to find what it takes. Craft a seed to unlock its field notes."
     },
     {
       "type": "patchouli:crafting",
