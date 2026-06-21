@@ -8,7 +8,7 @@ This document covers all planned island types, their blocks, variants, Y-level o
 
 > This section reconciles the plan below with what is actually built. Everything after it is the **design target**; only a subset is live, and the build made one structural choice that reframes much of what follows.
 
-**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), and Rocky (`skyseed:rocky`). Everything else in this document (Desert, Mushroom, Frozen, Meadow, Aquatic, Ancient, Badlands, Lush) is **not yet built**.
+**Seeds built:** Forest (`skyseed:forest`), Large Forest (`skyseed:forest_large` — the milestone-7 "bigger, pricier" size variant of Forest), Rocky (`skyseed:rocky`), and **Desert** (`skyseed:desert`). The remaining seven (Mushroom, Frozen, Meadow, Aquatic, Ancient, Badlands, Lush) are **not yet built**.
 
 **Engine features built:** datapack theme codec; biome-aware generation; Y-band overrides (`min_y`/`max_y`); contained ponds; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-column `surface_scatter`; snow peaks; curated start island; void world preset with multi-noise biomes; structures disabled; tick-budgeted placement; overlap safety; charge-to-throw distance; Patchouli guide (Forest / Rocky / Large Forest entries, advancement-gated).
 
@@ -157,6 +157,8 @@ Vein size 1–3 for all unless noted. Deepslate variants replace stone equivalen
 ### 🏜️ Desert
 
 **Character:** Arid surface, sandstone fill. Primary source of sand, sandstone, glass materials, and cactus. Clay sprinkle avoids needing a separate early-game aquatic source.
+
+> **As built (`skyseed:desert`):** sand / sandstone / smooth-sandstone, with core clusters of clay, gold, and rare bone-block fossils, plus dead bush + cactus. The "Red" variant is implemented as a `#is_badlands` biome-override (red sand / red sandstone / smooth red sandstone + extra gold) rather than a random variant. **Not done:** the "Dune" shape variant (the `Variant` record carries no shape — would need a biome-override or a new field) and water-edge sugar cane (deferred — no pond on Desert; sugar cane will land on Aquatic).
 
 **Recipe:** Sand + Sandstone (vertical)
 ```
