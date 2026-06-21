@@ -74,6 +74,14 @@ The solution is to break the village into its constituent parts and spread them 
 
 ### ⛪ Village Center Island ✨ (late-tier, all professions)
 
+> **Built (v0.9.0).** `skyseed:village_center` — a bell-topped 7×7 plaza with four themed trading halls
+> branching off it (farm / smith / scholar / craft), each plaza connector pointing at its own hall pool so
+> the layout is deterministic and **all 13 professions are guaranteed**, plus an iron golem (via the new
+> `JigsawConfig.iron_golems`). Crafted from 5 emeralds + iron + planks + cobblestone (`["EEE","ECE","PIP"]`).
+> Foundation pads were switched to a disc (the plus-shaped footprint needs no square corners, which would
+> float past a big island's rim). RCON-verified: 13 villagers, all 13 distinct professions claimed within
+> ~10 s, 1 iron golem. **Completes the villager progression** (Hamlet → Trade Post → Village Center).
+
 **Character:** The premium village island. A proper village center: a well, a notice board, 5–6 buildings, one iron golem, and a villager of each of the 13 professions. This is the "full trading hall" island — expensive, but it gives the player the complete trading economy in one throw.
 
 **Recipe:** 5× Emerald + Iron Ingot + Oak Planks + Cobblestone (shaped — a 3×3 recipe)

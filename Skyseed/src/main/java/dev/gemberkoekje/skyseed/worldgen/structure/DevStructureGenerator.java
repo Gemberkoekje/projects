@@ -7,7 +7,7 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import java.nio.file.Path;
 
 /**
- * Dev-only: writes Skyseed's code-authored building templates ({@link HamletTemplates}) into the source
+ * Dev-only: writes Skyseed's code-authored building templates (Hamlet/Trade Post/Village Center) into the source
  * {@code data/skyseed/structure/} tree on startup, so they are committed and shipped as real {@code .nbt}.
  * Never runs in production (the templates load from the jar there) and never overwrites an existing file,
  * so a structure-block-authored replacement is safe. Registered on the mod event bus in {@link Skyseed}.
@@ -25,6 +25,7 @@ public final class DevStructureGenerator {
                     .resolveSibling("src").resolve("main/resources/data/skyseed/structure");
             HamletTemplates.generateInto(base.resolve("hamlet"));
             TradePostTemplates.generateInto(base.resolve("trade_post"));
+            VillageCenterTemplates.generateInto(base.resolve("village_center"));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] dev structure template generation skipped: {}", e.toString());
         }

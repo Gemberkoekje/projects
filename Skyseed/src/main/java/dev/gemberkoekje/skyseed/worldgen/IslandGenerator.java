@@ -190,7 +190,7 @@ public final class IslandGenerator {
             final JigsawConfig jc = theme.jigsaw().get();
             final int gy = center.getY() + topDome;
             levelStructurePad(blockMap, surfaceList, center, gy, jc.pad());
-            jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(),
+            jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy, center.getZ())));
         }
 
@@ -238,8 +238,14 @@ public final class IslandGenerator {
                                           BlockPos center, int gy, int pad) {
         final BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
         final BlockState dirt = Blocks.DIRT.defaultBlockState();
+        final int pad2 = pad * pad;
+        // A disc, not a square: the village footprints are plus-shaped (corners empty), so a round pad
+        // covers them while staying inside a round island's rim — square corners would float past the edge.
         for (int dx = -pad; dx <= pad; dx++) {
             for (int dz = -pad; dz <= pad; dz++) {
+                if (dx * dx + dz * dz > pad2) {
+                    continue;
+                }
                 final int wx = center.getX() + dx;
                 final int wz = center.getZ() + dz;
                 for (int y = gy + 1; y <= gy + 10; y++) {
@@ -250,7 +256,11 @@ public final class IslandGenerator {
                 blockMap.put(new BlockPos(wx, gy - 2, wz), dirt);
             }
         }
-        surfaceList.removeIf(p -> Math.abs(p.getX() - center.getX()) <= pad && Math.abs(p.getZ() - center.getZ()) <= pad);
+        surfaceList.removeIf(p -> {
+            final int dx = p.getX() - center.getX();
+            final int dz = p.getZ() - center.getZ();
+            return dx * dx + dz * dz <= pad2;
+        });
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {

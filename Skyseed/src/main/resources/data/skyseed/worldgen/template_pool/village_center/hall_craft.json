@@ -1,0 +1,6 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:village_center/hall_craft", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } }
+  ]
+}

@@ -7,6 +7,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.animal.Bee;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.level.block.BedBlock;
@@ -86,6 +87,14 @@ public final class GenerationJob {
                     .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, js.pool()));
             JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
             spawnVillagersAtBeds(js.origin(), js.pad());
+            for (int i = 0; i < js.ironGolems(); i++) {
+                final IronGolem golem = EntityType.IRON_GOLEM.create(level);
+                if (golem != null) {
+                    golem.moveTo(js.origin().getX() + 0.5, js.origin().getY() + 1, js.origin().getZ() + 0.5, 0.0F, 0.0F);
+                    golem.setPersistenceRequired();
+                    level.addFreshEntity(golem);
+                }
+            }
         }
     }
 

@@ -24,6 +24,7 @@
     { "predicate": { "custom_model_data": 18 }, "model": "skyseed:item/island_seed_ancient_large" },
     { "predicate": { "custom_model_data": 19 }, "model": "skyseed:item/island_seed_aquatic_large" },
     { "predicate": { "custom_model_data": 20 }, "model": "skyseed:item/island_seed_hamlet" },
-    { "predicate": { "custom_model_data": 21 }, "model": "skyseed:item/island_seed_trade_post" }
+    { "predicate": { "custom_model_data": 21 }, "model": "skyseed:item/island_seed_trade_post" },
+    { "predicate": { "custom_model_data": 22 }, "model": "skyseed:item/island_seed_village_center" }
   ]
 }

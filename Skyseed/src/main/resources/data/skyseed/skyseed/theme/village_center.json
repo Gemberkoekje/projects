@@ -1,0 +1,14 @@
+{
+  "shape": { "radius": { "min": 15, "max": 18 }, "rim_noise": 0.22, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:village_center/start", "target": "minecraft:bottom", "depth": 2, "pad": 11, "iron_golems": 1 },
+  "variants": [
+    { "weight": 1, "name": "green", "decoration": {
+      "ground": [
+        { "block": "minecraft:short_grass", "chance": 0.18 },
+        { "block": "minecraft:dandelion", "chance": 0.03 },
+        { "block": "minecraft:poppy", "chance": 0.03 }
+      ] } }
+  ]
+}

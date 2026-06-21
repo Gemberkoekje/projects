@@ -1,0 +1,24 @@
+{
+  "name": "Village Center Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:bell",
+  "advancement": "skyseed:craft_village_center",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The premium village island: a bell-topped plaza with four trading halls around it, an iron golem on guard, and a villager of $(bold)every$() one of the 13 professions. The complete trading economy in one throw."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The four halls$()$(br)$(li)Farm hall — farmer, shepherd, fletcher, butcher$(li)Smith hall — armorer, weaponsmith, toolsmith$(li)Scholar hall — librarian, cartographer, cleric$(li)Craft hall — mason, leatherworker, fisherman"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Each villager has a bed and a job site, so the hall fills with trades on its own. The $(item)iron golem$() guards them — raids are disabled on Skyseed worlds, but mobs at night are not."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A late-game reward$()$(br)Costs $(item)5 emeralds$(), an iron ingot, planks and cobblestone. You'll want an established Rocky or Ancient mining run before this is within reach — but it pays back the whole economy at once."
+    }
+  ]
+}

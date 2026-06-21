@@ -8,14 +8,16 @@ import net.minecraft.resources.ResourceLocation;
  * A theme's jigsaw building config: the generator levels a pad and assembles a structure from the
  * {@code pool} (a vanilla {@code worldgen/template_pool}) at the island centre, exactly like a vanilla
  * village. {@code target} is the start piece's anchor jigsaw name, {@code depth} the jigsaw recursion
- * limit (1 = just the start piece), {@code pad} the half-width of the levelled foundation. See
- * {@code SKYVILLAGESPLAN.md}.
+ * limit (1 = just the start piece), {@code pad} the half-width of the levelled foundation, and
+ * {@code ironGolems} how many golems to spawn at the centre once assembled (the Village Center's guard).
+ * See {@code SKYVILLAGESPLAN.md}.
  */
-public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad) {
+public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", ResourceLocation.withDefaultNamespace("bottom")).forGetter(JigsawConfig::target),
             Codec.INT.optionalFieldOf("depth", 1).forGetter(JigsawConfig::depth),
-            Codec.INT.optionalFieldOf("pad", 6).forGetter(JigsawConfig::pad)
+            Codec.INT.optionalFieldOf("pad", 6).forGetter(JigsawConfig::pad),
+            Codec.INT.optionalFieldOf("iron_golems", 0).forGetter(JigsawConfig::ironGolems)
     ).apply(i, JigsawConfig::new));
 }

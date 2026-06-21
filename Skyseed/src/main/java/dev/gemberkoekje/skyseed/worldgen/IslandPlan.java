@@ -35,8 +35,9 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
 
     /**
      * A jigsaw structure to assemble at {@code origin} (the anchor tile) once the terrain is down.
-     * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed).
+     * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed);
+     * {@code ironGolems} golems are spawned at the centre once assembled.
      */
     public record JigsawSite(net.minecraft.resources.ResourceLocation pool, net.minecraft.resources.ResourceLocation target,
-                             int depth, int pad, BlockPos origin) {}
+                             int depth, int pad, int ironGolems, BlockPos origin) {}
 }

@@ -3,6 +3,24 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.9.0] - 2026-06-21
+
+### Added
+- **Village Center Island** (`skyseed:village_center`) — the premium, late-game village island, completing
+  the villager progression (Hamlet → Trade Post → Village Center). A bell-topped cobblestone plaza with four
+  themed trading halls branching off it (farm / smith / scholar / craft) and an **iron golem** on guard.
+  Built by the jigsaw system with each plaza connector pointing at its *own* hall pool, so the layout is
+  deterministic and **all 13 vanilla professions are guaranteed** — farmer, shepherd, fletcher, butcher,
+  armorer, weaponsmith, toolsmith, librarian, cartographer, cleric, mason, leatherworker, fisherman. Crafted
+  from 5 emeralds + an iron ingot + planks + cobblestone. Ships theme, recipe, advancement, guide, icon.
+  Verified via RCON: 13 villagers, **all 13 distinct professions claimed within ~10 s**, 1 iron golem.
+
+### Changed
+- `JigsawConfig` gained an optional `iron_golems` count (golems spawned at the structure centre once assembled).
+- **Structure foundation pads are now a disc, not a square.** The village footprints are plus-shaped (corners
+  empty), so a round pad covers them while staying inside a round island's rim — square corners could float
+  past the edge on the larger pads. Also gives the Hamlet and Trade Post a tidier round clearing.
+
 ## [0.8.0] - 2026-06-21
 
 ### Added

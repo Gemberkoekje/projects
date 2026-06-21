@@ -120,6 +120,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:village_center_skyseed",
+      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. All 13 professions and an iron golem — the whole economy in one throw."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:guide",
       "text": "This Almanac — a book crafted with any Skyseed."
     }
