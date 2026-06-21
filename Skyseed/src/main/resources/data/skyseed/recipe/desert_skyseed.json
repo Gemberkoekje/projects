@@ -2,12 +2,12 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "A",
-    "S"
+    "SS",
+    "ZZ"
   ],
   "key": {
-    "A": { "item": "minecraft:sand" },
-    "S": { "item": "minecraft:sandstone" }
+    "S": { "item": "minecraft:sand" },
+    "Z": { "item": "minecraft:sandstone" }
   },
   "result": {
     "id": "skyseed:island_seed",

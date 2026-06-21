@@ -1,10 +1,14 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    { "item": "minecraft:dirt" },
-    { "tag": "minecraft:small_flowers" }
+  "pattern": [
+    "FF",
+    "DD"
   ],
+  "key": {
+    "F": { "tag": "minecraft:small_flowers" },
+    "D": { "item": "minecraft:dirt" }
+  },
   "result": {
     "id": "skyseed:island_seed",
     "components": {

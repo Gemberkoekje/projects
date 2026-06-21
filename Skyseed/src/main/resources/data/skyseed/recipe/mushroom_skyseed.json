@@ -1,11 +1,15 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    { "item": "minecraft:dirt" },
-    { "item": "minecraft:red_mushroom" },
-    { "item": "minecraft:brown_mushroom" }
+  "pattern": [
+    "RB",
+    "DD"
   ],
+  "key": {
+    "R": { "item": "minecraft:red_mushroom" },
+    "B": { "item": "minecraft:brown_mushroom" },
+    "D": { "item": "minecraft:dirt" }
+  },
   "result": {
     "id": "skyseed:island_seed",
     "components": {

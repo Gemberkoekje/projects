@@ -1,10 +1,14 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    { "item": "minecraft:moss_block" },
-    [ { "item": "minecraft:azalea" }, { "item": "minecraft:flowering_azalea" } ]
+  "pattern": [
+    "AA",
+    "MM"
   ],
+  "key": {
+    "A": [ { "item": "minecraft:azalea" }, { "item": "minecraft:flowering_azalea" } ],
+    "M": { "item": "minecraft:moss_block" }
+  },
   "result": {
     "id": "skyseed:island_seed",
     "components": {

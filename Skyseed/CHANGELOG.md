@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.5.1] - 2026-06-21
+
+### Changed
+- **Consistent seed recipes.** Every small island now costs exactly **4 blocks** in a 2×2 "stack" — the
+  surface/feature on the top row, the base on the bottom: Desert = 2 sand over 2 sandstone, Rocky = 2
+  stone over 2 cobblestone, Forest = 2 planks over 2 dirt, Meadow = 2 flowers over 2 dirt, Frozen = 2
+  snow over 2 ice, Badlands = 2 red sand over 2 terracotta, Ancient = 2 deepslate over 2 cobbled
+  deepslate, Lush = 2 azalea over 2 moss, Aquatic = 2 sand over 2 clay, Mushroom = red + brown mushroom
+  over 2 dirt. (Previously these ranged from 2 to 4 blocks in mixed shapes.) Hamlet keeps its emerald
+  gate as 2 planks over cobblestone + emerald. Large variants are unchanged (3×3, nine blocks).
+
 ## [0.5.0] - 2026-06-21
 
 ### Added

@@ -2,8 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "SC",
-    "CS"
+    "SS",
+    "CC"
   ],
   "key": {
     "S": { "item": "minecraft:stone" },

@@ -2,8 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "NI",
-    "IN"
+    "NN",
+    "II"
   ],
   "key": {
     "N": { "item": "minecraft:snow_block" },

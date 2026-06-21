@@ -1,11 +1,15 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    { "tag": "minecraft:planks" },
-    { "item": "minecraft:cobblestone" },
-    { "item": "minecraft:emerald" }
+  "pattern": [
+    "PP",
+    "CE"
   ],
+  "key": {
+    "P": { "tag": "minecraft:planks" },
+    "C": { "item": "minecraft:cobblestone" },
+    "E": { "item": "minecraft:emerald" }
+  },
   "result": {
     "id": "skyseed:island_seed",
     "components": {
