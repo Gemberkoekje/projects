@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "KSK",
+    "SSS",
+    "KSK"
+  ],
+  "key": {
+    "K": { "item": "minecraft:clay" },
+    "S": { "item": "minecraft:sand" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:aquatic_large",
+      "minecraft:item_name": "\"Large Aquatic Skyseed\"",
+      "minecraft:custom_model_data": 19
+    }
+  }
+}

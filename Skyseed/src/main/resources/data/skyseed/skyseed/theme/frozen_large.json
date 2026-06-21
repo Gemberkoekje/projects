@@ -1,0 +1,29 @@
+{
+  "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 3, "max": 6 } },
+  "palette": { "surface": "minecraft:snow_block", "fill": "minecraft:snow_block", "core": "minecraft:stone", "fill_depth": 4 },
+  "ores": [
+    { "block": "minecraft:packed_ice", "chance": 0.95, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:ice", "chance": 0.70, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:powder_snow", "chance": 0.40, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+    { "block": "minecraft:blue_ice", "chance": 0.25, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" },
+    { "block": "minecraft:iron_ore", "chance": 0.60, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+    { "block": "minecraft:coal_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
+  ],
+  "pond": { "block": "minecraft:ice", "radius": 5, "depth": 2 },
+  "mobs": [
+    { "entity": "minecraft:rabbit", "chance": 0.18, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:polar_bear", "chance": 0.25, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:fox", "chance": 0.20, "count": { "min": 1, "max": 1 } }
+  ],
+  "variants": [
+    { "weight": 3, "name": "snowy", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 5, "spacing": 2 } ],
+      "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } },
+    { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:snow", "chance": 0.30 } ] } },
+    { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 4, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:snow", "chance": 0.20 } ] } }
+  ]
+}

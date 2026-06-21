@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "FDF",
+    "DDD",
+    "FDF"
+  ],
+  "key": {
+    "F": { "tag": "minecraft:small_flowers" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:meadow_large",
+      "minecraft:item_name": "\"Large Meadow Skyseed\"",
+      "minecraft:custom_model_data": 16
+    }
+  }
+}

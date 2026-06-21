@@ -1,0 +1,16 @@
+{
+  "name": "Large Meadow Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:bee_nest",
+  "advancement": "skyseed:craft_meadow_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A vast wildflower meadow — every flower variant on a larger canvas, dotted with oak and cherry trees."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)More bees$()$(br)With more flowers come more $(item)bee nests$() — the best Skyseed for starting an apiary. A full complement of farm animals grazes here too."
+    }
+  ]
+}

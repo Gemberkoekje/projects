@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RDB",
+    "DDD",
+    "BDR"
+  ],
+  "key": {
+    "R": { "item": "minecraft:red_mushroom" },
+    "B": { "item": "minecraft:brown_mushroom" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": {
+    "id": "skyseed:island_seed",
+    "components": {
+      "skyseed:theme": "skyseed:mushroom_large",
+      "minecraft:item_name": "\"Large Mushroom Skyseed\"",
+      "minecraft:custom_model_data": 14
+    }
+  }
+}

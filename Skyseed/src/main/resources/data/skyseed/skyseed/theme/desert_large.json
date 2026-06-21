@@ -1,0 +1,32 @@
+{
+  "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 4 } },
+  "palette": { "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:smooth_sandstone", "fill_depth": 4 },
+  "ores": [
+    { "block": "minecraft:clay", "chance": 0.80, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:gold_ore", "chance": 0.30, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
+    { "block": "minecraft:bone_block", "chance": 0.25, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 4, "max": 9 }, "depth": "deep_core" }
+  ],
+  "pond": {
+    "block": "minecraft:water", "radius": 3, "depth": 2,
+    "plants": [ { "block": "minecraft:lily_pad", "chance": 0.08 } ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.65 } ]
+  },
+  "mobs": [
+    { "entity": "minecraft:rabbit", "chance": 0.22, "count": { "min": 1, "max": 3 } }
+  ],
+  "variants": [
+    { "weight": 3, "name": "dunes", "decoration": {
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 }, { "block": "minecraft:cactus", "chance": 0.07 } ] } },
+    { "weight": 1, "name": "oasis", "decoration": {
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 }, { "block": "minecraft:dead_bush", "chance": 0.05 }, { "block": "minecraft:cactus", "chance": 0.04 } ] } }
+  ],
+  "biome_overrides": [
+    { "biomes": [ "#minecraft:is_badlands" ], "surface": "minecraft:red_sand", "fill": "minecraft:red_sandstone", "core": "minecraft:smooth_red_sandstone",
+      "ores": [
+        { "block": "minecraft:gold_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:clay", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
+      ],
+      "variants": [ { "weight": 1, "name": "red", "decoration": {
+        "ground": [ { "block": "minecraft:dead_bush", "chance": 0.14 }, { "block": "minecraft:cactus", "chance": 0.05 } ] } } ] }
+  ]
+}

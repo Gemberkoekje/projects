@@ -1,0 +1,20 @@
+{
+  "name": "Large Frozen Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:blue_ice",
+  "advancement": "skyseed:craft_frozen_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A grand glacier — a tall, broad ice island with a frozen lake set into its surface."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The frozen lake$()$(br)A sheet of solid ice rests in the centre. Packed ice, blue ice, and the hidden $(item)powder snow$() traps run through the core; ice spikes crown the glacier and deep-freeze variants."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Cold company$()$(br)Polar bears, rabbits, and foxes wander the snow."
+    }
+  ]
+}

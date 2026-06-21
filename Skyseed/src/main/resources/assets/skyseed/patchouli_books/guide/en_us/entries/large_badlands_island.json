@@ -1,0 +1,16 @@
+{
+  "name": "Large Badlands Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:gold_ore",
+  "advancement": "skyseed:craft_badlands_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A towering mesa — a tall, eroded butte of banded terracotta rising high above its rim, with thick strata you can read down the cliff face."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Gold country$()$(br)Badlands are the richest surface gold in the game, and this mesa carries it in quantity. Mesa, eroded, and wooded variants change the cap."
+    }
+  ]
+}

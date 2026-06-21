@@ -14,6 +14,14 @@
     { "predicate": { "custom_model_data": 8 }, "model": "skyseed:item/island_seed_ancient" },
     { "predicate": { "custom_model_data": 9 }, "model": "skyseed:item/island_seed_lush" },
     { "predicate": { "custom_model_data": 10 }, "model": "skyseed:item/island_seed_aquatic" },
-    { "predicate": { "custom_model_data": 11 }, "model": "skyseed:item/island_seed_lush_large" }
+    { "predicate": { "custom_model_data": 11 }, "model": "skyseed:item/island_seed_lush_large" },
+    { "predicate": { "custom_model_data": 12 }, "model": "skyseed:item/island_seed_rocky_large" },
+    { "predicate": { "custom_model_data": 13 }, "model": "skyseed:item/island_seed_desert_large" },
+    { "predicate": { "custom_model_data": 14 }, "model": "skyseed:item/island_seed_mushroom_large" },
+    { "predicate": { "custom_model_data": 15 }, "model": "skyseed:item/island_seed_frozen_large" },
+    { "predicate": { "custom_model_data": 16 }, "model": "skyseed:item/island_seed_meadow_large" },
+    { "predicate": { "custom_model_data": 17 }, "model": "skyseed:item/island_seed_badlands_large" },
+    { "predicate": { "custom_model_data": 18 }, "model": "skyseed:item/island_seed_ancient_large" },
+    { "predicate": { "custom_model_data": 19 }, "model": "skyseed:item/island_seed_aquatic_large" }
   ]
 }

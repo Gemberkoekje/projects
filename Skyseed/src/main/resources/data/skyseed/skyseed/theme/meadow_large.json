@@ -1,0 +1,40 @@
+{
+  "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 4 },
+  "ores": [],
+  "mobs": [
+    { "entity": "minecraft:sheep", "chance": 0.40, "count": { "min": 2, "max": 4 } },
+    { "entity": "minecraft:cow", "chance": 0.35, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:pig", "chance": 0.20, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:chicken", "chance": 0.25, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:rabbit", "chance": 0.22, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:horse", "chance": 0.12, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:donkey", "chance": 0.10, "count": { "min": 1, "max": 1 } }
+  ],
+  "variants": [
+    { "weight": 3, "name": "wildflower", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 2, "spacing": 5 } ],
+      "ground": [
+        { "block": "minecraft:short_grass", "chance": 0.15 },
+        { "block": "minecraft:dandelion", "chance": 0.06 }, { "block": "minecraft:poppy", "chance": 0.06 },
+        { "block": "minecraft:allium", "chance": 0.05 }, { "block": "minecraft:azure_bluet", "chance": 0.05 },
+        { "block": "minecraft:oxeye_daisy", "chance": 0.05 }, { "block": "minecraft:cornflower", "chance": 0.04 },
+        { "block": "minecraft:lily_of_the_valley", "chance": 0.04 },
+        { "block": "minecraft:lilac", "chance": 0.03 }, { "block": "minecraft:rose_bush", "chance": 0.02 }, { "block": "minecraft:peony", "chance": 0.02 },
+        { "block": "minecraft:bee_nest", "chance": 0.03 }
+      ] } },
+    { "weight": 2, "name": "sunflower", "decoration": {
+      "ground": [ { "block": "minecraft:sunflower", "chance": 0.28 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:dandelion", "chance": 0.04 }, { "block": "minecraft:bee_nest", "chance": 0.02 } ] } },
+    { "weight": 2, "name": "tulip", "decoration": {
+      "ground": [
+        { "block": "minecraft:red_tulip", "chance": 0.08 }, { "block": "minecraft:orange_tulip", "chance": 0.08 },
+        { "block": "minecraft:white_tulip", "chance": 0.08 }, { "block": "minecraft:pink_tulip", "chance": 0.08 },
+        { "block": "minecraft:short_grass", "chance": 0.15 }
+      ] } },
+    { "weight": 2, "name": "cherry", "decoration": {
+      "trees": [ { "feature": "minecraft:cherry", "tries": 4, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:pink_petals", "chance": 0.22 }, { "block": "minecraft:dandelion", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:bee_nest", "chance": 0.03 } ] } },
+    { "weight": 1, "name": "cornflower", "decoration": {
+      "ground": [ { "block": "minecraft:cornflower", "chance": 0.18 }, { "block": "minecraft:oxeye_daisy", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.12 } ] } }
+  ]
+}

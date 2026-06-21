@@ -3,6 +3,24 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-06-21
+
+### Added
+- **A Large variant of every island type.** Joining Large Forest and Large Lush, there are now Large
+  seeds for **Rocky, Desert, Mushroom, Frozen, Meadow, Badlands, Ancient, and Aquatic** — each a
+  bigger, pricier island (crafted from a 3×3 of its theme blocks) with its own advancement-gated guide
+  entry, creative-tab example, and disk icon. Each has a thematic twist beyond just scale:
+  - **Large Rocky** — a tall, peaked **mountain** that rises well above its rim, carrying **emerald
+    ore** and goats; snow-capped when grown high or over a snowy biome.
+  - **Large Aquatic** — a **proper deep lake** (a wide, deep pool) with squid, salmon, and **glow
+    squid**; a deep coral reef with tropical fish/cod/pufferfish over warm oceans.
+  - **Large Desert** — sweeping dunes with a small **oasis** pool, and larger buried bone-block fossils.
+  - **Large Frozen** — a glacier with a **frozen lake** of solid ice, plus foxes.
+  - **Large Mushroom** — a dense giant-mushroom grove.
+  - **Large Meadow** — a vast flower field with many more bee nests.
+  - **Large Badlands** — a towering, thickly-banded **mesa**.
+  - **Large Ancient** — a deep slab with the full deepslate ore suite, larger geodes and dripstone.
+
 ## [0.2.2] - 2026-06-21
 
 ### Added

@@ -30,15 +30,23 @@ public final class ModCreativeTabs {
                         output.accept(themedSeed("forest", "Forest Skyseed", 0));
                         output.accept(themedSeed("forest_large", "Large Forest Skyseed", 2));
                         output.accept(themedSeed("rocky", "Rocky Skyseed", 1));
+                        output.accept(themedSeed("rocky_large", "Large Rocky Skyseed", 12));
                         output.accept(themedSeed("desert", "Desert Skyseed", 3));
+                        output.accept(themedSeed("desert_large", "Large Desert Skyseed", 13));
                         output.accept(themedSeed("mushroom", "Mushroom Skyseed", 4));
+                        output.accept(themedSeed("mushroom_large", "Large Mushroom Skyseed", 14));
                         output.accept(themedSeed("frozen", "Frozen Skyseed", 5));
+                        output.accept(themedSeed("frozen_large", "Large Frozen Skyseed", 15));
                         output.accept(themedSeed("meadow", "Meadow Skyseed", 6));
+                        output.accept(themedSeed("meadow_large", "Large Meadow Skyseed", 16));
                         output.accept(themedSeed("badlands", "Badlands Skyseed", 7));
+                        output.accept(themedSeed("badlands_large", "Large Badlands Skyseed", 17));
                         output.accept(themedSeed("ancient", "Ancient Skyseed", 8));
+                        output.accept(themedSeed("ancient_large", "Large Ancient Skyseed", 18));
                         output.accept(themedSeed("lush", "Lush Skyseed", 9));
-                        output.accept(themedSeed("aquatic", "Aquatic Skyseed", 10));
                         output.accept(themedSeed("lush_large", "Large Lush Skyseed", 11));
+                        output.accept(themedSeed("aquatic", "Aquatic Skyseed", 10));
+                        output.accept(themedSeed("aquatic_large", "Large Aquatic Skyseed", 19));
                     })
                     .build());
 

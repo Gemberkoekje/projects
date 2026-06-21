@@ -1,0 +1,20 @@
+{
+  "name": "Large Rocky Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:emerald_ore",
+  "advancement": "skyseed:craft_rocky_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A true mountain — a tall, peaked Rocky island that rises well above its rim, far larger and richer than the standard isle."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Mountain riches$()$(br)The deep core carries the full Rocky ore suite, and being a mountain it also yields $(item)emerald ore$() — the reliable source for the trading economy. Goats roam the heights."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Snow-capped$()$(br)Thrown high or over a snowy biome it generates as a snow-capped alpine peak; otherwise bare stone and scree."
+    }
+  ]
+}

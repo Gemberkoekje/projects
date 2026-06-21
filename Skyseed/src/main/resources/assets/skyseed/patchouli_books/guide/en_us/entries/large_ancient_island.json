@@ -1,0 +1,20 @@
+{
+  "name": "Large Ancient Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:budding_amethyst",
+  "advancement": "skyseed:craft_ancient_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A massive slab of the deep — moss over tuff and deepslate, with a far larger core than the standard Ancient isle and proportionally more to mine."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The deep payoff$()$(br)The full deepslate ore suite in quantity — diamond and emerald in the deep core — plus larger amethyst geodes and dripstone clusters."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Throw deep$()$(br)Germinated low it skews toward diamond and emerald; the deep-dark variant brings sculk. Lantern up before it gets loud."
+    }
+  ]
+}

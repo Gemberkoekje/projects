@@ -24,8 +24,18 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:rocky_large_skyseed",
+      "text": "The $(item)Large Rocky Skyseed$() — a tall mountain with emeralds."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:desert_skyseed",
       "text": "The $(item)Desert Skyseed$() — sand over sandstone."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_large_skyseed",
+      "text": "The $(item)Large Desert Skyseed$() — big dunes with an oasis."
     },
     {
       "type": "patchouli:crafting",
@@ -34,8 +44,18 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:mushroom_large_skyseed",
+      "text": "The $(item)Large Mushroom Skyseed$() — a giant mushroom grove."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:frozen_skyseed",
       "text": "The $(item)Frozen Skyseed$() — snow and ice."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:frozen_large_skyseed",
+      "text": "The $(item)Large Frozen Skyseed$() — a glacier with a frozen lake."
     },
     {
       "type": "patchouli:crafting",
@@ -44,13 +64,28 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:meadow_large_skyseed",
+      "text": "The $(item)Large Meadow Skyseed$() — a vast flower field with bees."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:badlands_skyseed",
       "text": "The $(item)Badlands Skyseed$() — red sand and terracotta."
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:badlands_large_skyseed",
+      "text": "The $(item)Large Badlands Skyseed$() — a towering banded mesa."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:ancient_skyseed",
       "text": "The $(item)Ancient Skyseed$() — deepslate and cobbled deepslate."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ancient_large_skyseed",
+      "text": "The $(item)Large Ancient Skyseed$() — a deep slab, diamonds and geodes."
     },
     {
       "type": "patchouli:crafting",
@@ -66,6 +101,11 @@
       "type": "patchouli:crafting",
       "recipe": "skyseed:aquatic_skyseed",
       "text": "The $(item)Aquatic Skyseed$() — clay and sand."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:aquatic_large_skyseed",
+      "text": "The $(item)Large Aquatic Skyseed$() — a proper deep lake."
     },
     {
       "type": "patchouli:crafting",

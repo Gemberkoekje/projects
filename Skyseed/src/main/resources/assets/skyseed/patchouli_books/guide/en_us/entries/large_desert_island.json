@@ -1,0 +1,20 @@
+{
+  "name": "Large Desert Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:cactus",
+  "advancement": "skyseed:craft_desert_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sweeping dune field on a much larger scale — and, hidden among the sand, a small $(bold)oasis$()."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The oasis$()$(br)A little spring-fed pool with sugar cane along its banks breaks up the dunes — a patch of green and water in the desert."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Buried bounty$()$(br)More gold in the deep core and larger $(item)bone block$() fossils buried in the sandstone. Over badlands it turns to red sand and red sandstone."
+    }
+  ]
+}

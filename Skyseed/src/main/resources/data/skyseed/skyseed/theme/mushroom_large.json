@@ -1,0 +1,19 @@
+{
+  "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:mycelium", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 4 },
+  "ores": [],
+  "mobs": [
+    { "entity": "minecraft:mooshroom", "chance": 0.70, "count": { "min": 2, "max": 3 } }
+  ],
+  "variants": [
+    { "weight": 3, "name": "red", "decoration": {
+      "trees": [ { "feature": "minecraft:huge_red_mushroom", "tries": 9, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:red_mushroom", "chance": 0.12 }, { "block": "minecraft:brown_mushroom", "chance": 0.03 } ] } },
+    { "weight": 3, "name": "brown", "decoration": {
+      "trees": [ { "feature": "minecraft:huge_brown_mushroom", "tries": 9, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:brown_mushroom", "chance": 0.12 }, { "block": "minecraft:red_mushroom", "chance": 0.03 } ] } },
+    { "weight": 2, "name": "mixed", "decoration": {
+      "trees": [ { "feature": "minecraft:huge_red_mushroom", "tries": 6, "spacing": 2 }, { "feature": "minecraft:huge_brown_mushroom", "tries": 6, "spacing": 2 } ],
+      "ground": [ { "block": "minecraft:red_mushroom", "chance": 0.08 }, { "block": "minecraft:brown_mushroom", "chance": 0.08 } ] } }
+  ]
+}

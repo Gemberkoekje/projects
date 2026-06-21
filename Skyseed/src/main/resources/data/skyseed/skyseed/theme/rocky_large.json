@@ -1,0 +1,74 @@
+{
+  "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.32, "underside": "teardrop", "top_dome": { "min": 8, "max": 12 } },
+  "palette": {
+    "surface": "minecraft:stone", "fill": "minecraft:cobblestone", "core": "minecraft:stone", "fill_depth": 3,
+    "surface_scatter": [ { "block": "minecraft:andesite", "chance": 0.15 }, { "block": "minecraft:gravel", "chance": 0.10 } ]
+  },
+  "ores": [
+    { "block": "minecraft:iron_ore", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 2, "max": 5 }, "depth": "core" },
+    { "block": "minecraft:copper_ore", "chance": 0.60, "count": { "min": 3, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:coal_ore", "chance": 0.70, "count": { "min": 3, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:gold_ore", "chance": 0.30, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
+    { "block": "minecraft:lapis_ore", "chance": 0.30, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+    { "block": "minecraft:emerald_ore", "chance": 0.40, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
+  ],
+  "mobs": [
+    { "entity": "minecraft:goat", "chance": 0.35, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:sheep", "chance": 0.20, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 3, "name": "mountain", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } },
+    { "weight": 2, "name": "snowcapped", "surface_override": "minecraft:snow_block", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:snow", "chance": 0.70 } ] } },
+    { "weight": 1, "name": "scree", "surface_override": "minecraft:gravel", "decoration": {
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }
+  ],
+  "biome_overrides": [
+    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:grove", "minecraft:snowy_beach", "minecraft:frozen_river", "minecraft:frozen_ocean", "minecraft:deep_frozen_ocean" ],
+      "shape": { "radius": { "min": 10, "max": 14 }, "rim_noise": 0.30, "top_dome": { "min": 9, "max": 13 } },
+      "surface": "minecraft:snow_block", "fill": "minecraft:stone", "core": "minecraft:stone",
+      "surface_scatter": [ { "block": "minecraft:stone", "chance": 0.22 } ],
+      "variants": [ { "weight": 1, "name": "alpine", "decoration": {
+        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ],
+        "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } } ],
+      "ores": [
+        { "block": "minecraft:coal_ore", "chance": 0.55, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:iron_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:emerald_ore", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
+      ] },
+
+    { "min_y": 130,
+      "shape": { "radius": { "min": 10, "max": 14 }, "rim_noise": 0.30, "top_dome": { "min": 9, "max": 13 } },
+      "surface": "minecraft:snow_block", "fill": "minecraft:stone", "core": "minecraft:stone",
+      "surface_scatter": [ { "block": "minecraft:stone", "chance": 0.22 } ],
+      "variants": [ { "weight": 1, "name": "alpine", "decoration": {
+        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ],
+        "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } } ],
+      "ores": [
+        { "block": "minecraft:coal_ore", "chance": 0.55, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:iron_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:emerald_ore", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
+      ] },
+
+    { "max_y": 8,
+      "surface": "minecraft:deepslate", "fill": "minecraft:cobbled_deepslate", "core": "minecraft:deepslate",
+      "ores": [
+        { "block": "minecraft:deepslate_diamond_ore", "chance": 0.75, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" },
+        { "block": "minecraft:deepslate_redstone_ore", "chance": 0.85, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:deepslate_lapis_ore", "chance": 0.60, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:deepslate_gold_ore", "chance": 0.45, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
+        { "block": "minecraft:deepslate_iron_ore", "chance": 0.65, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
+      ] },
+
+    { "min_y": 70,
+      "ores": [
+        { "block": "minecraft:coal_ore", "chance": 0.95, "count": { "min": 4, "max": 7 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+        { "block": "minecraft:iron_ore", "chance": 0.75, "count": { "min": 3, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:copper_ore", "chance": 0.45, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:emerald_ore", "chance": 0.45, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
+      ] }
+  ]
+}
