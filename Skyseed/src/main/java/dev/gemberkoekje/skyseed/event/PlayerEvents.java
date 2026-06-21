@@ -36,21 +36,33 @@ public final class PlayerEvents {
             data.putBoolean(GUIDE_GIVEN, true);
         }
 
-        // On first join of a skyblock world, drop the player squarely on the island's grass centre,
-        // bypassing vanilla's spawn-fudge (which can land them on top of the tree).
+        // Resolve the curated start spawn (recorded when the world was first created).
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+        ServerLevel overworld = server.overworld();
+        SkyseedWorldData world = overworld.getDataStorage()
+                .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
+        BlockPos spawn = world.getStartSpawn();
+        if (spawn == null) {
+            return; // existing / non-Skyseed world: leave spawning to vanilla
+        }
+
+        // On first join, drop the player squarely on the island's grass centre, bypassing vanilla's
+        // spawn-fudge (which can land them on top of the tree).
         if (!data.getBoolean(START_SPAWNED)) {
-            MinecraftServer server = player.getServer();
-            if (server != null) {
-                ServerLevel overworld = server.overworld();
-                SkyseedWorldData world = overworld.getDataStorage()
-                        .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
-                BlockPos spawn = world.getStartSpawn();
-                if (spawn != null) {
-                    player.teleportTo(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
-                            player.getYRot(), player.getXRot());
-                    data.putBoolean(START_SPAWNED, true);
-                }
-            }
+            player.teleportTo(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
+                    player.getYRot(), player.getXRot());
+            data.putBoolean(START_SPAWNED, true);
+        }
+
+        // Pin the death-respawn to the start island for anyone without their own spawn point (no bed
+        // yet). Without this, respawning runs vanilla's area-search around the world spawn, which can
+        // drop the player onto a different, nearby island they've built. Sleeping in a bed (or an
+        // anchor) sets its own respawn and overrides this.
+        if (player.getRespawnPosition() == null) {
+            player.setRespawnPosition(overworld.dimension(), spawn, 0.0F, true, false);
         }
     }
 }

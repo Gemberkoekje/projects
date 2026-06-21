@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.3.4] - 2026-06-21
+
+### Fixed
+- **Death respawn now returns you to the start island.** First-join set the world spawn but never the
+  player's own respawn point, so dying ran vanilla's area-search around the world spawn and could drop
+  you onto a different, nearby island you'd built. Players without a bed are now pinned (forced
+  respawn) to the start island on login; sleeping in a bed still takes over as normal. Existing
+  characters are fixed on their next login (anyone who hasn't slept in a bed).
+
 ## [0.3.3] - 2026-06-21
 
 ### Fixed (guidebook)
