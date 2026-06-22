@@ -6,15 +6,19 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A dark-oak $(o)pillager watchtower$() rising off a lonely island. Climb the inside ladder floor by floor — crossbow bolts will be coming the whole way up — to a $(item)pillager spawner$() and a loot chest at the top."
+      "text": "A wide $(o)pillager watchtower$() of cobblestone and dark oak, ringed by a small camp — tents, an archery target, a campfire and a banner. Walk in through the arched base, past the caged golem, and climb the corner ladder."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The cage at the base$()$(br)An $(item)iron golem$() sits penned behind dark-oak fences on the ground floor. Break the cage and it joins the fight, turning on the pillagers — well worth the few seconds it takes."
+      "text": "$(bold)The pillager room$()$(br)The middle floor is an $(o)enclosed room$() with the $(item)pillager spawner$() and a loot chest — sealed so the pillagers fight you as you climb instead of tumbling off the island. Above it, an open watch platform sits under a pitched roof."
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Loot$()$(br)The top chest holds the vanilla outpost haul: a $(item)crossbow$(), tripwire hooks, dark oak, iron, an enchanted book, and $(item)ominous bottles$(). Raids are disabled up here, so treat ominous bottles as collectors' loot. Crafted from $(item)dark oak planks$(), a $(item)crossbow$() and an $(item)iron ingot$()."
+      "text": "$(bold)The caged golem$()$(br)An $(item)iron golem$() is penned behind dark-oak fences in the centre of the base. Break the cage and it joins the fight, turning on the pillagers — well worth the few seconds it takes."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Loot$()$(br)The chest holds the vanilla outpost haul: a $(item)crossbow$(), tripwire hooks, dark oak, iron, an enchanted book, and $(item)ominous bottles$(). Raids are disabled up here, so treat ominous bottles as collectors' loot. Crafted from $(item)dark oak planks$(), a $(item)crossbow$() and an $(item)iron ingot$()."
     }
   ]
 }

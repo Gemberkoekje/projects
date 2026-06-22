@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.0] - 2026-06-22
+
+### Changed
+- **Pillager Outpost rebuilt — wider, with a camp.** The cramped 5×5 box became a **7×7 cobblestone-and-dark-oak
+  watchtower** on a larger island, fixing both old problems:
+  - The iron-golem cage sits in a **semi-open arched base** with room to walk around it to the corner ladder (you
+    no longer have to break the cage to get past it).
+  - The pillager spawner moved to an **enclosed middle room** (walls, floor and ceiling), so spawned pillagers
+    can't fall off the island or get stuck in a tree — you fight them as you climb. Above it is an open watch
+    platform under a pitched roof.
+  - The base is ringed by a small **camp**: two canvas tents, an archery target, a campfire with log seats, a
+    banner on a pole, and hay-bale supplies. The outpost island (and the 5%-on-a-Trade-Post variant) grew to fit.
+
 ## [0.31.0] - 2026-06-22
 
 ### Changed

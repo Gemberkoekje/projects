@@ -7,10 +7,11 @@ import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoorHingeSide;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -19,11 +20,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The Pillager Outpost: a dark-oak watchtower (the vanilla outpost translated to a floating island — just the
- * tower). Three floors up a corner ladder; a fenced cage at the base holds the iron golem (spawned at the
- * jigsaw origin via the theme's {@code iron_golems}, so it lands inside), and the top floor carries a pillager
- * spawner + a {@code minecraft:chests/pillager_outpost} chest. Fight your way up; free the golem and it turns
- * on the pillagers. See {@code SKYSTRUCTURESPLAN.md}.
+ * The Pillager Outpost — a wide cobblestone-and-dark-oak watchtower (the vanilla outpost translated to a floating
+ * island) ringed by a small camp. A semi-open arched base holds the iron-golem cage at its centre (the golem
+ * spawns at the jigsaw origin via the theme's {@code iron_golems}, so it lands inside) with room to walk past it
+ * to the corner ladder; the middle floor is an <b>enclosed</b> room with the pillager spawner + a
+ * {@code chests/pillager_outpost} chest, so spawned pillagers can't fall off the island; the top is an open watch
+ * platform under a pitched roof. The camp apron carries tents, a target, a campfire and a banner. See
+ * {@code SKYSTRUCTURESPLAN.md}.
  */
 public final class OutpostTemplates {
     private OutpostTemplates() {}
@@ -31,6 +34,9 @@ public final class OutpostTemplates {
     private static final BlockState LOG = Blocks.DARK_OAK_LOG.defaultBlockState();
     private static final BlockState PLANK = Blocks.DARK_OAK_PLANKS.defaultBlockState();
     private static final BlockState FENCE = Blocks.DARK_OAK_FENCE.defaultBlockState();
+    private static final BlockState COBBLE = Blocks.COBBLESTONE.defaultBlockState();
+    private static final BlockState MOSSY = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
+    private static final BlockState GLASS = Blocks.GLASS_PANE.defaultBlockState();
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
     private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
@@ -44,78 +50,148 @@ public final class OutpostTemplates {
         }
     }
 
+    /** A deterministic cobble/mossy mix for the weathered base. */
+    private static BlockState stone(int a, int b) {
+        return Math.floorMod(a * 5 + b * 3, 4) == 0 ? MOSSY : COBBLE;
+    }
+
     private static Built tower() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final int max = 4, mid = 2;           // 5×5 footprint, 3×3 interior
-        final int[] floors = {0, 4, 8};       // floor slabs; interiors y1-3, y5-7, y9-11
-        final int roofY = 12;
+        final int lo = 3, hi = 9, mid = 6; // 7×7 tower walls at x/z 3..9, centre (6,6); .nbt apron is 0..12
 
-        // Shell: dark-oak log corners + plank walls from the base up to the roofline.
-        for (int x = 0; x <= max; x++) {
-            for (int z = 0; z <= max; z++) {
-                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
-                final boolean perim = x == 0 || x == max || z == 0 || z == max;
-                m.put(new BlockPos(x, 0, z), PLANK);     // base floor
-                m.put(new BlockPos(x, roofY, z), PLANK);  // roof
-                if (perim) {
-                    for (int y = 1; y < roofY; y++) {
-                        m.put(new BlockPos(x, y, z), corner ? LOG : PLANK);
-                    }
-                }
-            }
-        }
-        // Interior floor slabs (skip the base) with a ladder hole at corner (1,1).
-        for (int fi = 1; fi < floors.length; fi++) {
-            for (int x = 1; x < max; x++) {
-                for (int z = 1; z < max; z++) {
-                    m.put(new BlockPos(x, floors[fi], z), (x == 1 && z == 1) ? AIR : PLANK);
-                }
+        // Cobble floor under the tower.
+        for (int x = lo; x <= hi; x++) {
+            for (int z = lo; z <= hi; z++) {
+                m.put(new BlockPos(x, 0, z), stone(x, z));
             }
         }
 
-        // Arrow slits: a one-block gap mid-wall on each side, on every floor.
-        for (final int fy : new int[]{2, 6, 10}) {
-            m.put(new BlockPos(mid, fy, 0), AIR);
-            m.put(new BlockPos(mid, fy, max), AIR);
-            m.put(new BlockPos(0, fy, mid), AIR);
-            m.put(new BlockPos(max, fy, mid), AIR);
+        // --- Base (y1-3): weathered cobble walls + dark-oak corner posts, big arch openings, a front door. ---
+        for (int y = 1; y <= 4; y++) {
+            ring(m, lo, hi, y, (x, z) -> ((x == lo || x == hi) && (z == lo || z == hi)) ? LOG : stone(x, z));
+        }
+        for (final int d : new int[]{5, 6, 7}) { // 3-wide arches (y2-3) on the back and side walls
+            m.put(new BlockPos(d, 2, lo), AIR); m.put(new BlockPos(d, 3, lo), AIR);
+            m.put(new BlockPos(lo, 2, d), AIR); m.put(new BlockPos(lo, 3, d), AIR);
+            m.put(new BlockPos(hi, 2, d), AIR); m.put(new BlockPos(hi, 3, d), AIR);
+        }
+        door(m, mid, 1, hi, Direction.SOUTH); // front door, south wall
+
+        // Iron-golem cage: a 3×3 dark-oak cage at the centre; the golem spawns at (6,1,6) and is penned in.
+        for (final int[] c : new int[][]{{5, 5}, {7, 5}, {5, 7}, {7, 7}}) {
+            for (int y = 1; y <= 3; y++) {
+                m.put(new BlockPos(c[0], y, c[1]), LOG);
+            }
+        }
+        for (final int[] e : new int[][]{{mid, 5}, {5, mid}, {7, mid}, {mid, 7}}) {
+            for (int y = 1; y <= 3; y++) {
+                m.put(new BlockPos(e[0], y, e[1]), FENCE);
+            }
+        }
+        m.put(new BlockPos(mid, 0, mid), MOSSY); // cage floor (overwritten by the anchor below)
+
+        // Mid floor slab (y4) with the ladder hole at corner (4,4).
+        for (int x = 4; x <= 8; x++) {
+            for (int z = 4; z <= 8; z++) {
+                m.put(new BlockPos(x, 4, z), (x == 4 && z == 4) ? AIR : PLANK);
+            }
         }
 
-        // Ladder up corner (1,1), fixed to the north (z=0) wall, holes already cut through each floor.
-        final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.SOUTH);
-        for (int y = 1; y <= 11; y++) {
-            m.put(new BlockPos(1, y, 1), ladder);
+        // --- Enclosed spawner room (y5-7): dark-oak walls on a cobble course, log corners, arrow slits. ---
+        ring(m, lo, hi, 5, (x, z) -> ((x == lo || x == hi) && (z == lo || z == hi)) ? LOG : stone(x, z));
+        for (int y = 6; y <= 7; y++) {
+            ring(m, lo, hi, y, (x, z) -> ((x == lo || x == hi) && (z == lo || z == hi)) ? LOG : PLANK);
+        }
+        m.put(new BlockPos(mid, 6, lo), GLASS); m.put(new BlockPos(mid, 6, hi), GLASS);
+        m.put(new BlockPos(lo, 6, mid), GLASS); m.put(new BlockPos(hi, 6, mid), GLASS);
+        m.put(new BlockPos(mid, 5, mid), Blocks.SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(mid, 5, mid), spawner("minecraft:pillager"));
+        m.put(new BlockPos(7, 5, 7), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST));
+        bes.put(new BlockPos(7, 5, 7), lootChest("minecraft:chests/pillager_outpost"));
+
+        // Platform floor (y8), full 7×7 so the ladder backs onto solid, ladder hole at (4,4).
+        for (int x = lo; x <= hi; x++) {
+            for (int z = lo; z <= hi; z++) {
+                m.put(new BlockPos(x, 8, z), (x == 4 && z == 4) ? AIR : PLANK);
+            }
         }
 
-        // Ground floor: the golem cage — a 3-tall dark-oak fence box around the centre column (golem spawns
-        // here, at the jigsaw origin), and an entrance doorway in the east wall leading to the open corner.
+        // --- Open watch platform (y9-11): a fence railing, dark-oak corner posts, a lantern. ---
+        ring(m, lo, hi, 9, (x, z) -> ((x == lo || x == hi) && (z == lo || z == hi)) ? LOG : FENCE);
+        for (final int[] c : new int[][]{{lo, lo}, {hi, lo}, {lo, hi}, {hi, hi}}) {
+            for (int y = 9; y <= 11; y++) {
+                m.put(new BlockPos(c[0], y, c[1]), LOG);
+            }
+        }
+        m.put(new BlockPos(mid, 11, mid), Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true));
+
+        // Pitched dark-oak roof over the platform.
+        StructureParts.gableRoof(m, lo, hi, lo, hi, 12, PLANK, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 1);
+
+        // Ladder up the NW inside corner (backs onto the solid x=lo wall the whole way).
+        final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
+        for (int y = 1; y <= 8; y++) {
+            m.put(new BlockPos(4, y, 4), ladder);
+        }
+
+        // --- Camp apron: two tents, a target, a campfire, a banner, a couple of hay bales. ---
+        tent(m, 0, 4, Blocks.WHITE_WOOL.defaultBlockState(), Blocks.BARREL.defaultBlockState());
+        tent(m, 10, 6, Blocks.LIGHT_GRAY_WOOL.defaultBlockState(), Blocks.FLETCHING_TABLE.defaultBlockState());
+        // Target on a post.
+        m.put(new BlockPos(11, 1, 2), FENCE); m.put(new BlockPos(11, 2, 2), FENCE);
+        m.put(new BlockPos(11, 3, 2), Blocks.TARGET.defaultBlockState());
+        // Campfire + log seats.
+        m.put(new BlockPos(2, 1, 11), Blocks.CAMPFIRE.defaultBlockState());
+        m.put(new BlockPos(1, 1, 11), LOG); m.put(new BlockPos(3, 1, 11), LOG);
+        // Banner on a tall pole.
         for (int y = 1; y <= 3; y++) {
-            m.put(new BlockPos(mid - 1, y, mid), FENCE);
-            m.put(new BlockPos(mid + 1, y, mid), FENCE);
-            m.put(new BlockPos(mid, y, mid - 1), FENCE);
-            m.put(new BlockPos(mid, y, mid + 1), FENCE);
+            m.put(new BlockPos(10, y, 11), FENCE);
         }
-        m.put(new BlockPos(max, 1, 3), AIR); // doorway
-        m.put(new BlockPos(max, 2, 3), AIR);
-
-        // Top floor: pillager spawner on the centre of the upper floor, a loot chest beside it.
-        m.put(new BlockPos(mid, 9, mid), Blocks.SPAWNER.defaultBlockState());
-        bes.put(new BlockPos(mid, 9, mid), spawner("minecraft:pillager"));
-        m.put(new BlockPos(3, 9, 3), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
-        bes.put(new BlockPos(3, 9, 3), lootChest("minecraft:chests/pillager_outpost"));
-
-        // Battlement: a low log parapet ringing the roof.
-        for (int x = 0; x <= max; x++) {
-            for (int z = 0; z <= max; z++) {
-                if ((x == 0 || x == max || z == 0 || z == max) && (x + z) % 2 == 0) {
-                    m.put(new BlockPos(x, roofY + 1, z), LOG);
-                }
-            }
-        }
+        m.put(new BlockPos(10, 4, 11), Blocks.GRAY_BANNER.defaultBlockState());
+        // Supplies.
+        m.put(new BlockPos(1, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
+        m.put(new BlockPos(2, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
+        m.put(new BlockPos(1, 2, 1), Blocks.HAY_BLOCK.defaultBlockState());
 
         anchor(m, bes, new BlockPos(mid, 0, mid));
         return new Built(m, bes);
+    }
+
+    /** Place the perimeter ring of {@code [lo..hi]²} at height {@code y} from a per-column supplier. */
+    private interface Col { BlockState at(int x, int z); }
+    private static void ring(Map<BlockPos, BlockState> m, int lo, int hi, int y, Col col) {
+        for (int x = lo; x <= hi; x++) {
+            m.put(new BlockPos(x, y, lo), col.at(x, lo));
+            m.put(new BlockPos(x, y, hi), col.at(x, hi));
+        }
+        for (int z = lo; z <= hi; z++) {
+            m.put(new BlockPos(lo, y, z), col.at(lo, z));
+            m.put(new BlockPos(hi, y, z), col.at(hi, z));
+        }
+    }
+
+    /** A small 3×3 canvas tent on dark-oak posts with an item inside, its low corner at {@code (ox,oz)}. */
+    private static void tent(Map<BlockPos, BlockState> m, int ox, int oz, BlockState wool, BlockState inside) {
+        for (final int[] c : new int[][]{{0, 0}, {2, 0}, {0, 2}, {2, 2}}) {
+            m.put(new BlockPos(ox + c[0], 1, oz + c[1]), LOG);
+            m.put(new BlockPos(ox + c[0], 2, oz + c[1]), LOG);
+        }
+        for (int dx = 0; dx <= 2; dx++) {
+            for (int dz = 0; dz <= 2; dz++) {
+                m.put(new BlockPos(ox + dx, 3, oz + dz), wool);
+            }
+        }
+        m.put(new BlockPos(ox + 1, 4, oz + 1), wool); // peak
+        m.put(new BlockPos(ox + 1, 1, oz + 1), inside);
+    }
+
+    private static void door(Map<BlockPos, BlockState> m, int x, int y, int z, Direction facing) {
+        final BlockState base = Blocks.DARK_OAK_DOOR.defaultBlockState()
+                .setValue(BlockStateProperties.HORIZONTAL_FACING, facing)
+                .setValue(BlockStateProperties.DOOR_HINGE, DoorHingeSide.LEFT);
+        m.put(new BlockPos(x, y, z), base.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.LOWER));
+        m.put(new BlockPos(x, y + 1, z), base.setValue(BlockStateProperties.DOUBLE_BLOCK_HALF, DoubleBlockHalf.UPPER));
     }
 
     private static void anchor(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p) {
@@ -125,7 +201,7 @@ public final class OutpostTemplates {
         t.putString("name", "minecraft:bottom");
         t.putString("target", "minecraft:empty");
         t.putString("pool", "minecraft:empty");
-        t.putString("final_state", "minecraft:dark_oak_planks");
+        t.putString("final_state", "minecraft:mossy_cobblestone");
         t.putString("joint", "rollable");
         bes.put(p, t);
     }
