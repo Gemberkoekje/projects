@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.18.1] - 2026-06-22
+
+### Changed
+- **Toned down Rocky ore density.** A 10-island measurement at the y≈100 start height put small Rocky islands
+  at ~4.3% ore by volume (up to ~10% on the smallest) — about 1.5× vanilla's richest layers. Vein *counts* on
+  the mid / high / peak bands were trimmed (vein size stays 4–8) to bring it to ~2.75–3%, and the
+  smallest-island spike from ~10% to ~5.75%. The deep band and Large Rocky (the dedicated mining islands) keep
+  their richer tables.
+
 ## [0.18.0] - 2026-06-22
 
 ### Fixed
