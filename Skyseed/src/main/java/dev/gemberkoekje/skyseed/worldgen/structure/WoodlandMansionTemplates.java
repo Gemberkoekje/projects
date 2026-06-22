@@ -104,13 +104,16 @@ public final class WoodlandMansionTemplates {
         }
         chest(m, bes, 2, 1, 2, Direction.EAST);
 
+        // Staircase to the upper floor in the SE quarter, at x7-8 (clear of the (9,9) corner pillar, whose upper
+        // log used to block the climb's exit). It rises south from z6/y1 to z9/y4.
         for (int s = 0; s < 4; s++) {
             final int sy = 1 + s, sz = 6 + s;
+            m.put(new BlockPos(7, sy, sz), stair(Direction.SOUTH));
             m.put(new BlockPos(8, sy, sz), stair(Direction.SOUTH));
-            m.put(new BlockPos(9, sy, sz), stair(Direction.SOUTH));
         }
-        for (int x = 8; x <= 9; x++) {
-            for (int z = 6; z <= 9; z++) {
+        // Open the upper floor over the climb — z7-9 only (leave z6 floored so the upper-hall carpet has support).
+        for (int x = 7; x <= 8; x++) {
+            for (int z = 7; z <= 9; z++) {
                 m.put(new BlockPos(x, 5, z), AIR);
             }
         }
@@ -125,9 +128,13 @@ public final class WoodlandMansionTemplates {
             m.put(new BlockPos(10, 7, z), BOOKSHELF);
         }
 
+        // Inner-corner lanterns. Skip the GROUND lantern at the stairwell corner (8,8) — it would hang in the
+        // open stairwell; the upper one there lights the stairwell from above instead.
         for (final int[] l : new int[][]{{4, 4}, {8, 4}, {4, 8}, {8, 8}}) {
-            m.put(new BlockPos(l[0], 4, l[1]), LANTERN);
             m.put(new BlockPos(l[0], 9, l[1]), LANTERN);
+            if (!(l[0] == 8 && l[1] == 8)) {
+                m.put(new BlockPos(l[0], 4, l[1]), LANTERN);
+            }
         }
 
         StructureParts.gableRoof(m, x0, x1, z0, z1, 10, PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 1);
@@ -135,12 +142,32 @@ public final class WoodlandMansionTemplates {
         return new Built(m, bes);
     }
 
-    /** A floor-level connector at the box edge ({@code connX,connZ}) drawing the wings pool, with a 1×2 doorway
-     * carved through the wall behind it ({@code wallX,wallZ}); the connector becomes a plank threshold. */
+    /**
+     * A floor-level connector at the box edge ({@code connX,connZ}) drawing the wings pool, with a 1×2 doorway
+     * carved through the wall behind it ({@code wallX,wallZ}); the connector becomes a plank threshold.
+     *
+     * <p>The connector must sit a block proud of the wall (out in the roof-overhang plane) or the wing lands
+     * inside the core box and the jigsaw rejects it for overlap. That left a one-block open slot beside the
+     * doorway between the core wall and the attached wing. To close it, this also walls the box-edge plane across
+     * the wing's 5-wide footprint (a jamb), so the wing butts flush against solid instead of a gap — the wing
+     * sits one block further out (x-1 / z+13), adjacent to the jamb, so no overlap is introduced.
+     */
     private static void wingConnector(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes,
                                       int connX, int connZ, FrontAndTop facing, int wallX, int wallZ) {
         m.put(new BlockPos(wallX, 1, wallZ), AIR);
         m.put(new BlockPos(wallX, 2, wallZ), AIR);
+        // Jamb: fill the box-edge plane across the wing's 5-wide footprint (perpendicular to the facing).
+        final boolean spanZ = facing == FrontAndTop.WEST_UP || facing == FrontAndTop.EAST_UP;
+        for (int o = -2; o <= 2; o++) {
+            final int jx = spanZ ? connX : connX + o;
+            final int jz = spanZ ? connZ + o : connZ;
+            for (int y = 0; y <= 4; y++) {
+                m.put(new BlockPos(jx, y, jz), PLANKS);
+            }
+        }
+        // Doorway + connector through the jamb at the connector column.
+        m.put(new BlockPos(connX, 1, connZ), AIR);
+        m.put(new BlockPos(connX, 2, connZ), AIR);
         m.put(new BlockPos(connX, 0, connZ), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, facing));
         bes.put(new BlockPos(connX, 0, connZ), jig("skyseed:mansion_wall", "skyseed:wing_door", "skyseed:woodland_mansion/wings", PLANKS_ID));
     }

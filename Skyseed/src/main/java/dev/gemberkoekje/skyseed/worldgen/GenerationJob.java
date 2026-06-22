@@ -175,12 +175,41 @@ public final class GenerationJob {
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);
                 if (golem != null) {
-                    golem.moveTo(js.origin().getX() + 0.5, js.origin().getY() + 1, js.origin().getZ() + 0.5, 0.0F, 0.0F);
+                    final BlockPos spot = golemSpot(js.origin());
+                    golem.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
                     golem.setPersistenceRequired();
                     level.addFreshEntity(golem);
                 }
             }
         }
+    }
+
+    /**
+     * Feet position for a structure's iron golem. The structure floor sits a block below the jigsaw origin, so
+     * the golem stands at the origin itself; but it's ~2.7 tall, so spawning it on the floor of a tight pen (the
+     * Outpost cage, a 3-tall box) jams its head into the ceiling and suffocates it. Find the lowest level at/above
+     * the floor with three clear blocks, dropping the golem to the floor where there's room and only nudging up
+     * when the floor column is blocked.
+     */
+    private BlockPos golemSpot(BlockPos origin) {
+        for (int dy = 0; dy <= 4; dy++) {
+            final BlockPos feet = origin.above(dy);
+            if (clearForGolem(feet)) {
+                return feet;
+            }
+        }
+        return origin.above(); // nothing clear nearby — fall back to the old one-up spawn
+    }
+
+    /** True if {@code feet} and the two blocks above it have no collision (room for a ~2.7-tall iron golem). */
+    private boolean clearForGolem(BlockPos feet) {
+        for (int h = 0; h < 3; h++) {
+            final BlockPos p = feet.above(h);
+            if (!level.getBlockState(p).getCollisionShape(level, p).isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

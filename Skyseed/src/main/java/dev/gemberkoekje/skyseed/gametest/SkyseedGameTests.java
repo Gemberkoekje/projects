@@ -10,6 +10,7 @@ import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.npc.Villager;
@@ -246,6 +247,20 @@ public final class SkyseedGameTests {
         helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.SPAWNER), "outpost lost its pillager spawner");
         helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.DARK_OAK_FENCE), "outpost lost its golem cage");
         helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.CHEST), "outpost lost its loot chest");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void outpostGolemFitsInCage(GameTestHelper helper) {
+        // Guards the golem-suffocation fix: seated on the cage floor (where GenerationJob now spawns it), the
+        // ~1.4-wide, ~2.7-tall golem must have no suffocating block in its eye-box — needs the all-fence pen
+        // (a corner log there would suffocate it) and the floor-level spawn (one up jams its head in the ceiling).
+        final BlockPos o = place(helper, "skyseed:outpost/tower");
+        final IronGolem golem = EntityType.IRON_GOLEM.create(helper.getLevel());
+        helper.assertTrue(golem != null, "could not create an iron golem");
+        golem.moveTo(o.getX() + 6.5, o.getY() + 1, o.getZ() + 6.5, 0.0F, 0.0F);
+        helper.getLevel().addFreshEntity(golem);
+        helper.assertTrue(!golem.isInWall(), "the outpost golem is suffocating in its cage");
         helper.succeed();
     }
 

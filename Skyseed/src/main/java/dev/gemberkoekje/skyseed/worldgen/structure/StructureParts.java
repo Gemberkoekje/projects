@@ -6,16 +6,20 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 
 /** Shared building blocks for the code-authored structure-island templates: the jigsaw anchor, loot chests, roofs. */
@@ -125,6 +129,35 @@ public final class StructureParts {
         t.putString("final_state", finalState);
         t.putString("joint", "rollable");
         return t;
+    }
+
+    /**
+     * Resolve fence connection states from the assembled block map. Structure (jigsaw) placement copies each
+     * stored blockstate verbatim with no neighbour update, so a fence written with its default state renders as
+     * an unconnected post; this links every fence in {@code m} to its adjacent fences and full-block neighbours
+     * (logs, planks) before the template is written, so railings and cage walls join up in-world. Call it after
+     * the whole map is built, before the anchor.
+     */
+    public static void linkFences(Map<BlockPos, BlockState> m) {
+        final Map<BlockPos, BlockState> linked = new HashMap<>();
+        for (final Map.Entry<BlockPos, BlockState> e : m.entrySet()) {
+            if (!(e.getValue().getBlock() instanceof FenceBlock)) {
+                continue;
+            }
+            final BlockPos p = e.getKey();
+            linked.put(p, e.getValue()
+                    .setValue(BlockStateProperties.NORTH, fenceLinks(m.get(p.north())))
+                    .setValue(BlockStateProperties.SOUTH, fenceLinks(m.get(p.south())))
+                    .setValue(BlockStateProperties.EAST, fenceLinks(m.get(p.east())))
+                    .setValue(BlockStateProperties.WEST, fenceLinks(m.get(p.west()))));
+        }
+        m.putAll(linked);
+    }
+
+    /** A fence connects to a neighbour that is itself a fence or presents a full square face (a log, plank, …). */
+    private static boolean fenceLinks(BlockState neighbor) {
+        return neighbor != null && (neighbor.getBlock() instanceof FenceBlock
+                || Block.isShapeFullBlock(neighbor.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO)));
     }
 
     /** A vanilla mob-spawner block-entity that spawns {@code mobId}. */

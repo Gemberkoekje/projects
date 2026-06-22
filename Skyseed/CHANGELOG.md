@@ -3,6 +3,23 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.8] - 2026-06-22
+
+### Fixed
+- **Pillager Outpost — golem suffocation**: the iron golem now spawns on the cage floor (it was spawned one
+  block up, jamming its ~2.7-tall head into the floor above), and the cage is an all-fence ring instead of having
+  corner logs (a full block there sat inside the ~1.4-wide golem's eye-box and suffocated it). Spawn point is
+  also chosen by a clearance search now. Guarded by a new `outpostGolemFitsInCage` gametest.
+- **Pillager Outpost — unlinked fences**: the watch-platform railing and the cage now connect up. Jigsaw
+  placement copies stored blockstates verbatim with no neighbour update, so fences are pre-linked to their
+  neighbours when the template is generated, via a new `StructureParts.linkFences`.
+- **Woodland Mansion — wing gap**: the side wings now butt flush against the central hall instead of leaving an
+  open slot beside each doorway. The box-edge connector plane is walled across the wing's footprint (a jamb), so
+  the wing meets solid wall — without moving the connector and re-triggering the jigsaw overlap rejection.
+- **Woodland Mansion — staircase**: removed the lantern that hung in the open stairwell; moved the stairs one
+  column inward so the corner log pillar no longer blocks the climb's exit onto the upper floor; and stopped
+  carving the stairwell's near row so the upper-hall carpet no longer floats over the opening.
+
 ## [0.32.7] - 2026-06-22
 
 ### Internal

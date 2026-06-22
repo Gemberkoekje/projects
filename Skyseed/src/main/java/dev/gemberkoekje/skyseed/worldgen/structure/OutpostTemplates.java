@@ -77,15 +77,12 @@ public final class OutpostTemplates {
         }
         door(m, mid, 1, hi, Direction.SOUTH); // front door, south wall
 
-        // Iron-golem cage: a 3×3 dark-oak cage at the centre; the golem spawns at (6,1,6) and is penned in.
-        for (final int[] c : new int[][]{{5, 5}, {7, 5}, {5, 7}, {7, 7}}) {
+        // Iron-golem cage: an all-fence 3×3 ring around the centre pen; the golem spawns on the floor at (6,1,6)
+        // and is penned in. The whole ring is fence (not log) on purpose — the ~1.4-wide golem brushes the ring,
+        // and a full block there (a log) sits inside its eye-box and suffocates it; fences don't.
+        for (final int[] c : new int[][]{{5, 5}, {7, 5}, {5, 7}, {7, 7}, {mid, 5}, {5, mid}, {7, mid}, {mid, 7}}) {
             for (int y = 1; y <= 3; y++) {
-                m.put(new BlockPos(c[0], y, c[1]), LOG);
-            }
-        }
-        for (final int[] e : new int[][]{{mid, 5}, {5, mid}, {7, mid}, {mid, 7}}) {
-            for (int y = 1; y <= 3; y++) {
-                m.put(new BlockPos(e[0], y, e[1]), FENCE);
+                m.put(new BlockPos(c[0], y, c[1]), FENCE);
             }
         }
         m.put(new BlockPos(mid, 0, mid), MOSSY); // cage floor (overwritten by the anchor below)
@@ -153,6 +150,7 @@ public final class OutpostTemplates {
         m.put(new BlockPos(2, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
         m.put(new BlockPos(1, 2, 1), Blocks.HAY_BLOCK.defaultBlockState());
 
+        linkFences(m); // join the watch-platform railing + cage walls (jigsaw placement won't recompute them)
         anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:mossy_cobblestone");
         return new Built(m, bes);
     }
