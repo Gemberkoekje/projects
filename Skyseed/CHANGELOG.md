@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.27.0] - 2026-06-22
+
+### Added
+- **Tier-1 gating chambers** — the first build toward the grand Woodland Mansion & Trial Chamber (see
+  `SKYGRANDSTRUCTURESPLAN.md`). Small rare chambers that hand you the progression-gating items directly, so the
+  future grand structures can be spectacle rather than gatekeepers:
+  - **Evoker Cell** — a sealed dark-oak room (a mansion fragment) with an evoker inside and a woodland-mansion
+    chest, **5% on a Forest grown in a `dark_forest` biome**. Break in, kill the evoker, claim a bootstrap
+    **Totem of Undying**.
+  - **Vault Cell** — a buried tuff/copper room with **two trial spawners and a vault**, **5% on an Ancient
+    island**. Dig in, clear the spawners for **trial keys**, open the vault for the reward — a self-contained
+    mini trial-chamber. The trial mechanics are native 1.21 block-entities (spawner/vault NBT schema verified
+    in-game).
+
 ## [0.26.0] - 2026-06-22
 
 ### Added

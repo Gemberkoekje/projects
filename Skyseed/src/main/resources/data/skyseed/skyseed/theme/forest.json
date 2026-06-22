@@ -7,7 +7,10 @@
   ],
   "rare_structures": [
     { "chance": 0.05, "biomes": [ "#minecraft:is_taiga" ],
-      "jigsaw": { "pool": "skyseed:trail_ruins/ruins", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 3 } }
+      "jigsaw": { "pool": "skyseed:trail_ruins/ruins", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 3 } },
+    { "chance": 0.05, "biomes": [ "minecraft:dark_forest" ],
+      "jigsaw": { "pool": "skyseed:evoker_cell/cell", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:evoker", "adults": 1 } ] } ] }
   ],
   "mobs": [
     { "entity": "minecraft:cow", "chance": 0.20, "count": { "min": 1, "max": 2 } },

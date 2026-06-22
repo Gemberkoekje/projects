@@ -21,6 +21,10 @@
     { "block": "minecraft:amethyst_block", "chance": 0.30, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 5 }, "depth": "core" },
     { "block": "minecraft:budding_amethyst", "chance": 0.15, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" }
   ],
+  "rare_structures": [
+    { "chance": 0.05,
+      "jigsaw": { "pool": "skyseed:vault_cell/cell", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 5 } }
+  ],
   "variants": [
     { "weight": 3, "name": "deep_cave", "decoration": {
       "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.40 } ],

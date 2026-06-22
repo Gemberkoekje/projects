@@ -4,6 +4,7 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.LayeredCauldronBlock;
@@ -32,6 +33,8 @@ public final class RareStructureTemplates {
         writeIfAbsent(base.resolve("igloo/igloo.nbt"), igloo());
         writeIfAbsent(base.resolve("abandoned/cottage.nbt"), abandonedCottage());
         writeIfAbsent(base.resolve("ocean_ruin/ruin.nbt"), oceanRuin());
+        writeIfAbsent(base.resolve("evoker_cell/cell.nbt"), evokerCell());
+        writeIfAbsent(base.resolve("vault_cell/cell.nbt"), vaultCell());
     }
 
     private static void writeIfAbsent(Path file, Built b) throws IOException {
@@ -174,6 +177,113 @@ public final class RareStructureTemplates {
 
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:stone_bricks");
         return new Built(m, bes);
+    }
+
+    /**
+     * The <b>Evoker Cell</b> — a small sealed dark-oak room (a mansion fragment) holding one evoker, spawned via
+     * the rare structure's {@code mobs} pack into the dark centre. Kept dark so the evoker stays dormant until
+     * the player breaks in; on its death it drops the bootstrap <b>Totem of Undying</b>. A woodland-mansion chest
+     * and bookshelves dress it. Rare on a Forest grown in a {@code dark_forest} biome. See SKYGRANDSTRUCTURESPLAN.
+     */
+    private static Built evokerCell() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState plank = Blocks.DARK_OAK_PLANKS.defaultBlockState();
+        final BlockState log = Blocks.DARK_OAK_LOG.defaultBlockState();
+        final int max = 6, mid = 3; // 7×7 sealed, 5×5 interior
+
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), plank); // floor
+                m.put(new BlockPos(x, 4, z), plank); // ceiling — sealed and dark
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
+                if (perim) {
+                    for (int h = 1; h <= 3; h++) {
+                        m.put(new BlockPos(x, h, z), corner ? log : plank);
+                    }
+                }
+            }
+        }
+        // Mansion dressing — red carpet underfoot, a bookshelf, a woodland-mansion chest. The centre stays clear
+        // for the evoker to spawn into.
+        for (final int[] c : new int[][]{{2, 2}, {4, 2}, {2, 4}, {4, 4}, {3, 2}, {3, 4}}) {
+            m.put(new BlockPos(c[0], 1, c[1]), Blocks.RED_CARPET.defaultBlockState());
+        }
+        m.put(new BlockPos(5, 1, 1), Blocks.BOOKSHELF.defaultBlockState());
+        m.put(new BlockPos(5, 2, 1), Blocks.BOOKSHELF.defaultBlockState());
+        m.put(new BlockPos(1, 1, 1), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
+        bes.put(new BlockPos(1, 1, 1), StructureParts.lootChest("minecraft:chests/woodland_mansion"));
+
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:dark_oak_planks");
+        return new Built(m, bes);
+    }
+
+    /**
+     * The <b>Vault Cell</b> — a small tuff/copper room buried (theme {@code sink}) in an Ancient island: two
+     * {@code trial_spawner}s and a {@code vault}. Dig in, clear the spawners for <b>Trial Keys</b>, open the
+     * vault for the reward — a self-contained mini trial-chamber and the reliable key source. The trial mechanics
+     * are native 1.21 block-entity behaviour; the default vault already requires a trial key. See plan.
+     */
+    private static Built vaultCell() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState air = Blocks.AIR.defaultBlockState();
+        final int max = 6, mid = 3; // 7×7, 5×5×3 interior — carved out of solid fill when buried
+
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), tuffMix(x, z));   // floor
+                m.put(new BlockPos(x, 4, z), tuffMix(x, z));   // ceiling
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                for (int h = 1; h <= 3; h++) {
+                    m.put(new BlockPos(x, h, z), perim ? tuffMix(x, h + z) : air); // walls / hollow interior
+                }
+            }
+        }
+        // Two trial spawners (a zombie wave and a skeleton wave) and a vault. Completing a spawner yields a
+        // Trial Key (native); the default vault consumes a key and ejects the trial-chamber reward.
+        m.put(new BlockPos(2, 1, 2), Blocks.TRIAL_SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(2, 1, 2), trialSpawner("minecraft:zombie"));
+        m.put(new BlockPos(4, 1, 4), Blocks.TRIAL_SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(4, 1, 4), trialSpawner("minecraft:skeleton"));
+        m.put(new BlockPos(1, 1, 3), Blocks.VAULT.defaultBlockState());
+
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:tuff_bricks");
+        return new Built(m, bes);
+    }
+
+    /** A trial-spawner block entity configured to spawn waves of {@code mobId} (schema verified in-game). */
+    private static CompoundTag trialSpawner(String mobId) {
+        final CompoundTag entity = new CompoundTag();
+        entity.putString("id", mobId);
+        final CompoundTag spawnData = new CompoundTag();
+        spawnData.put("entity", entity.copy());
+        final CompoundTag potData = new CompoundTag();
+        potData.put("entity", entity.copy());
+        final CompoundTag potential = new CompoundTag();
+        potential.put("data", potData);
+        potential.putInt("weight", 1);
+        final ListTag potentials = new ListTag();
+        potentials.add(potential);
+        final CompoundTag normal = new CompoundTag();
+        normal.put("spawn_potentials", potentials);
+        normal.putFloat("total_mobs", 4.0f);
+        normal.putFloat("simultaneous_mobs", 2.0f);
+        final CompoundTag be = new CompoundTag();
+        be.putString("id", "minecraft:trial_spawner");
+        be.put("spawn_data", spawnData);
+        be.put("normal_config", normal);
+        return be;
+    }
+
+    /** A deterministic tuff/copper mix for the trial-cell masonry (mostly tuff bricks). */
+    private static BlockState tuffMix(int a, int b) {
+        return switch (Math.floorMod(a * 7 + b * 5, 6)) {
+            case 0 -> Blocks.CUT_COPPER.defaultBlockState();
+            case 1 -> Blocks.CHISELED_TUFF.defaultBlockState();
+            default -> Blocks.TUFF_BRICKS.defaultBlockState();
+        };
     }
 
     /** A deterministic weathered stone-brick mix (plain / mossy / cracked) for a ruined, varied look. */

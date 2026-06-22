@@ -89,6 +89,8 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 - 🗼 **Hostile takeover** — rarely a Trade Post comes up as a pillager outpost instead of a village: a watchtower full of pillagers where your shops should be.
 - 🪨 **Ruined Portal** — any big island (bar the Aquatic one) has a slim chance of growing with a broken Nether portal and its chest sitting on the surface — a free shot at crying obsidian.
 - 🏺 **Trail Ruins** — a Large Ancient island, or a Forest grown in a taiga, can hide a buried mud-brick ruin; spot the fragments poking through, dig in, and brush the suspicious gravel for pottery sherds.
+- 🕯️ **Evoker Cell** — rarely a Forest grown in a dark oak wood holds a sealed dark-oak room with an evoker; break in and kill it for a **Totem of Undying**.
+- 🗝️ **Vault Cell** — rarely an Ancient island buries a tuff-and-copper room with two trial spawners and a vault; clear the spawners for trial keys and crack the vault open.
 - 🧙 **Swamp Witch Hut** — rarely a Large Forest in a swamp or dark-oak wood, or a Large Aquatic island in a swamp, comes up with a witch's hut (and the witch and her cat) instead.
 
 ---
