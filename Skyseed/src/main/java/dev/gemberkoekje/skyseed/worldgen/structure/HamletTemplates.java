@@ -9,7 +9,6 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -109,25 +108,8 @@ public final class HamletTemplates {
         m.put(new BlockPos(hi - 1, 1, hi - 1), Blocks.CRAFTING_TABLE.defaultBlockState());
         m.put(new BlockPos(hi - 1, 1, 2), Blocks.TORCH.defaultBlockState());
 
-        // Gabled stair roof: each X column gets one roof block at its slope height, over [0..n+1] in both axes
-        // (a one-block overhang all round). Stairs face uphill toward the ridge; the ridge line is a solid beam.
-        for (int x = 0; x <= n + 1; x++) {
-            final int ry = ridgeY - Math.abs(x - mid);
-            final BlockState roof = x == mid ? planks
-                    : w.stairs().defaultBlockState().setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST);
-            for (int z = 0; z <= n + 1; z++) {
-                m.put(new BlockPos(x, ry, z), roof);
-            }
-        }
-
-        // Close the two gable triangles (front/back walls up to the roofline); a glass loft window in the front.
-        for (int x = lo; x <= hi; x++) {
-            final int top = ridgeY - Math.abs(x - mid);
-            for (int y = ceil + 1; y < top; y++) {
-                m.put(new BlockPos(x, y, lo), planks);
-                m.put(new BlockPos(x, y, hi), planks);
-            }
-        }
+        // Gabled stair roof with a one-block overhang, plus a glass loft window in the front gable.
+        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, planks, w.stairs(), 1);
         if (ceil + 1 < ridgeY) {
             m.put(new BlockPos(mid, ceil + 1, frontZ), glass);
         }

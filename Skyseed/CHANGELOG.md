@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.3] - 2026-06-22
+
+### Changed
+- **Gable roofs on the rest of the buildings.** Extended the pitched stair roof from the cottages to the
+  **Trade Post shops**, the **Village Center halls**, and the **Witch Hut** — no more flat lids. The roof
+  geometry is now a shared `StructureParts.gableRoof` helper: the single-piece Witch Hut gets the full
+  one-block overhang (spruce), while the connector-based shops/halls use flush eaves so their jigsaw
+  connections and the tight plaza packing stay intact. Verified the villages still assemble — 4 shop beds, all
+  13 professions + iron golem, and the witch + cat.
+
 ## [0.19.2] - 2026-06-22
 
 ### Changed

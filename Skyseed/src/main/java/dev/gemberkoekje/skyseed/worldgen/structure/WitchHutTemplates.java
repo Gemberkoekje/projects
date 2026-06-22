@@ -37,32 +37,36 @@ public final class WitchHutTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState plank = Blocks.SPRUCE_PLANKS.defaultBlockState();
         final BlockState log = Blocks.SPRUCE_LOG.defaultBlockState();
-        final int max = 4, mid = 2;
+        final BlockState glass = Blocks.GLASS.defaultBlockState();
+        final int lo = 1, hi = 5, mid = 3, ceil = 4; // inset one block so the roof overhang stays in bounds
 
-        for (int x = 0; x <= max; x++) {
-            for (int z = 0; z <= max; z++) {
+        for (int x = lo; x <= hi; x++) {
+            for (int z = lo; z <= hi; z++) {
                 m.put(new BlockPos(x, 0, z), plank); // floor
-                m.put(new BlockPos(x, 3, z), plank); // roof
-                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
-                final boolean perim = x == 0 || x == max || z == 0 || z == max;
-                if (corner) {
-                    m.put(new BlockPos(x, 1, z), log);
-                    m.put(new BlockPos(x, 2, z), log);
-                } else if (perim) {
-                    m.put(new BlockPos(x, 1, z), plank);
-                    m.put(new BlockPos(x, 2, z), plank);
+                final boolean perim = x == lo || x == hi || z == lo || z == hi;
+                final boolean corner = (x == lo || x == hi) && (z == lo || z == hi);
+                if (perim) {
+                    for (int h = 1; h <= 3; h++) {
+                        m.put(new BlockPos(x, h, z), corner ? log : plank);
+                    }
                 }
+                m.put(new BlockPos(x, ceil, z), plank); // ceiling
             }
         }
-        // Doorway in the front (z=0) wall.
-        m.remove(new BlockPos(mid, 1, 0));
-        m.remove(new BlockPos(mid, 2, 0));
+        // Open doorway in the front (z = lo) wall; a window on each of the other three walls.
+        m.remove(new BlockPos(mid, 1, lo));
+        m.remove(new BlockPos(mid, 2, lo));
+        m.put(new BlockPos(lo, 2, mid), glass);
+        m.put(new BlockPos(hi, 2, mid), glass);
+        m.put(new BlockPos(mid, 2, hi), glass);
 
-        // The witch's kit: a water cauldron, a crafting table, a potted red mushroom.
-        m.put(new BlockPos(1, 1, 1), Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
-        m.put(new BlockPos(3, 1, 1), Blocks.CRAFTING_TABLE.defaultBlockState());
-        m.put(new BlockPos(1, 1, 3), Blocks.POTTED_RED_MUSHROOM.defaultBlockState());
+        // The witch's kit: a water cauldron, a crafting table, a potted red mushroom (the centre kept clear).
+        m.put(new BlockPos(lo + 1, 1, lo + 1), Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
+        m.put(new BlockPos(hi - 1, 1, lo + 1), Blocks.CRAFTING_TABLE.defaultBlockState());
+        m.put(new BlockPos(lo + 1, 1, hi - 1), Blocks.POTTED_RED_MUSHROOM.defaultBlockState());
 
+        // Pitched spruce gable roof with a one-block overhang.
+        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, plank, Blocks.SPRUCE_STAIRS, 1);
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:spruce_planks");
         return new Built(m, bes);
     }

@@ -128,6 +128,8 @@ public final class TradePostTemplates {
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
         m.put(new BlockPos(3, 1, 3), jobSite);
         m.put(new BlockPos(3, 1, 1), Blocks.TORCH.defaultBlockState());
+        // Pitched gable roof over the cabin (flush eaves — the door wall is a gable end facing the plaza).
+        StructureParts.gableRoof(m, 0, max, 0, max, 4, floor, Blocks.OAK_STAIRS, 0);
         return new Built(m, bes);
     }
 }
