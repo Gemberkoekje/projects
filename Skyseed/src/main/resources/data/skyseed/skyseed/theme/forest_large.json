@@ -5,6 +5,10 @@
     { "block": "minecraft:coal_ore", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
     { "block": "minecraft:iron_ore", "chance": 0.65, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
+  "rare_structures": [
+    { "chance": 0.05, "biomes": [ "#minecraft:is_jungle" ],
+      "jigsaw": { "pool": "skyseed:jungle_temple/temple", "target": "minecraft:bottom", "depth": 1, "pad": 6 } }
+  ],
   "mobs": [
     { "entity": "minecraft:cow", "chance": 0.30, "count": { "min": 1, "max": 3 } },
     { "entity": "minecraft:pig", "chance": 0.25, "count": { "min": 1, "max": 2 } },

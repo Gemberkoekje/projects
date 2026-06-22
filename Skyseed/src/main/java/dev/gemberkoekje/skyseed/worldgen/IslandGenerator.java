@@ -172,7 +172,7 @@ public final class IslandGenerator {
         // Rolled here, before the pond, so a flooded ruin can suppress the pond it stands in for.
         RareStructure rolledRare = null;
         for (final RareStructure rs : theme.rareStructures()) {
-            if (random.nextFloat() < rs.chance()) {
+            if (rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
                 rolledRare = rs;
                 break;
             }

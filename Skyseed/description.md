@@ -74,7 +74,7 @@ Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 - ⚔️ **Dungeon** — a sealed cobblestone cube with a mob spawner and two loot chests (the music discs *Cat* and *13* among them).
 - 🪨 **Ruined Portal** — a broken Nether-portal frame and a chest of golden spoils — your only source of crying obsidian up here.
 - 🏺 **Desert Temple** — a sealed chamber, four treasure chests, and a buried cache of TNT.
-- 🌿 **Jungle Temple** — a mossy puzzle room with two chests and an arrow dispenser.
+- 🌿 **Jungle Temple** — a tiered, vine-draped ziggurat of cobblestone and moss, hiding a trapped chamber with two chests and a tripwire-rigged arrow dispenser.
 - 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
 
 And some surprises don't need their own seed — once in a while an ordinary island grows something extra:
@@ -82,6 +82,8 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 - 🏠 **Igloo** — rarely a Frozen island raises a sealed snow dome: dig in for a golden apple and a trapped zombie villager to cure.
 - 🏚️ **Abandoned cottage** — rarely a Hamlet comes up cobwebbed and bed-less, with a zombie villager for a tenant.
 - 🌊 **Ocean ruin** — rarely an Aquatic island's pool is instead a flooded stone-brick ruin, with suspicious sand to brush and a sunken chest.
+- 🏺 **Buried Desert Temple** — rarely a Large Desert hides a temple sunk beneath the dunes; a suspicious hole in the sand is the only clue, and dropping in springs its TNT trap.
+- 🌿 **Lost Jungle Temple** — rarely a Large Forest grown in a jungle raises a full jungle temple among the vines and jungle trees.
 
 ---
 

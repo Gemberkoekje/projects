@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.21.0] - 2026-06-22
+
+### Changed
+- **The Jungle Temple is rebuilt to look the part.** Instead of the old flat box it's now a tiered
+  cobblestone-and-moss ziggurat — a 9×9 base stepping up through smaller tiers, with corner columns rising
+  over it and vines trailing down the walls. The trapped inner chamber is intact: two loot chests and an arrow
+  dispenser wired to a tripwire (verified live after assembly), reached through a front doorway.
+
+### Added
+- **A Jungle Temple has a 5% chance on a Large Forest island grown in a jungle** — any `#minecraft:is_jungle`
+  biome, so bamboo and sparse jungles count too. It stands among the jungle trees (not buried — `sink` 0).
+  - New `biomes` filter on a rare structure gates the roll to matching germination biomes (same id/`#tag`
+    syntax as biome overrides). Verified end-to-end: in a real jungle the forest island grows jungle trees
+    *and* the temple; in plains it grows neither.
+
 ## [0.20.0] - 2026-06-22
 
 ### Added
