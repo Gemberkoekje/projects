@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.6] - 2026-06-22
+
+### Internal
+- **Split the `IslandGenerator` god class** (codereview A1): 1096 lines → a ~290-line orchestrator plus six
+  focused, package-private collaborators — `ShapeBuilder` (terrain pass), `OrePlanner`, `PondCarver`,
+  `DecorationPlanner` (+ `CustomTrees` for the hand-built mangrove/azalea/ice-spike), `MobPlanner` — and a
+  shared `Scatter` record. `planIsland` now reads as the generation pipeline, threading one `RandomSource`
+  through the passes in the original order; each pass is independently testable.
+- Guarded by a new **golden-master test** (`islandOutputIsStable`) fingerprinting the exact generation output
+  (centre-relative block checksum + entity/structure counts) of 5 themes covering all six planner paths. The
+  refactor is behaviour-preserving: every fingerprint is byte-identical and all 17 gametests pass. Coverage
+  held — orchestrator 99.3%, new classes 96.8–100% (ShapeBuilder/CustomTrees/Scatter 100%).
+
 ## [0.32.5] - 2026-06-22
 
 ### Internal

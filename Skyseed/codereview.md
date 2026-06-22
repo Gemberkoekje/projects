@@ -35,7 +35,7 @@ automated tests. Two rules don't translate cleanly and are called out where rele
 
 | # | Priority | Area | Item |
 |---|----------|------|------|
-| A1 | **High** | Architecture | `IslandGenerator` is a 1,096-line god class; split it |
+| A1 | ✅ done | Architecture | ~~`IslandGenerator` is a 1,096-line god class~~ — split into a ~290-line orchestrator + 6 planners (`ShapeBuilder`/`OrePlanner`/`PondCarver`/`DecorationPlanner`/`CustomTrees`/`MobPlanner`) |
 | A2 | ✅ done | Architecture | ~~Structure-template duplication~~ — consolidated into `StructureParts` + a shared `Built` record (~160 lines removed) |
 | B1 | ✅ done | Tooling | ~~No compiler lint~~ — `-Xlint:all` added (not `-Werror`), suppressions removed + warnings fixed |
 | B3 | ✅ done | Tooling | ~~No automated tests~~ — GameTest suite added as the refactoring guard |
@@ -49,8 +49,17 @@ automated tests. Two rules don't translate cleanly and are called out where rele
 
 ## A. Architecture & refactors (highest value)
 
-### A1 — `IslandGenerator` is a god class — **High**
-`worldgen/IslandGenerator.java` is **1,096 lines** in one class, with a **~200-line `planIsland`** method
+### A1 — `IslandGenerator` is a god class — **✅ done**
+Split into a ~290-line orchestrator (`planIsland` + the config-resolution helpers + `levelStructurePad`) and six
+package-private collaborators in `worldgen/`: `ShapeBuilder` (pass-1 terrain, returns the radius/dome/core-Y),
+`OrePlanner`, `PondCarver` (takes the resolved water `BlockState`, so `resolveBlock` stays in the orchestrator),
+`DecorationPlanner` (delegating the hand-built trees to `CustomTrees`), and `MobPlanner` — plus a shared `Scatter`
+record. `planIsland` threads one `RandomSource` through them in the original order, so the RNG sequence (and thus
+every island) is unchanged. **Verified by the `islandOutputIsStable` golden master**: all fingerprints byte-identical,
+17/17 gametests pass, coverage held (orchestrator 99.3%; new classes 96.8–100%). The original analysis is kept below.
+
+### A1 (original) — `IslandGenerator` is a god class
+`worldgen/IslandGenerator.java` was **1,096 lines** in one class, with a **~200-line `planIsland`** method
 (`:64–262`) orchestrating config resolution, shape, ores, rare structures, ponds, jigsaw, decoration,
 waterfalls, and mobs. The private statics already cluster into cohesive responsibilities — extract them:
 
