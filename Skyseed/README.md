@@ -205,12 +205,20 @@ Loader is **NeoForge** because the intended pack is content-heavy (most non-Crea
 Requires **JDK 21** (NeoForge 1.21.1's required Java). The build is pinned to a local JDK 21 via `org.gradle.java.home` in `gradle.properties` — adjust that path if your JDK lives elsewhere.
 
 ```sh
-./gradlew build          # compile + package the mod jar
-./gradlew runClient      # launch a dev Minecraft client with the mod loaded
-./gradlew runServer      # launch a dev dedicated server
+./gradlew build              # compile + package the mod jar
+./gradlew runClient          # launch a dev Minecraft client with the mod loaded
+./gradlew runServer          # launch a dev dedicated server
+./gradlew runGameTestServer  # run the GameTest suite (exits 0 on pass); also /test runall in dev
 ```
 
 The first invocation downloads Gradle, NeoForge, and Minecraft, so it takes a while.
+
+### Tests
+
+`gametest/SkyseedGameTests.java` holds a NeoForge GameTest suite that asserts generation/structure
+invariants (every theme plans without error, generation is deterministic, structures keep their key
+blocks). Run it with `./gradlew runGameTestServer` — it's the safety net to run before and after the
+refactors tracked in `codereview.md`.
 
 ## Repository layout
 

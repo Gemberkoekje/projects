@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.1] - 2026-06-22
+
+### Internal
+- Added a **NeoForge GameTest suite** (`gametest/SkyseedGameTests.java`, run with `./gradlew
+  runGameTestServer`) covering island-generation and structure invariants — every theme plans without
+  error, generation is deterministic and bottom-up sorted, rocky carries ore, structure themes record a
+  jigsaw site, the mansion plans its evoker garrison, and the outpost/trial-chamber pieces keep their key
+  blocks. This is the safety net for the refactors tracked in the new `codereview.md`.
+
 ## [0.32.0] - 2026-06-22
 
 ### Changed
