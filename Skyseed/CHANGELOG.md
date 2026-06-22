@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.9] - 2026-06-22
+
+### Fixed
+- **Pillager Outpost**: the watch-platform lantern no longer floats in mid-air — it hangs on a chain dropped
+  from the roof ridge. The golem cage's fences already link (the v0.32.8 all-fence ring + `linkFences`); the
+  `outpostHasSpawnerAndCage` gametest now also asserts a cage-edge fence is connected, to keep it that way.
+
+### Docs
+- `description.md`: fleshed out the **Large**-variant twist for all ten terrain islands (Forest, Mushroom,
+  Meadow and Ancient were the four still missing one), and added a line making clear each Large variant is its
+  own separate, pricier seed — so the ten terrain types are twenty islands in all.
+
 ## [0.32.8] - 2026-06-22
 
 ### Fixed

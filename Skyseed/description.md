@@ -32,16 +32,18 @@ Two throw modes; press **V** to switch (your choice is remembered):
 
 Each Skyseed grows its own kind of island, with multiple looks and hidden surprises — and every one has a bigger, pricier **Large** variant with a thematic twist:
 
-- 🌿 **Forest** — the starter. Grass, flowers, and trees that match wherever you throw it.
+- 🌿 **Forest** — the starter. Grass, flowers, and trees that match wherever you throw it. (Large: a sprawling old-growth wood, the biggest of the green islands.)
 - ⛰️ **Rocky** — the miner's island. Every ore is here, and *where you throw it matters*: low throws strike deepslate, diamonds and redstone; mid throws an iron-and-copper haul; high throws bring coal and iron — and the highest become snow-capped peaks. (Large Rocky is a tall, emerald-bearing mountain.)
 - 🏜️ **Desert** — sand and sandstone, cacti and dead bushes, with clay and buried fossils below. Throw it over a badlands for red dunes. (Large: an oasis.)
-- 🍄 **Mushroom** — a mycelium isle crowned with giant red and brown mushrooms. Mobs won't spawn here — a safe place to build.
+- 🍄 **Mushroom** — a mycelium isle crowned with giant red and brown mushrooms. Mobs won't spawn here — a safe place to build. (Large: a giant fungal isle grazed by mooshrooms.)
 - ❄️ **Frozen** — snow and ice, packed ice and rare blue ice... and hidden powder-snow pockets to watch your step around. (Large: a frozen lake.)
-- 🌸 **Meadow** — the flower island. Every dye-flower, towering sunflowers, cherry blossoms, and bee nests tucked among the blooms.
+- 🌸 **Meadow** — the flower island. Every dye-flower, towering sunflowers, cherry blossoms, and bee nests tucked among the blooms. (Large: a vast wildflower field of sunflowers, tulip rows and cherry blossom.)
 - 🪨 **Badlands** — a mesa in the sky, its cliffs banded in layers of orange, yellow, white, red, and brown terracotta, and rich with gold. (Large: a towering mesa.)
-- 🏛️ **Ancient** — a shard of the deep underground hung in the air: deepslate and tuff, amethyst geodes, dripstone teeth, and a rare deep-dark variant bristling with sculk.
+- 🏛️ **Ancient** — a shard of the deep underground hung in the air: deepslate and tuff, amethyst geodes, dripstone teeth, and a rare deep-dark variant bristling with sculk. (Large: a deeper shard, veined with budding amethyst.)
 - 🌿 **Lush** — a cave garden afloat. Moss, azalea trees, dripleaves, and glow-berry vines trailing off the underside. (Large: a deep pool with glow squid.)
 - 🌊 **Aquatic** — half land, half floating lake: kelp and lily pads, warm-water coral reefs, mangroves, and clay-and-gravel banks. (Large: a proper deep lake.)
+
+Each **Large** variant is its own separate, pricier seed — so the ten terrain *types* are really twenty islands to grow, before you even reach the villages, farms, and structures below.
 
 ---
 
