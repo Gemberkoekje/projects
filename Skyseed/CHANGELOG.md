@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.24.1] - 2026-06-22
+
+### Changed
+- **Drew the Outpost seed icon** — a dark-oak watchtower with a flag, arrow slits and a grass-and-dirt base,
+  in the iconographic style of the other structure seeds (it had shipped with a placeholder copied from the
+  Dungeon seed).
+
 ## [0.24.0] - 2026-06-22
 
 ### Added
@@ -10,7 +17,7 @@ All notable changes to Skyseed are recorded here. The format is loosely based on
   ladder past arrow slits to a **pillager spawner and a `pillager_outpost` loot chest** up top, while an
   **iron golem sits caged behind dark-oak fences at the base** — break the cage and it turns on the pillagers.
   - **🗼 Outpost Island** (`skyseed:outpost`) — its own seed (dark oak planks + crossbow + iron ingot), with an
-    Almanac entry. *(Placeholder seed icon for now.)*
+    Almanac entry.
   - **A Trade Post has a 5% chance of coming up as a Pillager Outpost instead** of a village — no villagers, a
     hostile takeover. Reuses the `rare_structures` mechanism; the caged golem spawns via the jigsaw
     `iron_golems` field (lands at the centre, inside the cage).
