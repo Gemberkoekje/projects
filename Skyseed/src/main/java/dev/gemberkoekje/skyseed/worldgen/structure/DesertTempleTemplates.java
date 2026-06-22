@@ -15,11 +15,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The desert temple's buried treasure chamber: a sealed sandstone room with four chests
- * ({@code minecraft:chests/desert_pyramid}), a hidden 3×3 cache of TNT one block below the floor, and a
- * pressure-plate trap over hidden TNT at each floor corner. The anchor sits on the chamber floor (y1) so the
- * cache (y0) buries below. The plates are baked as wool markers and swapped in by {@link Traps} after the
- * jigsaw assembles (fragile blocks pop on that path); stepping on one fires the corner TNT into the cache.
+ * The desert temple's buried treasure chamber, like the original: anchored on its ROOF so it sits flush with
+ * the (all-sandstone) island surface and the chamber hangs buried below, with a single hole in the roof centre
+ * inviting a drop-in. Four chests ({@code minecraft:chests/desert_pyramid}) line the walls; a pressure plate
+ * sits dead-centre on the floor over a TNT block and the buried 3×3 cache, directly under the hole — drop in
+ * carelessly and you land on it. The plate is baked as a wool marker and swapped in by {@link Traps} after the
+ * jigsaw assembles (fragile blocks pop on that path); the interior is carved with explicit air.
  * See {@code SKYSTRUCTURESPLAN.md}.
  */
 public final class DesertTempleTemplates {
@@ -41,33 +42,31 @@ public final class DesertTempleTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState sandstone = Blocks.SANDSTONE.defaultBlockState();
         final BlockState cut = Blocks.CUT_SANDSTONE.defaultBlockState();
+        final BlockState tnt = Blocks.TNT.defaultBlockState();
+        final BlockState air = Blocks.AIR.defaultBlockState();
         final int max = 4, mid = 2;
 
+        // The chamber is anchored on its ROOF (y5) so it lands flush with the island surface and hangs buried
+        // below — like the original. The interior is carved with explicit air; only the roof's centre is open.
         for (int x = 0; x <= max; x++) {
             for (int z = 0; z <= max; z++) {
-                // y0 sub-floor with the buried 3×3 TNT under the centre.
                 final boolean centre3 = x >= 1 && x <= 3 && z >= 1 && z <= 3;
-                m.put(new BlockPos(x, 0, z), centre3 ? Blocks.TNT.defaultBlockState() : sandstone);
-                // y1 chamber floor.
-                m.put(new BlockPos(x, 1, z), sandstone);
-                // y2-4 walls (cut sandstone), y5 roof.
                 final boolean perim = x == 0 || x == max || z == 0 || z == max;
-                if (perim) {
-                    m.put(new BlockPos(x, 2, z), cut);
-                    m.put(new BlockPos(x, 3, z), cut);
-                    m.put(new BlockPos(x, 4, z), cut);
+                final boolean centre = x == mid && z == mid;
+                m.put(new BlockPos(x, 0, z), centre3 ? tnt : sandstone);       // y0 buried 3×3 TNT cache
+                m.put(new BlockPos(x, 1, z), centre ? tnt : sandstone);        // y1 floor; centre TNT = the trigger
+                for (int y = 2; y <= 4; y++) {
+                    m.put(new BlockPos(x, y, z), perim ? cut : air);           // y2-4 walls, hollow interior
                 }
-                m.put(new BlockPos(x, 5, z), sandstone);
+                m.put(new BlockPos(x, 5, z), centre ? air : sandstone);        // y5 roof; a hole over the centre
             }
         }
-        // A pressure-plate trap at each floor corner over hidden TNT: the plate is baked as a wool marker and
-        // swapped to a real plate after assembly (fragile blocks don't survive the jigsaw path). Step on one →
-        // the corner TNT fires the buried 3×3 cache below. The plates sit clear of the four wall chests.
-        for (int[] c : new int[][]{{1, 1}, {3, 1}, {1, 3}, {3, 3}}) {
-            m.put(new BlockPos(c[0], 1, c[1]), Blocks.TNT.defaultBlockState());
-            m.put(new BlockPos(c[0], 2, c[1]), Blocks.YELLOW_WOOL.defaultBlockState()); // → stone pressure plate
-        }
-        // Four treasure chests around the centre, facing in (the buried 3×3 TNT cache sits below them).
+        // The central pressure-plate trap, baked as a wool marker swapped in by Traps after assembly — it sits
+        // on the floor's centre TNT directly under the roof hole. Drop in carelessly and you land on it: the
+        // centre TNT fires the buried cache. Disarm it (mine it from above) or pillar down past it.
+        m.put(new BlockPos(mid, 2, mid), Blocks.YELLOW_WOOL.defaultBlockState());
+
+        // Four treasure chests against the walls, facing in.
         m.put(new BlockPos(1, 2, mid), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
         bes.put(new BlockPos(1, 2, mid), StructureParts.lootChest("minecraft:chests/desert_pyramid"));
         m.put(new BlockPos(3, 2, mid), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
@@ -77,8 +76,8 @@ public final class DesertTempleTemplates {
         m.put(new BlockPos(mid, 2, 3), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
         bes.put(new BlockPos(mid, 2, 3), StructureParts.lootChest("minecraft:chests/desert_pyramid"));
 
-        // Anchor on the centre floor block (becomes sandstone; the buried TNT sits directly below it).
-        StructureParts.anchor(m, bes, new BlockPos(mid, 1, mid), "minecraft:sandstone");
+        // Anchor on a roof block one off the central hole (it can't be the hole), so the structure centres there.
+        StructureParts.anchor(m, bes, new BlockPos(mid, 5, mid + 1), "minecraft:sandstone");
         return new Built(m, bes);
     }
 }

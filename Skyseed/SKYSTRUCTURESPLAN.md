@@ -46,12 +46,13 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🏜️ Desert Temple
 
-> **Built (v0.14.0; trap restored v0.19.5).** `skyseed:desert_temple` — a sealed sandstone chamber, four
-> `minecraft:chests/desert_pyramid` chests over a buried 3×3 TNT cache. Sand + sandstone + TNT. **The
-> pressure-plate trap is back**: a plate over hidden TNT at each floor corner, wired to the buried cache.
-> Fragile/support-dependent blocks don't survive the jigsaw path, so they're baked as wool markers and swapped
-> to real blocks by the `Traps` post-pass after assembly (verified: a mob on a plate detonates the chamber).
-> Archaeology not yet included.
+> **Built (v0.14.0; reworked v0.19.5–v0.19.6).** `skyseed:desert_temple` — now **buried like the original**:
+> anchored on its roof so it sits flush with the all-sandstone island surface, chamber hanging below, a hole in
+> the roof centre inviting a drop-in. Four `minecraft:chests/desert_pyramid` chests line the walls; a single
+> pressure plate sits dead-centre over TNT and a buried 3×3 cache, directly under the hole — drop in carelessly
+> and you land on it. Fragile/support-dependent blocks don't survive the jigsaw path, so the plate is baked as
+> a wool marker and swapped in by the `Traps` post-pass; the interior is carved with explicit air (verified: a
+> mob dropped through the hole detonates the chamber). Archaeology not yet included.
 
 **Vanilla:** Sandstone pyramid with 4 treasure chests below a pressure-plate TNT trap. Archaeology added dig sites in 1.20.
 

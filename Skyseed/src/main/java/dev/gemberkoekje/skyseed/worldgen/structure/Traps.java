@@ -34,7 +34,7 @@ public final class Traps {
         final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int dx = -6; dx <= 6; dx++) {
             for (int dz = -6; dz <= 6; dz++) {
-                for (int dy = -4; dy <= 5; dy++) {
+                for (int dy = -7; dy <= 5; dy++) {
                     p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
                     final Block b = level.getBlockState(p).getBlock();
                     if (b == PLATE_MARKER) {

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.6] - 2026-06-22
+
+### Changed
+- **The Desert Temple is buried now, like the original.** Reworked it to anchor on its **roof** so it sits
+  flush with the (all-sandstone) island surface with the chamber hanging below — the only thing on top is a
+  hole in the roof centre that invites a drop-in. A single pressure plate sits dead-centre on the floor over
+  TNT and the buried cache, directly under the hole: drop in carelessly and you land on it (verified — a mob
+  dropped through the hole detonates the chamber). Replaces the four corner plates from v0.19.5. The buried
+  interior is carved with explicit air (which the jigsaw placement does honour).
+
 ## [0.19.5] - 2026-06-22
 
 ### Added
