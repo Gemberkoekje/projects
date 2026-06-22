@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.7] - 2026-06-22
+
+### Changed
+- **Cleaner roof eaves.** Removed the upside-down "soffit" stairs from under the overhanging eaves (added in
+  v0.19.4) — they cluttered the slope sides. The overhang is now an open stepped eave, matching the intended
+  look. Affects the cottages and the witch hut (the overhanging-roof structures).
+
 ## [0.19.6] - 2026-06-22
 
 ### Changed
