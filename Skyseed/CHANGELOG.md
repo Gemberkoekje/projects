@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.10] - 2026-06-22
+
+### Changed
+- **Gable rake upside-down stairs, corrected.** Moved them out to the overhang plane (tucked under the
+  overhanging rake stair, instead of replacing the gable wall), flipped their facing to downhill, and extended
+  them down to the bottom eave step. 16 per cottage (8 per gable).
+
 ## [0.19.9] - 2026-06-22
 
 ### Changed

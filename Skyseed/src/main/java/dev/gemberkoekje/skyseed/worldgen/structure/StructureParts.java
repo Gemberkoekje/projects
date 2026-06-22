@@ -38,18 +38,28 @@ public final class StructureParts {
                 m.put(new BlockPos(x, ry, z), roof);
             }
         }
+        // Gable triangles: fill the front/back walls (z0, z1) up to the roofline with planks.
         for (int x = x0; x <= x1; x++) {
             final int top = ridgeY - Math.abs(x - mid);
             for (int y = eaveY + 1; y < top; y++) {
-                // Smooth the gable rake: the topmost fill block under each sloped course is an upside-down
-                // stair (facing uphill, like the rake stair above it) so the diagonal edge reads as solid.
-                final BlockState b = (y == top - 1 && x != mid)
-                        ? stairs.defaultBlockState()
-                            .setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST)
-                            .setValue(StairBlock.HALF, Half.TOP)
-                        : planks;
-                m.put(new BlockPos(x, y, z0), b);
-                m.put(new BlockPos(x, y, z1), b);
+                m.put(new BlockPos(x, y, z0), planks);
+                m.put(new BlockPos(x, y, z1), planks);
+            }
+        }
+        // Smooth the gable rake: tuck an upside-down stair (facing downhill) under each overhanging rake stair
+        // — out on the overhang plane (z0-ov / z1+ov), not in the wall — so the diagonal edge reads as solid.
+        // Covers every sloped column including the lowest one at the eave.
+        if (ov > 0) {
+            for (int x = x0 - ov; x <= x1 + ov; x++) {
+                if (x == mid) {
+                    continue;
+                }
+                final int ry = ridgeY - Math.abs(x - mid);
+                final BlockState rake = stairs.defaultBlockState()
+                        .setValue(StairBlock.FACING, x < mid ? Direction.WEST : Direction.EAST)
+                        .setValue(StairBlock.HALF, Half.TOP);
+                m.put(new BlockPos(x, ry - 1, z0 - ov), rake);
+                m.put(new BlockPos(x, ry - 1, z1 + ov), rake);
             }
         }
     }
