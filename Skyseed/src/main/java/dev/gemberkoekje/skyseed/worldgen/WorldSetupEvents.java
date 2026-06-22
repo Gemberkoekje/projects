@@ -54,6 +54,8 @@ public final class WorldSetupEvents {
      */
     private static void disableRaids(MinecraftServer server, ServerLevel overworld) {
         overworld.getGameRules().getRule(GameRules.RULE_DISABLE_RAIDS).set(true, server);
+        // Also stop random pillager patrols wandering onto islands — pillagers should be an Outpost encounter.
+        overworld.getGameRules().getRule(GameRules.RULE_DO_PATROL_SPAWNING).set(false, server);
     }
 
     /**

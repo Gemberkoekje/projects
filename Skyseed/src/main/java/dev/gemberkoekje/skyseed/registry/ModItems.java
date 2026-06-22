@@ -30,7 +30,7 @@ public final class ModItems {
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
             "aquatic", "aquatic_large", "hamlet", "trade_post", "village_center",
             "pasture", "poultry", "wool_farm", "stable", "aquarium",
-            "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut");
+            "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost");
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();

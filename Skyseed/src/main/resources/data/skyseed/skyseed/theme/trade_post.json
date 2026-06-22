@@ -2,6 +2,10 @@
   "shape": { "radius": { "min": 13, "max": 16 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
+  "rare_structures": [
+    { "chance": 0.05,
+      "jigsaw": { "pool": "skyseed:outpost/tower", "target": "minecraft:bottom", "depth": 1, "pad": 4, "iron_golems": 1 } }
+  ],
   "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 2, "pad": 9 },
   "variants": [
     { "weight": 1, "name": "green", "decoration": {

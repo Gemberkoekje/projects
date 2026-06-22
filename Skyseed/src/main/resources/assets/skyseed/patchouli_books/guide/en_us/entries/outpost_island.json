@@ -1,0 +1,20 @@
+{
+  "name": "Outpost Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:crossbow",
+  "advancement": "skyseed:craft_outpost",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A dark-oak $(o)pillager watchtower$() rising off a lonely island. Climb the inside ladder floor by floor — crossbow bolts will be coming the whole way up — to a $(item)pillager spawner$() and a loot chest at the top."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The cage at the base$()$(br)An $(item)iron golem$() sits penned behind dark-oak fences on the ground floor. Break the cage and it joins the fight, turning on the pillagers — well worth the few seconds it takes."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Loot$()$(br)The top chest holds the vanilla outpost haul: a $(item)crossbow$(), tripwire hooks, dark oak, iron, an enchanted book, and $(item)ominous bottles$(). Raids are disabled up here, so treat ominous bottles as collectors' loot. Crafted from $(item)dark oak planks$(), a $(item)crossbow$() and an $(item)iron ingot$()."
+    }
+  ]
+}

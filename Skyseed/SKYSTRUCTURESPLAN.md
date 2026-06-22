@@ -121,6 +121,8 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 **Structure:** 4-floor dark oak tower, ladder inside, chest on top floor, cage at base  
 **Notes:** Ominous Bottles from outpost loot are what trigger raids — but as noted in SKYVILLAGESPLAN.md, raids are disabled on Skyseed village islands, so ominous bottles are effectively a currency/collector item rather than a raid trigger here. Worth flagging for the player in the Patchouli guide.
 
+**Status: ✅ Built** (v0.24.0). `skyseed:outpost` — a dark-oak watchtower (`skyseed:outpost/tower`): a 5×5 tower, three floors up a corner ladder past arrow slits, a `minecraft:pillager` spawner + `chests/pillager_outpost` chest on the top floor, and an iron golem caged behind dark-oak fences at the base (spawned at the jigsaw centre via the theme's `iron_golems: 1`, so it lands inside the cage). Also a **`rare_structures` entry on the Trade Post (5%)** that swaps the village jigsaw for the tower (no villagers). Pillager `doPatrolSpawning` is disabled with raids in `WorldSetupEvents`. Allays-instead-of-golem (the rare high-value cage reward) is deferred; the banner/tents/targets are omitted for now.
+
 ---
 
 ### 🏚️ Abandoned Village (Zombie Village)
