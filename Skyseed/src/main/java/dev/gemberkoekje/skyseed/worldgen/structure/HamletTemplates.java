@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.LadderBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -32,15 +33,15 @@ public final class HamletTemplates {
 
     private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
-    /** A wood palette for one cottage variant: body planks, corner-post log, roof stairs, and the door block. */
-    private record Wood(BlockState planks, BlockState log, Block stairs, Block door) {}
+    /** A wood palette for one cottage variant: body planks, corner-post log, roof stairs, ridge slab, door. */
+    private record Wood(BlockState planks, BlockState log, Block stairs, Block slab, Block door) {}
 
     private static final Wood OAK = new Wood(Blocks.OAK_PLANKS.defaultBlockState(),
-            Blocks.OAK_LOG.defaultBlockState(), Blocks.OAK_STAIRS, Blocks.OAK_DOOR);
+            Blocks.OAK_LOG.defaultBlockState(), Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR);
     private static final Wood SPRUCE = new Wood(Blocks.SPRUCE_PLANKS.defaultBlockState(),
-            Blocks.SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_DOOR);
+            Blocks.SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR);
     private static final Wood BIRCH = new Wood(Blocks.BIRCH_PLANKS.defaultBlockState(),
-            Blocks.BIRCH_LOG.defaultBlockState(), Blocks.BIRCH_STAIRS, Blocks.BIRCH_DOOR);
+            Blocks.BIRCH_LOG.defaultBlockState(), Blocks.BIRCH_STAIRS, Blocks.BIRCH_SLAB, Blocks.BIRCH_DOOR);
 
     public static void generateInto(Path structureDir) throws IOException {
         writeIfAbsent(structureDir.resolve("cottage_oak.nbt"), cottage(7, OAK, true));
@@ -109,9 +110,16 @@ public final class HamletTemplates {
         m.put(new BlockPos(hi - 1, 1, 2), Blocks.TORCH.defaultBlockState());
 
         // Gabled stair roof with a one-block overhang, plus a glass loft window in the front gable.
-        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, planks, w.stairs(), 1);
+        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, planks, w.stairs(), w.slab(), 1);
         if (ceil + 1 < ridgeY) {
             m.put(new BlockPos(mid, ceil + 1, frontZ), glass);
+        }
+
+        // A ladder up the back wall to the loft above the ceiling — the topmost rung punches the ceiling hole.
+        final int ladderZ = doorOnNorth ? hi - 1 : lo + 1;
+        final Direction ladderFace = doorOnNorth ? Direction.NORTH : Direction.SOUTH;
+        for (int y = 1; y <= ceil; y++) {
+            m.put(new BlockPos(mid, y, ladderZ), Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, ladderFace));
         }
 
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), BuiltInRegistries.BLOCK.getKey(planks.getBlock()).toString());

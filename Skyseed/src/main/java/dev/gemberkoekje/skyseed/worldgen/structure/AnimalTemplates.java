@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.LanternBlock;
 import net.minecraft.world.level.block.LayeredCauldronBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -72,6 +73,32 @@ public final class AnimalTemplates {
         m.put(new BlockPos(mid, 1, max), gate);
     }
 
+    /**
+     * Set every oak fence's connection state from its neighbours in the map, so a placed ring renders as a
+     * connected fence (not loose posts) — structure placement keeps the stored state but does no neighbour
+     * updates, so the connections have to be baked in here. Call after all fences and gates are placed.
+     */
+    private static void connectFences(Map<BlockPos, BlockState> m) {
+        final Map<BlockPos, BlockState> updated = new HashMap<>();
+        for (Map.Entry<BlockPos, BlockState> e : m.entrySet()) {
+            if (!e.getValue().is(Blocks.OAK_FENCE)) {
+                continue;
+            }
+            final BlockPos p = e.getKey();
+            updated.put(p, Blocks.OAK_FENCE.defaultBlockState()
+                    .setValue(BlockStateProperties.NORTH, joins(m, p.north()))
+                    .setValue(BlockStateProperties.SOUTH, joins(m, p.south()))
+                    .setValue(BlockStateProperties.EAST, joins(m, p.east()))
+                    .setValue(BlockStateProperties.WEST, joins(m, p.west())));
+        }
+        m.putAll(updated);
+    }
+
+    private static boolean joins(Map<BlockPos, BlockState> m, BlockPos p) {
+        final BlockState s = m.get(p);
+        return s != null && (s.is(Blocks.OAK_FENCE) || s.getBlock() instanceof FenceGateBlock);
+    }
+
     /** 🌾 Pasture: a 7×7 fenced field with a hay bale and a water trough. */
     private static Built pasturePen() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
@@ -80,10 +107,11 @@ public final class AnimalTemplates {
         fenceRing(m, 7);
         m.put(new BlockPos(2, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
         m.put(new BlockPos(4, 1, 4), Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
+        connectFences(m);
         return new Built(m, bes);
     }
 
-    /** 🐔 Poultry: a small enclosed 5×5 coop (chickens jump fences) with a slab roof, composter and hay. */
+    /** 🐔 Poultry: a small enclosed 5×5 coop (chickens jump fences) with a gabled roof, composter and hay. */
     private static Built poultryCoop() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
@@ -93,16 +121,20 @@ public final class AnimalTemplates {
         for (int x = 0; x < 5; x++) {
             for (int z = 0; z < 5; z++) {
                 if (x == 0 || x == max || z == 0 || z == max) {
-                    m.put(new BlockPos(x, 1, z), plank);
+                    m.put(new BlockPos(x, 1, z), plank); // walls
                     m.put(new BlockPos(x, 2, z), plank);
                 }
-                m.put(new BlockPos(x, 3, z), Blocks.OAK_SLAB.defaultBlockState()); // low roof
+                m.put(new BlockPos(x, 3, z), plank); // flat ceiling (keeps the birds in under the gable)
             }
         }
+        // A 2-tall gated doorway in the front wall.
         m.put(new BlockPos(mid, 1, 0), Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING, Direction.NORTH));
+        m.remove(new BlockPos(mid, 2, 0));
         m.put(new BlockPos(1, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
         m.put(new BlockPos(3, 1, 3), Blocks.COMPOSTER.defaultBlockState());
         m.put(new BlockPos(mid, 2, mid), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
+        // Pitched gable roof over the coop, sitting on the y3 ceiling.
+        StructureParts.gableRoof(m, 0, max, 0, max, 3, plank, Blocks.OAK_STAIRS, Blocks.OAK_SLAB, 0);
         return new Built(m, bes);
     }
 
@@ -120,6 +152,7 @@ public final class AnimalTemplates {
         }
         m.put(new BlockPos(2, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
         m.put(new BlockPos(6, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
+        connectFences(m);
         return new Built(m, bes);
     }
 
@@ -159,6 +192,7 @@ public final class AnimalTemplates {
         bes.put(new BlockPos(1, 1, 3), chest);
         m.put(new BlockPos(5, 1, 3), Blocks.HAY_BLOCK.defaultBlockState());
         m.put(new BlockPos(midX, 3, 2), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
+        connectFences(m);
         return new Built(m, bes);
     }
 

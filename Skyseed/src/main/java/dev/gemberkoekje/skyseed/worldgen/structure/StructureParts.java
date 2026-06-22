@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 
 import java.util.Map;
 
@@ -20,20 +21,35 @@ public final class StructureParts {
      * Add a pitched gable roof of stairs over a building footprint {@code [x0..x1]×[z0..z1]}: the ridge runs
      * along Z at the centre X column (a solid plank beam), the roof slopes down in X with stairs facing uphill
      * toward the ridge (so the eave edges taper thin), and the two gable ends (z0 / z1) are filled to the
-     * roofline. {@code eaveY} is the lowest roof course (sit it on the wall top). Pass {@code ov = 1} for a
-     * one-block overhang on every side — the building must be inset so {@code x0-1} and {@code z0-1} stay ≥ 0
-     * (structure NBT can't hold negative positions) — or {@code ov = 0} for flush eaves.
+     * roofline. The ridge line is capped with a {@code slab} (a slimmer peak than a full block). {@code eaveY}
+     * is the lowest roof course (sit it on the wall top). Pass {@code ov = 1} for a one-block overhang on every
+     * side — the building must be inset so {@code x0-1} and {@code z0-1} stay ≥ 0 (structure NBT can't hold
+     * negative positions), with upside-down stairs boxing the underside of the slope overhang — or
+     * {@code ov = 0} for flush eaves.
      */
     public static void gableRoof(Map<BlockPos, BlockState> m, int x0, int x1, int z0, int z1, int eaveY,
-                                 BlockState planks, Block stairs, int ov) {
+                                 BlockState planks, Block stairs, Block slab, int ov) {
         final int mid = (x0 + x1) / 2;
         final int ridgeY = eaveY + (mid - x0) + ov;
         for (int x = x0 - ov; x <= x1 + ov; x++) {
             final int ry = ridgeY - Math.abs(x - mid);
-            final BlockState roof = x == mid ? planks
+            final BlockState roof = x == mid ? slab.defaultBlockState()
                     : stairs.defaultBlockState().setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST);
             for (int z = z0 - ov; z <= z1 + ov; z++) {
                 m.put(new BlockPos(x, ry, z), roof);
+            }
+        }
+        // Box the underside of the slope-side overhang with upside-down stairs (a finished soffit).
+        for (int x = x0 - ov; x <= x1 + ov; x++) {
+            if (x >= x0 && x <= x1) {
+                continue; // only the overhang columns past the walls in X
+            }
+            final int ry = ridgeY - Math.abs(x - mid);
+            final BlockState soffit = stairs.defaultBlockState()
+                    .setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST)
+                    .setValue(StairBlock.HALF, Half.TOP);
+            for (int z = z0 - ov; z <= z1 + ov; z++) {
+                m.put(new BlockPos(x, ry - 1, z), soffit);
             }
         }
         for (int x = x0; x <= x1; x++) {

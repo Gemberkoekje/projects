@@ -66,7 +66,7 @@ public final class WitchHutTemplates {
         m.put(new BlockPos(lo + 1, 1, hi - 1), Blocks.POTTED_RED_MUSHROOM.defaultBlockState());
 
         // Pitched spruce gable roof with a one-block overhang.
-        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, plank, Blocks.SPRUCE_STAIRS, 1);
+        StructureParts.gableRoof(m, lo, hi, lo, hi, ceil, plank, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, 1);
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:spruce_planks");
         return new Built(m, bes);
     }

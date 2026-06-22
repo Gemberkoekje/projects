@@ -101,11 +101,42 @@ public final class GenerationJob {
                 }
                 continue;
             }
-            final Entity e = as.type().spawn(level, as.pos().above(), MobSpawnType.SPAWNER);
+            final Entity e = as.type().spawn(level, freeStandSpot(as.pos()), MobSpawnType.SPAWNER);
             if (e != null) {
                 applyTraits(e, as.baby());
             }
         }
+    }
+
+    /**
+     * The position a land mob should spawn at (its feet), given the floor block {@code base} it was planned on.
+     * If that column is blocked by a kit block (a cauldron, hay, composter), search outward for a clear column
+     * so the mob doesn't spawn inside furniture — e.g. a Witch Hut witch cooking herself in her own cauldron.
+     */
+    private BlockPos freeStandSpot(BlockPos base) {
+        if (standClear(base)) {
+            return base.above();
+        }
+        for (int r = 1; r <= 2; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    final BlockPos p = base.offset(dx, 0, dz);
+                    if (standClear(p)) {
+                        return p.above();
+                    }
+                }
+            }
+        }
+        return base.above();
+    }
+
+    /** True if {@code base} is solid footing with two non-colliding blocks above it (room for a standing mob). */
+    private boolean standClear(BlockPos base) {
+        final BlockPos foot = base.above();
+        final BlockPos head = base.above(2);
+        return !level.getBlockState(base).getCollisionShape(level, base).isEmpty()
+                && level.getBlockState(foot).getCollisionShape(level, foot).isEmpty()
+                && level.getBlockState(head).getCollisionShape(level, head).isEmpty();
     }
 
     private void applyTraits(Entity e, boolean baby) {

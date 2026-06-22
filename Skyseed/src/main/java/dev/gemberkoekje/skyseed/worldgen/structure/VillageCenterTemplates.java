@@ -158,7 +158,7 @@ public final class VillageCenterTemplates {
             m.put(new BlockPos(job[0], 1, job[1]), jobSites[i]);
         }
         // Pitched gable roof over the hall (flush eaves — the door wall is a gable end facing the plaza).
-        StructureParts.gableRoof(m, 0, max, 0, max, 4, floor, Blocks.OAK_STAIRS, 0);
+        StructureParts.gableRoof(m, 0, max, 0, max, 4, floor, Blocks.OAK_STAIRS, Blocks.OAK_SLAB, 0);
         return new Built(m, bes);
     }
 }

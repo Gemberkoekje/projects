@@ -3,6 +3,24 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.4] - 2026-06-22
+
+### Changed
+- **Roof + structure polish (from playtest feedback):**
+  - Roof ridges are now capped with a **slab** instead of a full block — a slimmer, cleaner peak.
+  - The overhang roofs (cottage, witch hut) get **upside-down soffit stairs** underneath, so the eaves are
+    boxed in rather than open.
+  - Cottages now have an accessible **loft**: a ladder climbs the back wall and punches through the ceiling
+    into the attic (lit by the gable's loft window).
+  - The **chicken coop** gained a gabled roof to match the rest of the buildings.
+
+### Fixed
+- **Pasture / Wool Farm / Stable fences render as a connected ring** instead of loose posts — the fence
+  connection states are now baked into the template (structure placement does no neighbour updates, so the
+  connections have to be stored, like the cottage doors).
+- **Enclosure mobs spawn in a clear spot** rather than inside the furniture — the Witch Hut witch no longer
+  materialises sitting in her own cauldron.
+
 ## [0.19.3] - 2026-06-22
 
 ### Changed
