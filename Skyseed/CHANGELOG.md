@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.30.0] - 2026-06-22
+
+### Changed
+- **Trial Chamber is now a modular jigsaw complex** (the flagged follow-up to v0.28.0). Instead of one fixed
+  11×11 arena, the chamber is assembled from a central **hub** (the breeze boss spawner, the ominous vault and
+  the ladder entrance) plus up to **four room pieces** drawn from a pool — zombie / skeleton / spider / breeze
+  spawner rooms (each with a vault) and a twin-vault treasure room — so the layout varies every time you grow
+  one. Still buried via `sink`, still the same self-contained spawner→key→vault loop and Bad-Omen ominous path;
+  the island is a touch larger to hold the spread-out complex. (Proves buried multi-piece jigsaw assembly.)
+
 ## [0.29.0] - 2026-06-22
 
 ### Added

@@ -155,16 +155,19 @@ vertical-connector + marker spikes) for room variety, per the design below.
 - **Seed:** a craftable destination — e.g. **Dark Oak + Diamond + Evoker banner** (the banner is dropped by the
   bootstrap **Evoker Cell**'s evoker, so the cell gates the mansion seed; thereafter the mansion farms totems).
 
-## Trial Chamber — **✅ Built** (v0.28.0)
-Shipped as `TrialChamberTemplates` → `data/skyseed/structure/trial_chamber/chamber.nbt`, on its own
-`trial_chamber` theme (a larger, thicker rocky island, radius 14–18) with a craftable **Trial Chamber Skyseed**
-(tuff bricks + copper blocks + a diamond). **v1 is a single rotated template, not a multi-piece jigsaw** — one
-buried 11×11 tuff/copper arena (`sink` 7) holds a centre **breeze** trial spawner + an **ominous vault**, four
-more trial spawners (zombie/skeleton/spider/breeze) each near one of three regular vaults, nine hanging lanterns,
-and a corner ladder shaft punched up to the surface as the only tell. The spawner helper sets both `normal_config`
-and `ominous_config`, so Bad Omen drives the ominous loop (ominous keys → the centre ominous vault → heavy core).
-*Follow-up:* split the arena into a modular jigsaw pool (entrance → corridors → intersections → boss) for layout
-variety, per the design below.
+## Trial Chamber — **✅ Built** (v0.28.0; modular jigsaw v2 in v0.30.0)
+Shipped as `TrialChamberTemplates` on its own `trial_chamber` theme (a larger, thicker rocky island) with a
+craftable **Trial Chamber Skyseed** (tuff bricks + copper blocks + a diamond). The spawner helper sets both
+`normal_config` and `ominous_config`, so Bad Omen drives the ominous loop (ominous keys → the centre ominous
+vault → heavy core).
+- **v1 (v0.28.0):** a single rotated 11×11 tuff/copper arena (`sink` 7) — a centre breeze trial spawner + an
+  ominous vault, four more trial spawners each near a regular vault, hanging lanterns, a corner ladder shaft.
+- **v2 (v0.30.0) — the modular jigsaw follow-up, done:** split into a **hub** start piece (breeze boss + ominous
+  vault + ladder + four edge connectors) and a **rooms pool** (zombie/skeleton/spider/breeze spawner rooms, each
+  with a vault, + a twin-vault treasure room). The hub draws up to four rooms (depth 2) through floor-level
+  connectors with pre-carved doorways, the whole assembly sunk via `sink` 7. **Proves buried multi-piece jigsaw
+  assembly** (RCON-verified: hub + 4 rooms attach out to ~7 blocks, buried + hollow, ladder to surface). Layout
+  now varies per throw. *(Corridor/intersection pieces are a possible further refinement.)*
 
 ### Original design (the jigsaw target for a future pass)
 - **Form:** *(decided)* a **buried complex** carved down into the island via `sink` — a surface entrance

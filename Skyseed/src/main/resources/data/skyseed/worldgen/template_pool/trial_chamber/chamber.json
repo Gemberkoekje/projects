@@ -1,6 +1,0 @@
-{
-  "fallback": "minecraft:empty",
-  "elements": [
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trial_chamber/chamber", "processors": "minecraft:empty", "projection": "rigid" } }
-  ]
-}
