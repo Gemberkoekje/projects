@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.22.0] - 2026-06-22
+
+### Added
+- **A Witch Hut can now turn up on big islands grown in the right biome** — 5% on a **Large Forest** in a
+  swamp, mangrove swamp or dark-oak (`dark_forest`) biome, and 5% on a **Large Aquatic** island in a swamp or
+  mangrove swamp. The witch and her cat come with it. It stands on dry swampy ground (the island's pond is
+  suppressed on a hut roll, the same way the ocean ruin replaces a pond). Reuses the `biomes` rare-structure
+  filter from 0.21.0 — datapack only, no new code.
+  - Verified: hut + witch appear in swamp and dark-oak forests and on a swamp aquatic island (lake gone); a
+    jungle forest still grows the jungle temple instead (the two forest entries coexist); plains grows neither.
+
 ## [0.21.0] - 2026-06-22
 
 ### Changed

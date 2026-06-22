@@ -84,6 +84,7 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 - 🌊 **Ocean ruin** — rarely an Aquatic island's pool is instead a flooded stone-brick ruin, with suspicious sand to brush and a sunken chest.
 - 🏺 **Buried Desert Temple** — rarely a Large Desert hides a temple sunk beneath the dunes; a suspicious hole in the sand is the only clue, and dropping in springs its TNT trap.
 - 🌿 **Lost Jungle Temple** — rarely a Large Forest grown in a jungle raises a full jungle temple among the vines and jungle trees.
+- 🧙 **Swamp Witch Hut** — rarely a Large Forest in a swamp or dark-oak wood, or a Large Aquatic island in a swamp, comes up with a witch's hut (and the witch and her cat) instead.
 
 ---
 

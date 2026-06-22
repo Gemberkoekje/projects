@@ -7,7 +7,10 @@
   ],
   "rare_structures": [
     { "chance": 0.05, "biomes": [ "#minecraft:is_jungle" ],
-      "jigsaw": { "pool": "skyseed:jungle_temple/temple", "target": "minecraft:bottom", "depth": 1, "pad": 6 } }
+      "jigsaw": { "pool": "skyseed:jungle_temple/temple", "target": "minecraft:bottom", "depth": 1, "pad": 6 } },
+    { "chance": 0.05, "biomes": [ "minecraft:swamp", "minecraft:mangrove_swamp", "minecraft:dark_forest" ], "suppress_pond": true,
+      "jigsaw": { "pool": "skyseed:witch_hut/hut", "target": "minecraft:bottom", "depth": 1, "pad": 4 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:witch", "adults": 1 }, { "entity": "minecraft:cat", "adults": 1 } ] } ] }
   ],
   "mobs": [
     { "entity": "minecraft:cow", "chance": 0.30, "count": { "min": 1, "max": 3 } },
