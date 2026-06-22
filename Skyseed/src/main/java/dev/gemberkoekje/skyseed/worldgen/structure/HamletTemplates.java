@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -15,7 +16,6 @@ import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,8 +31,6 @@ import java.util.Map;
 public final class HamletTemplates {
     private HamletTemplates() {}
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     /** A wood palette for one cottage variant: body planks, corner-post log, roof stairs, ridge slab, door. */
     private record Wood(BlockState planks, BlockState log, Block stairs, Block slab, Block door) {}
 
@@ -47,13 +45,6 @@ public final class HamletTemplates {
         writeIfAbsent(structureDir.resolve("cottage_oak.nbt"), cottage(7, OAK, true));
         writeIfAbsent(structureDir.resolve("cottage_spruce.nbt"), cottage(7, SPRUCE, false));
         writeIfAbsent(structureDir.resolve("cottage_small.nbt"), cottage(5, BIRCH, true));
-    }
-
-    private static void writeIfAbsent(Path file, Built built) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(built.blocks(), built.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
     }
 
     /**

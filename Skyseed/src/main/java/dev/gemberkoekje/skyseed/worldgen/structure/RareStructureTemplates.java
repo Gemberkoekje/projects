@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -11,7 +12,6 @@ import net.minecraft.world.level.block.LayeredCauldronBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,21 +27,12 @@ import java.util.Map;
 public final class RareStructureTemplates {
     private RareStructureTemplates() {}
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path base) throws IOException {
         writeIfAbsent(base.resolve("igloo/igloo.nbt"), igloo());
         writeIfAbsent(base.resolve("abandoned/cottage.nbt"), abandonedCottage());
         writeIfAbsent(base.resolve("ocean_ruin/ruin.nbt"), oceanRuin());
         writeIfAbsent(base.resolve("evoker_cell/cell.nbt"), evokerCell());
         writeIfAbsent(base.resolve("vault_cell/cell.nbt"), vaultCell());
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
     }
 
     /**

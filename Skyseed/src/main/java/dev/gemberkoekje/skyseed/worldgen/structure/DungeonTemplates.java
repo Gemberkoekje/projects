@@ -1,11 +1,12 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.JigsawBlock;
@@ -15,7 +16,6 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,19 +39,10 @@ public final class DungeonTemplates {
     private static final BlockState COBBLE = Blocks.COBBLESTONE.defaultBlockState();
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path dir) throws IOException {
         for (final String mob : new String[]{"zombie", "skeleton", "spider"}) {
             writeIfAbsent(dir.resolve("buried_" + mob + ".nbt"), room("minecraft:" + mob, false));
             writeIfAbsent(dir.resolve("lair_" + mob + ".nbt"), room("minecraft:" + mob, true));
-        }
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
         }
     }
 
@@ -77,17 +68,17 @@ public final class DungeonTemplates {
         }
         // Spawner centred on the floor; a loot chest against the west and east walls, facing in.
         m.put(new BlockPos(mid, 1, mid), Blocks.SPAWNER.defaultBlockState());
-        bes.put(new BlockPos(mid, 1, mid), spawner(mobId));
+        bes.put(new BlockPos(mid, 1, mid), mobSpawner(mobId));
         m.put(new BlockPos(1, 1, mid), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
-        bes.put(new BlockPos(1, 1, mid), lootChest());
+        bes.put(new BlockPos(1, 1, mid), lootChest("minecraft:chests/simple_dungeon"));
         m.put(new BlockPos(max - 1, 1, mid), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
-        bes.put(new BlockPos(max - 1, 1, mid), lootChest());
+        bes.put(new BlockPos(max - 1, 1, mid), lootChest("minecraft:chests/simple_dungeon"));
 
         if (entrance) {
             addEntrance(m, max, mid);
-            anchor(m, bes, new BlockPos(mid, 0, max)); // seat at the door wall so the stair stays centred-ish
+            anchor(m, bes, new BlockPos(mid, 0, max), "minecraft:cobblestone"); // seat at the door wall so the stair stays centred-ish
         } else {
-            anchor(m, bes, new BlockPos(mid, 0, mid)); // sealed box: seat at its own centre
+            anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:cobblestone"); // sealed box: seat at its own centre
         }
         return new Built(m, bes);
     }
@@ -134,46 +125,5 @@ public final class DungeonTemplates {
         for (int i = 0; i < h; i++) {
             m.put(new BlockPos(x, 6 + i, z), COBBLE);
         }
-    }
-
-    private static void anchor(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p) {
-        m.put(p, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", "minecraft:bottom");
-        t.putString("target", "minecraft:empty");
-        t.putString("pool", "minecraft:empty");
-        t.putString("final_state", "minecraft:cobblestone");
-        t.putString("joint", "rollable");
-        bes.put(p, t);
-    }
-
-    /** A vanilla-style mob-spawner block entity bound to one mob id. */
-    private static CompoundTag spawner(String mobId) {
-        final CompoundTag entity = new CompoundTag();
-        entity.putString("id", mobId);
-        final CompoundTag spawnData = new CompoundTag();
-        spawnData.put("entity", entity.copy());
-
-        final CompoundTag potData = new CompoundTag();
-        potData.put("entity", entity.copy());
-        final CompoundTag potential = new CompoundTag();
-        potential.putInt("weight", 1);
-        potential.put("data", potData);
-        final ListTag potentials = new ListTag();
-        potentials.add(potential);
-
-        final CompoundTag be = new CompoundTag();
-        be.putString("id", "minecraft:mob_spawner");
-        be.put("SpawnData", spawnData);
-        be.put("SpawnPotentials", potentials);
-        return be;
-    }
-
-    private static CompoundTag lootChest() {
-        final CompoundTag be = new CompoundTag();
-        be.putString("id", "minecraft:chest");
-        be.putString("LootTable", "minecraft:chests/simple_dungeon");
-        return be;
     }
 }

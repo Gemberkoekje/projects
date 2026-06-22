@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
@@ -12,7 +13,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,8 +32,6 @@ public final class TrialChamberTemplates {
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
     private static final String TUFF = "minecraft:tuff_bricks";
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("hub.nbt"), hub());
         writeIfAbsent(dir.resolve("room_zombie.nbt"), room("minecraft:zombie", 1));
@@ -41,13 +39,6 @@ public final class TrialChamberTemplates {
         writeIfAbsent(dir.resolve("room_spider.nbt"), room("minecraft:spider", 1));
         writeIfAbsent(dir.resolve("room_breeze.nbt"), room("minecraft:breeze", 1));
         writeIfAbsent(dir.resolve("room_treasure.nbt"), room(null, 2));
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
     }
 
     /** A deterministic tuff/copper masonry mix (mostly tuff bricks). */
@@ -61,18 +52,6 @@ public final class TrialChamberTemplates {
     }
 
     private static final BlockState LANTERN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
-
-    /** A jigsaw connector block-entity. */
-    private static CompoundTag jig(String name, String target, String pool, String finalState) {
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", name);
-        t.putString("target", target);
-        t.putString("pool", pool);
-        t.putString("final_state", finalState);
-        t.putString("joint", "rollable");
-        return t;
-    }
 
     /**
      * The start piece: a 7×7 hub with the breeze boss spawner + ominous vault, a corner ladder up to the

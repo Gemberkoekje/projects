@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.5] - 2026-06-22
+
+### Internal
+- **De-duplicated the structure templates** (codereview A2). A package-level `Built` record replaces 14 nested
+  copies, and `StructureParts` now owns the shared `writeIfAbsent`/`jig`/`mobSpawner` helpers (plus the existing
+  `anchor`/`lootChest`); the per-file re-implementations are gone. ~160 lines of copy-paste removed across 15
+  files. Behaviour-preserving: regenerating all 46 structure `.nbt` produced zero diffs, and the gametests pass.
+- Also normalized line endings (`.gitattributes` `* text=auto eol=lf`), stopping the LF/CRLF commit warnings.
+
 ## [0.32.4] - 2026-06-22
 
 ### Internal

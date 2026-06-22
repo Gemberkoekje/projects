@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
@@ -15,7 +16,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,33 +28,12 @@ import java.util.Map;
 public final class AnimalTemplates {
     private AnimalTemplates() {}
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("pasture_pen.nbt"), pasturePen());
         writeIfAbsent(dir.resolve("poultry_coop.nbt"), poultryCoop());
         writeIfAbsent(dir.resolve("wool_pen.nbt"), woolPen());
         writeIfAbsent(dir.resolve("stable.nbt"), stable());
         writeIfAbsent(dir.resolve("aquarium.nbt"), aquarium());
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
-    }
-
-    private static void anchor(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p, String floor) {
-        m.put(p, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", "minecraft:bottom");
-        t.putString("target", "minecraft:empty");
-        t.putString("pool", "minecraft:empty");
-        t.putString("final_state", floor);
-        t.putString("joint", "rollable");
-        bes.put(p, t);
     }
 
     /** A square oak-fence ring at y=1 (perimeter of an {@code n}×{@code n} pad), with gates north and south. */

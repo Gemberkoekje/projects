@@ -1,9 +1,11 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
+import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.JigsawBlock;
@@ -11,6 +13,9 @@ import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 /** Shared building blocks for the code-authored structure-island templates: the jigsaw anchor, loot chests, roofs. */
@@ -99,6 +104,46 @@ public final class StructureParts {
         final CompoundTag be = new CompoundTag();
         be.putString("id", "minecraft:brushable_block");
         be.putString("LootTable", lootTable);
+        return be;
+    }
+
+    /** Write {@code b} to {@code file} as a structure {@code .nbt}, unless the file already exists (dev-time gen). */
+    public static void writeIfAbsent(Path file, Built b) throws IOException {
+        if (!Files.exists(file)) {
+            StructureWriter.write(b.blocks(), b.blockEntities(), file);
+            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
+        }
+    }
+
+    /** A jigsaw connector block-entity; the piece becomes {@code finalState} once the jigsaw assembles. */
+    public static CompoundTag jig(String name, String target, String pool, String finalState) {
+        final CompoundTag t = new CompoundTag();
+        t.putString("id", "minecraft:jigsaw");
+        t.putString("name", name);
+        t.putString("target", target);
+        t.putString("pool", pool);
+        t.putString("final_state", finalState);
+        t.putString("joint", "rollable");
+        return t;
+    }
+
+    /** A vanilla mob-spawner block-entity that spawns {@code mobId}. */
+    public static CompoundTag mobSpawner(String mobId) {
+        final CompoundTag entity = new CompoundTag();
+        entity.putString("id", mobId);
+        final CompoundTag spawnData = new CompoundTag();
+        spawnData.put("entity", entity.copy());
+        final CompoundTag potData = new CompoundTag();
+        potData.put("entity", entity.copy());
+        final CompoundTag potential = new CompoundTag();
+        potential.putInt("weight", 1);
+        potential.put("data", potData);
+        final ListTag potentials = new ListTag();
+        potentials.add(potential);
+        final CompoundTag be = new CompoundTag();
+        be.putString("id", "minecraft:mob_spawner");
+        be.put("SpawnData", spawnData);
+        be.put("SpawnPotentials", potentials);
         return be;
     }
 }

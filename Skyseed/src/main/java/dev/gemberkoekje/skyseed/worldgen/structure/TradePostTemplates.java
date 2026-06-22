@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
@@ -14,7 +15,6 @@ import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,8 +27,6 @@ import java.util.Map;
 public final class TradePostTemplates {
     private TradePostTemplates() {}
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("plaza.nbt"), plaza());
         writeIfAbsent(dir.resolve("shop_farmer.nbt"), shop(Blocks.COMPOSTER.defaultBlockState()));
@@ -36,24 +34,6 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("shop_fisherman.nbt"), shop(Blocks.BARREL.defaultBlockState()));
         writeIfAbsent(dir.resolve("shop_fletcher.nbt"), shop(Blocks.FLETCHING_TABLE.defaultBlockState()));
         writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), shop(Blocks.SMITHING_TABLE.defaultBlockState()));
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
-    }
-
-    private static CompoundTag jig(String name, String target, String pool, String finalState) {
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", name);
-        t.putString("target", target);
-        t.putString("pool", pool);
-        t.putString("final_state", finalState);
-        t.putString("joint", "rollable");
-        return t;
     }
 
     /**

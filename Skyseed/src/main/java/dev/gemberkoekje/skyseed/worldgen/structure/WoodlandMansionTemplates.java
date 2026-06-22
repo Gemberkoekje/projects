@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
@@ -13,7 +14,6 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -43,31 +43,11 @@ public final class WoodlandMansionTemplates {
     private static final BlockState LANTERN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
     private static final String PLANKS_ID = "minecraft:dark_oak_planks";
 
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
-
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("core.nbt"), core());
         writeIfAbsent(dir.resolve("wing_storeroom.nbt"), wing("storeroom"));
         writeIfAbsent(dir.resolve("wing_library.nbt"), wing("library"));
         writeIfAbsent(dir.resolve("wing_checker.nbt"), wing("checker"));
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
-    }
-
-    private static CompoundTag jig(String name, String target, String pool, String finalState) {
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", name);
-        t.putString("target", target);
-        t.putString("pool", pool);
-        t.putString("final_state", finalState);
-        t.putString("joint", "rollable");
-        return t;
     }
 
     /** The start piece: the two-storey 13×13 manor, with three ground-floor wall connectors drawing wings. */

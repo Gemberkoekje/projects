@@ -1,5 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -20,8 +22,6 @@ import java.util.Map;
  */
 public final class WitchHutTemplates {
     private WitchHutTemplates() {}
-
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
     public static void generateInto(Path dir) throws IOException {
         final Path file = dir.resolve("hut.nbt");

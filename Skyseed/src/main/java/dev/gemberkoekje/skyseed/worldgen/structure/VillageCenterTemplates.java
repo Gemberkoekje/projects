@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
@@ -19,7 +20,6 @@ import net.minecraft.world.level.block.state.properties.BellAttachType;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,8 +31,6 @@ import java.util.Map;
  */
 public final class VillageCenterTemplates {
     private VillageCenterTemplates() {}
-
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("plaza.nbt"), plaza());
@@ -54,24 +52,6 @@ public final class VillageCenterTemplates {
                 Blocks.STONECUTTER.defaultBlockState(),      // mason
                 Blocks.CAULDRON.defaultBlockState(),         // leatherworker
                 Blocks.BARREL.defaultBlockState()));          // fisherman
-    }
-
-    private static void writeIfAbsent(Path file, Built b) throws IOException {
-        if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
-            Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
-        }
-    }
-
-    private static CompoundTag jig(String name, String target, String pool, String finalState) {
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", name);
-        t.putString("target", target);
-        t.putString("pool", pool);
-        t.putString("final_state", finalState);
-        t.putString("joint", "rollable");
-        return t;
     }
 
     /**

@@ -1,5 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.structure;
 
+import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
+
 import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -27,8 +29,6 @@ public final class TrailRuinsTemplates {
     private static final BlockState TERRACOTTA = Blocks.TERRACOTTA.defaultBlockState();
     private static final BlockState GRAVEL = Blocks.GRAVEL.defaultBlockState();
     private static final BlockState SUS_GRAVEL = Blocks.SUSPICIOUS_GRAVEL.defaultBlockState();
-
-    private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
     public static void generateInto(Path dir) throws IOException {
         final Path file = dir.resolve("ruins.nbt");

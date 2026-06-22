@@ -36,7 +36,7 @@ automated tests. Two rules don't translate cleanly and are called out where rele
 | # | Priority | Area | Item |
 |---|----------|------|------|
 | A1 | **High** | Architecture | `IslandGenerator` is a 1,096-line god class; split it |
-| A2 | **High** | Architecture | Structure-template duplication (`Built` ×14, `writeIfAbsent` ×8, `anchor`/`lootChest`/`jig`/`spawner` re-implemented) |
+| A2 | ✅ done | Architecture | ~~Structure-template duplication~~ — consolidated into `StructureParts` + a shared `Built` record (~160 lines removed) |
 | B1 | ✅ done | Tooling | ~~No compiler lint~~ — `-Xlint:all` added (not `-Werror`), suppressions removed + warnings fixed |
 | B3 | ✅ done | Tooling | ~~No automated tests~~ — GameTest suite added as the refactoring guard |
 | B2 | Medium | Tooling | `.gitattributes` doesn't normalize source line endings (every commit warns) |
@@ -64,7 +64,17 @@ waterfalls, and mobs. The private statics already cluster into cohesive responsi
 
 `planIsland` then reads as a short pipeline. This is the single biggest readability/maintainability win.
 
-### A2 — Structure-template duplication — **High**
+### A2 — Structure-template duplication — **✅ done**
+Consolidated: a package-level `Built` record replaces the 14 nested copies, and `StructureParts` now owns
+`writeIfAbsent`, `jig`, `mobSpawner` (alongside the pre-existing `anchor`/`lootChest`/`gableRoof`/`suspicious`),
+which the templates call via a static import. The re-implemented `anchor`/`lootChest` copies in
+Dungeon/Outpost/Animal are gone (they call the shared ones, passing their own `final_state`/loot-table). Net
+**~160 lines** removed across 15 files. **Verified behaviour-preserving:** regenerating all 46 `.nbt` produced
+**zero diffs** (byte-identical), and the 16 gametests pass. (`trialSpawner` was deliberately *not* merged — the
+Vault Cell's is normal-config-only while the Trial Chamber's adds an ominous config, so they genuinely differ.)
+The original analysis below is kept for context.
+
+### A2 (original) — Structure-template duplication
 The 14 `*Templates` classes copy the same scaffolding instead of sharing it:
 
 - `private record Built(Map<BlockPos,BlockState>, Map<BlockPos,CompoundTag>) {}` — **re-declared in 14
