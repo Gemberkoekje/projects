@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.18.2] - 2026-06-22
+
+### Changed
+- **Made Large Rocky a proper mining mountain.** A 10-island measurement showed it was actually *leaner* than
+  the small island — ~0.75% ore by volume at y≈100 (vs the small island's ~2.75%), because its vein counts
+  didn't scale with its ~6× larger volume. Raised the bulk-ore (coal / iron / copper) counts on its mid /
+  high / peak bands so density now lands ~1.8–2%, and total ore rose from ~54 to ~132 per island — clearly
+  richer than the small island in total, while staying in the vanilla per-block range. The emerald gateway
+  and the deep diamond band are unchanged.
+
 ## [0.18.1] - 2026-06-22
 
 ### Changed
