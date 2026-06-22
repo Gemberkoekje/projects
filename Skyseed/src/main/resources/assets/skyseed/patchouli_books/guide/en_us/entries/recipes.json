@@ -126,32 +126,32 @@
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:pasture_skyseed_wool",
-      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$(), planks and dirt. A fenced field of cows, sheep or pigs."
+      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$() and planks over two dirt. A fenced field of cows, sheep or pigs."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:pasture_skyseed_beef",
-      "text": "$(italic)Same Pasture Skyseed$(), the other way: $(item)Raw Beef$() instead of wool. Whichever animal you caught first."
+      "text": "$(italic)Same Pasture Skyseed$(), the other way: $(item)Raw Beef$() in place of the wool, over two dirt. Whichever animal you caught first."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:poultry_skyseed",
-      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$(), an $(item)Egg$() and dirt. A walled coop of chickens."
+      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$() and an $(item)Egg$() over two dirt. A walled coop of chickens."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:wool_farm_skyseed",
-      "text": "The $(item)Wool Farm Skyseed$() — $(item)2 Wool$(), an iron ingot and dirt. A flock in every colour."
+      "text": "The $(item)Wool Farm Skyseed$() — $(item)two Wool$() over an iron ingot and dirt. A flock in every colour."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:stable_skyseed",
-      "text": "The $(item)Stable Skyseed$() — $(item)Leather$(), a $(item)Gold Ingot$() and planks. Horses, and a chest that might hold a saddle."
+      "text": "The $(item)Stable Skyseed$() — $(item)Leather$() and a $(item)Gold Ingot$() over two planks. Horses, and a chest that might hold a saddle."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:aquarium_skyseed",
-      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$(), a $(item)Prismarine Shard$() and sand. A glass tank of turtles, axolotls and fish."
+      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$() and a $(item)Prismarine Shard$() over two sand. A glass tank of turtles, axolotls and fish."
     },
     {
       "type": "patchouli:crafting",
@@ -161,22 +161,22 @@
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:ruined_portal_skyseed",
-      "text": "The $(item)Ruined Portal Skyseed$() — $(item)obsidian$() and a $(item)gold ingot$(). A broken portal with a chest of Nether spoils."
+      "text": "The $(item)Ruined Portal Skyseed$() — $(item)two obsidian$() over two $(item)gold ingots$(). A broken portal with a chest of Nether spoils."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:desert_temple_skyseed",
-      "text": "The $(item)Desert Temple Skyseed$() — $(item)sand$(), $(item)sandstone$() and $(item)TNT$(). Four chests over a pressure-plate trap."
+      "text": "The $(item)Desert Temple Skyseed$() — $(item)sandstone$() and $(item)TNT$() over two $(item)sand$(). Four chests above a buried cache of TNT."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:jungle_temple_skyseed",
-      "text": "The $(item)Jungle Temple Skyseed$() — $(item)jungle planks$(), $(item)mossy cobblestone$() and a $(item)tripwire hook$(). A trapped puzzle room."
+      "text": "The $(item)Jungle Temple Skyseed$() — $(item)two mossy cobblestone$() over $(item)jungle planks$() and a $(item)tripwire hook$(). A sealed room with two chests and a dispenser."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:witch_hut_skyseed",
-      "text": "The $(item)Witch Hut Skyseed$() — $(item)oak planks$(), a $(item)brown mushroom$() and a $(item)cauldron$(). A witch, a cat, and brewing drops."
+      "text": "The $(item)Witch Hut Skyseed$() — a $(item)Cauldron$() and a $(item)brown mushroom$() over two $(item)oak planks$(). A witch, a cat, and brewing drops."
     },
     {
       "type": "patchouli:text",

@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Nether-adjacent spoils$()$(br)The chest holds the vanilla ruined-portal haul: golden gear, flint and steel, fire charges, obsidian and crying obsidian. Crafted from $(item)obsidian$() and a $(item)gold ingot$()."
+      "text": "$(bold)Nether-adjacent spoils$()$(br)The chest holds the vanilla ruined-portal haul: golden gear, flint and steel, fire charges, obsidian and crying obsidian. Crafted from $(item)two obsidian$() and two $(item)gold ingots$()."
     }
   ]
 }
