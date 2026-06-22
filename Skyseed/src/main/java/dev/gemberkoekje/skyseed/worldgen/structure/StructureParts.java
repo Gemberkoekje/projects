@@ -36,4 +36,15 @@ public final class StructureParts {
         be.putString("LootTable", lootTable);
         return be;
     }
+
+    /**
+     * A brushable (suspicious sand/gravel) block-entity bound to an archaeology loot table — the player
+     * brushes it for a single drop. Pair with a {@code minecraft:suspicious_sand}/{@code _gravel} block.
+     */
+    public static CompoundTag suspicious(String lootTable) {
+        final CompoundTag be = new CompoundTag();
+        be.putString("id", "minecraft:brushable_block");
+        be.putString("LootTable", lootTable);
+        return be;
+    }
 }

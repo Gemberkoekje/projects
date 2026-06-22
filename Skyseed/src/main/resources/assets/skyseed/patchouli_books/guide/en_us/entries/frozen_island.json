@@ -11,6 +11,10 @@
     {
       "type": "patchouli:text",
       "text": "$(bold)Cold goods$()$(br)$(item)Packed ice$() runs through the core, with rare $(item)blue ice$() deep down. A little iron and coal too."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A sealed dome$()$(br)Once in a rare while a Frozen isle grows an $(o)igloo$() — a dark snow hut. Dig in for a chest with a $(item)golden apple$()... and the trapped $(o)zombie villager$() you can cure with it."
     }
   ]
 }

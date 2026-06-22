@@ -131,6 +131,8 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 **Spawns:** 1 Zombie Villager  
 **Notes:** The zombie villager is the payoff — curing it gives the player a permanently discounted villager (Java Edition). The cure requires a Splash Weakness Potion and a Golden Apple, both of which require some progression to obtain, making this a mid-game bonus rather than an early shortcut.
 
+**Status: ✅ Built** (v0.19.0). A `rare_structures` entry on the Hamlet theme (10%) swaps the cottage jigsaw for `skyseed:abandoned/cottage` — a cobwebbed, gap-punched oak ruin with a `village_plains_house` chest and **no bed** (so the bed-scan spawns no normal villager). The zombie villager comes from the rare structure's own `mobs` pack. Uses the vanilla cure path; the chest gives string/food.
+
 ---
 
 ### 🏠 Igloo
@@ -144,6 +146,8 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 **Loot:** Basement chest (golden apple, emerald, coal, wheat, stone axe) — the golden apple is the igloo's signature reward and directly enables zombie villager curing  
 **Spawns:** 1 Zombie Villager (in cage), 1 Cleric Villager (in the basement brewing area)  
 **Notes:** The igloo is the intended introduction to the zombie villager curing mechanic. Including it as a Frozen island feature rather than its own seed keeps it as a discovery rather than a crafted destination.
+
+**Status: ✅ Built** (v0.19.0). A `rare_structures` entry on the Frozen theme (5%) places `skyseed:igloo/igloo` — a **sealed** snow dome (kept dark so the zombie villager survives daylight) holding a brewing stand, a water cauldron and the vanilla `igloo_chest`. Simplified from vanilla: one surface dome rather than a hidden basement, and the cleric is dropped (a loose zombie villager + cleric would fight) — the player cures the trapped zombie villager with the chest's golden apple, and the cured villager can then claim the brewing stand as a cleric.
 
 ---
 
@@ -226,6 +230,8 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 **Loot:** Vanilla ocean ruins loot (suspicious sand/gravel with archaeological finds, small chest with emerald, coal, gold nugget, enchanted fishing rod)  
 **Notes:** The Sniffer egg is obtainable from warm ocean ruin suspicious sand — if the Aquatic Island's warm variant can generate this, it's a meaningful rare reward that feeds into the Lush Island's Torchflower/Pitcher Plant payoff.
 
+**Status: ✅ Built** (v0.19.0). A `rare_structures` entry on the Aquatic theme (8%, `suppress_pond: true`) replaces the central pond with `skyseed:ocean_ruin/ruin` — a weathered (plain/mossy/cracked) stone-brick basin holding a contained 2-deep pool, three `suspicious_sand` (→ `archaeology/ocean_ruin_warm`, the Sniffer-egg source) and one `suspicious_gravel` (→ cold) sunk in the floor, a submerged `underwater_ruin_big` chest, and broken upper walls + a pillar. The basin is raised (walls hold the water) rather than truly sunk — a future refinement.
+
 ---
 
 ### ⚔️ Trial Chamber
@@ -262,12 +268,12 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 | Witch Hut | 🧙 Witch Hut Island | Dedicated seed |
 | Pillager Outpost | 🗼 Outpost Island | Dedicated seed |
 | Village | 🏡🏪⛪ Village Islands | See SKYVILLAGESPLAN.md |
-| Abandoned Village | Hamlet Island variant | 10% chance on Hamlet |
-| Igloo | Frozen Island feature | 5% rare feature on Frozen |
+| Abandoned Village | Hamlet Island variant | ✅ 10% chance on Hamlet |
+| Igloo | Frozen Island feature | ✅ 5% rare feature on Frozen |
 | Ruined Portal | 🪨 Ruined Portal Island | Dedicated seed |
 | Woodland Mansion | 🏰 Mansion Room Island | Dedicated seed (single room) |
 | Trail Ruins | 🏺 Ruins Island | Dedicated seed |
-| Ocean Ruins | Aquatic Island feature | 8% rare feature on Aquatic |
+| Ocean Ruins | Aquatic Island feature | ✅ 8% rare feature on Aquatic |
 | Trial Chamber | ⚔️ Trial Chamber Island | Dedicated seed (multi-room) |
 | Pillager Patrol | Disabled | Use `doPatrolSpawning` gamerule |
 | Stronghold | Deferred | Nether/End progression scope |

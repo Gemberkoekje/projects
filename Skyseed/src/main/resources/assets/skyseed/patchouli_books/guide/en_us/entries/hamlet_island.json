@@ -15,6 +15,10 @@
     {
       "type": "patchouli:text",
       "text": "$(bold)A home$()$(br)The cottage has a bed they will claim, so they restock and can breed (add more beds and food). $(br)Raids are switched off on Skyseed worlds — illagers would only path into the void — but $(item)iron golems$() still appear once a village grows large enough."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A home gone wrong$()$(br)Rarely a Hamlet grows $(o)abandoned$() instead: a cobwebbed ruin with no bed and a $(o)zombie villager$() for a tenant. Cure them and you have a villager — often with a discount."
     }
   ]
 }

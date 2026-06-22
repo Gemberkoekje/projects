@@ -5,6 +5,10 @@
     { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 8, "max": 12 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
     { "block": "minecraft:gravel", "chance": 0.90, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
   ],
+  "rare_structures": [
+    { "chance": 0.08, "suppress_pond": true,
+      "jigsaw": { "pool": "skyseed:ocean_ruin/ruin", "target": "minecraft:bottom", "depth": 1, "pad": 5 } }
+  ],
   "pond": {
     "block": "minecraft:water", "radius": 4, "depth": 3,
     "plants": [

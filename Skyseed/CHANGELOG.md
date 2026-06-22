@@ -3,6 +3,23 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.0] - 2026-06-22
+
+### Added
+- **Rare structures on ordinary islands.** A new `rare_structures` theme field rolls a chance-gated structure
+  that germinates in place of the usual island (the first whose chance hits wins, at most one per island). When
+  rolled, its jigsaw replaces the theme's normal one (or becomes the only one) and its own `mobs` pack spawns
+  the inhabitants; `suppress_pond` lets a flooded ruin stand in for the pond. Three surprises ship with it:
+  - **Igloo** — 5% on Frozen islands. A sealed snow dome (kept dark so it survives daylight) with a brewing
+    stand, a water cauldron, the vanilla `igloo_chest` (golden apple!), and a trapped **zombie villager** to
+    cure. Simplified from vanilla: a surface dome rather than a hidden basement, and no separate cleric.
+  - **Abandoned cottage** — 10% on Hamlet islands. A cobwebbed, gap-punched oak ruin with a `village_plains_house`
+    chest and **no bed** — so no normal villager spawns, only the haunting **zombie villager**.
+  - **Ocean ruin** — 8% on Aquatic islands. A weathered stone-brick basin (it replaces the central pond) holding
+    a contained pool, **suspicious sand** (warm — the Sniffer-egg source) and gravel, and a sunken
+    `underwater_ruin_big` chest.
+- Brief field notes for each surprise added to the Frozen / Hamlet / Aquatic guide entries.
+
 ## [0.18.2] - 2026-06-22
 
 ### Changed

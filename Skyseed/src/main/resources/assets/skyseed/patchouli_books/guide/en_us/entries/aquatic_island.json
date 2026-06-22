@@ -15,6 +15,10 @@
     {
       "type": "patchouli:text",
       "text": "$(bold)Mud & banks$()$(br)Over a swamp or mangrove it grows $(item)mud$() and mangroves. The bed is thick with $(item)clay$() and gravel — the point of the island."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Sunken stone$()$(br)Now and then the pool comes up an $(o)ocean ruin$() instead — a flooded stone-brick basin. Brush its $(item)suspicious sand$() for archaeology finds (a $(item)sniffer egg$(), if you're lucky) and loot the sunken chest."
     }
   ]
 }

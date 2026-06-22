@@ -77,6 +77,12 @@ Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 - 🌿 **Jungle Temple** — a mossy puzzle room with two chests and an arrow dispenser.
 - 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
 
+And some surprises don't need their own seed — once in a while an ordinary island grows something extra:
+
+- 🏠 **Igloo** — rarely a Frozen island raises a sealed snow dome: dig in for a golden apple and a trapped zombie villager to cure.
+- 🏚️ **Abandoned cottage** — rarely a Hamlet comes up cobwebbed and bed-less, with a zombie villager for a tenant.
+- 🌊 **Ocean ruin** — rarely an Aquatic island's pool is instead a flooded stone-brick ruin, with suspicious sand to brush and a sunken chest.
+
 ---
 
 ## A living, biome-aware world

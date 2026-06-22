@@ -3,6 +3,11 @@
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
   "jigsaw": { "pool": "skyseed:hamlet/cottages", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+  "rare_structures": [
+    { "chance": 0.10,
+      "jigsaw": { "pool": "skyseed:abandoned/cottage", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:zombie_villager", "adults": 1 } ] } ] }
+  ],
   "variants": [
     { "weight": 1, "name": "yard", "decoration": {
       "ground": [

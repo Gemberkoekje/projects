@@ -14,6 +14,7 @@ import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Palette;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import dev.gemberkoekje.skyseed.worldgen.theme.JigsawConfig;
+import dev.gemberkoekje.skyseed.worldgen.theme.RareStructure;
 import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
@@ -167,11 +168,22 @@ public final class IslandGenerator {
             planOres(blockMap, ores, coreList, minCoreY, maxCoreY, random);
         }
 
+        // Rare structures: at most one germinates in place of the usual island (the first whose chance rolls).
+        // Rolled here, before the pond, so a flooded ruin can suppress the pond it stands in for.
+        RareStructure rolledRare = null;
+        for (final RareStructure rs : theme.rareStructures()) {
+            if (random.nextFloat() < rs.chance()) {
+                rolledRare = rs;
+                break;
+            }
+        }
+        final RareStructure rare = rolledRare;
+
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
         final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
         final Set<Long> pondColumns = new HashSet<>();
         int pondSurfaceTmp = center.getY();
-        if (pondCfg.isPresent()) {
+        if (pondCfg.isPresent() && (rare == null || !rare.suppressPond())) {
             final Pond pond = pondCfg.get();
             // Ponds sit flush with the surface; rivers cut a channel down through it.
             final int waterY = pond.isRiver() ? center.getY() : pondWaterY(center, topDome, baseRadius, pond);
@@ -192,15 +204,17 @@ public final class IslandGenerator {
         // and a villager is spawned at every bed in it.
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
         final List<IslandPlan.AnimalSpawn> animals = new ArrayList<>();
-        if (theme.jigsaw().isPresent()) {
-            final JigsawConfig jc = theme.jigsaw().get();
+        // A rolled rare structure replaces the theme's normal jigsaw + animal packs for this island.
+        final JigsawConfig jc = rare != null ? rare.jigsaw() : theme.jigsaw().orElse(null);
+        final List<AnimalPack> animalPacks = rare != null ? rare.mobs() : theme.animals();
+        if (jc != null) {
             final int gy = center.getY() + topDome;
             levelStructurePad(blockMap, surfaceList, center, gy, jc.pad(), surface, fill);
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy, center.getZ())));
-            // Dedicated Animal Islands: roll one weighted pack into the enclosure centre.
-            if (!theme.animals().isEmpty()) {
-                rollAnimals(theme.animals(), new BlockPos(center.getX(), gy, center.getZ()), animals, random);
+            // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack into the centre.
+            if (!animalPacks.isEmpty()) {
+                rollAnimals(animalPacks, new BlockPos(center.getX(), gy, center.getZ()), animals, random);
             }
         }
 

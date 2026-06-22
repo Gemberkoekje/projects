@@ -14,10 +14,12 @@ import java.util.Optional;
  * like a vanilla village — e.g. a villager island's cottage — see {@code SKYVILLAGESPLAN.md}.
  * {@code animals} optionally rolls one weighted pack of farm animals into the jigsaw enclosure's centre,
  * for the dedicated Animal Islands — see {@code SKYANIMALSPLAN.md}.
+ * {@code rare_structures} optionally lets a chance-gated structure (igloo, haunted cottage, flooded ruin)
+ * germinate in place of the usual island — see {@code SKYSTRUCTURESPLAN.md}.
  */
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
-                          Optional<JigsawConfig> jigsaw, List<AnimalPack> animals) {
+                          Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures) {
     public static final Codec<IslandTheme> CODEC = RecordCodecBuilder.create(i -> i.group(
             Shape.CODEC.fieldOf("shape").forGetter(IslandTheme::shape),
             Palette.CODEC.fieldOf("palette").forGetter(IslandTheme::palette),
@@ -27,6 +29,7 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             Pond.CODEC.optionalFieldOf("pond").forGetter(IslandTheme::pond),
             MobEntry.CODEC.listOf().optionalFieldOf("mobs", List.of()).forGetter(IslandTheme::mobs),
             JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(IslandTheme::jigsaw),
-            AnimalPack.CODEC.listOf().optionalFieldOf("animals", List.of()).forGetter(IslandTheme::animals)
+            AnimalPack.CODEC.listOf().optionalFieldOf("animals", List.of()).forGetter(IslandTheme::animals),
+            RareStructure.CODEC.listOf().optionalFieldOf("rare_structures", List.of()).forGetter(IslandTheme::rareStructures)
     ).apply(i, IslandTheme::new));
 }
