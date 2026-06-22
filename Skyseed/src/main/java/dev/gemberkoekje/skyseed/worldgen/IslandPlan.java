@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -46,6 +47,6 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed);
      * {@code ironGolems} golems are spawned at the centre once assembled.
      */
-    public record JigsawSite(net.minecraft.resources.ResourceLocation pool, net.minecraft.resources.ResourceLocation target,
+    public record JigsawSite(ResourceLocation pool, ResourceLocation target,
                              int depth, int pad, int ironGolems, BlockPos origin) {}
 }

@@ -22,13 +22,20 @@ import java.util.Set;
 final class OrePlanner {
     private OrePlanner() {}
 
+    /** Fraction of the core Y-range (from the bottom) that counts as "deep core" for {@code deep_core} ores. */
+    private static final double DEEP_CORE_FRACTION = 0.4;
+    /** Chance a vein step grows to a face neighbour (compact veins) vs. a rarer diagonal. */
+    private static final float FACE_GROW_CHANCE = 0.80f;
+    /** Attempts to find a valid (depth-appropriate, not-yet-ore) seed block before giving up on a vein. */
+    private static final int SEED_TRIES = 16;
+
     static void planOres(Map<BlockPos, BlockState> blockMap, List<OreEntry> ores, List<BlockPos> coreList,
                          int minCoreY, int maxCoreY, RandomSource random) {
         final Set<Long> coreSet = new HashSet<>(coreList.size() * 2);
         for (BlockPos p : coreList) {
             coreSet.add(p.asLong());
         }
-        final int deepMaxY = minCoreY + (int) Math.round((maxCoreY - minCoreY) * 0.4); // lower 40% = deep_core
+        final int deepMaxY = minCoreY + (int) Math.round((maxCoreY - minCoreY) * DEEP_CORE_FRACTION); // lower 40% = deep_core
 
         for (OreEntry ore : ores) {
             if (!BuiltInRegistries.BLOCK.containsKey(ore.block())) {
@@ -51,7 +58,7 @@ final class OrePlanner {
 
     private static BlockPos pickSeed(List<BlockPos> coreList, Set<Long> coreSet, OreDepth depth,
                                      int deepMaxY, RandomSource random) {
-        for (int tries = 0; tries < 16; tries++) {
+        for (int tries = 0; tries < SEED_TRIES; tries++) {
             final BlockPos c = coreList.get(random.nextInt(coreList.size()));
             if (!coreSet.contains(c.asLong())) {
                 continue;
@@ -77,7 +84,7 @@ final class OrePlanner {
             final BlockPos from = placed.get(random.nextInt(placed.size()));
             // Favour growing to a face neighbour (compact, vanilla-looking veins); allow diagonals, but rarely.
             final BlockPos nb;
-            if (random.nextFloat() < 0.80f) {
+            if (random.nextFloat() < FACE_GROW_CHANCE) {
                 nb = from.relative(Direction.values()[random.nextInt(Direction.values().length)]);
             } else {
                 int dx, dy, dz; // a real diagonal step: at least two axes off

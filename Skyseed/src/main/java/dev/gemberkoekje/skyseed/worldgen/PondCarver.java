@@ -30,6 +30,11 @@ final class PondCarver {
             {1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
     };
 
+    /** Pond extent as a fraction of the island radius — keeps the pool well inside the rim so it can be contained. */
+    private static final double POND_EXTENT_FRACTION = 0.5;
+    /** Strength of the pond's harmonic edge wobble (up to ~28%). */
+    private static final double POND_RIM_WOBBLE = 0.28;
+
     /**
      * Water surface for a pond: flush with the island's top at the pond's rim, not the un-domed base
      * ({@code center.getY()}). The top is domed up by {@code topDome} at the centre, so filling to the
@@ -145,20 +150,30 @@ final class PondCarver {
         surfaceList.addAll(newRim); // decorations may grow on the new ring; stale lower entries are skipped (now buried)
     }
 
-    /** Pond-bed material: mostly sand, some gravel and clay, otherwise the island's own block. */
+    /** Pond-bed material: mostly sand, some gravel and clay. @return the bed block, or {@code null} to keep the island's own block. */
     private static BlockState pondBed(RandomSource random) {
         final float x = random.nextFloat();
-        if (x < 0.30f) return Blocks.SAND.defaultBlockState();
-        if (x < 0.50f) return Blocks.GRAVEL.defaultBlockState();
-        if (x < 0.62f) return Blocks.CLAY.defaultBlockState();
+        if (x < 0.30f) {
+            return Blocks.SAND.defaultBlockState();
+        }
+        if (x < 0.50f) {
+            return Blocks.GRAVEL.defaultBlockState();
+        }
+        if (x < 0.62f) {
+            return Blocks.CLAY.defaultBlockState();
+        }
         return null; // keep the existing island body
     }
 
-    /** Shore material at the waterline: sandy/gravelly patches, otherwise {@code fallback} (null = leave as-is). */
+    /** Shore material at the waterline: sandy/gravelly patches, otherwise {@code fallback}. @return the shore block, or {@code fallback} (which may be {@code null} = leave as-is). */
     private static BlockState pondShore(RandomSource random, BlockState fallback) {
         final float x = random.nextFloat();
-        if (x < 0.22f) return Blocks.SAND.defaultBlockState();
-        if (x < 0.35f) return Blocks.GRAVEL.defaultBlockState();
+        if (x < 0.22f) {
+            return Blocks.SAND.defaultBlockState();
+        }
+        if (x < 0.35f) {
+            return Blocks.GRAVEL.defaultBlockState();
+        }
         return fallback;
     }
 
@@ -167,21 +182,16 @@ final class PondCarver {
         final List<int[]> out = new ArrayList<>();
         // Keep the pool well inside the island (extent ≈ 0.62·baseRadius after wobble) so its rim always has
         // solid ground for the containment ring to wall against — overshooting the rim is what made it overflow.
-        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * 0.5)));
-        final int[] freq = { 2, 3, 5 };
-        final double[] amp = new double[freq.length];
-        final double[] phase = new double[freq.length];
-        double sum = 0;
-        for (int k = 0; k < freq.length; k++) { amp[k] = 0.3 + random.nextDouble(); sum += amp[k]; phase[k] = random.nextDouble() * Math.PI * 2; }
-        for (int k = 0; k < freq.length; k++) { amp[k] = amp[k] / sum * 0.28; } // wobble the edge by up to ~28%
+        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * POND_EXTENT_FRACTION)));
+        final RimNoise edge = RimNoise.sample(random, POND_RIM_WOBBLE);
         final int maxR = (int) Math.ceil(r * 1.25) + 1;
         for (int dx = -maxR; dx <= maxR; dx++) {
             for (int dz = -maxR; dz <= maxR; dz++) {
                 final double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
                 final double angle = Math.atan2(dz, dx);
-                double rim = r;
-                for (int k = 0; k < freq.length; k++) { rim += r * amp[k] * Math.sin(freq[k] * angle + phase[k]); }
-                if (dist <= rim) { out.add(new int[]{dx, dz}); }
+                if (dist <= edge.rim(r, angle)) {
+                    out.add(new int[]{dx, dz});
+                }
             }
         }
         return out;
@@ -203,7 +213,9 @@ final class PondCarver {
                 final double along = dx * dirX + dz * dirZ;
                 final double perp = dx * perpX + dz * perpZ;
                 final double centerline = mAmp * Math.sin(along * mFreq + mPhase);
-                if (Math.abs(perp - centerline) <= half) { out.add(new int[]{dx, dz}); }
+                if (Math.abs(perp - centerline) <= half) {
+                    out.add(new int[]{dx, dz});
+                }
             }
         }
         return out;

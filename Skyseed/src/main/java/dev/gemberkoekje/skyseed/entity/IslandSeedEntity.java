@@ -24,6 +24,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -33,12 +34,13 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * The thrown Skyseed. It arms for {@link #ARM_DURATION} ticks (~3 s) while flying — or resting, if it
- * lands first — then {@link #germinate()}s: particles, a sound, and (for now) a placeholder stone
- * platform. The real procedural island replaces the placeholder in milestone 4; per-theme content
- * keys off {@link #getTheme()} from milestone 6 on.
+ * The thrown Skyseed. It arms for {@link #ARM_DURATION} ticks (~2 s) while flying — or resting, if it lands
+ * first — then germinates: it resolves the seed's {@link #getTheme() theme}, plans a procedural island with
+ * {@link IslandGenerator#planIsland}, and hands the plan to a {@link GenerationJob} that grows it into the
+ * world over the following ticks (particles and a sound mark the moment). A Precise-mode throw instead flies
+ * through everything and germinates at an exact target (see {@code IslandSeedItem}).
  */
-public class IslandSeedEntity extends net.minecraft.world.entity.projectile.ThrowableItemProjectile {
+public class IslandSeedEntity extends ThrowableItemProjectile {
     private static final EntityDataAccessor<String> DATA_THEME =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
 
@@ -80,6 +82,7 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         this.entityData.set(DATA_THEME, theme == null ? "" : theme.toString());
     }
 
+    /** @return this seed's theme id, or {@code null} if none was set (a bare/legacy seed). */
     public ResourceLocation getTheme() {
         String s = this.entityData.get(DATA_THEME);
         return s.isEmpty() ? null : ResourceLocation.tryParse(s);
@@ -201,7 +204,10 @@ public class IslandSeedEntity extends net.minecraft.world.entity.projectile.Thro
         }
     }
 
-    /** Resolve this seed's theme from the datapack registry; fall back to forest, then to any theme. */
+    /**
+     * Resolve this seed's theme from the datapack registry; fall back to forest, then to any theme.
+     * @return the resolved theme, or {@code null} only if no themes are loaded at all.
+     */
     private IslandTheme resolveTheme(ServerLevel level) {
         Registry<IslandTheme> themes = level.registryAccess().registryOrThrow(SkyseedRegistries.THEME);
         ResourceLocation id = getTheme();

@@ -39,11 +39,12 @@ automated tests. Two rules don't translate cleanly and are called out where rele
 | A2 | ✅ done | Architecture | ~~Structure-template duplication~~ — consolidated into `StructureParts` + a shared `Built` record (~160 lines removed) |
 | B1 | ✅ done | Tooling | ~~No compiler lint~~ — `-Xlint:all` added (not `-Werror`), suppressions removed + warnings fixed |
 | B3 | ✅ done | Tooling | ~~No automated tests~~ — GameTest suite added as the refactoring guard |
-| B2 | Medium | Tooling | `.gitattributes` doesn't normalize source line endings (every commit warns) |
-| D1 | Medium | Docs | Stale `IslandSeedEntity` class Javadoc ("placeholder", "milestone 4") |
-| C1 | Medium | Quality | Null-as-sentinel returns; prefer `Optional` / document |
-| C2–C5 | Low | Quality | FQN-over-import, brace/format inconsistencies, magic numbers, import order |
-| P1 | Low | Perf | Jigsaw assembly placed un-budgeted in one tick |
+| B2 | ✅ done | Tooling | ~~`.gitattributes` doesn't normalize line endings~~ — `* text=auto eol=lf` + binary rules added |
+| B4 | ✅ done | Tooling | ~~Dead MDK example clutter in `build.gradle`~~ — JEI/coolmod/flat-dir/sister-project examples trimmed |
+| D1 | ✅ done | Docs | ~~Stale `IslandSeedEntity` Javadoc~~ — rewritten to the current germinate → plan → `GenerationJob` flow |
+| C1 | ✅ done | Quality | ~~Null-as-sentinel returns~~ — documented with `@return … or {@code null}` Javadoc (null is idiomatic in MC) |
+| C2–C5 | ✅ done | Quality | ~~FQN-over-import, brace/format, magic numbers, import order~~ — fixed; rim-harmonic routine extracted to `RimNoise` |
+| P1 | ✅ done | Perf | ~~Un-budgeted jigsaw assembly~~ — documented the trade-off + the defer-a-tick escape hatch |
 
 ---
 
@@ -158,7 +159,10 @@ code a server-side gametest can't reach. The five tiny `skyseed:gametest/*` them
 are test-only assets that currently ship in the main jar (inert — no seed item references them); they'd move
 with the gametest source set in the follow-up above.
 
-### B2 — Line-ending normalization — **Medium**
+### B2 — Line-ending normalization — **✅ done**
+Added `* text=auto eol=lf` + binary rules (`.nbt`/`.png`/`.ogg`/`.jar`); the per-commit CRLF warning is gone.
+
+### B2 (original) — Line-ending normalization
 `.gitattributes` only pins `src/generated/**` to LF. Source files aren't covered, so every commit prints
 `warning: … LF will be replaced by CRLF` and one `.java` file is already CRLF while the rest are LF. Add:
 ```gitattributes
@@ -168,15 +172,23 @@ with the gametest source set in the follow-up above.
 ```
 (or a blanket `* text=auto eol=lf`). Satisfies `instructions.md`'s "consistent line endings".
 
-### B4 — Dead template clutter — **Low**
-`build.gradle` still carries the NeoForge MDK's example comments (JEI, `coolmod`, flat-dir repo,
-`localRuntime` essay). Harmless, but trimming the unused examples reduces noise.
+### B4 — Dead template clutter — **✅ done**
+Trimmed the unused MDK examples from `build.gradle` (the JEI / `coolmod` flat-dir / file / sister-project
+dependency comments + the stray gradle-doc links and the `data` working-directory example). Kept the
+`localRuntime` config + comment (it's real — Patchouli rides on it). The lint/coverage blocks are unchanged.
 
 ---
 
 ## C. Code quality & conventions
 
-### C1 — Null as sentinel — **Medium**
+### C1 — Null as sentinel — **✅ done**
+Took the documented-null route (the codereview's lighter option; `null` is idiomatic in MC modding, and the
+callers already null-check correctly): added `@return … or {@code null}` Javadoc to `MobPlanner.resolveEntity`,
+`IslandGenerator.matchOverride`/`pickVariant`, `PondCarver.pondBed`/`pondShore`, and
+`IslandSeedEntity.getTheme`/`resolveTheme`. (`resolveBlock` was *not* in scope — it always returns a non-null
+fallback.) Left as-is rather than churning every helper to `Optional`.
+
+### C1 (original) — Null as sentinel
 Several methods return `null` to mean "none/skip": `IslandGenerator.resolveBlock`/`resolveEntity`/
 `pondBed`/`pondShore`/`matchOverride`/`pickVariant`, `IslandSeedEntity.getTheme`/`resolveTheme`. `null`
 is idiomatic in MC modding, so this is a judgement call rather than a bug — but to align with
@@ -184,48 +196,48 @@ is idiomatic in MC modding, so this is a judgement call rather than a bug — bu
 least add `@return … or {@code null}` Javadoc so callers know). The callers already null-check correctly,
 so this is about clarity, not correctness.
 
-### C2 — Fully-qualified names where an import exists — **Low**
-- `entity/IslandSeedEntity.java:41` — `extends net.minecraft.…ThrowableItemProjectile` (not imported).
-- `worldgen/IslandGenerator.java:265` — `java.util.Set` though `Set` is imported (`:51`).
-- `worldgen/IslandPlan.java:49` — `net.minecraft.resources.ResourceLocation` ×2 inline.
-Import them for consistency with the rest of the codebase.
+### C2 — Fully-qualified names where an import exists — **✅ done**
+- `IslandSeedEntity` — imports `ThrowableItemProjectile` and `extends` the simple name.
+- `IslandPlan.JigsawSite` — imports `ResourceLocation`, uses it for both fields.
+- The `java.util.Set` FQN in the old `IslandGenerator` was resolved by the A1 split (the `AQUATIC` set moved to
+  `MobPlanner`, which imports `Set`).
 
-### C3 — Brace / one-statement-per-line inconsistency — **Low**
-`IslandGenerator.pondBed`/`pondShore` (`:933–936`, `:942–944`) use braceless single-line `if`s, and
-`pondColumns`/`riverColumns` (`:957–958`, `:965`) pack multiple statements per line — both against the
-house style used everywhere else (braces, one statement per line).
+### C3 — Brace / one-statement-per-line inconsistency — **✅ done**
+`PondCarver.pondBed`/`pondShore` now brace every `if`, and `pondColumns`/`riverColumns` are one statement per
+line (the packed harmonic loop in `pondColumns` went away entirely with the `RimNoise` extraction — see C4).
 
-### C4 — Magic numbers & a duplicated noise routine — **Low**
-Gameplay-tuning constants are inline: bulge exponent `0.85` (`:138`), deep-core fraction `0.4` (`:474`),
-vein face-grow chance `0.80` (`:523`), `16` seed tries (`:497`), pad clear-height `10` (`:313`), pond
-extent `0.5·radius` (`:952`). Many are comment-explained; promoting the *tunable* ones to named
-constants would aid balancing. The **rim-harmonic routine** (`freq{2,3,5}` + amp/phase normalization) is
-**duplicated** at `:99–110` and `pondColumns:953–958` — extract a `RimNoise.sample(angle, …)` helper.
+### C4 — Magic numbers & a duplicated noise routine — **✅ done**
+The duplicated **rim-harmonic routine** is now a shared `RimNoise` class (`sample(random, strength)` rolls the
+six doubles in the original order; `rim(base, angle)` evaluates the wobbled radius), called by both
+`ShapeBuilder` and `PondCarver.pondColumns` — behaviour byte-identical (the golden master confirms it). Tunable
+constants were named: `ShapeBuilder.DEPTH_BULGE_EXP` (0.85), `OrePlanner.DEEP_CORE_FRACTION` (0.4) /
+`FACE_GROW_CHANCE` (0.80) / `SEED_TRIES` (16), `PondCarver.POND_EXTENT_FRACTION` (0.5) / `POND_RIM_WOBBLE`
+(0.28), `IslandGenerator.PAD_CLEAR_HEIGHT` (10). The pond bed/shore probability thresholds were left inline
+(comment-clear, not balance knobs).
 
-### C5 — Import ordering — **Low**
-`GenerationJob.java` interleaves `net.minecraft.core.*` (`:20–22`) among `net.minecraft.world.*` imports
-and puts `DyeColor` (`:15`) between two `npc` imports. `instructions.md` ("organize imports") — let the
-IDE re-sort; otherwise low impact.
+### C5 — Import ordering — **✅ done**
+`GenerationJob` imports re-sorted alphabetically — the `core`/`resources` imports no longer interrupt the
+`world.*` block, and `DyeColor` no longer sits between the two `npc` imports.
 
 ---
 
 ## D. Documentation
 
-### D1 — Stale class Javadoc — **Medium**
-`entity/IslandSeedEntity.java:35–39` still says germination produces *"a placeholder stone platform. The
-real procedural island replaces the placeholder in milestone 4"* — long superseded by the full theme
-system. Rewrite to describe current behaviour (arm timer → `IslandGenerator.planIsland` →
-`GenerationJob`). Worth a quick grep for other "milestone N"/"placeholder" comments that may have aged.
+### D1 — Stale class Javadoc — **✅ done**
+`IslandSeedEntity`'s class Javadoc now describes the real flow (arm timer → resolve theme →
+`IslandGenerator.planIsland` → `GenerationJob`), drops the broken `{@link #germinate()}` link (the method takes
+a `ServerLevel` now), and corrects "~3 s" → "~2 s". A grep confirmed no other "milestone N"/"placeholder"
+comments remain in `src/main/java`.
 
 ---
 
 ## E. Performance (minor)
 
-- **P1** — `GenerationJob.placeStructures()` (`:78`) runs `JigsawPlacement.generateJigsaw` for the whole
-  structure in a **single tick**, un-budgeted — a potential frame spike for the big assemblies
-  (Woodland Mansion + wings, Village Center) that the per-block budget otherwise avoids. It's one vanilla
-  call so hard to chunk; worth a comment acknowledging the trade-off, or deferring large structures a
-  tick.
+- **P1** — ✅ **done (comment).** `GenerationJob.placeStructures()` runs `JigsawPlacement.generateJigsaw` for
+  the whole structure in a **single tick**, un-budgeted — a potential frame spike for the big assemblies
+  (Woodland Mansion + wings, Village Center) that the per-block budget otherwise avoids. It's one vanilla call
+  so it can't be chunked without reimplementing jigsaw placement; a Javadoc note now records the trade-off and
+  the escape hatch (defer large structures to a later tick than the blocks/trees) if it ever bites.
 - **P2** — `IslandGenerator` keys its working map on `BlockPos` objects; a packed-`long` map would cut
   allocations on big islands. Micro-optimization; current cost is acceptable.
 - **P3** — `IslandSeedEntity.isTooCrowded` (`:177`) does up to a few thousand `getBlockState` × 4 nudge

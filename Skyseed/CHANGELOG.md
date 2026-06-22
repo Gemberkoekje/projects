@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.7] - 2026-06-22
+
+### Internal
+- **Code-review cleanup** (B4, C1–C5, D1, P1): trimmed the dead NeoForge-MDK example comments from
+  `build.gradle`; documented the nullable-sentinel returns (`@return … or {@code null}`); replaced
+  fully-qualified names with imports (`ThrowableItemProjectile`, `ResourceLocation`); braced and reflowed
+  `PondCarver`'s pond-bed/shore/column helpers; named the tunable magic numbers (depth-bulge exponent,
+  deep-core fraction, vein face-grow chance, seed tries, pond extent / rim wobble, pad clear-height);
+  re-sorted `GenerationJob`'s imports; rewrote the stale `IslandSeedEntity` class Javadoc (no more
+  "milestone 4 placeholder"); and documented the un-budgeted single-tick jigsaw trade-off.
+- Extracted the duplicated rim-harmonic routine into a shared `RimNoise` helper (used by both `ShapeBuilder`
+  and `PondCarver`). Behaviour-preserving: the `islandOutputIsStable` golden master stays byte-identical and
+  all 17 gametests pass; compiles warning-free under `-Xlint:all`.
+
 ## [0.32.6] - 2026-06-22
 
 ### Internal

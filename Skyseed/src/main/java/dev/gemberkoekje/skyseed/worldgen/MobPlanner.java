@@ -110,6 +110,7 @@ final class MobPlanner {
         return out;
     }
 
+    /** @return the entity type for {@code id}, or {@code null} (logged) if it isn't a registered entity. */
     private static EntityType<?> resolveEntity(ResourceLocation id) {
         if (BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
             return BuiltInRegistries.ENTITY_TYPE.get(id);

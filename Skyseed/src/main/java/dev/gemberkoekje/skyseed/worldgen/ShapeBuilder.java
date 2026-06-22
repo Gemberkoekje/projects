@@ -17,6 +17,9 @@ import java.util.Map;
 final class ShapeBuilder {
     private ShapeBuilder() {}
 
+    /** Falloff exponent for the body's depth vs. the centre bulge: lower = a flatter, more plateau-like underside. */
+    private static final double DEPTH_BULGE_EXP = 0.85;
+
     /** The shape values the orchestrator reuses after pass 1: the rolled radius/dome and the core Y-range (for ores). */
     record Result(int baseRadius, int topDome, int minCoreY, int maxCoreY) {}
 
@@ -31,18 +34,7 @@ final class ShapeBuilder {
         final double maxDepth = baseRadius * 1.05;
 
         // Irregular rim from a few angular harmonics (decorrelated per island via the RandomSource).
-        final int[] freq = { 2, 3, 5 };
-        final double[] amp = new double[freq.length];
-        final double[] phase = new double[freq.length];
-        double ampSum = 0;
-        for (int k = 0; k < freq.length; k++) {
-            amp[k] = 0.3 + random.nextDouble();
-            ampSum += amp[k];
-            phase[k] = random.nextDouble() * Math.PI * 2.0;
-        }
-        for (int k = 0; k < freq.length; k++) {
-            amp[k] = amp[k] / ampSum * rimNoise;
-        }
+        final RimNoise edge = RimNoise.sample(random, rimNoise);
 
         final int maxR = (int) Math.ceil(baseRadius * (1.0 + rimNoise)) + 1;
         int minCoreY = Integer.MAX_VALUE;
@@ -54,10 +46,7 @@ final class ShapeBuilder {
                 final double dist = Math.sqrt((double) dx * dx + (double) dz * dz);
                 final double angle = Math.atan2(dz, dx);
 
-                double rim = baseRadius;
-                for (int k = 0; k < freq.length; k++) {
-                    rim += baseRadius * amp[k] * Math.sin(freq[k] * angle + phase[k]);
-                }
+                final double rim = edge.rim(baseRadius, angle);
                 if (dist > rim) {
                     continue;
                 }
@@ -66,7 +55,7 @@ final class ShapeBuilder {
                 final double bulge = 1.0 - t * t;
 
                 final int dome = (int) Math.round(topDome * bulge);
-                int depth = (int) Math.round(maxDepth * Math.pow(bulge, 0.85));
+                int depth = (int) Math.round(maxDepth * Math.pow(bulge, DEPTH_BULGE_EXP));
                 if (random.nextFloat() < 0.3) {
                     depth += random.nextInt(2);
                 }

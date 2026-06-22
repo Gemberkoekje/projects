@@ -48,6 +48,9 @@ import java.util.Set;
 public final class IslandGenerator {
     private IslandGenerator() {}
 
+    /** Blocks of headroom cleared above a structure pad, so an assembled building isn't clipped by island terrain. */
+    private static final int PAD_CLEAR_HEIGHT = 10;
+
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
         final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY());
@@ -197,7 +200,7 @@ public final class IslandGenerator {
                 }
                 final int wx = center.getX() + dx;
                 final int wz = center.getZ() + dz;
-                for (int y = gy + 1; y <= gy + 10; y++) {
+                for (int y = gy + 1; y <= gy + PAD_CLEAR_HEIGHT; y++) {
                     blockMap.remove(new BlockPos(wx, y, wz));
                 }
                 blockMap.put(new BlockPos(wx, gy, wz), surface);
@@ -212,6 +215,7 @@ public final class IslandGenerator {
         });
     }
 
+    /** @return the first override matching {@code biome}/{@code y}, or {@code null} if none match (use the base theme). */
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {
         for (BiomeOverride o : overrides) {
             if (o.matches(biome, y)) {
@@ -251,6 +255,7 @@ public final class IslandGenerator {
         return out;
     }
 
+    /** @return a weighted-random variant, or {@code null} if the theme has no variants. */
     private static Variant pickVariant(List<Variant> variants, RandomSource random) {
         if (variants.isEmpty()) {
             return null;
