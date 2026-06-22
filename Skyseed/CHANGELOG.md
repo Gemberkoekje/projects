@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.23.0] - 2026-06-22
+
+### Changed
+- **The Dungeon is roomier and reworked.** The cramped 3×3 cell is now a **5×5×3 cobble room** — more space to
+  move and fight, especially against spiders. On the dedicated **Dungeon island** the room is now **sunk into
+  the ground** (like the Desert Temple) with a **stepped stairwell down to a dark-oak door**, and the (larger)
+  island is strewn with **broken ruin stubs and ruined stonework**. Spawner + two `simple_dungeon` chests as
+  before; the cobble is mossed by the weathering processor.
+
+### Added
+- **A Dungeon has a 5% chance on a Large Rocky or Large Ancient island** — buried and fully sealed (no stairs),
+  so the only way in is to dig down onto it: a nasty surprise and a reminder not to dig straight down. The
+  spawner still rolls zombie / skeleton / spider. (New `dungeon/buried` vs `dungeon/lair` pools; the burial
+  reuses the jigsaw `sink` field.)
+
 ## [0.22.0] - 2026-06-22
 
 ### Added

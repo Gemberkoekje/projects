@@ -1,0 +1,8 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon/lair_zombie", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon/lair_skeleton", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon/lair_spider", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } }
+  ]
+}

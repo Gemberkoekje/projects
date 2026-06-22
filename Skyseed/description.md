@@ -71,7 +71,7 @@ Dedicated farm islands, each a fenced enclosure with a guaranteed pack of animal
 
 Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 
-- ⚔️ **Dungeon** — a sealed cobblestone cube with a mob spawner and two loot chests (the music discs *Cat* and *13* among them).
+- ⚔️ **Dungeon** — a mossy cobblestone room with a mob spawner and two loot chests (the music discs *Cat* and *13* among them), sunk underground at the foot of a ruined stairwell, its island scattered with broken stonework.
 - 🪨 **Ruined Portal** — a broken Nether-portal frame and a chest of golden spoils — your only source of crying obsidian up here.
 - 🏺 **Desert Temple** — a sealed chamber, four treasure chests, and a buried cache of TNT.
 - 🌿 **Jungle Temple** — a tiered, vine-draped ziggurat of cobblestone and moss, hiding a trapped chamber with two chests and a tripwire-rigged arrow dispenser.
@@ -84,6 +84,7 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 - 🌊 **Ocean ruin** — rarely an Aquatic island's pool is instead a flooded stone-brick ruin, with suspicious sand to brush and a sunken chest.
 - 🏺 **Buried Desert Temple** — rarely a Large Desert hides a temple sunk beneath the dunes; a suspicious hole in the sand is the only clue, and dropping in springs its TNT trap.
 - 🌿 **Lost Jungle Temple** — rarely a Large Forest grown in a jungle raises a full jungle temple among the vines and jungle trees.
+- ⚔️ **Buried Dungeon** — rarely a Large Rocky or Large Ancient island hides a sealed dungeon just below the surface; there's no door, so the only way in is to dig down onto it — watch your step.
 - 🧙 **Swamp Witch Hut** — rarely a Large Forest in a swamp or dark-oak wood, or a Large Aquatic island in a swamp, comes up with a witch's hut (and the witch and her cat) instead.
 
 ---

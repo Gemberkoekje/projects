@@ -13,6 +13,10 @@
     { "block": "minecraft:redstone_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "deep_core" },
     { "block": "minecraft:emerald_ore", "chance": 0.40, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
   ],
+  "rare_structures": [
+    { "chance": 0.05,
+      "jigsaw": { "pool": "skyseed:dungeon/buried", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 5 } }
+  ],
   "mobs": [
     { "entity": "minecraft:goat", "chance": 0.35, "count": { "min": 1, "max": 2 } },
     { "entity": "minecraft:sheep", "chance": 0.20, "count": { "min": 1, "max": 2 } }
