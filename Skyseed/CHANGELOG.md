@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.2] - 2026-06-22
+
+### Changed
+- **Hamlet cottages got a proper roof.** Replaced the flat plank lid with a pitched, overhanging **gable roof**
+  built from stairs rising to a ridge beam — far nicer in silhouette. Cottages also gained log corner posts,
+  glass windows on three sides, and a glass loft window in the front gable. The three variants now use distinct
+  woods — **oak, spruce, birch** — instead of all sharing oak. (Built with a one-block border so the roof
+  overhang stays within the template's bounds. The Trade Post shops and Village Center halls still have flat
+  roofs — the same treatment can be extended to them.)
+
 ## [0.19.1] - 2026-06-22
 
 ### Fixed

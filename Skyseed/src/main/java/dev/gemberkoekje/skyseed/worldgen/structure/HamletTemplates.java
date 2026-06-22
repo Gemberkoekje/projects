@@ -3,13 +3,13 @@ package dev.gemberkoekje.skyseed.worldgen.structure;
 import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.FrontAndTop;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.JigsawBlock;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
@@ -22,25 +22,31 @@ import java.util.Map;
 
 /**
  * Code-authored Hamlet cottages, generated to {@code .nbt} structure templates at dev time (see
- * {@link DevStructureGenerator}). Three variants give the Hamlet some variety; each has a bed (so a
- * villager has a home) and a downward "bottom" jigsaw at its floor centre so the jigsaw assembler can
- * anchor it. Replace any file with a structure-block-authored {@code .nbt} of the same name to override it.
+ * {@link DevStructureGenerator}). Each is a small house with log corner posts, glass windows, a bed, and — the
+ * thing that sells it — a pitched, overhanging {@code stairs} roof rising to a gable ridge. Three variants in
+ * different woods (oak / spruce / birch) give the Hamlet variety; the jigsaw rotates each randomly. A downward
+ * "bottom" jigsaw at the floor centre lets the assembler anchor it. Replace any file with a structure-block
+ * {@code .nbt} of the same name to override it.
  */
 public final class HamletTemplates {
     private HamletTemplates() {}
 
     private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
+    /** A wood palette for one cottage variant: body planks, corner-post log, roof stairs, and the door block. */
+    private record Wood(BlockState planks, BlockState log, Block stairs, Block door) {}
+
+    private static final Wood OAK = new Wood(Blocks.OAK_PLANKS.defaultBlockState(),
+            Blocks.OAK_LOG.defaultBlockState(), Blocks.OAK_STAIRS, Blocks.OAK_DOOR);
+    private static final Wood SPRUCE = new Wood(Blocks.SPRUCE_PLANKS.defaultBlockState(),
+            Blocks.SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_DOOR);
+    private static final Wood BIRCH = new Wood(Blocks.BIRCH_PLANKS.defaultBlockState(),
+            Blocks.BIRCH_LOG.defaultBlockState(), Blocks.BIRCH_STAIRS, Blocks.BIRCH_DOOR);
+
     public static void generateInto(Path structureDir) throws IOException {
-        writeIfAbsent(structureDir.resolve("cottage_oak.nbt"),
-                cottage(7, Blocks.OAK_PLANKS.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState(),
-                        Blocks.OAK_LOG.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState(), true));
-        writeIfAbsent(structureDir.resolve("cottage_spruce.nbt"),
-                cottage(7, Blocks.COBBLESTONE.defaultBlockState(), Blocks.SPRUCE_PLANKS.defaultBlockState(),
-                        Blocks.SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_PLANKS.defaultBlockState(), false));
-        writeIfAbsent(structureDir.resolve("cottage_small.nbt"),
-                cottage(5, Blocks.OAK_PLANKS.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState(),
-                        Blocks.STRIPPED_OAK_LOG.defaultBlockState(), Blocks.OAK_PLANKS.defaultBlockState(), true));
+        writeIfAbsent(structureDir.resolve("cottage_oak.nbt"), cottage(7, OAK, true));
+        writeIfAbsent(structureDir.resolve("cottage_spruce.nbt"), cottage(7, SPRUCE, false));
+        writeIfAbsent(structureDir.resolve("cottage_small.nbt"), cottage(5, BIRCH, true));
     }
 
     private static void writeIfAbsent(Path file, Built built) throws IOException {
@@ -50,60 +56,83 @@ public final class HamletTemplates {
         }
     }
 
-    /** An n×n cottage (n odd): plank floor, walled with log corner posts, flat roof, door, windows, a bed, anchor jigsaw. */
-    private static Built cottage(int n, BlockState floor, BlockState wall, BlockState post,
-                                 BlockState roof, boolean doorOnNorth) {
+    /**
+     * An n×n cottage (n odd) with a gabled stair roof. Laid out with a one-block border (the building sits at
+     * [1..n]) so the roof's overhang stays within the template's non-negative bounds. The ridge runs along Z at
+     * the centre; the roof slopes down in X and overhangs a block on every side. The door wall is a gable end.
+     */
+    private static Built cottage(int n, Wood w, boolean doorOnNorth) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState planks = w.planks();
+        final BlockState log = w.log();
         final BlockState glass = Blocks.GLASS.defaultBlockState();
-        final int max = n - 1;
-        final int mid = n / 2;
+        final int lo = 1, hi = n;               // building spans [1..n]; the border at 0 / n+1 carries the eaves
+        final int mid = (n + 1) / 2;            // centre column (ridge line)
+        final int wallTop = 3, ceil = 4;        // walls y1..3, flat ceiling at y4
+        final int ridgeY = ceil + mid;          // eave at y4 (x = 0 / n+1), ridge at the centre
 
-        for (int x = 0; x < n; x++) {
-            for (int z = 0; z < n; z++) {
-                m.put(new BlockPos(x, 0, z), floor);
-                final boolean perim = x == 0 || x == max || z == 0 || z == max;
-                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
+        // Floor, walls (log corners), flat ceiling.
+        for (int x = lo; x <= hi; x++) {
+            for (int z = lo; z <= hi; z++) {
+                m.put(new BlockPos(x, 0, z), planks);
+                final boolean perim = x == lo || x == hi || z == lo || z == hi;
+                final boolean corner = (x == lo || x == hi) && (z == lo || z == hi);
                 if (perim) {
-                    for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? post : wall);
+                    for (int h = 1; h <= wallTop; h++) {
+                        m.put(new BlockPos(x, h, z), corner ? log : planks);
                     }
                 }
-                m.put(new BlockPos(x, 4, z), roof);
+                m.put(new BlockPos(x, ceil, z), planks);
             }
         }
 
-        m.put(new BlockPos(0, 2, mid), glass);
-        m.put(new BlockPos(max, 2, mid), glass);
-        m.put(new BlockPos(mid, 2, doorOnNorth ? max : 0), glass);
+        // Windows on the two side walls and the back wall.
+        final int frontZ = doorOnNorth ? lo : hi;
+        final int backZ = doorOnNorth ? hi : lo;
+        m.put(new BlockPos(lo, 2, mid), glass);
+        m.put(new BlockPos(hi, 2, mid), glass);
+        m.put(new BlockPos(mid, 2, backZ), glass);
 
-        final int doorZ = doorOnNorth ? 0 : max;
+        // Door in the front gable wall.
         final Direction face = doorOnNorth ? Direction.SOUTH : Direction.NORTH;
-        m.put(new BlockPos(mid, 1, doorZ), Blocks.OAK_DOOR.defaultBlockState()
+        m.put(new BlockPos(mid, 1, frontZ), w.door().defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, face));
-        m.put(new BlockPos(mid, 2, doorZ), Blocks.OAK_DOOR.defaultBlockState()
+        m.put(new BlockPos(mid, 2, frontZ), w.door().defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, face));
 
-        m.put(new BlockPos(1, 1, 1), Blocks.RED_BED.defaultBlockState()
+        // Furniture: a bed (a villager's home), a crafting table, a torch.
+        m.put(new BlockPos(2, 1, 2), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.FOOT).setValue(BedBlock.FACING, Direction.SOUTH));
-        m.put(new BlockPos(1, 1, 2), Blocks.RED_BED.defaultBlockState()
+        m.put(new BlockPos(2, 1, 3), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
-        m.put(new BlockPos(max - 1, 1, max - 1), Blocks.CRAFTING_TABLE.defaultBlockState());
-        m.put(new BlockPos(max - 1, 1, 1), Blocks.TORCH.defaultBlockState());
+        m.put(new BlockPos(hi - 1, 1, hi - 1), Blocks.CRAFTING_TABLE.defaultBlockState());
+        m.put(new BlockPos(hi - 1, 1, 2), Blocks.TORCH.defaultBlockState());
 
-        // Anchor jigsaw at the floor centre: turns back into the floor block after assembly, and lets the
-        // jigsaw placer position + rotate the cottage. Pool "empty" so it never tries to expand.
-        final BlockPos anchor = new BlockPos(mid, 0, mid);
-        m.put(anchor, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        final CompoundTag jigsaw = new CompoundTag();
-        jigsaw.putString("id", "minecraft:jigsaw");
-        jigsaw.putString("name", "minecraft:bottom");
-        jigsaw.putString("target", "minecraft:empty");
-        jigsaw.putString("pool", "minecraft:empty");
-        jigsaw.putString("final_state", BuiltInRegistries.BLOCK.getKey(floor.getBlock()).toString());
-        jigsaw.putString("joint", "rollable");
-        bes.put(anchor, jigsaw);
+        // Gabled stair roof: each X column gets one roof block at its slope height, over [0..n+1] in both axes
+        // (a one-block overhang all round). Stairs face uphill toward the ridge; the ridge line is a solid beam.
+        for (int x = 0; x <= n + 1; x++) {
+            final int ry = ridgeY - Math.abs(x - mid);
+            final BlockState roof = x == mid ? planks
+                    : w.stairs().defaultBlockState().setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST);
+            for (int z = 0; z <= n + 1; z++) {
+                m.put(new BlockPos(x, ry, z), roof);
+            }
+        }
 
+        // Close the two gable triangles (front/back walls up to the roofline); a glass loft window in the front.
+        for (int x = lo; x <= hi; x++) {
+            final int top = ridgeY - Math.abs(x - mid);
+            for (int y = ceil + 1; y < top; y++) {
+                m.put(new BlockPos(x, y, lo), planks);
+                m.put(new BlockPos(x, y, hi), planks);
+            }
+        }
+        if (ceil + 1 < ridgeY) {
+            m.put(new BlockPos(mid, ceil + 1, frontZ), glass);
+        }
+
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), BuiltInRegistries.BLOCK.getKey(planks.getBlock()).toString());
         return new Built(m, bes);
     }
 }
