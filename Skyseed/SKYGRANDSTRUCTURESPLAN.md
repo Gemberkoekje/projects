@@ -4,7 +4,7 @@ A design exploration for turning the **Woodland Mansion** and **Trial Chamber** 
 **jigsaw-assembled** sky islands — replacing the modest sketches in
 [SKYSTRUCTURESPLAN.md](SKYSTRUCTURESPLAN.md) (Mansion = "one enclosed room island"; Trial Chamber = "a chain of
 small single-section islands"). This doc supersedes those two sections **once the open decisions at the bottom
-are locked**. Status: **Tier-1 gating cells built (v0.27.0); grand Trial Chamber built (v0.28.0, single-template v1); Woodland Mansion still to do.**
+are locked**. Status: **all built — Tier-1 gating cells (v0.27.0), grand Trial Chamber (v0.28.0), grand Woodland Mansion (v0.29.0). Both grand structures are single-template v1; the modular jigsaw split is the remaining follow-up.**
 
 ---
 
@@ -129,7 +129,19 @@ vaults gate the *good* loot, the layout can stay roughly linear: fight in → ea
 
 ---
 
-## Woodland Mansion — proposed design
+## Woodland Mansion — **✅ Built** (v0.29.0)
+Shipped as `WoodlandMansionTemplates` → `data/skyseed/structure/woodland_mansion/mansion.nbt`, on its own
+`woodland_mansion` theme (a larger grassy island, radius 17–20, dark-forest variant) with a craftable **Woodland
+Mansion Skyseed** (dark oak + diamonds around a Totem of Undying). **v1 is a single rotated template, not a
+multi-piece jigsaw** — a two-storey 13×13 dark-oak manor: cobblestone foundation, a dark-oak-log frame, glass
+windows, a red-carpet ground hall, a staircase up to loot rooms + a small library, three `chests/woodland_mansion`
+chests, hanging lanterns, and a tall gable roof (the shared `StructureParts.gableRoof`). The illager garrison —
+a **guaranteed evoker** (→ Totem of Undying) + four vindicators — spawns in the open ground-floor hall via the
+theme's `animals` pack (jittered around the island centre, the proven Evoker-Cell pattern), so **no per-room
+marker spawning was needed for v1**. *Follow-up:* split into a modular jigsaw pool with per-room markers (the
+vertical-connector + marker spikes) for room variety, per the design below.
+
+### Original design (the jigsaw target for a future pass)
 - **Form:** *(decided)* a **multi-floor mansion** — a few rooms per floor + internal stairs, going **up** as well
   as out — on the **new larger "grand island" tier.** Wider than a pure spire, taller than a single wing, kept a
   bit smaller than a full vanilla sprawl.

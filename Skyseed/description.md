@@ -78,6 +78,7 @@ Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 - 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
 - 🗼 **Pillager Outpost** — a dark-oak watchtower; fight up the ladder to the spawner and loot chest at the top, and free the iron golem caged at the base to turn it loose on the pillagers.
 - 🗝️ **Trial Chamber** — the big one: a copper-and-tuff trial chamber sunk deep into a larger rocky island, found only by a single ladder shaft. Drop into a lantern-lit arena ringed by trial spawners with a **breeze** at its heart; clear them for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the whole place ominous and earn a shot at the **heavy core** for a **mace**.
+- 🏰 **Woodland Mansion** — a two-storey dark-oak manor on a big grassy island: a red-carpet hall, loot rooms, a library, a gabled roof. An **evoker** and a pack of **vindicators** hold it — kill the evoker for a **Totem of Undying**, then throw another seed whenever you want more. A reliable totem farm and the headline overworld build.
 
 And some surprises don't need their own seed — once in a while an ordinary island grows something extra:
 
@@ -118,7 +119,7 @@ Install **Patchouli** for the full illustrated edition; without it, the Almanac 
 
 Skyseed is actively developed, and there's plenty more sky to fill. On the roadmap:
 
-- **More structures to raid** — a grand **Woodland Mansion** (vindicators, evokers, and a shot at the Totem of Undying), and more lifted from across the game.
+- **More structures to raid** — more iconic builds lifted from across the game (the grand Trial Chamber and Woodland Mansion have landed; bigger, rarer "huge" islands are next).
 - **New dimensions** — the **Nether** and the **End** will be tackled in future versions, with their own Skyseeds, biomes, and structures, so you can grow a crimson forest or an End island the same way you grow the overworld today.
 - **More creatures, island types, and surprises** as the mod grows.
 

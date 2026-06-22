@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.29.0] - 2026-06-22
+
+### Added
+- **Woodland Mansion Skyseed** — the second grand structure from `SKYGRANDSTRUCTURESPLAN.md`, and the last of
+  the planned grand pair. A two-storey **dark-oak manor** (13×13, a tall gabled roof) raised on a larger grassy
+  island ringed with dark oaks: a red-carpet entrance hall, a staircase up to loot rooms and a small library,
+  glass windows, hanging lanterns.
+  - **Guaranteed totem** — an **evoker** and a pack of **vindicators** garrison the hall (spawned via the
+    theme's `animals` pack). Kill the evoker for a **Totem of Undying**; throw another seed whenever you want
+    more, so the mansion is a *reliable* totem destination.
+  - **Loot** — three chests on the vanilla `chests/woodland_mansion` table.
+  - Crafted from **dark oak + diamonds around a Totem of Undying** — your first totem comes from an Evoker Cell
+    (rarely on a dark-forest Forest island), which bootstraps the mansion. New `woodland_mansion` theme + guide
+    entry + advancement. *(With this, both planned grand structures are built.)*
+
 ## [0.28.0] - 2026-06-22
 
 ### Added
