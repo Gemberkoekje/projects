@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 
 import java.util.Map;
 
@@ -40,8 +41,15 @@ public final class StructureParts {
         for (int x = x0; x <= x1; x++) {
             final int top = ridgeY - Math.abs(x - mid);
             for (int y = eaveY + 1; y < top; y++) {
-                m.put(new BlockPos(x, y, z0), planks);
-                m.put(new BlockPos(x, y, z1), planks);
+                // Smooth the gable rake: the topmost fill block under each sloped course is an upside-down
+                // stair (facing uphill, like the rake stair above it) so the diagonal edge reads as solid.
+                final BlockState b = (y == top - 1 && x != mid)
+                        ? stairs.defaultBlockState()
+                            .setValue(StairBlock.FACING, x < mid ? Direction.EAST : Direction.WEST)
+                            .setValue(StairBlock.HALF, Half.TOP)
+                        : planks;
+                m.put(new BlockPos(x, y, z0), b);
+                m.put(new BlockPos(x, y, z1), b);
             }
         }
     }

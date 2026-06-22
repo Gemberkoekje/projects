@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.8] - 2026-06-22
+
+### Changed
+- **Smoothed the gable rake with upside-down stairs.** The diagonal gable edge now has upside-down stairs
+  filling the step-notches (the topmost gable-fill block under each sloped course), so the rake reads as a
+  solid diagonal rather than a blocky staircase. This is what the earlier "upside-down stairs at the overhang"
+  request actually meant — they belong on the gable rake, not the slope-side eaves. 8 per cottage gable.
+
 ## [0.19.7] - 2026-06-22
 
 ### Changed
