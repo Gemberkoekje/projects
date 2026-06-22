@@ -1,18 +1,11 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    {
-      "item": "minecraft:beef"
-    },
-    {
-      "tag": "minecraft:planks"
-    },
-    {
-      "item": "minecraft:dirt"
-    }
-  ],
-  "result": {
-    "id": "skyseed:pasture_skyseed"
-  }
+  "pattern": [ "BP", "DD" ],
+  "key": {
+    "B": { "item": "minecraft:beef" },
+    "P": { "tag": "minecraft:planks" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": { "id": "skyseed:pasture_skyseed" }
 }

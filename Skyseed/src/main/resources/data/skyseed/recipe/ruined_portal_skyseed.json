@@ -1,6 +1,10 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [ { "item": "minecraft:obsidian" }, { "item": "minecraft:gold_ingot" } ],
+  "pattern": [ "OO", "GG" ],
+  "key": {
+    "O": { "item": "minecraft:obsidian" },
+    "G": { "item": "minecraft:gold_ingot" }
+  },
   "result": { "id": "skyseed:ruined_portal_skyseed" }
 }

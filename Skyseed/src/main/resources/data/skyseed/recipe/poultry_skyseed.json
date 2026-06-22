@@ -1,18 +1,11 @@
 {
-  "type": "minecraft:crafting_shapeless",
+  "type": "minecraft:crafting_shaped",
   "category": "misc",
-  "ingredients": [
-    {
-      "item": "minecraft:feather"
-    },
-    {
-      "item": "minecraft:egg"
-    },
-    {
-      "item": "minecraft:dirt"
-    }
-  ],
-  "result": {
-    "id": "skyseed:poultry_skyseed"
-  }
+  "pattern": [ "FE", "DD" ],
+  "key": {
+    "F": { "item": "minecraft:feather" },
+    "E": { "item": "minecraft:egg" },
+    "D": { "item": "minecraft:dirt" }
+  },
+  "result": { "id": "skyseed:poultry_skyseed" }
 }

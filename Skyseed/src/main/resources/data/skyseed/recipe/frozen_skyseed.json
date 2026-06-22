@@ -10,7 +10,7 @@
       "item": "minecraft:snow_block"
     },
     "I": {
-      "tag": "minecraft:ice"
+      "tag": "skyseed:ice"
     }
   },
   "result": {

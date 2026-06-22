@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.18.0] - 2026-06-22
+
+### Fixed
+- **The Frozen and Large Frozen recipes were uncraftable.** They keyed the ice ingredient off
+  `#minecraft:ice`, which isn't a real item tag, so the slot resolved to nothing — it showed as a broken
+  red cross in the guide and couldn't be filled. Added a `#skyseed:ice` tag (ice / packed ice / blue ice)
+  and pointed both recipes at it.
+
+### Changed
+- **The animal and structure island recipes now use the 2×2 shaped layout** like the other small islands,
+  instead of shapeless: Pasture (both wool and beef), Poultry, Wool Farm, Stable, Aquarium, Ruined Portal,
+  Desert Temple, Jungle Temple and Witch Hut are each a four-ingredient 2×2 (e.g. Ruined Portal = obsidian
+  over gold, Desert Temple = sandstone + TNT over sand).
+
 ## [0.17.0] - 2026-06-21
 
 ### Changed

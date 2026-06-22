@@ -8,7 +8,7 @@
   ],
   "key": {
     "P": {
-      "tag": "minecraft:ice"
+      "tag": "skyseed:ice"
     },
     "S": {
       "item": "minecraft:snow_block"
