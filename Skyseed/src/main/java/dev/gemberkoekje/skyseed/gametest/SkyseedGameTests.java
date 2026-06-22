@@ -194,6 +194,50 @@ public final class SkyseedGameTests {
         return false;
     }
 
+    @GameTest(template = REGION)
+    public static void islandOutputIsStable(GameTestHelper helper) {
+        // Golden master: locks the EXACT generation output for a set of biome-independent themes, so a
+        // behaviour-preserving refactor (the IslandGenerator split) is provably byte-identical, not just
+        // "still produces an island". Update the GOLDEN constants ONLY for an intentional generation change.
+        final String[][] cases = {
+                {"gametest/island", "1"}, {"gametest/water", "4"}, {"gametest/features", "4"},
+                {"gametest/structure", "11"}, {"gametest/bad", "4"},
+        };
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        for (final String[] c : cases) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, c[0]),
+                    level.getBiome(center), RandomSource.create(Long.parseLong(c[1])));
+            long sum = 1L;
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                // positions RELATIVE to the island centre so the fingerprint is run-location independent
+                sum = sum * 1000003L + (bp.pos().getX() - center.getX());
+                sum = sum * 1000003L + (bp.pos().getY() - center.getY());
+                sum = sum * 1000003L + (bp.pos().getZ() - center.getZ());
+                sum = sum * 1000003L + bp.state().toString().hashCode();
+            }
+            final String fp = p.blocks().size() + "/" + sum + "/" + p.trees().size() + "/" + p.mobs().size()
+                    + "/" + p.animals().size() + "/" + p.jigsaws().size() + "/" + p.hives().size();
+            final String key = c[0] + "#" + c[1];
+            final String golden = GOLDEN.get(key);
+            if (golden == null) {
+                Skyseed.LOGGER.info("[golden] CAPTURE {} -> {}", key, fp);
+            } else {
+                helper.assertTrue(golden.equals(fp), "generation output changed for " + key + ": want " + golden + " got " + fp);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** Recorded fingerprints "blocks/checksum/trees/mobs/animals/jigsaws/hives" — the generation golden master. */
+    private static final java.util.Map<String, String> GOLDEN = java.util.Map.of(
+            "gametest/island#1", "213/-3285534759166012883/1/2/0/0/23",
+            "gametest/water#4", "1255/7744611612398851888/0/1/0/0/0",
+            "gametest/features#4", "1356/2766402466658160625/0/0/0/0/0",
+            "gametest/structure#11", "566/-538726431172054277/0/0/2/1/0",
+            "gametest/bad#4", "197/5964512207029114459/0/0/0/1/0"
+    );
+
     // --- structure templates (guard the template de-duplication) ---
 
     @GameTest(template = REGION)
