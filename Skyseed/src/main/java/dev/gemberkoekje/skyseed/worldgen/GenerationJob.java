@@ -1,5 +1,6 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.worldgen.structure.Traps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.AgeableMob;
@@ -160,6 +161,8 @@ public final class GenerationJob {
                     .lookupOrThrow(Registries.TEMPLATE_POOL)
                     .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, js.pool()));
             JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
+            // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
+            Traps.applyAfterJigsaw(level, js.origin());
             spawnVillagersAtBeds(js.origin(), js.pad());
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);

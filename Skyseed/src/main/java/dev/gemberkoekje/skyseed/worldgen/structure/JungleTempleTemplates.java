@@ -18,9 +18,10 @@ import java.util.Map;
 /**
  * The jungle temple's puzzle room: a sealed mossy-cobblestone chamber with two loot chests
  * ({@code minecraft:chests/jungle_temple}) and an arrow dispenser set into the wall
- * ({@code minecraft:chests/jungle_temple_dispenser}). (The vanilla tripwire trigger isn't placed — fragile
- * blocks don't survive the jigsaw placement path; the dispenser is left as lootable.)
- * See {@code SKYSTRUCTURESPLAN.md}.
+ * ({@code minecraft:chests/jungle_temple_dispenser}), rigged to a tripwire across the room. The tripwire hooks
+ * and string are baked as wool markers and swapped in by {@link Traps} after the jigsaw assembles (fragile
+ * blocks pop on that path); tripping the wire powers the hook on the dispenser, which fires. The dispenser
+ * loot fills on its first shot. See {@code SKYSTRUCTURESPLAN.md}.
  */
 public final class JungleTempleTemplates {
     private JungleTempleTemplates() {}
@@ -67,6 +68,13 @@ public final class JungleTempleTemplates {
         // An arrow dispenser set into the side wall, aimed across the room.
         m.put(new BlockPos(0, 1, 2), Blocks.DISPENSER.defaultBlockState().setValue(DispenserBlock.FACING, Direction.EAST));
         bes.put(new BlockPos(0, 1, 2), dispenser());
+
+        // Tripwire trap along the dispenser's line of fire: a hook mounted on the dispenser, a string across the
+        // room, and a hook on the far wall. Baked as wool markers and swapped to real tripwire by Traps after
+        // assembly (fragile blocks pop on the jigsaw path). Trip the string → the hook fires the dispenser.
+        m.put(new BlockPos(1, 1, 2), Blocks.RED_WOOL.defaultBlockState());  // → tripwire hook on the dispenser
+        m.put(new BlockPos(2, 1, 2), Blocks.LIME_WOOL.defaultBlockState()); // → tripwire string
+        m.put(new BlockPos(3, 1, 2), Blocks.RED_WOOL.defaultBlockState());  // → tripwire hook on the far wall
 
         StructureParts.anchor(m, bes, new BlockPos(midX, 0, 3), "minecraft:mossy_cobblestone");
         return new Built(m, bes);

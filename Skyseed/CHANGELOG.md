@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.5] - 2026-06-22
+
+### Added
+- **The temple traps are back.** A new post-placement pass (`Traps`) re-adds the support-dependent blocks that
+  the jigsaw assembler drops, so the trapped structures have their jeopardy again:
+  - **Desert Temple** — a pressure plate over hidden TNT at each floor corner, sitting over the buried 3×3
+    cache. Step on one and the chamber goes off (verified: a mob stepping on a plate detonates it).
+  - **Jungle Temple** — a tripwire strung across the dispenser's line of fire; tripping it powers the hook
+    mounted on the dispenser, which looses arrows.
+  - How: the fragile blocks are baked into the templates as **wool markers** (full blocks survive the jigsaw
+    path and rotate with the piece); after assembly, `Traps` swaps each marker for its real block with full
+    block updates, deriving a tripwire hook's facing from the adjacent string.
+
 ## [0.19.4] - 2026-06-22
 
 ### Changed

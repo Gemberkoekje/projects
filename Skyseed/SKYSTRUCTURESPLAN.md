@@ -46,10 +46,12 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🏜️ Desert Temple
 
-> **Built (v0.14.0).** `skyseed:desert_temple` — a sealed sandstone chamber, four
+> **Built (v0.14.0; trap restored v0.19.5).** `skyseed:desert_temple` — a sealed sandstone chamber, four
 > `minecraft:chests/desert_pyramid` chests over a buried 3×3 TNT cache. Sand + sandstone + TNT. **The
-> pressure-plate trap is omitted** (fragile/support-dependent blocks don't survive the jigsaw placement path);
-> the TNT is reframed as a minable cache. Archaeology not yet included.
+> pressure-plate trap is back**: a plate over hidden TNT at each floor corner, wired to the buried cache.
+> Fragile/support-dependent blocks don't survive the jigsaw path, so they're baked as wool markers and swapped
+> to real blocks by the `Traps` post-pass after assembly (verified: a mob on a plate detonates the chamber).
+> Archaeology not yet included.
 
 **Vanilla:** Sandstone pyramid with 4 treasure chests below a pressure-plate TNT trap. Archaeology added dig sites in 1.20.
 
@@ -66,10 +68,11 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 
 ### 🌿 Jungle Temple
 
-> **Built (v0.14.0).** `skyseed:jungle_temple` — a sealed mossy-cobblestone room, two
-> `minecraft:chests/jungle_temple` chests and a lootable `minecraft:chests/jungle_temple_dispenser`. Jungle
-> planks + mossy cobblestone + tripwire hook. **The tripwire trap + lever puzzle are omitted** (fragile blocks
-> don't survive jigsaw placement); the dispenser is left as plain loot.
+> **Built (v0.14.0; tripwire restored v0.19.5).** `skyseed:jungle_temple` — a sealed mossy-cobblestone room,
+> two `minecraft:chests/jungle_temple` chests and a `minecraft:chests/jungle_temple_dispenser`. Jungle planks +
+> mossy cobblestone + tripwire hook. **The tripwire trap is back**: a string across the dispenser's line of
+> fire, with a hook mounted on the dispenser, so tripping it fires arrows. The fragile blocks are baked as wool
+> markers and swapped in by the `Traps` post-pass after assembly. (The lever puzzle is still omitted.)
 
 **Vanilla:** Mossy cobblestone structure with tripwire traps, a puzzle dispenser, and 2 chests.
 

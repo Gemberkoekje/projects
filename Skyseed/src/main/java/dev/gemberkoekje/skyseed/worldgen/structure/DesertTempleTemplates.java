@@ -16,10 +16,11 @@ import java.util.Map;
 
 /**
  * The desert temple's buried treasure chamber: a sealed sandstone room with four chests
- * ({@code minecraft:chests/desert_pyramid}) and a hidden 3×3 cache of TNT buried one block below the floor —
- * mine it out carefully. The anchor sits on the chamber floor (y1) so the TNT (y0) buries into the island
- * body below. (The vanilla pressure-plate trigger isn't placed — fragile blocks don't survive the jigsaw
- * placement path; the buried TNT is reframed as a minable cache.) See {@code SKYSTRUCTURESPLAN.md}.
+ * ({@code minecraft:chests/desert_pyramid}), a hidden 3×3 cache of TNT one block below the floor, and a
+ * pressure-plate trap over hidden TNT at each floor corner. The anchor sits on the chamber floor (y1) so the
+ * cache (y0) buries below. The plates are baked as wool markers and swapped in by {@link Traps} after the
+ * jigsaw assembles (fragile blocks pop on that path); stepping on one fires the corner TNT into the cache.
+ * See {@code SKYSTRUCTURESPLAN.md}.
  */
 public final class DesertTempleTemplates {
     private DesertTempleTemplates() {}
@@ -59,9 +60,12 @@ public final class DesertTempleTemplates {
                 m.put(new BlockPos(x, 5, z), sandstone);
             }
         }
-        // A decorative glazed pattern in the floor corners.
+        // A pressure-plate trap at each floor corner over hidden TNT: the plate is baked as a wool marker and
+        // swapped to a real plate after assembly (fragile blocks don't survive the jigsaw path). Step on one →
+        // the corner TNT fires the buried 3×3 cache below. The plates sit clear of the four wall chests.
         for (int[] c : new int[][]{{1, 1}, {3, 1}, {1, 3}, {3, 3}}) {
-            m.put(new BlockPos(c[0], 1, c[1]), Blocks.BLUE_GLAZED_TERRACOTTA.defaultBlockState());
+            m.put(new BlockPos(c[0], 1, c[1]), Blocks.TNT.defaultBlockState());
+            m.put(new BlockPos(c[0], 2, c[1]), Blocks.YELLOW_WOOL.defaultBlockState()); // → stone pressure plate
         }
         // Four treasure chests around the centre, facing in (the buried 3×3 TNT cache sits below them).
         m.put(new BlockPos(1, 2, mid), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
