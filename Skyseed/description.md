@@ -78,7 +78,7 @@ Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 - 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
 - 🗼 **Pillager Outpost** — a dark-oak watchtower; fight up the ladder to the spawner and loot chest at the top, and free the iron golem caged at the base to turn it loose on the pillagers.
 - 🗝️ **Trial Chamber** — the big one: a copper-and-tuff trial chamber sunk deep into a larger rocky island, found only by a single ladder shaft. Drop into a lantern-lit complex — a **breeze** boss at its heart, with spawner-and-vault rooms branching off (a different layout every time); clear the spawners for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the whole place ominous and earn a shot at the **heavy core** for a **mace**.
-- 🏰 **Woodland Mansion** — a two-storey dark-oak manor on a big grassy island: a red-carpet hall, loot rooms, a library, a gabled roof. An **evoker** and a pack of **vindicators** hold it — kill the evoker for a **Totem of Undying**, then throw another seed whenever you want more. A reliable totem farm and the headline overworld build.
+- 🏰 **Woodland Mansion** — a two-storey dark-oak manor on a big grassy island: a red-carpet hall, loot rooms, a library, a gabled roof, and a sprawl of side wings (a storeroom, a library, a secret checkerboard room) that comes up differently every time. An **evoker** and a pack of **vindicators** hold it — kill the evoker for a **Totem of Undying**, then throw another seed whenever you want more. A reliable totem farm and the headline overworld build.
 
 And some surprises don't need their own seed — once in a while an ordinary island grows something extra:
 

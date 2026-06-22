@@ -1,8 +1,8 @@
 {
-  "shape": { "radius": { "min": 17, "max": 20 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "shape": { "radius": { "min": 20, "max": 23 }, "rim_noise": 0.22, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 4,
     "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.15 }, { "block": "minecraft:coarse_dirt", "chance": 0.10 } ] },
-  "jigsaw": { "pool": "skyseed:woodland_mansion/mansion", "target": "minecraft:bottom", "depth": 1, "pad": 10, "sink": 0 },
+  "jigsaw": { "pool": "skyseed:woodland_mansion/start", "target": "minecraft:bottom", "depth": 2, "pad": 13, "sink": 0 },
   "animals": [
     { "weight": 1, "entries": [
       { "entity": "minecraft:evoker", "adults": 1, "babies": 0 },

@@ -3,8 +3,10 @@ package dev.gemberkoekje.skyseed.worldgen.structure;
 import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
@@ -17,12 +19,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * The grand <b>Woodland Mansion</b> — the second grand structure from SKYGRANDSTRUCTURESPLAN. A two-storey
- * dark-oak manor (13×13 footprint, a tall gable roof) sitting on a larger grassy "grand island". The illager
- * garrison — a <b>guaranteed evoker</b> (→ Totem of Undying) and a pack of vindicators — spawns in the
- * ground-floor hall via the theme's {@code animals} pack (the proven Evoker-Cell pattern, jittered around the
- * island centre). Loot is on the vanilla {@code chests/woodland_mansion} table. v1 is a single rotated
- * template; splitting it into a modular jigsaw pool with per-room marker spawning is a flagged follow-up.
+ * The grand <b>Woodland Mansion</b>, assembled by the jigsaw from a two-storey dark-oak <b>core</b> (the start
+ * piece — the entrance hall + illager garrison, loot rooms, library, gabled roof) plus up to three single-storey
+ * <b>wing</b> pieces drawn from a pool (storeroom / library / checkerboard secret room), attached to the core's
+ * west, east and back walls so the manor sprawls a little differently each time. Connectors sit at floor level
+ * with pre-carved doorways (the Trade Post / Trial Chamber pattern). The illager garrison — a guaranteed evoker
+ * (→ Totem of Undying) + vindicators — spawns in the open ground-floor hall via the theme's {@code animals}
+ * pack. (v2 — split from the original single template into a modular core + wings pool for layout variety.
+ * Vertical floor-stacking via jigsaw was spiked and works, but the internal staircase makes horizontal wings
+ * the cleaner split here.)
  */
 public final class WoodlandMansionTemplates {
     private WoodlandMansionTemplates() {}
@@ -36,44 +41,58 @@ public final class WoodlandMansionTemplates {
     private static final BlockState RED_CARPET = Blocks.RED_CARPET.defaultBlockState();
     private static final BlockState BLUE_CARPET = Blocks.BLUE_CARPET.defaultBlockState();
     private static final BlockState LANTERN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
+    private static final String PLANKS_ID = "minecraft:dark_oak_planks";
 
     private record Built(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> blockEntities) {}
 
     public static void generateInto(Path dir) throws IOException {
-        final Path file = dir.resolve("mansion.nbt");
+        writeIfAbsent(dir.resolve("core.nbt"), core());
+        writeIfAbsent(dir.resolve("wing_storeroom.nbt"), wing("storeroom"));
+        writeIfAbsent(dir.resolve("wing_library.nbt"), wing("library"));
+        writeIfAbsent(dir.resolve("wing_checker.nbt"), wing("checker"));
+    }
+
+    private static void writeIfAbsent(Path file, Built b) throws IOException {
         if (!Files.exists(file)) {
-            final Built b = mansion();
             StructureWriter.write(b.blocks(), b.blockEntities(), file);
             Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
         }
     }
 
-    private static Built mansion() {
+    private static CompoundTag jig(String name, String target, String pool, String finalState) {
+        final CompoundTag t = new CompoundTag();
+        t.putString("id", "minecraft:jigsaw");
+        t.putString("name", name);
+        t.putString("target", target);
+        t.putString("pool", pool);
+        t.putString("final_state", finalState);
+        t.putString("joint", "rollable");
+        return t;
+    }
+
+    /** The start piece: the two-storey 13×13 manor, with three ground-floor wall connectors drawing wings. */
+    private static Built core() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        // Walls span x/z 1..11 (interior 2..10); the roof overhangs to 0..12 (the 13×13 .nbt).
-        final int x0 = 1, x1 = 11, z0 = 1, z1 = 11;
+        final int x0 = 1, x1 = 11, z0 = 1, z1 = 11; // walls; roof overhangs to 0..12
 
-        // Ground floor: cobblestone foundation ring + dark-oak planks inside.
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 final boolean perim = x == x0 || x == x1 || z == z0 || z == z1;
                 m.put(new BlockPos(x, 0, z), perim ? COBBLE : PLANKS);
             }
         }
-        // Exterior walls (both storeys), the mid-floor slab, and the top ceiling.
-        walls(m, x0, x1, z0, z1, 1, 4, PLANKS);   // ground-floor walls
-        walls(m, x0, x1, z0, z1, 6, 9, PLANKS);   // upper-floor walls
-        fillFloor(m, x0, x1, z0, z1, 5, PLANKS);  // upper-floor slab
-        fillFloor(m, x0, x1, z0, z1, 10, PLANKS); // ceiling under the roof
+        walls(m, x0, x1, z0, z1, 1, 4, PLANKS);
+        walls(m, x0, x1, z0, z1, 6, 9, PLANKS);
+        fillFloor(m, x0, x1, z0, z1, 5, PLANKS);
+        fillFloor(m, x0, x1, z0, z1, 10, PLANKS);
 
-        // Dark-oak-log frame: corner + mid-wall pillars, full height (no front-mid: the door sits there).
-        for (final int[] p : new int[][]{{1, 1}, {11, 1}, {1, 11}, {11, 11}, {1, 6}, {11, 6}, {6, 11}}) {
+        // Frame: corner pillars only now (the three mid-pillars give way to wing doorways).
+        for (final int[] p : new int[][]{{1, 1}, {11, 1}, {1, 11}, {11, 11}}) {
             for (int y = 1; y <= 9; y++) {
                 m.put(new BlockPos(p[0], y, p[1]), LOG);
             }
         }
-        // Four free-standing interior columns per storey for grandeur (clear of the central spawn hall).
         for (final int[] c : new int[][]{{3, 3}, {9, 3}, {3, 9}, {9, 9}}) {
             for (int y = 1; y <= 4; y++) {
                 m.put(new BlockPos(c[0], y, c[1]), LOG);
@@ -83,26 +102,28 @@ public final class WoodlandMansionTemplates {
             }
         }
 
-        // Windows — glass panes punched into both storeys (front wall keeps the door at x6).
-        final int[][] front = {{3, 1}, {9, 1}, {1, 3}, {1, 9}, {11, 3}, {11, 9}, {3, 11}, {9, 11}};
-        for (final int[] w : front) {
+        final int[][] windows = {{3, 1}, {9, 1}, {1, 3}, {1, 9}, {11, 3}, {11, 9}, {3, 11}, {9, 11}};
+        for (final int[] w : windows) {
             for (final int baseY : new int[]{2, 7}) {
                 m.put(new BlockPos(w[0], baseY, w[1]), GLASS);
                 m.put(new BlockPos(w[0], baseY + 1, w[1]), GLASS);
             }
         }
-        // Grand front door, centred in the front (−Z) wall.
         door(m, 6, 1, 1, Direction.NORTH);
 
-        // Ground floor: a red-carpet runner (the illager pack lands on the open centre here).
+        // Three ground-floor wings. The connector must sit at the template's bounding-box edge (x0/x12/z12,
+        // out in the roof-overhang plane) — not flush on the wall — or the wing lands inside the core's box and
+        // the jigsaw rejects it for overlap. The doorway is carved through the wall just inside each connector.
+        wingConnector(m, bes, 0, 6, FrontAndTop.WEST_UP, 1, 6);
+        wingConnector(m, bes, 12, 6, FrontAndTop.EAST_UP, 11, 6);
+        wingConnector(m, bes, 6, 12, FrontAndTop.SOUTH_UP, 6, 11);
+
         for (int t = 2; t <= 10; t++) {
             m.put(new BlockPos(6, 1, t), RED_CARPET);
             m.put(new BlockPos(t, 1, 6), RED_CARPET);
         }
         chest(m, bes, 2, 1, 2, Direction.EAST);
 
-        // Staircase to the upper floor: a two-wide run rising in +Z in the back-right, with the slab cut away
-        // above it for headroom and a landing at the top.
         for (int s = 0; s < 4; s++) {
             final int sy = 1 + s, sz = 6 + s;
             m.put(new BlockPos(8, sy, sz), stair(Direction.SOUTH));
@@ -110,11 +131,10 @@ public final class WoodlandMansionTemplates {
         }
         for (int x = 8; x <= 9; x++) {
             for (int z = 6; z <= 9; z++) {
-                m.put(new BlockPos(x, 5, z), AIR); // open the stairwell through the upper slab
+                m.put(new BlockPos(x, 5, z), AIR);
             }
         }
 
-        // Upper floor: a blue-carpet runner, two loot chests, and a little library.
         for (int t = 2; t <= 10; t++) {
             m.put(new BlockPos(t, 6, 6), BLUE_CARPET);
         }
@@ -125,21 +145,78 @@ public final class WoodlandMansionTemplates {
             m.put(new BlockPos(10, 7, z), BOOKSHELF);
         }
 
-        // Hanging lanterns keep both halls lit (clear of the corner columns).
         for (final int[] l : new int[][]{{4, 4}, {8, 4}, {4, 8}, {8, 8}}) {
             m.put(new BlockPos(l[0], 4, l[1]), LANTERN);
             m.put(new BlockPos(l[0], 9, l[1]), LANTERN);
         }
 
-        // Tall dark-oak gable roof with a one-block overhang.
         StructureParts.gableRoof(m, x0, x1, z0, z1, 10, PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 1);
-
-        // Anchor at the ground-floor centre (kept as open hall) — placed last so nothing overwrites the jigsaw.
-        StructureParts.anchor(m, bes, new BlockPos(6, 0, 6), "minecraft:dark_oak_planks");
+        StructureParts.anchor(m, bes, new BlockPos(6, 0, 6), PLANKS_ID);
         return new Built(m, bes);
     }
 
-    /** Perimeter walls (the four sides) of {@code [x0..x1]×[z0..z1]} from {@code y0} to {@code y1}. */
+    /** A floor-level connector at the box edge ({@code connX,connZ}) drawing the wings pool, with a 1×2 doorway
+     * carved through the wall behind it ({@code wallX,wallZ}); the connector becomes a plank threshold. */
+    private static void wingConnector(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes,
+                                      int connX, int connZ, FrontAndTop facing, int wallX, int wallZ) {
+        m.put(new BlockPos(wallX, 1, wallZ), AIR);
+        m.put(new BlockPos(wallX, 2, wallZ), AIR);
+        m.put(new BlockPos(connX, 0, connZ), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, facing));
+        bes.put(new BlockPos(connX, 0, connZ), jig("skyseed:mansion_wall", "skyseed:wing_door", "skyseed:woodland_mansion/wings", PLANKS_ID));
+    }
+
+    /** A 5×5 single-storey dark-oak wing: a connector + doorway on the −Z wall (faces the core), a gable roof,
+     * a {@code chests/woodland_mansion} chest and decoration by {@code kind}. */
+    private static Built wing(String kind) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final int max = 4, mid = 2;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), PLANKS);
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
+                if (perim) {
+                    for (int y = 1; y <= 3; y++) {
+                        m.put(new BlockPos(x, y, z), corner ? LOG : PLANKS);
+                    }
+                }
+            }
+        }
+        // Connector + doorway on the −Z wall.
+        m.put(new BlockPos(mid, 1, 0), AIR);
+        m.put(new BlockPos(mid, 2, 0), AIR);
+        m.put(new BlockPos(mid, 0, 0), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.NORTH_UP));
+        bes.put(new BlockPos(mid, 0, 0), jig("skyseed:wing_door", "skyseed:mansion_wall", "minecraft:empty", PLANKS_ID));
+        // Side windows.
+        m.put(new BlockPos(0, 2, mid), GLASS);
+        m.put(new BlockPos(max, 2, mid), GLASS);
+
+        switch (kind) {
+            case "library" -> {
+                for (int x = 1; x <= 3; x++) {
+                    m.put(new BlockPos(x, 1, max), BOOKSHELF);
+                    m.put(new BlockPos(x, 2, max), BOOKSHELF);
+                }
+            }
+            case "checker" -> {
+                for (int x = 1; x <= 3; x++) {
+                    for (int z = 1; z <= 3; z++) {
+                        m.put(new BlockPos(x, 0, z), (x + z) % 2 == 0 ? Blocks.RED_WOOL.defaultBlockState() : Blocks.BLUE_WOOL.defaultBlockState());
+                    }
+                }
+            }
+            default -> { // storeroom
+                m.put(new BlockPos(1, 1, 3), Blocks.BARREL.defaultBlockState());
+                m.put(new BlockPos(3, 1, 3), Blocks.BARREL.defaultBlockState());
+            }
+        }
+        chest(m, bes, mid, 1, 3, Direction.NORTH);
+        m.put(new BlockPos(mid, 3, mid), LANTERN);
+        StructureParts.gableRoof(m, 0, max, 0, max, 4, PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 0);
+        return new Built(m, bes);
+    }
+
     private static void walls(Map<BlockPos, BlockState> m, int x0, int x1, int z0, int z1, int y0, int y1, BlockState s) {
         for (int y = y0; y <= y1; y++) {
             for (int x = x0; x <= x1; x++) {

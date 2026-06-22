@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.31.0] - 2026-06-22
+
+### Changed
+- **Woodland Mansion is now a modular jigsaw structure** (the second half of the modular follow-up — both grand
+  structures are now modular). The two-storey dark-oak core is the start piece, and it draws up to **three
+  single-storey wings** from a pool — a storeroom (barrels), a library (bookshelves) and a checkerboard secret
+  room (wool) — attached to the west, east and back walls, each with its own `chests/woodland_mansion` chest, so
+  the manor sprawls a little differently every time (up to six chests now). Same guaranteed evoker → totem +
+  vindicator garrison in the hall; the island is larger to hold the wings. Vertical floor-stacking via jigsaw
+  was spiked and confirmed working, but the internal staircase makes horizontal wings the cleaner split.
+
 ## [0.30.0] - 2026-06-22
 
 ### Changed
