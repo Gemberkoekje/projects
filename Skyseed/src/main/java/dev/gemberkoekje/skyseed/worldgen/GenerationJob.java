@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+import net.neoforged.neoforge.event.EventHooks;
 
 /**
  * Drains an {@link IslandPlan} into the world a bounded number of blocks per tick, so an island never
@@ -85,7 +86,6 @@ public final class GenerationJob {
     }
 
     /** Spawn an Animal Island's guaranteed pack inside its enclosure — babies aged down, sheep dyed, fish submerged. */
-    @SuppressWarnings({"deprecation", "removal"}) // EntityType#spawn convenience overload
     private void spawnEnclosureAnimals() {
         for (IslandPlan.AnimalSpawn as : plan.animals()) {
             if (as.inWater()) {
@@ -97,7 +97,7 @@ public final class GenerationJob {
                     mob.moveTo(as.pos().getX() + 0.5, as.pos().getY() + 0.5, as.pos().getZ() + 0.5,
                             plan.random().nextFloat() * 360.0F, 0.0F);
                     applyTraits(mob, as.baby());
-                    mob.finalizeSpawn(level, level.getCurrentDifficultyAt(as.pos()), MobSpawnType.SPAWNER, null);
+                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(as.pos()), MobSpawnType.SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
                 continue;
@@ -203,7 +203,6 @@ public final class GenerationJob {
     }
 
     /** Fill any bee nests on the island with a few bees (they emerge to pollinate, then return home). */
-    @SuppressWarnings({"deprecation", "removal"}) // BeehiveBlockEntity#addOccupant: the simplest worldgen-time way to seed a hive
     private void populateHives() {
         for (BlockPos hive : plan.hives()) {
             if (!(level.getBlockEntity(hive) instanceof BeehiveBlockEntity beehive)) {
@@ -220,7 +219,6 @@ public final class GenerationJob {
     }
 
     /** Spawn the planned mobs: land mobs on top of their surface block, water mobs inside the pond. */
-    @SuppressWarnings({"deprecation", "removal"}) // EntityType#spawn convenience overload
     private void spawnMobs() {
         for (IslandPlan.MobSpawn ms : plan.mobs()) {
             if (ms.inWater()) {
@@ -233,7 +231,7 @@ public final class GenerationJob {
                 final Entity e = ms.type().create(level);
                 if (e instanceof Mob mob) {
                     mob.moveTo(wp.getX() + 0.5, wp.getY() + 0.5, wp.getZ() + 0.5, plan.random().nextFloat() * 360.0F, 0.0F);
-                    mob.finalizeSpawn(level, level.getCurrentDifficultyAt(wp), MobSpawnType.SPAWNER, null);
+                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wp), MobSpawnType.SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
                 continue;
@@ -242,12 +240,15 @@ public final class GenerationJob {
             final BlockPos spawnPos = surface.above();
             // Need solid ground and two blocks of standing room — but plants (flowers, grass, mushrooms)
             // don't block a mob, so allow those; only skip on no ground or a real obstruction (trunk, leaves).
-            if (level.getBlockState(surface).isAir()
-                    || level.getBlockState(spawnPos).blocksMotion()
-                    || level.getBlockState(spawnPos.above()).blocksMotion()) {
+            if (level.getBlockState(surface).isAir() || blocked(spawnPos) || blocked(spawnPos.above())) {
                 continue;
             }
             ms.type().spawn(level, spawnPos, MobSpawnType.SPAWNER);
         }
+    }
+
+    /** True if a mob can't occupy {@code p}: the block there has a collision shape (air, plants and water don't). */
+    private boolean blocked(BlockPos p) {
+        return !level.getBlockState(p).getCollisionShape(level, p).isEmpty();
     }
 }

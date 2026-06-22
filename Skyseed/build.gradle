@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.141'
     id 'idea'
+    id 'jacoco'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -188,6 +189,10 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+    // Surface all compiler warnings. Deliberately NOT -Werror: warnings should stay visible as reminders,
+    // not be turned into build failures that pressure people into suppressing them. See codereview.md (B1).
+    options.compilerArgs += ['-Xlint:all']
+    options.deprecation = true
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
@@ -195,5 +200,41 @@ idea {
     module {
         downloadSources = true
         downloadJavadoc = true
+    }
+}
+
+// --- Test coverage ----------------------------------------------------------------------------------------
+// There are no JUnit tests (the suite is NeoForge GameTests run on a real server, see SkyseedGameTests), so
+// coverage is measured by attaching the JaCoCo agent to the gameTestServer run and reporting against our own
+// classes. Run `./gradlew gameTestCoverage` → build/reports/jacoco/gameTestCoverage/html/index.html.
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+// The gameTestServer run is a ModDevGradle run, not a JavaExec/Test task, so the JaCoCo task extension does
+// not apply. Attach the agent as a JVM argument by hand (the :runtime classifier is the standalone agent jar).
+configurations {
+    jacocoAgentRuntime
+}
+dependencies {
+    jacocoAgentRuntime "org.jacoco:org.jacoco.agent:0.8.12:runtime"
+}
+neoForge.runs.named('gameTestServer').configure {
+    def execFile = layout.buildDirectory.file('jacoco/gameTest.exec').get().asFile
+    // includes= our packages only: avoids JaCoCo choking on Minecraft's huge Blocks/Items classes and keeps the
+    // run fast — we only care about coverage of the mod's own code anyway.
+    jvmArgument("-javaagent:${configurations.jacocoAgentRuntime.singleFile}=destfile=${execFile},append=false,includes=dev.gemberkoekje.skyseed.*")
+}
+
+tasks.register('gameTestCoverage', JacocoReport) {
+    group = 'verification'
+    description = 'Runs the GameTest suite and reports JaCoCo coverage of the mod classes.'
+    dependsOn 'runGameTestServer'
+    executionData(layout.buildDirectory.file('jacoco/gameTest.exec'))
+    sourceSets sourceSets.main
+    reports {
+        html.required = true
+        xml.required = true
+        csv.required = false
     }
 }

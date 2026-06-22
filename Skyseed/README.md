@@ -218,7 +218,10 @@ The first invocation downloads Gradle, NeoForge, and Minecraft, so it takes a wh
 `gametest/SkyseedGameTests.java` holds a NeoForge GameTest suite that asserts generation/structure
 invariants (every theme plans without error, generation is deterministic, structures keep their key
 blocks). Run it with `./gradlew runGameTestServer` — it's the safety net to run before and after the
-refactors tracked in `codereview.md`.
+refactors tracked in `codereview.md`. For test **coverage**, run `./gradlew gameTestCoverage` (attaches the
+JaCoCo agent to the run) → `build/reports/jacoco/gameTestCoverage/html/index.html`.
+
+The build compiles with `-Xlint:all` (warnings stay visible in the log; the build is *not* `-Werror`).
 
 ## Repository layout
 

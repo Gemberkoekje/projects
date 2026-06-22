@@ -26,8 +26,8 @@ automated tests. Two rules don't translate cleanly and are called out where rele
   held item, clamps a malicious precise-target to max range. This is exemplary — use it as the model.
 - **Deterministic RNG** seeded from `worldSeed ^ center` for reproducible islands.
 - Hygiene: **no** trailing whitespace, **no** `TODO/FIXME/HACK`, **no** `System.out`/`printStackTrace`,
-  only **one** broad `catch` (dev-only, justified), only **3** `@SuppressWarnings` (all with reasons).
-  Most files carry accurate Javadoc.
+  only **one** broad `catch` (dev-only, justified), and **no** `@SuppressWarnings` (the 3 it had were removed
+  and the underlying warnings fixed — see B1). Most files carry accurate Javadoc.
 
 ---
 
@@ -37,7 +37,7 @@ automated tests. Two rules don't translate cleanly and are called out where rele
 |---|----------|------|------|
 | A1 | **High** | Architecture | `IslandGenerator` is a 1,096-line god class; split it |
 | A2 | **High** | Architecture | Structure-template duplication (`Built` ×14, `writeIfAbsent` ×8, `anchor`/`lootChest`/`jig`/`spawner` re-implemented) |
-| B1 | **High** | Tooling | No compiler lint/warnings config in `build.gradle` |
+| B1 | ✅ done | Tooling | ~~No compiler lint~~ — `-Xlint:all` added (not `-Werror`), suppressions removed + warnings fixed |
 | B3 | ✅ done | Tooling | ~~No automated tests~~ — GameTest suite added as the refactoring guard |
 | B2 | Medium | Tooling | `.gitattributes` doesn't normalize source line endings (every commit warns) |
 | D1 | Medium | Docs | Stale `IslandSeedEntity` class Javadoc ("placeholder", "milestone 4") |
@@ -91,20 +91,15 @@ already bitten this project — the trial-spawner schema needed a fix in two pla
 
 ## B. Build & tooling
 
-### B1 — No compiler lint / warnings configuration — **High**
-`build.gradle:189` only sets `options.encoding = 'UTF-8'`. There is **no `-Xlint`, no `-Werror`**, so the
-deprecation/unchecked warnings hinted at by the 3 `@SuppressWarnings` (and any others) are invisible.
-`instructions.md` ("solve warnings… you are not done until all warnings are resolved") and the project's
-own *"warnings-as-errors house style"* (currently only honoured in the C# projects) both point the same
-way:
-```gradle
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-    options.compilerArgs += ['-Xlint:all', '-Xlint:-processing']
-    // once the tree is clean: options.compilerArgs += ['-Werror']
-}
-```
-Turn it on, triage what surfaces, then consider `-Werror`.
+### B1 — Compiler lint — **✅ done**
+`build.gradle` now compiles with **`-Xlint:all` + `options.deprecation = true`**, **deliberately not
+`-Werror`** (warnings stay visible as reminders rather than becoming failures that pressure people into
+suppressing them). All **three `@SuppressWarnings` were removed** and the four real warnings they hid were
+**fixed properly, not re-suppressed**: `Mob.finalizeSpawn` → the NeoForge `EventHooks.finalizeMobSpawn`
+(fires the spawn event, the non-deprecated path), and `BlockStateBase.blocksMotion()` → a position-aware
+`getCollisionShape(level, pos).isEmpty()` check (agrees with the old check for every block that occurs at a
+spawn column). The tree now compiles **warning-free** under `-Xlint:all`; any new warning will show in the
+build log. (Spawn behaviour re-verified in-game: pasture animals + meadow mobs still spawn.)
 
 ### B3 — Automated tests — **✅ started (the refactoring guard)**
 Previously there were **no tests** (the whole pipeline was hand-verified over RCON). A **NeoForge GameTest
@@ -121,6 +116,26 @@ Still worth adding later: pond-containment ("no water hangs off the rim" — nee
 rim waterfalls), island overlap rejection (`isTooCrowded`), and codec round-trips for the theme records.
 *(The GameTest sources currently ship in the main source set, gated by namespace; moving them to a
 dedicated `gametest`/test source set so they don't ship in the jar is a low-priority follow-up.)*
+
+**Coverage** is measured with **`./gradlew gameTestCoverage`** → `build/reports/jacoco/gameTestCoverage/`.
+JaCoCo can't use its task extension here (the gameTestServer is a ModDevGradle run, not a `JavaExec`/`Test`
+task), so the agent is attached as a JVM argument, scoped to `includes=dev.gemberkoekje.skyseed.*` (otherwise
+it chokes instrumenting Minecraft's huge `Blocks`/`Items`). Current run: **~65% line, 69% method, 80% class**.
+
+| Package | Line cov. | |
+|---|---|---|
+| `worldgen/theme` (codecs) | **98%** | the `everyThemePlansWithoutError` test hits every record |
+| `registry`, root, `gametest` | 93–100% | |
+| `worldgen/structure` | 69% | builders run at boot + the two placement tests |
+| `worldgen` (`IslandGenerator`) | 64% | the `planIsland` tests |
+| `IslandSeedEntity` | **0%** | throw/germinate/overlap — bypassed (tests call `planIsland` directly) |
+| `GenerationJob` | **0%** | the world-apply (block streaming, spawns) — verified by hand, not by tests |
+| `client` / `event` / `network` | 0–21% | client + event paths a server-side gametest can't reach |
+
+The honest read: the **generation core is well covered**, but the **entity germination loop and the
+`GenerationJob` world-apply are untested** (they need a test that throws a seed / drains a job and reads the
+world back — the highest-value coverage to add next, especially since `GenerationJob`'s spawn paths were just
+changed for B1).
 
 ### B2 — Line-ending normalization — **Medium**
 `.gitattributes` only pins `src/generated/**` to LF. Source files aren't covered, so every commit prints

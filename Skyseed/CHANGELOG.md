@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.2] - 2026-06-22
+
+### Internal
+- The build now compiles with **`-Xlint:all`** (deliberately *not* `-Werror`, so warnings stay visible
+  instead of pressuring suppression). Removed all three `@SuppressWarnings` and **fixed** the warnings they
+  hid: `Mob.finalizeSpawn` → `EventHooks.finalizeMobSpawn` (worldgen mob spawns now fire the NeoForge
+  FinalizeSpawn event) and `BlockStateBase.blocksMotion()` → a position-aware collision-shape check. The
+  tree compiles warning-free.
+- Added **test-coverage measurement**: `./gradlew gameTestCoverage` attaches JaCoCo to the gameTest run →
+  `build/reports/jacoco/`. The GameTest suite covers ~65% of the mod's own lines (generation core well
+  covered; the entity germination loop and `GenerationJob` world-apply are the main gaps).
+
 ## [0.32.1] - 2026-06-22
 
 ### Internal
