@@ -29,7 +29,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Area | Built |
 |---|---|
 | Core loop | Throwable charge-to-launch seed → arm timer → germinate → tick-budgeted grow-in |
-| Themes (seeds) | All 11 planned island types — **Forest**, **Rocky**, **Desert**, **Mushroom**, **Frozen**, **Meadow**, **Badlands**, **Ancient**, **Lush**, **Aquatic** — each with a **Large variant** (`*_large`): a bigger, pricier island with a thematic twist (Rocky → emerald mountain, Aquatic → deep lake, Desert → oasis, Frozen → frozen lake, Badlands → towering mesa, …) (`skyseed:*`) |
+| Themes (seeds) | All 10 planned island types — **Forest**, **Rocky**, **Desert**, **Mushroom**, **Frozen**, **Meadow**, **Badlands**, **Ancient**, **Lush**, **Aquatic** — each with a **Large variant** (`*_large`): a bigger, pricier island with a thematic twist (Rocky → emerald mountain, Aquatic → deep lake, Desert → oasis, Frozen → frozen lake, Badlands → towering mesa, …) (`skyseed:*`) |
 | Banded fill | `fill_bands` palette option: a Y-cycled body palette for badlands-style strata |
 | Underside decor | per-variant `underside` list: hanging dripstone, cave vines, spore blossoms, roots from the island's bottom |
 | Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
@@ -53,7 +53,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
 
-**All 11 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
+**All 10 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
 
 ---
 

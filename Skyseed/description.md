@@ -28,7 +28,7 @@ Two throw modes; press **V** to switch (your choice is remembered):
 
 ---
 
-## Eleven terrain islands to discover
+## Ten terrain islands to discover
 
 Each Skyseed grows its own kind of island, with multiple looks and hidden surprises — and every one has a bigger, pricier **Large** variant with a thematic twist:
 
@@ -111,6 +111,16 @@ Install **Patchouli** for the full illustrated edition; without it, the Almanac 
 
 ---
 
+## On the horizon
+
+Skyseed is actively developed, and there's plenty more sky to fill. On the roadmap:
+
+- **More structures to raid** — a **Woodland Mansion** room (vindicators, an evoker, and a shot at the Totem of Undying), a **Trial Chamber** with its trial spawners and vault loot, and more lifted from across the game.
+- **New dimensions** — the **Nether** and the **End** will be tackled in future versions, with their own Skyseeds, biomes, and structures, so you can grow a crimson forest or an End island the same way you grow the overworld today.
+- **More creatures, island types, and surprises** as the mod grows.
+
+---
+
 ## Getting started
 
 - Chop your starting tree and dig the island for dirt and planks.
@@ -127,4 +137,4 @@ Install **Patchouli** for the full illustrated edition; without it, the Almanac 
 
 ---
 
-*Skyseed is actively developed — more structures, creatures, and dimensions are on the way. Feedback and bug reports are very welcome! Add-on makers: every seed is a normal item in the `#skyseed:skyseeds` tag, and islands are pure datapack JSON, so new seeds are easy to bolt on.*
+*Feedback and bug reports are very welcome! Add-on makers: every seed is a normal item in the `#skyseed:skyseeds` tag, and islands are pure datapack JSON, so new seeds are easy to bolt on.*
