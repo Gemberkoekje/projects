@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.3] - 2026-06-22
+
+### Internal
+- Extended the GameTest suite to cover the **world-apply pipeline** that was at 0%: `IslandSeedEntity`
+  (throw → arm → germinate, precise-mode targeting, and an NBT save/load round-trip) and `GenerationJob`
+  (draining a structure island — block stream, jigsaw cottage, villager-at-bed, iron golem, animal pack).
+  Coverage of those two classes went **0% → 71% / 77%**; overall ~73% line. Adds two tiny test-only themes
+  (`skyseed:gametest/island`, `skyseed:gametest/structure`).
+
 ## [0.32.2] - 2026-06-22
 
 ### Internal

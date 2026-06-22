@@ -120,22 +120,24 @@ dedicated `gametest`/test source set so they don't ship in the jar is a low-prio
 **Coverage** is measured with **`./gradlew gameTestCoverage`** → `build/reports/jacoco/gameTestCoverage/`.
 JaCoCo can't use its task extension here (the gameTestServer is a ModDevGradle run, not a `JavaExec`/`Test`
 task), so the agent is attached as a JVM argument, scoped to `includes=dev.gemberkoekje.skyseed.*` (otherwise
-it chokes instrumenting Minecraft's huge `Blocks`/`Items`). Current run: **~65% line, 69% method, 80% class**.
+it chokes instrumenting Minecraft's huge `Blocks`/`Items`). Current run: **~73% line, 77% method, 84% class**.
 
-| Package | Line cov. | |
+| Package / class | Line cov. | |
 |---|---|---|
 | `worldgen/theme` (codecs) | **98%** | the `everyThemePlansWithoutError` test hits every record |
 | `registry`, root, `gametest` | 93–100% | |
+| `GenerationJob` | **77%** | `generationJobBuildsStructureIsland` drains a job (blocks, jigsaw, villager, golem, animals) + the germination tests |
+| `IslandSeedEntity` | **71%** | `seedGerminatesIntoIsland` / `preciseSeedGerminatesAtTarget` (throw→germinate) + an NBT save/load round-trip |
 | `worldgen/structure` | 69% | builders run at boot + the two placement tests |
 | `worldgen` (`IslandGenerator`) | 64% | the `planIsland` tests |
-| `IslandSeedEntity` | **0%** | throw/germinate/overlap — bypassed (tests call `planIsland` directly) |
-| `GenerationJob` | **0%** | the world-apply (block streaming, spawns) — verified by hand, not by tests |
 | `client` / `event` / `network` | 0–21% | client + event paths a server-side gametest can't reach |
 
-The honest read: the **generation core is well covered**, but the **entity germination loop and the
-`GenerationJob` world-apply are untested** (they need a test that throws a seed / drains a job and reads the
-world back — the highest-value coverage to add next, especially since `GenerationJob`'s spawn paths were just
-changed for B1).
+The honest read: the **generation core and the world-apply pipeline are now both well covered**. Remaining
+gaps are the harder/edge paths — the pond water-mob spawn (no aquatic theme in the suite), the
+overlap-fizzle branch, the projectile collision handlers, and the client/event code a server-side gametest
+can't reach. Two tiny `skyseed:gametest/*` themes + the empty region template are test-only assets that
+currently ship in the main jar (inert — no seed item references them); they'd move with the gametest source
+set in the follow-up above.
 
 ### B2 — Line-ending normalization — **Medium**
 `.gitattributes` only pins `src/generated/**` to LF. Source files aren't covered, so every commit prints

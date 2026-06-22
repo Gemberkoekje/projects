@@ -1,12 +1,22 @@
 package dev.gemberkoekje.skyseed.gametest;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
+import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
+import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
@@ -165,6 +175,99 @@ public final class SkyseedGameTests {
         helper.assertTrue(contains(helper, o, 8, 8, 8, Blocks.TRIAL_SPAWNER), "trial hub lost its breeze boss spawner");
         helper.assertTrue(contains(helper, o, 8, 8, 8, Blocks.VAULT), "trial hub lost its ominous vault");
         helper.succeed();
+    }
+
+    // --- world-apply: the throw → germinate → GenerationJob pipeline (covers IslandSeedEntity + GenerationJob) ---
+
+    @GameTest(template = REGION, timeoutTicks = 200)
+    public static void seedGerminatesIntoIsland(GameTestHelper helper) {
+        // End-to-end: a thrown seed arms (~40 ticks), germinates, and IslandGrowth drains the GenerationJob.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
+        final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        seed.setPos(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
+        seed.setTheme(skyseed("gametest/island"));
+        seed.setNoGravity(true); // rest in place and arm rather than fall through the region floor
+        level.addFreshEntity(seed);
+        helper.succeedWhen(() -> {
+            boolean grown = false;
+            for (final BlockPos p : BlockPos.betweenClosed(center.offset(-6, -6, -6), center.offset(6, 4, 6))) {
+                if (level.getBlockState(p).is(Blocks.GRASS_BLOCK)) {
+                    grown = true;
+                    break;
+                }
+            }
+            helper.assertTrue(grown, "the thrown seed has not germinated into an island yet");
+        });
+    }
+
+    @GameTest(template = REGION, timeoutTicks = 200)
+    public static void generationJobBuildsStructureIsland(GameTestHelper helper) {
+        // Drain a GenerationJob for a structure island directly: covers the block stream, placeStructures
+        // (jigsaw cottage), the bed→villager scan, the iron-golem spawn and the animal pack.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
+        final IslandPlan plan = IslandGenerator.planIsland(level, center, theme(level, "gametest/structure"),
+                level.getBiome(center), RandomSource.create(11L));
+        final GenerationJob job = new GenerationJob(level, plan);
+        int guard = 0;
+        while (!job.tick() && guard++ < 2000) {
+            // drain the whole job synchronously (each tick() does a bounded slice)
+        }
+        helper.assertTrue(guard < 2000, "GenerationJob never reported completion");
+        helper.assertTrue(contains(helper, center.offset(-8, -3, -8), 16, 12, 16, Blocks.RED_BED),
+                "the cottage's bed was not placed (placeStructures)");
+        helper.assertTrue(near(level, center, Villager.class), "no villager spawned at the bed");
+        helper.assertTrue(near(level, center, IronGolem.class), "no iron golem spawned (iron_golems)");
+        helper.assertTrue(near(level, center, Cow.class), "no animal-pack cow spawned (spawnEnclosureAnimals)");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION, timeoutTicks = 200)
+    public static void preciseSeedGerminatesAtTarget(GameTestHelper helper) {
+        // A Precise throw germinates at its chosen target, not where the seed sits.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos spawn = helper.absolutePos(new BlockPos(3, 18, 3));
+        final BlockPos target = helper.absolutePos(new BlockPos(10, 10, 10));
+        final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        seed.setPos(spawn.getX() + 0.5, spawn.getY() + 0.5, spawn.getZ() + 0.5);
+        seed.setTheme(skyseed("gametest/island"));
+        seed.setPreciseTarget(new Vec3(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5));
+        seed.setNoGravity(true);
+        level.addFreshEntity(seed);
+        helper.succeedWhen(() -> {
+            boolean atTarget = false;
+            for (final BlockPos p : BlockPos.betweenClosed(target.offset(-6, -6, -6), target.offset(6, 4, 6))) {
+                if (level.getBlockState(p).is(Blocks.GRASS_BLOCK)) {
+                    atTarget = true;
+                    break;
+                }
+            }
+            helper.assertTrue(atTarget, "the precise seed has not germinated at its target yet");
+        });
+    }
+
+    @GameTest(template = REGION)
+    public static void seedStateRoundTripsThroughNbt(GameTestHelper helper) {
+        // Save/load: theme + precise target must survive addAdditionalSaveData → readAdditionalSaveData.
+        final ServerLevel level = helper.getLevel();
+        final ResourceLocation theme = skyseed("gametest/island");
+        final IslandSeedEntity a = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        a.setTheme(theme);
+        a.setPreciseTarget(new Vec3(1.5, 2.5, 3.5));
+        final CompoundTag tag = new CompoundTag();
+        a.addAdditionalSaveData(tag);
+
+        final IslandSeedEntity b = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        b.readAdditionalSaveData(tag);
+        helper.assertTrue(theme.equals(b.getTheme()), "theme did not round-trip through NBT");
+        helper.assertTrue(tag.getBoolean("Precise") && tag.getDouble("TY") == 2.5, "precise target did not round-trip");
+        helper.succeed();
+    }
+
+    /** True if an entity of {@code cls} is within ~14 blocks of {@code c}. */
+    private static boolean near(ServerLevel level, BlockPos c, Class<? extends Entity> cls) {
+        return !level.getEntitiesOfClass(cls, new AABB(c).inflate(14)).isEmpty();
     }
 
     /** Place a single structure template (no rotation) at region-relative (1,1,1); returns its world origin. */

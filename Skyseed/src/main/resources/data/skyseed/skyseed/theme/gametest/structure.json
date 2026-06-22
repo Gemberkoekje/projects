@@ -1,0 +1,6 @@
+{
+  "shape": { "radius": { "min": 6, "max": 6 }, "rim_noise": 0.05, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2 },
+  "jigsaw": { "pool": "skyseed:hamlet/cottages", "target": "minecraft:bottom", "depth": 1, "pad": 4, "iron_golems": 1 },
+  "animals": [ { "weight": 1, "entries": [ { "entity": "minecraft:cow", "adults": 2, "babies": 0 } ] } ]
+}
