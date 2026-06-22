@@ -74,29 +74,33 @@ public final class VillageCenterTemplates {
         return t;
     }
 
-    /** 7×7 cobblestone plaza: "bottom" anchor, a bell meeting-point, corner lanterns, four connectors (one hall each). */
+    /**
+     * 9×9 cobblestone plaza: "bottom" anchor, a bell meeting-point, corner lanterns, four connectors (one hall
+     * each). The plaza is two wider than the 7-wide halls, so each hall (centred on an edge midpoint) leaves the
+     * plaza's corner columns open — walkable gaps to reach the bell and the halls without breaking blocks.
+     */
     private static Built plaza() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState cob = Blocks.COBBLESTONE.defaultBlockState();
-        for (int x = 0; x < 7; x++) {
-            for (int z = 0; z < 7; z++) {
+        for (int x = 0; x < 9; x++) {
+            for (int z = 0; z < 9; z++) {
                 m.put(new BlockPos(x, 0, z), cob);
             }
         }
         // Anchor + bell meeting-point on top, lanterns at the corners.
-        m.put(new BlockPos(3, 0, 3), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        bes.put(new BlockPos(3, 0, 3), jig("minecraft:bottom", "minecraft:empty", "minecraft:empty", "minecraft:cobblestone"));
-        m.put(new BlockPos(3, 1, 3), Blocks.BELL.defaultBlockState()
+        m.put(new BlockPos(4, 0, 4), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
+        bes.put(new BlockPos(4, 0, 4), jig("minecraft:bottom", "minecraft:empty", "minecraft:empty", "minecraft:cobblestone"));
+        m.put(new BlockPos(4, 1, 4), Blocks.BELL.defaultBlockState()
                 .setValue(BellBlock.ATTACHMENT, BellAttachType.FLOOR).setValue(BellBlock.FACING, Direction.NORTH));
-        for (int[] c : new int[][]{{1, 1}, {5, 1}, {1, 5}, {5, 5}}) {
+        for (int[] c : new int[][]{{1, 1}, {7, 1}, {1, 7}, {7, 7}}) {
             m.put(new BlockPos(c[0], 1, c[1]), Blocks.LANTERN.defaultBlockState());
         }
         // One connector per side, each drawing from its own hall pool (deterministic — all 13 professions).
-        edge(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, "skyseed:village_center/hall_farm");
-        edge(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP, "skyseed:village_center/hall_scholar");
-        edge(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP, "skyseed:village_center/hall_craft");
-        edge(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP, "skyseed:village_center/hall_smith");
+        edge(m, bes, new BlockPos(4, 0, 0), FrontAndTop.NORTH_UP, "skyseed:village_center/hall_farm");
+        edge(m, bes, new BlockPos(4, 0, 8), FrontAndTop.SOUTH_UP, "skyseed:village_center/hall_scholar");
+        edge(m, bes, new BlockPos(0, 0, 4), FrontAndTop.WEST_UP, "skyseed:village_center/hall_craft");
+        edge(m, bes, new BlockPos(8, 0, 4), FrontAndTop.EAST_UP, "skyseed:village_center/hall_smith");
         return new Built(m, bes);
     }
 

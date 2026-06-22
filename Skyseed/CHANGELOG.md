@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.1] - 2026-06-22
+
+### Fixed
+- **Structures no longer sit a block too deep.** `JigsawPlacement` seats a structure's anchor block at
+  `origin.y − 1`, so every island building (cottages, plazas, igloo, ruin, animal pens, dungeons, …) sank one
+  block into its levelled pad and left a grass lip around it. The jigsaw origin is now passed as `gy + 1` so
+  floors land flush on the pad. Uniform across all structures — the Desert Temple's TNT still buries one below.
+
+### Changed
+- **Trade Post and Village Center are now enterable without breaking blocks.** Their buildings ringed the plaza
+  flush on all four sides and met at the corners, sealing it in. The plazas are now two blocks wider than their
+  buildings (Trade Post 5→7, Village Center 7→9), so each building leaves the plaza's corner columns open as
+  walkable sneak-gaps to the bell and the traders. The Village Center island grew slightly to fit (radius
+  15–18 → 16–19, pad 11 → 12).
+
 ## [0.19.0] - 2026-06-22
 
 ### Added

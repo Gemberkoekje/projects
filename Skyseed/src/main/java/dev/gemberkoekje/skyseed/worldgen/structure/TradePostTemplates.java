@@ -56,26 +56,30 @@ public final class TradePostTemplates {
         return t;
     }
 
-    /** 5×5 cobblestone plaza: a "bottom" anchor, a lantern centre, and four outward connectors to the buildings pool. */
+    /**
+     * 7×7 cobblestone plaza: a "bottom" anchor, a lantern centre, and four outward connectors to the buildings
+     * pool. The plaza is two wider than the 5-wide shops so each shop, centred on an edge midpoint, leaves the
+     * plaza's corner columns open — walkable gaps to sneak in and out without breaking a building.
+     */
     private static Built plaza() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState cob = Blocks.COBBLESTONE.defaultBlockState();
-        for (int x = 0; x < 5; x++) {
-            for (int z = 0; z < 5; z++) {
+        for (int x = 0; x < 7; x++) {
+            for (int z = 0; z < 7; z++) {
                 m.put(new BlockPos(x, 0, z), cob);
             }
         }
         // Anchor (becomes cobblestone), with a lantern centrepiece on top.
-        m.put(new BlockPos(2, 0, 2), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        bes.put(new BlockPos(2, 0, 2), jig("minecraft:bottom", "minecraft:empty", "minecraft:empty", "minecraft:cobblestone"));
-        m.put(new BlockPos(2, 1, 2), Blocks.LANTERN.defaultBlockState());
+        m.put(new BlockPos(3, 0, 3), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
+        bes.put(new BlockPos(3, 0, 3), jig("minecraft:bottom", "minecraft:empty", "minecraft:empty", "minecraft:cobblestone"));
+        m.put(new BlockPos(3, 1, 3), Blocks.LANTERN.defaultBlockState());
 
         // Outward connectors at the four edge midpoints, drawing from the buildings pool.
-        addEdge(m, bes, new BlockPos(2, 0, 0), FrontAndTop.NORTH_UP);
-        addEdge(m, bes, new BlockPos(2, 0, 4), FrontAndTop.SOUTH_UP);
-        addEdge(m, bes, new BlockPos(0, 0, 2), FrontAndTop.WEST_UP);
-        addEdge(m, bes, new BlockPos(4, 0, 2), FrontAndTop.EAST_UP);
+        addEdge(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP);
+        addEdge(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP);
+        addEdge(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP);
+        addEdge(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP);
         return new Built(m, bes);
     }
 

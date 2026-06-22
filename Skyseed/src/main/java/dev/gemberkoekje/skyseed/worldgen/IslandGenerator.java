@@ -210,9 +210,12 @@ public final class IslandGenerator {
         if (jc != null) {
             final int gy = center.getY() + topDome;
             levelStructurePad(blockMap, surfaceList, center, gy, jc.pad(), surface, fill);
+            // JigsawPlacement lands the start piece's anchor block at origin.y - 1, so pass gy + 1 to seat the
+            // structure's floor (the anchor layer) flush on the pad at gy — otherwise it sinks a block into it.
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
-                    new BlockPos(center.getX(), gy, center.getZ())));
-            // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack into the centre.
+                    new BlockPos(center.getX(), gy + 1, center.getZ())));
+            // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack onto the pad (gy),
+            // spawned a block above, so the mob lands on the structure floor that now sits at gy.
             if (!animalPacks.isEmpty()) {
                 rollAnimals(animalPacks, new BlockPos(center.getX(), gy, center.getZ()), animals, random);
             }
