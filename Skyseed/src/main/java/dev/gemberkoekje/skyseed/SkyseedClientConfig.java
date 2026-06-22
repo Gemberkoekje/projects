@@ -14,9 +14,9 @@ public final class SkyseedClientConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         PRECISE_THROW = builder
-                .comment("Skyseed throw mode. true = Precise (direct placement along your look vector);",
-                        "false = Classic (charged physics arc). Toggle in-game with the throw-mode key.")
-                .define("preciseThrowMode", false);
+                .comment("Skyseed throw mode. true = Precise (direct placement along your look vector, the",
+                        "default); false = Classic (charged physics arc). Toggle in-game with the throw-mode key.")
+                .define("preciseThrowMode", true);
         SPEC = builder.build();
     }
 

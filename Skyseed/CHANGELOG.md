@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.9] - 2026-06-22
+
+### Changed
+- **Precise throw mode is now the default** (most playtesters preferred it). New installs start in Precise
+  (direct placement along your look vector); press **V** to switch to Classic (the charged arc). Existing
+  players keep whatever they last had — delete `config/skyseed-client.toml` or press V once to pick up the new
+  default. The in-game guide and store text were updated to match.
+
 ## [0.19.8] - 2026-06-22
 
 ### Changed

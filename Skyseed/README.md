@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.19.8** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.19.9** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
 
 | Area | Built |
 |---|---|
@@ -35,7 +35,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Two-tall plants | ground entries that are double plants (dripleaves, pitcher plant, tall flowers) place both halves |
 | Hand-built trees | `skyseed:mangrove`, `skyseed:azalea` — trees whose vanilla features won't place on floating islands |
 | Pond water plants | `pond.plants` list: lily pads on the surface, kelp / seagrass / coral / sea pickle / wet sponge on the floor |
-| Throw modes | Classic (charged physics arc) + Precise (direct placement along the look vector); toggle keybind (default **V**), persisted in client config |
+| Throw modes | **Precise** (default — direct placement along the look vector) + Classic (charged physics arc); toggle keybind (default **V**), persisted in client config |
 | Mob sprinkles | `mobs` list (theme / override / variant): animals spawned directly when an island finishes generating |
 | Water mobs | `pond.water_mobs`: animals spawned submerged in the pool (squid, axolotls, fish, glow squid) |
 | Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager. **Trade Post** (`skyseed:trade_post`): a plaza ringed by shops, each villager takes up a trade. **Village Center** (`skyseed:village_center`): a bell plaza + four trading halls with **all 13 professions** + an iron golem. See `SKYVILLAGESPLAN.md`. Raids disabled on Skyseed worlds |
@@ -62,7 +62,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 **One item per theme, `skyseed:<theme>_skyseed`** (e.g. `skyseed:forest_skyseed`). Each is an `IslandSeedItem` instance carrying a fixed `theme()` id; all are registered from `ModItems.SEED_THEMES` and named in the `lang` file ("Forest Skyseed"). Distinct items mean each shows up individually in JEI/REI, and add-on mods can register their own seed item (pointed at their own theme) and add it to the `#skyseed:skyseeds` item tag. Every seed's icon is its own client model under `models/item/<theme>_skyseed.json`.
 
 - **The `#skyseed:skyseeds` tag** holds every seed item — the guide recipe (any one skyseed → the Almanac) keys off it, and it's the integration point for add-on seeds.
-- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands; **Precise** places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there. On release the client sends a packet; the server reads the held seed's `theme()`, then validates and spawns the entity. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
+- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Precise** (the default) places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there; **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands. On release the client sends a packet; the server reads the held seed's `theme()`, then validates and spawns the entity. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
 
 A new Skyseed is one recipe JSON + one theme JSON + a one-line entry in `ModItems.SEED_THEMES` (plus an icon/model and a lang name). The theme content itself stays fully data-driven.
 

@@ -21,10 +21,10 @@ No two islands are ever the same — every one is rolled fresh within its theme,
 
 ## Throw it your way
 
-A toggle keybind (default **V**) switches between two throw modes — your choice is remembered:
+Two throw modes; press **V** to switch (your choice is remembered):
 
+- **Precise** *(default)* — direct placement. The island appears exactly where you're looking, at a distance set by how long you charge. Perfect for laying out a tidy sky-base.
 - **Classic** — a charged toss. A light tap drops the island close; a full charge sends it sailing.
-- **Precise** — direct placement. The island appears exactly where you're looking, at a distance set by how long you charge. Perfect for laying out a tidy sky-base.
 
 ---
 

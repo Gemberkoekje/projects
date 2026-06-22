@@ -41,9 +41,9 @@ public final class SkyseedGuide {
         final List<Component> pages = List.of(
                 Component.literal("The Skyfarer's Almanac\n\nCraft a Skyseed, hold right-click to wind up, "
                         + "and release to throw it. Where it lands, an island grows from nothing."),
-                Component.literal("Throwing (toggle with V):\n\n§lClassic§r — a charged arc; the island "
-                        + "grows where the seed comes to rest.\n\n§lPrecise§r — places the island along "
-                        + "your line of sight."),
+                Component.literal("Throwing (toggle with V):\n\n§lPrecise§r (default) — places the island "
+                        + "along your line of sight.\n\n§lClassic§r — a charged arc; the island grows where "
+                        + "the seed comes to rest."),
                 Component.literal("Every Skyseed grows its own kind of island — forests, deserts, mushroom isles, "
                         + "frozen peaks, villages, animal pens and more.\n\nHow high you throw sets the island's "
                         + "altitude, and so its ores."),
