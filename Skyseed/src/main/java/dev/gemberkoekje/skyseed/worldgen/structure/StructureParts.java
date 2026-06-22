@@ -50,7 +50,7 @@ public final class StructureParts {
         // — out on the overhang plane (z0-ov / z1+ov), not in the wall — so the diagonal edge reads as solid.
         // Covers every sloped column including the lowest one at the eave.
         if (ov > 0) {
-            for (int x = x0 - ov; x <= x1 + ov; x++) {
+            for (int x = x0; x <= x1; x++) { // skip the eave-corner overhang columns (x0-ov / x1+ov)
                 if (x == mid) {
                     continue;
                 }
@@ -61,6 +61,9 @@ public final class StructureParts {
                 m.put(new BlockPos(x, ry - 1, z0 - ov), rake);
                 m.put(new BlockPos(x, ry - 1, z1 + ov), rake);
             }
+            // A full block under the ridge slab at the gable-overhang peak — a touch nicer than slab-over-air.
+            m.put(new BlockPos(mid, ridgeY - 1, z0 - ov), planks);
+            m.put(new BlockPos(mid, ridgeY - 1, z1 + ov), planks);
         }
     }
 

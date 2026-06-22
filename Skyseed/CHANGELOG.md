@@ -3,6 +3,12 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.19.11] - 2026-06-22
+
+### Changed
+- **Two small roof tweaks.** Dropped the extra upside-down rake stair at each eave corner (it stuck out on the
+  side), and added a full block under the ridge slab at the gable-overhang peak (a touch nicer than slab-over-air).
+
 ## [0.19.10] - 2026-06-22
 
 ### Changed
