@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.25.0] - 2026-06-22
+
+### Added
+- **Every big island (except Aquatic) now has a 1% chance to grow a Ruined Portal** — the broken Nether-portal
+  frame with crying obsidian and a `ruined_portal` chest, sitting on the surface. A rare find across Large
+  Forest / Rocky / Desert / Mushroom / Frozen / Meadow / Badlands / Ancient / Lush. The island keeps its own
+  look (verified: a Large Frozen with a portal is still snow). Datapack-only — a 1% `rare_structures` entry on
+  each large theme.
+
 ## [0.24.1] - 2026-06-22
 
 ### Changed

@@ -87,6 +87,7 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 - 🌿 **Lost Jungle Temple** — rarely a Large Forest grown in a jungle raises a full jungle temple among the vines and jungle trees.
 - ⚔️ **Buried Dungeon** — rarely a Large Rocky or Large Ancient island hides a sealed dungeon just below the surface; there's no door, so the only way in is to dig down onto it — watch your step.
 - 🗼 **Hostile takeover** — rarely a Trade Post comes up as a pillager outpost instead of a village: a watchtower full of pillagers where your shops should be.
+- 🪨 **Ruined Portal** — any big island (bar the Aquatic one) has a slim chance of growing with a broken Nether portal and its chest sitting on the surface — a free shot at crying obsidian.
 - 🧙 **Swamp Witch Hut** — rarely a Large Forest in a swamp or dark-oak wood, or a Large Aquatic island in a swamp, comes up with a witch's hut (and the witch and her cat) instead.
 
 ---
