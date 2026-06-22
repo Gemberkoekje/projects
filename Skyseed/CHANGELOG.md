@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.20.0] - 2026-06-22
+
+### Added
+- **Structure islands can now also appear, buried, on big islands.** First one: a **Desert Temple has a 5%
+  chance on a Large Desert island**, sunk a block beneath the sand so its sandstone roof is hidden and the only
+  tell is a suspicious hole in the dunes (verified: zero sandstone shows at the surface; the island's own sand
+  stays intact right up to the hole). Drop in and the central pressure-plate-over-TNT trap is waiting, exactly
+  like the dedicated Desert Temple island.
+  - New `sink` field on a theme's jigsaw config buries the structure N blocks below the levelled surface, so
+    the island's own surface covers it; the temple's shaft punches up through that surface for the hole. The
+    dedicated Desert Temple island is unchanged (`sink` 0). The oasis is suppressed on a temple roll so the two
+    don't fight over the island centre.
+
 ## [0.19.11] - 2026-06-22
 
 ### Changed

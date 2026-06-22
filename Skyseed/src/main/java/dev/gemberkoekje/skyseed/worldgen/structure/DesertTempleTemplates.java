@@ -76,6 +76,12 @@ public final class DesertTempleTemplates {
         m.put(new BlockPos(mid, 2, 3), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
         bes.put(new BlockPos(mid, 2, 3), StructureParts.lootChest("minecraft:chests/desert_pyramid"));
 
+        // Punch the shaft one more block up (y6) through whatever surface sits above the roof. When this temple
+        // is sunk a block (the rare desert-island version), that surface is the island's own sand and only the
+        // hole shows; when not sunk it lands a block above the surface (already air), so it's harmless. Every
+        // other y6 cell is left absent, so the island's surface stays intact around the hole.
+        m.put(new BlockPos(mid, 6, mid), air);
+
         // Anchor on a roof block one off the central hole (it can't be the hole), so the structure centres there.
         StructureParts.anchor(m, bes, new BlockPos(mid, 5, mid + 1), "minecraft:sandstone");
         return new Built(m, bes);
