@@ -22,6 +22,8 @@
     { "block": "minecraft:budding_amethyst", "chance": 0.20, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" }
   ],
   "rare_structures": [
+    { "chance": 0.10,
+      "jigsaw": { "pool": "skyseed:trail_ruins/ruins", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 3 } },
     { "chance": 0.05,
       "jigsaw": { "pool": "skyseed:dungeon/buried", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 5 } },
     { "chance": 0.01,

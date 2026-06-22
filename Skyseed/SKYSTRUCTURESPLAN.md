@@ -223,6 +223,8 @@ Sourced from vanilla 1.21.1. Structures are listed with their skyblock translati
 **Structure:** Gravel/dirt surface island with suspicious gravel embedded in fill layer, some terracotta and brick fragments poking through  
 **Notes:** Pottery sherds are a collector/aesthetic reward. The island appeals to the completionist player more than the efficiency player. Brush tool required — this island teaches the archaeology mechanic if the player hasn't encountered it.
 
+**Status: ✅ Built** (v0.26.0). Not a dedicated seed — a `rare_structures` feature. `skyseed:trail_ruins/ruins` (`TrailRuinsTemplates`): a small buried 5×5 mud-brick/packed-mud/brick/terracotta floor under a gravel layer holding 7 `suspicious_gravel` (6 × `archaeology/trail_ruins_common` + 1 × `_rare`), low broken walls, and a few fragments poking up through the surface as the tell. Buried via the jigsaw `sink: 3`. Placed at **10% on `ancient_large`** (its deep/ancient home, no biome gate) and **5% on the regular `forest` theme gated to `#minecraft:is_taiga`** (the vanilla Trail Ruins biome — the forest grows its podzol/spruce taiga look there). Reuses the brushable-block (`StructureParts.suspicious`) + buried-structure mechanisms; no new seed.
+
 ---
 
 ### 🌊 Ocean Ruins

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.26.0] - 2026-06-22
+
+### Added
+- **Trail Ruins** — a buried archaeology site: a mud-brick floor under a gravel layer salted with **suspicious
+  gravel** to brush for pottery sherds (the vanilla `trail_ruins` loot tables), low broken walls, and a few
+  fragments poking up through the surface as the only tell. It's sunk a few blocks, so you spot the fragments,
+  dig in, and brush. Appears at **10% on a Large Ancient island** (its natural home — the deep, ancient isle)
+  and **5% on a Forest grown in a taiga biome** (the vanilla home for Trail Ruins). No new seed — reuses the
+  buried-structure (`sink`) and brushable-block mechanisms.
+
 ## [0.25.0] - 2026-06-22
 
 ### Added
