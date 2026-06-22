@@ -1,5 +1,13 @@
-# Disable autocrlf on generated files, they always generate with LF
-# Add any extra files or paths here to make git stop saying they
-# are changed when only line endings change.
+# Normalize line endings so commits stop warning "LF will be replaced by CRLF".
+# Text files are stored and checked out as LF on every platform; binary assets are left untouched.
+* text=auto eol=lf
+
+# Binary assets — never run line-ending conversion on these.
+*.nbt  binary
+*.png  binary
+*.ogg  binary
+*.jar  binary
+
+# Generated resources always generate with LF.
 src/generated/**/.cache/* text eol=lf
-src/generated/**/*.json text eol=lf
+src/generated/**/*.json   text eol=lf
