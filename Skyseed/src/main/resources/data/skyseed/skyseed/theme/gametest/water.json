@@ -1,0 +1,12 @@
+{
+  "shape": { "radius": { "min": 8, "max": 8 }, "rim_noise": 0.05, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2 },
+  "pond": { "style": "river", "radius": 2, "depth": 2,
+    "plants": [
+      { "block": "minecraft:lily_pad", "chance": 0.3 },
+      { "block": "minecraft:kelp", "chance": 0.3 },
+      { "block": "minecraft:tall_seagrass", "chance": 0.2 },
+      { "block": "minecraft:tube_coral_fan", "chance": 0.2 } ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.4 }, { "block": "minecraft:short_grass", "chance": 0.4 } ],
+    "water_mobs": [ { "entity": "minecraft:squid", "chance": 1.0, "count": { "min": 1, "max": 1 } } ] }
+}

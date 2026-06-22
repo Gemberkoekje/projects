@@ -1,0 +1,14 @@
+{
+  "shape": { "radius": { "min": 4, "max": 4 }, "rim_noise": 0.05, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "skyseed:nope", "fill": "skyseed:nope", "core": "skyseed:nope", "fill_depth": 2,
+    "surface_scatter": [ { "block": "skyseed:nope", "chance": 0.5 } ],
+    "fill_bands": [ "skyseed:nope" ] },
+  "ores": [ { "block": "skyseed:nope", "chance": 1.0, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" } ],
+  "mobs": [ { "entity": "skyseed:nope", "chance": 1.0, "count": { "min": 1, "max": 1 } } ],
+  "jigsaw": { "pool": "skyseed:hamlet/cottages", "target": "minecraft:bottom", "depth": 1, "pad": 3 },
+  "animals": [ { "weight": 1, "entries": [ { "entity": "skyseed:nope", "adults": 1, "babies": 0 } ] } ],
+  "variants": [
+    { "weight": 0, "name": "b", "decoration": {
+      "trees": [ { "feature": "skyseed:bogus_tree", "tries": 1, "spacing": 2 }, { "feature": "minecraft:bogus_feature", "tries": 1, "spacing": 2 } ] } }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "shape": { "radius": { "min": 8, "max": 8 }, "rim_noise": 0.10, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2 },
+  "biome_overrides": [ { "waterfalls": 2 } ],
+  "variants": [
+    { "weight": 1, "name": "m", "decoration": {
+      "trees": [ { "feature": "skyseed:mangrove", "tries": 3, "spacing": 2 } ] } }
+  ]
+}

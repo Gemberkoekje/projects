@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.32.4] - 2026-06-22
+
+### Internal
+- Raised `IslandGenerator` (the largest upcoming refactor) test coverage from **64% to ~99%** with targeted
+  tests + tiny themes that exercise the previously-untested paths: river-style ponds (`riverColumns`),
+  hand-built mangroves (`buildMangrove`), biome-override waterfalls (`placeWaterfalls`), and an all-bogus-ids
+  theme that drives the warn/fallback branches (`resolveBlock`/`resolveScatter`/`resolveBands`/`resolveEntity`
+  and unknown features). The remaining few lines are unreachable defensive branches. Overall ~76% line.
+
 ## [0.32.3] - 2026-06-22
 
 ### Internal

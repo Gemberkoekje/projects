@@ -158,6 +158,42 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void riverPondCarvesWater(GameTestHelper helper) {
+        // A river-style pond exercises riverColumns + the pond-plant/bank/water-mob paths.
+        final IslandPlan p = plan(helper, "gametest/water", 4L);
+        helper.assertTrue(planHas(p, Blocks.WATER), "the river carved no water (riverColumns)");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void mangroveAndWaterfallGenerate(GameTestHelper helper) {
+        // A hand-built mangrove (buildMangrove/leafBlob) + a biome-override waterfall (placeWaterfalls).
+        final IslandPlan p = plan(helper, "gametest/features", 4L);
+        helper.assertTrue(planHas(p, Blocks.MANGROVE_LOG), "no hand-built mangrove (buildMangrove)");
+        helper.assertTrue(planHas(p, Blocks.WATER), "no waterfall water (placeWaterfalls)");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void unknownThemeIdsFallBack(GameTestHelper helper) {
+        // Every id in this theme is bogus; the generator must warn-and-skip and still build a grass island
+        // (covers the resolveBlock/resolveScatter/resolveBands/resolveEntity/unknown-feature fallbacks).
+        final IslandPlan p = plan(helper, "gametest/bad", 4L);
+        helper.assertTrue(!p.blocks().isEmpty(), "the bad theme produced no blocks");
+        helper.assertTrue(planHas(p, Blocks.GRASS_BLOCK), "surface did not fall back to grass");
+        helper.succeed();
+    }
+
+    private static boolean planHas(IslandPlan p, Block b) {
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(b)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // --- structure templates (guard the template de-duplication) ---
 
     @GameTest(template = REGION)

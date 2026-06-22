@@ -120,24 +120,24 @@ dedicated `gametest`/test source set so they don't ship in the jar is a low-prio
 **Coverage** is measured with **`./gradlew gameTestCoverage`** → `build/reports/jacoco/gameTestCoverage/`.
 JaCoCo can't use its task extension here (the gameTestServer is a ModDevGradle run, not a `JavaExec`/`Test`
 task), so the agent is attached as a JVM argument, scoped to `includes=dev.gemberkoekje.skyseed.*` (otherwise
-it chokes instrumenting Minecraft's huge `Blocks`/`Items`). Current run: **~73% line, 77% method, 84% class**.
+it chokes instrumenting Minecraft's huge `Blocks`/`Items`). Current run: **~76% line, 78% method, 84% class**.
 
 | Package / class | Line cov. | |
 |---|---|---|
+| **`IslandGenerator`** (the A1 refactor) | **99%** | the `planIsland` tests + targeted themes for river ponds, mangroves, waterfalls and bad ids |
 | `worldgen/theme` (codecs) | **98%** | the `everyThemePlansWithoutError` test hits every record |
 | `registry`, root, `gametest` | 93–100% | |
 | `GenerationJob` | **77%** | `generationJobBuildsStructureIsland` drains a job (blocks, jigsaw, villager, golem, animals) + the germination tests |
 | `IslandSeedEntity` | **71%** | `seedGerminatesIntoIsland` / `preciseSeedGerminatesAtTarget` (throw→germinate) + an NBT save/load round-trip |
 | `worldgen/structure` | 69% | builders run at boot + the two placement tests |
-| `worldgen` (`IslandGenerator`) | 64% | the `planIsland` tests |
 | `client` / `event` / `network` | 0–21% | client + event paths a server-side gametest can't reach |
 
-The honest read: the **generation core and the world-apply pipeline are now both well covered**. Remaining
-gaps are the harder/edge paths — the pond water-mob spawn (no aquatic theme in the suite), the
-overlap-fizzle branch, the projectile collision handlers, and the client/event code a server-side gametest
-can't reach. Two tiny `skyseed:gametest/*` themes + the empty region template are test-only assets that
-currently ship in the main jar (inert — no seed item references them); they'd move with the gametest source
-set in the follow-up above.
+The honest read: **`IslandGenerator` — the biggest refactor (A1) — is now ~99% covered** (the last 8 lines are
+unreachable defensive branches: null returns, exact-centre edge cases). The world-apply pipeline is covered too.
+Remaining package gaps are the projectile collision handlers, the overlap-fizzle branch, and the client/event
+code a server-side gametest can't reach. The five tiny `skyseed:gametest/*` themes + the empty region template
+are test-only assets that currently ship in the main jar (inert — no seed item references them); they'd move
+with the gametest source set in the follow-up above.
 
 ### B2 — Line-ending normalization — **Medium**
 `.gitattributes` only pins `src/generated/**` to LF. Source files aren't covered, so every commit prints
