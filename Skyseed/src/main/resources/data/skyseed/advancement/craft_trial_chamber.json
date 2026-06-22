@@ -1,0 +1,8 @@
+{
+  "criteria": {
+    "crafted": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": { "recipe_id": "skyseed:trial_chamber_skyseed" }
+    }
+  }
+}

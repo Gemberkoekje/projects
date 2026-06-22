@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.28.0] - 2026-06-22
+
+### Added
+- **Trial Chamber Skyseed** — the first grand structure from `SKYGRANDSTRUCTURESPLAN.md`. A copper-and-tuff
+  **trial chamber sunk deep into a rocky island**, entered by a single ladder shaft punched up to the surface.
+  Drop into a lantern-lit arena with a **breeze trial spawner** dead centre and **four more trial spawners**
+  (zombie, skeleton, spider, breeze) around it.
+  - **Self-contained loop** — clear a spawner's waves for a **trial key**, spend keys on the **three vaults**
+    for loot. Nothing respawns.
+  - **Ominous path** — bring an **ominous bottle** (raid one from an Outpost island): the spawners turn
+    ominous and feed the centre **ominous vault**, the one holding the **heavy core** for a **mace**.
+  - Crafted from **tuff bricks + copper blocks around a diamond**; the island carries a little copper and iron
+    ore of its own. New `trial_chamber` theme (a larger, thicker rocky island) + guide entry + advancement.
+
 ## [0.27.0] - 2026-06-22
 
 ### Added

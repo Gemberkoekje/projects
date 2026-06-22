@@ -4,7 +4,7 @@ A design exploration for turning the **Woodland Mansion** and **Trial Chamber** 
 **jigsaw-assembled** sky islands — replacing the modest sketches in
 [SKYSTRUCTURESPLAN.md](SKYSTRUCTURESPLAN.md) (Mansion = "one enclosed room island"; Trial Chamber = "a chain of
 small single-section islands"). This doc supersedes those two sections **once the open decisions at the bottom
-are locked**. Status: **planning only — nothing built.**
+are locked**. Status: **Tier-1 gating cells built (v0.27.0); grand Trial Chamber built (v0.28.0, single-template v1); Woodland Mansion still to do.**
 
 ---
 
@@ -143,7 +143,18 @@ vaults gate the *good* loot, the layout can stay roughly linear: fight in → ea
 - **Seed:** a craftable destination — e.g. **Dark Oak + Diamond + Evoker banner** (the banner is dropped by the
   bootstrap **Evoker Cell**'s evoker, so the cell gates the mansion seed; thereafter the mansion farms totems).
 
-## Trial Chamber — proposed design
+## Trial Chamber — **✅ Built** (v0.28.0)
+Shipped as `TrialChamberTemplates` → `data/skyseed/structure/trial_chamber/chamber.nbt`, on its own
+`trial_chamber` theme (a larger, thicker rocky island, radius 14–18) with a craftable **Trial Chamber Skyseed**
+(tuff bricks + copper blocks + a diamond). **v1 is a single rotated template, not a multi-piece jigsaw** — one
+buried 11×11 tuff/copper arena (`sink` 7) holds a centre **breeze** trial spawner + an **ominous vault**, four
+more trial spawners (zombie/skeleton/spider/breeze) each near one of three regular vaults, nine hanging lanterns,
+and a corner ladder shaft punched up to the surface as the only tell. The spawner helper sets both `normal_config`
+and `ominous_config`, so Bad Omen drives the ominous loop (ominous keys → the centre ominous vault → heavy core).
+*Follow-up:* split the arena into a modular jigsaw pool (entrance → corridors → intersections → boss) for layout
+variety, per the design below.
+
+### Original design (the jigsaw target for a future pass)
 - **Form:** *(decided)* a **buried complex** carved down into the island via `sink` — a surface entrance
   descends into the multi-room chamber; the grand island is built *thicker* so there's body to carve into.
 - **Palette:** tuff + copper family (cut/chiseled copper, copper bulbs, tuff bricks).

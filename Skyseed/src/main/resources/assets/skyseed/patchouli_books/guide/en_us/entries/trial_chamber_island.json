@@ -1,0 +1,24 @@
+{
+  "name": "Trial Chamber Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:trial_key",
+  "advancement": "skyseed:craft_trial_chamber",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A grand $(o)trial chamber$() sunk deep into a rocky island, built from $(item)tuff$() and $(item)copper$(). A ladder shaft is the only way in. Drop down into a lantern-lit arena ringed by $(item)trial spawners$() — and a $(item)breeze$() waiting dead centre."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The loop$()$(br)Clear a spawner's waves and it drops a $(item)trial key$(); spend keys on the $(item)vaults$() around the room for armour, enchanted gear and emeralds. Nothing here respawns, so take your time and pick your fights."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Going ominous$()$(br)Drink an $(item)ominous bottle$() (raid these from a pillager outpost island) before you drop in. The spawners turn ominous, the fights get harder, and clearing them yields $(item)ominous trial keys$() for the centre $(item)ominous vault$() — the one holding the $(item)heavy core$() for a $(item)mace$()."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafting$()$(br)Ringed $(item)tuff bricks$() and $(item)copper blocks$() around a single $(item)diamond$(). The island carries a little copper and iron ore of its own."
+    }
+  ]
+}
