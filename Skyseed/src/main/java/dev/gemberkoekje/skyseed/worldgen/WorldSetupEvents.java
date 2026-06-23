@@ -37,7 +37,9 @@ public final class WorldSetupEvents {
         // Only a brand-new world (no ticks elapsed yet) — never retrofit an existing save.
         if (overworld.getGameTime() == 0L) {
             BlockPos center = findLandCenter(overworld);
-            BlockPos spawn = StartIsland.build(overworld, center);
+            // Honour the vanilla "Generate Bonus Chest" world-creation option with a starter chest on the island.
+            boolean bonusChest = event.getServer().getWorldData().worldGenOptions().generateBonusChest();
+            BlockPos spawn = StartIsland.build(overworld, center, bonusChest);
             overworld.setDefaultSpawnPos(spawn, 0.0F);
             data.markStartPlaced(spawn);
             disableRaids(event.getServer(), overworld);

@@ -7,6 +7,7 @@ import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
@@ -25,6 +26,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -314,6 +316,21 @@ public final class SkyseedGameTests {
             }
         }
         helper.assertTrue(guardian, "ocean monument planned no guardians");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void starterIslandBonusChest(GameTestHelper helper) {
+        // The starter island places a stocked chest beside the spawn iff the "Generate Bonus Chest" option is on.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 5, 8));
+        final BlockPos chestPos = center.offset(-1, 1, 0);
+        StartIsland.build(level, center, false);
+        helper.assertTrue(!level.getBlockState(chestPos).is(Blocks.CHEST), "bonus chest placed when the option is off");
+        StartIsland.build(level, center, true);
+        helper.assertTrue(level.getBlockState(chestPos).is(Blocks.CHEST), "bonus chest missing when the option is on");
+        helper.assertTrue(level.getBlockEntity(chestPos) instanceof ChestBlockEntity c && !c.isEmpty(),
+                "the bonus chest is empty");
         helper.succeed();
     }
 

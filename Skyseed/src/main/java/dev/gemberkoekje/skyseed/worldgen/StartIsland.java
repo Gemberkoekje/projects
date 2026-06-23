@@ -1,10 +1,15 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -18,8 +23,12 @@ public final class StartIsland {
 
     private StartIsland() {}
 
-    /** Builds the island centred on {@code center} (its grass surface) and returns the spawn pos on top. */
-    public static BlockPos build(ServerLevel level, BlockPos center) {
+    /**
+     * Builds the island centred on {@code center} (its grass surface) and returns the spawn pos on top.
+     * If {@code bonusChest} is set (the vanilla "Generate Bonus Chest" world option), a starter chest is placed
+     * on the grass beside the spawn with a small leg-up kit.
+     */
+    public static BlockPos build(ServerLevel level, BlockPos center, boolean bonusChest) {
         final BlockState grass = Blocks.GRASS_BLOCK.defaultBlockState();
         final BlockState dirt = Blocks.DIRT.defaultBlockState();
         final BlockState stone = Blocks.STONE.defaultBlockState();
@@ -35,7 +44,30 @@ public final class StartIsland {
         // A guaranteed oak, offset from the spawn point so the player doesn't stand in the trunk.
         buildOak(level, center.offset(2, 0, 2), pos);
 
+        if (bonusChest) {
+            placeBonusChest(level, center);
+        }
+
         return center.above(); // stand on the grass at the centre
+    }
+
+    /** A starter chest on the grass just beside the spawn: a wooden tool set, torches, and a little food + fuel. */
+    private static void placeBonusChest(ServerLevel level, BlockPos center) {
+        final BlockPos chestPos = center.offset(-1, 1, 0); // on the grass, one block west of where the player stands
+        level.setBlock(chestPos, Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST), FLAGS);
+        if (level.getBlockEntity(chestPos) instanceof ChestBlockEntity chest) {
+            int s = 0;
+            chest.setItem(s++, new ItemStack(Items.WOODEN_SWORD));
+            chest.setItem(s++, new ItemStack(Items.WOODEN_PICKAXE));
+            chest.setItem(s++, new ItemStack(Items.WOODEN_AXE));
+            chest.setItem(s++, new ItemStack(Items.WOODEN_SHOVEL));
+            chest.setItem(s++, new ItemStack(Items.WOODEN_HOE));
+            chest.setItem(s++, new ItemStack(Items.TORCH, 16));
+            chest.setItem(s++, new ItemStack(Items.APPLE, 6));
+            chest.setItem(s++, new ItemStack(Items.BREAD, 4));
+            chest.setItem(s++, new ItemStack(Items.OAK_LOG, 8));
+            chest.setItem(s, new ItemStack(Items.COAL, 4));
+        }
     }
 
     private static void layer(ServerLevel level, BlockPos center, int dy, int radius, BlockState state,

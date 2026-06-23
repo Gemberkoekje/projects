@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.2] - 2026-06-23
+
+### Added
+- **Bonus chest.** The vanilla **"Generate Bonus Chest"** world-creation checkbox now does something on a
+  Skyseed world: when it's ticked, a starter chest is placed on the grass right beside the spawn, holding a
+  wooden tool set (sword / pickaxe / axe / shovel / hoe), 16 torches, apples + bread, a few oak logs, and some
+  coal. Read from the world's `WorldOptions.generateBonusChest()` as the starter island is built; off unless you
+  tick the box.
+
 ## [0.34.1] - 2026-06-23
 
 ### Added
