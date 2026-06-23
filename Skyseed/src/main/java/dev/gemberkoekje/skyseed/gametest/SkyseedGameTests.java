@@ -237,6 +237,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void forestAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Forest adapts (SKYNETHERPLAN): a fungal forest — crimson nylium over netherrack in a
+        // crimson_forest biome — not the overworld grass-and-trees island.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var crimson = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.CRIMSON_FOREST);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "forest"), crimson, RandomSource.create(17L));
+        boolean crimsonNylium = false;
+        boolean netherrack = false;
+        boolean grass = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.CRIMSON_NYLIUM)) crimsonNylium = true;
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.GRASS_BLOCK)) grass = true;
+        }
+        helper.assertTrue(crimsonNylium, "forest in the Nether should have a crimson nylium surface");
+        helper.assertTrue(netherrack, "forest in the Nether should have a netherrack body");
+        helper.assertTrue(!grass, "forest in the Nether should not use the overworld grass surface");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

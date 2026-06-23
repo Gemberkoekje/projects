@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.44.0] - 2026-06-23
+
+### Added
+- **Forest adapts in the Nether — a fungal forest.** Throw a Forest Skyseed in the Nether and it grows a little fungal
+  patch instead of a grove: **crimson nylium** with crimson roots and fungi, **Hoglins** (the Nether's food animal)
+  and Piglins by default, or **warped nylium** with warped roots, nether sprouts and twisting vines and **Endermen**
+  when thrown into a warped forest. Shroomlights glow on the floor and weeping vines hang underneath. (The dense
+  huge-fungi forest is reserved for the future Tier-2 Crimson/Warped seeds.)
+
 ## [0.43.0] - 2026-06-23
 
 ### Added

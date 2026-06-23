@@ -178,6 +178,11 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   Nether's deep-mining island.
 
 ### 🌲 Forest → huge-fungi forest *(Crimson / Warped)*
+> **Built (v0.44.0).** A tiny ~7×7×4 fungal patch: **crimson nylium** (crimson roots/fungi, Hoglin + Piglin) by
+> default, or **warped nylium** (warped roots, nether sprouts, twisting vines, Endermen) in a `warped_forest` biome;
+> shroomlight floor glow, weeping vines hanging underneath, a little nether quartz. *Small* fungal decoration only —
+> the dense huge-fungi forest is the Tier-2 Crimson/Warped payoff.
+
 - Stays *foresty* — a dense fungal **forest**, not a grove. Tall huge crimson/warped fungus are the "trees."
 - **Palette:** crimson/warped nylium surface (by biome), netherrack fill.
 - **Decoration:** huge crimson/warped fungus (density ~0.2), weeping vines (crimson, hang off the underside),
