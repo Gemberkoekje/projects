@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.gametest;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.command.SkyseedCommands;
 import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
@@ -233,6 +234,42 @@ public final class SkyseedGameTests {
             helper.assertTrue(other == null, "seeds '" + theme + "' and '" + other + "' share the icon '" + layer0 + "'");
         }
         helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void legacyDimensionResetRewritesGeneratorSettings(GameTestHelper helper) {
+        // /emptynether|/emptyend rewrite one settings string in level.dat; guard the NBT navigation (the bit that
+        // would silently no-op or, worse, corrupt a save, if the path were wrong) against a synthetic level.dat.
+        CompoundTag root = legacyLevelDat("minecraft:the_nether", "minecraft:nether");
+        helper.assertTrue(SkyseedCommands.swapDimensionSettings(root, "minecraft:the_nether", "skyseed:void_nether"),
+                "swap should report a change when the generator is still vanilla");
+        String now = root.getCompound("Data").getCompound("WorldGenSettings").getCompound("dimensions")
+                .getCompound("minecraft:the_nether").getCompound("generator").getString("settings");
+        helper.assertTrue("skyseed:void_nether".equals(now), "settings should now be skyseed:void_nether but was " + now);
+        // Idempotent: a second run is a no-op (so a re-armed reset never re-wipes already-void chunks).
+        helper.assertTrue(!SkyseedCommands.swapDimensionSettings(root, "minecraft:the_nether", "skyseed:void_nether"),
+                "swap should report no change when already void");
+        // Safe: an unexpected structure is left alone rather than half-written.
+        helper.assertTrue(!SkyseedCommands.swapDimensionSettings(new CompoundTag(), "minecraft:the_nether", "skyseed:void_nether"),
+                "swap should refuse an empty/foreign level.dat");
+        helper.succeed();
+    }
+
+    /** A minimal {@code level.dat} root holding one dimension's generator, mirroring the real nesting. */
+    private static CompoundTag legacyLevelDat(String dimKey, String settingsId) {
+        CompoundTag generator = new CompoundTag();
+        generator.putString("settings", settingsId);
+        CompoundTag dimension = new CompoundTag();
+        dimension.put("generator", generator);
+        CompoundTag dimensions = new CompoundTag();
+        dimensions.put(dimKey, dimension);
+        CompoundTag worldGen = new CompoundTag();
+        worldGen.put("dimensions", dimensions);
+        CompoundTag data = new CompoundTag();
+        data.put("WorldGenSettings", worldGen);
+        CompoundTag root = new CompoundTag();
+        root.put("Data", data);
+        return root;
     }
 
     // --- book/icon coverage helpers ---

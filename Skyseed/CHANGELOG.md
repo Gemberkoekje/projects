@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.3] - 2026-06-23
+
+### Added
+- **`/emptynether` and `/emptyend` — convert a legacy world in place.** A rescue path for the older-world warning:
+  instead of starting fresh, an operator (or single-player with cheats) can wipe and regenerate just the Nether or
+  End with the new void generation. `/emptynether` first explains it will *permanently destroy* that dimension and
+  asks you to confirm with `/emptynether force`. Because a dimension's generator is baked into the save and can't be
+  swapped live without risking corruption, the reset is applied safely at shutdown: it rewrites the single generator
+  `settings` entry in `level.dat` and deletes that dimension's chunk folders, so the empty version regenerates the
+  next time the world loads. Anyone standing in the doomed dimension is moved to spawn first, and the legacy-world
+  login warning now points at these commands. (The End's entry-triggered dragon caveat from v0.35.1 still applies to
+  a converted world.)
+
 ## [0.35.2] - 2026-06-23
 
 ### Added

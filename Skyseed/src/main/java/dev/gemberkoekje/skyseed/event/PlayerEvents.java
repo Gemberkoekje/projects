@@ -64,13 +64,15 @@ public final class PlayerEvents {
         }
 
         // Skyseed world made before the Nether/End were voided (pre-0.35.x): those dimensions are baked
-        // into the save as vanilla terrain and can't be retrofitted, so nudge the player to start fresh.
+        // into the save as vanilla terrain. They can be converted in place with /emptynether and /emptyend
+        // (op/cheats), or by starting a new world; either way, only needed once.
         if (WorldSetupEvents.hasLegacyDimensions(server)) {
             player.sendSystemMessage(Component.literal(
                     "[Skyseed] This world was made on an older version, so its Nether and End are still the "
-                  + "normal vanilla dimensions. Your overworld is fine — but for the proper empty Skyseed Nether "
-                  + "and End you'll need to start a new world. You won't have to do this again: both dimensions "
-                  + "are now set up from the start.").withStyle(ChatFormatting.GOLD));
+                  + "normal vanilla dimensions. Your overworld is fine. To get the empty Skyseed Nether and End, "
+                  + "either start a new world, or convert this one in place with /emptynether and /emptyend "
+                  + "(this destroys and regenerates those dimensions). Either way you only do this once.")
+                  .withStyle(ChatFormatting.GOLD));
         }
     }
 }
