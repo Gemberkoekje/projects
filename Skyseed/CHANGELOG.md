@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.51.1] - 2026-06-23
+
+### Changed
+- **The default seed icon is now an unmistakable placeholder.** The Forest Skyseed got its own dedicated icon (the
+  green orb that used to be the generic fallback), and the generic `island_seed` texture is now a plain **white ball
+  with a question mark**. So any future seed that ships without its own icon shows a clear "?" placeholder instead of
+  masquerading as a Forest seed. (The creative-only debug seeds use this placeholder by design.)
+
 ## [0.51.0] - 2026-06-23
 
 ### Added
