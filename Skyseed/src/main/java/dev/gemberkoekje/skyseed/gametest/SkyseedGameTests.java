@@ -564,6 +564,58 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void netherBasaltIsFullSizeWithTinyBadlandsOverworld(GameTestHelper helper) {
+        // Tier-2 Basalt (SKYNETHERPLAN): a full-size Basalt Deltas — basalt over blackstone, gilded blackstone in the
+        // core. Thrown topside it makes a TINY badlands island. Nether-native base; the overworld form is an override.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nb = theme(overworld, "nether_basalt");
+        helper.assertTrue(nb.baseValidIn(Level.NETHER.location()), "nether_basalt base must implement the_nether");
+        helper.assertTrue(!nb.baseValidIn(Level.OVERWORLD.location()), "nether_basalt base must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+
+        helper.assertTrue(IslandGenerator.formValidFor(nb, wastes, 64, Level.NETHER.location()),
+                "nether_basalt should grow in the Nether");
+        helper.assertTrue(IslandGenerator.formValidFor(nb, plains, 80, Level.OVERWORLD.location()),
+                "nether_basalt should grow a tiny badlands in the overworld");
+
+        // Nether: full-size basalt deltas with gilded blackstone.
+        final IslandPlan inNether = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nb, wastes,
+                RandomSource.create(81L));
+        helper.assertTrue(inNether.blocks().size() > 500, "the basalt deltas should be full-size, was " + inNether.blocks().size());
+        boolean basalt = false;
+        boolean gilded = false;
+        boolean redSand = false;
+        for (IslandPlan.BlockPlacement bp : inNether.blocks()) {
+            if (bp.state().is(Blocks.BASALT)) basalt = true;
+            if (bp.state().is(Blocks.GILDED_BLACKSTONE)) gilded = true;
+            if (bp.state().is(Blocks.RED_SAND)) redSand = true;
+        }
+        helper.assertTrue(basalt, "the basalt deltas should have a basalt surface");
+        helper.assertTrue(gilded, "the basalt deltas should have gilded blackstone in the core");
+        helper.assertTrue(!redSand, "the basalt deltas should not have overworld red sand");
+
+        // Overworld: a tiny badlands island, never basalt.
+        final IslandPlan o = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), nb, plains,
+                RandomSource.create(82L));
+        helper.assertTrue(o.blocks().size() < 500, "the overworld easter-egg island should be tiny, was " + o.blocks().size());
+        boolean oRedSand = false;
+        boolean oBasalt = false;
+        for (IslandPlan.BlockPlacement bp : o.blocks()) {
+            if (bp.state().is(Blocks.RED_SAND)) oRedSand = true;
+            if (bp.state().is(Blocks.BASALT)) oBasalt = true;
+        }
+        helper.assertTrue(oRedSand, "the overworld easter-egg island should be a badlands (red sand)");
+        helper.assertTrue(!oBasalt, "the overworld easter-egg island should not be basalt");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

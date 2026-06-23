@@ -1,0 +1,20 @@
+{
+  "name": "Nether Basalt Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:gilded_blackstone",
+  "advancement": "skyseed:craft_nether_basalt",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Tier-2 of the Basalt Deltas, and the most $(bold)dangerous$() island there is: a full-size jumble of $(item)basalt$() over blackstone, bristling with jagged $(item)basalt$() columns, scarred with $(item)magma block$() patches and shallow lava wells. $(item)Magma Cubes$() bounce between the spires and a $(item)Ghast$() drifts overhead."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Yields$()$(br)Blackstone and basalt by the stack for building, magma cream from the cubes — and the prize: $(item)gilded blackstone$() salted through the core, dropping $(item)gold$() when you mine it. Watch your footing; the magma burns."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Badlands Skyseed$() packed with $(item)basalt$() and a lump of $(item)gilded blackstone$(). $(br)$(br)Thrown topside it makes a tiny $(bold)badlands$() butte instead — red sand, terracotta and a glint of gold."
+    }
+  ]
+}

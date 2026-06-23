@@ -249,7 +249,14 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ### 🌋 Badlands → Basalt Deltas
 > **Built (v0.40.0).** A tiny ~7×7×4 Basalt Deltas fragment: blackstone surface/core over a basalt fill (the overworld
 > terracotta strata dropped via a `fill_bands` override), magma-block + basalt ground scatter, gilded blackstone +
-> nether gold, and magma-cube sprinkles. Still to come: jagged basalt columns, lava wells, and Tier-2 *Basalt*.
+> nether gold, and magma-cube sprinkles.
+> **Tier-2 *Basalt* — BUILT (v0.53.0), the FIFTH + FINAL Tier-2 Nether-native seed.** Its own craftable `nether_basalt`
+> seed: a full-size (radius 6-9) Basalt Deltas — basalt over blackstone, **jagged basalt columns** (`minecraft:basalt_pillar`
+> configured feature as "trees" — NOT `basalt_columns`/`large_basalt_columns`, which don't exist as configured features),
+> magma-block patches, shallow **lava wells** (a `lava` field), near-guaranteed **gilded blackstone** (chance 0.85, gold
+> drops), Magma Cubes + a Ghast. Recipe (2×2) = a **Badlands Skyseed** + basalt + gilded blackstone. **Overworld easter
+> egg:** a TINY badlands butte (red sand / terracotta / a glint of gold). **★ This completes ALL FIVE Tier-2 Nether-native
+> seeds (Rocky, Lava, Crimson/Warped, Soul, Basalt) — the Nether's payoff tier is done.**
 
 - **Palette:** banded basalt/blackstone surface (echoing terracotta layers), blackstone fill, basalt core.
 - **Decoration:** jagged **basalt columns** (the defining feature), magma-block surface patches (the hazard — fire

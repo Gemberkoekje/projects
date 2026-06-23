@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.53.0] - 2026-06-23
+
+### Added
+- **Tier-2 Basalt — a full-size Basalt Deltas (tiny badlands topside), completing the Tier-2 Nether seeds.** The
+  fifth and final Tier-2 Nether-native seed, and the most dangerous island in the mod: a full-size jumble of
+  **basalt** over blackstone, bristling with jagged **basalt columns**, scarred with magma-block patches and shallow
+  lava wells, with **Magma Cubes** between the spires and the odd **Ghast**. Its core is salted with **gilded
+  blackstone** (gold when mined). Crafted (2×2) from a **Badlands Skyseed** + basalt + a lump of gilded blackstone.
+  Thrown topside it makes a tiny badlands butte (red sand, terracotta, a glint of gold). With this, **all five
+  sketched Tier-2 Nether seeds are done** (Rocky, Lava, Crimson/Warped, Soul, Basalt). Guarded by the
+  `netherBasaltIsFullSizeWithTinyBadlandsOverworld` gametest.
+
 ## [0.52.1] - 2026-06-23
 
 ### Changed
