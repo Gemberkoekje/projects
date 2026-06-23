@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.5] - 2026-06-23
+
+### Fixed
+- **Islands could germinate inside an existing island.** The old check tolerated up to 5% of the *new* island's
+  blocks overlapping solid, so a large island could swallow a small one (its blocks were under that 5%), and it kept
+  no gap at all. Replaced it with a proper **distance check**: every island now records its footprint, and a new
+  throw is rejected if it comes within a clearance of any recorded island. The keep-out is an oval — **wider than
+  deep** (islands are far wider than tall) — and the required gap is the sum of both islands' radii plus a margin, so
+  a big island reserves a bigger berth than a small one.
+- **A throw can no longer bury you.** Germination is rejected (nudged up, then fizzled if nothing's clear) when it
+  would grow over a player, so you can't end up immersed inside a freshly grown island.
+
 ## [0.34.4] - 2026-06-23
 
 ### Added

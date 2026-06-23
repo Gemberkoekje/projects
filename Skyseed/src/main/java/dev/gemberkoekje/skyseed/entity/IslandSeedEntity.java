@@ -7,7 +7,9 @@ import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandGrowth;
+import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -28,10 +30,11 @@ import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
 
 /**
  * The thrown Skyseed. It arms for {@link #ARM_DURATION} ticks (~2 s) while flying — or resting, if it lands
@@ -143,17 +146,23 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             this.setPos(targetX, targetY, targetZ);
         }
 
-        // Overlap safety: try the rest point, then a few lifts, until the volume is clear enough.
+        // Overlap safety: try the rest point, then a few lifts, until the spot is clear of other islands and players.
         // RNG decorrelated per island (worldSeed ^ center) — see README → Generation algorithm.
+        final SkyseedWorldData data = level.getDataStorage()
+                .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
         final BlockPos base = this.blockPosition();
+        final List<Vec3> players = level.players().stream().map(p -> p.position()).toList();
         IslandPlan plan = null;
+        IslandPlacement.Island footprint = null;
         for (int lift : NUDGE_STEPS) {
             BlockPos c = base.above(lift);
             RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
             // Island look can vary with the biome it lands in (README → Configuration → Biome overrides).
             IslandPlan candidate = IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
-            if (!isTooCrowded(level, candidate)) {
+            IslandPlacement.Island candidateFootprint = IslandPlacement.footprint(candidate, c);
+            if (!IslandPlacement.tooCrowded(candidateFootprint, data.islands(), players)) {
                 plan = candidate;
+                footprint = candidateFootprint;
                 break;
             }
         }
@@ -162,6 +171,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             this.discard();
             return;
         }
+        data.addIsland(footprint); // remember it so later throws keep their distance
 
         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.getX(), this.getY(), this.getZ(),
                 50, 1.2, 1.2, 1.2, 0.25);
@@ -174,21 +184,6 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         IslandGrowth.enqueue(new GenerationJob(level, plan));
 
         this.discard();
-    }
-
-    /** True if too much of the planned volume is already solid — used to avoid islands growing into each other. */
-    private boolean isTooCrowded(ServerLevel level, IslandPlan plan) {
-        final int threshold = Math.max(8, plan.blocks().size() / 20); // tolerate a ~5% graze, reject real overlaps
-        int hits = 0;
-        for (IslandPlan.BlockPlacement bp : plan.blocks()) {
-            BlockState state = level.getBlockState(bp.pos());
-            if (!state.isAir() && !state.canBeReplaced()) {
-                if (++hits > threshold) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /** Failed germination: a puff of smoke, a fizzle, and the seed dropped back so it isn't wasted. */

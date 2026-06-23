@@ -6,7 +6,9 @@ import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
+import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
@@ -120,6 +122,37 @@ public final class SkyseedGameTests {
             }
         }
         helper.assertTrue(anyOre, "rocky islands produced no ore across 6 seeds");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void placementRejectsOverlapAndPlayers(GameTestHelper helper) {
+        // The distance check must allow open sky, reject growing too close to a (smaller) neighbour, and reject onto a player.
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        final IslandPlacement.Island island = IslandPlacement.footprint(plan(helper, "rocky", 1L), center);
+        final java.util.List<Vec3> noPlayers = java.util.List.of();
+        final java.util.List<IslandPlacement.Island> noNeighbours = java.util.List.of();
+
+        helper.assertTrue(!IslandPlacement.tooCrowded(island, noNeighbours, noPlayers),
+                "an island in open sky was wrongly rejected");
+
+        // A tiny neighbour at the same centre = engulfment. The old 5%-of-size tolerance let big islands swallow
+        // small ones; the distance check must reject it regardless of the size gap.
+        final IslandPlacement.Island tiny = new IslandPlacement.Island(center.getX(), center.getY(), center.getZ(), 2, 2, 2);
+        helper.assertTrue(IslandPlacement.tooCrowded(island, java.util.List.of(tiny), noPlayers),
+                "an island engulfing a smaller neighbour was not rejected");
+
+        // A neighbour far beyond both radii + the gap -> fine.
+        final IslandPlacement.Island far = new IslandPlacement.Island(center.getX() + 200, center.getY(), center.getZ(), 8, 4, 8);
+        helper.assertTrue(!IslandPlacement.tooCrowded(island, java.util.List.of(far), noPlayers),
+                "a distant neighbour wrongly blocked germination");
+
+        // A player at the centre -> rejected (would be buried); a distant player -> fine.
+        helper.assertTrue(IslandPlacement.tooCrowded(island, noNeighbours, java.util.List.of(Vec3.atCenterOf(center))),
+                "germinating on top of a player was not rejected");
+        helper.assertTrue(!IslandPlacement.tooCrowded(island, noNeighbours,
+                        java.util.List.of(new Vec3(center.getX() + 200, center.getY(), center.getZ()))),
+                "a distant player wrongly blocked germination");
         helper.succeed();
     }
 
@@ -389,6 +422,7 @@ public final class SkyseedGameTests {
         // End-to-end: a thrown seed arms (~40 ticks), germinates, and IslandGrowth drains the GenerationJob.
         final ServerLevel level = helper.getLevel();
         final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
+        level.getDataStorage().computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME).clearIslands();
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
         seed.setTheme(skyseed("gametest/island"));
@@ -434,6 +468,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos spawn = helper.absolutePos(new BlockPos(3, 18, 3));
         final BlockPos target = helper.absolutePos(new BlockPos(10, 10, 10));
+        level.getDataStorage().computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME).clearIslands();
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(spawn.getX() + 0.5, spawn.getY() + 0.5, spawn.getZ() + 0.5);
         seed.setTheme(skyseed("gametest/island"));

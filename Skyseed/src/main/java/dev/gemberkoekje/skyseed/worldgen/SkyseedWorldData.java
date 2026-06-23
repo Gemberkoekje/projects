@@ -10,7 +10,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,6 +29,8 @@ public final class SkyseedWorldData extends SavedData {
     private BlockPos startSpawn = null;
     private final Set<UUID> guided = new HashSet<>();
     private final Set<UUID> spawned = new HashSet<>();
+    /** Footprint of every island grown so far, so new ones can keep their distance (see {@link IslandPlacement}). */
+    private final List<IslandPlacement.Island> islands = new ArrayList<>();
 
     public static SavedData.Factory<SkyseedWorldData> factory() {
         return new SavedData.Factory<>(SkyseedWorldData::new, SkyseedWorldData::load);
@@ -40,6 +44,11 @@ public final class SkyseedWorldData extends SavedData {
         }
         readUuids(tag, "Guided", data.guided);
         readUuids(tag, "Spawned", data.spawned);
+        for (Tag t : tag.getList("Islands", Tag.TAG_COMPOUND)) {
+            CompoundTag c = (CompoundTag) t;
+            data.islands.add(new IslandPlacement.Island(c.getInt("x"), c.getInt("y"), c.getInt("z"),
+                    c.getInt("rh"), c.getInt("up"), c.getInt("down")));
+        }
         return data;
     }
 
@@ -53,6 +62,18 @@ public final class SkyseedWorldData extends SavedData {
         }
         tag.put("Guided", writeUuids(guided));
         tag.put("Spawned", writeUuids(spawned));
+        ListTag islandList = new ListTag();
+        for (IslandPlacement.Island i : islands) {
+            CompoundTag c = new CompoundTag();
+            c.putInt("x", i.x());
+            c.putInt("y", i.y());
+            c.putInt("z", i.z());
+            c.putInt("rh", i.rh());
+            c.putInt("up", i.up());
+            c.putInt("down", i.down());
+            islandList.add(c);
+        }
+        tag.put("Islands", islandList);
         return tag;
     }
 
@@ -108,6 +129,25 @@ public final class SkyseedWorldData extends SavedData {
 
     public void markSpawned(UUID player) {
         if (spawned.add(player)) {
+            setDirty();
+        }
+    }
+
+    /** Footprints of every island grown so far — new islands keep a clearance from these (see {@link IslandPlacement}). */
+    public List<IslandPlacement.Island> islands() {
+        return islands;
+    }
+
+    /** Record a freshly germinated island so later throws keep their distance from it. */
+    public void addIsland(IslandPlacement.Island island) {
+        islands.add(island);
+        setDirty();
+    }
+
+    /** Forget all recorded island footprints (used by the gametests to isolate a germination run). */
+    public void clearIslands() {
+        if (!islands.isEmpty()) {
+            islands.clear();
             setDirty();
         }
     }

@@ -51,7 +51,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | World | Void world preset with multi-noise overworld biomes; structures disabled |
 | Start | Curated start island; safe spawn (valid biome, on island not in a tree); first-join guide book |
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
-| Safety | Tick-budget placement (no single-tick stalls); overlap nudge + fizzle-and-drop |
+| Safety | Tick-budget placement (no single-tick stalls); island-distance + player clearance, nudge + fizzle-and-drop |
 
 **All 10 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
 
@@ -146,7 +146,7 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 5. **Pond / waterfalls / decoration.** Carve the pond; pick weighted variant; place trees (vanilla features queued, or `skyseed:mangrove` hand-built into the plan) and per-column ground cover; add rim cascades.
 6. **RNG.** `RandomSource.create(worldSeed ^ center.asLong())` — unique per island, reproducible, decorrelated from neighbours.
 
-**Two guards:** *tick-budget placement* drains ~512 blocks + 2 trees per tick (no stutter; doubles as a grow-in animation, using block flags that avoid cascading neighbour/light updates); *overlap safety* nudges germination up through `{0, 8, 16, 24}` and, if nothing is clear, fizzles and drops the seed back rather than carving into existing terrain.
+**Two guards:** *tick-budget placement* drains ~512 blocks + 2 trees per tick (no stutter; doubles as a grow-in animation, using block flags that avoid cascading neighbour/light updates); *placement safety* keeps each island a clearance from every other island and from nearby players — a **distance check** on recorded island footprints (an oval keep-out, wider than deep, scaled by both radii; see `IslandPlacement`), nudging germination up through `{0, 8, 16, 24}` and, if nothing is clear, fizzling and dropping the seed back rather than growing into a neighbour or over the player.
 
 ---
 
