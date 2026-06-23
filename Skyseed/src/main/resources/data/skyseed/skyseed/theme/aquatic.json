@@ -25,6 +25,15 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.03 } ] } }
   ],
   "biome_overrides": [
+    { "max_y": -1, "surface": "minecraft:stone", "fill": "minecraft:cobblestone", "core": "minecraft:deepslate",
+      "surface_scatter": [ { "block": "minecraft:deepslate", "chance": 0.35 } ],
+      "ores": [
+        { "block": "minecraft:deepslate_iron_ore", "chance": 0.70, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:deepslate_redstone_ore", "chance": 0.50, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:deepslate_diamond_ore", "chance": 0.15, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+      ],
+      "variants": [] },
+
     { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean" ], "surface": "minecraft:sand", "fill": "minecraft:sand",
       "pond": {
         "block": "minecraft:water", "radius": 4, "depth": 3,
@@ -71,5 +80,10 @@
       "variants": [ { "weight": 1, "name": "swamp", "decoration": {
         "trees": [ { "feature": "minecraft:swamp_oak", "tries": 3, "spacing": 3 } ],
         "ground": [ { "block": "minecraft:blue_orchid", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 } ] } } ] }
-  ]
+  ],
+  "lava": {
+    "lakes": [
+      { "max_y": -1, "chance": 1.0, "radius": 6, "depth": 2 }
+    ]
+  }
 }

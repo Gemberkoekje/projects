@@ -60,6 +60,12 @@ public final class RuinedPortalTemplates {
         m.put(new BlockPos(2, 1, 2), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.SOUTH));
         bes.put(new BlockPos(2, 1, 2), StructureParts.lootChest("minecraft:chests/ruined_portal"));
 
+        // A small lava spill at the foot of the frame, sunk flush into the levelled pad so the surrounding
+        // ground walls it in (it stays put and can't run off the island).
+        m.put(new BlockPos(0, 0, 1), Blocks.LAVA.defaultBlockState());
+        m.put(new BlockPos(0, 0, 2), Blocks.LAVA.defaultBlockState());
+        m.put(new BlockPos(0, 0, 3), Blocks.LAVA.defaultBlockState());
+
         StructureParts.anchor(m, bes, new BlockPos(1, 0, 1), "minecraft:basalt");
         return new Built(m, bes);
     }

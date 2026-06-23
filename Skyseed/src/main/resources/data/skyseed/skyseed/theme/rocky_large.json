@@ -79,5 +79,14 @@
         { "block": "minecraft:copper_ore", "chance": 0.45, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
         { "block": "minecraft:emerald_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 1 }, "depth": "core" }
       ] }
-  ]
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": { "min": 4, "max": 8 },
+    "lakes": [
+      { "max_y": -1, "chance": 0.20, "radius": 6, "depth": 2 },
+      { "max_y": 40, "chance": 0.05, "radius": 5, "depth": 2 },
+      { "max_y": 69, "chance": 0.01, "radius": 5, "depth": 2 }
+    ]
+  }
 }

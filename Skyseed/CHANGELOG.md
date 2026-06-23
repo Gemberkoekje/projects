@@ -3,6 +3,24 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.33.0] - 2026-06-23
+
+### Added
+- **Lava.** A new optional `lava` theme field (orthogonal to the biome-override palette bands, so it doesn't
+  duplicate them) adds two things: a lava **vein** — a 4–8 block lava cluster grown into the core like an ore,
+  rolled at `vein_chance` — and Y-banded lava **lakes** — a contained lava pool carved like a pond, where the
+  first matching throw-height band rolls and a hit suppresses the theme's water pond. Wired up:
+  - **Rocky / Large Rocky** — a 5% lava vein, plus a lava lake whose odds rise with depth: 1% at normal height,
+    5% low, 20% sub-zero (Y < 0).
+  - **Ancient / Large Ancient** — a 5% lava vein, plus a 20% lava lake at any height.
+  - **Aquatic / Large Aquatic** thrown sub-zero (Y < 0) — comes up as a stone/deepslate island with a guaranteed
+    lava lake instead of its water one.
+  - **Ruined Portal** (the dedicated seed and the rare-encounter, same template) — a few lava blocks at the foot
+    of the frame, sunk flush into the levelled pad so the surrounding ground walls them in.
+
+  Lava lakes reuse the pond carving + containment, so they sit still and don't sheet off the island. Guarded by
+  a new `aquaticSubZeroHasLavaLake` gametest; the generation golden master is unchanged (no test theme uses lava).
+
 ## [0.32.9] - 2026-06-22
 
 ### Fixed

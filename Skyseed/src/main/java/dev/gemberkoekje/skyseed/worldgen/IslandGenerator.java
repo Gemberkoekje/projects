@@ -6,8 +6,11 @@ import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
 import dev.gemberkoekje.skyseed.worldgen.theme.AnimalPack;
 import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
+import dev.gemberkoekje.skyseed.worldgen.theme.IntRange;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
+import dev.gemberkoekje.skyseed.worldgen.theme.Lava;
 import dev.gemberkoekje.skyseed.worldgen.theme.MobEntry;
+import dev.gemberkoekje.skyseed.worldgen.theme.OreDepth;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Palette;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
@@ -89,8 +92,12 @@ public final class IslandGenerator {
         final int baseRadius = sh.baseRadius();
         final int topDome = sh.topDome();
 
+        // Lava content (orthogonal to the override bands): a vein appended to the ore pass, plus the Y-banded
+        // lava lakes rolled below before the normal pond.
+        final Lava lava = theme.lava().orElse(null);
+        final List<OreEntry> oreList = (lava != null && lava.veinChance() > 0f) ? withLavaVein(ores, lava) : ores;
         if (!coreList.isEmpty()) {
-            OrePlanner.planOres(blockMap, ores, coreList, sh.minCoreY(), sh.maxCoreY(), random);
+            OrePlanner.planOres(blockMap, oreList, coreList, sh.minCoreY(), sh.maxCoreY(), random);
         }
 
         // Rare structures: at most one germinates in place of the usual island (the first whose chance rolls).
@@ -104,11 +111,32 @@ public final class IslandGenerator {
         }
         final RareStructure rare = rolledRare;
 
+        // Lava lake (Y-banded, rolled before the normal pond): the first height band that matches rolls, and a
+        // hit carves a lava pool and suppresses the water pond — so e.g. a sub-zero Aquatic comes up as a stone
+        // island with a lava lake instead of a water one.
+        boolean lavaLake = false;
+        if (lava != null && (rare == null || !rare.suppressPond())) {
+            for (final Lava.Lake lk : lava.lakes()) {
+                if (lk.matches(center.getY())) {
+                    if (random.nextFloat() < lk.chance()) {
+                        final Pond pool = lk.toPond();
+                        final int lakeY = PondCarver.pondWaterY(center, topDome, baseRadius, pool);
+                        final int lakeBottom = lakeY - Math.max(0, pool.depth() - 1);
+                        final BlockState lavaState = resolveBlock(pool.block(), Blocks.LAVA).defaultBlockState();
+                        final Set<Long> carved = PondCarver.carvePond(blockMap, surfaceList, center, topDome, lakeY, baseRadius, pool, lavaState, random);
+                        PondCarver.containPond(blockMap, surfaceList, center, lakeY, lakeBottom, surface, fill, carved, random);
+                        lavaLake = true;
+                    }
+                    break; // only the first matching height band rolls
+                }
+            }
+        }
+
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
         final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
         final Set<Long> pondColumns = new HashSet<>();
         int pondSurfaceTmp = center.getY();
-        if (pondCfg.isPresent() && (rare == null || !rare.suppressPond())) {
+        if (!lavaLake && pondCfg.isPresent() && (rare == null || !rare.suppressPond())) {
             final Pond pond = pondCfg.get();
             // Ponds sit flush with the surface; rivers cut a channel down through it.
             final int waterY = pond.isRiver() ? center.getY() : PondCarver.pondWaterY(center, topDome, baseRadius, pond);
@@ -216,6 +244,14 @@ public final class IslandGenerator {
     }
 
     /** @return the first override matching {@code biome}/{@code y}, or {@code null} if none match (use the base theme). */
+    /** The ore list with a one-off lava vein appended (rolled last, so it doesn't shift the real ores' RNG). */
+    private static List<OreEntry> withLavaVein(List<OreEntry> ores, Lava lava) {
+        final List<OreEntry> out = new ArrayList<>(ores);
+        out.add(new OreEntry(ResourceLocation.withDefaultNamespace("lava"), lava.veinChance(),
+                new IntRange(1, 1), lava.veinSize(), OreDepth.CORE));
+        return out;
+    }
+
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y) {
         for (BiomeOverride o : overrides) {
             if (o.matches(biome, y)) {

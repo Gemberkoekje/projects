@@ -19,7 +19,8 @@ import java.util.Optional;
  */
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
-                          Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures) {
+                          Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures,
+                          Optional<Lava> lava) {
     public static final Codec<IslandTheme> CODEC = RecordCodecBuilder.create(i -> i.group(
             Shape.CODEC.fieldOf("shape").forGetter(IslandTheme::shape),
             Palette.CODEC.fieldOf("palette").forGetter(IslandTheme::palette),
@@ -30,6 +31,7 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             MobEntry.CODEC.listOf().optionalFieldOf("mobs", List.of()).forGetter(IslandTheme::mobs),
             JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(IslandTheme::jigsaw),
             AnimalPack.CODEC.listOf().optionalFieldOf("animals", List.of()).forGetter(IslandTheme::animals),
-            RareStructure.CODEC.listOf().optionalFieldOf("rare_structures", List.of()).forGetter(IslandTheme::rareStructures)
+            RareStructure.CODEC.listOf().optionalFieldOf("rare_structures", List.of()).forGetter(IslandTheme::rareStructures),
+            Lava.CODEC.optionalFieldOf("lava").forGetter(IslandTheme::lava)
     ).apply(i, IslandTheme::new));
 }

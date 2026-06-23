@@ -197,6 +197,19 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void aquaticSubZeroHasLavaLake(GameTestHelper helper) {
+        // Below Y0, an Aquatic island comes up as stone/deepslate with a 100% lava lake — not a water one.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(8, 8, 8));
+        final BlockPos deep = new BlockPos(base.getX(), -16, base.getZ());
+        final IslandPlan plan = IslandGenerator.planIsland(level, deep, theme(level, "aquatic"),
+                level.getBiome(deep), RandomSource.create(1L));
+        helper.assertTrue(planHas(plan, Blocks.LAVA), "sub-zero Aquatic did not generate its lava lake");
+        helper.assertTrue(!planHas(plan, Blocks.WATER), "sub-zero Aquatic still has water — the lava lake should replace it");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void islandOutputIsStable(GameTestHelper helper) {
         // Golden master: locks the EXACT generation output for a set of biome-independent themes, so a
         // behaviour-preserving refactor (the IslandGenerator split) is provably byte-identical, not just

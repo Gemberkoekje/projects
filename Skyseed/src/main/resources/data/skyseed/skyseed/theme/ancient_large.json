@@ -67,5 +67,12 @@
       { "block": "minecraft:dripstone_block", "chance": 0.55, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
       { "block": "minecraft:amethyst_block", "chance": 0.30, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 2, "max": 5 }, "depth": "core" }
     ] }
-  ]
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": { "min": 4, "max": 8 },
+    "lakes": [
+      { "chance": 0.20, "radius": 6, "depth": 2 }
+    ]
+  }
 }

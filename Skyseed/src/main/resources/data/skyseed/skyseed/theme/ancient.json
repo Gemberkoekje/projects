@@ -67,5 +67,12 @@
       { "block": "minecraft:amethyst_block", "chance": 0.25, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 5 }, "depth": "core" },
       { "block": "minecraft:budding_amethyst", "chance": 0.10, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" }
     ] }
-  ]
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": { "min": 4, "max": 8 },
+    "lakes": [
+      { "chance": 0.20, "radius": 5, "depth": 2 }
+    ]
+  }
 }

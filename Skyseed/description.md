@@ -33,15 +33,15 @@ Two throw modes; press **V** to switch (your choice is remembered):
 Each Skyseed grows its own kind of island, with multiple looks and hidden surprises — and every one has a bigger, pricier **Large** variant with a thematic twist:
 
 - 🌿 **Forest** — the starter. Grass, flowers, and trees that match wherever you throw it. (Large: a sprawling old-growth wood, the biggest of the green islands.)
-- ⛰️ **Rocky** — the miner's island. Every ore is here, and *where you throw it matters*: low throws strike deepslate, diamonds and redstone; mid throws an iron-and-copper haul; high throws bring coal and iron — and the highest become snow-capped peaks. (Large Rocky is a tall, emerald-bearing mountain.)
+- ⛰️ **Rocky** — the miner's island. Every ore is here, and *where you throw it matters*: low throws strike deepslate, diamonds and redstone; mid throws an iron-and-copper haul; high throws bring coal and iron — and the highest become snow-capped peaks. Dig in and you might tap a pocket of lava, and a contained lava lake grows likelier the lower you throw it — a long shot at mid-air, a one-in-five bet below Y 0. (Large Rocky is a tall, emerald-bearing mountain.)
 - 🏜️ **Desert** — sand and sandstone, cacti and dead bushes, with clay and buried fossils below. Throw it over a badlands for red dunes. (Large: an oasis.)
 - 🍄 **Mushroom** — a mycelium isle crowned with giant red and brown mushrooms. Mobs won't spawn here — a safe place to build. (Large: a giant fungal isle grazed by mooshrooms.)
 - ❄️ **Frozen** — snow and ice, packed ice and rare blue ice... and hidden powder-snow pockets to watch your step around. (Large: a frozen lake.)
 - 🌸 **Meadow** — the flower island. Every dye-flower, towering sunflowers, cherry blossoms, and bee nests tucked among the blooms. (Large: a vast wildflower field of sunflowers, tulip rows and cherry blossom.)
 - 🪨 **Badlands** — a mesa in the sky, its cliffs banded in layers of orange, yellow, white, red, and brown terracotta, and rich with gold. (Large: a towering mesa.)
-- 🏛️ **Ancient** — a shard of the deep underground hung in the air: deepslate and tuff, amethyst geodes, dripstone teeth, and a rare deep-dark variant bristling with sculk. (Large: a deeper shard, veined with budding amethyst.)
+- 🏛️ **Ancient** — a shard of the deep underground hung in the air: deepslate and tuff, amethyst geodes, dripstone teeth, and a rare deep-dark variant bristling with sculk. About one in five hides a contained lava lake, with the odd lava pocket lurking in the stone. (Large: a deeper shard, veined with budding amethyst.)
 - 🌿 **Lush** — a cave garden afloat. Moss, azalea trees, dripleaves, and glow-berry vines trailing off the underside. (Large: a deep pool with glow squid.)
-- 🌊 **Aquatic** — half land, half floating lake: kelp and lily pads, warm-water coral reefs, mangroves, and clay-and-gravel banks. (Large: a proper deep lake.)
+- 🌊 **Aquatic** — half land, half floating lake: kelp and lily pads, warm-water coral reefs, mangroves, and clay-and-gravel banks. Throw it below Y 0 and it comes up instead as a bare stone-and-deepslate isle cradling a lava lake where the water would be. (Large: a proper deep lake.)
 
 Each **Large** variant is its own separate, pricier seed — so the ten terrain *types* are really twenty islands to grow, before you even reach the villages, farms, and structures below.
 
@@ -74,7 +74,7 @@ Dedicated farm islands, each a fenced enclosure with a guaranteed pack of animal
 Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
 
 - ⚔️ **Dungeon** — a mossy cobblestone room with a mob spawner and two loot chests (the music discs *Cat* and *13* among them), sunk underground at the foot of a ruined stairwell, its island scattered with broken stonework.
-- 🪨 **Ruined Portal** — a broken Nether-portal frame and a chest of golden spoils — your only source of crying obsidian up here.
+- 🪨 **Ruined Portal** — a broken Nether-portal frame and a chest of golden spoils — your only source of crying obsidian up here, with a little lava pooled at the foot of the frame.
 - 🏺 **Desert Temple** — a sealed chamber, four treasure chests, and a buried cache of TNT.
 - 🌿 **Jungle Temple** — a tiered, vine-draped ziggurat of cobblestone and moss, hiding a trapped chamber with two chests and a tripwire-rigged arrow dispenser.
 - 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
@@ -103,7 +103,7 @@ And some surprises don't need their own seed — once in a while an ordinary isl
 
 Islands respond to **where** you throw them. A Forest seed over a savanna grows acacia; over a jungle, jungle trees; over an ocean, a little lake island. Throw a Desert over a badlands and it turns red. The sky is a full, varied biome map — your islands take after their surroundings.
 
-And on the mining islands, **altitude matters**: throw them deep for the richest treasure, high for coal and iron.
+And on the mining islands, **altitude matters**: throw them deep for the richest treasure, high for coal and iron — and the deeper you throw, the likelier you'll strike lava.
 
 Just about every block you'd dig up in a normal world has a home here — so whatever you're building, there's an island that grows it.
 
