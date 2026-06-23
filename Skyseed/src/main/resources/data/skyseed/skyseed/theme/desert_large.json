@@ -11,7 +11,7 @@
     { "chance": 0.05, "suppress_pond": true,
       "jigsaw": { "pool": "skyseed:desert_temple/chamber", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 1 } },
     { "chance": 0.01,
-      "jigsaw": { "pool": "skyseed:ruined_portal/portal", "target": "minecraft:bottom", "depth": 1, "pad": 4 } }
+      "jigsaw": { "pool": "skyseed:ruined_portal/portal", "target": "minecraft:bottom", "depth": 1, "pad": 4 }, "twin": "skyseed:ruined_portal" }
   ],
   "pond": {
     "block": "minecraft:water", "radius": 3, "depth": 2,

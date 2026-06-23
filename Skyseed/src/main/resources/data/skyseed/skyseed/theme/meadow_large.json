@@ -5,7 +5,7 @@
   "ores": [],
   "rare_structures": [
     { "chance": 0.01,
-      "jigsaw": { "pool": "skyseed:ruined_portal/portal", "target": "minecraft:bottom", "depth": 1, "pad": 4 } }
+      "jigsaw": { "pool": "skyseed:ruined_portal/portal", "target": "minecraft:bottom", "depth": 1, "pad": 4 }, "twin": "skyseed:ruined_portal" }
   ],
   "mobs": [
     { "entity": "minecraft:sheep", "chance": 0.40, "count": { "min": 2, "max": 4 } },

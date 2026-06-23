@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.54.1] - 2026-06-23
+
+### Added
+- **Ruined Portals that surface on big islands now get a twin too.** The cross-dimension portal pairing (v0.54.0)
+  previously only fired for the dedicated Ruined Portal seed; now the rare 1%-chance ruined portal that can roll on
+  *any* large island also grows its linked twin in the other dimension. (Internally the `twin` flag now names the
+  theme to pair, and lives on both the theme and the rare-structure config, routed through the island plan — so any
+  rolled structure can opt into a twin.)
+
 ## [0.54.0] - 2026-06-23
 
 ### Added

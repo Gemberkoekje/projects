@@ -243,7 +243,10 @@ public final class IslandGenerator {
             }
         }
 
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random);
+        // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
+        final Optional<ResourceLocation> twinTheme =
+                (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme);
     }
 
     /** Flatten a {@code pad}-radius disc to {@code gy} for a building: clear above, solid below, no decoration. */

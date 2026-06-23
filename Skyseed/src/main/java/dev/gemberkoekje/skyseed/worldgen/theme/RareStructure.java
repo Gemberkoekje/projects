@@ -9,6 +9,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A rare structure that occasionally germinates on an otherwise ordinary island — the surprise igloo on a
@@ -22,13 +23,16 @@ import java.util.List;
  * {@code SKYSTRUCTURESPLAN.md}.
  */
 public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> mobs, boolean suppressPond,
-                            List<String> biomes) {
+                            List<String> biomes, Optional<ResourceLocation> twin) {
     public static final Codec<RareStructure> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.FLOAT.fieldOf("chance").forGetter(RareStructure::chance),
             JigsawConfig.CODEC.fieldOf("jigsaw").forGetter(RareStructure::jigsaw),
             AnimalPack.CODEC.listOf().optionalFieldOf("mobs", List.of()).forGetter(RareStructure::mobs),
             Codec.BOOL.optionalFieldOf("suppress_pond", false).forGetter(RareStructure::suppressPond),
-            Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(RareStructure::biomes)
+            Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(RareStructure::biomes),
+            // If present, a roll of this rare structure also grows the named theme at the dimension-linked
+            // coordinate in the other dimension — so a ruined portal rolled on a big island gets its twin too.
+            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(RareStructure::twin)
     ).apply(i, RareStructure::new));
 
     /** True if this rare structure may roll in {@code biome} (no {@code biomes} filter set = any biome). */

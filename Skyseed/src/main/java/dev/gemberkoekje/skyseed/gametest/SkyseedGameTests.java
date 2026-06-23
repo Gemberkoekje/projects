@@ -622,7 +622,7 @@ public final class SkyseedGameTests {
         // flagged a twin theme, and the 8:1 linked-coordinate maths is the vanilla portal map.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme rp = theme(overworld, "ruined_portal");
-        helper.assertTrue(rp.twin(), "ruined_portal should be flagged as a cross-dimension twin theme");
+        helper.assertTrue(rp.twin().isPresent(), "ruined_portal should be flagged as a cross-dimension twin theme");
         helper.assertTrue(rp.baseValidIn(Level.OVERWORLD.location()), "ruined_portal should grow in the overworld");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
@@ -639,6 +639,14 @@ public final class SkyseedGameTests {
                 RandomSource.create(91L));
         helper.assertTrue(ow.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("ruined_portal/portal")),
                 "the overworld ruined portal should use the goodies pool ruined_portal/portal");
+        helper.assertTrue(ow.twinTheme().isPresent(), "the overworld ruined portal plan should carry a twin theme");
+
+        // A ruined portal that rolls on a big island via rare_structures pairs too: the rare structure carries the
+        // same twin theme, so planIsland routes it into the plan exactly like the dedicated seed does.
+        final IslandTheme rockyLarge = theme(overworld, "rocky_large");
+        helper.assertTrue(rockyLarge.rareStructures().stream().anyMatch(
+                        rs -> rs.jigsaw().pool().getPath().equals("ruined_portal/portal") && rs.twin().isPresent()),
+                "rocky_large's ruined-portal rare structure should carry the twin theme");
 
         // Nether form: a netherrack island whose jigsaw swaps to the no-goodies _nether pool.
         final IslandPlan nv = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), rp, wastes,

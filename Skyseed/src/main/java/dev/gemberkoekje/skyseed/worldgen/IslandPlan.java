@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A fully computed island, ready to be placed into the world over several ticks (README → Generation algorithm tick-budget
@@ -22,10 +23,12 @@ import java.util.List;
  *                spawned at every bed found in each one
  * @param animals dedicated Animal Island spawns — a rolled pack of farm animals placed in the enclosure
  * @param random RNG carried over from planning, used for the trees' own shape randomness
+ * @param twinTheme if present, grow this theme at the dimension-linked coordinate in the other dimension (the
+ *                  Ruined Portal twin — set by the theme's or a rolled rare structure's {@code twin} field)
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
                          List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
-                         RandomSource random) {
+                         RandomSource random, Optional<ResourceLocation> twinTheme) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}

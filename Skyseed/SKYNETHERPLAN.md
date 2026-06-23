@@ -54,8 +54,10 @@ There's no Y=128 ceiling; islands float at any Y under the open Nether fog. Valu
 > automatically by `IslandGenerator.dimensionVariant`). A `twin: true` flag on the theme makes germination grow a
 > matching island at the 8:1 linked coordinate in the other dimension (`IslandSeedEntity.spawnTwin` / `linkedPortalPos`),
 > placed with small steps only so it stays in vanilla's portal-linking range. The twin is spawned directly (not a
-> thrown seed) so it never recurses. Overworld = goodies, Nether = bare frame. *(Done for the dedicated seed; the
-> `rare_structures` ruined-portal roll could grow a twin too as a later extension.)*
+> thrown seed) so it never recurses. Overworld = goodies, Nether = bare frame. **Both triggers covered (v0.54.1):**
+> the `twin` flag names the theme to pair and sits on BOTH `IslandTheme` and `RareStructure` (routed through
+> `IslandPlan.twinTheme`), so the dedicated seed AND the 1% `rare_structures` ruined-portal roll on any big island
+> each grow their linked twin.
 
 A cross-dimension detail, and the one structure we can **pre-place** (because *we* choose where the ruined portal
 goes, unlike the player-placed arrival portal). **Whenever a ruined portal is created on either side** — the

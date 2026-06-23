@@ -184,10 +184,16 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // Tick-budgeted placement: the scheduler grows the island in over the next ticks (README → Generation algorithm).
         IslandGrowth.enqueue(new GenerationJob(level, plan));
 
-        // Cross-dimension twin (the Ruined Portal): grow a matching island at the vanilla-linked coordinate in the
-        // other dimension. Spawned directly here, not via another thrown seed, so it never spawns a twin of its own.
-        if (theme.twin()) {
-            spawnTwin(level, this.blockPosition(), theme);
+        // Cross-dimension twin (the Ruined Portal): grow the plan's twin theme at the vanilla-linked coordinate in
+        // the other dimension. The plan carries it whether it came from the seed's own theme (the dedicated portal
+        // seed) or a rolled rare structure (a portal that surfaced on a big island). Spawned directly here, not via
+        // another thrown seed, so it never spawns a twin of its own.
+        if (plan.twinTheme().isPresent()) {
+            final IslandTheme twinTheme = level.registryAccess()
+                    .registryOrThrow(SkyseedRegistries.THEME).get(plan.twinTheme().get());
+            if (twinTheme != null) {
+                spawnTwin(level, this.blockPosition(), twinTheme);
+            }
         }
 
         this.discard();
