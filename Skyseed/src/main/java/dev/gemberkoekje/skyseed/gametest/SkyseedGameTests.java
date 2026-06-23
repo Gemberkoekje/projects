@@ -189,6 +189,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void ancientAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Ancient adapts (SKYNETHERPLAN): a haunted deep — a dark blackstone island over a
+        // basalt core, not the overworld moss/deepslate.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var ssv = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.SOUL_SAND_VALLEY);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "ancient"), ssv, RandomSource.create(9L));
+        boolean blackstone = false;
+        boolean basalt = false;
+        boolean moss = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) blackstone = true;
+            if (bp.state().is(Blocks.BASALT)) basalt = true;
+            if (bp.state().is(Blocks.MOSS_BLOCK)) moss = true;
+        }
+        helper.assertTrue(blackstone, "ancient in the Nether should be a blackstone island");
+        helper.assertTrue(basalt, "ancient in the Nether should have a basalt core");
+        helper.assertTrue(!moss, "ancient in the Nether should not use the overworld moss surface");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

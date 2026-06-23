@@ -243,6 +243,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 - **Large variant:** Large Lush — denser vine curtains, more shroomlights. *(No Tier-2 upgrade.)*
 
 ### ⬛ Ancient → haunted deep *(Soul Sand Valley / any)*
+> **Built (v0.42.0).** A tiny ~7×7×4 dark blackstone island over a basalt band, soul-soil flecks + soul-lantern glow,
+> shot through with soul-sand veins, bone fossils and the odd Ancient Debris (a reliable if small debris source), with
+> skeleton + enderman sprinkles. Still to come: a larger fossil network, and Large Ancient (top debris odds).
+
 - The deep-dark vibe without sculk (no Nether analogue): a **blackstone/basalt deep** shot through with **soul-sand
   veins**, **buried bone fossils**, blue **soul fire**, thick fog, basalt spires. A mining-capable island with an
   eerie atmosphere — and, grown low, an Ancient-Debris island (deep = debris ties straight into lava proximity).

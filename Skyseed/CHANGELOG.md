@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.42.0] - 2026-06-23
+
+### Added
+- **Ancient adapts in the Nether — a haunted deep.** Throw an Ancient Skyseed in the Nether and it grows a dark
+  blackstone island shot through with **soul-sand veins**, buried **bone fossils** and the odd **Ancient Debris**,
+  flecked with soul soil and lit by soul lanterns, with skeletons and the odd Enderman. The eerie debris-mining island.
+
+### Changed
+- A theme's `lava` veins/lakes are now home-dimension only (like rare structures), so an overworld lava field tuned
+  for a big island doesn't swamp a tiny adapted Nether one — the Nether adaptation supplies its own lava (e.g.
+  Aquatic's lava lagoon).
+
 ## [0.41.0] - 2026-06-23
 
 ### Added

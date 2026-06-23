@@ -98,7 +98,9 @@ public final class IslandGenerator {
 
         // Lava content (orthogonal to the override bands): a vein appended to the ore pass, plus the Y-banded
         // lava lakes rolled below before the normal pond.
-        final Lava lava = theme.lava().orElse(null);
+        // The theme's lava veins/lakes are tuned for its home (overworld) dimension and would swamp a tiny adapted
+        // island; an adaptation supplies its own lava (e.g. Aquatic's lava pond), so the field is home-dimension only.
+        final Lava lava = baseValidHere ? theme.lava().orElse(null) : null;
         final List<OreEntry> oreList = (lava != null && lava.veinChance() > 0f) ? withLavaVein(ores, lava) : ores;
         if (!coreList.isEmpty()) {
             OrePlanner.planOres(blockMap, oreList, coreList, sh.minCoreY(), sh.maxCoreY(), random);
