@@ -39,7 +39,9 @@ public final class RuinedPortalTemplates {
         final BlockState obsidian = Blocks.OBSIDIAN.defaultBlockState();
         final BlockState crying = Blocks.CRYING_OBSIDIAN.defaultBlockState();
 
-        // A broken 4-wide × 5-tall frame standing in the z=1 plane (some blocks missing = ruined).
+        // A broken 4-wide × 5-tall frame standing in the z=1 plane — a real, repairable portal shape (2×3 inner)
+        // with its top-right corner decayed away and some blocks turned to crying obsidian = ruined. Completing
+        // the two missing blocks (2,5)+(3,5) yields a lightable portal.
         m.put(new BlockPos(0, 1, 1), obsidian);
         m.put(new BlockPos(1, 1, 1), crying);
         m.put(new BlockPos(2, 1, 1), obsidian);
@@ -47,9 +49,11 @@ public final class RuinedPortalTemplates {
         m.put(new BlockPos(0, 2, 1), obsidian);
         m.put(new BlockPos(0, 3, 1), crying);
         m.put(new BlockPos(0, 4, 1), obsidian);
+        m.put(new BlockPos(0, 5, 1), obsidian);
         m.put(new BlockPos(3, 2, 1), obsidian);
         m.put(new BlockPos(3, 3, 1), obsidian);
-        m.put(new BlockPos(1, 4, 1), obsidian); // top is partial (2,4 and 3,4 missing)
+        m.put(new BlockPos(3, 4, 1), crying);
+        m.put(new BlockPos(1, 5, 1), obsidian); // top is partial — (2,5) and the (3,5) corner are missing
 
         // Scorched ground accents on the levelled pad: netherrack, a magma block, a gold block.
         m.put(new BlockPos(2, 1, 0), Blocks.NETHERRACK.defaultBlockState());

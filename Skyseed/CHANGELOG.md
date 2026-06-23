@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.6] - 2026-06-23
+
+### Fixed
+- **The Ruined Portal frame was one row too short to ever be a portal.** It built a 4×4 frame (2×2 inner opening),
+  which can't be lit even if fully repaired — a working Nether portal needs a 2×3 inner (4×5 frame). It's now a
+  proper 4×5 ruined frame with a decayed top-right corner: it reads like a real ruined portal *and* can be repaired
+  into a working one by filling the two missing top blocks. Regenerated `portal.nbt`; applies to the Ruined Portal
+  seed and the 1%-on-big-islands version.
+
 ## [0.35.5] - 2026-06-23
 
 ### Changed
