@@ -117,6 +117,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void desertAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Desert adapts (SKYNETHERPLAN): a Soul Sand Valley — soul sand over soul soil and a
+        // basalt core — not the overworld sand island.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var ssv = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.SOUL_SAND_VALLEY);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "desert"), ssv, RandomSource.create(11L));
+        boolean soulSand = false;
+        boolean soulSoil = false;
+        boolean sand = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.SOUL_SAND)) soulSand = true;
+            if (bp.state().is(Blocks.SOUL_SOIL)) soulSoil = true;
+            if (bp.state().is(Blocks.SAND) || bp.state().is(Blocks.SANDSTONE)) sand = true;
+        }
+        helper.assertTrue(soulSand, "desert in the Nether should have soul sand on top");
+        helper.assertTrue(soulSoil, "desert in the Nether should have a soul soil fill");
+        helper.assertTrue(!sand, "desert in the Nether should not use overworld sand/sandstone");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void dimensionGateGrowsOrFizzlesByImplementation(GameTestHelper helper) {
         // The adapt-or-fizzle matrix (SKYNETHERPLAN): a seed grows only in dimensions it implements — its base
         // `dimensions` or a dimension-keyed override — and fizzles elsewhere rather than growing the foreign base.

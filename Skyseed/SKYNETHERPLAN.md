@@ -193,6 +193,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   *(No Tier-2 — Mushroom has no signature-block upgrade; its only "more" is the bigger Tier-1 island.)*
 
 ### 💀 Desert → Soul Sand Valley
+> **Built (v0.38.0).** Soul sand surface over soul soil + a basalt core, soul-fire ground scatter (eternal on soul
+> sand), bone-block fossils buried in the basalt (a beefed-up `bone_block` ore), a little nether quartz/gold, and
+> skeleton + enderman sprinkles. Still to come: a standalone bone fossil + basalt columns, and Tier-2 *Soul*.
+
 - **Palette:** soul sand surface, soul soil fill, basalt core.
 - **Decoration:** blue **soul fire** (ambient, hurts the player), basalt columns at the rim, one **bone-block
   fossil** rising from the island, blue flame particles.

@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.38.0] - 2026-06-23
+
+### Added
+- **Desert adapts in the Nether — a Soul Sand Valley island.** Throw a Desert Skyseed in the Nether and it grows a
+  Soul Sand Valley instead of the sand island: soul sand over soul soil and a basalt deep, scattered with the eternal
+  blue of **soul fire**, with **bone-block fossils** buried in the basalt and a little Nether Quartz and Gold.
+  Skeletons (and the odd Enderman) wander it. Soul sand is the gate to the **Wither** and **Soul Speed**.
+
 ## [0.37.1] - 2026-06-23
 
 ### Changed
