@@ -213,6 +213,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void mushroomAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Mushroom adapts (SKYNETHERPLAN): a calm mycelium pocket over netherrack (the
+        // mooshroom food island), not the overworld dirt-and-stone island.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "mushroom"), wastes, RandomSource.create(13L));
+        boolean mycelium = false;
+        boolean netherrack = false;
+        boolean dirt = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.MYCELIUM)) mycelium = true;
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.DIRT)) dirt = true;
+        }
+        helper.assertTrue(mycelium, "mushroom in the Nether should keep its mycelium surface");
+        helper.assertTrue(netherrack, "mushroom in the Nether should have a netherrack body");
+        helper.assertTrue(!dirt, "mushroom in the Nether should not use the overworld dirt fill");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

@@ -187,6 +187,11 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 - **Tier 2 — Crimson / Warped:** denser canopy, guaranteed mob pack, nether wart growing on the floor.
 
 ### 🍄 Mushroom → mushroom island *(a transplanted safe haven)*
+> **Built (v0.43.0).** A tiny ~7×7×4 calm mycelium island over netherrack, mushroom-cap surface patches + small
+> red/brown mushrooms, grazed by mooshrooms (the Nether's food/leather). **Caveat:** the overworld "no hostile spawns"
+> is a property of the *mushroom_fields biome*, not the mycelium block, so it does **not** translate to the Nether —
+> the value here is the mooshrooms, not safety. Still to come: Large Mushroom (the bigger haven with giant mushrooms).
+
 - Mushrooms thrive in the Nether's permanent darkness, so a literal mushroom island belongs here — and it doubles as
   the dimension's rare **safe pocket** and **food source** (Nether food is scarce). The actual-mushroom counterpart
   to Forest's fungal trees.

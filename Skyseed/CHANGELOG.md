@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.43.0] - 2026-06-23
+
+### Added
+- **Mushroom adapts in the Nether — a mushroom island.** Throw a Mushroom Skyseed in the Nether and it grows a calm
+  little mycelium island over netherrack, dotted with mushroom-cap patches and small mushrooms and grazed by
+  **mooshrooms** — the Nether's scarce source of food and leather. A gentle change of pace among the harsh islands.
+  (The overworld mushroom field's "nothing hostile spawns" is a biome property, so it doesn't carry into the Nether —
+  the value here is the mooshrooms, not safety.)
+
 ## [0.42.0] - 2026-06-23
 
 ### Added
