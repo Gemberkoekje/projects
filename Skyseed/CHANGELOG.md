@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.51.0] - 2026-06-23
+
+### Added
+- **Tier-2 Crimson/Warped — a full-size fungal forest (and a tiny grass island topside).** The third Tier-2
+  Nether-native seed: a full-size island thick with **huge fungi**. **Crimson** by default (crimson nylium, towering
+  crimson fungi, weeping vines, shroomlight, a pack of Hoglins and Piglins); thrown in a **Warped Forest** biome the
+  whole isle turns teal — warped nylium, huge warped fungi, nether sprouts, Endermen. Crafted from crimson + warped
+  stems, shroomlight and a nether wart block. Thrown in the overworld it shrugs into a tiny grass island (a seed's a
+  seed). New item, recipe, craft advancement, guide entry and a crimson-tinted icon. Guarded by the
+  `netherForestIsCrimsonWarpedWithTinyOverworld` gametest.
+
 ## [0.50.0] - 2026-06-23
 
 ### Added

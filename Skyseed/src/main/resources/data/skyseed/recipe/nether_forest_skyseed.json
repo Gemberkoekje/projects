@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CSW",
+    "SHS",
+    "CSW"
+  ],
+  "key": {
+    "C": {
+      "item": "minecraft:crimson_stem"
+    },
+    "W": {
+      "item": "minecraft:warped_stem"
+    },
+    "S": {
+      "item": "minecraft:shroomlight"
+    },
+    "H": {
+      "item": "minecraft:nether_wart_block"
+    }
+  },
+  "result": {
+    "id": "skyseed:nether_forest_skyseed"
+  }
+}

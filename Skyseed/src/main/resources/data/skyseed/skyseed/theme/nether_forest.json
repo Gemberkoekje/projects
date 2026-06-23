@@ -1,0 +1,43 @@
+{
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:crimson_nylium", "fill": "minecraft:netherrack", "core": "minecraft:netherrack", "fill_depth": 2 },
+  "ores": [
+    { "block": "minecraft:nether_quartz_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+    { "block": "minecraft:nether_gold_ore", "chance": 0.30, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+  ],
+  "mobs": [
+    { "entity": "minecraft:hoglin", "chance": 0.70, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:piglin", "chance": 0.40, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:zombified_piglin", "chance": 0.30, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 1, "name": "crimson", "decoration": {
+      "trees": [ { "feature": "minecraft:crimson_fungus_planted", "tries": 4, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:crimson_roots", "chance": 0.30 }, { "block": "minecraft:crimson_fungus", "chance": 0.10 }, { "block": "minecraft:nether_wart_block", "chance": 0.04 }, { "block": "minecraft:twisting_vines", "chance": 0.08 }, { "block": "minecraft:shroomlight", "chance": 0.05 } ],
+      "underside": [ { "block": "minecraft:weeping_vines", "chance": 0.25 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Warped fungal forest — in a warped_forest biome the island goes warped (teal): warped nylium, huge warped fungi, nether sprouts, Endermen. Same-dimension override, so it inherits the base shape / fill / core / ores; only the surface, mobs and decoration change.",
+      "dimension": "minecraft:the_nether", "biomes": [ "minecraft:warped_forest" ],
+      "surface": "minecraft:warped_nylium",
+      "mobs": [ { "entity": "minecraft:enderman", "chance": 0.60, "count": { "min": 1, "max": 2 } } ],
+      "variants": [
+        { "weight": 1, "name": "warped", "decoration": {
+          "trees": [ { "feature": "minecraft:warped_fungus_planted", "tries": 4, "spacing": 3 } ],
+          "ground": [ { "block": "minecraft:warped_roots", "chance": 0.30 }, { "block": "minecraft:nether_sprouts", "chance": 0.25 }, { "block": "minecraft:warped_fungus", "chance": 0.10 }, { "block": "minecraft:twisting_vines", "chance": 0.08 }, { "block": "minecraft:shroomlight", "chance": 0.05 } ],
+          "underside": [ { "block": "minecraft:weeping_vines", "chance": 0.20 } ] } }
+      ] },
+
+    { "_comment": "Overworld easter egg — thrown topside a Nether Forest seed makes a TINY ~7x7x4 plain grass island (a little tuft of green), not the fungal forest. The mirror of the Tier-2 design; a seed's a seed.",
+      "dimension": "minecraft:overworld",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2,
+      "ores": [],
+      "mobs": [],
+      "variants": [
+        { "weight": 1, "name": "tuft", "decoration": {
+          "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:dandelion", "chance": 0.04 }, { "block": "minecraft:poppy", "chance": 0.04 } ] } }
+      ] }
+  ]
+}

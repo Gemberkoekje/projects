@@ -455,6 +455,63 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void netherForestIsCrimsonWarpedWithTinyOverworld(GameTestHelper helper) {
+        // Tier-2 Crimson/Warped (SKYNETHERPLAN): a full-size fungal forest. Crimson by default; warped nylium in a
+        // warped_forest biome (a same-dimension biome override). Thrown topside it shrugs into a TINY grass island.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nf = theme(overworld, "nether_forest");
+        helper.assertTrue(nf.baseValidIn(Level.NETHER.location()), "nether_forest base must implement the_nether");
+        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location()), "nether_forest base must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var biomes = nether.registryAccess().registryOrThrow(Registries.BIOME);
+        final var crimson = biomes.getHolderOrThrow(Biomes.CRIMSON_FOREST);
+        final var warped = biomes.getHolderOrThrow(Biomes.WARPED_FOREST);
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+
+        // Crimson is the default Nether form: crimson nylium over a netherrack body, full-size.
+        final IslandPlan c = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nf, crimson,
+                RandomSource.create(61L));
+        helper.assertTrue(c.blocks().size() > 500, "the crimson forest island should be full-size, was " + c.blocks().size());
+        boolean crimsonNylium = false;
+        boolean cNetherrack = false;
+        for (IslandPlan.BlockPlacement bp : c.blocks()) {
+            if (bp.state().is(Blocks.CRIMSON_NYLIUM)) crimsonNylium = true;
+            if (bp.state().is(Blocks.NETHERRACK)) cNetherrack = true;
+        }
+        helper.assertTrue(crimsonNylium, "the default Nether forest should have a crimson nylium surface");
+        helper.assertTrue(cNetherrack, "the Nether forest should have a netherrack body");
+
+        // In a warped_forest biome the same seed goes warped.
+        final IslandPlan w = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nf, warped,
+                RandomSource.create(62L));
+        boolean warpedNylium = false;
+        for (IslandPlan.BlockPlacement bp : w.blocks()) {
+            if (bp.state().is(Blocks.WARPED_NYLIUM)) warpedNylium = true;
+        }
+        helper.assertTrue(warpedNylium, "in a warped_forest biome the island should have a warped nylium surface");
+
+        // Topside: a tiny grass island, no nylium, no netherrack.
+        final IslandPlan o = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), nf, plains,
+                RandomSource.create(63L));
+        helper.assertTrue(o.blocks().size() < 500, "the overworld easter-egg island should be tiny, was " + o.blocks().size());
+        boolean grass = false;
+        boolean oNylium = false;
+        boolean oNetherrack = false;
+        for (IslandPlan.BlockPlacement bp : o.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) grass = true;
+            if (bp.state().is(Blocks.CRIMSON_NYLIUM) || bp.state().is(Blocks.WARPED_NYLIUM)) oNylium = true;
+            if (bp.state().is(Blocks.NETHERRACK)) oNetherrack = true;
+        }
+        helper.assertTrue(grass, "the overworld easter-egg island should be a grass island");
+        helper.assertTrue(!oNylium, "the overworld easter-egg island should not be nylium");
+        helper.assertTrue(!oNetherrack, "the overworld easter-egg island should not be netherrack");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

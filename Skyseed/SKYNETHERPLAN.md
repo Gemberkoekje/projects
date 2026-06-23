@@ -194,8 +194,13 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ### 🌲 Forest → huge-fungi forest *(Crimson / Warped)*
 > **Built (v0.44.0).** A tiny ~7×7×4 fungal patch: **crimson nylium** (crimson roots/fungi, Hoglin + Piglin) by
 > default, or **warped nylium** (warped roots, nether sprouts, twisting vines, Endermen) in a `warped_forest` biome;
-> shroomlight floor glow, weeping vines hanging underneath, a little nether quartz. *Small* fungal decoration only —
-> the dense huge-fungi forest is the Tier-2 Crimson/Warped payoff.
+> shroomlight floor glow, weeping vines hanging underneath, a little nether quartz. *Small* fungal decoration only.
+> **Tier-2 *Crimson / Warped* — BUILT (v0.51.0), the third Tier-2 Nether-native seed.** Its own craftable
+> `nether_forest` seed: a full-size (radius 6-9) fungal forest with **huge fungi** (`crimson_fungus_planted` /
+> `warped_fungus_planted` configured features as "trees" — NOT `huge_*`, those don't exist for fungi). Crimson by
+> default (huge crimson fungi, crimson roots/fungus, wart blocks, Hoglin/Piglin pack); a `warped_forest` biome
+> override flips it to warped (huge warped fungi, nether sprouts, Endermen). Crafted from crimson + warped stems +
+> shroomlight + a nether wart block. **Overworld easter egg:** a TINY grass island (mirror of Nether Rocky's stone one).
 
 - Stays *foresty* — a dense fungal **forest**, not a grove. Tall huge crimson/warped fungus are the "trees."
 - **Palette:** crimson/warped nylium surface (by biome), netherrack fill.

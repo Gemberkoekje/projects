@@ -28,7 +28,7 @@ public final class ModItems {
             "forest", "forest_large", "rocky", "rocky_large", "desert", "desert_large",
             "mushroom", "mushroom_large", "frozen", "frozen_large", "meadow", "meadow_large",
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
-            "aquatic", "aquatic_large", "nether_rocky", "nether_lava", "hamlet", "trade_post", "village_center",
+            "aquatic", "aquatic_large", "nether_rocky", "nether_lava", "nether_forest", "hamlet", "trade_post", "village_center",
             "pasture", "poultry", "wool_farm", "stable", "aquarium",
             "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
             "woodland_mansion", "ocean_monument");

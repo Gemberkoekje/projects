@@ -120,6 +120,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_forest_skyseed",
+      "text": "The $(item)Nether Forest Skyseed$() — crimson and warped stems, shroomlight and a nether wart block. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },
