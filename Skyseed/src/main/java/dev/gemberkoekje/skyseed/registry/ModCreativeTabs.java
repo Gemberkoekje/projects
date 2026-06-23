@@ -24,6 +24,16 @@ public final class ModCreativeTabs {
                     })
                     .build());
 
+    /** A separate tab for the hidden debug seeds (one per chance-only rare structure) — creative testing only. */
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SKYSEED_DEBUG_TAB =
+            CREATIVE_MODE_TABS.register("skyseed_debug", () -> CreativeModeTab.builder()
+                    .title(Component.translatable("itemGroup.skyseed.debug"))
+                    .icon(() -> ModItems.DEBUG_SEEDS.get("debug_igloo").get().getDefaultInstance())
+                    .withTabsBefore(SKYSEED_TAB.getId())
+                    .displayItems((parameters, output) ->
+                            ModItems.DEBUG_SEED_THEMES.forEach(theme -> output.accept(ModItems.DEBUG_SEEDS.get(theme).get())))
+                    .build());
+
     private ModCreativeTabs() {}
 
     public static void register(IEventBus modEventBus) {

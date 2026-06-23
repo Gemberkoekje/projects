@@ -33,13 +33,32 @@ public final class ModItems {
             "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
             "woodland_mansion", "ocean_monument");
 
+    /**
+     * Hidden debug seeds — one per rare structure that otherwise <em>only</em> appears by chance (igloo,
+     * abandoned cottage, ocean ruin, evoker cell, vault cell, trail ruins). Each germinates that structure as a
+     * dedicated island, so it can be spawned on demand instead of throwing 30 seeds to roll it. These are
+     * <b>creative-only</b>: registered (and shown in the separate "Skyseed Debug" tab) but deliberately given
+     * <b>no recipe</b>, kept out of the {@code #skyseed:skyseeds} tag, and given no guide entry.
+     */
+    public static final List<String> DEBUG_SEED_THEMES = List.of(
+            "debug_igloo", "debug_abandoned_cottage", "debug_ocean_ruin",
+            "debug_evoker_cell", "debug_vault_cell", "debug_trail_ruins");
+
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();
 
+    /** theme id → its debug seed item, in {@link #DEBUG_SEED_THEMES} order. */
+    public static final Map<String, DeferredItem<IslandSeedItem>> DEBUG_SEEDS = new LinkedHashMap<>();
+
     static {
-        for (String theme : SEED_THEMES) {
+        registerSeeds(SEED_THEMES, SEEDS);
+        registerSeeds(DEBUG_SEED_THEMES, DEBUG_SEEDS);
+    }
+
+    private static void registerSeeds(List<String> themes, Map<String, DeferredItem<IslandSeedItem>> into) {
+        for (String theme : themes) {
             final ResourceLocation themeId = ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, theme);
-            SEEDS.put(theme, ITEMS.registerItem(theme + "_skyseed",
+            into.put(theme, ITEMS.registerItem(theme + "_skyseed",
                     props -> new IslandSeedItem(props, themeId), new Item.Properties().stacksTo(16)));
         }
     }

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.1] - 2026-06-23
+
+### Added
+- **Hidden debug seeds** for the rare structures that otherwise only appear by chance — **Igloo, Abandoned
+  Cottage, Ocean Ruin, Evoker Cell, Vault Cell, Trail Ruins**. Each germinates that structure as a dedicated
+  island (reusing the existing rare-structure jigsaw pools — no new templates), so it can be spawned on demand
+  instead of throwing dozens of seeds to roll it. They live in a separate **"Skyseed Debug"** creative tab and
+  are **creative-only**: no recipe, kept out of the `#skyseed:skyseeds` tag, and no guide entry. (Vault Cell and
+  Trail Ruins germinate buried, exactly like the real rolls — fly or dig down to inspect.)
+
 ## [0.34.0] - 2026-06-23
 
 ### Added

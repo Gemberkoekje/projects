@@ -1,0 +1,6 @@
+{
+  "shape": { "radius": { "min": 7, "max": 8 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:moss_block", "fill": "minecraft:tuff", "core": "minecraft:deepslate", "fill_depth": 2,
+    "surface_scatter": [ { "block": "minecraft:deepslate", "chance": 0.25 } ] },
+  "jigsaw": { "pool": "skyseed:vault_cell/cell", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 5 }
+}

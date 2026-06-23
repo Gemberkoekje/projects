@@ -1,0 +1,6 @@
+{
+  "shape": { "radius": { "min": 6, "max": 7 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:snow_block", "fill": "minecraft:packed_ice", "core": "minecraft:ice", "fill_depth": 2 },
+  "jigsaw": { "pool": "skyseed:igloo/igloo", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 0 },
+  "animals": [ { "weight": 1, "entries": [ { "entity": "minecraft:zombie_villager", "adults": 1, "babies": 0 } ] } ]
+}
