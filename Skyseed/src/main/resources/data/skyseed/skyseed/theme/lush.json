@@ -37,5 +37,16 @@
     { "weight": 1, "name": "ancient_garden", "decoration": {
       "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.50 }, { "block": "minecraft:small_dripleaf", "chance": 0.04 } ],
       "underside": [ { "block": "minecraft:glow_lichen", "chance": 0.12 }, { "block": "minecraft:spore_blossom", "chance": 0.12 }, { "block": "minecraft:hanging_roots", "chance": 0.10 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 vine grotto: warped nylium lit by shroomlights, weeping vines hanging beneath, warped roots + nether sprouts underfoot. Calm + pretty; Endermen. No pond (the base water pond is dropped by the dimension-override neutral default).",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:warped_nylium", "fill": "minecraft:netherrack", "core": "minecraft:netherrack",
+      "ores": [ { "block": "minecraft:nether_quartz_ore", "chance": 0.35, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" } ],
+      "mobs": [ { "entity": "minecraft:enderman", "chance": 0.25, "count": { "min": 1, "max": 2 } } ],
+      "variants": [ { "weight": 1, "name": "grotto", "decoration": {
+        "ground": [ { "block": "minecraft:warped_roots", "chance": 0.35 }, { "block": "minecraft:nether_sprouts", "chance": 0.30 }, { "block": "minecraft:twisting_vines", "chance": 0.12 }, { "block": "minecraft:shroomlight", "chance": 0.08 } ],
+        "underside": [ { "block": "minecraft:weeping_vines", "chance": 0.35 } ] } } ] }
   ]
 }

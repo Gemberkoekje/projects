@@ -79,7 +79,7 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 > the overworld fizzle for free. **Rocky** is the first adapted seed (overworld base + Nether overrides). **As of
 > v0.45.0 a dimension override never inherits Overworld content** — an unset field is neutral/empty (a
 > netherrack/end-stone body, no ores/decoration/mobs), not the overworld base, so a dimension form can't leak grass,
-> coal or terracotta across the portal. Still to do: adapt Lush (Meadow + Frozen fizzle by design).
+> coal or terracotta across the portal. **All eight viable terrain seeds are now adapted (v0.46.0)** — Meadow + Frozen fizzle by design.
 
 **One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
 
@@ -249,6 +249,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   bigger lagoon, guaranteed Strider pack, a gilded-blackstone or fossil islet. A standout new island.
 
 ### 🌿 Lush → vine grotto *(Crimson / Warped)*
+> **Built (v0.46.0).** A tiny ~7×7×4 warped-nylium grotto: shroomlight glow, weeping vines hanging beneath, warped
+> roots / nether sprouts / twisting vines underfoot, a little nether quartz, Endermen. No pond (the dimension-override
+> neutral default drops the base water pond rather than evaporating it). The last of the Tier-1 adaptations.
+
 - The "glowing hanging garden" translated: **twisting + weeping vines** drape the underside and walls,
   **shroomlights** provide the glow (in place of glow lichen/glow berries), nether sprouts and roots carpet the
   floor, the odd warped fungus. Calm and pretty — the Nether's prettiest island. Endermen if warped.

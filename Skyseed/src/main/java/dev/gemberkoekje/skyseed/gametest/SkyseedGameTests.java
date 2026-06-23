@@ -261,6 +261,33 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void lushAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Lush adapts (SKYNETHERPLAN): a warped-nylium vine grotto over netherrack, with no
+        // pond (the override omits one, so the base water pond is dropped, not evaporated to a dry hole).
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var warped = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.WARPED_FOREST);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "lush"), warped, RandomSource.create(21L));
+        boolean warpedNylium = false;
+        boolean netherrack = false;
+        boolean water = false;
+        boolean moss = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.WARPED_NYLIUM)) warpedNylium = true;
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.WATER)) water = true;
+            if (bp.state().is(Blocks.MOSS_BLOCK)) moss = true;
+        }
+        helper.assertTrue(warpedNylium, "lush in the Nether should have a warped nylium surface");
+        helper.assertTrue(netherrack, "lush in the Nether should have a netherrack body");
+        helper.assertTrue(!water, "lush in the Nether should drop the overworld water pond");
+        helper.assertTrue(!moss, "lush in the Nether should not use the overworld moss surface");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

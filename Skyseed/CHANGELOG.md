@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.46.0] - 2026-06-23
+
+### Added
+- **Lush adapts in the Nether — a vine grotto.** Throw a Lush Skyseed in the Nether and it grows the prettiest little
+  island down there: **warped nylium** lit by **shroomlights**, **weeping vines** hanging beneath, warped roots and
+  nether sprouts underfoot, and an Enderman or two — calm and dry, no pond. This **completes the Tier-1 Nether
+  adaptations**: all eight viable terrain seeds (Rocky, Desert, Badlands, Aquatic, Ancient, Mushroom, Forest, Lush)
+  now have a Nether form. (Meadow and Frozen fizzle by design.)
+
 ## [0.45.0] - 2026-06-23
 
 ### Changed
