@@ -26,6 +26,21 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.03 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 Lava Lagoon: the pond becomes a contained lava basin (a Strider rides it) on a basalt island with magma-block shores. Listed first so it wins in the Nether.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:basalt", "fill": "minecraft:netherrack", "core": "minecraft:netherrack",
+      "surface_scatter": [ { "block": "minecraft:magma_block", "chance": 0.18 } ],
+      "ores": [
+        { "block": "minecraft:nether_gold_ore", "chance": 0.30, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+      ],
+      "pond": {
+        "block": "minecraft:lava", "radius": 2, "depth": 2,
+        "water_mobs": [ { "entity": "minecraft:strider", "chance": 0.60, "count": { "min": 1, "max": 1 } } ]
+      },
+      "mobs": [ { "entity": "minecraft:magma_cube", "chance": 0.25, "count": { "min": 1, "max": 1 } } ],
+      "variants": [ { "weight": 1, "name": "lagoon", "decoration": {} } ] },
+
     { "max_y": -1, "surface": "minecraft:stone", "fill": "minecraft:cobblestone", "core": "minecraft:deepslate",
       "surface_scatter": [ { "block": "minecraft:deepslate", "chance": 0.35 } ],
       "ores": [

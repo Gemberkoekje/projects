@@ -225,6 +225,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   blackstone embedded in the core (gold drops). Genuinely dangerous to navigate.
 
 ### 🫧 Aquatic → Lava Lagoon *(any biome)*
+> **Built (v0.41.0).** A tiny ~7×7×4 basalt island whose pond is overridden to a contained **lava** basin
+> (magma-block shores, a Strider as the pond "water mob", a magma cube, a little nether gold). Still to come: an
+> islet, a guaranteed Strider pack, and Tier-2 *Lava* (the full-size lagoon).
+
 - The clever swap: water evaporates, so the pond becomes a **contained lava basin** (walled like the Ocean Ruin's
   pool so it can't overflow off the island).
 - **Decoration:** magma-block shore, basalt rim, an occasional islet; **Striders** ride the lava (the Nether's

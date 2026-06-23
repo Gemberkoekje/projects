@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.41.0] - 2026-06-23
+
+### Added
+- **Aquatic adapts in the Nether — a Lava Lagoon island.** Throw an Aquatic Skyseed in the Nether and its pond comes
+  up as a contained pool of **lava** instead of water (the clever bit — water can't survive down here): a tiny basalt
+  island with magma-block shores, a **Strider** riding the lava, and a magma cube or two, with a little Nether Gold.
+
+### Changed
+- Rare structures (igloo, ocean ruin, vault cell, …) are now gated to a theme's home dimension, so an adapted Nether
+  island never rolls an out-of-place overworld ruin.
+
 ## [0.40.0] - 2026-06-23
 
 ### Added

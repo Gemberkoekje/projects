@@ -165,6 +165,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void aquaticAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Aquatic adapts (SKYNETHERPLAN): a Lava Lagoon — the pond becomes a contained lava
+        // basin on a basalt island, not the overworld water lake.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "aquatic"), wastes, RandomSource.create(3L));
+        boolean lava = false;
+        boolean basalt = false;
+        boolean water = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.LAVA)) lava = true;
+            if (bp.state().is(Blocks.BASALT)) basalt = true;
+            if (bp.state().is(Blocks.WATER)) water = true;
+        }
+        helper.assertTrue(lava, "aquatic in the Nether should carve a lava lagoon");
+        helper.assertTrue(basalt, "aquatic in the Nether should be a basalt island");
+        helper.assertTrue(!water, "aquatic in the Nether should not place water");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.
