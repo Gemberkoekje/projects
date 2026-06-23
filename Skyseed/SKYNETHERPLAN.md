@@ -250,8 +250,13 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 
 ### 🫧 Aquatic → Lava Lagoon *(any biome)*
 > **Built (v0.41.0).** A tiny ~7×7×4 basalt island whose pond is overridden to a contained **lava** basin
-> (magma-block shores, a Strider as the pond "water mob", a magma cube, a little nether gold). Still to come: an
-> islet, a guaranteed Strider pack, and Tier-2 *Lava* (the full-size lagoon).
+> (magma-block shores, a Strider as the pond "water mob", a magma cube, a little nether gold).
+> **Tier-2 *Lava* — BUILT (v0.50.0), the second Tier-2 Nether-native seed.** Its own craftable `nether_lava` seed: a
+> full-size basalt island (radius 6-9) around a contained `lava` pond (radius 4, depth 3), magma-block patches, a
+> guaranteed **Strider pack** + Magma Cubes, a little quartz/gold. Crafted from blackstone + magma blocks + a bucket
+> of lava (returned). **Special case:** since the overworld has no lava island of its own, `nether_lava` is the one
+> Tier-2 seed that *also* grows FULL-SIZE topside (a stone-bodied volcanic isle, no netherrack) — via a full overworld
+> `biome_override`, not the tiny easter egg Nether Rocky makes.
 
 - The clever swap: water evaporates, so the pond becomes a **contained lava basin** (walled like the Ocean Ruin's
   pool so it can't overflow off the island).

@@ -1,0 +1,45 @@
+{
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:basalt", "fill": "minecraft:netherrack", "core": "minecraft:blackstone", "fill_depth": 2 },
+  "ores": [
+    { "block": "minecraft:nether_quartz_ore", "chance": 0.60, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 3, "max": 5 }, "depth": "core" },
+    { "block": "minecraft:nether_gold_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+  ],
+  "pond": {
+    "block": "minecraft:lava", "radius": 4, "depth": 3,
+    "water_mobs": [ { "entity": "minecraft:strider", "chance": 0.90, "count": { "min": 2, "max": 3 } } ]
+  },
+  "mobs": [
+    { "entity": "minecraft:magma_cube", "chance": 0.60, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:strider", "chance": 0.30, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 2, "name": "lagoon", "decoration": {
+      "ground": [ { "block": "minecraft:magma_block", "chance": 0.06 }, { "block": "minecraft:glowstone", "chance": 0.03 } ] } },
+    { "weight": 1, "name": "basalt", "decoration": {
+      "ground": [ { "block": "minecraft:basalt", "chance": 0.12 }, { "block": "minecraft:magma_block", "chance": 0.05 }, { "block": "minecraft:glowstone", "chance": 0.02 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Overworld form — the overworld has no real lava island yet, so a Nether Lava seed thrown topside grows a FULL-SIZE volcanic island (not a tiny easter egg): a basalt isle over a stone body with a contained lava lake, magma patches, sparse iron + gold, and Striders riding the lava. No netherrack (overworld-appropriate).",
+      "dimension": "minecraft:overworld",
+      "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+      "surface": "minecraft:basalt", "fill": "minecraft:stone", "core": "minecraft:blackstone", "fill_depth": 2,
+      "surface_scatter": [ { "block": "minecraft:magma_block", "chance": 0.12 } ],
+      "ores": [
+        { "block": "minecraft:iron_ore", "chance": 0.60, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 3, "max": 5 }, "depth": "core" },
+        { "block": "minecraft:gold_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+      ],
+      "pond": {
+        "block": "minecraft:lava", "radius": 4, "depth": 3,
+        "water_mobs": [ { "entity": "minecraft:strider", "chance": 0.80, "count": { "min": 1, "max": 2 } } ]
+      },
+      "mobs": [ { "entity": "minecraft:magma_cube", "chance": 0.50, "count": { "min": 1, "max": 2 } } ],
+      "variants": [
+        { "weight": 2, "name": "lava_isle", "decoration": {
+          "ground": [ { "block": "minecraft:magma_block", "chance": 0.05 } ] } },
+        { "weight": 1, "name": "scorched", "decoration": {
+          "ground": [ { "block": "minecraft:basalt", "chance": 0.10 }, { "block": "minecraft:magma_block", "chance": 0.05 } ] } }
+      ] }
+  ]
+}

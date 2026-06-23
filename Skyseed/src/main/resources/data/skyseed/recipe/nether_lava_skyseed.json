@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BMB",
+    "MLM",
+    "BMB"
+  ],
+  "key": {
+    "B": {
+      "item": "minecraft:blackstone"
+    },
+    "M": {
+      "item": "minecraft:magma_block"
+    },
+    "L": {
+      "item": "minecraft:lava_bucket"
+    }
+  },
+  "result": {
+    "id": "skyseed:nether_lava_skyseed"
+  }
+}

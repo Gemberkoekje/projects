@@ -115,6 +115,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_lava_skyseed",
+      "text": "The $(item)Nether Lava Skyseed$() — blackstone, magma blocks and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

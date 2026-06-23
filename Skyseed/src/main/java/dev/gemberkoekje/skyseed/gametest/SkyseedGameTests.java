@@ -342,8 +342,8 @@ public final class SkyseedGameTests {
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
                 theme(nether, "nether_rocky"), wastes, RandomSource.create(303L));
-        helper.assertTrue(p.blocks().size() > 1000,
-                "a Nether Rocky island should be full-size (>1000 blocks), was " + p.blocks().size());
+        helper.assertTrue(p.blocks().size() > 500,
+                "a Nether Rocky island should be full-size (>500 blocks, vs a tiny adaptation's ~150), was " + p.blocks().size());
         boolean netherrack = false;
         boolean blackstone = false;
         boolean quartz = false;
@@ -392,6 +392,65 @@ public final class SkyseedGameTests {
             if (bp.state().is(Blocks.DEEPSLATE) || bp.state().is(Blocks.COBBLED_DEEPSLATE)) deepslate = true;
         }
         helper.assertTrue(deepslate, "thrown low, the overworld easter-egg island should turn to deepslate");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void netherLavaIsFullSizeInBothDimensions(GameTestHelper helper) {
+        // Tier-2 Lava (SKYNETHERPLAN): a full-size lava-lagoon island. Nether-native, but because the overworld has
+        // no real lava island it ALSO grows full-size topside (a stone-bodied volcanic isle, NOT the tiny easter egg
+        // nether_rocky makes). Base is the_nether-only; the overworld form is a full dimension override.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nl = theme(overworld, "nether_lava");
+        helper.assertTrue(nl.baseValidIn(Level.NETHER.location()), "nether_lava base must implement the_nether");
+        helper.assertTrue(!nl.baseValidIn(Level.OVERWORLD.location()),
+                "nether_lava base must be the_nether-only (the overworld form is an override)");
+
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+
+        helper.assertTrue(IslandGenerator.formValidFor(nl, wastes, 64, Level.NETHER.location()),
+                "nether_lava should grow in the Nether");
+        helper.assertTrue(IslandGenerator.formValidFor(nl, plains, 80, Level.OVERWORLD.location()),
+                "nether_lava should ALSO grow (full-size) in the overworld");
+
+        // Nether: full-size lava lagoon over a netherrack body.
+        final IslandPlan inNether = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nl, wastes,
+                RandomSource.create(51L));
+        helper.assertTrue(inNether.blocks().size() > 500,
+                "the Nether lava island should be full-size (>500 blocks), was " + inNether.blocks().size());
+        boolean nBasalt = false;
+        boolean nLava = false;
+        boolean nNetherrack = false;
+        for (IslandPlan.BlockPlacement bp : inNether.blocks()) {
+            if (bp.state().is(Blocks.BASALT)) nBasalt = true;
+            if (bp.state().is(Blocks.LAVA)) nLava = true;
+            if (bp.state().is(Blocks.NETHERRACK)) nNetherrack = true;
+        }
+        helper.assertTrue(nBasalt, "Nether lava island should have a basalt surface");
+        helper.assertTrue(nLava, "Nether lava island should have a lava lagoon");
+        helper.assertTrue(nNetherrack, "Nether lava island should have a netherrack body");
+
+        // Overworld: full-size lava island too, but stone-bodied (never netherrack).
+        final IslandPlan inOverworld = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), nl, plains,
+                RandomSource.create(52L));
+        helper.assertTrue(inOverworld.blocks().size() > 500,
+                "the overworld lava island should be full-size (>500 blocks), was " + inOverworld.blocks().size());
+        boolean oBasalt = false;
+        boolean oLava = false;
+        boolean oNetherrack = false;
+        for (IslandPlan.BlockPlacement bp : inOverworld.blocks()) {
+            if (bp.state().is(Blocks.BASALT)) oBasalt = true;
+            if (bp.state().is(Blocks.LAVA)) oLava = true;
+            if (bp.state().is(Blocks.NETHERRACK)) oNetherrack = true;
+        }
+        helper.assertTrue(oBasalt, "overworld lava island should have a basalt surface");
+        helper.assertTrue(oLava, "overworld lava island should have a lava lake");
+        helper.assertTrue(!oNetherrack, "overworld lava island should NOT be netherrack (it is stone-bodied)");
         helper.succeed();
     }
 

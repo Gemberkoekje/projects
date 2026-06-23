@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.50.0] - 2026-06-23
+
+### Added
+- **Tier-2 Lava — a full-size lava lagoon, and the overworld's first lava island.** The molten counterpart to the
+  Aquatic isle: a full-size **basalt** island built around a contained **lava lake**, with magma-block shores, a
+  wandering pack of **Striders** and a Magma Cube or two. Crafted from blackstone, magma blocks and a bucket of lava
+  (you keep the bucket). Because the overworld has no lava island of its own, this is the one Tier-2 Nether seed that
+  *also* grows full-size when thrown topside — a stone-bodied volcanic isle with the same lava lake (Striders and
+  all), rather than the tiny easter egg Nether Rocky makes. New item, recipe, craft advancement, guide entry and a
+  lava-tinted icon. Guarded by the `netherLavaIsFullSizeInBothDimensions` gametest.
+
 ## [0.49.0] - 2026-06-23
 
 ### Added
