@@ -1,137 +1,125 @@
 # Skyseed
 
-**Terraform the sky, one seed at a time.**
+**Grow your skyblock instead of bridging it out.**
 
-Skyseed is a skyblock where you don't grind your way wider — you *grow* the world outward. Craft a **Skyseed**, throw it into the open air, and seconds later it germinates into a brand-new, procedurally generated floating island. Every throw is a new piece of world: trees, ore, water, whole biomes, villages, dungeons — blooming out of nothing.
+Here's the idea: you craft a seed, throw it into the open air, and a few seconds later it sprouts a fresh floating island. Each one is procedurally generated and stocked with whatever that seed grows: trees, ore, a pond, a whole biome, a village, a dungeon.
 
-You begin on a small starter island with a single tree. From there, exploration **and** crafting drive your progress — each new island gives you the blocks to craft the next, more ambitious one.
+You start on a small island with one tree. After that, exploring and crafting feed into each other. Every island you grow gives you the materials to craft the next, bigger one.
 
 ---
 
 ## How it works
 
-1. **Craft a Skyseed.** Different recipes make different seeds — dirt + planks for a Forest, stone + cobblestone for a Rocky, snow + ice for a Frozen, and so on. Each is its own item, so they're easy to find in JEI/REI.
-2. **Throw it.** Hold right-click to wind up, release to launch.
-3. **Watch it grow.** After a moment the seed germinates and an island grows in before your eyes.
-4. **Harvest, then craft the next seed.** Rinse, repeat, and build your archipelago across the sky.
+1. **Craft a Skyseed.** Each recipe makes a different seed: dirt and planks for a Forest, stone and cobblestone for a Rocky, snow and ice for a Frozen, and so on. They're separate items, so they're easy to find in JEI/REI.
+2. **Throw it.** Hold right-click to wind up, let go to launch.
+3. **Watch it grow.** The seed germinates after a moment and the island builds itself in over the next few seconds.
+4. **Harvest, then craft the next one.** Repeat, and your archipelago spreads across the sky.
 
-No two islands are ever the same — every one is rolled fresh within its theme, so you never paste the same blob twice.
-
----
-
-## Throw it your way
-
-Two throw modes; press **V** to switch (your choice is remembered):
-
-- **Precise** *(default)* — direct placement. The island appears exactly where you're looking, at a distance set by how long you charge. Perfect for laying out a tidy sky-base.
-- **Classic** — a charged toss. A light tap drops the island close; a full charge sends it sailing.
+Islands are rolled fresh every time within their theme, so you never grow the same one twice.
 
 ---
 
-## Ten terrain islands to discover
+## Two ways to throw
 
-Each Skyseed grows its own kind of island, with multiple looks and hidden surprises — and every one has a bigger, pricier **Large** variant with a thematic twist:
+Press **V** to switch modes; it remembers which you picked.
 
-- 🌿 **Forest** — the starter. Grass, flowers, and trees that match wherever you throw it. (Large: a sprawling old-growth wood, the biggest of the green islands.)
-- ⛰️ **Rocky** — the miner's island. Every ore is here, and *where you throw it matters*: low throws strike deepslate, diamonds and redstone; mid throws an iron-and-copper haul; high throws bring coal and iron — and the highest become snow-capped peaks. Dig in and you might tap a pocket of lava, and a contained lava lake grows likelier the lower you throw it — a long shot at mid-air, a one-in-five bet below Y 0. (Large Rocky is a tall, emerald-bearing mountain.)
-- 🏜️ **Desert** — sand and sandstone, cacti and dead bushes, with clay and buried fossils below. Throw it over a badlands for red dunes. (Large: an oasis.)
-- 🍄 **Mushroom** — a mycelium isle crowned with giant red and brown mushrooms. Mobs won't spawn here — a safe place to build. (Large: a giant fungal isle grazed by mooshrooms.)
-- ❄️ **Frozen** — snow and ice, packed ice and rare blue ice... and hidden powder-snow pockets to watch your step around. (Large: a frozen lake.)
-- 🌸 **Meadow** — the flower island. Every dye-flower, towering sunflowers, cherry blossoms, and bee nests tucked among the blooms. (Large: a vast wildflower field of sunflowers, tulip rows and cherry blossom.)
-- 🪨 **Badlands** — a mesa in the sky, its cliffs banded in layers of orange, yellow, white, red, and brown terracotta, and rich with gold. (Large: a towering mesa.)
-- 🏛️ **Ancient** — a shard of the deep underground hung in the air: deepslate and tuff, amethyst geodes, dripstone teeth, and a rare deep-dark variant bristling with sculk. About one in five hides a contained lava lake, with the odd lava pocket lurking in the stone. (Large: a deeper shard, veined with budding amethyst.)
-- 🌿 **Lush** — a cave garden afloat. Moss, azalea trees, dripleaves, and glow-berry vines trailing off the underside. (Large: a deep pool with glow squid.)
-- 🌊 **Aquatic** — half land, half floating lake: kelp and lily pads, warm-water coral reefs, mangroves, and clay-and-gravel banks. Throw it below Y 0 and it comes up instead as a bare stone-and-deepslate isle cradling a lava lake where the water would be. (Large: a proper deep lake.)
+- **Precise** (the default) puts the island exactly where you're aiming, at a distance set by how long you charge. Good for laying out a tidy base.
+- **Classic** is a charged toss. A tap drops the island nearby; a full charge throws it a long way out.
 
-Each **Large** variant is its own separate, pricier seed — so the ten terrain *types* are really twenty islands to grow, before you even reach the villages, farms, and structures below.
+---
+
+## Ten terrain islands
+
+Every Skyseed grows its own kind of island, and most have a few different looks plus the odd hidden surprise. Each one also has a larger, pricier **Large** version with its own twist.
+
+- 🌿 **Forest.** The one you start with. Grass, flowers, and trees that match wherever it lands. (Large: a sprawling old-growth wood, the biggest of the green islands.)
+- ⛰️ **Rocky.** The mining island. Every ore turns up here, and height matters: throw it low for deepslate, diamond and redstone; around the middle for iron and copper; high for coal and iron, with the very highest capped in snow. Dig in and you might hit lava, and a contained lava lake gets likelier the lower you throw. It's a long shot up high, about one in five below Y 0. (Large Rocky is a tall mountain that carries emeralds.)
+- 🏜️ **Desert.** Sand and sandstone, cacti and dead bushes, with clay and buried fossils underneath. Throw it over a badlands and you get red dunes instead. (Large: an oasis.)
+- 🍄 **Mushroom.** Mycelium under giant red and brown mushrooms. Nothing hostile spawns on it, so it's a safe place to build. (Large: a giant fungal isle with mooshrooms grazing it.)
+- ❄️ **Frozen.** Snow, ice, packed ice, the occasional blue ice, and a few powder-snow pockets to step carefully around. (Large: a frozen lake.)
+- 🌸 **Meadow.** Flowers, basically. Every dye flower, tall sunflowers, cherry blossom, and bee nests tucked among them. (Large: a wide wildflower field of sunflowers, tulip rows and cherry blossom.)
+- 🪨 **Badlands.** A mesa in the sky, its cliffs banded in orange, yellow, white, red and brown terracotta, with plenty of gold. (Large: a towering mesa.)
+- 🏛️ **Ancient.** A chunk of the deep underground floating out in the open: deepslate and tuff, amethyst geodes, dripstone, and a rare deep-dark version covered in sculk. Roughly one in five hides a contained lava lake, with the odd lava pocket sitting in the stone. (Large: a deeper shard veined with budding amethyst.)
+- 🌿 **Lush.** A cave garden, in the sky. Moss, azalea trees, dripleaves, and glow-berry vines hanging off the underside. (Large: a deep pool with glow squid.)
+- 🌊 **Aquatic.** Half land, half lake: kelp and lily pads, warm-water coral, mangroves, and clay-and-gravel banks. Throw it below Y 0 and it comes up bare stone and deepslate, with a lava lake where the water would have been. (Large: a proper deep lake.)
+
+Each Large variant is its own separate seed, so the ten terrain types are really twenty islands to grow before you even reach the villages, farms and structures below.
 
 ---
 
 ## Grow a village
 
-Build the trading economy a seed at a time — each tier assembled by the same jigsaw machinery vanilla villages use, so no two look alike:
+Build up a trading town one seed at a time. Each tier is assembled with the same jigsaw system vanilla villages use, so they all come out a little different.
 
-- 🏡 **Hamlet** — a single cottage and a villager to get you started.
-- 🏪 **Trade Post** — a lantern-lit plaza ringed by shops; each villager settles into its own trade.
-- ⛪ **Village Center** — a bell-topped plaza with four trading halls, a villager of **all 13 professions**, and an iron golem on guard. (Raids are disabled on Skyseed worlds, so your villagers are safe.)
+- 🏡 **Hamlet.** One cottage and a villager to get you going.
+- 🏪 **Trade Post.** A lantern-lit plaza ringed with shops, each villager taking up its own trade.
+- ⛪ **Village Center.** A bell-topped plaza with four trading halls, a villager for all 13 professions, and an iron golem standing guard. (Raids are off on Skyseed worlds, so your villagers stay safe.)
 
 ---
 
 ## Start an animal farm
 
-Dedicated farm islands, each a fenced enclosure with a guaranteed pack of animals inside:
+Each of these grows a fenced enclosure with a pack of animals already inside.
 
-- 🌾 **Pasture** — a breeding pair of cows, sheep or pigs.
-- 🐔 **Poultry** — a walled coop of chickens.
-- 🐑 **Wool Farm** — a flock of sheep in assorted colours.
-- 🐴 **Stable** — horses and donkeys, plus a chest that might hold a saddle.
-- 🐠 **Aquarium** — a glass tank of turtles, axolotls, fish and a squid.
+- 🌾 **Pasture.** A breeding pair of cows, sheep or pigs.
+- 🐔 **Poultry.** A walled coop of chickens.
+- 🐑 **Wool Farm.** A flock of sheep in mixed colours.
+- 🐴 **Stable.** Horses and donkeys, and a chest that might have a saddle.
+- 🐠 **Aquarium.** A glass tank of turtles, axolotls, fish and a squid.
 
 ---
 
 ## Raid a structure
 
-Loot-and-encounter islands lifted from the overworld's dungeons and ruins:
+Loot-and-encounter islands pulled from the overworld's dungeons and ruins.
 
-- ⚔️ **Dungeon** — a mossy cobblestone room with a mob spawner and two loot chests (the music discs *Cat* and *13* among them), sunk underground at the foot of a ruined stairwell, its island scattered with broken stonework.
-- 🪨 **Ruined Portal** — a broken Nether-portal frame and a chest of golden spoils — your only source of crying obsidian up here, with a little lava pooled at the foot of the frame.
-- 🏺 **Desert Temple** — a sealed chamber, four treasure chests, and a buried cache of TNT.
-- 🌿 **Jungle Temple** — a tiered, vine-draped ziggurat of cobblestone and moss, hiding a trapped chamber with two chests and a tripwire-rigged arrow dispenser.
-- 🧙 **Witch Hut** — a swamp hut with a witch and a cat for the taking.
-- 🗼 **Pillager Outpost** — a wide cobblestone-and-dark-oak watchtower ringed by a camp (tents, an archery target, a campfire, a banner). Walk in past the caged iron golem, fight up the ladder to the enclosed pillager room and its loot chest, then free the golem to turn it loose on the pillagers.
-- 🗝️ **Trial Chamber** — the big one: a copper-and-tuff trial chamber sunk deep into a larger rocky island, found only by a single ladder shaft. Drop into a lantern-lit complex — a **breeze** boss at its heart, with spawner-and-vault rooms branching off (a different layout every time); clear the spawners for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the whole place ominous and earn a shot at the **heavy core** for a **mace**.
-- 🏰 **Woodland Mansion** — a two-storey dark-oak manor on a big grassy island: a red-carpet hall, loot rooms, a library, a gabled roof, and a sprawl of side wings (a storeroom, a library, a secret checkerboard room) that comes up differently every time. An **evoker** and a pack of **vindicators** hold it — kill the evoker for a **Totem of Undying**, then throw another seed whenever you want more. A reliable totem farm and the headline overworld build.
+- ⚔️ **Dungeon.** A mossy cobblestone room with a spawner and two chests (the *Cat* and *13* discs turn up among the loot), sunk underground at the foot of a ruined stairwell, with broken stonework scattered over the island.
+- 🪨 **Ruined Portal.** A broken Nether-portal frame and a chest of gold, your only source of crying obsidian up here, with a bit of lava pooled at its base.
+- 🏺 **Desert Temple.** A sealed chamber, four treasure chests, and a cache of TNT buried beneath it.
+- 🌿 **Jungle Temple.** A tiered, vine-covered ziggurat of cobblestone and moss, with a trapped room inside holding two chests and a tripwire-rigged arrow dispenser.
+- 🧙 **Witch Hut.** A swamp hut with a witch and a cat to deal with.
+- 🗼 **Pillager Outpost.** A wide cobblestone-and-dark-oak watchtower in a camp of tents, an archery target, a campfire and a banner. Get past the caged iron golem, fight your way up the ladder to the pillager room and its loot chest at the top, then free the golem and let it loose on the camp.
+- 🔱 **Ocean Monument.** A prismarine temple on a sand island, best thrown over a deep ocean. Guardians patrol its flooded halls and an elder guardian sits at the core, so come ready for the mining-fatigue glare. Mine it out for all the prismarine, clear a wet-sponge room, and dig up a buried Heart of the Sea for a conduit. The guardian shards are also what finally unlock the Aquarium.
+- 🗝️ **Trial Chamber.** The big one. A copper-and-tuff chamber sunk deep into a larger rocky island, reached by a single ladder shaft. Drop in and you find a lantern-lit complex with a **breeze** at its heart and spawner-and-vault rooms branching off, laid out differently every time. Clear the spawners for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the place ominous and get a shot at the **heavy core** for a **mace**.
+- 🏰 **Woodland Mansion.** A two-storey dark-oak manor on a big grassy island, with a red-carpet hall, loot rooms, a library, a gabled roof, and a run of side wings (a storeroom, another library, a hidden checkerboard room) that change each time. An **evoker** and a pack of **vindicators** hold it. Kill the evoker for a **Totem of Undying**, then grow another whenever you want more. It's a dependable totem source and the centrepiece of the overworld so far.
 
-And some surprises don't need their own seed — once in a while an ordinary island grows something extra:
-
-- 🏠 **Igloo** — rarely a Frozen island raises a sealed snow dome: dig in for a golden apple and a trapped zombie villager to cure.
-- 🏚️ **Abandoned cottage** — rarely a Hamlet comes up cobwebbed and bed-less, with a zombie villager for a tenant.
-- 🌊 **Ocean ruin** — rarely an Aquatic island's pool is instead a flooded stone-brick ruin, with suspicious sand to brush and a sunken chest.
-- 🏺 **Buried Desert Temple** — rarely a Large Desert hides a temple sunk beneath the dunes; a suspicious hole in the sand is the only clue, and dropping in springs its TNT trap.
-- 🌿 **Lost Jungle Temple** — rarely a Large Forest grown in a jungle raises a full jungle temple among the vines and jungle trees.
-- ⚔️ **Buried Dungeon** — rarely a Large Rocky or Large Ancient island hides a sealed dungeon just below the surface; there's no door, so the only way in is to dig down onto it — watch your step.
-- 🗼 **Hostile takeover** — rarely a Trade Post comes up as a pillager outpost instead of a village: a watchtower full of pillagers where your shops should be.
-- 🪨 **Ruined Portal** — any big island (bar the Aquatic one) has a slim chance of growing with a broken Nether portal and its chest sitting on the surface — a free shot at crying obsidian.
-- 🏺 **Trail Ruins** — a Large Ancient island, or a Forest grown in a taiga, can hide a buried mud-brick ruin; spot the fragments poking through, dig in, and brush the suspicious gravel for pottery sherds.
-- 🕯️ **Evoker Cell** — rarely a Forest grown in a dark oak wood holds a sealed dark-oak room with an evoker; break in and kill it for a **Totem of Undying**.
-- 🗝️ **Vault Cell** — rarely an Ancient island buries a tuff-and-copper room with two trial spawners and a vault; clear the spawners for trial keys and crack the vault open.
-- 🧙 **Swamp Witch Hut** — rarely a Large Forest in a swamp or dark-oak wood, or a Large Aquatic island in a swamp, comes up with a witch's hut (and the witch and her cat) instead.
+And not everything announces itself with a seed of its own. Throw enough islands and you'll start turning up things you never crafted: a Frozen island sealed up inside an igloo, a Hamlet gone cobwebbed and abandoned, a ruin buried just under the surface that you only find by digging onto it. There are a fair few more hidden away in the ordinary islands, and the rest you'll have to come across yourself.
 
 ---
 
-## A living, biome-aware world
+## The world reacts to where you throw
 
-Islands respond to **where** you throw them. A Forest seed over a savanna grows acacia; over a jungle, jungle trees; over an ocean, a little lake island. Throw a Desert over a badlands and it turns red. The sky is a full, varied biome map — your islands take after their surroundings.
+Islands take after the biome they land in. A Forest seed thrown over a savanna grows acacia; over a jungle, jungle trees; over an ocean, a small lake island. A Desert thrown over a badlands turns red. The sky underneath is a full biome map, so each island picks up the character of whatever it's grown above.
 
-And on the mining islands, **altitude matters**: throw them deep for the richest treasure, high for coal and iron — and the deeper you throw, the likelier you'll strike lava.
+On the mining islands, height does the job that depth does underground. Throw them low for the best ore, high for coal and iron, and the deeper you go the better your odds of hitting lava.
 
-Just about every block you'd dig up in a normal world has a home here — so whatever you're building, there's an island that grows it.
-
----
-
-## Your field guide
-
-Every world comes with the **Skyfarer's Almanac**, an in-game guidebook. It always shows you how to craft each seed — and once you've made one, it unlocks that island's field notes so you can learn its secrets as you go. (You can turn any single Skyseed back into the book at a crafting table, so you'll never lose your way.)
-
-Install **Patchouli** for the full illustrated edition; without it, the Almanac is a plain written book with the essentials.
+Pretty much every block you'd dig up in a normal world is available somewhere here, so whatever you're building, some island grows it.
 
 ---
 
-## On the horizon
+## The guidebook
 
-Skyseed is actively developed, and there's plenty more sky to fill. On the roadmap:
+Every world starts you with the **Skyfarer's Almanac**. It lists how to craft each seed, and once you've made one it unlocks that island's field notes so you can read up on it as you go. If you misplace the book, craft any single Skyseed back into it at a table.
 
-- **More structures to raid** — more iconic builds lifted from across the game (the grand Trial Chamber and Woodland Mansion have landed; bigger, rarer "huge" islands are next).
-- **New dimensions** — the **Nether** and the **End** will be tackled in future versions, with their own Skyseeds, biomes, and structures, so you can grow a crimson forest or an End island the same way you grow the overworld today.
-- **More creatures, island types, and surprises** as the mod grows.
+With **Patchouli** installed you get the full illustrated version. Without it, the Almanac falls back to a plain written book that still covers the basics.
+
+---
+
+## What's next
+
+Skyseed is still in active development, with a fair bit of sky left to fill:
+
+- **More structures.** More recognisable builds from around the game. The Trial Chamber and Woodland Mansion are in; bigger, rarer "huge" islands come next.
+- **The Nether and the End.** Both are planned for later versions, each with their own seeds, biomes and structures, so you'll grow a crimson forest or an End island the same way you grow the overworld now.
+- **More creatures, island types and surprises** as it goes.
 
 ---
 
 ## Getting started
 
-- Chop your starting tree and dig the island for dirt and planks.
-- Craft your first **Forest Skyseed** and throw it into the open air to grow your second island.
-- Open the **Skyfarer's Almanac** for every recipe, and go build a sky.
+- Chop your first tree and dig the island for dirt and planks.
+- Craft a **Forest Skyseed** and throw it into the open air for your second island.
+- Open the **Skyfarer's Almanac** for the recipes, and go build a sky.
 
 ---
 
@@ -139,8 +127,8 @@ Skyseed is actively developed, and there's plenty more sky to fill. On the roadm
 
 - **Minecraft 1.21.1**
 - **NeoForge**
-- **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** — *optional*, for the illustrated guidebook (the mod plays fine without it).
+- **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** *(optional)*, for the illustrated guidebook. The mod runs fine without it.
 
 ---
 
-*Feedback and bug reports are very welcome! Add-on makers: every seed is a normal item in the `#skyseed:skyseeds` tag, and islands are pure datapack JSON, so new seeds are easy to bolt on.*
+*Bug reports and feedback welcome. For add-on makers: every seed is a normal item in the `#skyseed:skyseeds` tag, and the islands are plain datapack JSON, so adding new seeds is straightforward.*

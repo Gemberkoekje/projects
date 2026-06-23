@@ -2,7 +2,7 @@
 
 A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan (architecture, data model, decisions, status). For the island-by-island *content* roadmap — every planned island type, its blocks, variants, and recipes — see **[SKYISLANDSPLAN.md](SKYISLANDSPLAN.md)**.
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**; the next chapter (the Nether) is designed in `SKYNETHERPLAN.md`.
 
 ---
 
@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.27.0** — see [CHANGELOG.md](CHANGELOG.md). All planned engine milestones (0–9) are complete, plus several post-plan features. What exists today:
+**Version 0.34.9** — see [CHANGELOG.md](CHANGELOG.md). The overworld chapter is built end to end: every island type and its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, and the rare surprises. What exists today:
 
 | Area | Built |
 |---|---|
@@ -38,22 +38,35 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Throw modes | **Precise** (default — direct placement along the look vector) + Classic (charged physics arc); toggle keybind (default **V**), persisted in client config |
 | Mob sprinkles | `mobs` list (theme / override / variant): animals spawned directly when an island finishes generating |
 | Water mobs | `pond.water_mobs`: animals spawned submerged in the pool (squid, axolotls, fish, glow squid) |
-| Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager. **Trade Post** (`skyseed:trade_post`): a plaza ringed by shops, each villager takes up a trade. **Village Center** (`skyseed:village_center`): a bell plaza + four trading halls with **all 13 professions** + an iron golem. See `SKYVILLAGESPLAN.md`. Raids disabled on Skyseed worlds |
+| Villager islands | **Hamlet** (`skyseed:hamlet`): a cottage + an unemployed villager. **Trade Post** (`skyseed:trade_post`): a plaza ringed by shops, each villager takes up a trade. **Village Center** (`skyseed:village_center`): a bell plaza + four trading halls with **all 13 professions** + an iron golem. Raids disabled on Skyseed worlds |
 | Jigsaw buildings | A theme's `jigsaw` config assembles buildings from a vanilla `worldgen/template_pool` via `JigsawPlacement` — random rotation + structure-processor variation, exactly like vanilla villages. Single-piece (the Hamlet's three weathered cottages) or **multi-piece** (the Trade Post's plaza branches shops off jigsaw connectors). A villager spawns at every bed; drop in structure-block-authored `.nbt` to extend a pool |
-| Animal islands | **Pasture / Poultry / Wool Farm / Stable / Aquarium** — a fenced enclosure + a guaranteed pack of animals via the `animals` theme field (weighted packs, babies, random sheep colours, submerged aquarium life; the Stable carries a loot chest). See `SKYANIMALSPLAN.md` |
-| Structure islands | **Dungeon** (a 5×5 spawner room + two `simple_dungeon` chests, sunk underground with a stepped stairwell to a dark-oak door and ruins strewn across the island), **Ruined Portal** (broken frame + crying obsidian + `ruined_portal` chest), **Desert Temple** (4 `desert_pyramid` chests + buried TNT), **Jungle Temple** (a tiered cobble-and-moss ziggurat with corner columns and vines, over a trapped chamber of 2 `jungle_temple` chests + a tripwire dispenser), **Witch Hut** (witch + cat + cauldron), **Pillager Outpost** (a wide cobblestone-and-dark-oak watchtower with a camp — a semi-open arched base holds the `iron_golems`-spawned golem cage with room to walk past it, an enclosed middle room carries the pillager spawner + `pillager_outpost` chest so spawns can't fall off the island, an open watch platform sits under a pitched roof, and the apron has tents, a target, a campfire and a banner), **Trial Chamber** (the first *grand* structure — a copper-and-tuff complex sunk deep into a larger rocky island via the `sink` field, entered by one ladder shaft; a modular jigsaw hub holds the breeze boss spawner + a centre ominous vault for the heavy core/mace and draws up to four spawner/vault rooms from a pool, so the layout varies each throw), **Woodland Mansion** (the second grand structure — a two-storey dark-oak manor with a gabled roof on a larger grassy island; an evoker + vindicator garrison spawns in the hall via the theme's `animals` pack, so the guaranteed evoker makes it a reliable Totem-of-Undying source. A modular core start-piece draws up to three single-storey wings — storeroom/library/checkerboard room — from a pool, so the manor sprawls differently each throw, with up to six `woodland_mansion` chests). Built on the jigsaw system — loot chests, spawners, trial spawners, vaults and vanilla loot tables are block-entity NBT in the structure `.nbt`. See `SKYSTRUCTURESPLAN.md` and `SKYGRANDSTRUCTURESPLAN.md` |
+| Animal islands | **Pasture / Poultry / Wool Farm / Stable / Aquarium** — a fenced enclosure + a guaranteed pack of animals via the `animals` theme field (weighted packs, babies, random sheep colours, submerged aquarium life; the Stable carries a loot chest) |
+| Structure islands | **Dungeon** (a 5×5 spawner room + two `simple_dungeon` chests, sunk underground with a stepped stairwell to a dark-oak door and ruins strewn across the island), **Ruined Portal** (broken frame + crying obsidian + `ruined_portal` chest), **Desert Temple** (4 `desert_pyramid` chests + buried TNT), **Jungle Temple** (a tiered cobble-and-moss ziggurat with corner columns and vines, over a trapped chamber of 2 `jungle_temple` chests + a tripwire dispenser), **Witch Hut** (witch + cat + cauldron), **Pillager Outpost** (a wide cobblestone-and-dark-oak watchtower with a camp — a semi-open arched base holds the `iron_golems`-spawned golem cage with room to walk past it, an enclosed middle room carries the pillager spawner + `pillager_outpost` chest so spawns can't fall off the island, an open watch platform sits under a pitched roof, and the apron has tents, a target, a campfire and a banner), **Trial Chamber** (the first *grand* structure — a copper-and-tuff complex sunk deep into a larger rocky island via the `sink` field, entered by one ladder shaft; a modular jigsaw hub holds the breeze boss spawner + a centre ominous vault for the heavy core/mace and draws up to four spawner/vault rooms from a pool, so the layout varies each throw), **Woodland Mansion** (the second grand structure — a two-storey dark-oak manor with a gabled roof on a larger grassy island; an evoker + vindicator garrison spawns in the hall via the theme's `animals` pack, so the guaranteed evoker makes it a reliable Totem-of-Undying source. A modular core start-piece draws up to three single-storey wings — storeroom/library/checkerboard room — from a pool, so the manor sprawls differently each throw, with up to six `woodland_mansion` chests), and **Ocean Monument** (`skyseed:ocean_monument` — a prismarine temple on a deep-ocean sand island: guardians + an elder guardian via the `animals` pack, a wet-sponge room, sea lanterns, and a buried-treasure chest with a Heart of the Sea for a conduit; also a 5% `rare_structures` roll on Large Aquatic). Built on the jigsaw system — loot chests, spawners, trial spawners, vaults and vanilla loot tables are block-entity NBT in the structure `.nbt` |
 | Rare features | `rare_structures`: a chance-gated structure that germinates in place of the ordinary island. **Igloo** (5% on Frozen — a sealed snow dome with a trapped zombie villager to cure), **Abandoned cottage** (10% on Hamlet — a cobwebbed, bed-less ruin haunted by a zombie villager), **Ocean ruin** (8% on Aquatic — a flooded stone-brick basin with suspicious sand and a sunken chest, replacing the pond), **Desert Temple** (5% on Large Desert — sunk a block under the sand so only a suspicious hole gives it away, via the jigsaw `sink` field), **Jungle Temple** (5% on Large Forest grown in a `#minecraft:is_jungle` biome — a `biomes` filter on the rare structure gates the roll), **Witch Hut** (5% on Large Forest in a swamp/mangrove/`dark_forest` biome, or Large Aquatic in a swamp/mangrove — witch + cat included, pond suppressed for dry footing), **Dungeon** (5% on Large Rocky or Large Ancient — buried and sealed via the `sink` field, no stairs, so you only find it by digging onto it), **Pillager Outpost** (5% on a Trade Post — the watchtower replaces the village, villagers and all), **Ruined Portal** (1% on any big island except Aquatic — the broken frame + chest on the surface, the island keeps its own terrain), **Trail Ruins** (10% on Large Ancient, 5% on a Forest grown in a `#minecraft:is_taiga` biome — a buried mud-brick site with suspicious gravel to brush for pottery sherds, fragments poking up as the tell), **Evoker Cell** (5% on a Forest in a `dark_forest` biome — a sealed dark-oak room with an evoker for a bootstrap totem), **Vault Cell** (5% on Ancient — a buried tuff/copper room with two trial spawners + a vault, a self-contained mini trial-chamber and trial-key source). The surprise's own `mobs` pack spawns its inhabitants |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
-| Water | Contained ponds (a containment ring walls the rim up to the water before decoration), sand/clay/gravel beds and shores; off-rim static waterfall cascades; hand-built mangroves (`skyseed:mangrove`) |
+| Water | Contained ponds and rivers (a containment ring walls the rim up to the water before decoration), sand/clay/gravel beds and shores; off-rim waterfall cascades; hand-built mangroves (`skyseed:mangrove`); per-island **bank styles** (steep / sloped / mixed) that step a river's banks down toward the waterline; shore plants (sugar cane only where water sits beside its support) |
 | Surface | Per-column `surface_scatter` (block mixes); snow-capped peaks (taller shape + snow) |
+| Lava | A `lava` theme field: a low-chance lava vein in the core, Y-banded contained lava lakes (Rocky/Ancient — likelier the deeper you throw; Aquatic below Y 0 comes up a bare stone/deepslate isle around a lava lake), and a pool at the foot of a Ruined Portal |
 | World | Void world preset with multi-noise overworld biomes; structures disabled |
-| Start | Curated start island; safe spawn (valid biome, on island not in a tree); first-join guide book |
+| Start | Curated start island; safe spawn (valid biome, on island not in a tree); first-join guide book; honours the vanilla *Generate Bonus Chest* world option with a starter kit chest |
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); block-overlap fit + horizontal nudge-off (islands sit flush), player-aware, fizzle-and-drop |
 
-**All 10 island types in [SKYISLANDSPLAN.md](SKYISLANDSPLAN.md) are now built.** Remaining polish is small and mostly placement-shaped: water-edge sugar cane, side vines, sculk veins, Frozen ice spikes, and bees inside Meadow nests (needs entity spawning). Content beyond the island set lives in the sibling plans `SKYANIMALSPLAN.md` (mobs) and `THROWMODEPLAN.md` (throw modes). Nether/End skyblock dimensions are a long-term goal.
+**The overworld is essentially feature-complete** — all ten island types and their Large variants, the village / animal / structure islands, the two grand structures, and the rare surprises are built and shipped. What remains is the next chapter; see **Roadmap** below.
+
+---
+
+## Roadmap
+
+The overworld chapter is done; what's planned next:
+
+- **The Nether** — the next dimension, designed in detail in `SKYNETHERPLAN.md`. Overworld seeds adapt across the portal (Rocky → a netherrack mining island, Aquatic → a lava lagoon, Desert → a soul-sand valley, …), alongside new Fortress, Bastion and Piglin Trading Post structures.
+- **The End** — after the Nether.
+- **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
+- **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
+- **Remaining vanilla blocks** — a short list (a copper bulb, a few Nether-gated blocks), tracked in `MISSINGBLOCKSPLAN.md`.
 
 ---
 
@@ -62,7 +75,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 **One item per theme, `skyseed:<theme>_skyseed`** (e.g. `skyseed:forest_skyseed`). Each is an `IslandSeedItem` instance carrying a fixed `theme()` id; all are registered from `ModItems.SEED_THEMES` and named in the `lang` file ("Forest Skyseed"). Distinct items mean each shows up individually in JEI/REI, and add-on mods can register their own seed item (pointed at their own theme) and add it to the `#skyseed:skyseeds` item tag. Every seed's icon is its own client model under `models/item/<theme>_skyseed.json`.
 
 - **The `#skyseed:skyseeds` tag** holds every seed item — the guide recipe (any one skyseed → the Almanac) keys off it, and it's the integration point for add-on seeds.
-- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config — see `THROWMODEPLAN.md`): **Precise** (the default) places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there; **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands. On release the client sends a packet; the server reads the held seed's `theme()`, then validates and spawns the entity. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
+- **Throwing.** Hold right-click to wind up, release to throw. Two modes, toggled by a keybind (default **V**, persisted in client config): **Precise** (the default) places the island directly along the look vector at a charge-scaled distance (5–40 blocks) and germinates exactly there; **Classic** lobs a charged physics arc (a tap lands close, a full ~1.25 s charge flies far) and germinates where it lands. On release the client sends a packet; the server reads the held seed's `theme()`, then validates and spawns the entity. Throw height/distance are how the player *chooses* an island's germination Y (and thus, on Rocky, its ore band).
 
 A new Skyseed is one recipe JSON + one theme JSON + a one-line entry in `ModItems.SEED_THEMES` (plus an icon/model and a lang name). The theme content itself stays fully data-driven.
 
@@ -181,22 +194,20 @@ The plan's former open questions, settled by the build:
 - **Bridging.** v1 is **free-floating only**; the overlap nudge keeps islands from merging. Growing onto existing islands is deferred.
 - **Theme codec.** Finalized and extended well past the original sketch (`biome_overrides`, `min_y`/`max_y`, `surface_scatter`, `pond`, `waterfalls`, `shape.top_dome`).
 - **RNG seeding.** `worldSeed ^ center` only; the planned `throwCount` term was dropped as redundant — overlap safety already guarantees distinct centers.
-- **Structure templates / jigsaw.** Remain deferred; pure procedural generation is sufficient.
+- **Structure templates / jigsaw.** Adopted after all: villages, animal pens, the structure islands and both grand structures assemble from code-authored `.nbt` via vanilla `JigsawPlacement`. (The original "pure procedural is enough" call was reversed once structures landed.)
 
 **Still open:** multiplayer client-sync hasn't been explicitly verified (generation is server-side and placed with client-updating block flags, so it *should* be fine).
 
 ---
 
-## Modpack roadmap
+## Modpack
 
-Loader is **NeoForge** because the intended pack is content-heavy (most non-Create tech mods worth a pack's identity live there, several NeoForge-exclusive). The Skyseed mechanic is the pack's signature, so it doesn't need Create.
+Two CurseForge packs are planned, both on NeoForge 1.21.1:
 
-- **Tech:** Immersive Engineering, Mekanism, Applied Energistics 2, Powah.
-- **Quests:** FTB Quests + Library/Teams — each island theme is a natural quest gate (model the actual branching DAG, not a single column).
-- **Beauty:** Supplementaries, Macaw's suite, Immersive Furniture, Chipped/Rechiseled.
-- **Performance:** Sodium + modern stack.
+- **Vanilla-like** — Skyseed plus a curated quality-of-life set, **no content mods** (nothing beyond vanilla blocks). Scaffolded in `modpack-vanilla/`.
+- **Full** (later) — layers in content mods (Quark, the Delights, storage, tech, …), and each one is also wired into island generation as a new island tier, so its blocks have somewhere to grow.
 
-*(Mod-availability landscape last checked June 2026; re-verify 1.21 support before locking the pack.)*
+Skyseed itself only optionally integrates with Patchouli; nothing else is referenced, so it drops cleanly into either pack.
 
 ---
 
@@ -218,7 +229,7 @@ The first invocation downloads Gradle, NeoForge, and Minecraft, so it takes a wh
 `gametest/SkyseedGameTests.java` holds a NeoForge GameTest suite that asserts generation/structure
 invariants (every theme plans without error, generation is deterministic, structures keep their key
 blocks). Run it with `./gradlew runGameTestServer` — it's the safety net to run before and after the
-refactors tracked in `codereview.md`. For test **coverage**, run `./gradlew gameTestCoverage` (attaches the
+refactors in the codebase. For test **coverage**, run `./gradlew gameTestCoverage` (attaches the
 JaCoCo agent to the run) → `build/reports/jacoco/gameTestCoverage/html/index.html`.
 
 The build compiles with `-Xlint:all` (warnings stay visible in the log; the build is *not* `-Werror`).
