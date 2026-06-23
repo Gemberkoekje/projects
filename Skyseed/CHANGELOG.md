@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.55.0] - 2026-06-23
+
+### Added
+- **Nether Fortress Island — a new seed.** A piece of nether fortress set adrift, and built with a *form*, not a box:
+  an **arched nether-brick walkway** over a glowing **magma channel**, running straight out of a square **keep** with
+  a pitched roof, fence-grate windows and a caged **blaze spawner** — a renewable blaze-rod source with no fortress to
+  hunt for — ending in a **nether-wart garden** and a bridge-loot chest. Wither skeletons patrol it; blazes and magma
+  cubes drift past. Nether-native (fizzles in the overworld). Crafted from nether bricks, nether brick fence and a
+  nether wart block. New item, recipe, craft advancement, guide entry and a nether-brick-tinted icon. Guarded by the
+  `netherFortressIsNetherNativeWithFortressJigsaw` gametest.
+
 ## [0.54.1] - 2026-06-23
 
 ### Added

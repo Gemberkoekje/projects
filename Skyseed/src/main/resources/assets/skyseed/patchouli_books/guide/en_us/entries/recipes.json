@@ -135,6 +135,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_fortress_skyseed",
+      "text": "The $(item)Nether Fortress Skyseed$() — nether bricks, nether brick fence and a nether wart block. A bridge-and-keep fortress fragment with a caged $(bold)blaze spawner$()."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

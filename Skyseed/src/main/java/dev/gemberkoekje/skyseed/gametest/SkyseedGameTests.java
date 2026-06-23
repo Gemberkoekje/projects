@@ -670,6 +670,35 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
+        // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
+        // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation
+        // job, so the plan carries it as a jigsaw site.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nf = theme(overworld, "nether_fortress");
+        helper.assertTrue(nf.baseValidIn(Level.NETHER.location()), "nether_fortress must implement the_nether");
+        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location()), "nether_fortress must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(nf, wastes, 64, Level.NETHER.location()),
+                "nether_fortress should grow in the Nether");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nf, wastes,
+                RandomSource.create(131L));
+        boolean netherrack = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+        }
+        helper.assertTrue(netherrack, "the nether fortress island should be a netherrack island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/fortress")),
+                "the nether fortress island should assemble the fortress jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

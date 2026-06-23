@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "FNF",
+    "NWN",
+    "FNF"
+  ],
+  "key": {
+    "F": {
+      "item": "minecraft:nether_brick_fence"
+    },
+    "N": {
+      "item": "minecraft:nether_bricks"
+    },
+    "W": {
+      "item": "minecraft:nether_wart_block"
+    }
+  },
+  "result": {
+    "id": "skyseed:nether_fortress_skyseed"
+  }
+}

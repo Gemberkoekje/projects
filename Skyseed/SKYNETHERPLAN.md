@@ -338,10 +338,14 @@ These have no overworld-craftable parallel, so they're genuinely new seeds — b
 mob-pack machinery (as the overworld structure islands are).
 
 ### 🏰 Nether Fortress Island
-- **Recipe:** Nether Brick **only** (smeltable from netherrack). *This deliberately drops the old Blaze-Rod
-  requirement, which was circular — you needed a Fortress to get the Blaze Rod that the Fortress seed required.*
-- **Structure:** a jigsaw Fortress section — corridors, a **blaze spawner room**, a nether-wart garden, a chest room.
-- **Spawns:** Blaze (permanent spawner), Wither Skeleton (corridors), Magma Cube.
+> **BUILT (v0.55.0), the first Nether STRUCTURE seed.** `nether_fortress` (`dimensions: [the_nether]`): a netherrack
+> island carrying a hand-built (not jigsaw-subpieced) fortress fragment — `NetherFortressTemplates.fortress()`. **Form
+> first, no box:** an arcaded nether-brick **bridge** (pillars every 4 + stair arch springers) over a **magma
+> channel**, running out of a 5×5 **keep** with a `gableRoof` pitched roof, fence-grate windows, a doorway and a caged
+> **blaze spawner** (`StructureParts.mobSpawner("minecraft:blaze")`), ending in a nether-wart garden + a
+> `chests/nether_bridge` chest. Recipe = nether_bricks + nether_brick_fence + nether_wart_block. Wither skeleton /
+> blaze / magma cube theme mobs. **Standalone blaze-spawner ROOM (a 5% rare roll on the future LARGE nether seeds +
+> a debug seed) is DEFERRED until those large nether seeds exist** (user's call).
 - **Loot:** `minecraft:chests/nether_bridge`. **Why it matters:** Blaze Rods -> brewing + Eyes of Ender (the End
   gate); nether wart -> all potions; wither skeleton skulls -> the Wither.
 

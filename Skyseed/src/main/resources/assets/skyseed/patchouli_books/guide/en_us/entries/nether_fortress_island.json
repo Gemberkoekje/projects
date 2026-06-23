@@ -1,0 +1,20 @@
+{
+  "name": "Nether Fortress Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:nether_bricks",
+  "advancement": "skyseed:craft_nether_fortress",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A piece of $(item)Nether Fortress$() torn loose and set adrift: an arched nether-brick walkway over a glowing magma channel, running out of a square keep with a pitched roof and fence-grate windows. $(item)Wither Skeletons$() patrol it; a $(item)Blaze$() or two drift past."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The keep$()$(br)Inside, behind the windows, a caged $(item)blaze spawner$() — your renewable source of $(item)blaze rods$() for brewing and beacons, with no fortress to hunt for. Soul-sand braziers grow $(item)nether wart$() in the corners."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Yields$()$(br)Wither skeletons (coal, bones, and the rare $(item)skull$() for the Wither), blaze rods, nether wart for brewing, and a $(item)bridge chest$() at the far end. Crafted from nether bricks, nether brick fence and a nether wart block."
+    }
+  ]
+}
