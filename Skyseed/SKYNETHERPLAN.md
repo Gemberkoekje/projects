@@ -91,8 +91,14 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 
 | Tier | What you throw | What you get | Gate |
 |---|---|---|---|
-| **1 — adapt (free)** | the overworld seed (e.g. Rocky) | the *basic* Nether island for that biome | just reaching + surviving the Nether |
-| **2 — upgrade (craft)** | a **Nether seed** crafted from the overworld seed + a signature Nether block | the *enhanced* island: richer ore, guaranteed mob packs, the biome's rare block | Nether materials (the crafting sink) |
+| **1 — adapt (free)** | the overworld seed (e.g. Rocky) | a **tiny** Nether island (~7×7×4) — a foothold and some resources, not a base | just reaching + surviving the Nether |
+| **2 — upgrade (craft)** | a **Nether seed** crafted from the overworld seed + a signature Nether block | the **full-size**, *enhanced* island: richer ore, guaranteed mob packs, the biome's rare block | Nether materials (the crafting sink) |
+
+> **★ Design decision (v0.39.0): Tier-1 adapted islands are deliberately TINY (~7×7×4).** Reusing an overworld seed
+> in the Nether gives you a *foothold* — enough netherrack / soul sand and a little ore to bootstrap — but it is
+> small on purpose. The substantial Nether islands come from the Tier-2 **Nether-specific seeds**: full-size and far
+> richer. Reuse is a convenience, not a shortcut; the incentive is firmly to craft the Nether seeds. *(A deliberate
+> deviation from the earlier "Tier-1 = the basic island" framing — putting the weight on Nether seeds is more fun.)*
 
 So the old dedicated seeds come back as Tier-2 upgrades, not a parallel system:
 
@@ -158,9 +164,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ## Adapted islands (detail)
 
 ### 🪨 Rocky → Nether mining *(Nether Wastes)*
-> **Built (v0.36.0).** Tier-1 Rocky: a netherrack body + blackstone core, Nether Quartz + Nether Gold, and Ancient
-> Debris that ramps up low (a `max_y: 50` band), with zombified piglin / magma cube / piglin sprinkles. Still to come:
-> Tier-2 *Nether Rocky*, and the biome-specific surface patches below (crimson/warped/soul/basalt).
+> **Built (v0.36.0; tiny since v0.39.0).** Tier-1 Rocky: a **tiny ~7×7×4** netherrack island with a blackstone core,
+> a little Nether Quartz + Nether Gold, and Ancient Debris that ramps up low (a `max_y: 50` band), with zombified
+> piglin / magma cube / piglin sprinkles. Still to come: Tier-2 *Nether Rocky* (the full-size, debris-rich version),
+> and the biome-specific surface patches below (crimson/warped/soul/basalt).
 
 - **Palette:** netherrack surface/fill, basalt/blackstone core.
 - **Biome overrides:** crimson -> crimson nylium patches; warped -> warped patches; soul -> soul sand patches + blue
@@ -193,9 +200,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   *(No Tier-2 — Mushroom has no signature-block upgrade; its only "more" is the bigger Tier-1 island.)*
 
 ### 💀 Desert → Soul Sand Valley
-> **Built (v0.38.0).** Soul sand surface over soul soil + a basalt core, soul-fire ground scatter (eternal on soul
-> sand), bone-block fossils buried in the basalt (a beefed-up `bone_block` ore), a little nether quartz/gold, and
-> skeleton + enderman sprinkles. Still to come: a standalone bone fossil + basalt columns, and Tier-2 *Soul*.
+> **Built (v0.38.0; tiny since v0.39.0).** A **tiny ~7×7×4** soul-sand island over soul soil + a basalt core,
+> soul-fire ground scatter (eternal on soul sand), bone-block fossils buried in the basalt (a `bone_block` ore), a
+> little nether quartz/gold, and skeleton + enderman sprinkles. Still to come: a standalone bone fossil + basalt
+> columns, and Tier-2 *Soul* (the full-size version).
 
 - **Palette:** soul sand surface, soul soil fill, basalt core.
 - **Decoration:** blue **soul fire** (ambient, hurts the player), basalt columns at the rim, one **bone-block

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.39.0] - 2026-06-23
+
+### Changed
+- **Nether islands grown from overworld seeds are now deliberately tiny (~7×7×4).** A reused overworld seed in the
+  Nether gives you a *foothold* — some netherrack / soul sand and a little ore to bootstrap — but it's small on
+  purpose. The substantial, richer Nether islands are meant to come from the (upcoming) **Nether-specific seeds**, so
+  reusing an overworld seed is a convenience, not a shortcut. Rocky and Desert (the two adapted so far) are shrunk
+  accordingly, with their ore scaled down to match the smaller volume. A deliberate shift of weight onto the Nether
+  seeds — it should make crafting them the main event. (See `SKYNETHERPLAN.md`.)
+
 ## [0.38.1] - 2026-06-23
 
 ### Fixed

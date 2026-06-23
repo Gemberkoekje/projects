@@ -12,13 +12,14 @@
   ],
   "variants": [],
   "biome_overrides": [
-    { "_comment": "Nether adaptation (Tier 1) — abyss/low band near the lava sea: Ancient Debris emerges. Listed first so it wins in the Nether.",
+    { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 island on purpose (reused overworld seed; the incentive is to craft Nether-specific seeds). Abyss/low band near the lava sea: Ancient Debris emerges. Listed first so it wins in the Nether.",
       "dimension": "minecraft:the_nether", "max_y": 50,
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
       "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone",
       "ores": [
-        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
-        { "block": "minecraft:nether_gold_ore", "chance": 0.85, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
-        { "block": "minecraft:ancient_debris", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.85, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:ancient_debris", "chance": 0.50, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
       ],
       "mobs": [
         { "entity": "minecraft:zombified_piglin", "chance": 0.30, "count": { "min": 1, "max": 2 } },
@@ -26,12 +27,13 @@
         { "entity": "minecraft:piglin", "chance": 0.15, "count": { "min": 1, "max": 1 } }
       ] },
 
-    { "_comment": "Nether adaptation (Tier 1) — baseline mining island (any Nether biome, above the low band): quartz + gold, the odd debris.",
+    { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 baseline mining island (any Nether biome, above the low band): a little quartz + gold, the odd debris.",
       "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
       "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone",
       "ores": [
-        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
-        { "block": "minecraft:nether_gold_ore", "chance": 0.70, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.70, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" },
         { "block": "minecraft:ancient_debris", "chance": 0.12, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 1 }, "depth": "deep_core" }
       ],
       "mobs": [
