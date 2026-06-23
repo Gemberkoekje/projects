@@ -46,7 +46,7 @@ authors="Gemberkoekje"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-A terraforming skyblock. Craft and throw a Skyseed to germinate a new, procedurally generated themed sky island.
+A terraforming skyblock — craft and throw a Skyseed and a procedurally generated themed sky island grows where it lands. Terrain, villages, farms, loot structures, and their Nether forms are all seed-grown.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.

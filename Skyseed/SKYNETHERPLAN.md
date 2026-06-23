@@ -1,472 +1,88 @@
 # Skyseed — Nether Chapter Plan
 
-This document covers the Nether dimension chapter of Skyseed. See `README.md` for general architecture and the
-built Overworld chapter, and `description.md` for the published mod description.
-
-> **Design pivot (this revision):** the Nether no longer has a separate "dedicated Nether seed" track that competed
-> with the overworld seeds. Instead there is **one rule** — every overworld terrain seed either *adapts* to the
-> Nether (same item, dimension + biome aware) or *fizzles* — plus a **Tier-2 upgrade** path where the old Nether
-> seeds (Nether Rocky, Crimson, Warped, Soul, Basalt) return as Nether-material crafts — joined by a new Lava seed —
-> that grow the *enhanced* version. This kills the earlier self-contradictions (the "works vs fizzle" table, Forest both reused and fizzled,
-> Y both gating and not gating value) and lets far more overworld seeds carry into the Nether.
+The Nether is **built out end to end** as of v0.57.0 — every overworld seed adapts or fizzles, all five Nether
+biomes have a full-size native seed (+ a Large variant), and the first Nether structure (the Fortress + its blaze
+spawner room) is in. What's left: the remaining structures (Bastion, Trading Post, Wither Arena), then the handoff
+to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
-## World design
+## Shipped (one line each)
 
-### The void
+**The dimension**
+- Nether emptied to a **void + a lava sea below Y 32** + the 5 Nether biomes — new worlds only (v0.35.0); the End
+  pre-voided too with its biome source kept (v0.35.1); legacy-world login warning + `/emptynether` `/emptyend`
+  in-place rescue commands (v0.35.2–0.35.3).
+- **Adapt-or-fizzle:** a theme declares its `dimensions`; thrown into a dimension it doesn't implement it fizzles
+  rather than grow the wrong base form (v0.37.0). A Nether/End `biome_override` never inherits overworld content
+  (v0.45.0).
 
-> **Built (v0.35.0).** `the_nether` in the `skyseed:skyblock` preset now uses the `skyseed:void_nether` noise settings: no terrain (`final_density` 0), a **lava sea** below Y 32 (`default_fluid` lava + `sea_level` 32), and the five Nether biomes via the `minecraft:nether` multi-noise source. Applies to newly created worlds. Seeds and the Nether structures are still to come; there's deliberately **no curated start platform** (see *Arrival* below).
+**Tier-1 — overworld seeds adapt (deliberately TINY ~7×7×4 footholds, v0.39.0)**
+- All 8 viable terrain seeds adapt: Rocky → mining (v0.36.0) · Desert → Soul Sand Valley (v0.38.0) · Badlands →
+  Basalt Deltas (v0.40.0) · Aquatic → Lava Lagoon (v0.41.0) · Mushroom (v0.43.0) · Forest → crimson/warped fungal
+  (v0.44.0) · Ancient → haunted deep · Lush → vine grotto (v0.46.0). Meadow + Frozen fizzle by design.
+- The 8 **Large** overworld variants also adapt — same form, ~1.5× the tiny size (v0.47.0).
 
-The Nether is **completely empty** except for what the player generates — no natural terrain, no bedrock floor.
-Below every island is a **lava sea** at a fixed low Y: it lights the dimension from beneath, gives the hellish
-ambience, and is a lethal hazard. Fall off an island and you're dead, no recovery.
+**Tier-2 — full-size Nether-native seeds (the payoff; radius 6-9)**
+- `nether_rocky` (v0.48.0) · `nether_lava` (v0.50.0 — also grows a full-size lava island in the overworld) ·
+  `nether_forest` (v0.51.0, crimson/warped) · `nether_soul` (v0.52.0) · `nether_basalt` (v0.53.0). Each has a tiny
+  overworld easter-egg island. Recipes are 2×2 = the matching overworld seed + 2 nether blocks + 1 signature (v0.52.1).
+- **Large Nether seeds** — a Large variant of each (radius 11-17), recipe 3×3 with the matching Large overworld seed
+  in the centre (v0.56.0); a 5% **blaze spawner room** rolls on them + a `debug_blaze_spawner` debug seed (v0.57.0).
 
-The biome map still generates normally with the full multi-noise Nether biomes, distributed as in a natural Nether.
-Seeds respond to the biome at their germination point exactly as overworld seeds respond to overworld biomes. This
-is the core loop: **you get the right Nether island by throwing the right seed into the right part of the sky**,
-which means exploring the void to find biomes first. Xaero's biome overlay earns its keep here.
-
-### Arrival — no curated start
-
-**Decision: there is no curated Nether start.** When the player first steps through a portal, the game's own portal
-placement drops them onto the little obsidian platform it builds in the void over the lava sea — a small spot to
-stand on, and that's all they need. From there they do what they do everywhere in Skyseed: start throwing seeds (the
-first Nether seed *is* the first real platform). Keeping arrival uncurated is simpler and skyblock-pure.
-
-The early Nether is genuinely lethal — one stumble into the lava sea is fatal — but that's the player's problem to
-solve with the gear and potions they carry **through** the portal, not something handed to them on arrival.
-
-### No ceiling — and how value is gated
-
-There's no Y=128 ceiling; islands float at any Y under the open Nether fog. Value is gated on **two axes**:
-
-- **Biome -> island *type*.** Which of the five biomes you throw into decides the island's character (mining,
-  fungal, soul, basalt, lava).
-- **Lava proximity (low Y) -> ore *richness*.** Islands grown low, near the lava sea, are hotter, more dangerous,
-  and carry the Ancient Debris that vanilla puts at low Y; high islands are safe but lean. This deliberately
-  **rewards risky low throws** — that risk/reward tension is the point, and it maps directly onto vanilla
-  (debris peaks ~Y15). *(Earlier drafts claimed altitude doesn't gate value — it does, via lava proximity. Resolved.)*
-
-### Ruined Portal twins — linked across dimensions
-> **BUILT (v0.54.0).** Thrown in the Nether the Ruined Portal grows a small netherrack island with the no-goodies
-> frame (a `the_nether` biome_override + the `skyseed:ruined_portal/portal_nether` dimension-variant pool, picked
-> automatically by `IslandGenerator.dimensionVariant`). A `twin: true` flag on the theme makes germination grow a
-> matching island at the 8:1 linked coordinate in the other dimension (`IslandSeedEntity.spawnTwin` / `linkedPortalPos`),
-> placed with small steps only so it stays in vanilla's portal-linking range. The twin is spawned directly (not a
-> thrown seed) so it never recurses. Overworld = goodies, Nether = bare frame. **Both triggers covered (v0.54.1):**
-> the `twin` flag names the theme to pair and sits on BOTH `IslandTheme` and `RareStructure` (routed through
-> `IslandPlan.twinTheme`), so the dedicated seed AND the 1% `rare_structures` ruined-portal roll on any big island
-> each grow their linked twin.
-
-A cross-dimension detail, and the one structure we can **pre-place** (because *we* choose where the ruined portal
-goes, unlike the player-placed arrival portal). **Whenever a ruined portal is created on either side** — the
-dedicated Ruined Portal seed *or* the random `rare_structures` roll on a big island — a matching ruined portal is
-generated on the **other** side at the **vanilla-linked coordinate** (the standard 8:1 map: `nether = overworld / 8`,
-`overworld = nether * 8`).
-
-- **The twin is a small, dimension-appropriate island:** a little **dirt** island in the Overworld, a little
-  **netherrack** island in the Nether, each carrying its own ruined frame.
-- **Placement stays close on purpose.** It runs the normal germination free-space check (is every block clear? if
-  not, step to the nearest free spot) — but the step must be *small*: a Nether portal too far from the linked
-  coordinate **won't link**. So unlike a normal seed (which can be shoved any distance to fit), the twin prefers the
-  exact linked spot and moves only the shortest distance that frees it.
-- **The payoff is free.** Sitting at the linked coordinate, if the player repairs and lights *both* frames, vanilla's
-  own portal search connects them into a real working pair — no linking code needed. (This is why the frame was
-  fixed to a real, repairable 4×5 shape in v0.35.6.)
-- **No recursion:** a twin doesn't spawn a twin of its own.
+**Structures & cross-dimension**
+- **Nether Fortress Island** (`nether_fortress`, v0.55.0): a hand-built arcaded nether-brick bridge running out of a
+  keep with a caged blaze spawner. The standalone blaze-spawner room is the 5% roll on the Large Nether seeds (v0.57.0).
+- **Ruined Portal twins:** the ruined portal grows in both dimensions (overworld = goodies, Nether = bare frame) and
+  spawns a linked twin at the vanilla 8:1 coordinate so repaired+lit frames link for free — for the dedicated seed
+  *and* the rare-structure roll (v0.54.0–0.54.1).
 
 ---
 
-## The adaptation model
+## World design (reference)
 
-> **Built (v0.36.0 / v0.37.0).** The dimension key is implemented: a `biome_override` takes an optional `dimension`
-> (e.g. `minecraft:the_nether`), matched alongside biome + Y, so a seed's Nether form is a dimension-gated override —
-> no new item. A theme also declares its base `dimensions` (every current seed is explicitly `[minecraft:overworld]`).
-> **Adapt-or-fizzle is live (v0.37.0):** a seed thrown into a dimension it implements neither in `dimensions` nor via
-> a dimension-keyed override **fizzles** instead of growing the foreign base form — so a future Nether-only seed gets
-> the overworld fizzle for free. **Rocky** is the first adapted seed (overworld base + Nether overrides). **As of
-> v0.45.0 a dimension override never inherits Overworld content** — an unset field is neutral/empty (a
-> netherrack/end-stone body, no ores/decoration/mobs), not the overworld base, so a dimension form can't leak grass,
-> coal or terracotta across the portal. **All eight viable terrain seeds are now adapted (v0.46.0)** — Meadow + Frozen fizzle by design.
-> **Large variants adapt too (v0.47.0):** each Large terrain seed grows its normal seed's Nether form, just ~1.5× bigger
-> (shape radius 3–4 vs the normal 2–3). The whole point holds — yes you *can* throw a Large overworld seed in the Nether,
-> no it's still not the efficient way; Nether-specific seeds remain the path to real size + payoff.
-
-**One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
-
-- **Adapts** — the throw entity already checks dimension (the fizzle rule). An overworld seed thrown in the Nether
-  grows its Nether form, shaped by the biome it lands in, via the existing `biome_overrides` system extended with a
-  dimension key. No new item.
-- **Fizzles** — seeds with no Nether analogue puff out (a smoke burst, a hiss, the seed is consumed). A light
-  punishment; experimentation stays cheap. The Patchouli guide flags which seeds are dimension-specific.
-
-**Two tiers (the hybrid):**
-
-| Tier | What you throw | What you get | Gate |
-|---|---|---|---|
-| **1 — adapt (free)** | the overworld seed (e.g. Rocky) | a **tiny** Nether island (~7×7×4) — a foothold and some resources, not a base | just reaching + surviving the Nether |
-| **2 — upgrade (craft)** | a **Nether seed** crafted from the overworld seed + a signature Nether block | the **full-size**, *enhanced* island: richer ore, guaranteed mob packs, the biome's rare block | Nether materials (the crafting sink) |
-
-> **★ Design decision (v0.39.0): Tier-1 adapted islands are deliberately TINY (~7×7×4).** Reusing an overworld seed
-> in the Nether gives you a *foothold* — enough netherrack / soul sand and a little ore to bootstrap — but it is
-> small on purpose. The substantial Nether islands come from the Tier-2 **Nether-specific seeds**: full-size and far
-> richer. Reuse is a convenience, not a shortcut; the incentive is firmly to craft the Nether seeds. *(A deliberate
-> deviation from the earlier "Tier-1 = the basic island" framing — putting the weight on Nether seeds is more fun.)*
-
-So the old dedicated seeds come back as Tier-2 upgrades, not a parallel system:
-
-| Tier-2 seed | Recipe (sketch) | Adds over Tier 1 |
-|---|---|---|
-| **Nether Rocky** | Rocky seed + Blackstone | deeper, gilded blackstone, debris-rich core |
-| **Crimson** | Forest seed + Nether Wart Block | dense canopy, guaranteed Hoglin pack, wart floor |
-| **Warped** | Forest seed + Warped Wart Block | dense canopy, guaranteed Enderman population |
-| **Soul** | Desert seed + Bone Block | large fossil, soul fire field, more skeletons |
-| **Basalt** | Badlands seed + Gilded Blackstone | taller chaotic columns, gilded core |
-| **Lava** | Aquatic seed + Magma Block | bigger lava lagoon, guaranteed Strider pack |
-
-**Large vs Tier-2 — they never blur.** Overworld **Large** seeds adapt too, as *larger Tier-1* islands: bigger,
-same content. **Tier-2 Nether seeds are defined by exclusive *content*, not size** — gilded blackstone, ancient-debris
-nodes, guaranteed mob packs, the biome's signature rare block. So Large = bigger; Tier-2 = richer.
-
-### Large Nether seeds (the two axes combine)
-
-> **The 5 seeds BUILT (v0.56.0).** `nether_rocky_large` · `nether_lava_large` · `nether_forest_large` ·
-> `nether_soul_large` · `nether_basalt_large` — each the Tier-2 theme scaled up (radius 11-17 matching the parent
-> overworld Large; ore counts ~×3, premium ~×2), the `NSN/NRN/NSN` 3×3 recipe (Large overworld seed centre + 6 bulk
-> + 2 signature), and the easter eggs scaled to ~1.5× (lava grows full-size→Large topside).
-> **Blaze Spawner Room BUILT (v0.57.0):** a standalone 7×7 non-boxy nether-brick room (pitched `gableRoof`, fence
-> windows, doorway, caged blaze spawner, soul-sand/wart braziers, a `nether_bridge` chest) in
-> `NetherFortressTemplates.blazeRoom()` → `structure/nether_fortress/blaze_room.nbt`. A **5% `rare_structures` roll**
-> on all 5 Large Nether seeds, plus the creative-only `debug_blaze_spawner` seed (Skyseed Debug tab) that germinates
-> it on demand. **The whole Large-Nether chapter is now complete.**
-
-A **Large variant of each of the 5 Tier-2 Nether-native seeds**: Tier-2's richer content *at* Large's bigger size,
-each carrying a **5% Blaze Spawner Room** (the room deferred from the Nether Fortress task, finally homed here).
-
-- **The five:** `nether_rocky_large` · `nether_lava_large` · `nether_forest_large` · `nether_soul_large` ·
-  `nether_basalt_large`.
-- **Size:** mirror the *parent overworld Large* radius — rocky / soul / basalt **11-15**, lava **11-14**, forest
-  **13-17** (vs the Tier-2's 6-9). Same palette / biome content as the Tier-2 seed, ore counts scaled up the way the
-  overworld Large seeds scale theirs (≈ ×3 vein counts).
-- **Recipe — 3×3 with a Large overworld seed in the centre** (the rule): pattern `NSN / NRN / NSN` = 6 bulk block
-  **N** + 2 signature **S** around the Large overworld seed **R** — a scaled-up echo of the Tier-2 2×2's
-  bulk + signature + parent:
-
-  | Large Nether seed | centre **R** | bulk **N** ×6 | signature **S** ×2 |
-  |---|---|---|---|
-  | `nether_rocky_large` | `rocky_large_skyseed` | netherrack | nether quartz |
-  | `nether_lava_large` | `aquatic_large_skyseed` | basalt | lava bucket (returned) |
-  | `nether_forest_large` | `forest_large_skyseed` | crimson stem | shroomlight |
-  | `nether_soul_large` | `desert_large_skyseed` | soul sand | bone block |
-  | `nether_basalt_large` | `badlands_large_skyseed` | basalt | gilded blackstone |
-
-  (parent mapping = the Tier-2 mapping: desert→soul, aquatic→lava, forest→forest, rocky→rocky, badlands→basalt.)
-- **Blaze Spawner Room** — one structure, two new uses (+ it reuses the Fortress keep's design): a standalone
-  *non-boxy* nether-brick room — pitched `gableRoof`, fence-grate windows, a doorway, a **caged blaze spawner** on a
-  plinth, soul-sand/wart braziers, a small `chests/nether_bridge` chest. Used by **(1)** a 5% `rare_structures` roll
-  on each of the 5 Large Nether seeds, and **(2)** a `debug_blaze_spawner` creative-only debug seed (no recipe/tag/
-  guide, "Skyseed Debug" tab). Pool `skyseed:nether_fortress/blaze_room`.
-- **Overworld easter eggs:** ≈1.5× the Tier-2's tiny ones (mirroring the Large overworld→Nether adaptations) —
-  *except* `nether_lava_large`, which (like `nether_lava`) grows a *full-size — here Large* lava island topside,
-  since the overworld still has no lava island of its own.
-- **Build order:** the Blaze Spawner Room structure + the `debug_blaze_spawner` seed first (unblocks the 5% roll),
-  then the 5 Large seeds — each = the Tier-2 theme scaled up + the 5% blaze room + the 3×3 recipe + the standard
-  12-touch-point seed wiring.
+- **The void.** Like the overworld void, the Nether is empty + a lava sea below Y 32; you arrive via a portal onto
+  its obsidian platform and grow islands out from there. No curated start — bring your own gear; the early Nether is
+  lethal.
+- **No ceiling — value gated by lava proximity.** The Nether has no "depth," so *lava proximity* does the job height
+  does in the overworld: throw a mining seed low (near the lava sea) for the richest ore (Ancient Debris, gold),
+  high for the lean version. One ore model across the Nether seeds.
+- **Five biomes.** Nether Wastes, Crimson Forest, Warped Forest, Soul Sand Valley, Basalt Deltas — each has a native
+  Tier-2 seed; an adapted overworld seed takes its form from the biome it lands in.
 
 ---
 
-## Seed mapping
+## Still to build
 
-The ten overworld terrain seeds (and Ruined Portal), in the Nether:
-
-| Overworld seed | Nether (Tier 1, free) | Biome focus | Tier-2 upgrade |
-|---|---|---|---|
-| **Rocky** | netherrack **mining** island (quartz/gold/debris) | Nether Wastes | Nether Rocky |
-| **Forest** | dense **huge-fungi forest** (wood, canopy, mobs) | Crimson / Warped | Crimson / Warped |
-| **Mushroom** | the **mushroom island** (giant red/brown mushrooms, Mooshrooms — a safe larder) | any (a transplanted safe pocket) | — |
-| **Desert** | **Soul Sand Valley** (soul sand, bone fossils) | Soul Sand Valley | Soul |
-| **Badlands** | **Basalt Deltas** (banded basalt/blackstone) | Basalt Deltas | Basalt |
-| **Aquatic** | **Lava Lagoon** (contained lava pool, striders) | any (lava is everywhere) | Lava |
-| **Lush** | **vine grotto** (vines + shroomlight glow) | Crimson / Warped | — |
-| **Ancient** | **haunted deep** (blackstone, soul veins, fossils) | Soul Sand Valley / any | — |
-| **Frozen** | **fizzles** — no cold analogue | — | — |
-| **Meadow** | **fizzles** — flowers/grass have no Nether analogue | — | — |
-| **Ruined Portal** | **works** — Nether-scene version (blackstone surround) | any | — |
-
-That's eight of ten terrain seeds carrying into the Nether (vs two before), filling all five biomes plus the
-mushroom, lava-lagoon and grotto extras — which is what makes the dimension feel fuller without inventing biomes that
-don't exist.
-
-> **Forest vs Mushroom (resolved):** they're now clearly distinct. **Forest** stays *foresty* — the dense
-> huge-fungus **forest** (crimson/warped stems as "trees," canopy, vines, Hoglins/Endermen). **Mushroom** is the
-> dedicated **mushroom island** — giant red & brown mushrooms (which thrive in the Nether's dark) on mycelium, with
-> Mooshrooms: a calm safe haven and a rare *food* source. Nether fungi vs actual mushrooms — no overlap.
-
----
-
-## The five biomes (reference)
-
-What each biome *is* in vanilla, so the adaptations above have a grounding. **Structures don't generate naturally**
-in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-grown (below).
-
-| Biome | Character | Signature blocks | Native mobs |
-|---|---|---|---|
-| 🔥 **Nether Wastes** | open netherrack plains, lava pools | netherrack, quartz ore, gold ore, gravel | Zombified Piglin, Ghast, Piglin, Magma Cube |
-| 🌲 **Crimson Forest** | dense red fungal forest | crimson nylium/stem, weeping vines, shroomlight, wart block | Hoglin, Piglin, Zombified Piglin |
-| 🌀 **Warped Forest** | the "safe" teal fungal forest | warped nylium/stem, twisting vines, nether sprouts | Enderman (almost exclusively) |
-| 💀 **Soul Sand Valley** | haunting, lethal, foggy | soul sand/soil, blue soul fire, bone block fossils, basalt | Skeleton (high), Ghast, Enderman |
-| 🌋 **Basalt Deltas** | volcanic chaos | basalt, blackstone, magma block, gilded blackstone | Magma Cube (high), Ghast |
-
----
-
-## Adapted islands (detail)
-
-### 🪨 Rocky → Nether mining *(Nether Wastes)*
-> **Built (v0.36.0; tiny since v0.39.0).** Tier-1 Rocky: a **tiny ~7×7×4** netherrack island with a blackstone core,
-> a little Nether Quartz + Nether Gold, and Ancient Debris that ramps up low (a `max_y: 50` band), with zombified
-> piglin / magma cube / piglin sprinkles.
-> **Tier-2 *Nether Rocky* — BUILT (v0.48.0), the FIRST Tier-2 Nether-native seed.** Its own craftable `nether_rocky`
-> seed (`dimensions: [the_nether]`, so it fizzles in the overworld): a **full-size** mining island (radius 6-9, like
-> an overworld normal seed), netherrack body / blackstone core, generous quartz + gold, gilded blackstone + ancient
-> debris, a deep `max_y: 34` band that runs richest near the lava sea, glowstone/basalt/magma variants, lava veins +
-> lakes, and a fuller piglin/magma mob pack. Crafted from netherrack + blackstone + quartz (all Nether-mined). Still
-> to come: the biome-specific surface patches below (crimson/warped/soul/basalt).
-> **Easter egg (v0.49.0):** thrown in the *overworld* it does NOT fizzle — two `dimension: minecraft:overworld`
-> overrides make a deliberately TINY (~7×7×4) plain rocky island with sparse iron + gold, turning to **deepslate**
-> (`max_y: 8`) if thrown low. The mirror of the Tier-1 adaptations: "yeah, I figured that'd happen" — the real
-> full-size island is still Nether-only.
-
-- **Palette:** netherrack surface/fill, basalt/blackstone core.
-- **Biome overrides:** crimson -> crimson nylium patches; warped -> warped patches; soul -> soul sand patches + blue
-  fire; basalt -> basalt/blackstone + magma block patches.
-- **Ore (lava proximity — see below):** quartz + gold high; Ancient Debris emerges low.
-- **Mobs:** Zombified Piglin (30%), Magma Cube small (20%), Piglin (15%, triggers bartering if you wear gold).
-- **Tier 2 — Nether Rocky:** taller blackstone/basalt mountain, gilded blackstone surface, best debris odds. The
-  Nether's deep-mining island.
-
-### 🌲 Forest → huge-fungi forest *(Crimson / Warped)*
-> **Built (v0.44.0).** A tiny ~7×7×4 fungal patch: **crimson nylium** (crimson roots/fungi, Hoglin + Piglin) by
-> default, or **warped nylium** (warped roots, nether sprouts, twisting vines, Endermen) in a `warped_forest` biome;
-> shroomlight floor glow, weeping vines hanging underneath, a little nether quartz. *Small* fungal decoration only.
-> **Tier-2 *Crimson / Warped* — BUILT (v0.51.0), the third Tier-2 Nether-native seed.** Its own craftable
-> `nether_forest` seed: a full-size (radius 6-9) fungal forest with **huge fungi** (`crimson_fungus_planted` /
-> `warped_fungus_planted` configured features as "trees" — NOT `huge_*`, those don't exist for fungi). Crimson by
-> default (huge crimson fungi, crimson roots/fungus, wart blocks, Hoglin/Piglin pack); a `warped_forest` biome
-> override flips it to warped (huge warped fungi, nether sprouts, Endermen). Crafted from crimson + warped stems +
-> shroomlight + a nether wart block. **Overworld easter egg:** a TINY grass island (mirror of Nether Rocky's stone one).
-
-- Stays *foresty* — a dense fungal **forest**, not a grove. Tall huge crimson/warped fungus are the "trees."
-- **Palette:** crimson/warped nylium surface (by biome), netherrack fill.
-- **Decoration:** huge crimson/warped fungus (density ~0.2), weeping vines (crimson, hang off the underside),
-  twisting vines (warped, climb up), shroomlights in the canopy, roots/sprouts on the floor.
-- **Mobs:** crimson -> Hoglin (25%, the Nether's food animal) + Piglin; warped -> Enderman (40%), no Hoglin/Piglin.
-- **Yields:** crimson stem (wood), wart blocks, shroomlights; Hoglin meat/leather (crimson) or ender pearls (warped).
-- **Tier 2 — Crimson / Warped:** denser canopy, guaranteed mob pack, nether wart growing on the floor.
-
-### 🍄 Mushroom → mushroom island *(a transplanted safe haven)*
-> **Built (v0.43.0).** A tiny ~7×7×4 calm mycelium island over netherrack, mushroom-cap surface patches + small
-> red/brown mushrooms, grazed by mooshrooms (the Nether's food/leather). **Caveat:** the overworld "no hostile spawns"
-> is a property of the *mushroom_fields biome*, not the mycelium block, so it does **not** translate to the Nether —
-> the value here is the mooshrooms, not safety. Still to come: Large Mushroom (the bigger haven with giant mushrooms).
-
-- Mushrooms thrive in the Nether's permanent darkness, so a literal mushroom island belongs here — and it doubles as
-  the dimension's rare **safe pocket** and **food source** (Nether food is scarce). The actual-mushroom counterpart
-  to Forest's fungal trees.
-- **Palette:** mycelium surface, netherrack fill/core.
-- **Decoration:** giant **red & brown mushrooms** (density ~0.15), red/brown mushroom ground scatter, mushrooms on
-  the underside. No hostile decoration — it's the calm island.
-- **Mobs:** **Mooshroom** (the draw — milk, mushroom stew, beef + leather); nothing hostile spawns on it.
-- **Yields:** mushroom blocks (building), stew/food, brown mushroom (-> fermented spider eye -> weakness/harming).
-- **Biome behavior:** ignores the surrounding biome's hostility — the same calm island wherever thrown (a deliberate
-  oddity, like a mooshroom island floating in hell). **Large variant:** a bigger haven, a guaranteed Mooshroom herd.
-  *(No Tier-2 — Mushroom has no signature-block upgrade; its only "more" is the bigger Tier-1 island.)*
-
-### 💀 Desert → Soul Sand Valley
-> **Built (v0.38.0; tiny since v0.39.0).** A **tiny ~7×7×4** soul-sand island over soul soil + a basalt core,
-> soul-fire ground scatter (eternal on soul sand), bone-block fossils buried in the basalt (a `bone_block` ore), a
-> little nether quartz/gold, and skeleton + enderman sprinkles.
-> **Tier-2 *Soul* — BUILT (v0.52.0), the fourth Tier-2 Nether-native seed.** Its own craftable `nether_soul` seed: a
-> full-size (radius 6-9) soul-sand island over soul soil / basalt, near-guaranteed **bone-block fossils** (`bone_block`
-> ore at chance 0.95, bigger veins), soul-fire scatter, a guaranteed **Skeleton pack** + Endermen + the odd Ghast, a
-> little quartz/gold. Recipe = a ring of **soul sand** around a single **bone block** (the fossil core; soul sand is
-> Nether-only, a bone block is an overworld fossil). **Overworld easter egg:** a TINY desert island (sand/sandstone, a
-> dead bush) — mirror of Nether Rocky's stone / Nether Forest's grass.
-
-- **Palette:** soul sand surface, soul soil fill, basalt core.
-- **Decoration:** blue **soul fire** (ambient, hurts the player), basalt columns at the rim, one **bone-block
-  fossil** rising from the island, blue flame particles.
-- **Mobs:** Skeleton (50%, multiple on spawn), Ghast (10%, spawns off-island).
-- **Yields:** soul sand (Wither, Soul Speed), soul soil, bone meal. **Tier 2 — Soul:** larger fossil, deeper soul
-  sand, soul fire everywhere, more skeletons.
-
-### 🌋 Badlands → Basalt Deltas
-> **Built (v0.40.0).** A tiny ~7×7×4 Basalt Deltas fragment: blackstone surface/core over a basalt fill (the overworld
-> terracotta strata dropped via a `fill_bands` override), magma-block + basalt ground scatter, gilded blackstone +
-> nether gold, and magma-cube sprinkles.
-> **Tier-2 *Basalt* — BUILT (v0.53.0), the FIFTH + FINAL Tier-2 Nether-native seed.** Its own craftable `nether_basalt`
-> seed: a full-size (radius 6-9) Basalt Deltas — basalt over blackstone, **jagged basalt columns** (`minecraft:basalt_pillar`
-> configured feature as "trees" — NOT `basalt_columns`/`large_basalt_columns`, which don't exist as configured features),
-> magma-block patches, shallow **lava wells** (a `lava` field), near-guaranteed **gilded blackstone** (chance 0.85, gold
-> drops), Magma Cubes + a Ghast. Recipe (2×2) = a **Badlands Skyseed** + basalt + gilded blackstone. **Overworld easter
-> egg:** a TINY badlands butte (red sand / terracotta / a glint of gold). **★ This completes ALL FIVE Tier-2 Nether-native
-> seeds (Rocky, Lava, Crimson/Warped, Soul, Basalt) — the Nether's payoff tier is done.**
-
-- **Palette:** banded basalt/blackstone surface (echoing terracotta layers), blackstone fill, basalt core.
-- **Decoration:** jagged **basalt columns** (the defining feature), magma-block surface patches (the hazard — fire
-  damage on contact), shallow lava wells between columns, blackstone boulders.
-- **Mobs:** Magma Cube large (30%) / medium (40%), Ghast (10%).
-- **Yields:** blackstone (the Nether's stone), magma cream. **Tier 2 — Basalt:** taller chaotic columns, gilded
-  blackstone embedded in the core (gold drops). Genuinely dangerous to navigate.
-
-### 🫧 Aquatic → Lava Lagoon *(any biome)*
-> **Built (v0.41.0).** A tiny ~7×7×4 basalt island whose pond is overridden to a contained **lava** basin
-> (magma-block shores, a Strider as the pond "water mob", a magma cube, a little nether gold).
-> **Tier-2 *Lava* — BUILT (v0.50.0), the second Tier-2 Nether-native seed.** Its own craftable `nether_lava` seed: a
-> full-size basalt island (radius 6-9) around a contained `lava` pond (radius 4, depth 3), magma-block patches, a
-> guaranteed **Strider pack** + Magma Cubes, a little quartz/gold. Crafted from blackstone + magma blocks + a bucket
-> of lava (returned). **Special case:** since the overworld has no lava island of its own, `nether_lava` is the one
-> Tier-2 seed that *also* grows FULL-SIZE topside (a stone-bodied volcanic isle, no netherrack) — via a full overworld
-> `biome_override`, not the tiny easter egg Nether Rocky makes.
-
-- The clever swap: water evaporates, so the pond becomes a **contained lava basin** (walled like the Ocean Ruin's
-  pool so it can't overflow off the island).
-- **Decoration:** magma-block shore, basalt rim, an occasional islet; **Striders** ride the lava (the Nether's
-  rideable lava mob — finally used), Magma Cubes around, the odd Ghast overhead.
-- **Yields:** striders (lava travel + breeding with warped fungus on a stick), magma cream. **Tier 2 — Lava:** a
-  bigger lagoon, guaranteed Strider pack, a gilded-blackstone or fossil islet. A standout new island.
-
-### 🌿 Lush → vine grotto *(Crimson / Warped)*
-> **Built (v0.46.0).** A tiny ~7×7×4 warped-nylium grotto: shroomlight glow, weeping vines hanging beneath, warped
-> roots / nether sprouts / twisting vines underfoot, a little nether quartz, Endermen. No pond (the dimension-override
-> neutral default drops the base water pond rather than evaporating it). The last of the Tier-1 adaptations.
-
-- The "glowing hanging garden" translated: **twisting + weeping vines** drape the underside and walls,
-  **shroomlights** provide the glow (in place of glow lichen/glow berries), nether sprouts and roots carpet the
-  floor, the odd warped fungus. Calm and pretty — the Nether's prettiest island. Endermen if warped.
-- **Large variant:** Large Lush — denser vine curtains, more shroomlights. *(No Tier-2 upgrade.)*
-
-### ⬛ Ancient → haunted deep *(Soul Sand Valley / any)*
-> **Built (v0.42.0).** A tiny ~7×7×4 dark blackstone island over a basalt band, soul-soil flecks + soul-lantern glow,
-> shot through with soul-sand veins, bone fossils and the odd Ancient Debris (a reliable if small debris source), with
-> skeleton + enderman sprinkles. Still to come: a larger fossil network, and Large Ancient (top debris odds).
-
-- The deep-dark vibe without sculk (no Nether analogue): a **blackstone/basalt deep** shot through with **soul-sand
-  veins**, **buried bone fossils**, blue **soul fire**, thick fog, basalt spires. A mining-capable island with an
-  eerie atmosphere — and, grown low, an Ancient-Debris island (deep = debris ties straight into lava proximity).
-- **Mobs:** Skeleton, Enderman. **Large variant:** Large Ancient — bigger fossil network, more soul fire, top debris odds. *(No Tier-2 upgrade.)*
-- *(Distinct from Desert->Soul: Desert is open soul-sand surface dunes + farming; Ancient is dark blackstone depths +
-  debris mining.)*
-
----
-
-## Ore & value — lava proximity (the one ore model)
-
-Mining-capable islands (Rocky, Ancient, and any island grown low) use a **single** ore model keyed to height above
-the lava sea. There is no second, competing system.
-
-| Height above the lava sea | Ore content |
-|---|---|
-| **High** | Nether Quartz (common), Nether Gold (common) |
-| **Mid** | Quartz, Gold (richer), a small Ancient Debris chance |
-| **Low** | Ancient Debris (notable), Gold (rich), Quartz |
-| **Abyss** (just above the lava) | Ancient Debris (best), Gold, Gilded Blackstone (rare) |
-
-**Ancient Debris** is the only source of Netherite — and it generates low in vanilla, so "throw low, near the lava,
-for the best ore" is both thematically right and mechanically faithful. The danger of a low throw *is* the gate.
-
----
-
-## Nether structures (new seeds — no overworld parallel)
-
-These have no overworld-craftable parallel, so they're genuinely new seeds — built with the existing jigsaw +
-mob-pack machinery (as the overworld structure islands are).
-
-### 🏰 Nether Fortress Island
-> **BUILT (v0.55.0), the first Nether STRUCTURE seed.** `nether_fortress` (`dimensions: [the_nether]`): a netherrack
-> island carrying a hand-built (not jigsaw-subpieced) fortress fragment — `NetherFortressTemplates.fortress()`. **Form
-> first, no box:** an arcaded nether-brick **bridge** (pillars every 4 + stair arch springers) over a **magma
-> channel**, running out of a 5×5 **keep** with a `gableRoof` pitched roof, fence-grate windows, a doorway and a caged
-> **blaze spawner** (`StructureParts.mobSpawner("minecraft:blaze")`), ending in a nether-wart garden + a
-> `chests/nether_bridge` chest. Recipe = nether_bricks + nether_brick_fence + nether_wart_block. Wither skeleton /
-> blaze / magma cube theme mobs. **Standalone blaze-spawner ROOM (a 5% rare roll on the future LARGE nether seeds +
-> a debug seed) is DEFERRED until those large nether seeds exist** (user's call).
-- **Loot:** `minecraft:chests/nether_bridge`. **Why it matters:** Blaze Rods -> brewing + Eyes of Ender (the End
-  gate); nether wart -> all potions; wither skeleton skulls -> the Wither.
+Genuinely new seeds with no overworld parallel, on the existing jigsaw + mob-pack machinery:
 
 ### 🏯 Bastion Remnant Island
-- **Recipe:** Blackstone + Gold Ingot + Crying Obsidian.
-- **Fizzles over Basalt Deltas specifically** (vanilla rule) with its own message: *"The seed finds no purchase in
-  the volcanic rock."*
-- **Variants (weighted):** Bridge (3) — brutes, hoglin stables; Housing (2) — piglins, central loot; Treasure (1) —
-  brutes, gilded blackstone, magma-cube spawner, the best loot.
-- **Loot:** `minecraft:chests/bastion_treasure` / `bastion_other`. Lodestone, Pigstep, top Nether loot.
+- Recipe: Blackstone + Gold Ingot + Crying Obsidian. **Fizzles over Basalt Deltas** (the vanilla rule) with its own
+  message.
+- Weighted variants: Bridge (brutes, hoglin stables) · Housing (piglins, central loot) · Treasure (brutes, gilded
+  blackstone, magma-cube spawner, best loot). Loot `chests/bastion_treasure` / `bastion_other` — lodestone, Pigstep.
 
 ### 🐷 Piglin Trading Post Island *(the Nether's "village")*
-- **Recipe:** Gold Ingot + Blackstone + Netherrack.
-- **Structure:** a blackstone hall with gold accents, soul-campfire "thrones," **3–5 gold-armoured Piglins** (neutral
-  so they won't attack). The player drops gold to barter — no job blocks; barter is fixed by vanilla.
-- **Barter table covers:** Fire Resistance Potion, gravel/flint, leather, nether brick, small obsidian + soul sand,
-  string, Ender Pearl (rare), Soul Speed boots (rare). The economy hub, gold instead of emeralds.
+- Recipe: Gold Ingot + Blackstone + Netherrack. A blackstone hall with gold accents + 3-5 gold-armoured (neutral)
+  Piglins; drop gold to barter (barter table is fixed by vanilla). The gold-economy hub.
 
 ### ☠️ Wither Arena Island
-- **Recipe:** Obsidian + Nether Brick + Soul Sand — a sturdy, **blast-resistant** arena so the Wither's explosions
-  can't blow you into the void or lava. The seed itself consumes **no skulls** — you bring those to build the boss.
-- **Structure:** a large enclosed obsidian/nether-brick **bowl** with a soul-sand floor (where you build the Wither),
-  a safe perimeter ledge, shroomlight/glowstone lighting, and a charged **Respawn Anchor** in the corner.
-- **Why:** the Wither becomes craftable mid-Nether (soul sand from Desert/Soul + skulls from the Fortress), but
-  fighting it on a small island over a lava sea is suicide. This is the dedicated, survivable venue.
-- **Reward:** Nether Star -> Beacon (the Nether chapter's capstone craft).
+- Recipe: Obsidian + Nether Brick + Soul Sand — a **blast-resistant** arena so the Wither can't blow you into the
+  void. An enclosed obsidian/nether-brick bowl with a soul-sand floor, a safe ledge, a charged Respawn Anchor.
+- Reward: Nether Star → Beacon (the Nether chapter's capstone). The Wither is craftable mid-Nether (soul sand from
+  Soul islands + skulls from the Fortress); this is the survivable venue to fight it.
+
+### Then → the End
+Warped Enderman pearls + Fortress blaze rods → Eyes of Ender → the End chapter (already pre-voided, biome source
+kept, so no re-save needed). The last nether-gated blocks (wither rose, froglight, copper bulb) ride in with this
+work — see `MISSINGBLOCKSPLAN.md`.
 
 ---
 
-## Progression sketch
-
-```
-Overworld → build a Nether Portal → step through (vanilla drops you on a small obsidian platform; no curated start)
-    ↓ Bring your own gear through the portal: fire-resistance potion, blocks, food (the early Nether is lethal)
-    ↓ Explore the void to find biomes (Xaero's biome overlay)
-
-Throw overworld seeds straight into the Nether (Tier 1, free):
-  Rocky    → netherrack mining (quartz, gold)            → low throws → Ancient Debris → Netherite
-  Forest   → fungal forest (crimson: Hoglin food/wood;  warped: Enderman pearls → End gate)
-  Mushroom → mushroom island (Mooshroom food — the safe larder)
-  Desert   → Soul Sand Valley (soul sand → Wither, Soul Speed)
-  Badlands → Basalt Deltas (blackstone, gilded blackstone)
-  Aquatic  → Lava Lagoon (Striders, magma cream)
-  Lush     → vine grotto;   Ancient → haunted deep (debris)
-
-Craft Tier-2 Nether seeds (Nether materials → enhanced islands):
-  Nether Rocky / Crimson / Warped / Soul / Basalt / Lava
-
-Structures (new seeds):
-  🏰 Nether Fortress (nether brick) → Blaze Rods, nether wart, wither skeleton skulls
-  🏯 Bastion Remnant (blackstone + gold + crying obsidian) → lodestone, top loot
-  🐷 Piglin Trading Post (gold + blackstone + netherrack) → fire res, obsidian, ender pearls
-  ☠️ Wither Arena (obsidian + nether brick + soul sand) → safe Wither fight → Nether Star → Beacon
-
-Warped Enderman pearls + Fortress Blaze Rods → Eyes of Ender → The End chapter
-```
-
----
-
-## Open questions & implementation notes
-
-Resolved this pass: **Wither Arena** (added as a seed), **Forest vs Mushroom** (Forest = fungal forest, Mushroom =
-the mushroom island), **Meadow** (fizzles), **Large vs Tier-2** (Large = bigger Tier-1, Tier-2 = exclusive content).
-
-- **Respawn in the Nether** — Respawn Anchors charge with Glowstone (from Rocky/Wastes). "Charge an anchor before you
-  explore" is Nether 101 and doubly true when every island is separated by void — give it a prominent guide entry.
-- **Ruined Portal twins (impl)** — whenever a ruined portal is created on either side (seed *or* `rare_structures`
-  roll), generate a matching small ruined-portal island on the other side at the vanilla-linked coord
-  (`nether = overworld / 8`), nudging only the shortest free distance so it stays in portal-linking range; a twin
-  must not spawn its own twin. See *Ruined Portal twins* under World design. (Also still worth confirming the seed
-  renders a Nether-appropriate scene — blackstone/basalt surround — when thrown in the Nether.)
-- **Mooshrooms in the Nether (impl)** — spawned via the `animals` pack and marked persistent; they won't naturally
-  breed-spawn there, so the seed places a starter herd. Verify they don't despawn.
-
----
-
-*Nether biome list verified against Minecraft 1.21.1 — exactly five biomes (Nether Wastes, Crimson Forest, Warped
-Forest, Soul Sand Valley, Basalt Deltas); all five are covered above. Re-verify mob spawn tables and structure loot
-table IDs before implementation.*
+## Notes
+- **Respawn in the Nether:** Respawn Anchors charge with glowstone (Rocky / Wastes) — "charge an anchor before you
+  explore" deserves a prominent guide entry, given every island sits over void.
+- **Standing rule:** the void noise_settings IDs (`skyseed:void` / `void_nether` / `void_end`) are baked into
+  level.dat by string — never rename them.
+- Nether biome list verified against 1.21.1 (exactly five biomes); re-verify mob spawn tables + structure loot-table
+  IDs before building the remaining structures.

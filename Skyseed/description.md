@@ -1,3 +1,5 @@
+![Skyseed banner](https://media.forgecdn.net/attachments/1752/165/banner2_with_name-png.png)
+
 # Skyseed
 
 **Grow your skyblock instead of bridging it out.**
@@ -97,6 +99,18 @@ Pretty much every block you'd dig up in a normal world is available somewhere he
 
 ---
 
+## Into the Nether
+
+Build a portal, step through, and the Nether is the same idea — an empty sky over a lava sea, grown out one seed at a time.
+
+- **Your overworld seeds still work.** Throw a Rocky seed in the Nether and it adapts: a little netherrack mining island instead of stone. Desert becomes a soul-sand valley, Aquatic a lava lagoon, Forest a crimson or warped fungal patch, and so on. These are small on purpose — a foothold, not a base. Seeds with no Nether form (Meadow, Frozen) politely fizzle out.
+- **Nether seeds are the real payoff.** Craft a dedicated Nether seed from your overworld one plus a signature Nether block, and you get the full-size island: a deep-mining netherrack mountain rich in ancient debris, a broad lava lagoon with a strider pack, a towering fungal forest, a soul-sand valley riddled with fossils, or a hazardous basalt deltas of jagged columns. Each has a Large version too. Throw one *topside* as a joke and you'll get a tiny overworld island of the matching kind — except the Nether Lava seed, which grows a proper lava island up there, the only one there is.
+- **Lava is the new depth.** With no bedrock to dig toward, height is replaced by lava proximity: throw a mining island low, near the lava sea, for the best ancient debris and gold.
+- **Fortresses and surprises.** A Nether Fortress seed grows an arched nether-brick bridge running out of a keep, with a caged blaze spawner inside — a renewable source of blaze rods, no fortress to hunt for. And the Large Nether islands sometimes turn up with a blaze spawner room tucked on them.
+- **Ruined portals link up.** Throw a Ruined Portal and a matching one appears in the *other* dimension at the linked coordinate. Repair and light both frames and they connect into a real working pair — no setup, just vanilla doing its thing.
+
+---
+
 ## The guidebook
 
 Every world starts you with the **Skyfarer's Almanac**. It lists how to craft each seed, and once you've made one it unlocks that island's field notes so you can read up on it as you go. If you misplace the book, craft any single Skyseed back into it at a table.
@@ -109,8 +123,8 @@ With **Patchouli** installed you get the full illustrated version. Without it, t
 
 Skyseed is still in active development, with a fair bit of sky left to fill:
 
-- **More structures.** More recognisable builds from around the game. The Trial Chamber and Woodland Mansion are in; bigger, rarer "huge" islands come next.
-- **The Nether and the End.** Both are planned for later versions, each with their own seeds, biomes and structures, so you'll grow a crimson forest or an End island the same way you grow the overworld now.
+- **More Nether structures.** The Fortress is in; a Bastion, a Piglin Trading Post and a Wither arena come next.
+- **The End.** Already pre-voided and waiting in the background, so it'll grow out the same way — End islands, the city, the dragon — without anyone needing a fresh save.
 - **More creatures, island types and surprises** as it goes.
 
 ---

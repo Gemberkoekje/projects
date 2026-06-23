@@ -2,7 +2,7 @@
 
 A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**; the next chapter (the Nether) is designed in `SKYNETHERPLAN.md`.
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**; the Nether chapter — built out as of v0.57.0 — and its remaining structures are tracked in `SKYNETHERPLAN.md`.
 
 ---
 
@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.34.9** — see [CHANGELOG.md](CHANGELOG.md). The overworld chapter is built end to end: every island type and its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, and the rare surprises. What exists today:
+**Version 0.57.0** — see [CHANGELOG.md](CHANGELOG.md). The **overworld chapter** is built end to end (every island type and its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, the rare surprises) and the **Nether chapter** is built out too (overworld seeds adapt or fizzle across the portal, all five Nether biomes have a full-size native seed + a Large variant, a Nether Fortress with a caged blaze spawner, ruined-portal twins linked across dimensions). What exists today:
 
 | Area | Built |
 |---|---|
@@ -43,6 +43,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Animal islands | **Pasture / Poultry / Wool Farm / Stable / Aquarium** — a fenced enclosure + a guaranteed pack of animals via the `animals` theme field (weighted packs, babies, random sheep colours, submerged aquarium life; the Stable carries a loot chest) |
 | Structure islands | **Dungeon** (a 5×5 spawner room + two `simple_dungeon` chests, sunk underground with a stepped stairwell to a dark-oak door and ruins strewn across the island), **Ruined Portal** (broken frame + crying obsidian + `ruined_portal` chest), **Desert Temple** (4 `desert_pyramid` chests + buried TNT), **Jungle Temple** (a tiered cobble-and-moss ziggurat with corner columns and vines, over a trapped chamber of 2 `jungle_temple` chests + a tripwire dispenser), **Witch Hut** (witch + cat + cauldron), **Pillager Outpost** (a wide cobblestone-and-dark-oak watchtower with a camp — a semi-open arched base holds the `iron_golems`-spawned golem cage with room to walk past it, an enclosed middle room carries the pillager spawner + `pillager_outpost` chest so spawns can't fall off the island, an open watch platform sits under a pitched roof, and the apron has tents, a target, a campfire and a banner), **Trial Chamber** (the first *grand* structure — a copper-and-tuff complex sunk deep into a larger rocky island via the `sink` field, entered by one ladder shaft; a modular jigsaw hub holds the breeze boss spawner + a centre ominous vault for the heavy core/mace and draws up to four spawner/vault rooms from a pool, so the layout varies each throw), **Woodland Mansion** (the second grand structure — a two-storey dark-oak manor with a gabled roof on a larger grassy island; an evoker + vindicator garrison spawns in the hall via the theme's `animals` pack, so the guaranteed evoker makes it a reliable Totem-of-Undying source. A modular core start-piece draws up to three single-storey wings — storeroom/library/checkerboard room — from a pool, so the manor sprawls differently each throw, with up to six `woodland_mansion` chests), and **Ocean Monument** (`skyseed:ocean_monument` — a prismarine temple on a deep-ocean sand island: guardians + an elder guardian via the `animals` pack, a wet-sponge room, sea lanterns, and a buried-treasure chest with a Heart of the Sea for a conduit; also a 5% `rare_structures` roll on Large Aquatic). Built on the jigsaw system — loot chests, spawners, trial spawners, vaults and vanilla loot tables are block-entity NBT in the structure `.nbt` |
 | Rare features | `rare_structures`: a chance-gated structure that germinates in place of the ordinary island. **Igloo** (5% on Frozen — a sealed snow dome with a trapped zombie villager to cure), **Abandoned cottage** (10% on Hamlet — a cobwebbed, bed-less ruin haunted by a zombie villager), **Ocean ruin** (8% on Aquatic — a flooded stone-brick basin with suspicious sand and a sunken chest, replacing the pond), **Desert Temple** (5% on Large Desert — sunk a block under the sand so only a suspicious hole gives it away, via the jigsaw `sink` field), **Jungle Temple** (5% on Large Forest grown in a `#minecraft:is_jungle` biome — a `biomes` filter on the rare structure gates the roll), **Witch Hut** (5% on Large Forest in a swamp/mangrove/`dark_forest` biome, or Large Aquatic in a swamp/mangrove — witch + cat included, pond suppressed for dry footing), **Dungeon** (5% on Large Rocky or Large Ancient — buried and sealed via the `sink` field, no stairs, so you only find it by digging onto it), **Pillager Outpost** (5% on a Trade Post — the watchtower replaces the village, villagers and all), **Ruined Portal** (1% on any big island except Aquatic — the broken frame + chest on the surface, the island keeps its own terrain), **Trail Ruins** (10% on Large Ancient, 5% on a Forest grown in a `#minecraft:is_taiga` biome — a buried mud-brick site with suspicious gravel to brush for pottery sherds, fragments poking up as the tell), **Evoker Cell** (5% on a Forest in a `dark_forest` biome — a sealed dark-oak room with an evoker for a bootstrap totem), **Vault Cell** (5% on Ancient — a buried tuff/copper room with two trial spawners + a vault, a self-contained mini trial-chamber and trial-key source). The surprise's own `mobs` pack spawns its inhabitants |
+| Nether chapter | Overworld seeds **adapt or fizzle** across the portal (deliberately tiny ~7×7×4 Tier-1 footholds; Meadow/Frozen fizzle); five full-size **Nether-native** Tier-2 seeds — `nether_rocky` / `nether_lava` / `nether_forest` / `nether_soul` / `nether_basalt` — plus a **Large variant** of each, gated by a theme `dimensions` field; a **Nether Fortress** island (hand-built arcaded bridge + keep + caged blaze spawner) and a 5% **blaze spawner room** on the Large Nether seeds; **ruined-portal twins** that grow a linked frame in the other dimension at the vanilla 8:1 coordinate. The Nether/End are pre-voided (void + a lava sea below Y 32, biome sources kept) |
 | Datapack themes | Full `IslandTheme` codec (the keystone); themes are pure JSON |
 | Biome response | `biome_overrides` keyed to the germination biome (Forest rolls acacia over savanna, jungle over jungle, lake over ocean, …) |
 | Y-band overrides | `min_y` / `max_y` gating — drives Rocky's deepslate ↔ coal/iron gradient and snow peaks |
@@ -54,16 +55,16 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); block-overlap fit + horizontal nudge-off (islands sit flush), player-aware, fizzle-and-drop |
 
-**The overworld is essentially feature-complete** — all ten island types and their Large variants, the village / animal / structure islands, the two grand structures, and the rare surprises are built and shipped. What remains is the next chapter; see **Roadmap** below.
+**The overworld is feature-complete and the Nether is built out** — all the overworld islands/structures, plus the full Nether chapter (adaptations, the five Tier-2 native seeds + their Large variants, the Fortress + blaze room, ruined-portal twins). What remains is the rest of the Nether's structures and then the End; see **Roadmap** below.
 
 ---
 
 ## Roadmap
 
-The overworld chapter is done; what's planned next:
+The overworld and Nether chapters are built; what's planned next:
 
-- **The Nether** — the next dimension, designed in detail in `SKYNETHERPLAN.md`. Overworld seeds adapt across the portal (Rocky → a netherrack mining island, Aquatic → a lava lagoon, Desert → a soul-sand valley, …), alongside new Fortress, Bastion and Piglin Trading Post structures. Already emptied to a void + lava sea as of v0.35.0.
-- **The End** — after the Nether. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
+- **The rest of the Nether's structures** — a Bastion Remnant, a Piglin Trading Post and a Wither arena, designed in `SKYNETHERPLAN.md` (the Nether Fortress is already in).
+- **The End** — after the Nether's structures. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
 - **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
 - **Remaining vanilla blocks** — a short list (a copper bulb, a few Nether-gated blocks), tracked in `MISSINGBLOCKSPLAN.md`.
@@ -110,8 +111,15 @@ One JSON per theme under `data/<namespace>/skyseed/theme/<id>.json` (the `skysee
 | `palette` | Palette | — (required) | The layered blocks |
 | `ores` | OreEntry[] | `[]` | Base ore table |
 | `variants` | Variant[] | `[]` | Weighted decoration looks (one rolled per island) |
-| `biome_overrides` | BiomeOverride[] | `[]` | Conditional tweaks by biome and/or Y |
+| `biome_overrides` | BiomeOverride[] | `[]` | Conditional tweaks by biome and/or Y (and/or dimension) |
 | `pond` | Pond | — | Optional contained pool |
+| `mobs` | MobEntry[] | `[]` | Mobs/animals spawned when the island finishes generating |
+| `jigsaw` | JigsawConfig | — | Assemble a structure on the island from a vanilla template pool |
+| `animals` | AnimalPack[] | `[]` | Weighted farm-animal packs (Animal Islands; rare-structure mobs) |
+| `rare_structures` | RareStructure[] | `[]` | Chance-gated structures that roll in place of / onto the island |
+| `lava` | Lava | — | Lava veins + Y-banded contained lava lakes |
+| `dimensions` | string[] | `["minecraft:overworld"]` | Which dimensions the base config implements; a seed thrown into one it doesn't implement (and no dimension-keyed override covers) **fizzles** |
+| `twin` | id | — | Grow this theme at the vanilla 8:1 linked coordinate in the other dimension (the Ruined Portal's cross-dimension twin) |
 
 **Shape** — `radius` `{min,max}` (required) · `rim_noise` float (0.40) · `underside` (`teardrop`) · `top_dome` `{min,max}` (`{1,2}`; raise for peaks).
 
@@ -143,8 +151,10 @@ Each entry in `biome_overrides` is conditionally applied on top of the base them
 | `variants` | Variant[] | Decoration override (`[]` = bare) |
 | `pond` | Pond | Add/override a pond |
 | `waterfalls` | int | Number of static cascades off the rim |
+| `dimension` | id | Gate the override to one dimension — the Nether/End form of a seed. An override for a *foreign* dimension is a **complete** spec: any field it doesn't set goes neutral/empty, never the overworld base |
+| `fill_bands` | block-id[] | Banded body override (`[]` clears the base's bands) |
 
-Examples in the shipped themes: Forest over `#minecraft:is_ocean` → lake island + pond + waterfalls; over `mangrove_swamp` → mud + hand-built mangroves; Rocky with `max_y: 8` → deepslate island with diamonds; Rocky with `min_y: 130` *or* a snowy biome → snow-capped peak.
+Examples in the shipped themes: Forest over `#minecraft:is_ocean` → lake island + pond + waterfalls; over `mangrove_swamp` → mud + hand-built mangroves; Rocky with `max_y: 8` → deepslate island with diamonds; Rocky with `min_y: 130` *or* a snowy biome → snow-capped peak; Rocky with `dimension: "minecraft:the_nether"` → a tiny netherrack mining island instead of fizzling.
 
 ---
 
@@ -180,7 +190,8 @@ A near-pure function `planIsland(ServerLevel, BlockPos center, IslandTheme, Hold
 - **`item/`** — `IslandSeedItem` (charge-to-throw, one per theme) and `SkyseedGuide` (builds the guide book: Patchouli if present via the isolated `compat/PatchouliCompat`, else a vanilla written book).
 - **`entity/IslandSeedEntity`** — `ThrowableItemProjectile` carrying the theme; arms `ARM_DURATION = 40` ticks (~2 s), rests on block-hit, then `germinate()`s (overlap loop → enqueue plan).
 - **`worldgen/`** — `IslandGenerator` (the algorithm) → `IslandPlan`; `GenerationJob` + `IslandGrowth` (the tick-budget scheduler on `ServerTickEvent.Post`); `StartIsland`; `SkyseedWorldData` (`SavedData`); `WorldSetupEvents`; `event/PlayerEvents`.
-- **`worldgen/theme/`** — the codec records: `IslandTheme`, `Shape`, `Palette`, `OreEntry`, `Variant`, `Decoration`, `TreeEntry`, `GroundEntry`, `Pond`, `BiomeOverride`, plus `IntRange`, `OreDepth`, `Underside`.
+- **`worldgen/theme/`** — the codec records: `IslandTheme`, `Shape`, `Palette`, `OreEntry`, `Variant`, `Decoration`, `TreeEntry`, `GroundEntry`, `Pond`, `BiomeOverride`, `MobEntry`, `JigsawConfig`, `AnimalPack`, `RareStructure`, `Lava`, plus `IntRange`, `OreDepth`, `Underside`.
+- **`worldgen/structure/`** — code-authored structure templates (`*Templates.java`, one per structure — hamlet, dungeon, ruined portal, nether fortress, …) written to `.nbt` at dev time via `DevStructureGenerator`, plus the shared `StructureParts` helpers (jigsaw anchors, loot chests, mob spawners, pitched `gableRoof`s, fence-linking).
 - **`client/SkyseedClientEvents`** — renderers and the world-type default hook.
 
 ---
