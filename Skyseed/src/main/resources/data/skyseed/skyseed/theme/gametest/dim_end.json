@@ -1,0 +1,5 @@
+{
+  "dimensions": ["minecraft:the_end"],
+  "shape": { "radius": { "min": 3, "max": 3 } },
+  "palette": { "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone" }
+}

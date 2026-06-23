@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 8, "max": 10 }, "rim_noise": 0.18, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3,
     "surface_scatter": [ { "block": "minecraft:coarse_dirt", "chance": 0.12 } ] },

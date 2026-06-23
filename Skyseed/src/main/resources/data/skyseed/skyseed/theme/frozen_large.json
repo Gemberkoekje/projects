@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 3, "max": 6 } },
   "palette": { "surface": "minecraft:snow_block", "fill": "minecraft:snow_block", "core": "minecraft:stone", "fill_depth": 4 },
   "ores": [

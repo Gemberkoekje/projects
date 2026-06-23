@@ -117,6 +117,36 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void dimensionGateGrowsOrFizzlesByImplementation(GameTestHelper helper) {
+        // The adapt-or-fizzle matrix (SKYNETHERPLAN): a seed grows only in dimensions it implements — its base
+        // `dimensions` or a dimension-keyed override — and fizzles elsewhere rather than growing the foreign base.
+        final ServerLevel level = helper.getLevel();
+        final var biome = level.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.PLAINS);
+        final ResourceLocation ow = Level.OVERWORLD.location();
+        final ResourceLocation nether = Level.NETHER.location();
+        final ResourceLocation end = Level.END.location();
+
+        record Case(String theme, boolean ow, boolean nether, boolean end) {}
+        final Case[] cases = {
+            new Case("gametest/dim_overworld", true, false, false),
+            new Case("gametest/dim_nether", false, true, false),
+            new Case("gametest/dim_end", false, false, true),
+            new Case("gametest/dim_ow_nether", true, true, false),
+            new Case("gametest/dim_all", true, true, true),
+        };
+        for (Case c : cases) {
+            final IslandTheme t = theme(level, c.theme());
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, ow) == c.ow(),
+                    c.theme() + ": overworld should " + (c.ow() ? "grow" : "fizzle"));
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, nether) == c.nether(),
+                    c.theme() + ": nether should " + (c.nether() ? "grow" : "fizzle"));
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, end) == c.end(),
+                    c.theme() + ": end should " + (c.end() ? "grow" : "fizzle"));
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void islandIsDeterministic(GameTestHelper helper) {
         final IslandPlan a = plan(helper, "rocky", 42L);
         final IslandPlan b = plan(helper, "rocky", 42L);

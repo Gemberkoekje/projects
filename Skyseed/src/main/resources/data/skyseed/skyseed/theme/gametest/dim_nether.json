@@ -1,0 +1,5 @@
+{
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 3, "max": 3 } },
+  "palette": { "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone" }
+}

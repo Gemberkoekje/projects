@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.37.0] - 2026-06-23
+
+### Added
+- **Seeds now fizzle in dimensions they don't implement.** This completes the adapt-or-fizzle model: a Skyseed only
+  grows where it has an implementation — its declared base `dimensions` (now spelled out on every seed, all
+  `["minecraft:overworld"]`) or a dimension-keyed `biome_override`. Thrown anywhere it doesn't implement — an
+  overworld seed into the Nether or End — it puffs out and drops back instead of growing the wrong, foreign island.
+  A future Nether-only or End-only seed therefore gets the overworld fizzle for free (it simply won't declare
+  overworld). Rocky still adapts in the Nether (it declares overworld *and* carries Nether overrides).
+
+### Changed
+- Non-dimensioned `biome_overrides` are scoped to the theme's base dimension(s), so an overworld biome/height tweak
+  can't leak onto a seed grown in another dimension.
+
 ## [0.36.0] - 2026-06-23
 
 ### Added

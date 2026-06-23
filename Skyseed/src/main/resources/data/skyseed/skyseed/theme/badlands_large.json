@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.42, "underside": "teardrop", "top_dome": { "min": 5, "max": 9 } },
   "palette": {
     "surface": "minecraft:red_sand",

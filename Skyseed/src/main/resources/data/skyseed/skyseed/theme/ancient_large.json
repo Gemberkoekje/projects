@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
   "palette": {
     "surface": "minecraft:moss_block",

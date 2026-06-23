@@ -56,7 +56,9 @@ public final class IslandGenerator {
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
-        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), level.dimension().location());
+        final ResourceLocation dim = level.dimension().location();
+        final boolean baseValidHere = theme.baseValidIn(dim);
+        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, baseValidHere);
 
         // --- effective config: base theme, overlaid by the matching biome override ---
         final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get() : theme.shape();
@@ -255,13 +257,32 @@ public final class IslandGenerator {
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y,
-                                               ResourceLocation dim) {
+                                               ResourceLocation dim, boolean baseValidHere) {
         for (BiomeOverride o : overrides) {
+            // A non-dimensioned override belongs to the base config's home dimension(s); it must not leak into a
+            // foreign dimension (e.g. an overworld biome tweak applying to a seed thrown in the Nether). Only
+            // dimension-keyed overrides for the current dimension are eligible there.
+            if (o.dimension().isEmpty() && !baseValidHere) {
+                continue;
+            }
             if (o.matches(biome, y, dim)) {
                 return o;
             }
         }
         return null;
+    }
+
+    /**
+     * Whether {@code theme} can grow an island in dimension {@code dim} at {@code biome}/{@code y}: true if the base
+     * config is declared for {@code dim}, or a dimension-keyed override for {@code dim} matches here. False means the
+     * seed must <em>fizzle</em> — it has no implementation for this dimension and must not fall back to the foreign
+     * base form (e.g. an overworld seed thrown in the Nether). See SKYNETHERPLAN and {@code IslandSeedEntity}.
+     */
+    public static boolean formValidFor(IslandTheme theme, Holder<Biome> biome, int y, ResourceLocation dim) {
+        if (theme.baseValidIn(dim)) {
+            return true;
+        }
+        return matchOverride(theme.biomeOverrides(), biome, y, dim, false) != null;
     }
 
     private static List<Scatter> resolveScatter(List<GroundEntry> cfg) {

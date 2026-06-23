@@ -1,0 +1,9 @@
+{
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 3, "max": 3 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone" },
+  "biome_overrides": [
+    { "dimension": "minecraft:the_nether", "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone" },
+    { "dimension": "minecraft:the_end", "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone" }
+  ]
+}

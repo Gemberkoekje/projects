@@ -153,6 +153,14 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // Placement: grow at the rest point / target if it's clear, else nudge horizontally off whatever it would
         // grow into (so islands sit adjacent, not stacked), and only lift up/down if there's no horizontal room.
         final BlockPos base = this.blockPosition();
+        // Dimension gate: a seed only grows where it has an implementation (its base dimensions, or a dimension-keyed
+        // override). Thrown into a dimension it doesn't implement — an overworld seed in the Nether, say — it fizzles
+        // rather than growing the wrong, foreign base island here.
+        if (!IslandGenerator.formValidFor(theme, level.getBiome(base), base.getY(), level.dimension().location())) {
+            fizzle(level);
+            this.discard();
+            return;
+        }
         final List<Vec3> players = level.players().stream().map(p -> p.position()).toList();
         final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
         final IslandPlacement.Occupancy occupied = (x, y, z) -> {

@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 4 } },
   "palette": { "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:smooth_sandstone", "fill_depth": 4 },
   "ores": [

@@ -71,10 +71,13 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 
 ## The adaptation model
 
-> **Built (v0.36.0).** The dimension key is implemented: a `biome_override` takes an optional `dimension`
+> **Built (v0.36.0 / v0.37.0).** The dimension key is implemented: a `biome_override` takes an optional `dimension`
 > (e.g. `minecraft:the_nether`), matched alongside biome + Y, so a seed's Nether form is a dimension-gated override —
-> no new item. **Rocky** is the first adapted seed. The **fizzle** for non-adapting seeds is *not* built yet: other
-> seeds still grow their overworld form in the Nether until each is adapted in turn.
+> no new item. A theme also declares its base `dimensions` (every current seed is explicitly `[minecraft:overworld]`).
+> **Adapt-or-fizzle is live (v0.37.0):** a seed thrown into a dimension it implements neither in `dimensions` nor via
+> a dimension-keyed override **fizzles** instead of growing the foreign base form — so a future Nether-only seed gets
+> the overworld fizzle for free. **Rocky** is the first adapted seed (overworld base + Nether overrides). Still to do:
+> adapt the remaining seeds one at a time.
 
 **One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
 

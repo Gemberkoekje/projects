@@ -1,4 +1,5 @@
 {
+  "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.40, "underside": "teardrop" },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [
