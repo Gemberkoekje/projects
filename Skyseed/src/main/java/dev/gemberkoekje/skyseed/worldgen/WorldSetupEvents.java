@@ -42,8 +42,6 @@ public final class WorldSetupEvents {
             BlockPos spawn = StartIsland.build(overworld, center, bonusChest);
             overworld.setDefaultSpawnPos(spawn, 0.0F);
             data.markStartPlaced(spawn);
-            // Record the start island's footprint (small teardrop + an oak) so thrown seeds keep clear of spawn.
-            data.addIsland(new IslandPlacement.Island(center.getX(), center.getY(), center.getZ(), 6, 6, 5));
             disableRaids(event.getServer(), overworld);
             Skyseed.LOGGER.info("[skyseed] placed curated starting island at {}; spawn {}", center, spawn);
         } else {

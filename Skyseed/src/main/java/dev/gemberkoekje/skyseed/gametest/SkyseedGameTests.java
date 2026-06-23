@@ -8,7 +8,6 @@ import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
-import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
@@ -127,32 +126,28 @@ public final class SkyseedGameTests {
 
     @GameTest(template = REGION)
     public static void placementRejectsOverlapAndPlayers(GameTestHelper helper) {
-        // The distance check must allow open sky, reject growing too close to a (smaller) neighbour, and reject onto a player.
+        // The fit check must allow open sky (so islands can sit adjacent), reject real overlap (engulfment), and
+        // reject burying a player.
+        final IslandPlan island = plan(helper, "rocky", 1L);
         final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
-        final IslandPlacement.Island island = IslandPlacement.footprint(plan(helper, "rocky", 1L), center);
         final java.util.List<Vec3> noPlayers = java.util.List.of();
-        final java.util.List<IslandPlacement.Island> noNeighbours = java.util.List.of();
 
-        helper.assertTrue(!IslandPlacement.tooCrowded(island, noNeighbours, noPlayers),
+        helper.assertTrue(IslandPlacement.check(island, noPlayers, (x, y, z) -> false).ok(),
                 "an island in open sky was wrongly rejected");
 
-        // A tiny neighbour at the same centre = engulfment. The old 5%-of-size tolerance let big islands swallow
-        // small ones; the distance check must reject it regardless of the size gap.
-        final IslandPlacement.Island tiny = new IslandPlacement.Island(center.getX(), center.getY(), center.getZ(), 2, 2, 2);
-        helper.assertTrue(IslandPlacement.tooCrowded(island, java.util.List.of(tiny), noPlayers),
-                "an island engulfing a smaller neighbour was not rejected");
+        // A solid column through the centre = real overlap (e.g. another island). Even though it's small relative to
+        // the island, it must be rejected — the old 5%-of-size tolerance let big islands swallow small ones — and the
+        // blocked centroid must point back at the column so the caller can push off it.
+        final IslandPlacement.Occupancy column = (x, y, z) ->
+                Math.abs(x - center.getX()) <= 3 && Math.abs(z - center.getZ()) <= 3;
+        final IslandPlacement.Fit blocked = IslandPlacement.check(island, noPlayers, column);
+        helper.assertTrue(!blocked.ok(), "an island overlapping solid was not rejected (engulfment)");
+        helper.assertTrue(Math.abs(blocked.blockedX() - center.getX()) <= 3 && Math.abs(blocked.blockedZ() - center.getZ()) <= 3,
+                "the blocked centroid did not point at the obstruction");
 
-        // A neighbour far beyond both radii + the gap -> fine.
-        final IslandPlacement.Island far = new IslandPlacement.Island(center.getX() + 200, center.getY(), center.getZ(), 8, 4, 8);
-        helper.assertTrue(!IslandPlacement.tooCrowded(island, java.util.List.of(far), noPlayers),
-                "a distant neighbour wrongly blocked germination");
-
-        // A player at the centre -> rejected (would be buried); a distant player -> fine.
-        helper.assertTrue(IslandPlacement.tooCrowded(island, noNeighbours, java.util.List.of(Vec3.atCenterOf(center))),
-                "germinating on top of a player was not rejected");
-        helper.assertTrue(!IslandPlacement.tooCrowded(island, noNeighbours,
-                        java.util.List.of(new Vec3(center.getX() + 200, center.getY(), center.getZ()))),
-                "a distant player wrongly blocked germination");
+        // A player whose body is where the island would place blocks -> buried, must not fit.
+        helper.assertTrue(!IslandPlacement.check(island, java.util.List.of(Vec3.atCenterOf(center)), (x, y, z) -> false).ok(),
+                "germinating with a block on the player was not rejected");
         helper.succeed();
     }
 
@@ -422,7 +417,6 @@ public final class SkyseedGameTests {
         // End-to-end: a thrown seed arms (~40 ticks), germinates, and IslandGrowth drains the GenerationJob.
         final ServerLevel level = helper.getLevel();
         final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
-        level.getDataStorage().computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME).clearIslands();
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
         seed.setTheme(skyseed("gametest/island"));
@@ -468,7 +462,6 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos spawn = helper.absolutePos(new BlockPos(3, 18, 3));
         final BlockPos target = helper.absolutePos(new BlockPos(10, 10, 10));
-        level.getDataStorage().computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME).clearIslands();
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(spawn.getX() + 0.5, spawn.getY() + 0.5, spawn.getZ() + 0.5);
         seed.setTheme(skyseed("gametest/island"));

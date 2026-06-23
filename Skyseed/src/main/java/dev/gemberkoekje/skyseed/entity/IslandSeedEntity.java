@@ -9,7 +9,6 @@ import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandGrowth;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
-import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
@@ -30,6 +29,7 @@ import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
@@ -50,8 +50,12 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     /** Ticks from spawn to germination (~2 s at 20 tps). */
     public static final int ARM_DURATION = 40;
 
-    /** Upward lifts to try if the rest point's volume is already occupied (overlap safety — see README → Generation algorithm). */
-    private static final int[] NUDGE_STEPS = { 0, 8, 16, 24 };
+    /** Horizontal search: nudge off a collision at most this many times, this far each, before giving up sideways. */
+    private static final int MAX_H_ATTEMPTS = 10;
+    private static final int H_STEP = 4;
+    private static final int MAX_H_DIST = 48; // a "decent" horizontal distance to look before falling back to up/down
+    /** Vertical fall-back lifts, only tried when there's no horizontal room: up first, then down. */
+    private static final int[] V_FALLBACK = { 8, 16, 24, -8, -16, 32 };
 
     private int armTicks = 0;
 
@@ -146,32 +150,21 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             this.setPos(targetX, targetY, targetZ);
         }
 
-        // Overlap safety: try the rest point, then a few lifts, until the spot is clear of other islands and players.
-        // RNG decorrelated per island (worldSeed ^ center) — see README → Generation algorithm.
-        final SkyseedWorldData data = level.getDataStorage()
-                .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
+        // Placement: grow at the rest point / target if it's clear, else nudge horizontally off whatever it would
+        // grow into (so islands sit adjacent, not stacked), and only lift up/down if there's no horizontal room.
         final BlockPos base = this.blockPosition();
         final List<Vec3> players = level.players().stream().map(p -> p.position()).toList();
-        IslandPlan plan = null;
-        IslandPlacement.Island footprint = null;
-        for (int lift : NUDGE_STEPS) {
-            BlockPos c = base.above(lift);
-            RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-            // Island look can vary with the biome it lands in (README → Configuration → Biome overrides).
-            IslandPlan candidate = IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
-            IslandPlacement.Island candidateFootprint = IslandPlacement.footprint(candidate, c);
-            if (!IslandPlacement.tooCrowded(candidateFootprint, data.islands(), players)) {
-                plan = candidate;
-                footprint = candidateFootprint;
-                break;
-            }
-        }
+        final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        final IslandPlacement.Occupancy occupied = (x, y, z) -> {
+            final BlockState s = level.getBlockState(probe.set(x, y, z));
+            return !s.isAir() && !s.canBeReplaced();
+        };
+        final IslandPlan plan = findClearSpot(level, theme, base, players, occupied);
         if (plan == null) {
             fizzle(level); // nowhere clear to grow — give the seed back rather than carve into things
             this.discard();
             return;
         }
-        data.addIsland(footprint); // remember it so later throws keep their distance
 
         level.sendParticles(ParticleTypes.HAPPY_VILLAGER, this.getX(), this.getY(), this.getZ(),
                 50, 1.2, 1.2, 1.2, 0.25);
@@ -184,6 +177,54 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         IslandGrowth.enqueue(new GenerationJob(level, plan));
 
         this.discard();
+    }
+
+    /**
+     * Finds a spot the island can grow without interpenetrating existing blocks or burying a player. Tries the base
+     * first; on a collision it nudges <em>horizontally</em> away from the centroid of whatever is in the way (so
+     * islands end up touching, never stacked), out to {@link #MAX_H_DIST}; only if there's no horizontal room does it
+     * fall back to {@link #V_FALLBACK} lifts. Re-plans per position (RNG keyed by centre) and moves the entity to the
+     * chosen spot so the germination effects play there. Returns {@code null} if nothing is clear.
+     */
+    private IslandPlan findClearSpot(ServerLevel level, IslandTheme theme, BlockPos base,
+                                     List<Vec3> players, IslandPlacement.Occupancy occupied) {
+        BlockPos cursor = base;
+        for (int attempt = 0; attempt < MAX_H_ATTEMPTS; attempt++) {
+            final IslandPlan candidate = planAt(level, theme, cursor);
+            final IslandPlacement.Fit fit = IslandPlacement.check(candidate, players, occupied);
+            if (fit.ok()) {
+                this.setPos(cursor.getX() + 0.5, cursor.getY() + 0.5, cursor.getZ() + 0.5);
+                return candidate;
+            }
+            // Push the island off whatever it would swallow, horizontally, away from the blocked centroid.
+            final double dx = cursor.getX() - fit.blockedX();
+            final double dz = cursor.getZ() - fit.blockedZ();
+            final double len = Math.sqrt(dx * dx + dz * dz);
+            final int sx = len < 1.0e-3 ? H_STEP : (int) Math.round(dx / len * H_STEP);
+            final int sz = len < 1.0e-3 ? 0 : (int) Math.round(dz / len * H_STEP);
+            cursor = cursor.offset(sx, 0, sz);
+            final int ddx = cursor.getX() - base.getX();
+            final int ddz = cursor.getZ() - base.getZ();
+            if (ddx * ddx + ddz * ddz > MAX_H_DIST * MAX_H_DIST) {
+                break; // no horizontal room within a decent distance — fall back to up/down
+            }
+        }
+        for (int lift : V_FALLBACK) {
+            final BlockPos c = base.above(lift);
+            final IslandPlan candidate = planAt(level, theme, c);
+            if (IslandPlacement.check(candidate, players, occupied).ok()) {
+                this.setPos(c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5);
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** Plan the island at {@code c}; RNG is decorrelated per island via {@code worldSeed ^ centre}. */
+    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c) {
+        final RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
+        // Island look can vary with the biome it lands in (README → Configuration → Biome overrides).
+        return IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
     }
 
     /** Failed germination: a puff of smoke, a fizzle, and the seed dropped back so it isn't wasted. */

@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.6] - 2026-06-23
+
+### Changed
+- **Reworked the placement fix so new islands can sit right next to existing ones — and you can hop onto them.**
+  v0.34.5's distance check was too strict: a precise throw a short way off the start island got shoved far *upward*
+  instead of placing an island beside you. Reverted to a **block-level overlap** test (islands may sit flush —
+  touching is fine, only real interpenetration is rejected), and on a collision the island now nudges
+  **horizontally** off whatever it would grow into, out to a decent distance, falling back to up/down lifts only
+  when there's genuinely no horizontal room. Engulfment and player-burial are still rejected, but islands are no
+  longer held apart, so close placement (especially in precise mode) works.
+
 ## [0.34.5] - 2026-06-23
 
 ### Fixed
