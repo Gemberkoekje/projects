@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.38.1] - 2026-06-23
+
+### Fixed
+- **Structure fences, panes and walls now connect.** Jigsaw (structure) placement copies blockstates verbatim, so a
+  fence or glass pane lands as an unconnected post. After pasting *any* structure, Skyseed now re-derives the
+  connection state of every fence / pane / wall in its footprint with the game's own shape update — so the Evoker
+  Cell's windows, and any structure's railings and bars, link up to their neighbours (and the surrounding terrain).
+- **Evoker Cell front:** the dark-oak door is now framed by wood, with the red windows moved out to the edges next
+  to the cobblestone pillars instead of crowding the door.
+
 ## [0.38.0] - 2026-06-23
 
 ### Added

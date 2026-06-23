@@ -229,12 +229,13 @@ public final class RareStructureTemplates {
         window(m, new BlockPos(2, 0, max), new BlockPos(mid, 0, max), new BlockPos(4, 0, max), glass, white);
         window(m, new BlockPos(0, 0, 2), new BlockPos(0, 0, mid), new BlockPos(0, 0, 4), glass, white);
         window(m, new BlockPos(max, 0, 2), new BlockPos(max, 0, mid), new BlockPos(max, 0, 4), glass, white);
-        // Front wall: a dark-oak door flanked by the illagers' red windows.
+        // Front wall: a dark-oak door framed by wood, with the illagers' red windows out at the edges (next to
+        // the cobblestone pillars) rather than crowding the door.
         m.put(new BlockPos(mid, 1, 0), Blocks.DARK_OAK_DOOR.defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, Direction.NORTH));
         m.put(new BlockPos(mid, 2, 0), Blocks.DARK_OAK_DOOR.defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
-        for (final int wx : new int[]{2, 4}) {
+        for (final int wx : new int[]{1, 5}) {
             m.put(new BlockPos(wx, 2, 0), red);
             m.put(new BlockPos(wx, 3, 0), glass);
         }

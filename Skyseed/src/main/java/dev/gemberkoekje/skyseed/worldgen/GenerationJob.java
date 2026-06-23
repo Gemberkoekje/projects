@@ -20,6 +20,8 @@ import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CrossCollisionBlock;
+import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
@@ -37,6 +39,10 @@ import net.neoforged.neoforge.event.EventHooks;
 public final class GenerationJob {
     private static final int BLOCKS_PER_TICK = 512;
     private static final int TREES_PER_TICK = 2;
+    // Box (around a jigsaw origin) the connection-relink pass scans — generous enough for our biggest templates.
+    private static final int LINK_RADIUS = 16;
+    private static final int LINK_DOWN = 2;
+    private static final int LINK_UP = 28;
 
     private final ServerLevel level;
     private final IslandPlan plan;
@@ -171,6 +177,8 @@ public final class GenerationJob {
             JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
             Traps.applyAfterJigsaw(level, js.origin());
+            // Link up any fences / panes / walls the jigsaw pasted in their default (unconnected) state.
+            linkConnections(level, js.origin());
             spawnVillagersAtBeds(js.origin(), js.pad());
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);
@@ -179,6 +187,31 @@ public final class GenerationJob {
                     golem.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
                     golem.setPersistenceRequired();
                     level.addFreshEntity(golem);
+                }
+            }
+        }
+    }
+
+    /**
+     * Re-derive the connection state of any fences, panes/bars or walls in a just-placed structure's footprint.
+     * Jigsaw (structure) placement copies each stored blockstate verbatim with no neighbour update, so a connecting
+     * block written in its default state renders as an unconnected post; re-running the vanilla shape update links it
+     * to its real in-world neighbours (including the island terrain it sits against). Applied to every structure —
+     * a no-op wherever there is nothing to link. Scans a box around the jigsaw origin large enough for our templates.
+     */
+    public static void linkConnections(ServerLevel level, BlockPos origin) {
+        final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int dy = -LINK_DOWN; dy <= LINK_UP; dy++) {
+            for (int dx = -LINK_RADIUS; dx <= LINK_RADIUS; dx++) {
+                for (int dz = -LINK_RADIUS; dz <= LINK_RADIUS; dz++) {
+                    p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
+                    final BlockState state = level.getBlockState(p);
+                    if (state.getBlock() instanceof CrossCollisionBlock || state.getBlock() instanceof WallBlock) {
+                        final BlockState linked = Block.updateFromNeighbourShapes(state, level, p);
+                        if (linked != state) {
+                            level.setBlock(p.immutable(), linked, Block.UPDATE_CLIENTS);
+                        }
+                    }
                 }
             }
         }

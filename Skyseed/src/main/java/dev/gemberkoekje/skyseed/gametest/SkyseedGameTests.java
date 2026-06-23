@@ -141,6 +141,28 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
+        // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
+        // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos mid = helper.absolutePos(new BlockPos(5, 2, 8));
+        // UPDATE_KNOWN_SHAPE suppresses the neighbour-shape update, leaving the panes unconnected the way a pasted
+        // structure does (plain UPDATE_CLIENTS would re-link them on placement).
+        for (int dx = -1; dx <= 1; dx++) {
+            level.setBlock(mid.offset(dx, 0, 0), Blocks.GLASS_PANE.defaultBlockState(),
+                    Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        }
+        final BlockState before = level.getBlockState(mid);
+        helper.assertTrue(!before.getValue(BlockStateProperties.EAST) && !before.getValue(BlockStateProperties.WEST),
+                "a pane placed with UPDATE_CLIENTS should start unconnected");
+        GenerationJob.linkConnections(level, mid);
+        final BlockState after = level.getBlockState(mid);
+        helper.assertTrue(after.getValue(BlockStateProperties.EAST) && after.getValue(BlockStateProperties.WEST),
+                "linkConnections should connect the middle pane to both neighbours");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void dimensionGateGrowsOrFizzlesByImplementation(GameTestHelper helper) {
         // The adapt-or-fizzle matrix (SKYNETHERPLAN): a seed grows only in dimensions it implements — its base
         // `dimensions` or a dimension-keyed override — and fizzles elsewhere rather than growing the foreign base.
