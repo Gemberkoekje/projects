@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.9] - 2026-06-23
+
+### Fixed
+- **Guide book: missing seed recipes, and the Ocean Monument seed's icon.** The recipe almanac was missing the
+  **Outpost, Ocean Monument, Trial Chamber and Woodland Mansion** crafting pages — added, so the book now lists
+  every craftable seed. The **Ocean Monument Skyseed** also reused the generic seed texture; it now has its own
+  prismarine icon, plus a field-notes entry and its craft advancement, so it's fully documented like every other
+  seed.
+
 ## [0.34.8] - 2026-06-23
 
 ### Added

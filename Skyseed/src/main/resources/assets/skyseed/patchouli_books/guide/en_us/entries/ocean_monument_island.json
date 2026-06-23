@@ -1,0 +1,16 @@
+{
+  "name": "Ocean Monument",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:prismarine",
+  "advancement": "skyseed:craft_ocean_monument",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A sunken $(bold)prismarine temple$() on a sand island, lit from within by $(item)sea lanterns$(). $(bold)Guardians$() patrol its flooded halls and an $(bold)Elder Guardian$() guards the core — beware its mining-fatigue glare. Grow it over a $(item)deep ocean$()."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The reward$()$(br)Mine it for every $(item)prismarine$() — bricks and dark prismarine too — while the guardians drop the $(item)prismarine shards$() and crystals that finally unlock the $(item)Aquarium$(). A wet-sponge niche and a buried $(item)Heart of the Sea$() (for a $(item)Conduit$()) round out the haul."
+    }
+  ]
+}

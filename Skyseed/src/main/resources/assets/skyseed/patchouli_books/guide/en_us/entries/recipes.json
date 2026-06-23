@@ -179,6 +179,26 @@
       "text": "The $(item)Witch Hut Skyseed$() — a $(item)Cauldron$() and a $(item)brown mushroom$() over two $(item)oak planks$(). A witch, a cat, and brewing drops."
     },
     {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:outpost_skyseed",
+      "text": "The $(item)Outpost Skyseed$() — $(item)dark oak planks$() around a $(item)crossbow$() and an $(item)iron ingot$(). A pillager watchtower over a caged iron golem, with a loot chest up top."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ocean_monument_skyseed",
+      "text": "The $(item)Ocean Monument Skyseed$() — $(item)gold blocks$() and $(item)sponge$() around a $(item)diamond$(). A prismarine temple with guardians, a sponge room and a buried $(item)Heart of the Sea$(). Best thrown over a deep ocean."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:trial_chamber_skyseed",
+      "text": "The $(item)Trial Chamber Skyseed$() — $(item)tuff bricks$() and $(item)copper blocks$() around a $(item)diamond$(). A buried copper-and-tuff arena of trial spawners and vaults, guarded by a $(item)Breeze$()."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:woodland_mansion_skyseed",
+      "text": "The $(item)Woodland Mansion Skyseed$() — $(item)dark oak planks$() and $(item)diamonds$() around a $(item)Totem of Undying$(). A two-storey dark-oak manor of vindicators and an evoker."
+    },
+    {
       "type": "patchouli:text",
       "text": "$(bold)This Almanac$()$(br)Craft any single Skyseed on its own to turn it back into this book — so you'll never lose your way."
     }
