@@ -3,7 +3,10 @@ package dev.gemberkoekje.skyseed.event;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.item.SkyseedGuide;
 import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
+import dev.gemberkoekje.skyseed.worldgen.WorldSetupEvents;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +61,16 @@ public final class PlayerEvents {
         // anchor) sets its own respawn and overrides this.
         if (player.getRespawnPosition() == null) {
             player.setRespawnPosition(overworld.dimension(), spawn, 0.0F, true, false);
+        }
+
+        // Skyseed world made before the Nether/End were voided (pre-0.35.x): those dimensions are baked
+        // into the save as vanilla terrain and can't be retrofitted, so nudge the player to start fresh.
+        if (WorldSetupEvents.hasLegacyDimensions(server)) {
+            player.sendSystemMessage(Component.literal(
+                    "[Skyseed] This world was made on an older version, so its Nether and End are still the "
+                  + "normal vanilla dimensions. Your overworld is fine — but for the proper empty Skyseed Nether "
+                  + "and End you'll need to start a new world. You won't have to do this again: both dimensions "
+                  + "are now set up from the start.").withStyle(ChatFormatting.GOLD));
         }
     }
 }

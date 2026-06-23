@@ -25,6 +25,8 @@ public final class SkyseedWorldData extends SavedData {
     private boolean startPlaced = false;
     @Nullable
     private BlockPos startSpawn = null;
+    @Nullable
+    private String createdVersion = null;
     private final Set<UUID> guided = new HashSet<>();
     private final Set<UUID> spawned = new HashSet<>();
 
@@ -38,6 +40,9 @@ public final class SkyseedWorldData extends SavedData {
         if (tag.contains("SpawnX")) {
             data.startSpawn = new BlockPos(tag.getInt("SpawnX"), tag.getInt("SpawnY"), tag.getInt("SpawnZ"));
         }
+        if (tag.contains("CreatedVersion")) {
+            data.createdVersion = tag.getString("CreatedVersion");
+        }
         readUuids(tag, "Guided", data.guided);
         readUuids(tag, "Spawned", data.spawned);
         return data;
@@ -50,6 +55,9 @@ public final class SkyseedWorldData extends SavedData {
             tag.putInt("SpawnX", startSpawn.getX());
             tag.putInt("SpawnY", startSpawn.getY());
             tag.putInt("SpawnZ", startSpawn.getZ());
+        }
+        if (createdVersion != null) {
+            tag.putString("CreatedVersion", createdVersion);
         }
         tag.put("Guided", writeUuids(guided));
         tag.put("Spawned", writeUuids(spawned));
@@ -81,6 +89,17 @@ public final class SkyseedWorldData extends SavedData {
     @Nullable
     public BlockPos getStartSpawn() {
         return startSpawn;
+    }
+
+    /** The Skyseed version this world was created on, or null for worlds made before stamping (pre-0.35.2). */
+    @Nullable
+    public String getCreatedVersion() {
+        return createdVersion;
+    }
+
+    public void setCreatedVersion(String version) {
+        this.createdVersion = version;
+        setDirty();
     }
 
     /** Mark the start island as handled for this world; {@code spawn} is null for existing worlds (no island). */

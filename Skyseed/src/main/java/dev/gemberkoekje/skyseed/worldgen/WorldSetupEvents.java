@@ -4,14 +4,20 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import org.jetbrains.annotations.Nullable;
 
 /** Places the curated starting island once, when a brand-new world is first created (README → World & progression setup). */
 @EventBusSubscriber(modid = Skyseed.MODID)
@@ -24,29 +30,65 @@ public final class WorldSetupEvents {
 
     @SubscribeEvent
     static void onServerStarted(ServerStartedEvent event) {
-        ServerLevel overworld = event.getServer().overworld();
+        MinecraftServer server = event.getServer();
+        ServerLevel overworld = server.overworld();
         SkyseedWorldData data = overworld.getDataStorage()
                 .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
         if (data.isStartPlaced()) {
             // Existing world: keep raids off if this is a Skyseed world (it has a curated start island).
             if (data.getStartSpawn() != null) {
-                disableRaids(event.getServer(), overworld);
+                disableRaids(server, overworld);
             }
+            logVersion(server, data);
             return;
         }
         // Only a brand-new world (no ticks elapsed yet) — never retrofit an existing save.
         if (overworld.getGameTime() == 0L) {
             BlockPos center = findLandCenter(overworld);
             // Honour the vanilla "Generate Bonus Chest" world-creation option with a starter chest on the island.
-            boolean bonusChest = event.getServer().getWorldData().worldGenOptions().generateBonusChest();
+            boolean bonusChest = server.getWorldData().worldGenOptions().generateBonusChest();
             BlockPos spawn = StartIsland.build(overworld, center, bonusChest);
             overworld.setDefaultSpawnPos(spawn, 0.0F);
             data.markStartPlaced(spawn);
-            disableRaids(event.getServer(), overworld);
+            data.setCreatedVersion(Skyseed.VERSION); // stamp the creation version for future-migration warnings
+            disableRaids(server, overworld);
             Skyseed.LOGGER.info("[skyseed] placed curated starting island at {}; spawn {}", center, spawn);
         } else {
             data.markStartPlaced(null); // existing world: leave spawn untouched
         }
+        logVersion(server, data);
+    }
+
+    private static void logVersion(MinecraftServer server, SkyseedWorldData data) {
+        String created = data.getCreatedVersion();
+        Skyseed.LOGGER.info("[skyseed] Skyseed {} active; this world was created on {}{}",
+                Skyseed.VERSION,
+                created != null ? created : "an earlier version (pre-0.35.2)",
+                hasLegacyDimensions(server)
+                        ? " — its Nether/End are still vanilla; a new world is needed for the empty Skyseed Nether and End"
+                        : "");
+    }
+
+    /**
+     * True if this world's Nether or End predate the void-dimension setup (v0.35.x) — i.e. they're still the
+     * vanilla terrain dimensions baked in at creation, which can only be fixed by starting a new world. The
+     * generator (and so its noise settings) is inlined into {@code level.dat} at world creation, so we read it
+     * straight off the live dimension rather than guessing from a version stamp (which old worlds don't have).
+     */
+    public static boolean hasLegacyDimensions(MinecraftServer server) {
+        return !usesVoidSettings(server.getLevel(Level.NETHER), "void_nether")
+                || !usesVoidSettings(server.getLevel(Level.END), "void_end");
+    }
+
+    private static boolean usesVoidSettings(@Nullable ServerLevel level, String settingsPath) {
+        if (level == null) {
+            return true; // dimension absent (e.g. removed by another mod) → nothing to flag
+        }
+        if (level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator gen) {
+            return gen.generatorSettings().is(ResourceKey.create(Registries.NOISE_SETTINGS,
+                    ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, settingsPath)));
+        }
+        return false;
     }
 
     /**

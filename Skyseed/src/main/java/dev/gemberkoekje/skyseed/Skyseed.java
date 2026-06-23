@@ -20,9 +20,12 @@ public class Skyseed {
     // The mod id, referenced everywhere (registries, themes, item/entity ids).
     public static final String MODID = "skyseed";
     public static final Logger LOGGER = LogUtils.getLogger();
+    /** This build's mod version (e.g. "0.35.2"); stamped into new worlds and logged on load. */
+    public static String VERSION = "unknown";
 
     // FML passes in the mod event bus and container automatically.
     public Skyseed(IEventBus modEventBus, ModContainer modContainer) {
+        VERSION = modContainer.getModInfo().getVersion().toString();
         ModItems.register(modEventBus);
         ModEntities.register(modEventBus);
         ModRecipes.register(modEventBus);

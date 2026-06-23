@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.2] - 2026-06-23
+
+### Added
+- **Older-world warning for the Nether/End.** A world's dimensions are baked in when it's created, so a save
+  started before v0.35.x keeps the vanilla Nether and End — there's no way to retrofit the empty Skyseed ones
+  without a fresh world. The mod now checks the live Nether/End generators on load and, if they're still the
+  vanilla terrain, shows the player a one-line heads-up at login recommending a new world (the overworld is
+  unaffected). New worlds are also stamped with the Skyseed version they were created on, and the active mod
+  version + the world's creation version are logged on every load. *Why now:* with the overworld, Nether and End
+  all emptied as of v0.35.1, this is the last expected world-breaking change — so anyone starting fresh today
+  shouldn't need to restart again for the dimension work.
+
 ## [0.35.1] - 2026-06-23
 
 ### Added
