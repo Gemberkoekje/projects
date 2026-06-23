@@ -1,0 +1,10 @@
+{
+  "name": "Large Nether Lava Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:magma_block",
+  "advancement": "skyseed:craft_nether_lava_large",
+  "pages": [
+    { "type": "patchouli:text", "text": "A broad $(bold)lava lagoon$() — a wide contained lake, a bigger $(item)Strider$() pack, magma shores. And like the normal Nether Lava, thrown $(bold)topside$() it grows a full-size $(bold)Large$() lava island, the overworld's only one." },
+    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Aquatic Skyseed$() in the centre of a 3x3 of $(item)basalt$() and buckets of $(item)lava$() (returned empty)." }
+  ]
+}

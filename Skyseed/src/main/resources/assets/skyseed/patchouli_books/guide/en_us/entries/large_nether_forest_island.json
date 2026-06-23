@@ -1,0 +1,10 @@
+{
+  "name": "Large Nether Forest Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:crimson_fungus",
+  "advancement": "skyseed:craft_nether_forest_large",
+  "pages": [
+    { "type": "patchouli:text", "text": "A vast $(bold)fungal forest$() thick with huge fungi and Hoglins — crimson by default, $(bold)warped$() (teal, with Endermen) in a warped biome." },
+    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Forest Skyseed$() in the centre of a 3x3 of $(item)crimson stems$() and $(item)shroomlight$()." }
+  ]
+}

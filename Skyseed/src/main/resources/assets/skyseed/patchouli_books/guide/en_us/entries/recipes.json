@@ -135,6 +135,31 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_rocky_large_skyseed",
+      "text": "The $(item)Large Nether Rocky Skyseed$() — a $(item)Large Rocky Skyseed$() centred in netherrack + nether quartz. A broad deep-mining isle."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_lava_large_skyseed",
+      "text": "The $(item)Large Nether Lava Skyseed$() — a $(item)Large Aquatic Skyseed$() centred in basalt + lava buckets. A broad lagoon (and a Large lava island topside)."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_forest_large_skyseed",
+      "text": "The $(item)Large Nether Forest Skyseed$() — a $(item)Large Forest Skyseed$() centred in crimson stems + shroomlight. A vast fungal forest."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_soul_large_skyseed",
+      "text": "The $(item)Large Nether Soul Skyseed$() — a $(item)Large Desert Skyseed$() centred in soul sand + bone blocks. A sprawling Soul Sand Valley."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_basalt_large_skyseed",
+      "text": "The $(item)Large Nether Basalt Skyseed$() — a $(item)Large Badlands Skyseed$() centred in basalt + gilded blackstone. A vast Basalt Deltas."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:nether_fortress_skyseed",
       "text": "The $(item)Nether Fortress Skyseed$() — nether bricks, nether brick fence and a nether wart block. A bridge-and-keep fortress fragment with a caged $(bold)blaze spawner$()."
     },

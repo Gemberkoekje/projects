@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NSN",
+    "NRN",
+    "NSN"
+  ],
+  "key": {
+    "N": { "item": "minecraft:crimson_stem" },
+    "S": { "item": "minecraft:shroomlight" },
+    "R": { "item": "skyseed:forest_large_skyseed" }
+  },
+  "result": {
+    "id": "skyseed:nether_forest_large_skyseed"
+  }
+}

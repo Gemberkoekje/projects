@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NSN",
+    "NRN",
+    "NSN"
+  ],
+  "key": {
+    "N": { "item": "minecraft:basalt" },
+    "S": { "item": "minecraft:lava_bucket" },
+    "R": { "item": "skyseed:aquatic_large_skyseed" }
+  },
+  "result": {
+    "id": "skyseed:nether_lava_large_skyseed"
+  }
+}

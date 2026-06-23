@@ -670,6 +670,41 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void largeNetherSeedsAreFullSizeNetherNative(GameTestHelper helper) {
+        // The Large variants of the 5 Tier-2 Nether-native seeds (SKYNETHERPLAN): same biome content, much bigger
+        // (radius 11-17). Each is the_nether-only and grows a LARGE island carrying its surface block.
+        final ServerLevel overworld = helper.getLevel();
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        record L(String theme, Block surface) {}
+        final L[] cases = {
+            new L("nether_rocky_large", Blocks.NETHERRACK),
+            new L("nether_lava_large", Blocks.BASALT),
+            new L("nether_forest_large", Blocks.CRIMSON_NYLIUM),
+            new L("nether_soul_large", Blocks.SOUL_SAND),
+            new L("nether_basalt_large", Blocks.BASALT),
+        };
+        long seed = 200L;
+        for (L c : cases) {
+            final IslandTheme t = theme(nether, c.theme());
+            helper.assertTrue(t.baseValidIn(Level.NETHER.location()), c.theme() + " must implement the_nether");
+            helper.assertTrue(!t.baseValidIn(Level.OVERWORLD.location()), c.theme() + " must be the_nether-only");
+            final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), t, wastes,
+                    RandomSource.create(seed++));
+            helper.assertTrue(p.blocks().size() > 1500,
+                    c.theme() + " should be a LARGE island (>1500 blocks), was " + p.blocks().size());
+            boolean surface = false;
+            for (IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(c.surface())) surface = true;
+            }
+            helper.assertTrue(surface, c.theme() + " should carry its surface block " + c.surface());
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
         // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation

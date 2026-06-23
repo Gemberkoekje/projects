@@ -129,6 +129,47 @@ So the old dedicated seeds come back as Tier-2 upgrades, not a parallel system:
 same content. **Tier-2 Nether seeds are defined by exclusive *content*, not size** — gilded blackstone, ancient-debris
 nodes, guaranteed mob packs, the biome's signature rare block. So Large = bigger; Tier-2 = richer.
 
+### Large Nether seeds (the two axes combine)
+
+> **The 5 seeds BUILT (v0.56.0).** `nether_rocky_large` · `nether_lava_large` · `nether_forest_large` ·
+> `nether_soul_large` · `nether_basalt_large` — each the Tier-2 theme scaled up (radius 11-17 matching the parent
+> overworld Large; ore counts ~×3, premium ~×2), the `NSN/NRN/NSN` 3×3 recipe (Large overworld seed centre + 6 bulk
+> + 2 signature), and the easter eggs scaled to ~1.5× (lava grows full-size→Large topside). **The 5% Blaze Spawner
+> Room roll + the `debug_blaze_spawner` debug seed are STILL DEFERRED — to be added next.**
+
+A **Large variant of each of the 5 Tier-2 Nether-native seeds**: Tier-2's richer content *at* Large's bigger size,
+each carrying a **5% Blaze Spawner Room** (the room deferred from the Nether Fortress task, finally homed here).
+
+- **The five:** `nether_rocky_large` · `nether_lava_large` · `nether_forest_large` · `nether_soul_large` ·
+  `nether_basalt_large`.
+- **Size:** mirror the *parent overworld Large* radius — rocky / soul / basalt **11-15**, lava **11-14**, forest
+  **13-17** (vs the Tier-2's 6-9). Same palette / biome content as the Tier-2 seed, ore counts scaled up the way the
+  overworld Large seeds scale theirs (≈ ×3 vein counts).
+- **Recipe — 3×3 with a Large overworld seed in the centre** (the rule): pattern `NSN / NRN / NSN` = 6 bulk block
+  **N** + 2 signature **S** around the Large overworld seed **R** — a scaled-up echo of the Tier-2 2×2's
+  bulk + signature + parent:
+
+  | Large Nether seed | centre **R** | bulk **N** ×6 | signature **S** ×2 |
+  |---|---|---|---|
+  | `nether_rocky_large` | `rocky_large_skyseed` | netherrack | nether quartz |
+  | `nether_lava_large` | `aquatic_large_skyseed` | basalt | lava bucket (returned) |
+  | `nether_forest_large` | `forest_large_skyseed` | crimson stem | shroomlight |
+  | `nether_soul_large` | `desert_large_skyseed` | soul sand | bone block |
+  | `nether_basalt_large` | `badlands_large_skyseed` | basalt | gilded blackstone |
+
+  (parent mapping = the Tier-2 mapping: desert→soul, aquatic→lava, forest→forest, rocky→rocky, badlands→basalt.)
+- **Blaze Spawner Room** — one structure, two new uses (+ it reuses the Fortress keep's design): a standalone
+  *non-boxy* nether-brick room — pitched `gableRoof`, fence-grate windows, a doorway, a **caged blaze spawner** on a
+  plinth, soul-sand/wart braziers, a small `chests/nether_bridge` chest. Used by **(1)** a 5% `rare_structures` roll
+  on each of the 5 Large Nether seeds, and **(2)** a `debug_blaze_spawner` creative-only debug seed (no recipe/tag/
+  guide, "Skyseed Debug" tab). Pool `skyseed:nether_fortress/blaze_room`.
+- **Overworld easter eggs:** ≈1.5× the Tier-2's tiny ones (mirroring the Large overworld→Nether adaptations) —
+  *except* `nether_lava_large`, which (like `nether_lava`) grows a *full-size — here Large* lava island topside,
+  since the overworld still has no lava island of its own.
+- **Build order:** the Blaze Spawner Room structure + the `debug_blaze_spawner` seed first (unblocks the 5% roll),
+  then the 5 Large seeds — each = the Tier-2 theme scaled up + the 5% blaze room + the 3×3 recipe + the standard
+  12-touch-point seed wiring.
+
 ---
 
 ## Seed mapping

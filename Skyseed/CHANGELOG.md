@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.56.0] - 2026-06-23
+
+### Added
+- **Large Nether seeds — a Large variant of each of the 5 Tier-2 Nether-native seeds.** Same biome content as their
+  Tier-2 counterparts, much bigger (radius 11-17, mirroring the overworld Large jump) with ore counts scaled to
+  match: **Large Nether Rocky, Lava, Forest, Soul and Basalt.** Recipe: **3×3 with the matching Large overworld seed
+  in the centre** + 6 bulk nether blocks + 2 signature items (e.g. a *Large Rocky Skyseed* ringed by netherrack and
+  nether quartz). Overworld easter eggs scale up to match — except **Large Nether Lava**, which (like Nether Lava)
+  grows a full-size **Large lava island** topside, the overworld's only one. New items, recipes, advancements, guide
+  entries and nether-tinted icons. Guarded by the `largeNetherSeedsAreFullSizeNetherNative` gametest. *(The 5% Blaze
+  Spawner Room roll planned for these is deferred — to be added next.)*
+
 ## [0.55.0] - 2026-06-23
 
 ### Added

@@ -1,0 +1,10 @@
+{
+  "name": "Large Nether Basalt Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:gilded_blackstone",
+  "advancement": "skyseed:craft_nether_basalt_large",
+  "pages": [
+    { "type": "patchouli:text", "text": "A vast, hazardous $(bold)Basalt Deltas$() — a forest of basalt columns, magma underfoot, and $(item)gilded blackstone$() salted through the core for $(item)gold$()." },
+    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Badlands Skyseed$() in the centre of a 3x3 of $(item)basalt$() and $(item)gilded blackstone$()." }
+  ]
+}
