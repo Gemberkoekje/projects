@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.4] - 2026-06-23
+
+### Changed
+- **Hardened the `/emptynether` / `/emptyend` reset against interruption.** Three changes so an ill-timed crash or
+  power loss can't corrupt or half-convert a save: the `level.dat` rewrite now happens *last* and *atomically* (it's
+  written to a temp file and atomically moved into place, so the real file is never seen half-written); the old
+  chunks are deleted *before* that flip, so any interruption leaves `level.dat` still pointing at the original
+  generator — the dimension just regenerates consistently and the command can be re-run, instead of leaving a
+  half-void/half-vanilla mix; and the original `level.dat` is copied to `level.dat_skyseed_backup` first as a
+  recovery point. The blast radius stays tiny: only `level.dat` and the target dimension's `region`/`entities`/`poi`
+  folders are ever touched — the overworld, player data and everything else are left alone.
+
 ## [0.35.3] - 2026-06-23
 
 ### Added

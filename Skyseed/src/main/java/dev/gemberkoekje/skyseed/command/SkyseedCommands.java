@@ -27,8 +27,10 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -168,21 +170,46 @@ public final class SkyseedCommands {
 
     private static void applyReset(Path levelDat, Path worldRoot, Target target) {
         try {
+            // 1. Validate on a fresh read before touching anything. swapDimensionSettings only returns true if the
+            //    expected vanilla generator is actually present, so an unexpected or already-void level.dat aborts
+            //    here with nothing deleted or rewritten.
             CompoundTag root = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap());
             if (!swapDimensionSettings(root, target.dimKey(), target.voidSettingsId())) {
-                Skyseed.LOGGER.warn("[skyseed] {} reset skipped: level.dat had no {} generator to switch (or it was already void)",
+                Skyseed.LOGGER.warn("[skyseed] {} reset skipped: level.dat had no vanilla {} generator to switch",
                         target.label, target.dimKey());
                 return;
             }
-            NbtIo.writeCompressed(root, levelDat);
+            // 2. Keep the original level.dat as a recovery point.
+            Path backup = levelDat.resolveSibling("level.dat_skyseed_backup");
+            Files.copy(levelDat, backup, StandardCopyOption.REPLACE_EXISTING);
+            // 3. Delete the old chunks FIRST. If we're interrupted anywhere up to step 4, level.dat still names the
+            //    vanilla generator, so the dimension just regenerates vanilla (a consistent world) and the command
+            //    can simply be re-run — there is no half-converted state.
             Path dim = worldRoot.resolve(target.folder());
             deleteRecursively(dim.resolve("region"));
             deleteRecursively(dim.resolve("entities"));
             deleteRecursively(dim.resolve("poi"));
-            Skyseed.LOGGER.info("[skyseed] {} reset applied: level.dat now uses {} and the old chunks were wiped",
-                    target.label, target.voidSettingsId());
+            // 4. Flip level.dat to the void generator LAST, and atomically (temp file + atomic move), so it is never
+            //    observed half-written even on a power loss.
+            writeLevelDatAtomically(root, levelDat);
+            Skyseed.LOGGER.info("[skyseed] {} reset applied: level.dat now uses {}, old chunks wiped, original backed up to {}",
+                    target.label, target.voidSettingsId(), backup.getFileName());
         } catch (IOException e) {
-            Skyseed.LOGGER.error("[skyseed] {} reset failed; the dimension was left untouched", target.label, e);
+            // level.dat is flipped last and atomically, so on any failure it still names the vanilla generator and
+            // the world stays consistent (any already-wiped chunks just regenerate vanilla). Re-running is safe.
+            Skyseed.LOGGER.error("[skyseed] {} reset did not finish; level.dat was left on the original generator, so "
+                    + "the world stays consistent — you can re-run the command", target.label, e);
+        }
+    }
+
+    /** Write {@code level.dat} via a temp file + atomic move, so the real file is never seen half-written. */
+    private static void writeLevelDatAtomically(CompoundTag root, Path levelDat) throws IOException {
+        Path tmp = levelDat.resolveSibling("level.dat_skyseedtmp");
+        NbtIo.writeCompressed(root, tmp);
+        try {
+            Files.move(tmp, levelDat, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tmp, levelDat, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
