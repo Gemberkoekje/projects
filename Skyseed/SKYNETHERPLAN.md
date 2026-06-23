@@ -16,7 +16,7 @@ built Overworld chapter, and `description.md` for the published mod description.
 
 ### The void
 
-> **Built (v0.35.0).** `the_nether` in the `skyseed:skyblock` preset now uses the `skyseed:void_nether` noise settings: no terrain (`final_density` 0), a **lava sea** below Y 32 (`default_fluid` lava + `sea_level` 32), and the five Nether biomes via the `minecraft:nether` multi-noise source. Applies to newly created worlds. The start platform, portal arrival, and seeds are still to come.
+> **Built (v0.35.0).** `the_nether` in the `skyseed:skyblock` preset now uses the `skyseed:void_nether` noise settings: no terrain (`final_density` 0), a **lava sea** below Y 32 (`default_fluid` lava + `sea_level` 32), and the five Nether biomes via the `minecraft:nether` multi-noise source. Applies to newly created worlds. Seeds and the Nether structures are still to come; there's deliberately **no curated start platform** (see *Arrival* below).
 
 The Nether is **completely empty** except for what the player generates — no natural terrain, no bedrock floor.
 Below every island is a **lava sea** at a fixed low Y: it lights the dimension from beneath, gives the hellish
@@ -27,14 +27,15 @@ Seeds respond to the biome at their germination point exactly as overworld seeds
 is the core loop: **you get the right Nether island by throwing the right seed into the right part of the sky**,
 which means exploring the void to find biomes first. Xaero's biome overlay earns its keep here.
 
-### The starting island
+### Arrival — no curated start
 
-The player arrives through a **Nether portal on the overworld start island** onto a curated netherrack/blackstone
-platform — slightly larger than the overworld start, because a stumble here means the lava sea. It has:
+**Decision: there is no curated Nether start.** When the player first steps through a portal, the game's own portal
+placement drops them onto the little obsidian platform it builds in the void over the lava sea — a small spot to
+stand on, and that's all they need. From there they do what they do everywhere in Skyseed: start throwing seeds (the
+first Nether seed *is* the first real platform). Keeping arrival uncurated is simpler and skyblock-pure.
 
-- The active portal (or frame + flint & steel in a chest)
-- A small netherrack platform with a fire (light + atmosphere)
-- A chest with a **fire resistance potion** and basic food — the early Nether is genuinely lethal
+The early Nether is genuinely lethal — one stumble into the lava sea is fatal — but that's the player's problem to
+solve with the gear and potions they carry **through** the portal, not something handed to them on arrival.
 
 ### No ceiling — and how value is gated
 
@@ -46,6 +47,25 @@ There's no Y=128 ceiling; islands float at any Y under the open Nether fog. Valu
   and carry the Ancient Debris that vanilla puts at low Y; high islands are safe but lean. This deliberately
   **rewards risky low throws** — that risk/reward tension is the point, and it maps directly onto vanilla
   (debris peaks ~Y15). *(Earlier drafts claimed altitude doesn't gate value — it does, via lava proximity. Resolved.)*
+
+### Ruined Portal twins — linked across dimensions
+
+A cross-dimension detail, and the one structure we can **pre-place** (because *we* choose where the ruined portal
+goes, unlike the player-placed arrival portal). **Whenever a ruined portal is created on either side** — the
+dedicated Ruined Portal seed *or* the random `rare_structures` roll on a big island — a matching ruined portal is
+generated on the **other** side at the **vanilla-linked coordinate** (the standard 8:1 map: `nether = overworld / 8`,
+`overworld = nether * 8`).
+
+- **The twin is a small, dimension-appropriate island:** a little **dirt** island in the Overworld, a little
+  **netherrack** island in the Nether, each carrying its own ruined frame.
+- **Placement stays close on purpose.** It runs the normal germination free-space check (is every block clear? if
+  not, step to the nearest free spot) — but the step must be *small*: a Nether portal too far from the linked
+  coordinate **won't link**. So unlike a normal seed (which can be shoved any distance to fit), the twin prefers the
+  exact linked spot and moves only the shortest distance that frees it.
+- **The payoff is free.** Sitting at the linked coordinate, if the player repairs and lights *both* frames, vanilla's
+  own portal search connects them into a real working pair — no linking code needed. (This is why the frame was
+  fixed to a real, repairable 4×5 shape in v0.35.6.)
+- **No recursion:** a twin doesn't spawn a twin of its own.
 
 ---
 
@@ -259,8 +279,8 @@ mob-pack machinery (as the overworld structure islands are).
 ## Progression sketch
 
 ```
-Overworld → Nether Portal (curated start island)
-    ↓ Fire Resistance Potion from the start chest
+Overworld → build a Nether Portal → step through (vanilla drops you on a small obsidian platform; no curated start)
+    ↓ Bring your own gear through the portal: fire-resistance potion, blocks, food (the early Nether is lethal)
     ↓ Explore the void to find biomes (Xaero's biome overlay)
 
 Throw overworld seeds straight into the Nether (Tier 1, free):
@@ -293,8 +313,11 @@ the mushroom island), **Meadow** (fizzles), **Large vs Tier-2** (Large = bigger 
 
 - **Respawn in the Nether** — Respawn Anchors charge with Glowstone (from Rocky/Wastes). "Charge an anchor before you
   explore" is Nether 101 and doubly true when every island is separated by void — give it a prominent guide entry.
-- **Ruined Portal scene (impl)** — the seed already reads dimension for the fizzle rule; confirm it renders the
-  Nether scene (blackstone/basalt surround) in the Nether vs the scorched-earth scene in the Overworld.
+- **Ruined Portal twins (impl)** — whenever a ruined portal is created on either side (seed *or* `rare_structures`
+  roll), generate a matching small ruined-portal island on the other side at the vanilla-linked coord
+  (`nether = overworld / 8`), nudging only the shortest free distance so it stays in portal-linking range; a twin
+  must not spawn its own twin. See *Ruined Portal twins* under World design. (Also still worth confirming the seed
+  renders a Nether-appropriate scene — blackstone/basalt surround — when thrown in the Nether.)
 - **Mooshrooms in the Nether (impl)** — spawned via the `animals` pack and marked persistent; they won't naturally
   breed-spawn there, so the seed places a starter herd. Verify they don't despawn.
 
