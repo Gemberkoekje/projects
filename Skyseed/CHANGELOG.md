@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.45.0] - 2026-06-23
+
+### Changed
+- **A Nether/End override never inherits Overworld content.** A dimension-keyed `biome_override` is now a complete
+  spec for that dimension: any field it doesn't set defaults to neutral/empty (a netherrack/end-stone body, no ores,
+  no decoration, no mobs, no pond, a small shape) instead of falling back to the theme's Overworld base. So overworld
+  ore, plants, mobs or terracotta strata can't leak across the portal when an override omits a field. (Overworld
+  generation is unchanged — the base config only applies where it's valid for the dimension.)
+
 ## [0.44.0] - 2026-06-23
 
 ### Added

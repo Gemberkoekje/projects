@@ -76,8 +76,10 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 > no new item. A theme also declares its base `dimensions` (every current seed is explicitly `[minecraft:overworld]`).
 > **Adapt-or-fizzle is live (v0.37.0):** a seed thrown into a dimension it implements neither in `dimensions` nor via
 > a dimension-keyed override **fizzles** instead of growing the foreign base form — so a future Nether-only seed gets
-> the overworld fizzle for free. **Rocky** is the first adapted seed (overworld base + Nether overrides). Still to do:
-> adapt the remaining seeds one at a time.
+> the overworld fizzle for free. **Rocky** is the first adapted seed (overworld base + Nether overrides). **As of
+> v0.45.0 a dimension override never inherits Overworld content** — an unset field is neutral/empty (a
+> netherrack/end-stone body, no ores/decoration/mobs), not the overworld base, so a dimension form can't leak grass,
+> coal or terracotta across the portal. Still to do: adapt Lush (Meadow + Frozen fizzle by design).
 
 **One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
 

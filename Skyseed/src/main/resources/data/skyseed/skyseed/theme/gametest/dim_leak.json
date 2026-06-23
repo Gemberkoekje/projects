@@ -1,0 +1,11 @@
+{
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 3, "max": 3 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone" },
+  "ores": [
+    { "block": "minecraft:coal_ore", "chance": 1.0, "count": { "min": 3, "max": 3 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+  ],
+  "biome_overrides": [
+    { "dimension": "minecraft:the_nether", "surface": "minecraft:netherrack" }
+  ]
+}

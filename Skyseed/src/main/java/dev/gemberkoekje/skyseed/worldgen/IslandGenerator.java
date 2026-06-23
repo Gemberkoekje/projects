@@ -17,6 +17,7 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import dev.gemberkoekje.skyseed.worldgen.theme.JigsawConfig;
 import dev.gemberkoekje.skyseed.worldgen.theme.RareStructure;
 import dev.gemberkoekje.skyseed.worldgen.theme.Shape;
+import dev.gemberkoekje.skyseed.worldgen.theme.Underside;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -53,6 +54,8 @@ public final class IslandGenerator {
 
     /** Blocks of headroom cleared above a structure pad, so an assembled building isn't clipped by island terrain. */
     private static final int PAD_CLEAR_HEIGHT = 10;
+    /** Fallback shape for a dimension override that omits one — small, so it never inherits the overworld silhouette. */
+    private static final Shape NEUTRAL_SHAPE = new Shape(new IntRange(3, 3), 0.2f, Underside.TEARDROP, new IntRange(1, 1));
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
@@ -60,19 +63,32 @@ public final class IslandGenerator {
         final boolean baseValidHere = theme.baseValidIn(dim);
         final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, baseValidHere);
 
-        // --- effective config: base theme, overlaid by the matching biome override ---
-        final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get() : theme.shape();
-        final List<OreEntry> ores = (ov != null && ov.ores().isPresent()) ? ov.ores().get() : theme.ores();
-        final List<Variant> variants = (ov != null && ov.variants().isPresent()) ? ov.variants().get() : theme.variants();
+        // --- effective config: the matching override, over the base theme ONLY where the base is valid in this
+        // dimension. A Nether/End override is a complete spec: when the base config is the wrong dimension
+        // (`baseValidHere` false) an unset field is neutral/empty, NEVER the overworld value — overworld content
+        // (ores, palette, decoration, mobs, …) can't leak across the portal.
+        final boolean useBase = baseValidHere;
+        final ResourceLocation neutralBlock = ResourceLocation.withDefaultNamespace(
+                dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
         final Palette pal = theme.palette();
-        final ResourceLocation fillId = (ov != null && ov.fill().isPresent()) ? ov.fill().get() : pal.fill();
-        final ResourceLocation coreId = (ov != null && ov.core().isPresent()) ? ov.core().get() : pal.core();
-        final int baseFill = (ov != null && ov.fillDepth().isPresent()) ? ov.fillDepth().get() : pal.fillDepth();
-        final List<GroundEntry> scatterCfg =
-                (ov != null && ov.surfaceScatter().isPresent()) ? ov.surfaceScatter().get() : pal.surfaceScatter();
+        final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get()
+                : (useBase ? theme.shape() : NEUTRAL_SHAPE);
+        final List<OreEntry> ores = (ov != null && ov.ores().isPresent()) ? ov.ores().get()
+                : (useBase ? theme.ores() : List.<OreEntry>of());
+        final List<Variant> variants = (ov != null && ov.variants().isPresent()) ? ov.variants().get()
+                : (useBase ? theme.variants() : List.<Variant>of());
+        final ResourceLocation fillId = (ov != null && ov.fill().isPresent()) ? ov.fill().get()
+                : (useBase ? pal.fill() : neutralBlock);
+        final ResourceLocation coreId = (ov != null && ov.core().isPresent()) ? ov.core().get()
+                : (useBase ? pal.core() : neutralBlock);
+        final int baseFill = (ov != null && ov.fillDepth().isPresent()) ? ov.fillDepth().get()
+                : (useBase ? pal.fillDepth() : 2);
+        final List<GroundEntry> scatterCfg = (ov != null && ov.surfaceScatter().isPresent()) ? ov.surfaceScatter().get()
+                : (useBase ? pal.surfaceScatter() : List.<GroundEntry>of());
 
         final Variant variant = pickVariant(variants, random);
-        ResourceLocation surfaceId = (ov != null && ov.surface().isPresent()) ? ov.surface().get() : pal.surface();
+        ResourceLocation surfaceId = (ov != null && ov.surface().isPresent()) ? ov.surface().get()
+                : (useBase ? pal.surface() : neutralBlock);
         if (variant != null && variant.surfaceOverride().isPresent()) {
             surfaceId = variant.surfaceOverride().get();
         }
@@ -81,9 +97,10 @@ public final class IslandGenerator {
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
         final List<Scatter> scatter = resolveScatter(scatterCfg);
         // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
-        // replace the bands, or clear them with an empty list (e.g. the Nether adaptation drops the terracotta strata).
+        // replace the bands, or clear them with an empty list; a foreign-dimension override never inherits them.
         final List<BlockState> bands = (ov != null && ov.fillBands().isPresent())
-                ? resolveBands(ov.fillBands().get()) : resolveBands(pal.fillBands());
+                ? resolveBands(ov.fillBands().get())
+                : (useBase ? resolveBands(pal.fillBands()) : List.<BlockState>of());
         final int bandThickness = Math.max(1, pal.bandThickness());
 
         // --- pass 1: solid island terrain ---
@@ -140,7 +157,8 @@ public final class IslandGenerator {
         }
 
         // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
-        final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond() : theme.pond();
+        final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond()
+                : (useBase ? theme.pond() : Optional.<Pond>empty());
         final Set<Long> pondColumns = new HashSet<>();
         int pondSurfaceTmp = center.getY();
         if (!lavaLake && pondCfg.isPresent() && (rare == null || !rare.suppressPond())) {
@@ -197,7 +215,8 @@ public final class IslandGenerator {
         }
 
         // Mobs: theme/override sprinkles plus any variant-specific ones, spawned after the island lands.
-        final List<MobEntry> baseMobs = (ov != null && ov.mobs().isPresent()) ? ov.mobs().get() : theme.mobs();
+        final List<MobEntry> baseMobs = (ov != null && ov.mobs().isPresent()) ? ov.mobs().get()
+                : (useBase ? theme.mobs() : List.<MobEntry>of());
         final List<MobEntry> mobCfg = new ArrayList<>(baseMobs);
         if (variant != null) {
             mobCfg.addAll(variant.decoration().mobs());

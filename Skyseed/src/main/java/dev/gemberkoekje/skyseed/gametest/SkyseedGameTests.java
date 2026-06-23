@@ -313,6 +313,31 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void dimensionOverrideNeverInheritsOverworld(GameTestHelper helper) {
+        // A Nether/End override is a complete spec — an unset field must NOT fall back to the overworld base. This
+        // theme's base has coal ore + grass; its bare Nether override sets only the surface, so the Nether island
+        // must carry none of that overworld content (neutral netherrack body, no coal, no grass).
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "gametest/dim_leak"), wastes, RandomSource.create(1L));
+        boolean netherrack = false;
+        boolean coal = false;
+        boolean grass = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.COAL_ORE)) coal = true;
+            if (bp.state().is(Blocks.GRASS_BLOCK)) grass = true;
+        }
+        helper.assertTrue(netherrack, "a bare nether override should give a neutral netherrack body");
+        helper.assertTrue(!coal, "a nether override must NOT inherit the base's overworld coal ore");
+        helper.assertTrue(!grass, "a nether override must NOT inherit the base's overworld grass");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void islandIsDeterministic(GameTestHelper helper) {
         final IslandPlan a = plan(helper, "rocky", 42L);
         final IslandPlan b = plan(helper, "rocky", 42L);
