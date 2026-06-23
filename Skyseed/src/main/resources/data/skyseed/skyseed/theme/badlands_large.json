@@ -36,5 +36,19 @@
     { "weight": 1, "name": "wooded", "surface_override": "minecraft:grass_block", "decoration": {
       "trees": [ { "feature": "minecraft:dark_oak", "tries": 5, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.12 }, { "block": "minecraft:dead_bush", "chance": 0.04 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Large Nether adaptation — as the normal Badlands Basalt Deltas, ~1.5x bigger.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },
+      "surface": "minecraft:blackstone", "fill": "minecraft:basalt", "core": "minecraft:blackstone", "fill_depth": 2,
+      "fill_bands": [],
+      "ores": [
+        { "block": "minecraft:gilded_blackstone", "chance": 0.30, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.45, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+      ],
+      "mobs": [ { "entity": "minecraft:magma_cube", "chance": 0.40, "count": { "min": 1, "max": 2 } } ],
+      "variants": [ { "weight": 1, "name": "delta", "decoration": {
+        "ground": [ { "block": "minecraft:magma_block", "chance": 0.14 }, { "block": "minecraft:basalt", "chance": 0.08 } ] } } ] }
   ]
 }

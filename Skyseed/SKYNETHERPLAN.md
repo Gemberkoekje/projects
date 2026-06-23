@@ -80,6 +80,9 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 > v0.45.0 a dimension override never inherits Overworld content** — an unset field is neutral/empty (a
 > netherrack/end-stone body, no ores/decoration/mobs), not the overworld base, so a dimension form can't leak grass,
 > coal or terracotta across the portal. **All eight viable terrain seeds are now adapted (v0.46.0)** — Meadow + Frozen fizzle by design.
+> **Large variants adapt too (v0.47.0):** each Large terrain seed grows its normal seed's Nether form, just ~1.5× bigger
+> (shape radius 3–4 vs the normal 2–3). The whole point holds — yes you *can* throw a Large overworld seed in the Nether,
+> no it's still not the efficient way; Nether-specific seeds remain the path to real size + payoff.
 
 **One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
 

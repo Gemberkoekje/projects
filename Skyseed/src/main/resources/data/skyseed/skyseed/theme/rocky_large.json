@@ -35,6 +35,36 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "Large Nether adaptation — as the normal Rocky Nether island, ~1.5x bigger. Abyss/low band: debris.",
+      "dimension": "minecraft:the_nether", "max_y": 50,
+      "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },
+      "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone",
+      "ores": [
+        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.85, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:ancient_debris", "chance": 0.50, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+      ],
+      "mobs": [
+        { "entity": "minecraft:zombified_piglin", "chance": 0.30, "count": { "min": 1, "max": 2 } },
+        { "entity": "minecraft:magma_cube", "chance": 0.20, "count": { "min": 1, "max": 1 } },
+        { "entity": "minecraft:piglin", "chance": 0.15, "count": { "min": 1, "max": 1 } }
+      ] },
+
+    { "_comment": "Large Nether adaptation — baseline mining island.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },
+      "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone",
+      "ores": [
+        { "block": "minecraft:nether_quartz_ore", "chance": 0.90, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.70, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:ancient_debris", "chance": 0.12, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 1 }, "depth": "deep_core" }
+      ],
+      "mobs": [
+        { "entity": "minecraft:zombified_piglin", "chance": 0.30, "count": { "min": 1, "max": 2 } },
+        { "entity": "minecraft:magma_cube", "chance": 0.20, "count": { "min": 1, "max": 1 } },
+        { "entity": "minecraft:piglin", "chance": 0.15, "count": { "min": 1, "max": 1 } }
+      ] },
+
     { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:grove", "minecraft:snowy_beach", "minecraft:frozen_river", "minecraft:frozen_ocean", "minecraft:deep_frozen_ocean" ],
       "shape": { "radius": { "min": 10, "max": 14 }, "rim_noise": 0.30, "top_dome": { "min": 9, "max": 13 } },
       "surface": "minecraft:snow_block", "fill": "minecraft:stone", "core": "minecraft:stone",

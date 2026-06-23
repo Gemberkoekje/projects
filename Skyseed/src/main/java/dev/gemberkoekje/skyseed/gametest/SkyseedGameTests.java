@@ -288,6 +288,41 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void largeSeedsAdaptInTheNether(GameTestHelper helper) {
+        // Each Large terrain seed gets the same Nether form as its normal seed (just bigger). Spot-check that each
+        // grows its Nether island — the expected Nether block present, no overworld block — when thrown in the Nether.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        record L(String theme, Block present, Block absent) {}
+        final L[] cases = {
+            new L("rocky_large", Blocks.NETHERRACK, Blocks.COBBLESTONE),
+            new L("desert_large", Blocks.SOUL_SAND, Blocks.SAND),
+            new L("badlands_large", Blocks.BLACKSTONE, Blocks.ORANGE_TERRACOTTA),
+            new L("aquatic_large", Blocks.BASALT, Blocks.GRASS_BLOCK),
+            new L("ancient_large", Blocks.BLACKSTONE, Blocks.MOSS_BLOCK),
+            new L("mushroom_large", Blocks.MYCELIUM, Blocks.DIRT),
+            new L("forest_large", Blocks.CRIMSON_NYLIUM, Blocks.GRASS_BLOCK),
+            new L("lush_large", Blocks.WARPED_NYLIUM, Blocks.MOSS_BLOCK),
+        };
+        long seed = 100L;
+        for (L c : cases) {
+            final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                    theme(nether, c.theme()), wastes, RandomSource.create(seed++));
+            boolean present = false;
+            boolean absent = false;
+            for (IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(c.present())) present = true;
+                if (bp.state().is(c.absent())) absent = true;
+            }
+            helper.assertTrue(present, c.theme() + " should carry its Nether block " + c.present());
+            helper.assertTrue(!absent, c.theme() + " must not carry the overworld block " + c.absent());
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

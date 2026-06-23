@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.47.0] - 2026-06-23
+
+### Added
+- **Large terrain seeds adapt in the Nether too — same form, ~1.5× bigger.** All eight Large terrain Skyseeds
+  (Rocky, Desert, Badlands, Aquatic, Ancient, Mushroom, Forest, Lush) now grow their normal seed's Nether island
+  when thrown in the Nether — just about 1.5× the size of a normal seed's Nether island (shape radius 3–4 vs 2–3),
+  with the same blocks, ores, mobs and decoration. Still a fraction of their lavish Overworld selves: yes, you *can*
+  toss a Large overworld seed down here, but it remains emphatically *not* the efficient way to build in the Nether.
+  Guarded by the `largeSeedsAdaptInTheNether` gametest.
+
 ## [0.46.0] - 2026-06-23
 
 ### Added
