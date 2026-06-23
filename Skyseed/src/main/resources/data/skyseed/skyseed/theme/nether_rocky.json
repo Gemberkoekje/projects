@@ -29,6 +29,24 @@
         { "block": "minecraft:nether_gold_ore", "chance": 0.95, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
         { "block": "minecraft:gilded_blackstone", "chance": 0.45, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
         { "block": "minecraft:ancient_debris", "chance": 0.65, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+      ] },
+
+    { "_comment": "Easter egg — thrown in the OVERWORLD, a Nether Rocky seed does NOT fizzle: it makes a TINY ~7x7x4 plain rocky island, sparse iron + gold. Deepslate version when thrown low enough (max_y 8). 'Yeah, I figured that'd happen.' Listed before the stone version so the deep band wins at low Y.",
+      "dimension": "minecraft:overworld", "max_y": 8,
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:deepslate", "fill": "minecraft:cobbled_deepslate", "core": "minecraft:deepslate", "fill_depth": 2,
+      "ores": [
+        { "block": "minecraft:deepslate_iron_ore", "chance": 0.70, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:deepslate_gold_ore", "chance": 0.35, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" }
+      ] },
+
+    { "_comment": "Easter egg — the overworld surface/mid-air version: a tiny plain stone rocky island, sparse iron + gold (same amounts as the deepslate band, just not deepslate).",
+      "dimension": "minecraft:overworld",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:stone", "fill": "minecraft:cobblestone", "core": "minecraft:stone", "fill_depth": 2,
+      "ores": [
+        { "block": "minecraft:iron_ore", "chance": 0.70, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+        { "block": "minecraft:gold_ore", "chance": 0.35, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" }
       ] }
   ],
   "lava": {

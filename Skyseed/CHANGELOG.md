@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.49.0] - 2026-06-23
+
+### Added
+- **Easter egg: throw a Nether Rocky seed in the overworld and it makes a tiny rocky island.** The mirror of the
+  Tier-1 adaptations — instead of fizzling, a Nether-native seed thrown topside grows a deliberately tiny (~7×7×4)
+  plain **stone** island with sparse iron and gold. Throw it low enough (Y ≤ 8) and it comes out **deepslate**
+  instead. A "yeah, I figured that'd happen" sort of thing; the real, full-size Nether Rocky island is still only
+  down in the Nether.
+
 ## [0.48.0] - 2026-06-23
 
 ### Added

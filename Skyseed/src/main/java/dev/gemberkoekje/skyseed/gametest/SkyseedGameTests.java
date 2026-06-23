@@ -325,24 +325,20 @@ public final class SkyseedGameTests {
     @GameTest(template = REGION)
     public static void netherRockyIsNetherNativeAndFullSize(GameTestHelper helper) {
         // The first Tier-2 Nether-NATIVE seed (SKYNETHERPLAN): unlike an overworld seed's tiny Nether foothold, this
-        // grows a FULL-SIZE mining island in the Nether (radius 6-9, like an overworld normal seed), and FIZZLES in
-        // the overworld (it is not an implementation for that dimension).
+        // grows a FULL-SIZE mining island in the Nether (radius 6-9, like an overworld normal seed). Its BASE config
+        // is the_nether only (the overworld form is just an easter-egg override — see netherRockySeedMakesTinyOverworldIsland).
         final IslandTheme nr = theme(helper.getLevel(), "nether_rocky");
         helper.assertTrue(nr.baseValidIn(Level.NETHER.location()), "nether_rocky must implement the_nether");
-        helper.assertTrue(!nr.baseValidIn(Level.OVERWORLD.location()), "nether_rocky must NOT implement the overworld");
+        helper.assertTrue(!nr.baseValidIn(Level.OVERWORLD.location()), "nether_rocky's BASE must not be an overworld implementation");
 
         final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
-        final var plains = helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME)
-                .getHolderOrThrow(Biomes.PLAINS);
 
-        // Germination gate: valid in the Nether, fizzles in the overworld.
+        // Germination gate: valid (full base form) in the Nether.
         helper.assertTrue(IslandGenerator.formValidFor(nr, wastes, 64, Level.NETHER.location()),
                 "nether_rocky should grow in the Nether");
-        helper.assertTrue(!IslandGenerator.formValidFor(nr, plains, 80, Level.OVERWORLD.location()),
-                "nether_rocky should fizzle in the overworld");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
                 theme(nether, "nether_rocky"), wastes, RandomSource.create(303L));
@@ -359,6 +355,43 @@ public final class SkyseedGameTests {
         helper.assertTrue(netherrack, "nether_rocky should have a netherrack body");
         helper.assertTrue(blackstone, "nether_rocky should have a blackstone core");
         helper.assertTrue(quartz, "nether_rocky should carry nether quartz ore");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void netherRockySeedMakesTinyOverworldIsland(GameTestHelper helper) {
+        // Easter egg (SKYNETHERPLAN): thrown in the OVERWORLD a Nether Rocky seed does NOT fizzle — it grows a TINY
+        // plain rocky island (sparse iron + gold), and deepslate if thrown low enough. "Yeah, I figured that'd happen."
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nr = theme(overworld, "nether_rocky");
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+
+        // It grows (does not fizzle) in the overworld via the easter-egg override.
+        helper.assertTrue(IslandGenerator.formValidFor(nr, plains, 80, Level.OVERWORLD.location()),
+                "nether_rocky should grow a tiny island in the overworld (easter egg), not fizzle");
+
+        // High up: a tiny stone island, never netherrack.
+        final IslandPlan high = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), nr, plains,
+                RandomSource.create(11L));
+        helper.assertTrue(high.blocks().size() < 500,
+                "the overworld easter-egg island should be tiny, was " + high.blocks().size());
+        boolean stone = false;
+        boolean netherrack = false;
+        for (IslandPlan.BlockPlacement bp : high.blocks()) {
+            if (bp.state().is(Blocks.STONE)) stone = true;
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+        }
+        helper.assertTrue(stone, "the overworld easter-egg island should be made of stone");
+        helper.assertTrue(!netherrack, "the overworld easter-egg island should not be netherrack");
+
+        // Thrown low (Y <= 8): the same tiny island, but deepslate.
+        boolean deepslate = false;
+        for (IslandPlan.BlockPlacement bp : IslandGenerator.planIsland(overworld, new BlockPos(40, 4, 40), nr, plains,
+                RandomSource.create(12L)).blocks()) {
+            if (bp.state().is(Blocks.DEEPSLATE) || bp.state().is(Blocks.COBBLED_DEEPSLATE)) deepslate = true;
+        }
+        helper.assertTrue(deepslate, "thrown low, the overworld easter-egg island should turn to deepslate");
         helper.succeed();
     }
 

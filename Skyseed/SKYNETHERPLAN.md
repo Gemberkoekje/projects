@@ -178,6 +178,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 > debris, a deep `max_y: 34` band that runs richest near the lava sea, glowstone/basalt/magma variants, lava veins +
 > lakes, and a fuller piglin/magma mob pack. Crafted from netherrack + blackstone + quartz (all Nether-mined). Still
 > to come: the biome-specific surface patches below (crimson/warped/soul/basalt).
+> **Easter egg (v0.49.0):** thrown in the *overworld* it does NOT fizzle — two `dimension: minecraft:overworld`
+> overrides make a deliberately TINY (~7×7×4) plain rocky island with sparse iron + gold, turning to **deepslate**
+> (`max_y: 8`) if thrown low. The mirror of the Tier-1 adaptations: "yeah, I figured that'd happen" — the real
+> full-size island is still Nether-only.
 
 - **Palette:** netherrack surface/fill, basalt/blackstone core.
 - **Biome overrides:** crimson -> crimson nylium patches; warped -> warped patches; soul -> soul sand patches + blue
