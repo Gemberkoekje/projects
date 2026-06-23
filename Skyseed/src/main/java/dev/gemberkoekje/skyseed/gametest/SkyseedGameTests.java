@@ -25,6 +25,8 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
@@ -149,6 +151,42 @@ public final class SkyseedGameTests {
         helper.assertTrue(!IslandPlacement.check(island, java.util.List.of(Vec3.atCenterOf(center)), (x, y, z) -> false).ok(),
                 "germinating with a block on the player was not rejected");
         helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void bankSugarCaneStandsInWater(GameTestHelper helper) {
+        // Every sugar cane the carver places must be able to survive — stacked on cane, or on dirt/sand with water
+        // horizontally beside its *supporting* block. (The bug placed it on steep banks 3 up from the water, where
+        // it instantly pops.)
+        int totalCane = 0;
+        for (long seed = 1; seed <= 8; seed++) {
+            final java.util.Map<BlockPos, BlockState> map = new java.util.HashMap<>();
+            for (IslandPlan.BlockPlacement bp : plan(helper, "gametest/water", seed).blocks()) {
+                map.put(bp.pos(), bp.state());
+            }
+            for (var e : map.entrySet()) {
+                if (!e.getValue().is(Blocks.SUGAR_CANE)) {
+                    continue;
+                }
+                totalCane++;
+                final BlockPos below = e.getKey().below();
+                final BlockState ground = map.get(below);
+                final boolean onCane = ground != null && ground.is(Blocks.SUGAR_CANE);
+                final boolean onWetSoil = ground != null
+                        && (ground.is(BlockTags.DIRT) || ground.is(Blocks.SAND) || ground.is(Blocks.RED_SAND))
+                        && (isWaterAt(map, below.east()) || isWaterAt(map, below.west())
+                            || isWaterAt(map, below.north()) || isWaterAt(map, below.south()));
+                helper.assertTrue(onCane || onWetSoil,
+                        "sugar cane at " + e.getKey() + " would pop — no cane below and no water beside its support");
+            }
+        }
+        helper.assertTrue(totalCane > 0, "no sugar cane grew across 8 water-island seeds to verify");
+        helper.succeed();
+    }
+
+    private static boolean isWaterAt(java.util.Map<BlockPos, BlockState> map, BlockPos p) {
+        final BlockState s = map.get(p);
+        return s != null && s.getFluidState().is(FluidTags.WATER);
     }
 
     @GameTest(template = REGION)
@@ -279,7 +317,7 @@ public final class SkyseedGameTests {
     /** Recorded fingerprints "blocks/checksum/trees/mobs/animals/jigsaws/hives" — the generation golden master. */
     private static final java.util.Map<String, String> GOLDEN = java.util.Map.of(
             "gametest/island#1", "213/-3285534759166012883/1/2/0/0/23",
-            "gametest/water#4", "1255/7744611612398851888/0/1/0/0/0",
+            "gametest/water#4", "1240/-725086389989523181/0/1/0/0/0",
             "gametest/features#4", "1356/2766402466658160625/0/0/0/0/0",
             "gametest/structure#11", "566/-538726431172054277/0/0/2/1/0",
             "gametest/bad#4", "197/5964512207029114459/0/0/0/1/0"

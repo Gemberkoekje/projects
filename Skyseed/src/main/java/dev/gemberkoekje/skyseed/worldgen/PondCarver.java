@@ -5,6 +5,8 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -278,8 +280,8 @@ final class PondCarver {
         for (BlockPos col : surfaceList) { // carved columns were already removed from surfaceList
             final int dx = col.getX() - center.getX();
             final int dz = col.getZ() - center.getZ();
-            // Only the immediate water's-edge — a 4-neighbour must be a carved water column — so the cane
-            // stays put (sugar cane needs water beside it or it pops on the first update).
+            // The bank ring: a column whose 4-neighbour is carved water. (Sugar cane gets a stricter, exact check in
+            // bankPlant — water must sit beside its *supporting* block at the same Y, or it pops on a steep bank.)
             final boolean waterAdjacent = carved.contains(colKey(dx + 1, dz)) || carved.contains(colKey(dx - 1, dz))
                     || carved.contains(colKey(dx, dz + 1)) || carved.contains(colKey(dx, dz - 1));
             if (!waterAdjacent) {
@@ -306,12 +308,30 @@ final class PondCarver {
     private static void bankPlant(Map<BlockPos, BlockState> blockMap, BlockPos above, ResourceLocation id, RandomSource random) {
         final BlockState state = BuiltInRegistries.BLOCK.get(id).defaultBlockState();
         if (id.getPath().equals("sugar_cane")) {
-            final int h = 1 + random.nextInt(3); // 1-3 tall
+            final int h = 1 + random.nextInt(3); // 1-3 tall (rolled regardless of placement, to keep generation deterministic)
+            if (!caneCanStand(blockMap, above.below())) {
+                return; // would pop on the first tick — only grow cane where water sits beside its supporting block
+            }
             for (int i = 0; i < h; i++) {
                 blockMap.put(above.above(i), state);
             }
         } else {
             blockMap.put(above, state);
         }
+    }
+
+    /** Sugar cane survives only on dirt/sand-type ground with water at the same Y horizontally beside it — else it pops. */
+    private static boolean caneCanStand(Map<BlockPos, BlockState> blockMap, BlockPos support) {
+        final BlockState soil = blockMap.get(support);
+        if (soil == null || !(soil.is(BlockTags.DIRT) || soil.is(Blocks.SAND) || soil.is(Blocks.RED_SAND))) {
+            return false;
+        }
+        return isWater(blockMap, support.east()) || isWater(blockMap, support.west())
+                || isWater(blockMap, support.north()) || isWater(blockMap, support.south());
+    }
+
+    private static boolean isWater(Map<BlockPos, BlockState> blockMap, BlockPos p) {
+        final BlockState s = blockMap.get(p);
+        return s != null && s.getFluidState().is(FluidTags.WATER);
     }
 }

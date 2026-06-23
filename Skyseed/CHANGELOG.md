@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.7] - 2026-06-23
+
+### Fixed
+- **Sugarcane on river/pond banks no longer instantly pops.** Bank placement only checked that an adjacent
+  *column* held carved water (no Y), so on a steep bank the cane could land several blocks above the water surface —
+  where no water sits beside its supporting block — and broke on the first tick. Sugarcane is now placed only where
+  its supporting block is dirt/sand-type ground with water horizontally beside it at the same level (so it's always
+  next to, and one up from, a water block). Other bank plants are unaffected.
+
 ## [0.34.6] - 2026-06-23
 
 ### Changed
