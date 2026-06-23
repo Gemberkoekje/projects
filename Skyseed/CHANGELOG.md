@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.57.0] - 2026-06-23
+
+### Added
+- **A surprise blaze spawner room on the Large Nether seeds.** Each of the 5 Large Nether seeds now has a **5% chance**
+  to grow with a **caged blaze spawner room** tucked on it — a standalone non-boxy nether-brick room (pitched roof,
+  fence-grate windows, a doorway, soul-sand/wart braziers, a bridge-loot chest) with a permanent **blaze spawner**: a
+  renewable blaze-rod source if you get lucky. Plus a creative-only **Debug: Blaze Spawner** seed (in the "Skyseed
+  Debug" tab) that germinates the room on demand. Guarded by the `blazeRoomRollsOnLargeNetherSeedsAndDebugSeed`
+  gametest.
+
 ## [0.56.0] - 2026-06-23
 
 ### Added

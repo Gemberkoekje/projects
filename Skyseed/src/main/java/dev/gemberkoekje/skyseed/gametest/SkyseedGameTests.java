@@ -705,6 +705,27 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void blazeRoomRollsOnLargeNetherSeedsAndDebugSeed(GameTestHelper helper) {
+        // The surprise blaze spawner room (SKYNETHERPLAN): a 5% rare_structures roll on each of the 5 Large Nether
+        // seeds, and the dedicated debug_blaze_spawner seed germinates it as a whole island.
+        final ServerLevel overworld = helper.getLevel();
+        for (String t : new String[] { "nether_rocky_large", "nether_lava_large", "nether_forest_large",
+                "nether_soul_large", "nether_basalt_large" }) {
+            final IslandTheme nt = theme(overworld, t);
+            helper.assertTrue(nt.rareStructures().stream().anyMatch(
+                            rs -> rs.jigsaw().pool().getPath().equals("nether_fortress/blaze_room")),
+                    t + " should carry the 5% blaze spawner room rare structure");
+        }
+        final IslandTheme dbg = theme(overworld, "debug_blaze_spawner");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, dbg, overworld.getBiome(c),
+                RandomSource.create(140L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/blaze_room")),
+                "the debug blaze spawner seed should assemble the blaze room jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
         // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation

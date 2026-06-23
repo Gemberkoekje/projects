@@ -21,6 +21,7 @@
     { "weight": 1, "name": "basalt", "decoration": {
       "ground": [ { "block": "minecraft:basalt", "chance": 0.12 }, { "block": "minecraft:magma_block", "chance": 0.05 }, { "block": "minecraft:glowstone", "chance": 0.02 } ] } }
   ],
+  "rare_structures": [ { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } } ],
   "biome_overrides": [
     { "_comment": "Deep band near the lava sea — richest debris + gold; inherits the base surface / variants / mobs.",
       "max_y": 34,

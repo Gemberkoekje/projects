@@ -53,6 +53,7 @@
   "item.skyseed.debug_evoker_cell_skyseed": "Debug: Evoker Cell",
   "item.skyseed.debug_vault_cell_skyseed": "Debug: Vault Cell",
   "item.skyseed.debug_trail_ruins_skyseed": "Debug: Trail Ruins",
+  "item.skyseed.debug_blaze_spawner_skyseed": "Debug: Blaze Spawner",
   "entity.skyseed.island_seed": "Skyseed",
   "itemGroup.skyseed": "Skyseed",
   "itemGroup.skyseed.debug": "Skyseed Debug",

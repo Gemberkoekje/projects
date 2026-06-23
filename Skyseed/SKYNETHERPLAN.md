@@ -134,8 +134,12 @@ nodes, guaranteed mob packs, the biome's signature rare block. So Large = bigger
 > **The 5 seeds BUILT (v0.56.0).** `nether_rocky_large` · `nether_lava_large` · `nether_forest_large` ·
 > `nether_soul_large` · `nether_basalt_large` — each the Tier-2 theme scaled up (radius 11-17 matching the parent
 > overworld Large; ore counts ~×3, premium ~×2), the `NSN/NRN/NSN` 3×3 recipe (Large overworld seed centre + 6 bulk
-> + 2 signature), and the easter eggs scaled to ~1.5× (lava grows full-size→Large topside). **The 5% Blaze Spawner
-> Room roll + the `debug_blaze_spawner` debug seed are STILL DEFERRED — to be added next.**
+> + 2 signature), and the easter eggs scaled to ~1.5× (lava grows full-size→Large topside).
+> **Blaze Spawner Room BUILT (v0.57.0):** a standalone 7×7 non-boxy nether-brick room (pitched `gableRoof`, fence
+> windows, doorway, caged blaze spawner, soul-sand/wart braziers, a `nether_bridge` chest) in
+> `NetherFortressTemplates.blazeRoom()` → `structure/nether_fortress/blaze_room.nbt`. A **5% `rare_structures` roll**
+> on all 5 Large Nether seeds, plus the creative-only `debug_blaze_spawner` seed (Skyseed Debug tab) that germinates
+> it on demand. **The whole Large-Nether chapter is now complete.**
 
 A **Large variant of each of the 5 Tier-2 Nether-native seeds**: Tier-2's richer content *at* Large's bigger size,
 each carrying a **5% Blaze Spawner Room** (the room deferred from the Nether Fortress task, finally homed here).

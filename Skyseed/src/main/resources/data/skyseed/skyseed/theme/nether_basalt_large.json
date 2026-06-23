@@ -19,6 +19,7 @@
       "trees": [ { "feature": "minecraft:basalt_pillar", "tries": 9, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:magma_block", "chance": 0.06 }, { "block": "minecraft:blackstone", "chance": 0.06 }, { "block": "minecraft:basalt", "chance": 0.06 } ] } }
   ],
+  "rare_structures": [ { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } } ],
   "biome_overrides": [
     { "_comment": "Overworld easter egg — a small (~1.5x the Tier-2 tiny) badlands island, not the basalt deltas.",
       "dimension": "minecraft:overworld",
