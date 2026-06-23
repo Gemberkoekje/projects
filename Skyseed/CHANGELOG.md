@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.5] - 2026-06-23
+
+### Changed
+- **The legacy-world warning now presents the in-place conversion as a genuine, equal option.** Now that the reset
+  is interruption-hardened, the login message offers `/emptynether` and `/emptyend` as a normal, safe way to fix an
+  older world — on equal footing with starting fresh — instead of a scary caveat-laden last resort.
+
 ## [0.35.4] - 2026-06-23
 
 ### Changed
