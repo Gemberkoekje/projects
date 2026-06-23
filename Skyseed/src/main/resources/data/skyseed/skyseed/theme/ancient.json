@@ -29,6 +29,7 @@
     { "weight": 3, "name": "deep_cave", "decoration": {
       "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.40 } ],
       "underside": [
+        { "block": "minecraft:glow_lichen", "chance": 0.12 },
         { "block": "minecraft:pointed_dripstone", "chance": 0.18 },
         { "block": "minecraft:cave_vines", "chance": 0.05 },
         { "block": "minecraft:hanging_roots", "chance": 0.05 }

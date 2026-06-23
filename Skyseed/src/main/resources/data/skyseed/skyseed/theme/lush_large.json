@@ -33,6 +33,7 @@
         { "block": "minecraft:pitcher_plant", "chance": 0.015 }
       ],
       "underside": [
+        { "block": "minecraft:glow_lichen", "chance": 0.12 },
         { "block": "minecraft:hanging_roots", "chance": 0.15 },
         { "block": "minecraft:cave_vines", "chance": 0.10 },
         { "block": "minecraft:spore_blossom", "chance": 0.05 }
@@ -40,9 +41,9 @@
     { "weight": 2, "name": "glow", "decoration": {
       "trees": [ { "feature": "skyseed:azalea", "tries": 5, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.40 }, { "block": "minecraft:small_dripleaf", "chance": 0.05 } ],
-      "underside": [ { "block": "minecraft:cave_vines", "chance": 0.30 }, { "block": "minecraft:hanging_roots", "chance": 0.05 } ] } },
+      "underside": [ { "block": "minecraft:glow_lichen", "chance": 0.22 }, { "block": "minecraft:cave_vines", "chance": 0.30 }, { "block": "minecraft:hanging_roots", "chance": 0.05 } ] } },
     { "weight": 1, "name": "ancient_garden", "decoration": {
       "ground": [ { "block": "minecraft:moss_carpet", "chance": 0.50 }, { "block": "minecraft:small_dripleaf", "chance": 0.04 } ],
-      "underside": [ { "block": "minecraft:spore_blossom", "chance": 0.12 }, { "block": "minecraft:hanging_roots", "chance": 0.10 } ] } }
+      "underside": [ { "block": "minecraft:glow_lichen", "chance": 0.12 }, { "block": "minecraft:spore_blossom", "chance": 0.12 }, { "block": "minecraft:hanging_roots", "chance": 0.10 } ] } }
   ]
 }

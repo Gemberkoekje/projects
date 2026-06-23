@@ -347,6 +347,41 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void lushHangsGlowLichen(GameTestHelper helper) {
+        // The multiface glow lichen gets a valid UP face (not an empty state), and lush islands hang it underneath.
+        helper.assertTrue(Blocks.GLOW_LICHEN.defaultBlockState().setValue(BlockStateProperties.UP, true)
+                .getValue(BlockStateProperties.UP), "glow lichen has no UP face property");
+        boolean found = false;
+        for (long seed = 1; seed <= 8 && !found; seed++) {
+            found = planHas(plan(helper, "lush", seed), Blocks.GLOW_LICHEN);
+        }
+        helper.assertTrue(found, "no lush island hung glow lichen across 8 seeds");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void aquaticReefHasCoral(GameTestHelper helper) {
+        // A warm-ocean Aquatic reef grows small coral plants (and fans). Use Y 64 so the sub-zero stone override
+        // doesn't win, and a warm-ocean biome so the reef override does.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(8, 8, 8));
+        final BlockPos center = new BlockPos(base.getX(), 64, base.getZ());
+        final var warm = level.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.WARM_OCEAN);
+        boolean coral = false;
+        for (long seed = 1; seed <= 10 && !coral; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "aquatic_large"), warm, RandomSource.create(seed));
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().getBlock() instanceof net.minecraft.world.level.block.CoralPlantBlock) {
+                    coral = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(coral, "warm-ocean Aquatic reef grew no small coral plants across 10 seeds");
+        helper.succeed();
+    }
+
     // --- world-apply: the throw → germinate → GenerationJob pipeline (covers IslandSeedEntity + GenerationJob) ---
 
     @GameTest(template = REGION, timeoutTicks = 200)

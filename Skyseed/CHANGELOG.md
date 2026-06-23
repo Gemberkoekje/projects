@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.4] - 2026-06-23
+
+### Added
+- **Glow lichen** now hangs under **Lush** and **Ancient** islands (added to their underside decoration). It's a
+  multiface block, so it's placed with its UP face set, clinging to the island's bottom and glowing. Shears it off.
+- **Coral fans + small coral plants** — the warm-ocean reefs on **Aquatic** and **Large Aquatic** now grow the full
+  set: the three coral fans that were missing (brain / bubble / horn) and all five small coral plants, alongside the
+  coral blocks already there. Every coral variant is now obtainable. Both close their `MISSINGBLOCKSPLAN.md` gaps.
+
 ## [0.34.3] - 2026-06-23
 
 ### Added

@@ -173,6 +173,8 @@ final class DecorationPlanner {
                             .defaultBlockState().setValue(BlockStateProperties.BERRIES, Boolean.TRUE));
                 }
             }
+            // Glow lichen is a multiface block: set its UP face so it clings to the island's underside and glows.
+            case "glow_lichen" -> blockMap.put(first, Blocks.GLOW_LICHEN.defaultBlockState().setValue(BlockStateProperties.UP, true));
             default -> blockMap.put(first, BuiltInRegistries.BLOCK.get(id).defaultBlockState());
         }
     }
