@@ -291,6 +291,32 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void oceanMonumentHasPrismarineAndTreasure(GameTestHelper helper) {
+        final BlockPos o = place(helper, "skyseed:ocean_monument/monument");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.PRISMARINE_BRICKS), "monument lost its prismarine");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.SEA_LANTERN), "monument lost its sea lanterns");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.WATER), "monument's pool is not filled");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.GOLD_BLOCK), "monument lost its gold treasure");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.CHEST), "monument lost its treasure chest");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void oceanMonumentPlansSubmergedGuardian(GameTestHelper helper) {
+        // The monument's guardians must be flagged to spawn in water (the AQUATIC set), or they'd beach and die.
+        final IslandPlan p = plan(helper, "ocean_monument", 1L);
+        boolean guardian = false;
+        for (final IslandPlan.AnimalSpawn a : p.animals()) {
+            if (a.type() == EntityType.GUARDIAN || a.type() == EntityType.ELDER_GUARDIAN) {
+                helper.assertTrue(a.inWater(), "monument guardian is not flagged to spawn submerged");
+                guardian = true;
+            }
+        }
+        helper.assertTrue(guardian, "ocean monument planned no guardians");
+        helper.succeed();
+    }
+
     // --- world-apply: the throw → germinate → GenerationJob pipeline (covers IslandSeedEntity + GenerationJob) ---
 
     @GameTest(template = REGION, timeoutTicks = 200)

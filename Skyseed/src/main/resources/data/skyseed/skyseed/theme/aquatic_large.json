@@ -6,6 +6,9 @@
     { "block": "minecraft:gravel", "chance": 0.90, "count": { "min": 4, "max": 8 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
   ],
   "rare_structures": [
+    { "chance": 0.05, "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean" ], "suppress_pond": true,
+      "jigsaw": { "pool": "skyseed:ocean_monument/start", "target": "minecraft:bottom", "depth": 1, "pad": 9 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:elder_guardian", "adults": 1 }, { "entity": "minecraft:guardian", "adults": 4 } ] } ] },
     { "chance": 0.05, "biomes": [ "minecraft:swamp", "minecraft:mangrove_swamp" ], "suppress_pond": true,
       "jigsaw": { "pool": "skyseed:witch_hut/hut", "target": "minecraft:bottom", "depth": 1, "pad": 4 },
       "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:witch", "adults": 1 }, { "entity": "minecraft:cat", "adults": 1 } ] } ] }

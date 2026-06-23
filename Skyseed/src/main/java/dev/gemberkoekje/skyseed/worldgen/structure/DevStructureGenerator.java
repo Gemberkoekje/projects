@@ -43,6 +43,7 @@ public final class DevStructureGenerator {
             TrailRuinsTemplates.generateInto(base.resolve("trail_ruins"));
             TrialChamberTemplates.generateInto(base.resolve("trial_chamber"));
             WoodlandMansionTemplates.generateInto(base.resolve("woodland_mansion"));
+            OceanMonumentTemplates.generateInto(base.resolve("ocean_monument"));
             RareStructureTemplates.generateInto(base);
             writeGameTestRegion(base.resolve("gametest").resolve("region.nbt"));
         } catch (Exception e) {

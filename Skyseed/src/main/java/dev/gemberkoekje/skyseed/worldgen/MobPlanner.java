@@ -25,7 +25,8 @@ final class MobPlanner {
     /** Entity types that must be spawned submerged (Aquarium) — they die if placed on dry land. */
     private static final Set<EntityType<?>> AQUATIC = Set.of(
             EntityType.AXOLOTL, EntityType.SQUID, EntityType.GLOW_SQUID, EntityType.TURTLE,
-            EntityType.TROPICAL_FISH, EntityType.COD, EntityType.SALMON, EntityType.PUFFERFISH, EntityType.DOLPHIN);
+            EntityType.TROPICAL_FISH, EntityType.COD, EntityType.SALMON, EntityType.PUFFERFISH, EntityType.DOLPHIN,
+            EntityType.GUARDIAN, EntityType.ELDER_GUARDIAN);
 
     /** Pick one weighted pack and expand it into concrete animal spawns jittered around the enclosure centre. */
     static void rollAnimals(List<AnimalPack> packs, BlockPos center, List<IslandPlan.AnimalSpawn> out, RandomSource random) {

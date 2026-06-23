@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.0] - 2026-06-23
+
+### Added
+- **Ocean Monument** — a new structure island, *and* a 5% rare roll on a Large Aquatic island thrown over an
+  ocean biome (both share one `ocean_monument/monument` template + jigsaw pool). A 13×13 prismarine basin
+  (prismarine / bricks / dark prismarine, lit by sea lanterns) holds a contained, open-top pool with
+  dark-prismarine corner towers; an **elder guardian + four guardians** spawn submerged in it (guardians added
+  to the aquatic-spawn set so they don't beach), guarding a gold-block cache and a `chests/buried_treasure`
+  chest — a **Heart of the Sea** + nautilus shells for a **conduit**. A wet-sponge niche sits in the west wall.
+  This closes the biggest overworld gap in `MISSINGBLOCKSPLAN.md`: mining the build yields prismarine, sea
+  lanterns and sponges, and the guardians drop **prismarine shards** — which also un-blocks the **Aquarium** seed
+  recipe (it required shards, previously unobtainable). New `ocean_monument` seed (gold blocks + sponge +
+  diamond). Also fixed: the three newest structure seeds (Outpost, Trial Chamber, Woodland Mansion) were missing
+  from the `#skyseed:skyseeds` tag — added.
+
 ## [0.33.0] - 2026-06-23
 
 ### Added

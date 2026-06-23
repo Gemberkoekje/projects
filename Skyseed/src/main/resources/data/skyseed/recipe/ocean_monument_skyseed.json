@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "GSG", "SDS", "GSG" ],
+  "key": {
+    "G": { "item": "minecraft:gold_block" },
+    "S": { "item": "minecraft:sponge" },
+    "D": { "item": "minecraft:diamond" }
+  },
+  "result": { "id": "skyseed:ocean_monument_skyseed" }
+}
