@@ -71,6 +71,11 @@ generated on the **other** side at the **vanilla-linked coordinate** (the standa
 
 ## The adaptation model
 
+> **Built (v0.36.0).** The dimension key is implemented: a `biome_override` takes an optional `dimension`
+> (e.g. `minecraft:the_nether`), matched alongside biome + Y, so a seed's Nether form is a dimension-gated override —
+> no new item. **Rocky** is the first adapted seed. The **fizzle** for non-adapting seeds is *not* built yet: other
+> seeds still grow their overworld form in the Nether until each is adapted in turn.
+
 **One rule:** every overworld terrain seed either **adapts** or **fizzles** in the Nether.
 
 - **Adapts** — the throw entity already checks dimension (the fizzle rule). An overworld seed thrown in the Nether
@@ -150,6 +155,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ## Adapted islands (detail)
 
 ### 🪨 Rocky → Nether mining *(Nether Wastes)*
+> **Built (v0.36.0).** Tier-1 Rocky: a netherrack body + blackstone core, Nether Quartz + Nether Gold, and Ancient
+> Debris that ramps up low (a `max_y: 50` band), with zombified piglin / magma cube / piglin sprinkles. Still to come:
+> Tier-2 *Nether Rocky*, and the biome-specific surface patches below (crimson/warped/soul/basalt).
+
 - **Palette:** netherrack surface/fill, basalt/blackstone core.
 - **Biome overrides:** crimson -> crimson nylium patches; warped -> warped patches; soul -> soul sand patches + blue
   fire; basalt -> basalt/blackstone + magma block patches.

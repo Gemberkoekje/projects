@@ -31,6 +31,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -87,6 +88,31 @@ public final class SkyseedGameTests {
         final IslandPlan p = plan(helper, "rocky", 1L);
         helper.assertTrue(!p.blocks().isEmpty(), "planIsland produced no blocks for 'rocky'");
         helper.assertTrue(p.blocks().size() > 100, "a rocky island should be more than 100 blocks");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void rockyAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, the Rocky seed adapts (SKYNETHERPLAN): a netherrack body over a blackstone core
+        // instead of overworld stone/cobblestone. Plan against the live the_nether level so planIsland reads
+        // dimension = the_nether and the dimension-gated biome override wins.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var netherWastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "rocky"), netherWastes, RandomSource.create(7L));
+        boolean netherrack = false;
+        boolean blackstone = false;
+        boolean cobblestone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.BLACKSTONE)) blackstone = true;
+            if (bp.state().is(Blocks.COBBLESTONE)) cobblestone = true;
+        }
+        helper.assertTrue(netherrack, "rocky in the Nether should be built from netherrack");
+        helper.assertTrue(blackstone, "rocky in the Nether should have a blackstone core");
+        helper.assertTrue(!cobblestone, "rocky in the Nether should not use overworld cobblestone");
         helper.succeed();
     }
 

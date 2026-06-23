@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.36.0] - 2026-06-23
+
+### Added
+- **Rocky adapts in the Nether — the first Nether island.** Throw a Rocky Skyseed in the Nether and, instead of the
+  overworld stone island, it grows a **Nether mining island**: a netherrack body over a blackstone core, seeded with
+  Nether Quartz and Nether Gold, and — the lower you throw it, near the lava sea — **Ancient Debris** (the only route
+  to Netherite). Zombified Piglins, a Magma Cube and the odd Piglin wander it. This rides a new general mechanism:
+  `biome_overrides` now take an optional **`dimension`** key, so a seed's Nether (or any other-dimension) form is just
+  a dimension-gated override — no new item, no parallel system. The other terrain seeds don't adapt yet (they still
+  grow their overworld form in the Nether); they follow one at a time.
+
 ## [0.35.6] - 2026-06-23
 
 ### Fixed

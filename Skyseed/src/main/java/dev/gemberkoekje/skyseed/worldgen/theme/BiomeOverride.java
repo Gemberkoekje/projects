@@ -14,8 +14,10 @@ import java.util.Optional;
 /**
  * A conditional tweak applied on top of a theme's base config when a seed germinates somewhere that
  * matches. A match requires the biome to be in {@code biomes} (empty = any biome) AND the germination
- * Y to be within {@code min_y}..{@code max_y} (each optional). Every other field is optional and, when
- * present, replaces the base theme's corresponding field for that island. First matching override wins.
+ * Y to be within {@code min_y}..{@code max_y} (each optional) AND, when {@code dimension} is set, the
+ * germination dimension to equal it (e.g. {@code minecraft:the_nether} — this is how an overworld seed
+ * adapts to its Nether form, see SKYNETHERPLAN). Every other field is optional and, when present, replaces
+ * the base theme's corresponding field for that island. First matching override wins.
  */
 public record BiomeOverride(
         List<String> biomes,
@@ -31,7 +33,8 @@ public record BiomeOverride(
         Optional<List<Variant>> variants,
         Optional<Pond> pond,
         Optional<Integer> waterfalls,
-        Optional<List<MobEntry>> mobs) {
+        Optional<List<MobEntry>> mobs,
+        Optional<String> dimension) {
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
@@ -47,11 +50,15 @@ public record BiomeOverride(
             Variant.CODEC.listOf().optionalFieldOf("variants").forGetter(BiomeOverride::variants),
             Pond.CODEC.optionalFieldOf("pond").forGetter(BiomeOverride::pond),
             Codec.INT.optionalFieldOf("waterfalls").forGetter(BiomeOverride::waterfalls),
-            MobEntry.CODEC.listOf().optionalFieldOf("mobs").forGetter(BiomeOverride::mobs)
+            MobEntry.CODEC.listOf().optionalFieldOf("mobs").forGetter(BiomeOverride::mobs),
+            Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension)
     ).apply(i, BiomeOverride::new));
 
-    /** True if {@code biome} (when biomes is set) and {@code y} (when a range is set) both match. */
-    public boolean matches(Holder<Biome> biome, int y) {
+    /** True if {@code dim} (when dimension is set), {@code biome} (when biomes is set) and {@code y} (when a range is set) all match. */
+    public boolean matches(Holder<Biome> biome, int y, ResourceLocation dim) {
+        if (dimension.isPresent() && (dim == null || !dimension.get().equals(dim.toString()))) {
+            return false;
+        }
         if (!biomes.isEmpty() && !matchesBiome(biome)) {
             return false;
         }
