@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.40.0] - 2026-06-23
+
+### Added
+- **Badlands adapts in the Nether — a Basalt Deltas island.** Throw a Badlands Skyseed in the Nether and it grows a
+  tiny Basalt Deltas fragment instead of the mesa: blackstone over a basalt body, scattered with glowing **magma
+  blocks** (the deltas' stand-here-and-burn hazard), a little **gilded blackstone** and Nether Gold, and magma cubes
+  bouncing around. The overworld terracotta strata are dropped.
+
+### Changed
+- A `biome_override` can now replace or clear a theme's `fill_bands` (banded body), so an adaptation can drop strata
+  that shouldn't carry across dimensions — Badlands' terracotta bands don't follow it into the Nether.
+
 ## [0.39.0] - 2026-06-23
 
 ### Changed

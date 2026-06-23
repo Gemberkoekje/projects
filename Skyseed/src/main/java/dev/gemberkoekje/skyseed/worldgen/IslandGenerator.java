@@ -80,8 +80,10 @@ public final class IslandGenerator {
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
         final List<Scatter> scatter = resolveScatter(scatterCfg);
-        // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core.
-        final List<BlockState> bands = resolveBands(pal.fillBands());
+        // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
+        // replace the bands, or clear them with an empty list (e.g. the Nether adaptation drops the terracotta strata).
+        final List<BlockState> bands = (ov != null && ov.fillBands().isPresent())
+                ? resolveBands(ov.fillBands().get()) : resolveBands(pal.fillBands());
         final int bandThickness = Math.max(1, pal.bandThickness());
 
         // --- pass 1: solid island terrain ---

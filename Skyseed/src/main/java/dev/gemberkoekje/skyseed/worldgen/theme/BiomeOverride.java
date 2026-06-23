@@ -34,7 +34,8 @@ public record BiomeOverride(
         Optional<Pond> pond,
         Optional<Integer> waterfalls,
         Optional<List<MobEntry>> mobs,
-        Optional<String> dimension) {
+        Optional<String> dimension,
+        Optional<List<ResourceLocation>> fillBands) {
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
@@ -51,7 +52,8 @@ public record BiomeOverride(
             Pond.CODEC.optionalFieldOf("pond").forGetter(BiomeOverride::pond),
             Codec.INT.optionalFieldOf("waterfalls").forGetter(BiomeOverride::waterfalls),
             MobEntry.CODEC.listOf().optionalFieldOf("mobs").forGetter(BiomeOverride::mobs),
-            Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension)
+            Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension),
+            ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands)
     ).apply(i, BiomeOverride::new));
 
     /** True if {@code dim} (when dimension is set), {@code biome} (when biomes is set) and {@code y} (when a range is set) all match. */

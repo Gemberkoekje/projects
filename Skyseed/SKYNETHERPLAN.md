@@ -213,6 +213,10 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
   sand, soul fire everywhere, more skeletons.
 
 ### 🌋 Badlands → Basalt Deltas
+> **Built (v0.40.0).** A tiny ~7×7×4 Basalt Deltas fragment: blackstone surface/core over a basalt fill (the overworld
+> terracotta strata dropped via a `fill_bands` override), magma-block + basalt ground scatter, gilded blackstone +
+> nether gold, and magma-cube sprinkles. Still to come: jagged basalt columns, lava wells, and Tier-2 *Basalt*.
+
 - **Palette:** banded basalt/blackstone surface (echoing terracotta layers), blackstone fill, basalt core.
 - **Decoration:** jagged **basalt columns** (the defining feature), magma-block surface patches (the hazard — fire
   damage on contact), shallow lava wells between columns, blackstone boulders.

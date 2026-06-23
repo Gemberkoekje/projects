@@ -141,6 +141,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void badlandsAdaptsInTheNether(GameTestHelper helper) {
+        // Thrown in the Nether, Badlands adapts (SKYNETHERPLAN): a Basalt Deltas fragment — blackstone + basalt,
+        // with the overworld terracotta strata dropped (the override clears fill_bands).
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var deltas = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.BASALT_DELTAS);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "badlands"), deltas, RandomSource.create(5L));
+        boolean blackstone = false;
+        boolean basalt = false;
+        boolean terracotta = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) blackstone = true;
+            if (bp.state().is(Blocks.BASALT)) basalt = true;
+            if (bp.state().is(Blocks.TERRACOTTA) || bp.state().is(Blocks.ORANGE_TERRACOTTA)) terracotta = true;
+        }
+        helper.assertTrue(blackstone, "badlands in the Nether should have blackstone");
+        helper.assertTrue(basalt, "badlands in the Nether should have a basalt fill");
+        helper.assertTrue(!terracotta, "badlands in the Nether should drop the overworld terracotta bands");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.
