@@ -8,8 +8,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.LayeredCauldronBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -18,7 +21,7 @@ import java.util.Map;
 
 /**
  * Code-authored templates for the {@code rare_structures} surprises that occasionally germinate in place of an
- * ordinary island: the snowy {@link #igloo()} (a sealed snow hut with a trapped zombie villager to cure and an
+ * ordinary island: the snowy {@link #igloo()} (a rounded snow dome with a zombie villager to cure and an
  * igloo-loot chest), the {@link #abandonedCottage()} (a cobwebbed ruin of a Hamlet home, haunted by a zombie
  * villager), and the {@link #oceanRuin()} (a flooded stone-brick basin with suspicious sand and a sunken chest).
  * The mobs themselves come from each rare structure's {@code mobs} pack (spawned at the island centre); these
@@ -36,34 +39,53 @@ public final class RareStructureTemplates {
     }
 
     /**
-     * A 5×5 sealed snow dome: snow walls and roof keep it dark, so the zombie villager spawned inside (via the
-     * theme's mobs pack) survives daylight until the player digs in. A brewing stand, a water cauldron and an
-     * igloo-loot chest furnish it — once cured by the player, the villager claims the brewing stand as a cleric.
+     * A rounded snow-block igloo (not an ice box): an octagonal 7×7 footprint, two wall courses, then a shoulder
+     * that steps inward and a small cap — the silhouette curves in toward the top. A 1×2 doorway lets the player
+     * in (the shoulder arches over it as a lintel, so the interior — and the zombie villager spawned in from the
+     * mobs pack — still can't see the sky). A hearth, a workbench, the cleric's brewing stand + water cauldron, an
+     * igloo-loot chest, a dim redstone torch and red carpet furnish it.
      */
     private static Built igloo() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState snow = Blocks.SNOW_BLOCK.defaultBlockState();
-        final int max = 4, mid = 2;
+        final int mid = 3;
 
-        for (int x = 0; x <= max; x++) {
-            for (int z = 0; z <= max; z++) {
-                m.put(new BlockPos(x, 0, z), snow); // floor
-                m.put(new BlockPos(x, 4, z), snow); // roof (sealed, keeps it dark)
-                if (x == 0 || x == max || z == 0 || z == max) {
-                    for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), snow); // walls
-                    }
+        // Dome by squared horizontal distance from the centre: floor disc, wall ring, an inset shoulder, a cap.
+        for (int x = 0; x <= 6; x++) {
+            for (int z = 0; z <= 6; z++) {
+                final int d2 = sq(x - mid) + sq(z - mid);
+                if (d2 <= 13) {
+                    m.put(new BlockPos(x, 0, z), snow);                 // floor (octagonal disc, corners cut)
+                }
+                if (d2 >= 9 && d2 <= 13) {
+                    m.put(new BlockPos(x, 1, z), snow);                 // wall ring
+                    m.put(new BlockPos(x, 2, z), snow);
+                }
+                if (d2 >= 2 && d2 <= 10) {
+                    m.put(new BlockPos(x, 3, z), snow);                 // shoulder (steps in, arches over the door)
+                }
+                if (d2 <= 5) {
+                    m.put(new BlockPos(x, 4, z), snow);                 // cap
                 }
             }
         }
-        // The igloo's kit, in the corners — the centre stays clear for the zombie villager to spawn into.
-        m.put(new BlockPos(1, 1, 1), Blocks.BREWING_STAND.defaultBlockState());
-        m.put(new BlockPos(3, 1, 1), Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
-        m.put(new BlockPos(3, 1, 3), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
-        bes.put(new BlockPos(3, 1, 3), StructureParts.lootChest("minecraft:chests/igloo_chest"));
-        m.put(new BlockPos(2, 1, 3), Blocks.RED_CARPET.defaultBlockState());
-        m.put(new BlockPos(1, 1, 3), Blocks.RED_CARPET.defaultBlockState());
+        // Doorway through the front wall; the y=3 shoulder already covers it from above.
+        m.remove(new BlockPos(mid, 1, 0));
+        m.remove(new BlockPos(mid, 2, 0));
+
+        // The kit around the edges (centre kept clear for the zombie villager). Redstone torch = the dim igloo glow
+        // (light 7 won't melt the snow), and it's block-light only, so the sealed interior still burns no undead.
+        m.put(new BlockPos(1, 1, 1), Blocks.FURNACE.defaultBlockState());
+        m.put(new BlockPos(1, 1, 2), Blocks.CRAFTING_TABLE.defaultBlockState());
+        m.put(new BlockPos(5, 1, 1), Blocks.BREWING_STAND.defaultBlockState());
+        m.put(new BlockPos(5, 1, 2), Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
+        m.put(new BlockPos(5, 1, 5), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
+        bes.put(new BlockPos(5, 1, 5), StructureParts.lootChest("minecraft:chests/igloo_chest"));
+        m.put(new BlockPos(1, 1, 5), Blocks.REDSTONE_TORCH.defaultBlockState());
+        m.put(new BlockPos(2, 1, 4), Blocks.RED_CARPET.defaultBlockState());
+        m.put(new BlockPos(3, 1, 4), Blocks.RED_CARPET.defaultBlockState());
+        m.put(new BlockPos(4, 1, 4), Blocks.RED_CARPET.defaultBlockState());
 
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:snow_block");
         return new Built(m, bes);
@@ -171,43 +193,115 @@ public final class RareStructureTemplates {
     }
 
     /**
-     * The <b>Evoker Cell</b> — a small sealed dark-oak room (a mansion fragment) holding one evoker, spawned via
-     * the rare structure's {@code mobs} pack into the dark centre. Kept dark so the evoker stays dormant until
-     * the player breaks in; on its death it drops the bootstrap <b>Totem of Undying</b>. A woodland-mansion chest
-     * and bookshelves dress it. Rare on a Forest grown in a {@code dark_forest} biome. See SKYGRANDSTRUCTURESPLAN.
+     * The <b>Evoker Cell</b> — a mini woodland mansion (not a wooden box) holding one evoker, spawned via the rare
+     * structure's {@code mobs} pack into the centre; on its death it drops the bootstrap <b>Totem of Undying</b>.
+     * Cobblestone corner pillars and a foundation course, dark-oak plank walls with white-framed glass windows
+     * (and the illagers' red windows flanking a dark-oak front door), a pitched dark-oak stair roof, and a
+     * woodland-mansion chest with bookshelves inside. Rare on a Forest grown in a {@code dark_forest} biome.
      */
     private static Built evokerCell() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState plank = Blocks.DARK_OAK_PLANKS.defaultBlockState();
-        final BlockState log = Blocks.DARK_OAK_LOG.defaultBlockState();
-        final int max = 6, mid = 3; // 7×7 sealed, 5×5 interior
+        final BlockState cobble = Blocks.COBBLESTONE.defaultBlockState();
+        final BlockState glass = Blocks.GLASS_PANE.defaultBlockState();
+        final BlockState white = Blocks.WHITE_WOOL.defaultBlockState();
+        final BlockState red = Blocks.RED_WOOL.defaultBlockState();
+        final int max = 6, mid = 3; // 7×7, 5×5 interior
 
         for (int x = 0; x <= max; x++) {
             for (int z = 0; z <= max; z++) {
                 m.put(new BlockPos(x, 0, z), plank); // floor
-                m.put(new BlockPos(x, 4, z), plank); // ceiling — sealed and dark
-                final boolean perim = x == 0 || x == max || z == 0 || z == max;
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
-                if (perim) {
-                    for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? log : plank);
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                if (corner) {
+                    for (int h = 1; h <= 4; h++) {
+                        m.put(new BlockPos(x, h, z), cobble); // cobblestone corner pillars
                     }
+                } else if (perim) {
+                    m.put(new BlockPos(x, 1, z), cobble); // cobblestone foundation course
+                    m.put(new BlockPos(x, 2, z), plank);  // dark-oak wall
+                    m.put(new BlockPos(x, 3, z), plank);
                 }
             }
         }
-        // Mansion dressing — red carpet underfoot, a bookshelf, a woodland-mansion chest. The centre stays clear
-        // for the evoker to spawn into.
-        for (final int[] c : new int[][]{{2, 2}, {4, 2}, {2, 4}, {4, 4}, {3, 2}, {3, 4}}) {
+        // White-framed glass windows in the middle of the back and both side walls.
+        window(m, new BlockPos(2, 0, max), new BlockPos(mid, 0, max), new BlockPos(4, 0, max), glass, white);
+        window(m, new BlockPos(0, 0, 2), new BlockPos(0, 0, mid), new BlockPos(0, 0, 4), glass, white);
+        window(m, new BlockPos(max, 0, 2), new BlockPos(max, 0, mid), new BlockPos(max, 0, 4), glass, white);
+        // Front wall: a dark-oak door flanked by the illagers' red windows.
+        m.put(new BlockPos(mid, 1, 0), Blocks.DARK_OAK_DOOR.defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, Direction.NORTH));
+        m.put(new BlockPos(mid, 2, 0), Blocks.DARK_OAK_DOOR.defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
+        for (final int wx : new int[]{2, 4}) {
+            m.put(new BlockPos(wx, 2, 0), red);
+            m.put(new BlockPos(wx, 3, 0), glass);
+        }
+
+        // Pitched dark-oak roof: an eaves course of stairs around the rim over a sealed plank ceiling, then a
+        // smaller stepped course capped with planks — a hip roof, not a flat lid. Corner pillars show through.
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
+                final boolean edge = x == 0 || x == max || z == 0 || z == max;
+                if (corner) {
+                    // leave the cobblestone pillar top
+                } else if (edge) {
+                    m.put(new BlockPos(x, 4, z), roofStair(x, z, 0, max)); // eaves
+                } else {
+                    m.put(new BlockPos(x, 4, z), plank);                   // sealed ceiling
+                }
+                final boolean ring2 = (x == 1 || x == max - 1 || z == 1 || z == max - 1)
+                        && (x >= 1 && x <= max - 1 && z >= 1 && z <= max - 1);
+                if (ring2) {
+                    m.put(new BlockPos(x, 5, z), roofStair(x, z, 1, max - 1)); // second step
+                } else if (x >= 2 && x <= max - 2 && z >= 2 && z <= max - 2) {
+                    m.put(new BlockPos(x, 5, z), plank);                       // ridge cap
+                }
+            }
+        }
+        // Inside — a red-carpet runner, bookshelves and a woodland-mansion chest; the centre stays clear for the evoker.
+        for (final int[] c : new int[][]{{3, 1}, {3, 2}, {3, 4}, {3, 5}, {2, 5}, {4, 5}}) {
             m.put(new BlockPos(c[0], 1, c[1]), Blocks.RED_CARPET.defaultBlockState());
         }
-        m.put(new BlockPos(5, 1, 1), Blocks.BOOKSHELF.defaultBlockState());
-        m.put(new BlockPos(5, 2, 1), Blocks.BOOKSHELF.defaultBlockState());
+        m.put(new BlockPos(1, 1, 5), Blocks.BOOKSHELF.defaultBlockState());
+        m.put(new BlockPos(1, 2, 5), Blocks.BOOKSHELF.defaultBlockState());
         m.put(new BlockPos(1, 1, 1), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.EAST));
         bes.put(new BlockPos(1, 1, 1), StructureParts.lootChest("minecraft:chests/woodland_mansion"));
 
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:dark_oak_planks");
         return new Built(m, bes);
+    }
+
+    /** A 2-tall framed window: {@code b} is the central glass pane, {@code a}/{@code c} the wool frame (y2–y3). */
+    private static void window(Map<BlockPos, BlockState> m, BlockPos a, BlockPos b, BlockPos c,
+                               BlockState glass, BlockState frame) {
+        for (int y = 2; y <= 3; y++) {
+            m.put(a.above(y), frame);
+            m.put(b.above(y), glass);
+            m.put(c.above(y), frame);
+        }
+    }
+
+    /** A dark-oak roof stair on a rim block, facing outward from the rim so the roof slopes up toward the centre. */
+    private static BlockState roofStair(int x, int z, int lo, int hi) {
+        final Direction facing;
+        if (z == lo) {
+            facing = Direction.NORTH;
+        } else if (z == hi) {
+            facing = Direction.SOUTH;
+        } else if (x == lo) {
+            facing = Direction.WEST;
+        } else {
+            facing = Direction.EAST;
+        }
+        return Blocks.DARK_OAK_STAIRS.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+    }
+
+    /** Squared integer distance helper for the igloo dome. */
+    private static int sq(int n) {
+        return n * n;
     }
 
     /**

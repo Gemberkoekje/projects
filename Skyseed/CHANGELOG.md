@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.37.1] - 2026-06-23
+
+### Changed
+- **The Igloo looks like an igloo.** It was a sealed 5×5×5 snow cube; it's now a rounded snow dome (octagonal
+  footprint, two wall courses, an inset shoulder and a cap) with a doorway you can actually walk through, furnished
+  with a hearth, a workbench, the cleric's brewing stand + cauldron, an igloo-loot chest, a redstone-torch glow and
+  carpet. (The shoulder arches over the doorway, so the interior still can't see the sky and the zombie villager
+  inside doesn't burn.)
+- **The Evoker Cell looks like a mini woodland mansion.** It was a sealed dark-oak box with no way in; it's now a
+  mansion fragment — cobblestone corner pillars and a foundation course, dark-oak walls with white-framed glass
+  windows (and the illagers' red windows flanking a **dark-oak front door**), and a pitched dark-oak stair roof.
+
 ## [0.37.0] - 2026-06-23
 
 ### Added
