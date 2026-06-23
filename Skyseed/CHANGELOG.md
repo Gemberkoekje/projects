@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.0] - 2026-06-23
+
+### Added
+- **Emptied the Nether** — the first step of the Nether chapter (and, as is tradition, the way the overworld
+  started). The `skyseed:skyblock` world preset now generates `the_nether` as void (no natural terrain), the same
+  trick that voids the overworld, but with a **lava sea** filling everything below Y 32 instead of empty air — a
+  hellish floor and light source you'd fall into rather than open sky. The five Nether biomes still generate
+  (multi-noise), so you explore the void to find them, and the dimension keeps its own feel (ultrawarm, red fog).
+  New `skyseed:void_nether` noise settings; applies to newly created worlds. A portal-arrival platform, the
+  Nether Skyseeds, and the structures follow.
+
 ## [0.34.9] - 2026-06-23
 
 ### Fixed

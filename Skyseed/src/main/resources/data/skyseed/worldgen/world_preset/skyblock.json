@@ -19,7 +19,7 @@
           "type": "minecraft:multi_noise",
           "preset": "minecraft:nether"
         },
-        "settings": "minecraft:nether"
+        "settings": "skyseed:void_nether"
       }
     },
     "minecraft:the_end": {

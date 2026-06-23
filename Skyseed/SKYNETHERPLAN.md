@@ -16,6 +16,8 @@ built Overworld chapter, and `description.md` for the published mod description.
 
 ### The void
 
+> **Built (v0.35.0).** `the_nether` in the `skyseed:skyblock` preset now uses the `skyseed:void_nether` noise settings: no terrain (`final_density` 0), a **lava sea** below Y 32 (`default_fluid` lava + `sea_level` 32), and the five Nether biomes via the `minecraft:nether` multi-noise source. Applies to newly created worlds. The start platform, portal arrival, and seeds are still to come.
+
 The Nether is **completely empty** except for what the player generates — no natural terrain, no bedrock floor.
 Below every island is a **lava sea** at a fixed low Y: it lights the dimension from beneath, gives the hellish
 ambience, and is a lethal hazard. Fall off an island and you're dead, no recovery.
