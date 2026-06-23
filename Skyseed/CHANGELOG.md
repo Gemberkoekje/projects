@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.54.0] - 2026-06-23
+
+### Added
+- **Ruined Portals now come in pairs, linked across dimensions.** Thrown in the Nether, a Ruined Portal Skyseed now
+  grows a small netherrack island carrying an unfinished frame (instead of fizzling). And whenever a Ruined Portal is
+  thrown on *either* side, a matching one is grown at the vanilla **8:1 linked coordinate** in the other dimension
+  (overworld ÷ 8, nether × 8), placed as close to the link as possible — so repairing and lighting **both** frames
+  connects them into a real working portal pair, with no special linking code (vanilla's own portal search does it).
+  The split is deliberate: the **overworld** portal always carries the goodies (the ruined-portal loot chest, gold
+  blocks); the **nether** portal is just the bare, repairable frame. A twin never spawns a twin of its own.
+- Internally, a general convention: a structure can ship a Nether variant by providing a `<pool>_nether` template
+  pool, which is preferred automatically in the Nether (the Ruined Portal uses it for its no-goodies frame).
+
 ## [0.53.0] - 2026-06-23
 
 ### Added

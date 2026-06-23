@@ -25,9 +25,12 @@ public final class RuinedPortalTemplates {
     private RuinedPortalTemplates() {}
 
     public static void generateInto(Path dir) throws IOException {
-        final Path file = dir.resolve("portal.nbt");
+        writeIfAbsent(dir.resolve("portal.nbt"), portal());
+        writeIfAbsent(dir.resolve("portal_nether.nbt"), portalNether());
+    }
+
+    private static void writeIfAbsent(Path file, Built b) throws IOException {
         if (!Files.exists(file)) {
-            final Built b = portal();
             StructureWriter.write(b.blocks(), b.blockEntities(), file);
             Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
         }
@@ -71,6 +74,44 @@ public final class RuinedPortalTemplates {
         m.put(new BlockPos(0, 0, 3), Blocks.LAVA.defaultBlockState());
 
         StructureParts.anchor(m, bes, new BlockPos(1, 0, 1), "minecraft:basalt");
+        return new Built(m, bes);
+    }
+
+    /**
+     * The Nether twin: the same repairable 4×5 frame, but <em>unfinished and empty</em> — no loot chest and no gold
+     * block, just scorched netherrack and a walled-in lava dribble on a small netherrack island. The "goodies" live
+     * only on the Overworld side; this is the free linked frame at the divided coordinate (see SKYNETHERPLAN). Picked
+     * automatically in the Nether via the {@code skyseed:ruined_portal/portal_nether} dimension-variant pool.
+     */
+    private static Built portalNether() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState obsidian = Blocks.OBSIDIAN.defaultBlockState();
+        final BlockState crying = Blocks.CRYING_OBSIDIAN.defaultBlockState();
+
+        // Identical frame shape so it's repairable into a real, lightable portal (complete (2,5)+(3,5)).
+        m.put(new BlockPos(0, 1, 1), obsidian);
+        m.put(new BlockPos(1, 1, 1), crying);
+        m.put(new BlockPos(2, 1, 1), obsidian);
+        m.put(new BlockPos(3, 1, 1), obsidian);
+        m.put(new BlockPos(0, 2, 1), obsidian);
+        m.put(new BlockPos(0, 3, 1), crying);
+        m.put(new BlockPos(0, 4, 1), obsidian);
+        m.put(new BlockPos(0, 5, 1), obsidian);
+        m.put(new BlockPos(3, 2, 1), obsidian);
+        m.put(new BlockPos(3, 3, 1), obsidian);
+        m.put(new BlockPos(3, 4, 1), crying);
+        m.put(new BlockPos(1, 5, 1), obsidian); // top partial — (2,5) and (3,5) missing, repair to light
+
+        // Scorch underfoot — netherrack + a magma block, but NO gold block and NO chest (the twin carries no loot).
+        m.put(new BlockPos(2, 1, 0), Blocks.NETHERRACK.defaultBlockState());
+        m.put(new BlockPos(3, 1, 0), Blocks.MAGMA_BLOCK.defaultBlockState());
+
+        // A small walled-in lava dribble at the foot of the frame.
+        m.put(new BlockPos(0, 0, 1), Blocks.LAVA.defaultBlockState());
+        m.put(new BlockPos(0, 0, 2), Blocks.LAVA.defaultBlockState());
+
+        StructureParts.anchor(m, bes, new BlockPos(1, 0, 1), "minecraft:netherrack");
         return new Built(m, bes);
     }
 }

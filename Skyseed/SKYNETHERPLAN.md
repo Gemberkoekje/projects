@@ -49,6 +49,13 @@ There's no Y=128 ceiling; islands float at any Y under the open Nether fog. Valu
   (debris peaks ~Y15). *(Earlier drafts claimed altitude doesn't gate value — it does, via lava proximity. Resolved.)*
 
 ### Ruined Portal twins — linked across dimensions
+> **BUILT (v0.54.0).** Thrown in the Nether the Ruined Portal grows a small netherrack island with the no-goodies
+> frame (a `the_nether` biome_override + the `skyseed:ruined_portal/portal_nether` dimension-variant pool, picked
+> automatically by `IslandGenerator.dimensionVariant`). A `twin: true` flag on the theme makes germination grow a
+> matching island at the 8:1 linked coordinate in the other dimension (`IslandSeedEntity.spawnTwin` / `linkedPortalPos`),
+> placed with small steps only so it stays in vanilla's portal-linking range. The twin is spawned directly (not a
+> thrown seed) so it never recurses. Overworld = goodies, Nether = bare frame. *(Done for the dedicated seed; the
+> `rare_structures` ruined-portal roll could grow a twin too as a later extension.)*
 
 A cross-dimension detail, and the one structure we can **pre-place** (because *we* choose where the ruined portal
 goes, unlike the player-placed arrival portal). **Whenever a ruined portal is created on either side** — the

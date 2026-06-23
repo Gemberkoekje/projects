@@ -1,5 +1,6 @@
 {
   "dimensions": ["minecraft:overworld"],
+  "twin": true,
   "shape": { "radius": { "min": 5, "max": 7 }, "rim_noise": 0.18, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
   "palette": { "surface": "minecraft:basalt", "fill": "minecraft:blackstone", "core": "minecraft:stone", "fill_depth": 3,
     "surface_scatter": [ { "block": "minecraft:netherrack", "chance": 0.18 }, { "block": "minecraft:magma_block", "chance": 0.04 } ] },
@@ -7,5 +8,13 @@
   "jigsaw": { "pool": "skyseed:ruined_portal/portal", "target": "minecraft:bottom", "depth": 1, "pad": 4 },
   "variants": [
     { "weight": 1, "name": "scorched", "decoration": { "ground": [] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Nether ruined portal (the twin): a SMALL netherrack island carrying just the unfinished frame, NO goodies. The frame swaps to skyseed:ruined_portal/portal_nether automatically in the Nether (the dimension-variant pool convention). Thrown in the Nether OR placed as the twin of an overworld throw, this is what grows; repair + light both frames and vanilla links them at the divided coordinate.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 4, "max": 5 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:netherrack", "fill_depth": 2,
+      "ores": [],
+      "variants": [ { "weight": 1, "name": "scorched", "decoration": { "ground": [] } } ] }
   ]
 }

@@ -24,7 +24,7 @@ import java.util.Optional;
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
                           Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures,
-                          Optional<Lava> lava, List<String> dimensions) {
+                          Optional<Lava> lava, List<String> dimensions, boolean twin) {
 
     /** True if this theme's base config is an implementation for {@code dim} (its declared {@code dimensions}). */
     public boolean baseValidIn(ResourceLocation dim) {
@@ -43,6 +43,9 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             AnimalPack.CODEC.listOf().optionalFieldOf("animals", List.of()).forGetter(IslandTheme::animals),
             RareStructure.CODEC.listOf().optionalFieldOf("rare_structures", List.of()).forGetter(IslandTheme::rareStructures),
             Lava.CODEC.optionalFieldOf("lava").forGetter(IslandTheme::lava),
-            Codec.STRING.listOf().optionalFieldOf("dimensions", List.of("minecraft:overworld")).forGetter(IslandTheme::dimensions)
+            Codec.STRING.listOf().optionalFieldOf("dimensions", List.of("minecraft:overworld")).forGetter(IslandTheme::dimensions),
+            // When true, germinating this island also grows a matching island at the vanilla 8:1 dimension-linked
+            // coordinate in the other dimension (overworld <-> nether). Used by the Ruined Portal — see SKYNETHERPLAN.
+            Codec.BOOL.optionalFieldOf("twin", false).forGetter(IslandTheme::twin)
     ).apply(i, IslandTheme::new));
 }

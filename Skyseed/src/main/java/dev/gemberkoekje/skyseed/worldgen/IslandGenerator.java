@@ -22,8 +22,10 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
@@ -186,7 +188,8 @@ public final class IslandGenerator {
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
         final List<IslandPlan.AnimalSpawn> animals = new ArrayList<>();
         // A rolled rare structure replaces the theme's normal jigsaw + animal packs for this island.
-        final JigsawConfig jc = rare != null ? rare.jigsaw() : theme.jigsaw().orElse(null);
+        final JigsawConfig jcRaw = rare != null ? rare.jigsaw() : theme.jigsaw().orElse(null);
+        final JigsawConfig jc = jcRaw != null ? dimensionVariant(level, jcRaw) : null;
         final List<AnimalPack> animalPacks = rare != null ? rare.mobs() : theme.animals();
         if (jc != null) {
             final int gy = center.getY() + topDome;
@@ -307,6 +310,24 @@ public final class IslandGenerator {
             return true;
         }
         return matchOverride(theme.biomeOverrides(), biome, y, dim, false) != null;
+    }
+
+    /**
+     * In the Nether, prefer a {@code <pool>_nether} variant of a theme's jigsaw pool if one is registered — so e.g.
+     * the Ruined Portal places its no-goodies Nether frame ({@code skyseed:ruined_portal/portal_nether}) instead of
+     * the Overworld treasure version. A general convention: any structure can ship a Nether variant by providing the
+     * suffixed template pool. See SKYNETHERPLAN (Ruined Portal twins).
+     */
+    private static JigsawConfig dimensionVariant(ServerLevel level, JigsawConfig jc) {
+        if (level.dimension() != Level.NETHER) {
+            return jc;
+        }
+        final ResourceLocation netherPool = ResourceLocation.fromNamespaceAndPath(
+                jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
+        if (level.registryAccess().registryOrThrow(Registries.TEMPLATE_POOL).containsKey(netherPool)) {
+            return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink());
+        }
+        return jc;
     }
 
     private static List<Scatter> resolveScatter(List<GroundEntry> cfg) {

@@ -616,6 +616,52 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void ruinedPortalHasNetherVariantAndTwins(GameTestHelper helper) {
+        // SKYNETHERPLAN (Ruined Portal twins): the ruined portal now grows in BOTH dimensions. Overworld = the
+        // treasure frame (goodies pool); Nether = a small netherrack island with the no-goodies _nether frame. It is
+        // flagged a twin theme, and the 8:1 linked-coordinate maths is the vanilla portal map.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme rp = theme(overworld, "ruined_portal");
+        helper.assertTrue(rp.twin(), "ruined_portal should be flagged as a cross-dimension twin theme");
+        helper.assertTrue(rp.baseValidIn(Level.OVERWORLD.location()), "ruined_portal should grow in the overworld");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+        helper.assertTrue(IslandGenerator.formValidFor(rp, wastes, 64, Level.NETHER.location()),
+                "ruined_portal should now also grow in the Nether");
+
+        // Overworld form: the jigsaw uses the goodies pool.
+        final IslandPlan ow = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), rp, plains,
+                RandomSource.create(91L));
+        helper.assertTrue(ow.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("ruined_portal/portal")),
+                "the overworld ruined portal should use the goodies pool ruined_portal/portal");
+
+        // Nether form: a netherrack island whose jigsaw swaps to the no-goodies _nether pool.
+        final IslandPlan nv = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), rp, wastes,
+                RandomSource.create(92L));
+        boolean netherrack = false;
+        for (IslandPlan.BlockPlacement bp : nv.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+        }
+        helper.assertTrue(netherrack, "the Nether ruined portal should be a netherrack island");
+        helper.assertTrue(nv.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("ruined_portal/portal_nether")),
+                "the Nether ruined portal should swap to the no-goodies pool ruined_portal/portal_nether");
+
+        // Linked-coordinate maths: overworld/8 and nether*8 (vanilla's portal map).
+        final BlockPos toNether = IslandSeedEntity.linkedPortalPos(new BlockPos(800, 80, 80), Level.NETHER, nether);
+        helper.assertTrue(toNether.getX() == 100 && toNether.getZ() == 10,
+                "overworld->nether twin should divide X/Z by 8, was " + toNether);
+        final BlockPos toOverworld = IslandSeedEntity.linkedPortalPos(new BlockPos(100, 70, 10), Level.OVERWORLD, overworld);
+        helper.assertTrue(toOverworld.getX() == 800 && toOverworld.getZ() == 80,
+                "nether->overworld twin should multiply X/Z by 8, was " + toOverworld);
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

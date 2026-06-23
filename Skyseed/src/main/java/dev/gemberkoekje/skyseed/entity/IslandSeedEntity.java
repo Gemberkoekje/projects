@@ -184,7 +184,98 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // Tick-budgeted placement: the scheduler grows the island in over the next ticks (README → Generation algorithm).
         IslandGrowth.enqueue(new GenerationJob(level, plan));
 
+        // Cross-dimension twin (the Ruined Portal): grow a matching island at the vanilla-linked coordinate in the
+        // other dimension. Spawned directly here, not via another thrown seed, so it never spawns a twin of its own.
+        if (theme.twin()) {
+            spawnTwin(level, this.blockPosition(), theme);
+        }
+
         this.discard();
+    }
+
+    /**
+     * Grow a twin island at the 8:1 dimension-linked coordinate in the paired dimension (overworld &harr; nether), so
+     * a repaired-and-lit frame on both sides connects with no linking code (SKYNETHERPLAN → Ruined Portal twins). The
+     * twin germinates the same theme — the dimension itself decides the form (goodies in the overworld, a bare frame
+     * in the Nether). Placement stays close to the linked spot (small steps only) so the portals still link.
+     */
+    private void spawnTwin(ServerLevel origin, BlockPos center, IslandTheme theme) {
+        final net.minecraft.resources.ResourceKey<Level> to;
+        if (origin.dimension() == Level.OVERWORLD) {
+            to = Level.NETHER;
+        } else if (origin.dimension() == Level.NETHER) {
+            to = Level.OVERWORLD;
+        } else {
+            return; // twins only pair the overworld and the Nether
+        }
+        final ServerLevel other = origin.getServer().getLevel(to);
+        if (other == null) {
+            return;
+        }
+        final BlockPos linked = linkedPortalPos(center, to, other);
+        if (!IslandGenerator.formValidFor(theme, other.getBiome(linked), linked.getY(), other.dimension().location())) {
+            return; // the theme doesn't implement the other dimension — no twin
+        }
+        final IslandPlan twin = placeTwinNear(other, theme, linked);
+        if (twin != null) {
+            IslandGrowth.enqueue(new GenerationJob(other, twin));
+        }
+    }
+
+    /** The vanilla 8:1 cross-dimension coordinate (overworld/8 &harr; nether*8), Y kept and clamped to {@code to}. */
+    public static BlockPos linkedPortalPos(BlockPos c, net.minecraft.resources.ResourceKey<Level> to, ServerLevel toLevel) {
+        final int x;
+        final int z;
+        if (to == Level.NETHER) {
+            x = Math.floorDiv(c.getX(), 8);
+            z = Math.floorDiv(c.getZ(), 8);
+        } else {
+            x = c.getX() * 8;
+            z = c.getZ() * 8;
+        }
+        int y = c.getY();
+        if (to == Level.NETHER) {
+            y = net.minecraft.util.Mth.clamp(y, 16, 110); // above the lava sea, below the ceiling
+        } else {
+            y = net.minecraft.util.Mth.clamp(y, toLevel.getMinBuildHeight() + 8, toLevel.getMaxBuildHeight() - 16);
+        }
+        return new BlockPos(x, y, z);
+    }
+
+    /** Plan the twin as close to {@code linked} as possible — small steps only, so the portal stays in linking range. */
+    private static IslandPlan placeTwinNear(ServerLevel level, IslandTheme theme, BlockPos linked) {
+        final List<Vec3> players = level.players().stream().map(p -> p.position()).toList();
+        final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        final IslandPlacement.Occupancy occupied = (x, y, z) -> {
+            final BlockState s = level.getBlockState(probe.set(x, y, z));
+            return !s.isAir() && !s.canBeReplaced();
+        };
+        for (BlockPos c : twinSearchSpots(linked)) {
+            final IslandPlan candidate = planAt(level, theme, c);
+            if (IslandPlacement.check(candidate, players, occupied).ok()) {
+                return candidate;
+            }
+        }
+        // No clear spot close by — grow it at the linked coordinate anyway; sitting on the link is the whole point.
+        return planAt(level, theme, linked);
+    }
+
+    /** The linked spot first, then a tight ring (small horizontal steps), then a couple of small vertical lifts. */
+    private static List<BlockPos> twinSearchSpots(BlockPos linked) {
+        final java.util.List<BlockPos> spots = new java.util.ArrayList<>();
+        spots.add(linked);
+        for (int d = 3; d <= 9; d += 3) {
+            spots.add(linked.offset(d, 0, 0));
+            spots.add(linked.offset(-d, 0, 0));
+            spots.add(linked.offset(0, 0, d));
+            spots.add(linked.offset(0, 0, -d));
+            spots.add(linked.offset(d, 0, d));
+            spots.add(linked.offset(-d, 0, -d));
+        }
+        for (int lift : new int[] { 6, -6, 12, -12 }) {
+            spots.add(linked.above(lift));
+        }
+        return spots;
     }
 
     /**
