@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed.gametest;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
+import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -187,6 +189,92 @@ public final class SkyseedGameTests {
     private static boolean isWaterAt(java.util.Map<BlockPos, BlockState> map, BlockPos p) {
         final BlockState s = map.get(p);
         return s != null && s.getFluidState().is(FluidTags.WATER);
+    }
+
+    @GameTest(template = REGION)
+    public static void everySeedRecipeAndBookEntryMatchesSeedKind(GameTestHelper helper) {
+        // Auto-discovered from the registry maps, so a new seed is covered with no test edit. A regular seed must be
+        // craftable, listed in the recipe almanac, and have a field-notes entry; a debug seed must have none of those.
+        final ServerLevel level = helper.getLevel();
+        final java.util.Set<Item> craftable = new java.util.HashSet<>();
+        for (var r : level.getRecipeManager().getRecipes()) {
+            craftable.add(r.value().getResultItem(level.registryAccess()).getItem());
+        }
+        final String almanac = readResource("/assets/skyseed/patchouli_books/guide/en_us/entries/recipes.json");
+        helper.assertTrue(almanac != null, "could not read the recipe almanac (recipes.json) from the classpath");
+
+        for (var e : ModItems.SEEDS.entrySet()) {
+            final String theme = e.getKey();
+            final String id = e.getValue().getId().toString();
+            helper.assertTrue(craftable.contains(e.getValue().get()), "seed '" + theme + "' has no crafting recipe");
+            helper.assertTrue(almanac.contains(id), "seed '" + theme + "' is missing from the recipe almanac (recipes.json)");
+            helper.assertTrue(resourceExists(entryPath(theme)), "seed '" + theme + "' has no field-notes entry (" + entryPath(theme) + ")");
+        }
+        for (var e : ModItems.DEBUG_SEEDS.entrySet()) {
+            final String theme = e.getKey();
+            final String id = e.getValue().getId().toString();
+            helper.assertTrue(!craftable.contains(e.getValue().get()), "debug seed '" + theme + "' must not be craftable");
+            helper.assertTrue(!almanac.contains(id), "debug seed '" + theme + "' must not be in the recipe almanac");
+            helper.assertTrue(!resourceExists(entryPath(theme)), "debug seed '" + theme + "' must not have a field-notes entry");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void everyCraftableSeedHasUniqueIcon(GameTestHelper helper) {
+        // Each regular seed's item model must point at its own texture (no two share one — that is how the Ocean
+        // Monument seed slipped through reusing the generic island_seed icon), and that texture must exist.
+        final java.util.Map<String, String> byTexture = new java.util.HashMap<>();
+        for (String theme : ModItems.SEEDS.keySet()) {
+            final String layer0 = modelLayer0(theme);
+            helper.assertTrue(layer0 != null, "seed '" + theme + "' item model has no layer0 texture");
+            helper.assertTrue(resourceExists(texturePath(layer0)), "seed '" + theme + "' icon texture is missing (" + layer0 + ")");
+            final String other = byTexture.put(layer0, theme);
+            helper.assertTrue(other == null, "seeds '" + theme + "' and '" + other + "' share the icon '" + layer0 + "'");
+        }
+        helper.succeed();
+    }
+
+    // --- book/icon coverage helpers ---
+
+    /** Patchouli field-notes entry path for a theme — note large variants flip to a {@code large_} prefix. */
+    private static String entryPath(String theme) {
+        final String name = theme.endsWith("_large")
+                ? "large_" + theme.substring(0, theme.length() - "_large".length()) + "_island"
+                : theme + "_island";
+        return "/assets/skyseed/patchouli_books/guide/en_us/entries/" + name + ".json";
+    }
+
+    /** The {@code layer0} texture id from a seed's item model, or {@code null}. */
+    private static String modelLayer0(String theme) {
+        final String json = readResource("/assets/skyseed/models/item/" + theme + "_skyseed.json");
+        if (json == null) {
+            return null;
+        }
+        final com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+        if (!root.has("textures")) {
+            return null;
+        }
+        final com.google.gson.JsonObject tex = root.getAsJsonObject("textures");
+        return tex.has("layer0") ? tex.get("layer0").getAsString() : null;
+    }
+
+    /** Resource path of the PNG a {@code namespace:item/name} texture id refers to. */
+    private static String texturePath(String textureId) {
+        final int colon = textureId.indexOf(':');
+        return "/assets/" + textureId.substring(0, colon) + "/textures/" + textureId.substring(colon + 1) + ".png";
+    }
+
+    private static boolean resourceExists(String path) {
+        return SkyseedGameTests.class.getResource(path) != null;
+    }
+
+    private static String readResource(String path) {
+        try (java.io.InputStream in = SkyseedGameTests.class.getResourceAsStream(path)) {
+            return in == null ? null : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException ex) {
+            return null;
+        }
     }
 
     @GameTest(template = REGION)
