@@ -1,0 +1,33 @@
+{
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:soul_sand", "fill": "minecraft:soul_soil", "core": "minecraft:basalt", "fill_depth": 2 },
+  "ores": [
+    { "block": "minecraft:bone_block", "chance": 0.95, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:nether_quartz_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
+    { "block": "minecraft:nether_gold_ore", "chance": 0.30, "count": { "min": 1, "max": 1 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+  ],
+  "mobs": [
+    { "entity": "minecraft:skeleton", "chance": 0.70, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:enderman", "chance": 0.30, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:ghast", "chance": 0.08, "count": { "min": 1, "max": 1 } }
+  ],
+  "variants": [
+    { "weight": 2, "name": "valley", "decoration": {
+      "ground": [ { "block": "minecraft:soul_fire", "chance": 0.06 }, { "block": "minecraft:basalt", "chance": 0.05 } ] } },
+    { "weight": 1, "name": "fossil", "decoration": {
+      "ground": [ { "block": "minecraft:soul_fire", "chance": 0.08 }, { "block": "minecraft:bone_block", "chance": 0.04 }, { "block": "minecraft:basalt", "chance": 0.06 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Overworld easter egg — thrown topside a Nether Soul seed makes a TINY ~7x7x4 plain desert island (sand over sandstone, a dead bush or two), not the soul sand valley. The mirror of the Tier-2 design.",
+      "dimension": "minecraft:overworld",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },
+      "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:sandstone", "fill_depth": 2,
+      "ores": [],
+      "mobs": [],
+      "variants": [
+        { "weight": 1, "name": "dune", "decoration": {
+          "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 } ] } }
+      ] }
+  ]
+}

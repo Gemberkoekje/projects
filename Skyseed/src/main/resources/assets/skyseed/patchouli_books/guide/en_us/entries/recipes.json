@@ -125,6 +125,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_soul_skyseed",
+      "text": "The $(item)Nether Soul Skyseed$() — soul sand around a $(item)bone block$() fossil. A full-size $(bold)Soul Sand Valley$(): soul sand, fossils and soul fire."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

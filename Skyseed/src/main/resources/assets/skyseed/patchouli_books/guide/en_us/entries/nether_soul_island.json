@@ -1,0 +1,20 @@
+{
+  "name": "Nether Soul Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:soul_sand",
+  "advancement": "skyseed:craft_nether_soul",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Tier-2 of the Soul Sand Valley: a $(bold)full-size$() island of $(item)soul sand$() and soul soil, riddled with $(item)bone$() fossils and lit by ghostly $(item)soul fire$(). A pack of $(item)Skeletons$() haunts it, with Endermen and the odd Ghast overhead."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Yields$()$(br)Soul sand by the ton — for $(item)Wither$() skulls' stand, soul-speed roads, and Nether wart farms — plus soul soil, and bone blocks from the fossils for endless bone meal. Skeletons drop the bones and arrows."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A ring of $(item)soul sand$() around a single $(item)bone block$() — the fossil at its heart. (Soul sand comes from the Nether; a bone block you can dig from an overworld $(bold)fossil$(), or craft from bones.) $(br)$(br)Thrown topside it makes a tiny patch of $(bold)desert$() instead."
+    }
+  ]
+}

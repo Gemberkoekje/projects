@@ -231,8 +231,13 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ### 💀 Desert → Soul Sand Valley
 > **Built (v0.38.0; tiny since v0.39.0).** A **tiny ~7×7×4** soul-sand island over soul soil + a basalt core,
 > soul-fire ground scatter (eternal on soul sand), bone-block fossils buried in the basalt (a `bone_block` ore), a
-> little nether quartz/gold, and skeleton + enderman sprinkles. Still to come: a standalone bone fossil + basalt
-> columns, and Tier-2 *Soul* (the full-size version).
+> little nether quartz/gold, and skeleton + enderman sprinkles.
+> **Tier-2 *Soul* — BUILT (v0.52.0), the fourth Tier-2 Nether-native seed.** Its own craftable `nether_soul` seed: a
+> full-size (radius 6-9) soul-sand island over soul soil / basalt, near-guaranteed **bone-block fossils** (`bone_block`
+> ore at chance 0.95, bigger veins), soul-fire scatter, a guaranteed **Skeleton pack** + Endermen + the odd Ghast, a
+> little quartz/gold. Recipe = a ring of **soul sand** around a single **bone block** (the fossil core; soul sand is
+> Nether-only, a bone block is an overworld fossil). **Overworld easter egg:** a TINY desert island (sand/sandstone, a
+> dead bush) — mirror of Nether Rocky's stone / Nether Forest's grass.
 
 - **Palette:** soul sand surface, soul soil fill, basalt core.
 - **Decoration:** blue **soul fire** (ambient, hurts the player), basalt columns at the rim, one **bone-block

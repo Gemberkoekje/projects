@@ -512,6 +512,58 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void netherSoulIsFullSizeWithTinyDesertOverworld(GameTestHelper helper) {
+        // Tier-2 Soul (SKYNETHERPLAN): a full-size Soul Sand Valley — soul sand riddled with bone fossils. Thrown
+        // topside it makes a TINY desert island instead. Nether-native base; the overworld form is a dimension override.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme ns = theme(overworld, "nether_soul");
+        helper.assertTrue(ns.baseValidIn(Level.NETHER.location()), "nether_soul base must implement the_nether");
+        helper.assertTrue(!ns.baseValidIn(Level.OVERWORLD.location()), "nether_soul base must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+
+        helper.assertTrue(IslandGenerator.formValidFor(ns, wastes, 64, Level.NETHER.location()),
+                "nether_soul should grow in the Nether");
+        helper.assertTrue(IslandGenerator.formValidFor(ns, plains, 80, Level.OVERWORLD.location()),
+                "nether_soul should grow a tiny desert in the overworld");
+
+        // Nether: full-size soul sand valley with bone fossils.
+        final IslandPlan inNether = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), ns, wastes,
+                RandomSource.create(71L));
+        helper.assertTrue(inNether.blocks().size() > 500, "the soul valley should be full-size, was " + inNether.blocks().size());
+        boolean soulSand = false;
+        boolean bone = false;
+        boolean sand = false;
+        for (IslandPlan.BlockPlacement bp : inNether.blocks()) {
+            if (bp.state().is(Blocks.SOUL_SAND)) soulSand = true;
+            if (bp.state().is(Blocks.BONE_BLOCK)) bone = true;
+            if (bp.state().is(Blocks.SAND)) sand = true;
+        }
+        helper.assertTrue(soulSand, "the soul valley should have a soul sand surface");
+        helper.assertTrue(bone, "the soul valley should have bone fossils");
+        helper.assertTrue(!sand, "the soul valley should not have overworld sand");
+
+        // Overworld: a tiny desert island, never soul sand.
+        final IslandPlan o = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), ns, plains,
+                RandomSource.create(72L));
+        helper.assertTrue(o.blocks().size() < 500, "the overworld easter-egg island should be tiny, was " + o.blocks().size());
+        boolean oSand = false;
+        boolean oSoulSand = false;
+        for (IslandPlan.BlockPlacement bp : o.blocks()) {
+            if (bp.state().is(Blocks.SAND)) oSand = true;
+            if (bp.state().is(Blocks.SOUL_SAND)) oSoulSand = true;
+        }
+        helper.assertTrue(oSand, "the overworld easter-egg island should be a desert (sand)");
+        helper.assertTrue(!oSoulSand, "the overworld easter-egg island should not be soul sand");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

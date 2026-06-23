@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.52.0] - 2026-06-23
+
+### Added
+- **Tier-2 Soul — a full-size Soul Sand Valley (tiny desert topside).** The fourth Tier-2 Nether-native seed: a
+  full-size island of **soul sand** and soul soil, riddled with **bone fossils** and lit by ghostly **soul fire**,
+  haunted by a pack of **Skeletons** (with Endermen and the odd Ghast). Crafted from a ring of soul sand around a
+  single **bone block** — the fossil at its heart (soul sand from the Nether, a bone block from an overworld fossil
+  or crafted from bones). Thrown in the overworld it makes a tiny desert island instead. New item, recipe, craft
+  advancement, guide entry and a soul-sand-tinted icon. Guarded by the `netherSoulIsFullSizeWithTinyDesertOverworld`
+  gametest.
+
 ## [0.51.1] - 2026-06-23
 
 ### Changed
