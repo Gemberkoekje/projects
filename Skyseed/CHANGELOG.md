@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.52.1] - 2026-06-23
+
+### Changed
+- **Tier-2 Nether seed recipes are now compact 2×2 crafts built on their overworld Skyseed.** Instead of a full 3×3
+  of Nether blocks, each Tier-2 Nether seed is now its matching overworld seed infused with a couple of Nether
+  blocks and a signature ingredient — cheaper, and a clear "upgrade the overworld seed into its Nether form"
+  progression (the parent seed is consumed):
+  - **Nether Soul** = 2 soul sand + a **Desert Skyseed** + a bone block.
+  - **Nether Rocky** = 2 netherrack + a **Rocky Skyseed** + nether quartz.
+  - **Nether Lava** = 2 basalt + an **Aquatic Skyseed** + a bucket of lava (returned empty).
+  - **Nether Forest** = crimson + warped stems + a **Forest Skyseed** + a shroomlight.
+
 ## [0.52.0] - 2026-06-23
 
 ### Added

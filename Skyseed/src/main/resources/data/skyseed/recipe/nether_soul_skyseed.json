@@ -2,13 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "SSS",
-    "SBS",
-    "SSS"
+    "SS",
+    "DB"
   ],
   "key": {
     "S": {
       "item": "minecraft:soul_sand"
+    },
+    "D": {
+      "item": "skyseed:desert_skyseed"
     },
     "B": {
       "item": "minecraft:bone_block"

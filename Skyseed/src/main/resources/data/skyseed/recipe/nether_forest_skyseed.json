@@ -2,9 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "CSW",
-    "SHS",
-    "CSW"
+    "CW",
+    "FS"
   ],
   "key": {
     "C": {
@@ -13,11 +12,11 @@
     "W": {
       "item": "minecraft:warped_stem"
     },
+    "F": {
+      "item": "skyseed:forest_skyseed"
+    },
     "S": {
       "item": "minecraft:shroomlight"
-    },
-    "H": {
-      "item": "minecraft:nether_wart_block"
     }
   },
   "result": {

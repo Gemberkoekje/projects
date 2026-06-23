@@ -2,16 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "BMB",
-    "MLM",
-    "BMB"
+    "BB",
+    "AL"
   ],
   "key": {
     "B": {
-      "item": "minecraft:blackstone"
+      "item": "minecraft:basalt"
     },
-    "M": {
-      "item": "minecraft:magma_block"
+    "A": {
+      "item": "skyseed:aquatic_skyseed"
     },
     "L": {
       "item": "minecraft:lava_bucket"

@@ -14,7 +14,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Topside, too$()$(br)The overworld has no lava island of its own, so this seed grows a $(bold)full one$() there as well: a stone-bodied volcanic isle with the same lava lake — Striders and all. Crafted from blackstone, magma blocks and a bucket of lava (you keep the bucket)."
+      "text": "$(bold)Topside, too$()$(br)The overworld has no lava island of its own, so this seed grows a $(bold)full one$() there as well: a stone-bodied volcanic isle with the same lava lake — Striders and all. Crafted from an $(item)Aquatic Skyseed$(), basalt and a bucket of lava (you keep the bucket)."
     }
   ]
 }

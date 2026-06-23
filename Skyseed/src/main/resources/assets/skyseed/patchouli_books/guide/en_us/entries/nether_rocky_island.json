@@ -14,7 +14,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Worth the trip$()$(br)Crafted from $(item)netherrack$(), $(item)blackstone$() and $(item)quartz$() — all of it dug from a starter Nether island. A deliberate step up: commit to the Nether, and it pays you back in full-size islands."
+      "text": "$(bold)Worth the trip$()$(br)Crafted from a $(item)Rocky Skyseed$() infused with $(item)netherrack$() and nether $(item)quartz$(). A deliberate step up: commit to the Nether, and it pays you back in full-size islands."
     }
   ]
 }

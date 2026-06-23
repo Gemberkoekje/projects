@@ -14,7 +14,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Yields$()$(br)Stems and shroomlight for building, fungi for breeding hoglins and steering striders, nylium to spread your own forest. $(br)$(br)Thrown $(bold)topside$() it shrugs and makes a tiny tuft of a grass island instead — a seed's a seed. Crafted from crimson and warped stems, shroomlight and a nether wart block."
+      "text": "$(bold)Yields$()$(br)Stems and shroomlight for building, fungi for breeding hoglins and steering striders, nylium to spread your own forest. $(br)$(br)Thrown $(bold)topside$() it shrugs and makes a tiny tuft of a grass island instead — a seed's a seed. Crafted from a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight."
     }
   ]
 }

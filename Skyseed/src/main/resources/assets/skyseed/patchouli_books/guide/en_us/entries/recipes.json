@@ -111,22 +111,22 @@
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:nether_rocky_skyseed",
-      "text": "The $(item)Nether Rocky Skyseed$() — netherrack, blackstone and quartz, all dug from a starter $(bold)Nether$() island. The first $(bold)Nether-native$() seed: a full-size mining isle."
+      "text": "The $(item)Nether Rocky Skyseed$() — a $(item)Rocky Skyseed$() infused with netherrack and nether quartz. The first $(bold)Nether-native$() seed: a full-size mining isle."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:nether_lava_skyseed",
-      "text": "The $(item)Nether Lava Skyseed$() — blackstone, magma blocks and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside."
+      "text": "The $(item)Nether Lava Skyseed$() — an $(item)Aquatic Skyseed$(), basalt and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:nether_forest_skyseed",
-      "text": "The $(item)Nether Forest Skyseed$() — crimson and warped stems, shroomlight and a nether wart block. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome."
+      "text": "The $(item)Nether Forest Skyseed$() — a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome."
     },
     {
       "type": "patchouli:crafting",
       "recipe": "skyseed:nether_soul_skyseed",
-      "text": "The $(item)Nether Soul Skyseed$() — soul sand around a $(item)bone block$() fossil. A full-size $(bold)Soul Sand Valley$(): soul sand, fossils and soul fire."
+      "text": "The $(item)Nether Soul Skyseed$() — a $(item)Desert Skyseed$(), soul sand and a $(item)bone block$() fossil. A full-size $(bold)Soul Sand Valley$(): soul sand, fossils and soul fire."
     },
     {
       "type": "patchouli:crafting",

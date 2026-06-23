@@ -14,7 +14,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Crafted$()$(br)A ring of $(item)soul sand$() around a single $(item)bone block$() — the fossil at its heart. (Soul sand comes from the Nether; a bone block you can dig from an overworld $(bold)fossil$(), or craft from bones.) $(br)$(br)Thrown topside it makes a tiny patch of $(bold)desert$() instead."
+      "text": "$(bold)Crafted$()$(br)A $(item)Desert Skyseed$() with $(item)soul sand$() and a $(item)bone block$() fossil. (Soul sand comes from the Nether; a bone block you can dig from an overworld $(bold)fossil$(), or craft from bones.) $(br)$(br)Thrown topside it makes a tiny patch of $(bold)desert$() instead."
     }
   ]
 }

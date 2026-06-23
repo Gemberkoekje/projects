@@ -2,16 +2,15 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "NBN",
-    "BQB",
-    "NBN"
+    "NN",
+    "RQ"
   ],
   "key": {
     "N": {
       "item": "minecraft:netherrack"
     },
-    "B": {
-      "item": "minecraft:blackstone"
+    "R": {
+      "item": "skyseed:rocky_skyseed"
     },
     "Q": {
       "item": "minecraft:quartz"
