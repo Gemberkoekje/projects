@@ -62,8 +62,8 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 The overworld chapter is done; what's planned next:
 
-- **The Nether** — the next dimension, designed in detail in `SKYNETHERPLAN.md`. Overworld seeds adapt across the portal (Rocky → a netherrack mining island, Aquatic → a lava lagoon, Desert → a soul-sand valley, …), alongside new Fortress, Bastion and Piglin Trading Post structures.
-- **The End** — after the Nether.
+- **The Nether** — the next dimension, designed in detail in `SKYNETHERPLAN.md`. Overworld seeds adapt across the portal (Rocky → a netherrack mining island, Aquatic → a lava lagoon, Desert → a soul-sand valley, …), alongside new Fortress, Bastion and Piglin Trading Post structures. Already emptied to a void + lava sea as of v0.35.0.
+- **The End** — after the Nether. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
 - **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
 - **Remaining vanilla blocks** — a short list (a copper bulb, a few Nether-gated blocks), tracked in `MISSINGBLOCKSPLAN.md`.

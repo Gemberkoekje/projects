@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.35.1] - 2026-06-23
+
+### Added
+- **Pre-emptied the End** — the same treatment as the Nether, done early on purpose: so that whenever the End
+  chapter actually gets built, players won't have to start a new save to see it. `the_end` in the `skyseed:skyblock`
+  preset now uses a new `skyseed:void_end` void noise settings (no terrain), while keeping the standard
+  `minecraft:the_end` biome source so all the End biomes stay available for later. Applies to newly created worlds.
+  Two differences from the Nether worth knowing: you arrive on the game's hardcoded obsidian platform (no lava to
+  fall into), and the ender dragon fight is triggered by *entering* the dimension rather than by terrain — so for
+  now a dragon still spawns over the void on first entry. Deciding what happens to it is part of the (still
+  unwritten) End chapter.
+
 ## [0.35.0] - 2026-06-23
 
 ### Added
