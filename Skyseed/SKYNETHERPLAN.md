@@ -84,5 +84,8 @@ work — see `MISSINGBLOCKSPLAN.md`.
   explore" deserves a prominent guide entry, given every island sits over void.
 - **Standing rule:** the void noise_settings IDs (`skyseed:void` / `void_nether` / `void_end`) are baked into
   level.dat by string — never rename them.
+- **⚠ Before 1.0:** remove the `/emptynether` / `/emptyend` rescue commands (and the conversion offer in
+  `PlayerEvents`) — a pre-void-world stopgap that leans on the "experimental features" path, fine now but not for a
+  1.0 release. See the README Roadmap.
 - Nether biome list verified against 1.21.1 (exactly five biomes); re-verify mob spawn tables + structure loot-table
   IDs before building the remaining structures.

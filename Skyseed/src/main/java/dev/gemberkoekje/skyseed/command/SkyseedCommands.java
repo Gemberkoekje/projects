@@ -44,6 +44,11 @@ import java.util.stream.Stream;
  * one {@code settings} string in {@code level.dat} and delete the dimension's region folders. On the next load MC
  * builds the void dimension natively and the wiped chunks regenerate empty. The reset therefore applies when the
  * player exits to the title screen (or the server restarts), which the confirmation message makes clear.
+ *
+ * <p><b>TODO — remove before v1.0.</b> These are a one-time rescue stopgap for worlds created <em>before</em> the
+ * void dimensions (v0.35.x). By 1.0 there should be no pre-void world left to convert, and the in-place conversion
+ * leans on Minecraft's "experimental features" path — fine as a rescue route now, but not something a 1.0 release
+ * should ship. Delete this class, its registration, and the conversion offer in {@code PlayerEvents}. (See README.)
  */
 @EventBusSubscriber(modid = Skyseed.MODID)
 public final class SkyseedCommands {
