@@ -323,6 +323,46 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void netherRockyIsNetherNativeAndFullSize(GameTestHelper helper) {
+        // The first Tier-2 Nether-NATIVE seed (SKYNETHERPLAN): unlike an overworld seed's tiny Nether foothold, this
+        // grows a FULL-SIZE mining island in the Nether (radius 6-9, like an overworld normal seed), and FIZZLES in
+        // the overworld (it is not an implementation for that dimension).
+        final IslandTheme nr = theme(helper.getLevel(), "nether_rocky");
+        helper.assertTrue(nr.baseValidIn(Level.NETHER.location()), "nether_rocky must implement the_nether");
+        helper.assertTrue(!nr.baseValidIn(Level.OVERWORLD.location()), "nether_rocky must NOT implement the overworld");
+
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        final var plains = helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+
+        // Germination gate: valid in the Nether, fizzles in the overworld.
+        helper.assertTrue(IslandGenerator.formValidFor(nr, wastes, 64, Level.NETHER.location()),
+                "nether_rocky should grow in the Nether");
+        helper.assertTrue(!IslandGenerator.formValidFor(nr, plains, 80, Level.OVERWORLD.location()),
+                "nether_rocky should fizzle in the overworld");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "nether_rocky"), wastes, RandomSource.create(303L));
+        helper.assertTrue(p.blocks().size() > 1000,
+                "a Nether Rocky island should be full-size (>1000 blocks), was " + p.blocks().size());
+        boolean netherrack = false;
+        boolean blackstone = false;
+        boolean quartz = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.BLACKSTONE)) blackstone = true;
+            if (bp.state().is(Blocks.NETHER_QUARTZ_ORE)) quartz = true;
+        }
+        helper.assertTrue(netherrack, "nether_rocky should have a netherrack body");
+        helper.assertTrue(blackstone, "nether_rocky should have a blackstone core");
+        helper.assertTrue(quartz, "nether_rocky should carry nether quartz ore");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

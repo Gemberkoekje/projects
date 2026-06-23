@@ -1,0 +1,20 @@
+{
+  "name": "Nether Rocky Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:blackstone",
+  "advancement": "skyseed:craft_nether_rocky",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The first $(bold)Nether-native$() Skyseed — and the first to grow a $(bold)full-size$() island down here, not the tiny foothold an overworld seed makes in the Nether. A netherrack isle over a $(item)blackstone$() core, built for one thing: mining."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Ores$()$(br)$(item)Nether quartz$() and $(item)nether gold$() turn up on nearly every isle, in generous veins, with $(item)gilded blackstone$() and the odd $(item)ancient debris$() for the patient. $(bold)Throw it low$(), near the lava sea, and the deepest isles run richest — the best debris haul is down there."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Worth the trip$()$(br)Crafted from $(item)netherrack$(), $(item)blackstone$() and $(item)quartz$() — all of it dug from a starter Nether island. A deliberate step up: commit to the Nether, and it pays you back in full-size islands."
+    }
+  ]
+}

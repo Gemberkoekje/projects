@@ -171,8 +171,13 @@ in the empty Skyseed Nether — Fortresses, Bastions and Trading Posts are seed-
 ### 🪨 Rocky → Nether mining *(Nether Wastes)*
 > **Built (v0.36.0; tiny since v0.39.0).** Tier-1 Rocky: a **tiny ~7×7×4** netherrack island with a blackstone core,
 > a little Nether Quartz + Nether Gold, and Ancient Debris that ramps up low (a `max_y: 50` band), with zombified
-> piglin / magma cube / piglin sprinkles. Still to come: Tier-2 *Nether Rocky* (the full-size, debris-rich version),
-> and the biome-specific surface patches below (crimson/warped/soul/basalt).
+> piglin / magma cube / piglin sprinkles.
+> **Tier-2 *Nether Rocky* — BUILT (v0.48.0), the FIRST Tier-2 Nether-native seed.** Its own craftable `nether_rocky`
+> seed (`dimensions: [the_nether]`, so it fizzles in the overworld): a **full-size** mining island (radius 6-9, like
+> an overworld normal seed), netherrack body / blackstone core, generous quartz + gold, gilded blackstone + ancient
+> debris, a deep `max_y: 34` band that runs richest near the lava sea, glowstone/basalt/magma variants, lava veins +
+> lakes, and a fuller piglin/magma mob pack. Crafted from netherrack + blackstone + quartz (all Nether-mined). Still
+> to come: the biome-specific surface patches below (crimson/warped/soul/basalt).
 
 - **Palette:** netherrack surface/fill, basalt/blackstone core.
 - **Biome overrides:** crimson -> crimson nylium patches; warped -> warped patches; soul -> soul sand patches + blue

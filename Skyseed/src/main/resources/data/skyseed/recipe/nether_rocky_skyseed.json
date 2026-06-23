@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NBN",
+    "BQB",
+    "NBN"
+  ],
+  "key": {
+    "N": {
+      "item": "minecraft:netherrack"
+    },
+    "B": {
+      "item": "minecraft:blackstone"
+    },
+    "Q": {
+      "item": "minecraft:quartz"
+    }
+  },
+  "result": {
+    "id": "skyseed:nether_rocky_skyseed"
+  }
+}

@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.48.0] - 2026-06-23
+
+### Added
+- **The first Tier-2 Nether-native Skyseed: Nether Rocky.** A **full-size** Nether mining island — the size of a
+  normal overworld seed's island, *not* the tiny foothold an overworld seed makes in the Nether. A netherrack body
+  over a **blackstone** core, packed with **nether quartz** and **nether gold**, with **gilded blackstone** and
+  **ancient debris** for the patient; throw it low near the lava sea and the deepest isles run richest. Crafted from
+  netherrack, blackstone and quartz — all Nether-mined — it's the payoff for committing to the Nether and the first
+  proof of the Tier-2 design. New item, recipe, craft advancement, guide entry and a netherrack-tinted icon. Fizzles
+  in the overworld. Guarded by the `netherRockyIsNetherNativeAndFullSize` gametest.
+
 ## [0.47.0] - 2026-06-23
 
 ### Added

@@ -1,0 +1,43 @@
+{
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop" },
+  "palette": { "surface": "minecraft:netherrack", "fill": "minecraft:netherrack", "core": "minecraft:blackstone", "fill_depth": 2 },
+  "ores": [
+    { "block": "minecraft:nether_quartz_ore", "chance": 0.95, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:nether_gold_ore", "chance": 0.90, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:gilded_blackstone", "chance": 0.30, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+    { "block": "minecraft:ancient_debris", "chance": 0.30, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+  ],
+  "mobs": [
+    { "entity": "minecraft:zombified_piglin", "chance": 0.40, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:magma_cube", "chance": 0.30, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:piglin", "chance": 0.20, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 2, "name": "rugged", "decoration": {
+      "ground": [ { "block": "minecraft:glowstone", "chance": 0.03 }, { "block": "minecraft:magma_block", "chance": 0.05 } ] } },
+    { "weight": 1, "name": "glowing", "decoration": {
+      "ground": [ { "block": "minecraft:glowstone", "chance": 0.10 } ] } },
+    { "weight": 1, "name": "basalt", "decoration": {
+      "ground": [ { "block": "minecraft:basalt", "chance": 0.12 }, { "block": "minecraft:magma_block", "chance": 0.05 }, { "block": "minecraft:glowstone", "chance": 0.02 } ] } }
+  ],
+  "biome_overrides": [
+    { "_comment": "Deep band near the lava sea — the richest debris + gold (mirrors overworld Rocky's deep-diamond floor). Deeper = richer; inherits the base surface / variants / mobs (same dimension, so unset fields fall back to base).",
+      "max_y": 34,
+      "ores": [
+        { "block": "minecraft:nether_quartz_ore", "chance": 0.95, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+        { "block": "minecraft:nether_gold_ore", "chance": 0.95, "count": { "min": 3, "max": 4 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+        { "block": "minecraft:gilded_blackstone", "chance": 0.45, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "core" },
+        { "block": "minecraft:ancient_debris", "chance": 0.65, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" }
+      ] }
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": { "min": 4, "max": 8 },
+    "lakes": [
+      { "max_y": 34, "chance": 0.15, "radius": 4, "depth": 2 },
+      { "max_y": 80, "chance": 0.06, "radius": 3, "depth": 2 },
+      { "max_y": 200, "chance": 0.02, "radius": 3, "depth": 2 }
+    ]
+  }
+}
