@@ -317,7 +317,7 @@ public final class SkyseedGameTests {
     /** Recorded fingerprints "blocks/checksum/trees/mobs/animals/jigsaws/hives" — the generation golden master. */
     private static final java.util.Map<String, String> GOLDEN = java.util.Map.of(
             "gametest/island#1", "213/-3285534759166012883/1/2/0/0/23",
-            "gametest/water#4", "1240/-725086389989523181/0/1/0/0/0",
+            "gametest/water#4", "1240/-3972436084849772311/0/1/0/0/0",
             "gametest/features#4", "1356/2766402466658160625/0/0/0/0/0",
             "gametest/structure#11", "566/-538726431172054277/0/0/2/1/0",
             "gametest/bad#4", "197/5964512207029114459/0/0/0/1/0"

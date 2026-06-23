@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -150,6 +151,80 @@ final class PondCarver {
             }
         }
         surfaceList.addAll(newRim); // decorations may grow on the new ring; stale lower entries are skipped (now buried)
+    }
+
+    /**
+     * Soften the banks of a carved pool: step the land down toward the waterline in concentric rings, turning a
+     * sheer channel into a gentle slope. For natural variation, each island leaves its banks <em>steep</em>, fully
+     * <em>sloped</em>, or a coherent <em>mix</em> of the two. Only ever lowers land that sits above the water surface,
+     * so it can't spill the pool — and the flush inner ring it creates is exactly where sugar cane can then grow.
+     */
+    static void terraceBanks(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList, BlockPos center,
+                             int waterY, Set<Long> carved, BlockState surface, RandomSource random) {
+        if (carved.isEmpty()) {
+            return;
+        }
+        final float style = random.nextFloat();
+        if (style < 0.34f) {
+            return; // STEEP island — leave the carve sheer
+        }
+        final boolean mixed = style >= 0.67f; // else SLOPED (every stretch); MIXED slopes only some stretches
+        final int steps = 2 + random.nextInt(2); // slope length: 2-3 rings out from the water
+        final long salt = random.nextLong(); // a per-island pattern for the mixed style
+
+        // Current surface height per column, from the contained surface list.
+        final Map<Long, Integer> topByCol = new HashMap<>();
+        for (BlockPos p : surfaceList) {
+            topByCol.merge(colKey(p.getX() - center.getX(), p.getZ() - center.getZ()), p.getY(), Math::max);
+        }
+
+        final Map<Long, BlockPos> lowered = new HashMap<>(); // column -> its new (lowered) surface block
+        final Set<Long> seen = new HashSet<>(carved);
+        Set<Long> prev = carved;
+        for (int d = 1; d <= steps; d++) {
+            final int targetY = waterY + (d - 1); // ring 1 sits flush with the water; each ring out rises one block
+            final Set<Long> ring = new HashSet<>();
+            for (long k : prev) {
+                final int dx = (int) (k >> 32);
+                final int dz = (int) k;
+                for (int[] n : NEIGHBORS_8) {
+                    final long nk = colKey(dx + n[0], dz + n[1]);
+                    if (!seen.add(nk)) {
+                        continue;
+                    }
+                    ring.add(nk);
+                    final int wx = center.getX() + dx + n[0];
+                    final int wz = center.getZ() + dz + n[1];
+                    if (mixed && !slopeHere(wx, wz, salt)) {
+                        continue; // this stretch stays steep
+                    }
+                    final Integer top = topByCol.get(nk);
+                    if (top == null || top <= targetY) {
+                        continue; // off-island, or already at/below the step height (only ever lower, never raise)
+                    }
+                    for (int y = targetY + 1; y <= top; y++) {
+                        blockMap.remove(new BlockPos(wx, y, wz));
+                    }
+                    final BlockPos newTop = new BlockPos(wx, targetY, wz);
+                    blockMap.put(newTop, surface);
+                    lowered.put(nk, newTop);
+                    topByCol.put(nk, targetY);
+                }
+            }
+            prev = ring;
+        }
+
+        if (!lowered.isEmpty()) {
+            surfaceList.removeIf(p -> lowered.containsKey(colKey(p.getX() - center.getX(), p.getZ() - center.getZ())));
+            surfaceList.addAll(lowered.values());
+        }
+    }
+
+    /** Coherent ~8-block-region gate for the "mixed" bank style: some stretches slope, others stay steep. */
+    private static boolean slopeHere(int wx, int wz, long salt) {
+        long h = (((long) (wx >> 3)) * 0x9E3779B97F4A7C15L) ^ (((long) (wz >> 3)) * 0xC2B2AE3D27D4EB4FL) ^ salt;
+        h ^= h >>> 31;
+        return (h & 1L) == 0L;
     }
 
     /** Pond-bed material: mostly sand, some gravel and clay. @return the bed block, or {@code null} to keep the island's own block. */

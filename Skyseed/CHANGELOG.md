@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.8] - 2026-06-23
+
+### Added
+- **Varied, gentler river/pond banks.** A sheer carved channel can now slope down to the waterline instead of always
+  dropping straight to it. Each island rolls a bank style — **steep** (sheer, as before), **sloped** (banks step
+  down to a flush shore over 2–3 rings), or a coherent **mix** of the two — so islands differ from one another. The
+  flush inner ring this creates is also where sugar cane grows, so gentle-banked rivers get their greenery back.
+
 ## [0.34.7] - 2026-06-23
 
 ### Fixed

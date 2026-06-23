@@ -147,6 +147,8 @@ public final class IslandGenerator {
             // Wall up any open edge to the water surface (a containing ring) and dress the bed/shore with
             // sand/clay/gravel — before decorations, so cane and lily pads sit on contained ground.
             PondCarver.containPond(blockMap, surfaceList, center, waterY, bottomY, surface, fill, carved, random);
+            // Soften the banks (steep / sloped / mixed per island) so a sheer channel can become a gentle shore.
+            PondCarver.terraceBanks(blockMap, surfaceList, center, waterY, carved, surface, random);
             PondCarver.placePondPlants(blockMap, center, waterY, pond, carved, random);
             PondCarver.placePondBanks(blockMap, surfaceList, center, pond, carved, random);
             pondColumns.addAll(carved);
