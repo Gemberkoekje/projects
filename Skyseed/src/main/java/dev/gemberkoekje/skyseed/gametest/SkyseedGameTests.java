@@ -18,12 +18,14 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
@@ -331,6 +333,17 @@ public final class SkyseedGameTests {
         helper.assertTrue(level.getBlockState(chestPos).is(Blocks.CHEST), "bonus chest missing when the option is on");
         helper.assertTrue(level.getBlockEntity(chestPos) instanceof ChestBlockEntity c && !c.isEmpty(),
                 "the bonus chest is empty");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void forestInBambooBiomeGrowsBamboo(GameTestHelper helper) {
+        // Thrown over a bamboo jungle, a Forest island comes up as a bamboo forest.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var bamboo = level.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.BAMBOO_JUNGLE);
+        final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "forest"), bamboo, RandomSource.create(3L));
+        helper.assertTrue(planHas(p, Blocks.BAMBOO), "a Forest over a bamboo jungle grew no bamboo");
         helper.succeed();
     }
 

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.34.3] - 2026-06-23
+
+### Added
+- **Bamboo.** A Forest / Large Forest seed thrown over a **bamboo jungle** now comes up as a **bamboo forest** —
+  a dense bamboo grove with scattered jungle trees and podzol. Thrown over a regular **jungle** or **sparse
+  jungle** (the other biomes where bamboo grows naturally) it gets a light sprinkle of bamboo among the jungle
+  trees. (Bamboo plants in one block tall and grows up over time, like the real thing.) The new
+  `bamboo_jungle` override sits before the general `#is_jungle` one so the tag doesn't swallow it. Closes the
+  bamboo gap from `MISSINGBLOCKSPLAN.md` — every bamboo block is now craftable.
+
 ## [0.34.2] - 2026-06-23
 
 ### Added

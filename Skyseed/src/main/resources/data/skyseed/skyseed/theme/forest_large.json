@@ -86,9 +86,13 @@
       "trees": [ { "feature": "minecraft:spruce", "tries": 11, "spacing": 2 } ],
       "ground": [ { "block": "minecraft:fern", "chance": 0.25 }, { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.06 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:red_mushroom", "chance": 0.02 } ] } } ] },
 
+    { "biomes": [ "minecraft:bamboo_jungle" ], "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.22 } ], "variants": [ { "weight": 1, "name": "bamboo", "decoration": {
+      "trees": [ { "feature": "minecraft:jungle_tree", "tries": 6, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:bamboo", "chance": 0.42 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:fern", "chance": 0.08 } ] } } ] },
+
     { "biomes": [ "#minecraft:is_jungle" ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:jungle_tree", "tries": 11, "spacing": 2 }, { "feature": "minecraft:jungle_bush", "tries": 6, "spacing": 1 } ],
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.40 }, { "block": "minecraft:fern", "chance": 0.10 } ] } } ] },
+      "ground": [ { "block": "minecraft:bamboo", "chance": 0.07 }, { "block": "minecraft:short_grass", "chance": 0.40 }, { "block": "minecraft:fern", "chance": 0.10 } ] } } ] },
 
     { "biomes": [ "#minecraft:is_savanna" ], "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:acacia", "tries": 9, "spacing": 3 } ],
