@@ -1375,8 +1375,7 @@ public final class SkyseedGameTests {
                     level.getBiome(center), RandomSource.create(seed));
             int centreLadders = 0;
             int centreWater = 0;
-            int lowestCobbleY = Integer.MAX_VALUE;
-            boolean solidCentreLanding = false;
+            final java.util.Set<Long> cobble = new java.util.HashSet<>();
             for (final IslandPlan.BlockPlacement bp : p.blocks()) {
                 final boolean centreColumn = bp.pos().getX() == center.getX() && bp.pos().getZ() == center.getZ();
                 if (bp.state().is(Blocks.LADDER)) {
@@ -1388,21 +1387,27 @@ public final class SkyseedGameTests {
                         centreWater++;
                     }
                 } else if (bp.state().is(Blocks.COBBLESTONE)) {
-                    lowestCobbleY = Math.min(lowestCobbleY, bp.pos().getY());
-                    if (centreColumn) {
-                        solidCentreLanding = true;
-                    }
+                    cobble.add(bp.pos().asLong());
                 }
             }
-            // Every Ladder Island, ladder or waterfall, hangs a solid cobblestone landing ~20 blocks below.
-            helper.assertTrue(lowestCobbleY != Integer.MAX_VALUE && center.getY() - lowestCobbleY > 18,
-                    "landing should hang ~20 below the island (seed " + seed + "), lowest cobble dY="
-                            + (center.getY() - lowestCobbleY));
-            helper.assertTrue(solidCentreLanding, "the landing centre should be solid cobblestone (seed " + seed + ")");
+            // The landing level, found from a cobble block at the 5x5's edge (clear of the shaft + backing column).
+            int landingY = Integer.MIN_VALUE;
+            for (int y = center.getY(); y > center.getY() - 60; y--) {
+                if (cobble.contains(new BlockPos(center.getX() + 2, y, center.getZ()).asLong())) {
+                    landingY = y;
+                    break;
+                }
+            }
+            helper.assertTrue(landingY != Integer.MIN_VALUE && center.getY() - landingY > 18,
+                    "landing should hang ~20 below the island (seed " + seed + "), landing dY=" + (center.getY() - landingY));
+            final long centreLanding = new BlockPos(center.getX(), landingY, center.getZ()).asLong();
+            final long centreCap = new BlockPos(center.getX(), landingY - 1, center.getZ()).asLong();
             if (centreLadders > 0) {
                 sawLadders = true;
                 helper.assertTrue(centreLadders > 15,
                         "ladder shaft too short (seed " + seed + "): " + centreLadders + " ladders");
+                helper.assertTrue(cobble.contains(centreLanding),
+                        "the ladder variant's landing centre should be solid (seed " + seed + ")");
                 helper.assertTrue(p.fluidTicks().isEmpty(),
                         "the ladder variant should not schedule a waterfall (seed " + seed + ")");
             }
@@ -1412,6 +1417,10 @@ public final class SkyseedGameTests {
                         "the waterfall should be a single surface source, was " + centreWater + " (seed " + seed + ")");
                 helper.assertTrue(p.fluidTicks().size() == 1,
                         "the waterfall source should be recorded for a fluid tick (seed " + seed + ")");
+                helper.assertTrue(!cobble.contains(centreLanding),
+                        "the waterfall landing centre should be an open drain (seed " + seed + ")");
+                helper.assertTrue(cobble.contains(centreCap),
+                        "the waterfall drain should be capped one block below (seed " + seed + ")");
             }
         }
         helper.assertTrue(sawLadders, "no seed produced the ladder shaft");

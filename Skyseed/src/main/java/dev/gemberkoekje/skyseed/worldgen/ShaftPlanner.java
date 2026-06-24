@@ -75,12 +75,20 @@ final class ShaftPlanner {
             blockMap.putIfAbsent(new BlockPos(cx, y, bz), cobble);
         }
 
-        // A solid square cobblestone landing — the waterfall just pools on it and spills off the rim naturally.
+        // A square cobblestone landing. The waterfall variant leaves the centre open as a drain so the water sinks
+        // in instead of flooding the landing — but capped one block below, so the water is contained AND the player
+        // riding the waterfall down lands on the cap rather than dropping through into the void.
         final int r = cfg.landingRadius();
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
+                if (waterfall && dx == 0 && dz == 0) {
+                    continue;
+                }
                 blockMap.put(new BlockPos(cx + dx, landingY, cz + dz), cobble);
             }
+        }
+        if (waterfall) {
+            blockMap.put(new BlockPos(cx, landingY - 1, cz), cobble);
         }
     }
 }

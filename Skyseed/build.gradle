@@ -6,7 +6,9 @@ plugins {
     id 'jacoco'
 }
 
-version = mod_version
+// Prefix the Minecraft version so jars and the in-game version are distinguishable across MC versions once we
+// target more than one (e.g. skyseed-1.21.1_0.60.0.jar). minecraft_version is per-node under Stonecutter.
+version = "${minecraft_version}_${mod_version}"
 group = mod_group_id
 
 sourceSets.main.resources {
@@ -134,7 +136,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_id                 : mod_id,
             mod_name               : mod_name,
             mod_license            : mod_license,
-            mod_version            : mod_version,
+            mod_version            : "${minecraft_version}_${mod_version}",
     ]
     inputs.properties replaceProperties
     expand replaceProperties

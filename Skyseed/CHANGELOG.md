@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.60.0] - 2026-06-24
+
+### Changed
+- **Version strings now carry the Minecraft version** — `<mc>_<mod>`, e.g. the jar is `skyseed-1.21.1_0.60.0.jar`
+  and the in-game mod version matches. Once Skyseed targets more than one Minecraft version the builds are
+  distinguishable at a glance, and it tracks the per-version Stonecutter node automatically.
+- **The Ladder Island waterfall drains through a capped centre.** The landing's centre is left open so the water
+  sinks in instead of flooding the landing — but with a cobblestone block one below it, so the water stays contained
+  *and* a player riding the waterfall down lands on the cap rather than dropping through into the void.
+- **The Desert Temple no longer blows the island's bottom out.** The TNT trap is cut from ten charges (a buried 3×3
+  cache plus the trigger) down to the single trigger, over a hidden obsidian floor — so the blast still stings (lost
+  loot, a crater) but leaves the island's underside intact for your dropped items to land on.
+
 ## [0.59.0] - 2026-06-24
 
 ### Added
