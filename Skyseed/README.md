@@ -68,6 +68,7 @@ The overworld and Nether chapters are built; what's planned next:
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
 - **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
 - **Remaining vanilla blocks** — a short list (a copper bulb, a few Nether-gated blocks), tracked in `MISSINGBLOCKSPLAN.md`.
+- **Multi-version support** — building against multiple Minecraft / NeoForge versions from one codebase, planned in `REFACTORPLAN.md`: isolate the version-volatile API calls behind a `compat` facade, then drive the version matrix with **Stonecutter** (NeoForge-only; no new runtime dependency; Fabric is a separate future concern).
 
 > **⚠ Before 1.0 (cleanup):** **remove the `/emptynether` and `/emptyend` rescue commands** (`SkyseedCommands.java`, offered by the legacy-world warning in `PlayerEvents`). They're a one-time stopgap for worlds created *before* the void dimensions landed (v0.35.x) — by 1.0 there should be no pre-void world left to rescue — and the in-place conversion leans on Minecraft's **experimental-features** path, which is acceptable as a rescue route now but should **not** ship in a 1.0 release.
 
