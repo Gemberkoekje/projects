@@ -8,14 +8,16 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LadderBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.List;
 import java.util.Map;
 
 /**
  * Punches a vertical "way down" through an island's centre (README → ladder islands): the centre column becomes a
  * climbable shaft — ladders backed by a cobblestone wall — that hangs {@code depth} blocks below the island to a
  * small cobblestone landing at mining level, so you can get down without bridging out into the void. A
- * {@code waterfall_chance} roll swaps the ladders for a still water column (placed without physics, like the ponds,
- * so it doesn't spill) with the landing's centre left open as a drain.
+ * {@code waterfall_chance} roll instead leaves the shaft open and drops a <em>single</em> water source on the
+ * surface; water physics carries it straight down as a tidy one-wide waterfall (the source position is recorded so
+ * {@link GenerationJob} can schedule its fluid tick — the block fill is physics-free, so it would otherwise sit).
  *
  * <p>Geometry: the climb column is the island centre {@code (cx, cz)}; the backing wall is one block south
  * {@code (cx, cz+1)}, so the ladders face north and rest on the wall behind them. Within the island the body itself
@@ -24,7 +26,8 @@ import java.util.Map;
 final class ShaftPlanner {
     private ShaftPlanner() {}
 
-    static void carve(Map<BlockPos, BlockState> blockMap, BlockPos center, LadderShaft cfg, RandomSource random) {
+    static void carve(Map<BlockPos, BlockState> blockMap, BlockPos center, LadderShaft cfg, RandomSource random,
+                      List<BlockPos> fluidTicks) {
         final int cx = center.getX();
         final int cz = center.getZ();
 
@@ -44,31 +47,38 @@ final class ShaftPlanner {
         final boolean waterfall = random.nextFloat() < cfg.waterfallChance();
         final int bz = cz + 1; // backing wall one block south → ladders face north (their support is behind them)
         final int landingY = colBottom - 1 - cfg.depth();
-        final int shaftBottom = landingY + 1; // lowest climb/backing block, one above the landing
+        final int shaftBottom = landingY + 1; // lowest shaft/backing block, one above the landing
 
         final BlockState cobble = Blocks.COBBLESTONE.defaultBlockState();
-        final BlockState climb = waterfall
-                ? Blocks.WATER.defaultBlockState()
-                : Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, Direction.NORTH);
 
-        // The climb column: replace the island's centre column and continue down to just above the landing.
-        for (int y = colTop; y >= shaftBottom; y--) {
-            blockMap.put(new BlockPos(cx, y, cz), climb);
+        if (waterfall) {
+            // Clear the centre column to an open shaft and drop a single water source flush on the surface; water
+            // physics carries it straight down (GenerationJob schedules the fluid tick). Falling water stays a tidy
+            // one-wide column — no source-per-block to spill once the chunk ticks.
+            for (int y = colTop; y >= shaftBottom; y--) {
+                blockMap.remove(new BlockPos(cx, y, cz));
+            }
+            final BlockPos source = new BlockPos(cx, colTop, cz);
+            blockMap.put(source, Blocks.WATER.defaultBlockState());
+            fluidTicks.add(source);
+        } else {
+            // Fill the centre column with ladders, backed by the island body / the cobblestone wall below.
+            final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, Direction.NORTH);
+            for (int y = colTop; y >= shaftBottom; y--) {
+                blockMap.put(new BlockPos(cx, y, cz), ladder);
+            }
         }
         blockMap.remove(new BlockPos(cx, colTop + 1, cz)); // clear any decoration over the entrance
 
-        // The backing wall: fill any gaps behind the climb column with cobblestone (the island body backs the rest).
+        // The backing/"stack" wall: fill any gaps behind the shaft with cobblestone (the island body backs the rest).
         for (int y = colTop; y >= shaftBottom; y--) {
             blockMap.putIfAbsent(new BlockPos(cx, y, bz), cobble);
         }
 
-        // The landing: a square cobblestone platform; the waterfall variant leaves its centre open as a drain.
+        // A solid square cobblestone landing — the waterfall just pools on it and spills off the rim naturally.
         final int r = cfg.landingRadius();
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
-                if (waterfall && dx == 0 && dz == 0) {
-                    continue;
-                }
                 blockMap.put(new BlockPos(cx + dx, landingY, cz + dz), cobble);
             }
         }

@@ -25,10 +25,12 @@ import java.util.Optional;
  * @param random RNG carried over from planning, used for the trees' own shape randomness
  * @param twinTheme if present, grow this theme at the dimension-linked coordinate in the other dimension (the
  *                  Ruined Portal twin — set by the theme's or a rolled rare structure's {@code twin} field)
+ * @param fluidTicks water sources (placed physics-free with the rest of the blocks) to nudge into flowing once the
+ *                   island has landed — e.g. a Ladder Island waterfall. {@link GenerationJob} schedules each a tick.
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
                          List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
-                         RandomSource random, Optional<ResourceLocation> twinTheme) {
+                         RandomSource random, Optional<ResourceLocation> twinTheme, List<BlockPos> fluidTicks) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}

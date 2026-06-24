@@ -27,6 +27,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.event.EventHooks;
 
 /**
@@ -85,9 +86,21 @@ public final class GenerationJob {
             spawnMobs();
             spawnEnclosureAnimals();
             populateHives();
+            kickFluids();
             mobsSpawned = true;
         }
         return true;
+    }
+
+    /**
+     * Nudge planned water sources (a Ladder Island waterfall) into flowing. The block fill places everything with
+     * {@code UPDATE_CLIENTS} only, so a source would otherwise sit inert until something disturbs it — scheduling a
+     * fluid tick lets physics carry it down the open shaft.
+     */
+    private void kickFluids() {
+        for (final BlockPos pos : plan.fluidTicks()) {
+            level.scheduleTick(pos, Fluids.WATER, 1);
+        }
     }
 
     /** Spawn an Animal Island's guaranteed pack inside its enclosure — babies aged down, sheep dyed, fish submerged. */

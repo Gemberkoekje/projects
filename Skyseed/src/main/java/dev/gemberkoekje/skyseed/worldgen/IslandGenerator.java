@@ -232,7 +232,8 @@ public final class IslandGenerator {
         // Ladder shaft: punch a climbable way down through the centre to a landing far below — a "home-grown" route
         // to mining level. Applied in every dimension the seed grows in (it's structure, not biome content), and
         // carved last so it cuts cleanly through the finished terrain.
-        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random));
+        final List<BlockPos> fluidTicks = new ArrayList<>();
+        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks));
 
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
@@ -251,7 +252,7 @@ public final class IslandGenerator {
         // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
         final Optional<ResourceLocation> twinTheme =
                 (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme);
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks);
     }
 
     /** Flatten a {@code pad}-radius disc to {@code gy} for a building: clear above, solid below, no decoration. */

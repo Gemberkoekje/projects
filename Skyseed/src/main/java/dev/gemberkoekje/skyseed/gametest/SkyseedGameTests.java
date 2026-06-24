@@ -1363,8 +1363,8 @@ public final class SkyseedGameTests {
     @GameTest(template = REGION)
     public static void ladderIslandPunchesAShaftToALanding(GameTestHelper helper) {
         // The Ladder Island's whole point: a climbable shaft through the centre, hanging ~20 blocks below the island
-        // to a 5x5 cobblestone landing at mining level. 5% of the time the ladders come up as a water column instead,
-        // with the landing's centre left open as a drain. Verified on the (deterministic) plan over a seed sweep.
+        // to a 5x5 cobblestone landing at mining level. 5% of the time it comes up as a waterfall instead — a single
+        // surface water source that physics carries down the open shaft. Verified on the (deterministic) plan.
         final ServerLevel level = helper.getLevel();
         final BlockPos center = helper.absolutePos(new BlockPos(8, 40, 8));
         final IslandTheme theme = theme(level, "ladder_small");
@@ -1373,22 +1373,19 @@ public final class SkyseedGameTests {
         for (long seed = 0; seed < 200 && !(sawLadders && sawWaterfall); seed++) {
             final IslandPlan p = IslandGenerator.planIsland(level, center, theme,
                     level.getBiome(center), RandomSource.create(seed));
-            int centreClimb = 0;
-            int ladders = 0;
+            int centreLadders = 0;
             int centreWater = 0;
             int lowestCobbleY = Integer.MAX_VALUE;
             boolean solidCentreLanding = false;
             for (final IslandPlan.BlockPlacement bp : p.blocks()) {
                 final boolean centreColumn = bp.pos().getX() == center.getX() && bp.pos().getZ() == center.getZ();
                 if (bp.state().is(Blocks.LADDER)) {
-                    ladders++;
                     if (centreColumn) {
-                        centreClimb++;
+                        centreLadders++;
                     }
                 } else if (bp.state().is(Blocks.WATER)) {
                     if (centreColumn) {
                         centreWater++;
-                        centreClimb++;
                     }
                 } else if (bp.state().is(Blocks.COBBLESTONE)) {
                     lowestCobbleY = Math.min(lowestCobbleY, bp.pos().getY());
@@ -1397,21 +1394,24 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            // Every Ladder Island, ladder or waterfall, has a tall centre shaft and a landing far below.
-            helper.assertTrue(centreClimb > 15,
-                    "ladder_small shaft too short (seed " + seed + "): " + centreClimb + " centre climb blocks");
+            // Every Ladder Island, ladder or waterfall, hangs a solid cobblestone landing ~20 blocks below.
             helper.assertTrue(lowestCobbleY != Integer.MAX_VALUE && center.getY() - lowestCobbleY > 18,
                     "landing should hang ~20 below the island (seed " + seed + "), lowest cobble dY="
                             + (center.getY() - lowestCobbleY));
-            if (ladders > 0) {
+            helper.assertTrue(solidCentreLanding, "the landing centre should be solid cobblestone (seed " + seed + ")");
+            if (centreLadders > 0) {
                 sawLadders = true;
-                helper.assertTrue(solidCentreLanding,
-                        "the ladder variant should have a solid landing centre (seed " + seed + ")");
+                helper.assertTrue(centreLadders > 15,
+                        "ladder shaft too short (seed " + seed + "): " + centreLadders + " ladders");
+                helper.assertTrue(p.fluidTicks().isEmpty(),
+                        "the ladder variant should not schedule a waterfall (seed " + seed + ")");
             }
             if (centreWater > 0) {
                 sawWaterfall = true;
-                helper.assertTrue(!solidCentreLanding,
-                        "the waterfall variant should leave the landing centre open as a drain (seed " + seed + ")");
+                helper.assertTrue(centreWater == 1,
+                        "the waterfall should be a single surface source, was " + centreWater + " (seed " + seed + ")");
+                helper.assertTrue(p.fluidTicks().size() == 1,
+                        "the waterfall source should be recorded for a fluid tick (seed " + seed + ")");
             }
         }
         helper.assertTrue(sawLadders, "no seed produced the ladder shaft");
