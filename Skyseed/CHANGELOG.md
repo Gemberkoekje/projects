@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.3] - 2026-06-24
+
+### Added
+- **A "Rare Catch" guide** in Getting Started — always readable, it spells out how to unlock the islands that hide
+  behind a rare find: the Woodland Mansion's totem (from the 1‑in‑20 Evoker Cell), the Ocean Monument's sponge, the
+  Aquarium's scute/prismarine, the deep‑thrown Trial Chamber, and the badlands/jungle biome seeds. A green
+  "[x] … found it!" line appears under each once you've gathered its makings — as close to a live checklist as
+  Patchouli allows.
+
 ## [0.66.2] - 2026-06-24
 
 ### Changed

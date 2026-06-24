@@ -1,0 +1,66 @@
+{
+  "name": "The Rare Catch",
+  "category": "skyseed:basics",
+  "icon": "minecraft:totem_of_undying",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A few islands hide behind something rare — a far-off biome, a lucky drop, a 1-in-20 find. Their pages stay a locked $(bold)?$() until you have what they need, so here's exactly where to look. A green $(2)[x]$() turns up under each once you've gathered the makings."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Woodland Mansion$()$(br)Win a $(item)Totem of Undying$() from an $(item)evoker$(). One haunts the rare $(o)Evoker Cell$() — keep throwing $(item)Forest$() seeds into a $(bold)dark forest$() until one rolls the cell (about 1 in 20), then kill the evoker inside."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Woodland Mansion — found it!$()",
+      "advancement": "skyseed:gathered_woodland_mansion"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Ocean Monument$()$(br)Take $(item)wet sponge$() off the bed of a $(item)Large Aquatic$() isle thrown over a $(bold)deep ocean$(), and smelt it dry. (Rarely a whole monument rises there, sponge rooms and all.)"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Ocean Monument — found it!$()",
+      "advancement": "skyseed:gathered_ocean_monument"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Aquarium$()$(br)Raise $(item)turtles$() on a warm $(bold)beach$() for a $(item)scute$(), or mine an $(item)Ocean Monument$() for $(item)prismarine$() — its guardians drop the shards."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Aquarium — found it!$()",
+      "advancement": "skyseed:gathered_aquarium"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Trial Chamber$()$(br)Throw a $(item)Rocky$() or $(item)Ancient$() isle $(bold)deep$(), near the world's floor — that's where the $(item)diamond$(), copper and tuff it wants come up."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Trial Chamber — found it!$()",
+      "advancement": "skyseed:gathered_trial_chamber"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Badlands$()$(br)Throw a $(item)Desert$() seed over a $(bold)badlands$() biome — its sand comes up $(item)red$(). Bake your clay into terracotta for the rest."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Badlands — found it!$()",
+      "advancement": "skyseed:gathered_badlands"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Jungle Temple$()$(br)Throw a $(item)Forest$() seed into a $(bold)jungle$() for jungle wood; moss comes off an $(item)Ancient$() isle, and a tripwire hook from iron and a stick."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(2)$(bold)[x] Jungle Temple — found it!$()",
+      "advancement": "skyseed:gathered_jungle_temple"
+    }
+  ]
+}
