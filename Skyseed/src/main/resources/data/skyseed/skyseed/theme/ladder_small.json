@@ -1,0 +1,23 @@
+{
+  "_comment": "Ladder Island — a small biome/dimension-aware foothold whose only job is a way DOWN: the centre is punched through with a ladder shaft hanging ~20 blocks to a 5x5 cobblestone landing at mining level (5% easter egg: a water column instead). The shaft is applied in every dimension. See ShaftPlanner.",
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.20, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2 },
+  "ores": [],
+  "ladder_shaft": { "depth": 20, "landing_radius": 2, "waterfall_chance": 0.05 },
+  "biome_overrides": [
+    { "_comment": "Nether: a small netherrack foothold (body goes neutral); the shaft still drops you toward the lava-sea mining level. Listed first so it wins in the Nether.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } } },
+    { "_comment": "End: a small end-stone foothold.",
+      "dimension": "minecraft:the_end",
+      "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } } },
+    { "_comment": "Biome-aware overworld surfaces — sand in the desert, red sand in the badlands, snow in the cold.",
+      "biomes": [ "minecraft:desert" ],
+      "surface": "minecraft:sand", "fill": "minecraft:sand", "core": "minecraft:sandstone" },
+    { "biomes": [ "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands" ],
+      "surface": "minecraft:red_sand", "fill": "minecraft:red_sand", "core": "minecraft:red_sandstone" },
+    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:snowy_beach" ],
+      "surface": "minecraft:snow_block", "fill": "minecraft:dirt", "core": "minecraft:stone" }
+  ]
+}

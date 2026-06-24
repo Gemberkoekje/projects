@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.58.0] - 2026-06-24
+
+### Added
+- **Ladder Island — a home-grown way down to mining level.** A small, biome- and dimension-aware island whose centre
+  is punched through with a **ladder shaft**: ladders backed by a cobblestone wall, hanging ~20 blocks below the
+  island to a **5×5 cobblestone landing** — so you can get down to mining level without bridging out over the void.
+  It takes the look of wherever it lands (grass / sand / snow) and grows in every dimension (a netherrack nub in the
+  Nether, end stone in the End — the shaft comes too). **5% easter egg:** the ladders come up as a **water column**
+  instead, with the landing's centre left open as a drain. Crafted from dirt, cobblestone and a ladder. New theme
+  field `ladder_shaft` driving a new `ShaftPlanner`; new item, recipe, advancement, guide entry and icon. Guarded by
+  the `ladderIslandPunchesAShaftToALanding` gametest.
+
 ## [0.57.1] - 2026-06-24
 
 ### Fixed

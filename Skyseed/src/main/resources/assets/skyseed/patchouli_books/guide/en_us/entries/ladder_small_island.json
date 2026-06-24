@@ -1,0 +1,16 @@
+{
+  "name": "Small Ladder Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:ladder",
+  "advancement": "skyseed:craft_ladder_small",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Home-grown stairs down. A small island whose centre is punched through with a $(item)ladder$() shaft — backed by a cobblestone wall and hanging some $(bold)20 blocks$() below to a little $(item)cobblestone$() landing at mining level. No more bridging out over the void to find a way down."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "It takes the look of wherever it lands — grass, sand, snow — and grows in every dimension (a netherrack nub in the Nether, end stone in the End). $(br)$(br)$(o)Rarely, the ladders come up as a waterfall instead.$()"
+    }
+  ]
+}

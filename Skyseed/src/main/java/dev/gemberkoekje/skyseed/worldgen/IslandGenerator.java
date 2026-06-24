@@ -229,6 +229,11 @@ public final class IslandGenerator {
             mobs.addAll(MobPlanner.planPondMobs(center, pondSurfaceY, pondCfg.get(), pondColumns, random));
         }
 
+        // Ladder shaft: punch a climbable way down through the centre to a landing far below — a "home-grown" route
+        // to mining level. Applied in every dimension the seed grows in (it's structure, not biome content), and
+        // carved last so it cuts cleanly through the finished terrain.
+        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random));
+
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
             blocks.add(new BlockPlacement(e.getKey(), e.getValue()));

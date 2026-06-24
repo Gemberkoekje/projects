@@ -24,7 +24,8 @@ import java.util.Optional;
 public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, List<Variant> variants,
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
                           Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures,
-                          Optional<Lava> lava, List<String> dimensions, Optional<ResourceLocation> twin) {
+                          Optional<Lava> lava, List<String> dimensions, Optional<ResourceLocation> twin,
+                          Optional<LadderShaft> ladderShaft) {
 
     /** True if this theme's base config is an implementation for {@code dim} (its declared {@code dimensions}). */
     public boolean baseValidIn(ResourceLocation dim) {
@@ -47,6 +48,9 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             // If present, germinating this island also grows the named theme at the vanilla 8:1 dimension-linked
             // coordinate in the other dimension (overworld <-> nether). The Ruined Portal names itself — see
             // SKYNETHERPLAN. (RareStructure has the same field, so a rolled ruined portal on a big island pairs too.)
-            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(IslandTheme::twin)
+            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(IslandTheme::twin),
+            // Optional "way down": a ladder shaft (or, rarely, a water column) punched through the island centre to a
+            // landing far below, so you can reach mining level without bridging out. See LadderShaft / ShaftPlanner.
+            LadderShaft.CODEC.optionalFieldOf("ladder_shaft").forGetter(IslandTheme::ladderShaft)
     ).apply(i, IslandTheme::new));
 }

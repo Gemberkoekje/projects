@@ -110,6 +110,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:ladder_small_skyseed",
+      "text": "The $(item)Small Ladder Skyseed$() — dirt, cobblestone and a $(item)ladder$(). A small island with a ladder shaft punched straight down to mining level (rarely, a waterfall instead)."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:nether_rocky_skyseed",
       "text": "The $(item)Nether Rocky Skyseed$() — a $(item)Rocky Skyseed$() infused with netherrack and nether quartz. The first $(bold)Nether-native$() seed: a full-size mining isle."
     },
