@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.6] - 2026-06-24
+
+### Changed
+- **Snow now caps the highest block of each column** rather than the ground. In a snowy Forest the snow settles on the
+  spruce canopies and on open ground, leaving bare ground *under* the trees — the look you'd expect, instead of snow
+  pooled around the trunks.
+
 ## [0.65.5] - 2026-06-24
 
 ### Fixed

@@ -103,7 +103,9 @@ public final class GenerationJob {
                 if (!plan.scatterPositions().contains(bp.pos())) {
                     continue; // terrain, already placed
                 }
-                if (level.getBlockState(bp.pos()).isAir()) {
+                if (bp.state().is(Blocks.SNOW)) {
+                    snowColumnTop(bp.pos(), bp.state()); // cap the column's highest block (a tree's canopy), bare beneath
+                } else if (level.getBlockState(bp.pos()).isAir()) {
                     level.setBlock(bp.pos(), bp.state(), Block.UPDATE_CLIENTS);
                 }
             }
@@ -132,6 +134,22 @@ public final class GenerationJob {
                 treesPlaced++;
                 return;
             }
+        }
+    }
+
+    /** Lay a snow layer on the highest block of a column (a tree's canopy in a snowy biome), leaving the ground bare. */
+    private void snowColumnTop(BlockPos scatterPos, BlockState snow) {
+        final BlockPos surface = scatterPos.below();
+        BlockPos top = surface;
+        for (int y = 1; y <= 24; y++) { // tall enough for any tree's canopy
+            final BlockPos p = surface.above(y);
+            if (!level.getBlockState(p).isAir()) {
+                top = p;
+            }
+        }
+        final BlockPos snowPos = top.above();
+        if (level.getBlockState(snowPos).isAir()) {
+            level.setBlock(snowPos, snow, Block.UPDATE_CLIENTS);
         }
     }
 
