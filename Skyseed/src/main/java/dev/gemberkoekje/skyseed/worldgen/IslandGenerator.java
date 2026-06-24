@@ -315,6 +315,9 @@ public final class IslandGenerator {
      * base form (e.g. an overworld seed thrown in the Nether). See SKYNETHERPLAN and {@code IslandSeedEntity}.
      */
     public static boolean formValidFor(IslandTheme theme, Holder<Biome> biome, int y, ResourceLocation dim) {
+        if (theme.fizzlesIn(biome)) {
+            return false; // a hard biome exclusion (e.g. bastions never form in the basalt deltas)
+        }
         if (theme.baseValidIn(dim)) {
             return true;
         }

@@ -1,6 +1,8 @@
 {
   "fallback": "minecraft:empty",
   "elements": [
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:bastion/bastion", "processors": "minecraft:empty", "projection": "rigid" } }
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:bastion/treasure", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:bastion/bridge", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:bastion/housing", "processors": "minecraft:empty", "projection": "rigid" } }
   ]
 }

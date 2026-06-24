@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.62.0] - 2026-06-24
+
+### Added
+- **The Bastion Remnant Island now grows all three variants.** Alongside the Treasure room, a throw can come up as a
+  **Bridge** (a raised blackstone bridge over a lava channel, with a stable end and loot) or a **Housing** block (a
+  walled, partitioned unit around a central loot chamber) — one weighted‑random per island. Hoglins now roam the
+  bastion too.
+- **A hard biome‑exclusion fizzle (`fizzle` theme rule).** A theme can list `biomes` it refuses to grow in even in a
+  dimension it implements, with an optional message. The Bastion uses it to **fizzle in the basalt deltas** (the
+  vanilla rule), showing the thrower its own action‑bar message.
+
 ## [0.61.1] - 2026-06-24
 
 ### Changed

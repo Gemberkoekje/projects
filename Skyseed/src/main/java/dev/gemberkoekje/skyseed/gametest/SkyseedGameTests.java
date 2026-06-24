@@ -770,6 +770,10 @@ public final class SkyseedGameTests {
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
         helper.assertTrue(IslandGenerator.formValidFor(bastion, wastes, 64, Level.NETHER.location()),
                 "bastion should grow in the Nether");
+        final var deltas = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.BASALT_DELTAS);
+        helper.assertTrue(!IslandGenerator.formValidFor(bastion, deltas, 64, Level.NETHER.location()),
+                "the bastion should fizzle in the basalt deltas (the vanilla rule)");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), bastion, wastes,
                 RandomSource.create(7L));

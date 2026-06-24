@@ -2,7 +2,9 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,11 +27,16 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
                           List<BiomeOverride> biomeOverrides, Optional<Pond> pond, List<MobEntry> mobs,
                           Optional<JigsawConfig> jigsaw, List<AnimalPack> animals, List<RareStructure> rareStructures,
                           Optional<Lava> lava, List<String> dimensions, Optional<ResourceLocation> twin,
-                          Optional<LadderShaft> ladderShaft) {
+                          Optional<LadderShaft> ladderShaft, Optional<FizzleRule> fizzle) {
 
     /** True if this theme's base config is an implementation for {@code dim} (its declared {@code dimensions}). */
     public boolean baseValidIn(ResourceLocation dim) {
         return dimensions.contains(dim.toString());
+    }
+
+    /** True if a {@code fizzle} rule excludes {@code biome} — the seed should fizzle there regardless of dimension. */
+    public boolean fizzlesIn(Holder<Biome> biome) {
+        return fizzle.map(f -> f.matches(biome)).orElse(false);
     }
 
     public static final Codec<IslandTheme> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -51,6 +58,9 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
             ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(IslandTheme::twin),
             // Optional "way down": a ladder shaft (or, rarely, a water column) punched through the island centre to a
             // landing far below, so you can reach mining level without bridging out. See LadderShaft / ShaftPlanner.
-            LadderShaft.CODEC.optionalFieldOf("ladder_shaft").forGetter(IslandTheme::ladderShaft)
+            LadderShaft.CODEC.optionalFieldOf("ladder_shaft").forGetter(IslandTheme::ladderShaft),
+            // A hard biome exclusion: fizzle (with a message) when thrown into these biomes even in a dimension this
+            // theme implements — the Bastion never forms in the basalt deltas. See IslandGenerator.formValidFor.
+            FizzleRule.CODEC.optionalFieldOf("fizzle").forGetter(IslandTheme::fizzle)
     ).apply(i, IslandTheme::new));
 }

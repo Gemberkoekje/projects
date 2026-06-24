@@ -11,11 +11,14 @@ import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandGrowth;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.theme.FizzleRule;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -32,6 +35,7 @@ import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -156,10 +160,16 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // Placement: grow at the rest point / target if it's clear, else nudge horizontally off whatever it would
         // grow into (so islands sit adjacent, not stacked), and only lift up/down if there's no horizontal room.
         final BlockPos base = this.blockPosition();
+        final Holder<Biome> biome = level.getBiome(base);
         // Dimension gate: a seed only grows where it has an implementation (its base dimensions, or a dimension-keyed
         // override). Thrown into a dimension it doesn't implement — an overworld seed in the Nether, say — it fizzles
-        // rather than growing the wrong, foreign base island here.
-        if (!IslandGenerator.formValidFor(theme, level.getBiome(base), base.getY(), level.dimension().location())) {
+        // rather than growing the wrong, foreign base island here. A `fizzle` biome rule also excludes specific biomes
+        // (the Bastion never forms in the basalt deltas), showing the thrower its own action-bar message.
+        if (!IslandGenerator.formValidFor(theme, biome, base.getY(), level.dimension().location())) {
+            if (theme.fizzlesIn(biome) && this.getOwner() instanceof Player thrower) {
+                theme.fizzle().flatMap(FizzleRule::message)
+                        .ifPresent(key -> thrower.displayClientMessage(Component.translatable(key), true));
+            }
             fizzle(level);
             this.discard();
             return;
