@@ -61,8 +61,11 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     private static final int MAX_H_ATTEMPTS = 10;
     private static final int H_STEP = 4;
     private static final int MAX_H_DIST = 48; // a "decent" horizontal distance to look before falling back to up/down
-    /** Vertical fall-back lifts, only tried when there's no horizontal room: up first, then down. */
-    private static final int[] V_FALLBACK = { 8, 16, 24, -8, -16, 32 };
+    /**
+     * Vertical fall-back nudges, only tried when there's no horizontal room: a small, CONTAINED up/down step — never
+     * an extreme lift. If even these don't clear it, the seed fizzles back to the thrower rather than stacking high.
+     */
+    private static final int[] V_FALLBACK = { 8, -8 };
 
     private int armTicks = 0;
 
@@ -301,8 +304,10 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
      * Finds a spot the island can grow without interpenetrating existing blocks or burying a player. Tries the base
      * first; on a collision it nudges <em>horizontally</em> away from the centroid of whatever is in the way (so
      * islands end up touching, never stacked), out to {@link #MAX_H_DIST}; only if there's no horizontal room does it
-     * fall back to {@link #V_FALLBACK} lifts. Re-plans per position (RNG keyed by centre) and moves the entity to the
-     * chosen spot so the germination effects play there. Returns {@code null} if nothing is clear.
+     * try a contained {@link #V_FALLBACK} nudge (a few blocks up or down — never an extreme lift). Re-plans per
+     * position (RNG keyed by centre) and moves the entity to the chosen spot so the germination effects play there.
+     * Returns {@code null} if nothing is clear within those margins — the caller then fizzles the seed back to the
+     * thrower instead of shoving the island high.
      */
     private IslandPlan findClearSpot(ServerLevel level, IslandTheme theme, BlockPos base,
                                      List<Vec3> players, IslandPlacement.Occupancy occupied) {

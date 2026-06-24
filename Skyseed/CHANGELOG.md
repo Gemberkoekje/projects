@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.1] - 2026-06-24
+
+### Changed
+- **A blocked seed now fizzles back to you instead of stacking the island high.** Placement still slides horizontally
+  to find room and tries a small, contained up/down nudge, but the old extreme vertical lifts (up to +32) are gone —
+  if the island can't fit within those margins, the seed fizzles and returns to the thrower.
+
 ## [0.66.0] - 2026-06-24
 
 ### Changed
