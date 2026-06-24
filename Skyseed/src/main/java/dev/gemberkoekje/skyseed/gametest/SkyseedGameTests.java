@@ -825,6 +825,35 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void piglinTradingPostOverworldEasterEggGrowsTheCottage(GameTestHelper helper) {
+        // Easter egg: thrown topside the Nether-native trading post doesn't fizzle — an overworld biome_override grows
+        // a grass island and an overworld-dimensioned rare structure (chance 1.0) swaps the hall for the abandoned
+        // cottage (the Hamlet's 10% rare structure).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme post = theme(overworld, "piglin_trading_post");
+        final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.PLAINS);
+        helper.assertTrue(IslandGenerator.formValidFor(post, plains, 80, Level.OVERWORLD.location()),
+                "the trading post should grow (not fizzle) in the overworld");
+
+        final IslandPlan p = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), post, plains,
+                RandomSource.create(5L));
+        boolean grass = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) {
+                grass = true;
+            }
+        }
+        helper.assertTrue(grass, "the overworld easter egg should be a grass island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("abandoned/cottage")),
+                "the overworld easter egg should assemble the abandoned cottage");
+        helper.assertTrue(p.jigsaws().stream()
+                        .noneMatch(j -> j.pool().getPath().equals("piglin_trading_post/trading_post")),
+                "the trading-post hall must not appear in the overworld");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void witherArenaIsNetherNativeWithItsJigsaw(GameTestHelper helper) {
         // Nether-native Wither Arena: the capstone venue. A blackstone island that assembles the hand-built obsidian
         // arena jigsaw, and (like the other nether structures) grows only in the Nether.

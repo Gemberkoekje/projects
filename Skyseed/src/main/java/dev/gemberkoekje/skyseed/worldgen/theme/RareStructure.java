@@ -24,7 +24,7 @@ import java.util.Optional;
  * {@code SKYSTRUCTURESPLAN.md}.
  */
 public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> mobs, boolean suppressPond,
-                            List<String> biomes, Optional<ResourceLocation> twin) {
+                            List<String> biomes, Optional<ResourceLocation> twin, Optional<String> dimension) {
     public static final Codec<RareStructure> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.FLOAT.fieldOf("chance").forGetter(RareStructure::chance),
             JigsawConfig.CODEC.fieldOf("jigsaw").forGetter(RareStructure::jigsaw),
@@ -33,8 +33,18 @@ public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> 
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(RareStructure::biomes),
             // If present, a roll of this rare structure also grows the named theme at the dimension-linked
             // coordinate in the other dimension — so a ruined portal rolled on a big island gets its twin too.
-            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(RareStructure::twin)
+            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(RareStructure::twin),
+            // A roll gate by dimension: when set, this rare structure rolls only in that dimension — so a Nether-native
+            // seed can carry an overworld easter egg (the Trading Post growing the abandoned cottage thrown topside).
+            // Unset, it follows the theme's home dimension. See rollsIn.
+            Codec.STRING.optionalFieldOf("dimension").forGetter(RareStructure::dimension)
     ).apply(i, RareStructure::new));
+
+    /** Whether this rare structure may roll in {@code dim}: only its own {@code dimension} when set, else the theme's
+     * home dimension ({@code baseValidHere}). */
+    public boolean rollsIn(ResourceLocation dim, boolean baseValidHere) {
+        return dimension.isPresent() ? dimension.get().equals(dim.toString()) : baseValidHere;
+    }
 
     /** True if this rare structure may roll in {@code biome} (no {@code biomes} filter set = any biome). */
     public boolean matchesBiome(Holder<Biome> biome) {

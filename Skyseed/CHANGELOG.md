@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.64.1] - 2026-06-24
+
+### Added
+- **Piglin Trading Post easter egg.** Thrown in the overworld, the Nether‑native trading post no longer fizzles — it
+  grows a grass island carrying the **abandoned cottage** (the Hamlet's 10% rare structure), zombie villager and all.
+  Built on a small reusable mechanism: a `rare_structures` entry can now name a `dimension` so it rolls only there (an
+  overworld easter egg on a Nether seed), paired with an overworld `biome_override` so the seed takes root topside.
+
 ## [0.64.0] - 2026-06-24
 
 ### Added

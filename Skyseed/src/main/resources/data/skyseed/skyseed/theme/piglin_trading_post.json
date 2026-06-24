@@ -1,5 +1,5 @@
 {
-  "_comment": "Piglin Trading Post Island — the Nether's village. A Nether-native blackstone island carrying a trading-post hall (skyseed:piglin_trading_post/trading_post): an open colonnade around a gold trade pillar, gilded-blackstone accents, hanging lanterns and two bastion loot chests. 3-5 neutral piglins keep it — wear gold and drop a gold ingot to barter. See SKYNETHERPLAN.",
+  "_comment": "Piglin Trading Post Island — the Nether's village. A Nether-native blackstone island carrying a trading-post hall (skyseed:piglin_trading_post/trading_post): an open colonnade around a gold trade pillar, gilded-blackstone accents, hanging lanterns and two bastion loot chests. 3-5 neutral piglins keep it — wear gold and drop a gold ingot to barter. EASTER EGG: thrown topside it doesn't fizzle — an overworld biome_override grows a grass island and an overworld-dimensioned rare_structure (chance 1.0) grows the abandoned cottage (the Hamlet's 10% rare structure) with its zombie villager. See SKYNETHERPLAN.",
   "dimensions": ["minecraft:the_nether"],
   "shape": { "radius": { "min": 7, "max": 9 }, "rim_noise": 0.3, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
   "palette": { "surface": "minecraft:blackstone", "fill": "minecraft:blackstone", "core": "minecraft:basalt", "fill_depth": 2 },
@@ -14,5 +14,31 @@
   "variants": [
     { "weight": 1, "name": "trading_post", "decoration": {
       "ground": [ { "block": "minecraft:gilded_blackstone", "chance": 0.03 } ] } }
+  ],
+  "biome_overrides": [
+    {
+      "dimension": "minecraft:overworld",
+      "surface": "minecraft:grass_block",
+      "fill": "minecraft:dirt",
+      "core": "minecraft:stone",
+      "fill_depth": 2,
+      "shape": { "radius": { "min": 7, "max": 8 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+      "variants": [
+        { "weight": 1, "name": "yard", "decoration": {
+          "ground": [
+            { "block": "minecraft:short_grass", "chance": 0.25 },
+            { "block": "minecraft:dandelion", "chance": 0.04 },
+            { "block": "minecraft:poppy", "chance": 0.04 }
+          ] } }
+      ]
+    }
+  ],
+  "rare_structures": [
+    {
+      "chance": 1.0,
+      "dimension": "minecraft:overworld",
+      "jigsaw": { "pool": "skyseed:abandoned/cottage", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:zombie_villager", "adults": 1 } ] } ]
+    }
   ]
 }

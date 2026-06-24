@@ -10,7 +10,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "Wear gold and they stay neutral; $(bold)drop a gold ingot$() near one and it barters. The gold-economy hub. Nether-native — it fizzles thrown anywhere else. Crafted from blackstone, gold and $(item)netherrack$()."
+      "text": "Wear gold and they stay neutral; $(bold)drop a gold ingot$() near one and it barters. The gold-economy hub. Nether-native, and best thrown there — though a topside throw won't go entirely to waste… Crafted from blackstone, gold and $(item)netherrack$()."
     }
   ]
 }

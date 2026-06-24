@@ -126,11 +126,12 @@ public final class IslandGenerator {
         }
 
         // Rare structures: at most one germinates in place of the usual island (the first whose chance rolls).
-        // Rolled here, before the pond, so a flooded ruin can suppress the pond it stands in for. Gated to the
-        // theme's home dimension — these are overworld ruins/cells, so they don't roll on an adapted Nether island.
+        // Rolled here, before the pond, so a flooded ruin can suppress the pond it stands in for. Gated to the theme's
+        // home dimension by default (overworld ruins/cells don't roll on an adapted Nether island) — unless a rare
+        // structure names its own `dimension`, an overworld easter egg on a Nether-native seed (see RareStructure).
         RareStructure rolledRare = null;
         for (final RareStructure rs : theme.rareStructures()) {
-            if (baseValidHere && rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
+            if (rs.rollsIn(dim, baseValidHere) && rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
                 rolledRare = rs;
                 break;
             }
