@@ -54,10 +54,23 @@ changes between versions the Stonecutter directives live in a handful of named f
 
 ## Migration stages (each ends green: `runGameTestServer` passes on the active version)
 
-0. **Stonecutter skeleton + build proof.** Add Stonecutter with the **current version only** (1.21.1). Confirm a
-   clean `build` + `runClient` + `runGameTestServer` with Stonecutter wrapping the existing ModDevGradle build, and
-   that the IDE resolves the active version. **This is the de-risking spike — the one real unknown is the
-   Stonecutter ↔ ModDevGradle integration; prove it before touching any code.**
+0. **Stonecutter skeleton + build proof.** ✅ **DONE — spike succeeded** (branch `refactor/stonecutter-spike`).
+   Stonecutter **0.9.6** wraps the existing **ModDevGradle 2.0.141** build cleanly on **Gradle 9.2.1** *with the
+   configuration cache on*. Verified on the single 1.21.1 node: configure ✓ · `compileJava` ✓ · `runGameTestServer`
+   **52/52** ✓ · `build` → a correct jar (`neoforge.mods.toml` + all 317 `data/skyseed/` entries, no dupes) ✓.
+   - **Setup:** `settings.gradle` declares the matrix (`stonecutter { create(rootProject) { versions("1.21.1");
+     vcsVersion = "1.21.1" } }`) + the kikugie maven; Stonecutter auto-generated the `stonecutter.gradle.kts`
+     controller (`stonecutter active "1.21.1"`); `dev.kikugie.stonecutter.hard_mode=true` acknowledges Groovy DSL.
+   - **Build-script adaptations (the only files touched — `build.gradle` runs in the per-version node now):** dropped
+     the root-only `wrapper` task; pointed explicit `src/...` paths (generated resources, templates, datagen) at
+     `rootProject.file(...)`; added `duplicatesStrategy = EXCLUDE` on `ProcessResources` (Stonecutter copies
+     `src/main` into the node, so each resource shows up twice — identical for one version); gitignored
+     `versions/` + `.stonecutter/`.
+   - **Workflow change:** tasks now run under the node — `./gradlew :1.21.1:runGameTestServer` / `:1.21.1:build`
+     (bare `runGameTestServer` is gone); `chiseledBuild` builds every node. `runClient` not launched headlessly, but
+     the gameTestServer run loads the full mod on a real server, which covers the integration.
+   - **Note for later:** the ecosystem is Kotlin-DSL-centric (Stonecutter even warns about Groovy). Groovy works for
+     now; reconsider a `.kts` move if the controller/`parameters` config gets fiddly in Stage 2.
 1. **Concentrate the volatile surface into `compat`.** Route the registry access, `ResourceLocation` construction,
    jigsaw placement, and the registration / event / network / config glue through the facade. The algorithm,
    planners, codecs and templates stay untouched; golden-master fingerprints unchanged. **Valuable on its own** — it
@@ -68,8 +81,11 @@ changes between versions the Stonecutter directives live in a handful of named f
 3. **Generalize + document.** Add further versions as wanted; write the "how to add a version" recipe (a node + the
    expected directive sites); optionally a CI matrix (`chiseledBuild`).
 
-> The structural value (Stages 0–1) lands first and is useful immediately; the actual second version (Stage 2+) waits
-> until you name a target.
+> **Priority (per the maintainer): 1.21.1 only for now.** Stages 0–1 (the structural value) land first and are useful
+> immediately; the **second version (Stage 2+) is deliberately deferred until Skyseed is feature-complete on 1.21.1**.
+> The eventual driver is adopting the **world-gen-impacting features** newer versions introduced — so when a target is
+> named it's chosen for what its worldgen brings, not merely to prove the matrix. Stage 1 is still worth doing now: it
+> is a pure, golden-master-guarded code-organization refactor (no behaviour change) and the on-ramp for that later work.
 
 ---
 

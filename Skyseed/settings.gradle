@@ -1,9 +1,21 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
+        maven { url = "https://maven.kikugie.dev/releases" }
+        maven { url = "https://maven.kikugie.dev/snapshots" }
+        maven { url = "https://maven.neoforged.net/releases" }
     }
 }
 
 plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+    id 'dev.kikugie.stonecutter' version '0.9.6'
+}
+
+// Stonecutter version matrix. One version for now (the Stage-0 spike); add nodes here to target more.
+stonecutter {
+    create(rootProject) {
+        versions("1.21.1")
+        vcsVersion = "1.21.1"
+    }
 }

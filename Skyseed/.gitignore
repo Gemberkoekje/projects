@@ -38,3 +38,7 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### Stonecutter (multi-version build) — generated per-version subprojects + preprocessor cache ###
+versions/
+.stonecutter/
