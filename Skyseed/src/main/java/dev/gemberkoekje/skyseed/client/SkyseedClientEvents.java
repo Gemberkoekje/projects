@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.client;
 
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.SkyseedClientConfig;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -11,7 +12,6 @@ import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.levelgen.presets.WorldPreset;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -27,7 +27,7 @@ import java.lang.ref.WeakReference;
 @EventBusSubscriber(modid = Skyseed.MODID, value = Dist.CLIENT)
 public final class SkyseedClientEvents {
     private static final ResourceKey<WorldPreset> SKYBLOCK_PRESET =
-            ResourceKey.create(Registries.WORLD_PRESET, ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "skyblock"));
+            ResourceKey.create(Registries.WORLD_PRESET, Ids.mod("skyblock"));
 
     // Track the last screen we defaulted, so we set the type once per screen (not on every resize).
     private static WeakReference<Screen> defaulted = new WeakReference<>(null);

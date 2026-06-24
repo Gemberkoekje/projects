@@ -1,11 +1,11 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreDepth;
 import dev.gemberkoekje.skyseed.worldgen.theme.OreEntry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -38,14 +38,14 @@ final class OrePlanner {
         final int deepMaxY = minCoreY + (int) Math.round((maxCoreY - minCoreY) * DEEP_CORE_FRACTION); // lower 40% = deep_core
 
         for (OreEntry ore : ores) {
-            if (!BuiltInRegistries.BLOCK.containsKey(ore.block())) {
+            if (!Lookup.hasBlock(ore.block())) {
                 Skyseed.LOGGER.warn("[skyseed] theme ore references unknown block '{}' — skipping", ore.block());
                 continue;
             }
             if (random.nextFloat() >= ore.chance()) {
                 continue;
             }
-            final BlockState state = BuiltInRegistries.BLOCK.get(ore.block()).defaultBlockState();
+            final BlockState state = Lookup.blockState(ore.block());
             final int veins = ore.count().sample(random);
             for (int v = 0; v < veins; v++) {
                 final BlockPos seed = pickSeed(coreList, coreSet, ore.depth(), deepMaxY, random);

@@ -1,9 +1,9 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
@@ -311,7 +311,7 @@ final class PondCarver {
             for (GroundEntry g : pond.plants()) {
                 roll -= g.chance();
                 if (roll < 0) {
-                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                    if (Lookup.hasBlock(g.block())) {
                         plantInPond(blockMap, wx, wz, waterY, bottomY, g.block());
                     }
                     break;
@@ -337,7 +337,7 @@ final class PondCarver {
                 }
             }
             default -> {
-                BlockState st = BuiltInRegistries.BLOCK.get(id).defaultBlockState();
+                BlockState st = Lookup.blockState(id);
                 if (st.hasProperty(BlockStateProperties.WATERLOGGED)) {
                     st = st.setValue(BlockStateProperties.WATERLOGGED, Boolean.TRUE); // coral fans, sea pickle, …
                 }
@@ -370,7 +370,7 @@ final class PondCarver {
             for (GroundEntry g : pond.bank()) {
                 roll -= g.chance();
                 if (roll < 0) {
-                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                    if (Lookup.hasBlock(g.block())) {
                         bankPlant(blockMap, above, g.block(), random);
                     }
                     break;
@@ -381,7 +381,7 @@ final class PondCarver {
 
     /** Place a bank plant; sugar cane stacks 1-3 tall, everything else is a single block. */
     private static void bankPlant(Map<BlockPos, BlockState> blockMap, BlockPos above, ResourceLocation id, RandomSource random) {
-        final BlockState state = BuiltInRegistries.BLOCK.get(id).defaultBlockState();
+        final BlockState state = Lookup.blockState(id);
         if (id.getPath().equals("sugar_cane")) {
             final int h = 1 + random.nextInt(3); // 1-3 tall (rolled regardless of placement, to keep generation deterministic)
             if (!caneCanStand(blockMap, above.below())) {

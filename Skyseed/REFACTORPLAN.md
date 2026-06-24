@@ -71,10 +71,23 @@ changes between versions the Stonecutter directives live in a handful of named f
      the gameTestServer run loads the full mod on a real server, which covers the integration.
    - **Note for later:** the ecosystem is Kotlin-DSL-centric (Stonecutter even warns about Groovy). Groovy works for
      now; reconsider a `.kts` move if the controller/`parameters` config gets fiddly in Stage 2.
-1. **Concentrate the volatile surface into `compat`.** Route the registry access, `ResourceLocation` construction,
-   jigsaw placement, and the registration / event / network / config glue through the facade. The algorithm,
-   planners, codecs and templates stay untouched; golden-master fingerprints unchanged. **Valuable on its own** — it
-   localizes all future version churn even before a second version exists.
+1. **Concentrate the volatile surface into `compat`.** ✅ **DONE** — behaviour-preserving; all 52 gametests pass,
+   including the `islandOutputIsStable` golden master (byte-identical generation).
+   - **The facade** (`compat/`, alongside the existing `PatchouliCompat`): `Ids` (every `ResourceLocation` —
+     `mod`/`mc`/`of`/`parse`), `Lookup` (registry access — `block`/`blockState`/`blockId`/`hasBlock`,
+     `entityType`/`hasEntityType`, `registry`, `templatePool`/`hasTemplatePool`, `configuredFeature`), and `Jigsaw`
+     (`place`, wrapping `JigsawPlacement.generateJigsaw`). Each method reproduces exactly what its former call sites
+     did, so a future API rename lands here (a Stonecutter directive in `compat/`) instead of in the algorithm.
+   - **Routed:** every production `ResourceLocation` construction (`fromNamespaceAndPath`/`withDefaultNamespace`/
+     `tryParse`), every `BuiltInRegistries`/`registryAccess().registryOrThrow|lookupOrThrow` call (the code even
+     mixed the old + new names — now unified in `Lookup`), and the one `generateJigsaw` site. ~18 files; unused
+     imports cleaned.
+   - **Deliberately not wrapped (already localized):** the NeoForge registration / network / config glue
+     (`DeferredRegister`, the payload registrar, `ModConfigSpec`) already lives in dedicated classes (`ModItems`,
+     `ModEntities`, `ModRecipes`, `ModCreativeTabs`, `SkyseedNetwork`/`ThrowSeedPayload`, `SkyseedClientConfig`) —
+     those *are* the facade for their concern, so Stage-2 directives sit there without a new wrapper. The gametest
+     (`SkyseedGameTests`) keeps its direct calls: it's the golden-master witness (don't refactor the oracle while it's
+     guarding the refactor) and will need per-version expected values anyway — route it when Stage 2 lands.
 2. **Add the second MC/NeoForge version** (target **TBD — you pick**: latest 1.21.x, 1.22, …). Add the Stonecutter
    node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get **both** versions
    building and each one's gametests passing.

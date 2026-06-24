@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
@@ -21,7 +22,7 @@ import java.util.List;
 public record Pond(ResourceLocation block, int radius, int depth, List<GroundEntry> plants,
                    List<GroundEntry> bank, List<MobEntry> waterMobs, String style) {
     public static final Codec<Pond> CODEC = RecordCodecBuilder.create(i -> i.group(
-            ResourceLocation.CODEC.optionalFieldOf("block", ResourceLocation.withDefaultNamespace("water")).forGetter(Pond::block),
+            ResourceLocation.CODEC.optionalFieldOf("block", Ids.mc("water")).forGetter(Pond::block),
             Codec.INT.optionalFieldOf("radius", 3).forGetter(Pond::radius),
             Codec.INT.optionalFieldOf("depth", 2).forGetter(Pond::depth),
             GroundEntry.CODEC.listOf().optionalFieldOf("plants", List.of()).forGetter(Pond::plants),

@@ -1,12 +1,12 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BiomeTags;
@@ -86,7 +86,7 @@ public final class WorldSetupEvents {
         }
         if (level.getChunkSource().getGenerator() instanceof NoiseBasedChunkGenerator gen) {
             return gen.generatorSettings().is(ResourceKey.create(Registries.NOISE_SETTINGS,
-                    ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, settingsPath)));
+                    Ids.mod(settingsPath)));
         }
         return false;
     }

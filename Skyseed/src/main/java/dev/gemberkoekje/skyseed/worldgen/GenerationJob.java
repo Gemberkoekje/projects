@@ -1,10 +1,10 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Jigsaw;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.structure.Traps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
@@ -26,7 +26,6 @@ import net.minecraft.world.level.block.entity.BeehiveBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
 import net.neoforged.neoforge.event.EventHooks;
 
@@ -163,7 +162,8 @@ public final class GenerationJob {
     /**
      * Assemble the planned jigsaw structures, then spawn a villager at every bed they placed.
      *
-     * <p>Trade-off: unlike the per-block fill, {@link JigsawPlacement#generateJigsaw} runs the whole structure
+     * <p>Trade-off: unlike the per-block fill, {@link Jigsaw#place} (vanilla {@code JigsawPlacement.generateJigsaw})
+     * runs the whole structure
      * in one tick, un-budgeted — a possible frame spike for the big assemblies (Woodland Mansion + wings,
      * Village Center). It's a single vanilla call so it can't be chunked across ticks without reimplementing
      * jigsaw placement; in practice it fires once per island and the spike is acceptable. If it ever becomes a
@@ -171,10 +171,8 @@ public final class GenerationJob {
      */
     private void placeStructures() {
         for (IslandPlan.JigsawSite js : plan.jigsaws()) {
-            final Holder<StructureTemplatePool> pool = level.registryAccess()
-                    .lookupOrThrow(Registries.TEMPLATE_POOL)
-                    .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, js.pool()));
-            JigsawPlacement.generateJigsaw(level, pool, js.target(), js.depth(), js.origin(), false);
+            final Holder<StructureTemplatePool> pool = Lookup.templatePool(level.registryAccess(), js.pool());
+            Jigsaw.place(level, pool, js.target(), js.depth(), js.origin(), false);
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
             Traps.applyAfterJigsaw(level, js.origin());
             // Link up any fences / panes / walls the jigsaw pasted in their default (unconnected) state.

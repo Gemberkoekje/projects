@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -73,12 +74,12 @@ public record BiomeOverride(
     private boolean matchesBiome(Holder<Biome> biome) {
         for (String entry : biomes) {
             if (entry.startsWith("#")) {
-                ResourceLocation tagId = ResourceLocation.tryParse(entry.substring(1));
+                ResourceLocation tagId = Ids.parse(entry.substring(1));
                 if (tagId != null && biome.is(TagKey.create(Registries.BIOME, tagId))) {
                     return true;
                 }
             } else {
-                ResourceLocation id = ResourceLocation.tryParse(entry);
+                ResourceLocation id = Ids.parse(entry);
                 if (id != null && biome.is(id)) {
                     return true;
                 }

@@ -1,10 +1,9 @@
 package dev.gemberkoekje.skyseed.registry;
 
-import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.registries.DataPackRegistryEvent;
 
 /**
@@ -14,7 +13,7 @@ import net.neoforged.neoforge.registries.DataPackRegistryEvent;
  */
 public final class SkyseedRegistries {
     public static final ResourceKey<Registry<IslandTheme>> THEME =
-            ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "theme"));
+            ResourceKey.createRegistryKey(Ids.mod("theme"));
 
     private SkyseedRegistries() {}
 

@@ -1,6 +1,8 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.BlockPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
 import dev.gemberkoekje.skyseed.worldgen.theme.AnimalPack;
@@ -21,8 +23,6 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Underside;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -70,7 +70,7 @@ public final class IslandGenerator {
         // (`baseValidHere` false) an unset field is neutral/empty, NEVER the overworld value — overworld content
         // (ores, palette, decoration, mobs, …) can't leak across the portal.
         final boolean useBase = baseValidHere;
-        final ResourceLocation neutralBlock = ResourceLocation.withDefaultNamespace(
+        final ResourceLocation neutralBlock = Ids.mc(
                 dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
         final Palette pal = theme.palette();
         final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get()
@@ -281,7 +281,7 @@ public final class IslandGenerator {
     /** The ore list with a one-off lava vein appended (rolled last, so it doesn't shift the real ores' RNG). */
     private static List<OreEntry> withLavaVein(List<OreEntry> ores, Lava lava) {
         final List<OreEntry> out = new ArrayList<>(ores);
-        out.add(new OreEntry(ResourceLocation.withDefaultNamespace("lava"), lava.veinChance(),
+        out.add(new OreEntry(Ids.mc("lava"), lava.veinChance(),
                 new IntRange(1, 1), lava.veinSize(), OreDepth.CORE));
         return out;
     }
@@ -325,9 +325,9 @@ public final class IslandGenerator {
         if (level.dimension() != Level.NETHER) {
             return jc;
         }
-        final ResourceLocation netherPool = ResourceLocation.fromNamespaceAndPath(
+        final ResourceLocation netherPool = Ids.of(
                 jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
-        if (level.registryAccess().registryOrThrow(Registries.TEMPLATE_POOL).containsKey(netherPool)) {
+        if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
             return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink());
         }
         return jc;
@@ -339,8 +339,8 @@ public final class IslandGenerator {
         }
         List<Scatter> out = new ArrayList<>(cfg.size());
         for (GroundEntry g : cfg) {
-            if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                out.add(new Scatter(BuiltInRegistries.BLOCK.get(g.block()).defaultBlockState(), g.chance()));
+            if (Lookup.hasBlock(g.block())) {
+                out.add(new Scatter(Lookup.blockState(g.block()), g.chance()));
             } else {
                 Skyseed.LOGGER.warn("[skyseed] theme surface_scatter references unknown block '{}' — skipping", g.block());
             }
@@ -354,8 +354,8 @@ public final class IslandGenerator {
         }
         List<BlockState> out = new ArrayList<>(ids.size());
         for (ResourceLocation id : ids) {
-            if (BuiltInRegistries.BLOCK.containsKey(id)) {
-                out.add(BuiltInRegistries.BLOCK.get(id).defaultBlockState());
+            if (Lookup.hasBlock(id)) {
+                out.add(Lookup.blockState(id));
             } else {
                 Skyseed.LOGGER.warn("[skyseed] theme fill_bands references unknown block '{}' — skipping", id);
             }
@@ -386,11 +386,11 @@ public final class IslandGenerator {
     }
 
     private static Block resolveBlock(ResourceLocation id, Block fallback) {
-        if (id != null && BuiltInRegistries.BLOCK.containsKey(id)) {
-            return BuiltInRegistries.BLOCK.get(id);
+        if (id != null && Lookup.hasBlock(id)) {
+            return Lookup.block(id);
         }
         Skyseed.LOGGER.warn("[skyseed] theme references unknown block '{}' — using {}",
-                id, BuiltInRegistries.BLOCK.getKey(fallback));
+                id, Lookup.blockId(fallback));
         return fallback;
     }
 }

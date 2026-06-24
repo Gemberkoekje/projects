@@ -1,15 +1,13 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.TreeEntry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -42,9 +40,6 @@ final class DecorationPlanner {
         if (surfaceList.isEmpty()) {
             return;
         }
-        final Registry<ConfiguredFeature<?, ?>> features =
-                level.registryAccess().registryOrThrow(Registries.CONFIGURED_FEATURE);
-
         final List<BlockPos> treeBases = new ArrayList<>();
         for (TreeEntry tree : deco.trees()) {
             // skyseed:* "features" are built-in hand-built trees (vanilla features that won't place
@@ -58,7 +53,8 @@ final class DecorationPlanner {
                     continue;
                 }
             } else {
-                Optional<ConfiguredFeature<?, ?>> resolved = features.getOptional(tree.feature());
+                Optional<ConfiguredFeature<?, ?>> resolved =
+                        Lookup.configuredFeature(level.registryAccess(), tree.feature());
                 if (resolved.isEmpty()) {
                     Skyseed.LOGGER.warn("[skyseed] theme references unknown feature '{}' — skipping", tree.feature());
                     continue;
@@ -105,8 +101,8 @@ final class DecorationPlanner {
                 for (GroundEntry g : deco.ground()) {
                     roll -= g.chance();
                     if (roll < 0) {
-                        if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
-                            placeGround(blockMap, above, BuiltInRegistries.BLOCK.get(g.block()));
+                        if (Lookup.hasBlock(g.block())) {
+                            placeGround(blockMap, above, Lookup.block(g.block()));
                         }
                         break;
                     }
@@ -138,7 +134,7 @@ final class DecorationPlanner {
             for (GroundEntry g : cfg) {
                 roll -= g.chance();
                 if (roll < 0) {
-                    if (BuiltInRegistries.BLOCK.containsKey(g.block())) {
+                    if (Lookup.hasBlock(g.block())) {
                         hangUnder(blockMap, bottom, g.block(), random);
                     }
                     break;
@@ -175,7 +171,7 @@ final class DecorationPlanner {
             }
             // Glow lichen is a multiface block: set its UP face so it clings to the island's underside and glows.
             case "glow_lichen" -> blockMap.put(first, Blocks.GLOW_LICHEN.defaultBlockState().setValue(BlockStateProperties.UP, true));
-            default -> blockMap.put(first, BuiltInRegistries.BLOCK.get(id).defaultBlockState());
+            default -> blockMap.put(first, Lookup.blockState(id));
         }
     }
 

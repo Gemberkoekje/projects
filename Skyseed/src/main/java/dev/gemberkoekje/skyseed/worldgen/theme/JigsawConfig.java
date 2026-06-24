@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -17,7 +18,7 @@ import net.minecraft.resources.ResourceLocation;
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems, int sink) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
-            ResourceLocation.CODEC.optionalFieldOf("target", ResourceLocation.withDefaultNamespace("bottom")).forGetter(JigsawConfig::target),
+            ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
             Codec.INT.optionalFieldOf("depth", 1).forGetter(JigsawConfig::depth),
             Codec.INT.optionalFieldOf("pad", 6).forGetter(JigsawConfig::pad),
             Codec.INT.optionalFieldOf("iron_golems", 0).forGetter(JigsawConfig::ironGolems),

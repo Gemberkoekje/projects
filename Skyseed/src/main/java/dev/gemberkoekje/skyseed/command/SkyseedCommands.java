@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -13,7 +14,6 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -61,7 +61,7 @@ public final class SkyseedCommands {
         }
 
         ResourceKey<net.minecraft.world.level.levelgen.NoiseGeneratorSettings> voidSettingsKey() {
-            return ResourceKey.create(Registries.NOISE_SETTINGS, ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, voidPath));
+            return ResourceKey.create(Registries.NOISE_SETTINGS, Ids.mod(voidPath));
         }
     }
 

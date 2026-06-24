@@ -2,9 +2,9 @@ package dev.gemberkoekje.skyseed.worldgen.structure;
 
 import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
 
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
@@ -113,7 +113,7 @@ public final class HamletTemplates {
             m.put(new BlockPos(mid, y, ladderZ), Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, ladderFace));
         }
 
-        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), BuiltInRegistries.BLOCK.getKey(planks.getBlock()).toString());
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), Lookup.blockId(planks.getBlock()).toString());
         return new Built(m, bes);
     }
 }

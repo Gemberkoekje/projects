@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.item.IslandSeedItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -60,7 +61,7 @@ public final class ModItems {
 
     private static void registerSeeds(List<String> themes, Map<String, DeferredItem<IslandSeedItem>> into) {
         for (String theme : themes) {
-            final ResourceLocation themeId = ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, theme);
+            final ResourceLocation themeId = Ids.mod(theme);
             into.put(theme, ITEMS.registerItem(theme + "_skyseed",
                     props -> new IslandSeedItem(props, themeId), new Item.Properties().stacksTo(16)));
         }
@@ -71,7 +72,7 @@ public final class ModItems {
 
     /** Every Skyseed item — the guide recipe accepts any one of these; add-on seeds should join this tag. */
     public static final TagKey<Item> SKYSEEDS =
-            TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "skyseeds"));
+            TagKey.create(Registries.ITEM, Ids.mod("skyseeds"));
 
     private ModItems() {}
 

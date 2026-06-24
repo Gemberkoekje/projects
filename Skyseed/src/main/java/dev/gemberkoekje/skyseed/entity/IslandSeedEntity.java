@@ -1,6 +1,8 @@
 package dev.gemberkoekje.skyseed.entity;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
@@ -92,7 +94,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     /** @return this seed's theme id, or {@code null} if none was set (a bare/legacy seed). */
     public ResourceLocation getTheme() {
         String s = this.entityData.get(DATA_THEME);
-        return s.isEmpty() ? null : ResourceLocation.tryParse(s);
+        return s.isEmpty() ? null : Ids.parse(s);
     }
 
     /** Mark this a Precise-mode throw: it flies through everything and germinates at {@code target}. */
@@ -189,8 +191,8 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // seed) or a rolled rare structure (a portal that surfaced on a big island). Spawned directly here, not via
         // another thrown seed, so it never spawns a twin of its own.
         if (plan.twinTheme().isPresent()) {
-            final IslandTheme twinTheme = level.registryAccess()
-                    .registryOrThrow(SkyseedRegistries.THEME).get(plan.twinTheme().get());
+            final IslandTheme twinTheme = Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME)
+                    .get(plan.twinTheme().get());
             if (twinTheme != null) {
                 spawnTwin(level, this.blockPosition(), twinTheme);
             }
@@ -350,11 +352,11 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
      * @return the resolved theme, or {@code null} only if no themes are loaded at all.
      */
     private IslandTheme resolveTheme(ServerLevel level) {
-        Registry<IslandTheme> themes = level.registryAccess().registryOrThrow(SkyseedRegistries.THEME);
+        Registry<IslandTheme> themes = Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME);
         ResourceLocation id = getTheme();
         IslandTheme theme = (id != null) ? themes.get(id) : null;
         if (theme == null) {
-            ResourceLocation forest = ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, "forest");
+            ResourceLocation forest = Ids.mod("forest");
             theme = themes.get(forest);
             if (theme != null && id != null) {
                 Skyseed.LOGGER.warn("[skyseed] unknown theme '{}' — falling back to {}", id, forest);
@@ -386,7 +388,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         super.readAdditionalSaveData(tag);
         this.armTicks = tag.getInt("ArmTicks");
         if (tag.contains("Theme")) {
-            setTheme(ResourceLocation.tryParse(tag.getString("Theme")));
+            setTheme(Ids.parse(tag.getString("Theme")));
         }
         this.precise = tag.getBoolean("Precise");
         if (this.precise) {
