@@ -27,9 +27,14 @@ public final class DevStructureGenerator {
             return;
         }
         try {
-            // runServer/runClient working dir is the `run/` folder, a sibling of `src/`.
-            final Path base = Path.of(System.getProperty("user.dir"))
-                    .resolveSibling("src").resolve("main/resources/data/skyseed/structure");
+            // build.gradle passes the repo-root structure dir as a system property — needed under Stonecutter, where
+            // the run executes in the per-version node and a user.dir guess would write to the node's throwaway src
+            // copy. Fall back to the old "run/ is a sibling of src/" guess for a plain run without the property.
+            final String override = System.getProperty("skyseed.structureDir");
+            final Path base = (override != null && !override.isBlank())
+                    ? Path.of(override)
+                    : Path.of(System.getProperty("user.dir"))
+                            .resolveSibling("src").resolve("main/resources/data/skyseed/structure");
             HamletTemplates.generateInto(base.resolve("hamlet"));
             TradePostTemplates.generateInto(base.resolve("trade_post"));
             VillageCenterTemplates.generateInto(base.resolve("village_center"));

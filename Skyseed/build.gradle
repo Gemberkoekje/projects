@@ -91,6 +91,10 @@ neoForge {
             // "REGISTRIES": For firing of registry events.
             // "REGISTRYDUMP": For getting the contents of all registries.
             systemProperty 'forge.logging.markers', 'REGISTRIES'
+            // The dev structure generator (DevStructureGenerator) writes code-authored .nbt templates here. Point it
+            // at the repo-root src so it works under Stonecutter (the run otherwise executes in the per-version node
+            // and would write to that throwaway src copy).
+            systemProperty 'skyseed.structureDir', rootProject.file('src/main/resources/data/skyseed/structure').getAbsolutePath()
 
             // Recommended logging level for the console
             // You can set various levels here.
