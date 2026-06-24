@@ -3,6 +3,12 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.2] - 2026-06-24
+
+### Fixed
+- The Woodland Mansion hint now points at the right Totem of Undying source — the rare **Evoker Cell** that grows on a
+  Forest island thrown into a **dark forest** — instead of a village raid.
+
 ## [0.65.1] - 2026-06-24
 
 ### Changed
