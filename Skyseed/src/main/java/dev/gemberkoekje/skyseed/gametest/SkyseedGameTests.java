@@ -1478,6 +1478,29 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void ladderShaftRotationVaries(GameTestHelper helper) {
+        // The shaft (and its cobblestone backing) faces a random one of the 4 directions per island, so they aren't
+        // all aligned. Sweep seeds until we see at least two different ladder facings.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 40, 8));
+        final IslandTheme theme = theme(level, "ladder_small");
+        final java.util.Set<net.minecraft.core.Direction> facings = new java.util.HashSet<>();
+        for (long seed = 0; seed < 60 && facings.size() < 2; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme, level.getBiome(center),
+                    RandomSource.create(seed));
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(Blocks.LADDER)) {
+                    facings.add(bp.state().getValue(net.minecraft.world.level.block.LadderBlock.FACING));
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(facings.size() >= 2,
+                "the ladder shaft should face different directions across islands, saw " + facings);
+        helper.succeed();
+    }
+
     @GameTest(template = REGION, timeoutTicks = 200)
     public static void preciseSeedGerminatesAtTarget(GameTestHelper helper) {
         // A Precise throw germinates at its chosen target, not where the seed sits.

@@ -47,7 +47,8 @@ public final class ModItems {
      */
     public static final List<String> DEBUG_SEED_THEMES = List.of(
             "debug_igloo", "debug_abandoned_cottage", "debug_ocean_ruin",
-            "debug_evoker_cell", "debug_vault_cell", "debug_trail_ruins", "debug_blaze_spawner");
+            "debug_evoker_cell", "debug_vault_cell", "debug_trail_ruins", "debug_blaze_spawner",
+            "debug_small_waterfall", "debug_large_waterfall");
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();

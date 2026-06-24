@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.61.1] - 2026-06-24
+
+### Changed
+- **Ladder Island shafts now face a random direction.** The shaft and its cobblestone backing pick one of the four
+  directions per island, instead of every ladder facing the same way.
+
+### Added
+- **Debug seeds for the ladder waterfall** (creative-only, in the "Skyseed Debug" tab): *Debug: Small Waterfall* and
+  *Debug: Large Waterfall* force the 5% waterfall variant of the small / large Ladder Island, for testing.
+
 ## [0.61.0] - 2026-06-24
 
 ### Added
