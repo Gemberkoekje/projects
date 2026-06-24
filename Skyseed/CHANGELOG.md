@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.5] - 2026-06-24
+
+### Fixed
+- **A Forest seed on snowy plains (and grove/snowy biomes) came up bare.** Ground cover (a 90% snow layer) was placed
+  before the deferred tree features, and a snow layer fails the vanilla tree's valid‑position check — so the spruces
+  never formed. Generation now follows the natural order: **terrain → trees → ground cover** (placed onto the bare
+  surface, skipping wherever a tree stands). A Forest island is also guaranteed at least one tree — a last‑resort
+  fallback plants one if every site somehow fails.
+
 ## [0.65.4] - 2026-06-24
 
 ### Changed

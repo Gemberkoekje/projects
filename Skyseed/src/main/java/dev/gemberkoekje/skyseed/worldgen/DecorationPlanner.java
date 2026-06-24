@@ -23,8 +23,9 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Plants a variant's surface decoration onto an island: trees (vanilla configured features deferred to
@@ -36,7 +37,7 @@ final class DecorationPlanner {
 
     static void planDecoration(ServerLevel level, Map<BlockPos, BlockState> blockMap, List<TreeSite> trees,
                                List<BlockPos> surfaceList, List<BlockPos> bottomList, Decoration deco,
-                               RandomSource random) {
+                               Set<BlockPos> scatter, RandomSource random) {
         if (surfaceList.isEmpty()) {
             return;
         }
@@ -91,6 +92,9 @@ final class DecorationPlanner {
             }
         }
 
+        // Ground cover is recorded as "scatter": GenerationJob places these positions AFTER the (deferred) trees, so a
+        // snow layer can't claim a tree's spot and make the vanilla tree feature fail (which left a snowy Forest bare).
+        // Hand-built trees are already in blockMap and skipped.
         if (!deco.ground().isEmpty()) {
             for (BlockPos grass : surfaceList) {
                 final BlockPos above = grass.above();
@@ -102,7 +106,7 @@ final class DecorationPlanner {
                     roll -= g.chance();
                     if (roll < 0) {
                         if (Lookup.hasBlock(g.block())) {
-                            placeGround(blockMap, above, Lookup.block(g.block()));
+                            placeGround(blockMap, above, Lookup.block(g.block()), scatter);
                         }
                         break;
                     }
@@ -114,12 +118,15 @@ final class DecorationPlanner {
     }
 
     /** Place a ground plant, expanding two-tall plants (dripleaves, pitcher plant, tall flowers) into both halves. */
-    private static void placeGround(Map<BlockPos, BlockState> blockMap, BlockPos above, Block block) {
+    private static void placeGround(Map<BlockPos, BlockState> blockMap, BlockPos above, Block block, Set<BlockPos> scatter) {
         if (block instanceof DoublePlantBlock) {
             blockMap.put(above, block.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.LOWER));
             blockMap.put(above.above(), block.defaultBlockState().setValue(DoublePlantBlock.HALF, DoubleBlockHalf.UPPER));
+            scatter.add(above);
+            scatter.add(above.above());
         } else {
             blockMap.put(above, block.defaultBlockState());
+            scatter.add(above);
         }
     }
 

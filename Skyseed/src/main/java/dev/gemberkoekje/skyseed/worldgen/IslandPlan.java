@@ -9,6 +9,7 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A fully computed island, ready to be placed into the world over several ticks (README → Generation algorithm tick-budget
@@ -27,10 +28,13 @@ import java.util.Optional;
  *                  Ruined Portal twin — set by the theme's or a rolled rare structure's {@code twin} field)
  * @param fluidTicks water sources (placed physics-free with the rest of the blocks) to nudge into flowing once the
  *                   island has landed — e.g. a Ladder Island waterfall. {@link GenerationJob} schedules each a tick.
+ * @param scatterPositions ground-cover positions (a subset of {@code blocks}) that {@link GenerationJob} places AFTER
+ *                   the trees, skipping any a tree has taken — so a snow layer can't block a tree from forming.
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
                          List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
-                         RandomSource random, Optional<ResourceLocation> twinTheme, List<BlockPos> fluidTicks) {
+                         RandomSource random, Optional<ResourceLocation> twinTheme, List<BlockPos> fluidTicks,
+                         Set<BlockPos> scatterPositions) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}

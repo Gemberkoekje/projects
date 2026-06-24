@@ -208,8 +208,10 @@ public final class IslandGenerator {
         }
 
         final List<TreeSite> trees = new ArrayList<>();
+        final Set<BlockPos> scatterPositions = new HashSet<>();
         if (variant != null) {
-            DecorationPlanner.planDecoration(level, blockMap, trees, surfaceList, bottomList, variant.decoration(), random);
+            DecorationPlanner.planDecoration(level, blockMap, trees, surfaceList, bottomList, variant.decoration(),
+                    scatterPositions, random);
         }
 
         // Waterfalls: short static cascades off the rim (block placements, no flow physics).
@@ -253,7 +255,7 @@ public final class IslandGenerator {
         // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
         final Optional<ResourceLocation> twinTheme =
                 (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks);
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks, scatterPositions);
     }
 
     /** Flatten a {@code pad}-radius disc to {@code gy} for a building: clear above, solid below, no decoration. */

@@ -884,6 +884,28 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void forestInSnowDefersGroundCoverPastTrees(GameTestHelper helper) {
+        // Regression: a Forest seed on snowy_plains came up bare — the 90% snow ground cover was placed before the
+        // (deferred) spruce sites, and a snow layer fails the vanilla tree feature's valid-position check. Ground cover
+        // is now recorded as scatter and placed AFTER the trees (GenerationJob), so it can never block one.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme forest = theme(level, "forest");
+        final var snowy = level.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.SNOWY_PLAINS);
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), forest, snowy,
+                RandomSource.create(3L));
+        helper.assertTrue(!p.trees().isEmpty(), "a Forest island must always plan at least one tree");
+        // every snow layer must be deferred scatter (placed after the trees), never an eager block that blocks them
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.SNOW)) {
+                helper.assertTrue(p.scatterPositions().contains(bp.pos()),
+                        "snow at " + bp.pos() + " is not deferred scatter — it would be placed before the trees");
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

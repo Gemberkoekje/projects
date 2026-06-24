@@ -48,6 +48,8 @@ public final class GenerationJob {
     private final IslandPlan plan;
     private int blockIndex = 0;
     private int treeIndex = 0;
+    private int treesPlaced = 0;
+    private int scatterIndex = 0;
     private boolean mobsSpawned = false;
 
     public GenerationJob(ServerLevel level, IslandPlan plan) {
@@ -61,6 +63,9 @@ public final class GenerationJob {
         int budget = BLOCKS_PER_TICK;
         while (budget-- > 0 && blockIndex < blockCount) {
             IslandPlan.BlockPlacement bp = plan.blocks().get(blockIndex++);
+            if (plan.scatterPositions().contains(bp.pos())) {
+                continue; // ground cover — deferred until after the trees so it can't block them
+            }
             // UPDATE_CLIENTS only: show the block without neighbour/physics cascades.
             level.setBlock(bp.pos(), bp.state(), Block.UPDATE_CLIENTS);
         }
@@ -74,9 +79,35 @@ public final class GenerationJob {
             int treeBudget = TREES_PER_TICK;
             while (treeBudget-- > 0 && treeIndex < treeCount) {
                 IslandPlan.TreeSite ts = plan.trees().get(treeIndex++);
-                ts.feature().place(level, generator, plan.random(), ts.pos());
+                if (ts.feature().place(level, generator, plan.random(), ts.pos())) {
+                    treesPlaced++;
+                }
             }
             if (treeIndex < treeCount) {
+                return false;
+            }
+            // Guarantee at least one tree: a vanilla tree feature returns false if its spot is blocked (a snow layer,
+            // a sandy surface, the rim), so an island that asked for trees could come up bare. If every site failed,
+            // force one onto a cleared grass+air spot.
+            if (treesPlaced == 0) {
+                forceOneTree(generator);
+            }
+        }
+
+        // Ground cover, placed now (after the trees) onto the bare terrain, skipping any spot a tree has taken — so a
+        // snow layer never makes a tree fail. Same blocks() list, re-scanned for the deferred scatter positions.
+        if (scatterIndex < blockCount) {
+            int scatterBudget = BLOCKS_PER_TICK;
+            while (scatterBudget-- > 0 && scatterIndex < blockCount) {
+                IslandPlan.BlockPlacement bp = plan.blocks().get(scatterIndex++);
+                if (!plan.scatterPositions().contains(bp.pos())) {
+                    continue; // terrain, already placed
+                }
+                if (level.getBlockState(bp.pos()).isAir()) {
+                    level.setBlock(bp.pos(), bp.state(), Block.UPDATE_CLIENTS);
+                }
+            }
+            if (scatterIndex < blockCount) {
                 return false;
             }
         }
@@ -90,6 +121,18 @@ public final class GenerationJob {
             mobsSpawned = true;
         }
         return true;
+    }
+
+    /** Last resort so a tree-bearing island is never bare: clear a site to grass + air and place its feature there. */
+    private void forceOneTree(ChunkGenerator generator) {
+        for (IslandPlan.TreeSite ts : plan.trees()) {
+            level.setBlock(ts.pos().below(), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
+            level.setBlock(ts.pos(), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            if (ts.feature().place(level, generator, plan.random(), ts.pos())) {
+                treesPlaced++;
+                return;
+            }
+        }
     }
 
     /**
