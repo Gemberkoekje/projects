@@ -27,6 +27,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -334,17 +335,40 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         return IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
     }
 
-    /** Failed germination: a puff of smoke, a fizzle, and the seed dropped back so it isn't wasted. */
+    /**
+     * Failed germination: a puff of smoke, a fizzle, and the seed handed back to the thrower so it isn't wasted.
+     *
+     * <p>Almost every fizzle happens over the void (you're throwing into empty sky), where a dropped item would just
+     * tumble out of reach — so we return the seed to whoever threw it: into their inventory, or at their feet if it's
+     * full. Only a seed with no player thrower (e.g. a dispenser) falls back to dropping where it failed.
+     */
     private void fizzle(ServerLevel level) {
         level.sendParticles(ParticleTypes.SMOKE, this.getX(), this.getY(), this.getZ(), 20, 0.3, 0.3, 0.3, 0.02);
         level.playSound(null, this.getX(), this.getY(), this.getZ(),
                 SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.7F, 1.4F);
-        ItemStack drop = this.getItem().copy();
-        if (!drop.isEmpty()) {
-            ItemEntity item = new ItemEntity(level, this.getX(), this.getY(), this.getZ(), drop);
-            item.setDefaultPickUpDelay();
-            level.addFreshEntity(item);
+        final ItemStack drop = this.getItem().copy();
+        if (drop.isEmpty()) {
+            return;
         }
+        if (this.getOwner() instanceof Player thrower) {
+            if (thrower.getInventory().add(drop)) {
+                // a soft "bloop" at the thrower so they notice the seed came back to them
+                level.playSound(null, thrower.getX(), thrower.getY(), thrower.getZ(),
+                        SoundEvents.ITEM_PICKUP, SoundSource.PLAYERS, 0.6F, 1.6F);
+            } else {
+                // inventory full — drop at their feet (reachable) rather than into the void
+                dropSeed(level, thrower.getX(), thrower.getY(), thrower.getZ(), drop);
+            }
+            return;
+        }
+        // No player thrower (e.g. a dispenser): best-effort drop where it fizzled.
+        dropSeed(level, this.getX(), this.getY(), this.getZ(), drop);
+    }
+
+    private static void dropSeed(ServerLevel level, double x, double y, double z, ItemStack stack) {
+        final ItemEntity item = new ItemEntity(level, x, y, z, stack);
+        item.setDefaultPickUpDelay();
+        level.addFreshEntity(item);
     }
 
     /**

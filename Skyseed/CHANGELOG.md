@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.57.1] - 2026-06-24
+
+### Fixed
+- **A fizzling seed is returned to the thrower instead of dropped into the void.** When a seed can't germinate where
+  it's thrown (an overworld seed in the Nether, say), it used to drop itself at the failure point — which, since
+  you're almost always throwing over empty sky, meant watching the seed you just crafted tumble out of reach. It now
+  goes back into the thrower's inventory (or at their feet if it's full), with the fizzle smoke and hiss still playing
+  at the failure point. A seed thrown by a dispenser (no player) still drops where it fizzled.
+
 ## [0.57.0] - 2026-06-23
 
 ### Added
