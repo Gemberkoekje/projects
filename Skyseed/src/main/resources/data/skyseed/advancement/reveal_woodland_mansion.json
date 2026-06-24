@@ -1,32 +1,14 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:forest_skyseed"
-      }
-    },
-    "has_0": {
+    "got_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
-          {
-            "items": "minecraft:dark_oak_planks"
-          },
-          {
-            "items": "minecraft:diamond"
-          },
           {
             "items": "minecraft:totem_of_undying"
           }
         ]
       }
     }
-  },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  }
 }

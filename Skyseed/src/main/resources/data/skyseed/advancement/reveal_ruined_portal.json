@@ -1,29 +1,14 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:badlands_skyseed"
-      }
-    },
-    "has_0": {
+    "got_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
           {
             "items": "minecraft:obsidian"
-          },
-          {
-            "items": "minecraft:gold_ingot"
           }
         ]
       }
     }
-  },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  }
 }

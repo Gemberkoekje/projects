@@ -19,7 +19,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)How this book works$()$(br)It unfolds as you play. A seed's page appears once you've crafted the one before it — or already hold everything it needs. The page then shows $(bold)what to gather$(), reveals its $(bold)recipe$() when you're holding the makings, and unlocks its full $(bold)field notes$() the moment you craft it.$(br2)Start with the $(item)Forest Skyseed$() and follow the trail."
+      "text": "$(bold)How this book works$()$(br)It unfolds as you play. Most pages appear once you've crafted the island before them; the rarer ones — farms, ruins, monuments — stay a locked $(bold)?$() until you $(bold)find the item they call for$() (a feather, a totem, a sponge). A page then shows $(bold)what to gather$(), reveals its $(bold)recipe$() when you hold the makings, and unlocks its $(bold)field notes$() the moment you craft it.$(br2)Start with the $(item)Forest Skyseed$() and follow the trail."
     }
   ]
 }

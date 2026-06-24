@@ -1,23 +1,21 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
+    "got_0": {
+      "trigger": "minecraft:inventory_changed",
       "conditions": {
-        "recipe_id": "skyseed:forest_skyseed"
+        "items": [
+          {
+            "items": "minecraft:egg"
+          }
+        ]
       }
     },
-    "has_0": {
+    "got_1": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
           {
             "items": "minecraft:feather"
-          },
-          {
-            "items": "minecraft:egg"
-          },
-          {
-            "items": "minecraft:dirt"
           }
         ]
       }
@@ -25,8 +23,8 @@
   },
   "requirements": [
     [
-      "prereq",
-      "has_0"
+      "got_0",
+      "got_1"
     ]
   ]
 }

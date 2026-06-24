@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.2] - 2026-06-24
+
+### Changed
+- **Farm, animal and structure seeds now reveal on finding their signature item**, not on crafting a prerequisite —
+  Poultry on an egg or feather, Woodland Mansion on a totem, Ocean Monument on a sponge, Aquarium on a scute or
+  prismarine shard, Dungeon on rotten flesh, and so on (14 seeds). The biome islands, Larges and the village chain keep
+  the craft‑the‑prior‑tier unfold, so the main path stays guided while the rare islands become finds. The intro now
+  tells you the rarer seeds unlock when you find the item they call for.
+
 ## [0.66.1] - 2026-06-24
 
 ### Changed

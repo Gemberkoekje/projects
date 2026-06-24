@@ -1,32 +1,14 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:desert_skyseed"
-      }
-    },
-    "has_0": {
+    "got_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
           {
-            "items": "minecraft:sandstone"
-          },
-          {
             "items": "minecraft:tnt"
-          },
-          {
-            "items": "minecraft:sand"
           }
         ]
       }
     }
-  },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  }
 }

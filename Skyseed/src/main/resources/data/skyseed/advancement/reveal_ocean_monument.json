@@ -1,23 +1,21 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:aquatic_large_skyseed"
-      }
-    },
-    "has_0": {
+    "got_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
           {
-            "items": "minecraft:gold_block"
-          },
-          {
             "items": "minecraft:sponge"
-          },
+          }
+        ]
+      }
+    },
+    "got_1": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
           {
-            "items": "minecraft:diamond"
+            "items": "minecraft:wet_sponge"
           }
         ]
       }
@@ -25,8 +23,8 @@
   },
   "requirements": [
     [
-      "prereq",
-      "has_0"
+      "got_0",
+      "got_1"
     ]
   ]
 }

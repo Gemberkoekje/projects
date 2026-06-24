@@ -1,32 +1,14 @@
 {
   "criteria": {
-    "prereq": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:forest_skyseed"
-      }
-    },
-    "has_0": {
+    "got_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
           {
             "items": "minecraft:cauldron"
-          },
-          {
-            "items": "minecraft:brown_mushroom"
-          },
-          {
-            "items": "minecraft:oak_planks"
           }
         ]
       }
     }
-  },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  }
 }
