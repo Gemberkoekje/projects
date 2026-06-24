@@ -1,8 +1,9 @@
 # Skyseed — Nether Chapter Plan
 
 The Nether is **built out end to end** as of v0.57.0 — every overworld seed adapts or fizzles, all five Nether
-biomes have a full-size native seed (+ a Large variant), and the first Nether structures (the Fortress + blaze room, the Bastion Remnant, the Piglin Trading Post)
-are in. What's left: the Wither Arena, then the handoff to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
+biomes have a full-size native seed (+ a Large variant), and all four Nether structures (the Fortress + blaze room,
+the Bastion Remnant, the Piglin Trading Post, the Wither Arena) are in — the Nether chapter is **complete**. Next: the
+handoff to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -51,18 +52,14 @@ are in. What's left: the Wither Arena, then the handoff to the End. Per-release 
 
 ---
 
-## Still to build
+## Structure seeds — all shipped
 
-Genuinely new seeds with no overworld parallel, on the existing jigsaw + mob-pack machinery:
+Genuinely new seeds with no overworld parallel, on the jigsaw + mob-pack machinery — all built:
 
-_Shipped: the **Bastion Remnant** (3 weighted variants + the basalt-deltas fizzle, v0.62.0) and the **Piglin Trading
-Post** (v0.63.0) — see the [CHANGELOG](CHANGELOG.md)._
-
-### ☠️ Wither Arena Island
-- Recipe: Obsidian + Nether Brick + Soul Sand — a **blast-resistant** arena so the Wither can't blow you into the
-  void. An enclosed obsidian/nether-brick bowl with a soul-sand floor, a safe ledge, a charged Respawn Anchor.
-- Reward: Nether Star → Beacon (the Nether chapter's capstone). The Wither is craftable mid-Nether (soul sand from
-  Soul islands + skulls from the Fortress); this is the survivable venue to fight it.
+- The **Bastion Remnant** — 3 weighted variants (treasure / bridge / housing) + the basalt-deltas fizzle (v0.62.0).
+- The **Piglin Trading Post** — the Nether's "village", a gold-economy hall of bartering piglins (v0.63.0).
+- The **Wither Arena** — the capstone: a blast-resistant obsidian venue with a charged respawn anchor, for the
+  Nether Star → Beacon (v0.64.0).
 
 ### Then → the End
 Warped Enderman pearls + Fortress blaze rods → Eyes of Ender → the End chapter (already pre-voided, biome source

@@ -185,6 +185,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:wither_arena_skyseed",
+      "text": "The $(item)Wither Arena Skyseed$() — obsidian, nether bricks and soul sand. The Nether's capstone: a blast-resistant obsidian arena with a charged respawn anchor, the safe venue to fight the $(bold)Wither$() for a Nether Star."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

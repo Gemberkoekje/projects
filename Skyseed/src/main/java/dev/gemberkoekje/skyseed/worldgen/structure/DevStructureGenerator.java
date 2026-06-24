@@ -44,6 +44,7 @@ public final class DevStructureGenerator {
             NetherFortressTemplates.generateInto(base.resolve("nether_fortress"));
             BastionTemplates.generateInto(base.resolve("bastion"));
             PiglinTradingPostTemplates.generateInto(base.resolve("piglin_trading_post"));
+            WitherArenaTemplates.generateInto(base.resolve("wither_arena"));
             DesertTempleTemplates.generateInto(base.resolve("desert_temple"));
             JungleTempleTemplates.generateInto(base.resolve("jungle_temple"));
             WitchHutTemplates.generateInto(base.resolve("witch_hut"));

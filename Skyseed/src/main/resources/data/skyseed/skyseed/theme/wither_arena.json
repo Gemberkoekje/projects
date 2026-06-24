@@ -1,0 +1,15 @@
+{
+  "_comment": "Wither Arena Island — the Nether chapter's capstone. A Nether-native blackstone island carrying an enclosed, blast-resistant obsidian arena (skyseed:wither_arena/wither_arena): a soul-sand summoning patch, a sheltered corner with a charged respawn anchor and a bastion_treasure reward chest. The survivable venue to fight the Wither for the Nether Star -> Beacon. No theme mobs — you bring the boss. See SKYNETHERPLAN.",
+  "dimensions": ["minecraft:the_nether"],
+  "shape": { "radius": { "min": 9, "max": 11 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:blackstone", "fill": "minecraft:blackstone", "core": "minecraft:basalt", "fill_depth": 2 },
+  "ores": [
+    { "block": "minecraft:nether_gold_ore", "chance": 0.40, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" }
+  ],
+  "jigsaw": { "pool": "skyseed:wither_arena/wither_arena", "target": "minecraft:bottom", "depth": 1, "pad": 7 },
+  "mobs": [],
+  "variants": [
+    { "weight": 1, "name": "wither_arena", "decoration": {
+      "ground": [ { "block": "minecraft:magma_block", "chance": 0.02 } ] } }
+  ]
+}

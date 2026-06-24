@@ -825,6 +825,36 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void witherArenaIsNetherNativeWithItsJigsaw(GameTestHelper helper) {
+        // Nether-native Wither Arena: the capstone venue. A blackstone island that assembles the hand-built obsidian
+        // arena jigsaw, and (like the other nether structures) grows only in the Nether.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme arena = theme(overworld, "wither_arena");
+        helper.assertTrue(arena.baseValidIn(Level.NETHER.location()), "wither arena must implement the_nether");
+        helper.assertTrue(!arena.baseValidIn(Level.OVERWORLD.location()), "wither arena must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(arena, wastes, 64, Level.NETHER.location()),
+                "wither arena should grow in the Nether");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), arena, wastes,
+                RandomSource.create(13L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the wither arena island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("wither_arena/wither_arena")),
+                "the wither arena should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

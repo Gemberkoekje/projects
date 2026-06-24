@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.64.0] - 2026-06-24
+
+### Added
+- **Wither Arena Island** — the Nether chapter's capstone. A new Nether‑native seed (obsidian + nether bricks + soul
+  sand) that grows a blackstone island carrying an enclosed, blast‑resistant **obsidian arena**: the Wither's skull
+  explosions can't break it or blow you into the void. A soul‑sand summoning patch, glowstone lighting, nether‑brick
+  trim, a narrow entrance the boss can't fit through, and a sheltered corner holding a **charged respawn anchor** (set
+  spawn so a death drops you back here, not home) and a `bastion_treasure` reward chest behind an arrow slit. Bring
+  your own boss — the survivable venue to win the Nether Star → Beacon. **The Nether chapter is complete.**
+
 ## [0.63.0] - 2026-06-24
 
 ### Added
