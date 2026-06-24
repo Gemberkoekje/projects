@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Wither Arena Skyseed$() — obsidian, nether bricks and soul sand. The Nether's capstone: a blast-resistant obsidian arena with a charged respawn anchor, the safe venue to fight the $(bold)Wither$() for a Nether Star."
+      "text": "The $(item)Wither Arena Skyseed$() — obsidian, nether bricks and soul sand. The Nether's capstone: a blast-resistant obsidian arena with a charged respawn anchor, the safe venue to fight the $(bold)Wither$() for a Nether Star.$(br2)$(bold)Where to look$()$(br)Obsidian where water meets lava; nether bricks smelt from netherrack; soul sand from a $(item)Nether Soul$() isle."
     },
     {
       "type": "patchouli:crafting",

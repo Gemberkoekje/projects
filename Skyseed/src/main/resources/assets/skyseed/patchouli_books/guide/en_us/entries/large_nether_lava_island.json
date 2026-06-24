@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Large Nether Lava Skyseed$() — a $(item)Large Aquatic Skyseed$() centred in basalt + lava buckets. A broad lagoon (and a Large lava island topside)."
+      "text": "The $(item)Large Nether Lava Skyseed$() — a $(item)Large Aquatic Skyseed$() centred in basalt + lava buckets. A broad lagoon (and a Large lava island topside).$(br2)$(bold)Where to look$()$(br)Basalt and lava from any Nether isle, or the lava sea below."
     },
     {
       "type": "patchouli:crafting",

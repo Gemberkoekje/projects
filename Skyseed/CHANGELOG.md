@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.1] - 2026-06-24
+
+### Changed
+- **Seed hints now point you toward the rarer materials.** Each seed's hint page gained a "Where to look" line for
+  its non‑obvious ingredients — which island bears them, and any biome or height that matters: gold off a Badlands
+  isle, diamonds from a deep throw, the Nether materials from the foothold the matching overworld seed leaves below.
+  Obvious materials (wood, dirt, cobble) are left unsaid. 30 entries enriched.
+
 ## [0.65.0] - 2026-06-24
 
 ### Changed

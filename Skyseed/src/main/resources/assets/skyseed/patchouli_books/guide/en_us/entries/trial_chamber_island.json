@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Trial Chamber Skyseed$() — $(item)tuff bricks$() and $(item)copper blocks$() around a $(item)diamond$(). A buried copper-and-tuff arena of trial spawners and vaults, guarded by a $(item)Breeze$()."
+      "text": "The $(item)Trial Chamber Skyseed$() — $(item)tuff bricks$() and $(item)copper blocks$() around a $(item)diamond$(). A buried copper-and-tuff arena of trial spawners and vaults, guarded by a $(item)Breeze$().$(br2)$(bold)Where to look$()$(br)Tuff and diamond come from a $(item)Rocky$() or $(item)Ancient$() isle thrown $(bold)deep$(); copper from most Rocky cores."
     },
     {
       "type": "patchouli:crafting",

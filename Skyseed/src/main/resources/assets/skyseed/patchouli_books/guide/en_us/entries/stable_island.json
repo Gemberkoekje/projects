@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Stable Skyseed$() — $(item)Leather$() and a $(item)Gold Ingot$() over two planks. Horses, and a chest that might hold a saddle."
+      "text": "The $(item)Stable Skyseed$() — $(item)Leather$() and a $(item)Gold Ingot$() over two planks. Horses, and a chest that might hold a saddle.$(br2)$(bold)Where to look$()$(br)Leather comes from cows on a grassy isle; gold from a $(item)Badlands$() isle (or any Nether one)."
     },
     {
       "type": "patchouli:crafting",

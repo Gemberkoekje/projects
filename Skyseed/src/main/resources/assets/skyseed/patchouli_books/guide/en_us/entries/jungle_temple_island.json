@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Jungle Temple Skyseed$() — $(item)two mossy cobblestone$() over $(item)jungle planks$() and a $(item)tripwire hook$(). A sealed room with two chests and a dispenser."
+      "text": "The $(item)Jungle Temple Skyseed$() — $(item)two mossy cobblestone$() over $(item)jungle planks$() and a $(item)tripwire hook$(). A sealed room with two chests and a dispenser.$(br2)$(bold)Where to look$()$(br)Jungle wood grows on a $(item)Forest$() seed thrown into a $(bold)jungle$(); moss off an $(item)Ancient$() isle."
     },
     {
       "type": "patchouli:crafting",

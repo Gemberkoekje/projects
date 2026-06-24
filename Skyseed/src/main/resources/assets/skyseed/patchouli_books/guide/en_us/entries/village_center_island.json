@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. All 13 professions and an iron golem — the whole economy in one throw."
+      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. All 13 professions and an iron golem — the whole economy in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds and iron both come off a $(item)Rocky$() isle (throw it $(bold)high$() for emeralds)."
     },
     {
       "type": "patchouli:crafting",

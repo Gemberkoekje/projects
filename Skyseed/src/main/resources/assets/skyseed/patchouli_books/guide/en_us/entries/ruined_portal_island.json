@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Ruined Portal Skyseed$() — $(item)two obsidian$() over two $(item)gold ingots$(). A broken portal with a chest of Nether spoils."
+      "text": "The $(item)Ruined Portal Skyseed$() — $(item)two obsidian$() over two $(item)gold ingots$(). A broken portal with a chest of Nether spoils.$(br2)$(bold)Where to look$()$(br)Gold comes off a $(item)Badlands$() isle; obsidian forms where water floods a lava pool."
     },
     {
       "type": "patchouli:crafting",

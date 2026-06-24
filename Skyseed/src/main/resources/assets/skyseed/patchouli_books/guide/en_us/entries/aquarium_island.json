@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$() and a $(item)Prismarine Shard$() over two sand. A glass tank of turtles, axolotls and fish."
+      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$() and a $(item)Prismarine Shard$() over two sand. A glass tank of turtles, axolotls and fish.$(br2)$(bold)Where to look$()$(br)Turtles hatch on warm $(bold)beaches$() and shed scutes; prismarine is an $(item)Ocean Monument$() spoil."
     },
     {
       "type": "patchouli:crafting",

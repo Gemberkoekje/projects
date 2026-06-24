@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Wool Farm Skyseed$() — $(item)two Wool$() over an iron ingot and dirt. A flock in every colour."
+      "text": "The $(item)Wool Farm Skyseed$() — $(item)two Wool$() over an iron ingot and dirt. A flock in every colour.$(br2)$(bold)Where to look$()$(br)Wool off any sheep; the iron from a $(item)Rocky$() core."
     },
     {
       "type": "patchouli:crafting",

@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$() and planks over two dirt. A fenced field of cows, sheep or pigs."
+      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$() and planks over two dirt. A fenced field of cows, sheep or pigs.$(br2)$(bold)Where to look$()$(br)That first wool or beef is off a sheep or cow — they wander onto grassy isles like $(item)Forest$() and $(item)Meadow$()."
     },
     {
       "type": "patchouli:crafting",

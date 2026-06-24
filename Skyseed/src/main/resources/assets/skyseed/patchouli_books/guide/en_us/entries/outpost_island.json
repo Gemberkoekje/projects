@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Outpost Skyseed$() — $(item)dark oak planks$() around a $(item)crossbow$() and an $(item)iron ingot$(). A pillager watchtower over a caged iron golem, with a loot chest up top."
+      "text": "The $(item)Outpost Skyseed$() — $(item)dark oak planks$() around a $(item)crossbow$() and an $(item)iron ingot$(). A pillager watchtower over a caged iron golem, with a loot chest up top.$(br2)$(bold)Where to look$()$(br)Dark oak grows on a $(item)Forest$() seed thrown over a $(bold)dark forest$(); iron from a $(item)Rocky$() core."
     },
     {
       "type": "patchouli:crafting",

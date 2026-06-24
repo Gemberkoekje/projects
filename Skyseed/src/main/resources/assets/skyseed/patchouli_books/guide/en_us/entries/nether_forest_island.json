@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Forest Skyseed$() — a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome."
+      "text": "The $(item)Nether Forest Skyseed$() — a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome.$(br2)$(bold)Where to look$()$(br)A $(item)Forest$() seed thrown $(bold)in the Nether$() sprouts a small fungal grove — crimson and warped stems, and a shroomlight or two."
     },
     {
       "type": "patchouli:crafting",

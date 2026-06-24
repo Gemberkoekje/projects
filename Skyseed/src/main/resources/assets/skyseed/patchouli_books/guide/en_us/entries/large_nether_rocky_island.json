@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Large Nether Rocky Skyseed$() — a $(item)Large Rocky Skyseed$() centred in netherrack + nether quartz. A broad deep-mining isle."
+      "text": "The $(item)Large Nether Rocky Skyseed$() — a $(item)Large Rocky Skyseed$() centred in netherrack + nether quartz. A broad deep-mining isle.$(br2)$(bold)Where to look$()$(br)Netherrack and quartz from any island grown $(bold)in the Nether$()."
     },
     {
       "type": "patchouli:crafting",

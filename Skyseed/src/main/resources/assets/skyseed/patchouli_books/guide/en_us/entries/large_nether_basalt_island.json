@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Large Nether Basalt Skyseed$() — a $(item)Large Badlands Skyseed$() centred in basalt + gilded blackstone. A vast Basalt Deltas."
+      "text": "The $(item)Large Nether Basalt Skyseed$() — a $(item)Large Badlands Skyseed$() centred in basalt + gilded blackstone. A vast Basalt Deltas.$(br2)$(bold)Where to look$()$(br)Basalt and gilded blackstone from any $(item)Nether Basalt$() isle."
     },
     {
       "type": "patchouli:crafting",

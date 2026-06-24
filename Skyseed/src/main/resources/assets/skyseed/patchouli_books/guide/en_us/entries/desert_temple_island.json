@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Desert Temple Skyseed$() — $(item)sandstone$() and $(item)TNT$() over two $(item)sand$(). Four chests above a buried cache of TNT."
+      "text": "The $(item)Desert Temple Skyseed$() — $(item)sandstone$() and $(item)TNT$() over two $(item)sand$(). Four chests above a buried cache of TNT.$(br2)$(bold)Where to look$()$(br)Sand off any $(item)Desert$() isle; the TNT wants gunpowder, a creeper's parting gift."
     },
     {
       "type": "patchouli:crafting",

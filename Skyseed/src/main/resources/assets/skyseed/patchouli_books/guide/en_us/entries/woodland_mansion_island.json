@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Woodland Mansion Skyseed$() — $(item)dark oak planks$() and $(item)diamonds$() around a $(item)Totem of Undying$(). A two-storey dark-oak manor of vindicators and an evoker."
+      "text": "The $(item)Woodland Mansion Skyseed$() — $(item)dark oak planks$() and $(item)diamonds$() around a $(item)Totem of Undying$(). A two-storey dark-oak manor of vindicators and an evoker.$(br2)$(bold)Where to look$()$(br)Diamonds from a $(bold)deep$() isle; a Totem of Undying is an evoker's drop — bring a raid down on a $(item)Village$()."
     },
     {
       "type": "patchouli:crafting",

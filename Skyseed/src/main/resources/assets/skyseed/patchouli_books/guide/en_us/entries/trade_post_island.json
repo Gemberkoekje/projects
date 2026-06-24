@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A plaza of shops, several trades in one throw."
+      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A plaza of shops, several trades in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds come from a $(item)Rocky$() isle — taller, and thrown higher, gives more."
     },
     {
       "type": "patchouli:crafting",

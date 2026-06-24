@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Soul Skyseed$() — a $(item)Desert Skyseed$(), soul sand and a $(item)bone block$() fossil. A full-size $(bold)Soul Sand Valley$(): soul sand, fossils and soul fire."
+      "text": "The $(item)Nether Soul Skyseed$() — a $(item)Desert Skyseed$(), soul sand and a $(item)bone block$() fossil. A full-size $(bold)Soul Sand Valley$(): soul sand, fossils and soul fire.$(br2)$(bold)Where to look$()$(br)A $(item)Desert$() seed thrown $(bold)in the Nether$() makes a soul-sand foothold — soul sand, and bone fossils to break."
     },
     {
       "type": "patchouli:crafting",

@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Basalt Skyseed$() — a $(item)Badlands Skyseed$(), basalt and a lump of $(item)gilded blackstone$(). A full-size $(bold)Basalt Deltas$(): columns, magma and gold-bearing gilded blackstone."
+      "text": "The $(item)Nether Basalt Skyseed$() — a $(item)Badlands Skyseed$(), basalt and a lump of $(item)gilded blackstone$(). A full-size $(bold)Basalt Deltas$(): columns, magma and gold-bearing gilded blackstone.$(br2)$(bold)Where to look$()$(br)A $(item)Badlands$() seed thrown $(bold)in the Nether$() leaves a basalt foothold — basalt columns and gilded blackstone."
     },
     {
       "type": "patchouli:crafting",

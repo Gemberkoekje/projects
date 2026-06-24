@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Witch Hut Skyseed$() — a $(item)Cauldron$() and a $(item)brown mushroom$() over two $(item)oak planks$(). A witch, a cat, and brewing drops."
+      "text": "The $(item)Witch Hut Skyseed$() — a $(item)Cauldron$() and a $(item)brown mushroom$() over two $(item)oak planks$(). A witch, a cat, and brewing drops.$(br2)$(bold)Where to look$()$(br)Brown mushrooms favour the shade of a $(item)Forest$() (or a $(item)Mushroom$() isle); the cauldron's iron from a $(item)Rocky$() core."
     },
     {
       "type": "patchouli:crafting",

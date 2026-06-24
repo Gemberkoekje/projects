@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Rocky Skyseed$() — a $(item)Rocky Skyseed$() infused with netherrack and nether quartz. The first $(bold)Nether-native$() seed: a full-size mining isle."
+      "text": "The $(item)Nether Rocky Skyseed$() — a $(item)Rocky Skyseed$() infused with netherrack and nether quartz. The first $(bold)Nether-native$() seed: a full-size mining isle.$(br2)$(bold)Where to look$()$(br)A $(item)Rocky$() seed thrown $(bold)in the Nether$() makes a small mining foothold — netherrack, quartz and blackstone to dig."
     },
     {
       "type": "patchouli:crafting",

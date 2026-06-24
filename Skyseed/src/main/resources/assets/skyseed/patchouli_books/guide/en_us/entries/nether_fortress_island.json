@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Fortress Skyseed$() — nether bricks, nether brick fence and a nether wart block. A bridge-and-keep fortress fragment with a caged $(bold)blaze spawner$()."
+      "text": "The $(item)Nether Fortress Skyseed$() — nether bricks, nether brick fence and a nether wart block. A bridge-and-keep fortress fragment with a caged $(bold)blaze spawner$().$(br2)$(bold)Where to look$()$(br)Nether bricks smelt up from netherrack; nether wart you'll first find growing in a Fortress."
     },
     {
       "type": "patchouli:crafting",

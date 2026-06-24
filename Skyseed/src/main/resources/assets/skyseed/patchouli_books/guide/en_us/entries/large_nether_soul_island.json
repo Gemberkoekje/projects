@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Large Nether Soul Skyseed$() — a $(item)Large Desert Skyseed$() centred in soul sand + bone blocks. A sprawling Soul Sand Valley."
+      "text": "The $(item)Large Nether Soul Skyseed$() — a $(item)Large Desert Skyseed$() centred in soul sand + bone blocks. A sprawling Soul Sand Valley.$(br2)$(bold)Where to look$()$(br)Soul sand and bones from any $(item)Nether Soul$() isle."
     },
     {
       "type": "patchouli:crafting",

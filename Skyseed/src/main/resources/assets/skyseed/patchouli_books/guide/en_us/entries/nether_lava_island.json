@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Nether Lava Skyseed$() — an $(item)Aquatic Skyseed$(), basalt and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside."
+      "text": "The $(item)Nether Lava Skyseed$() — an $(item)Aquatic Skyseed$(), basalt and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside.$(br2)$(bold)Where to look$()$(br)An $(item)Aquatic$() seed thrown $(bold)in the Nether$() leaves a lava foothold — basalt, and lava for your bucket."
     },
     {
       "type": "patchouli:crafting",

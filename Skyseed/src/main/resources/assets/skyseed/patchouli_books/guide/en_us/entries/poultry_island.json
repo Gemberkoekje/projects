@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$() and an $(item)Egg$() over two dirt. A walled coop of chickens."
+      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$() and an $(item)Egg$() over two dirt. A walled coop of chickens.$(br2)$(bold)Where to look$()$(br)Chickens roam grassy isles; a feather or a dropped egg is enough to start the coop."
     },
     {
       "type": "patchouli:crafting",

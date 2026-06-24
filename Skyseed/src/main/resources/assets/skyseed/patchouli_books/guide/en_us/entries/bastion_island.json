@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Bastion Remnant Skyseed$() — blackstone, gold and crying obsidian. A blackstone bastion ruin with a $(item)lodestone$() treasure plinth, bastion loot and a $(bold)magma cube spawner$(); piglins included."
+      "text": "The $(item)Bastion Remnant Skyseed$() — blackstone, gold and crying obsidian. A blackstone bastion ruin with a $(item)lodestone$() treasure plinth, bastion loot and a $(bold)magma cube spawner$(); piglins included.$(br2)$(bold)Where to look$()$(br)Blackstone off a Nether-thrown $(item)Rocky$() isle, gold from a $(item)Badlands$() (or nether gold ore), crying obsidian from a $(item)Ruined Portal$()."
     },
     {
       "type": "patchouli:crafting",

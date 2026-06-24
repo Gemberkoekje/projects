@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Piglin Trading Post Skyseed$() — blackstone, gold and netherrack. The Nether's village: a blackstone hall around a $(item)gold$() trade pillar where 3-5 piglins barter. $(bold)Drop them gold$()."
+      "text": "The $(item)Piglin Trading Post Skyseed$() — blackstone, gold and netherrack. The Nether's village: a blackstone hall around a $(item)gold$() trade pillar where 3-5 piglins barter. $(bold)Drop them gold$().$(br2)$(bold)Where to look$()$(br)Blackstone from a Nether-thrown $(item)Rocky$() isle, gold from nether gold ore or a $(item)Badlands$(), netherrack from any Nether foothold."
     },
     {
       "type": "patchouli:crafting",
