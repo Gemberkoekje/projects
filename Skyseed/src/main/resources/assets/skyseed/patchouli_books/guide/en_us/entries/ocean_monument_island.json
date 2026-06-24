@@ -1,6 +1,7 @@
 {
   "name": "Ocean Monument",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_ocean_monument",
   "icon": "minecraft:prismarine",
   "sortnum": 8,
   "pages": [

@@ -1,6 +1,7 @@
 {
   "name": "Large Frozen Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_frozen_large",
   "icon": "minecraft:blue_ice",
   "sortnum": 9,
   "pages": [

@@ -1,6 +1,7 @@
 {
   "name": "Rocky Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_rocky",
   "icon": "minecraft:stone",
   "sortnum": 2,
   "pages": [

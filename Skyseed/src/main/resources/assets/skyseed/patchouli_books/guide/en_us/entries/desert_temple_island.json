@@ -1,6 +1,7 @@
 {
   "name": "Desert Temple Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_desert_temple",
   "icon": "minecraft:tnt",
   "sortnum": 2,
   "pages": [

@@ -1,6 +1,7 @@
 {
   "name": "Large Aquatic Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_aquatic_large",
   "icon": "minecraft:heart_of_the_sea",
   "sortnum": 19,
   "pages": [

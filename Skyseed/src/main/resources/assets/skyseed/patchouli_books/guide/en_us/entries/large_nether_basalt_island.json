@@ -1,6 +1,7 @@
 {
   "name": "Large Nether Basalt Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_basalt_large",
   "icon": "minecraft:gilded_blackstone",
   "sortnum": 9,
   "pages": [

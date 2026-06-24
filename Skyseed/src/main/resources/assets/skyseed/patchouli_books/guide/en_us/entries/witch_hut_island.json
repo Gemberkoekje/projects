@@ -1,6 +1,7 @@
 {
   "name": "Witch Hut Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_witch_hut",
   "icon": "minecraft:cauldron",
   "sortnum": 4,
   "pages": [

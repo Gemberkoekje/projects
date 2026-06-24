@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:dirt"
+          },
+          {
+            "items": "skyseed:meadow_skyseed"
           }
         ]
       }

@@ -1,6 +1,7 @@
 {
   "name": "Large Badlands Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_badlands_large",
   "icon": "minecraft:gold_ore",
   "sortnum": 13,
   "pages": [

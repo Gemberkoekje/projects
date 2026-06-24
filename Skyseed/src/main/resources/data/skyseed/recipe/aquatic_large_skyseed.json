@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "KSK",
-    "SSS",
+    "SGS",
     "KSK"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "S": {
       "item": "minecraft:sand"
+    },
+    "G": {
+      "item": "skyseed:aquatic_skyseed"
     }
   },
   "result": {

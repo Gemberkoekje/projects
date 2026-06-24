@@ -1,6 +1,7 @@
 {
   "name": "Badlands Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_badlands",
   "icon": "minecraft:terracotta",
   "sortnum": 12,
   "pages": [

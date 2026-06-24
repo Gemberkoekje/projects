@@ -1,0 +1,32 @@
+{
+  "criteria": {
+    "prereq": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "skyseed:rocky_skyseed"
+      }
+    },
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "#minecraft:planks"
+          },
+          {
+            "items": "minecraft:cobblestone"
+          },
+          {
+            "items": "minecraft:emerald"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "prereq",
+      "has_0"
+    ]
+  ]
+}

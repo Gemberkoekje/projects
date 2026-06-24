@@ -1,6 +1,7 @@
 {
   "name": "Meadow Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_meadow",
   "icon": "minecraft:poppy",
   "sortnum": 10,
   "pages": [

@@ -7,9 +7,15 @@
     "NSN"
   ],
   "key": {
-    "N": { "item": "minecraft:netherrack" },
-    "S": { "item": "minecraft:quartz" },
-    "R": { "item": "skyseed:rocky_large_skyseed" }
+    "N": {
+      "item": "minecraft:netherrack"
+    },
+    "S": {
+      "item": "minecraft:quartz"
+    },
+    "R": {
+      "item": "skyseed:nether_rocky_skyseed"
+    }
   },
   "result": {
     "id": "skyseed:nether_rocky_large_skyseed"

@@ -1,6 +1,7 @@
 {
   "name": "Pasture Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_pasture",
   "icon": "minecraft:wheat",
   "sortnum": 3,
   "pages": [

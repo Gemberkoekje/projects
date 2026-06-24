@@ -1,6 +1,7 @@
 {
   "name": "Aquarium Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_aquarium",
   "icon": "minecraft:sea_lantern",
   "sortnum": 7,
   "pages": [

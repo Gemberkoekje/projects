@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "TRT",
-    "RRR",
+    "RGR",
     "TRT"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "R": {
       "item": "minecraft:red_sand"
+    },
+    "G": {
+      "item": "skyseed:badlands_skyseed"
     }
   },
   "result": {

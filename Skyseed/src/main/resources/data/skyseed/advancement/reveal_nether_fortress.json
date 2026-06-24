@@ -1,0 +1,32 @@
+{
+  "criteria": {
+    "prereq": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "skyseed:nether_rocky_skyseed"
+      }
+    },
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:nether_brick_fence"
+          },
+          {
+            "items": "minecraft:nether_bricks"
+          },
+          {
+            "items": "minecraft:nether_wart_block"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "prereq",
+      "has_0"
+    ]
+  ]
+}

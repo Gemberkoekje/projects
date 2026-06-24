@@ -1,6 +1,7 @@
 {
   "name": "Large Meadow Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_meadow_large",
   "icon": "minecraft:bee_nest",
   "sortnum": 11,
   "pages": [

@@ -12,6 +12,9 @@
           },
           {
             "items": "minecraft:dirt"
+          },
+          {
+            "items": "skyseed:mushroom_skyseed"
           }
         ]
       }

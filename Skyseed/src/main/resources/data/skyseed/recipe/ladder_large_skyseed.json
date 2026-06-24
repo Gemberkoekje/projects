@@ -3,8 +3,8 @@
   "category": "misc",
   "pattern": [
     "DDD",
-    "CLC",
-    "CCC"
+    "CSC",
+    "CLC"
   ],
   "key": {
     "D": {
@@ -12,6 +12,9 @@
     },
     "C": {
       "item": "minecraft:cobblestone"
+    },
+    "S": {
+      "item": "skyseed:ladder_small_skyseed"
     },
     "L": {
       "item": "minecraft:ladder"

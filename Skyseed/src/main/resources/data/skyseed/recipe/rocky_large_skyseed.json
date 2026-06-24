@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "SCS",
-    "CCC",
+    "CGC",
     "SCS"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "C": {
       "item": "minecraft:cobblestone"
+    },
+    "G": {
+      "item": "skyseed:rocky_skyseed"
     }
   },
   "result": {

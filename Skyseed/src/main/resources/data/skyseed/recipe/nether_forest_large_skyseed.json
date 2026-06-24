@@ -7,9 +7,15 @@
     "NSN"
   ],
   "key": {
-    "N": { "item": "minecraft:crimson_stem" },
-    "S": { "item": "minecraft:shroomlight" },
-    "R": { "item": "skyseed:forest_large_skyseed" }
+    "N": {
+      "item": "minecraft:crimson_stem"
+    },
+    "S": {
+      "item": "minecraft:shroomlight"
+    },
+    "R": {
+      "item": "skyseed:nether_forest_skyseed"
+    }
   },
   "result": {
     "id": "skyseed:nether_forest_large_skyseed"

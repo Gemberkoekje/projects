@@ -1,6 +1,7 @@
 {
   "name": "Lush Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_lush",
   "icon": "minecraft:flowering_azalea",
   "sortnum": 16,
   "pages": [

@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "AMA",
-    "MMM"
+    "MGM"
   ],
   "key": {
     "M": {
@@ -16,7 +16,10 @@
       {
         "item": "minecraft:flowering_azalea"
       }
-    ]
+    ],
+    "G": {
+      "item": "skyseed:lush_skyseed"
+    }
   },
   "result": {
     "id": "skyseed:lush_large_skyseed"

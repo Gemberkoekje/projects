@@ -1103,12 +1103,22 @@ public final class SkyseedGameTests {
                     "seed '" + theme + "' field-notes entry does not carry its crafting recipe");
             helper.assertTrue(resourceExists(gatheredPath(theme)),
                     "seed '" + theme + "' has no gathered-materials advancement (" + gatheredPath(theme) + ")");
+            // Every seed but the Forest root is gated by a reveal advancement (crafted prereq OR held all ingredients).
+            if (theme.equals("forest")) {
+                helper.assertTrue(!resourceExists(revealPath(theme)), "the Forest root must not be reveal-gated");
+            } else {
+                helper.assertTrue(resourceExists(revealPath(theme)),
+                        "seed '" + theme + "' has no reveal advancement (" + revealPath(theme) + ")");
+                helper.assertTrue(entry.contains("reveal_" + theme),
+                        "seed '" + theme + "' entry is not gated by its reveal advancement");
+            }
         }
         for (var e : ModItems.DEBUG_SEEDS.entrySet()) {
             final String theme = e.getKey();
             helper.assertTrue(!craftable.contains(e.getValue().get()), "debug seed '" + theme + "' must not be craftable");
             helper.assertTrue(!resourceExists(entryPath(theme)), "debug seed '" + theme + "' must not have a field-notes entry");
             helper.assertTrue(!resourceExists(gatheredPath(theme)), "debug seed '" + theme + "' must not have a gathered advancement");
+            helper.assertTrue(!resourceExists(revealPath(theme)), "debug seed '" + theme + "' must not have a reveal advancement");
         }
         helper.succeed();
     }
@@ -1177,6 +1187,11 @@ public final class SkyseedGameTests {
     /** Path to a seed's gathered-materials advancement — the Patchouli page gate that reveals its recipe. */
     private static String gatheredPath(String theme) {
         return "/data/skyseed/advancement/gathered_" + theme + ".json";
+    }
+
+    /** Path to a seed's reveal advancement — the gate that unhides its book entry (crafted prereq or held makings). */
+    private static String revealPath(String theme) {
+        return "/data/skyseed/advancement/reveal_" + theme + ".json";
     }
 
     /** The {@code layer0} texture id from a seed's item model, or {@code null}. */

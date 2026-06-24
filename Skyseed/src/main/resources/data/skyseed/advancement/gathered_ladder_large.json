@@ -11,6 +11,9 @@
             "items": "minecraft:cobblestone"
           },
           {
+            "items": "skyseed:ladder_small_skyseed"
+          },
+          {
             "items": "minecraft:ladder"
           }
         ]

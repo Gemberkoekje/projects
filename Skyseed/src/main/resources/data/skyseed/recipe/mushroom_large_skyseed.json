@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "RDB",
-    "DDD",
+    "DGD",
     "BDR"
   ],
   "key": {
@@ -15,6 +15,9 @@
     },
     "D": {
       "item": "minecraft:dirt"
+    },
+    "G": {
+      "item": "skyseed:mushroom_skyseed"
     }
   },
   "result": {

@@ -1,6 +1,7 @@
 {
   "name": "Large Nether Forest Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_forest_large",
   "icon": "minecraft:crimson_fungus",
   "sortnum": 5,
   "pages": [

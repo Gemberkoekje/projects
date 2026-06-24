@@ -7,9 +7,15 @@
     "NSN"
   ],
   "key": {
-    "N": { "item": "minecraft:soul_sand" },
-    "S": { "item": "minecraft:bone_block" },
-    "R": { "item": "skyseed:desert_large_skyseed" }
+    "N": {
+      "item": "minecraft:soul_sand"
+    },
+    "S": {
+      "item": "minecraft:bone_block"
+    },
+    "R": {
+      "item": "skyseed:nether_soul_skyseed"
+    }
   },
   "result": {
     "id": "skyseed:nether_soul_large_skyseed"

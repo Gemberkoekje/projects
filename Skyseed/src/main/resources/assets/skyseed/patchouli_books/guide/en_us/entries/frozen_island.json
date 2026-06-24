@@ -1,6 +1,7 @@
 {
   "name": "Frozen Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_frozen",
   "icon": "minecraft:ice",
   "sortnum": 8,
   "pages": [

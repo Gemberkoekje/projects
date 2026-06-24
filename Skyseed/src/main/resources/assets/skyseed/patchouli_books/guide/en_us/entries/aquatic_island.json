@@ -1,6 +1,7 @@
 {
   "name": "Aquatic Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_aquatic",
   "icon": "minecraft:lily_pad",
   "sortnum": 18,
   "pages": [

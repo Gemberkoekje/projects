@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "ZSZ",
-    "SSS",
+    "SGS",
     "ZSZ"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "S": {
       "item": "minecraft:sand"
+    },
+    "G": {
+      "item": "skyseed:desert_skyseed"
     }
   },
   "result": {

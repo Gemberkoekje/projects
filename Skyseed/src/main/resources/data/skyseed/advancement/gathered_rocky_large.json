@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:cobblestone"
+          },
+          {
+            "items": "skyseed:rocky_skyseed"
           }
         ]
       }

@@ -1,6 +1,7 @@
 {
   "name": "Stable Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_stable",
   "icon": "minecraft:saddle",
   "sortnum": 6,
   "pages": [

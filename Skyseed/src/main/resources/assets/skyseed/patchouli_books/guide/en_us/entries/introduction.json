@@ -19,7 +19,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)How this book works$()$(br)Every seed has a page. It shows $(bold)what to gather$() right away; once you're holding the makings, its $(bold)recipe$() appears; craft it, and its full $(bold)field notes$() unlock.$(br2)A half-filled page is a to-do list — go find what it names."
+      "text": "$(bold)How this book works$()$(br)It unfolds as you play. A seed's page appears once you've crafted the one before it — or already hold everything it needs. The page then shows $(bold)what to gather$(), reveals its $(bold)recipe$() when you're holding the makings, and unlocks its full $(bold)field notes$() the moment you craft it.$(br2)Start with the $(item)Forest Skyseed$() and follow the trail."
     }
   ]
 }

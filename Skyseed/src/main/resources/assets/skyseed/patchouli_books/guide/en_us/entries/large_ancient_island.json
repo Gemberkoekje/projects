@@ -1,6 +1,7 @@
 {
   "name": "Large Ancient Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_ancient_large",
   "icon": "minecraft:budding_amethyst",
   "sortnum": 15,
   "pages": [

@@ -1,6 +1,7 @@
 {
   "name": "Large Ladder Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_ladder_large",
   "icon": "minecraft:ladder",
   "sortnum": 21,
   "pages": [

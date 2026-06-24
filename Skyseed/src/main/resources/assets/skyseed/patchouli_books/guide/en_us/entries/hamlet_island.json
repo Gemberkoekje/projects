@@ -1,6 +1,7 @@
 {
   "name": "Hamlet Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_hamlet",
   "icon": "minecraft:emerald",
   "sortnum": 0,
   "pages": [

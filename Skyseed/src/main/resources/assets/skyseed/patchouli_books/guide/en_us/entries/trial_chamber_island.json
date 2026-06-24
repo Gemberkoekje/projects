@@ -1,6 +1,7 @@
 {
   "name": "Trial Chamber Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_trial_chamber",
   "icon": "minecraft:trial_key",
   "sortnum": 6,
   "pages": [

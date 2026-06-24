@@ -1,6 +1,7 @@
 {
   "name": "Wither Arena Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_wither_arena",
   "icon": "minecraft:nether_star",
   "sortnum": 13,
   "pages": [

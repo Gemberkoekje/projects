@@ -1,6 +1,7 @@
 {
   "name": "Woodland Mansion Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_woodland_mansion",
   "icon": "minecraft:dark_oak_door",
   "sortnum": 7,
   "pages": [

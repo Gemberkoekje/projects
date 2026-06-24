@@ -1,6 +1,7 @@
 {
   "name": "Bastion Remnant Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_bastion",
   "icon": "minecraft:gilded_blackstone",
   "sortnum": 11,
   "pages": [

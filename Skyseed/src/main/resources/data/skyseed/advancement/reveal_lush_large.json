@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "prereq": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "skyseed:lush_skyseed"
+      }
+    }
+  }
+}

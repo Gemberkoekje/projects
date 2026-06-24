@@ -1,6 +1,7 @@
 {
   "name": "Ancient Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_ancient",
   "icon": "minecraft:deepslate",
   "sortnum": 14,
   "pages": [

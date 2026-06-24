@@ -1,6 +1,7 @@
 {
   "name": "Small Ladder Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_ladder_small",
   "icon": "minecraft:ladder",
   "sortnum": 20,
   "pages": [

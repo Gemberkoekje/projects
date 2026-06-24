@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:red_sand"
+          },
+          {
+            "items": "skyseed:badlands_skyseed"
           }
         ]
       }

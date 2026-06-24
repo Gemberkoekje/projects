@@ -7,9 +7,15 @@
     "NSN"
   ],
   "key": {
-    "N": { "item": "minecraft:basalt" },
-    "S": { "item": "minecraft:gilded_blackstone" },
-    "R": { "item": "skyseed:badlands_large_skyseed" }
+    "N": {
+      "item": "minecraft:basalt"
+    },
+    "S": {
+      "item": "minecraft:gilded_blackstone"
+    },
+    "R": {
+      "item": "skyseed:nether_basalt_skyseed"
+    }
   },
   "result": {
     "id": "skyseed:nether_basalt_large_skyseed"

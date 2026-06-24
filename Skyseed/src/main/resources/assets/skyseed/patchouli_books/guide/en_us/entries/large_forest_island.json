@@ -1,6 +1,7 @@
 {
   "name": "Large Forest Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_forest_large",
   "icon": "minecraft:oak_log",
   "sortnum": 1,
   "pages": [

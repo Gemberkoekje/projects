@@ -1,6 +1,7 @@
 {
   "name": "Large Nether Soul Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_soul_large",
   "icon": "minecraft:soul_sand",
   "sortnum": 7,
   "pages": [

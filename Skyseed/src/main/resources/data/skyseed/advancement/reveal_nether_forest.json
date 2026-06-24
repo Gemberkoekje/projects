@@ -1,0 +1,35 @@
+{
+  "criteria": {
+    "prereq": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "skyseed:forest_skyseed"
+      }
+    },
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:crimson_stem"
+          },
+          {
+            "items": "minecraft:warped_stem"
+          },
+          {
+            "items": "skyseed:forest_skyseed"
+          },
+          {
+            "items": "minecraft:shroomlight"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "prereq",
+      "has_0"
+    ]
+  ]
+}

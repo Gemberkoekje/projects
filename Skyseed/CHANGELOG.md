@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.0] - 2026-06-24
+
+### Changed
+- **The Almanac now unfolds as a tech tree.** Each seed's entry is hidden until you reach its tier: crafting its
+  prerequisite reveals it (Forest → Rocky → Ancient, Desert → Badlands, …), with an override so holding all its
+  ingredients at least once reveals it anyway — for a lucky rare‑roll find. **Forest** is the always‑visible root, and
+  the **Nether** chapter stays hidden until you set foot in the Nether.
+- **Large seed recipes now take the small seed in the centre.** Each Large is built from its small (Large Forest = a
+  Forest seed + logs + dirt, etc.; the Nether larges take the small Nether seed rather than the overworld large) — so a
+  Large is both gated behind and crafted from its small.
+
 ## [0.65.6] - 2026-06-24
 
 ### Changed

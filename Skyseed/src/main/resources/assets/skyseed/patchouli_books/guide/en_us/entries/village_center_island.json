@@ -1,6 +1,7 @@
 {
   "name": "Village Center Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_village_center",
   "icon": "minecraft:bell",
   "sortnum": 2,
   "pages": [

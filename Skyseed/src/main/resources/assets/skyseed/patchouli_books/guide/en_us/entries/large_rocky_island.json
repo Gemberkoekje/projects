@@ -1,6 +1,7 @@
 {
   "name": "Large Rocky Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_rocky_large",
   "icon": "minecraft:emerald_ore",
   "sortnum": 3,
   "pages": [

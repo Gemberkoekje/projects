@@ -1,6 +1,7 @@
 {
   "name": "Poultry Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_poultry",
   "icon": "minecraft:egg",
   "sortnum": 4,
   "pages": [

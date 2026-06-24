@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:sand"
+          },
+          {
+            "items": "skyseed:desert_skyseed"
           }
         ]
       }

@@ -1,6 +1,7 @@
 {
   "name": "Nether Rocky Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_rocky",
   "icon": "minecraft:blackstone",
   "sortnum": 0,
   "pages": [

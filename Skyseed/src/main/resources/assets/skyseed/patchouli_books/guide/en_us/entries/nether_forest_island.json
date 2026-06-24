@@ -1,6 +1,7 @@
 {
   "name": "Nether Forest Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_forest",
   "icon": "minecraft:crimson_fungus",
   "sortnum": 4,
   "pages": [

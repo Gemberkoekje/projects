@@ -1,6 +1,7 @@
 {
   "name": "Ruined Portal Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_ruined_portal",
   "icon": "minecraft:crying_obsidian",
   "sortnum": 1,
   "pages": [

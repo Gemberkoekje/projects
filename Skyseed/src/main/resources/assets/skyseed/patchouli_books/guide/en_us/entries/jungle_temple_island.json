@@ -1,6 +1,7 @@
 {
   "name": "Jungle Temple Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_jungle_temple",
   "icon": "minecraft:mossy_cobblestone",
   "sortnum": 3,
   "pages": [

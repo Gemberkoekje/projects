@@ -1,6 +1,7 @@
 {
   "name": "Large Lush Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_lush_large",
   "icon": "minecraft:flowering_azalea",
   "sortnum": 17,
   "pages": [

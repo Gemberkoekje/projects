@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "DCD",
-    "CCC",
+    "CGC",
     "DCD"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "C": {
       "item": "minecraft:cobbled_deepslate"
+    },
+    "G": {
+      "item": "skyseed:ancient_skyseed"
     }
   },
   "result": {

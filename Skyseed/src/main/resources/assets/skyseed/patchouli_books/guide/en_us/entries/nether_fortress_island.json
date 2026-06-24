@@ -1,6 +1,7 @@
 {
   "name": "Nether Fortress Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_fortress",
   "icon": "minecraft:nether_bricks",
   "sortnum": 10,
   "pages": [

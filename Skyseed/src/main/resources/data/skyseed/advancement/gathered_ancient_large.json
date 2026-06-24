@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:cobbled_deepslate"
+          },
+          {
+            "items": "skyseed:ancient_skyseed"
           }
         ]
       }

@@ -9,6 +9,9 @@
           },
           {
             "items": "minecraft:snow_block"
+          },
+          {
+            "items": "skyseed:frozen_skyseed"
           }
         ]
       }

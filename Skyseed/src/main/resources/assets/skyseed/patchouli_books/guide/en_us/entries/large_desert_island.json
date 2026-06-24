@@ -1,6 +1,7 @@
 {
   "name": "Large Desert Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_desert_large",
   "icon": "minecraft:cactus",
   "sortnum": 5,
   "pages": [

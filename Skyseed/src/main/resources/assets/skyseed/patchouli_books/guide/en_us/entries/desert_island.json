@@ -1,6 +1,7 @@
 {
   "name": "Desert Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_desert",
   "icon": "minecraft:sand",
   "sortnum": 4,
   "pages": [

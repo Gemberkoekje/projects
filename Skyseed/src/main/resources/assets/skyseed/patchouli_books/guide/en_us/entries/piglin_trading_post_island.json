@@ -1,6 +1,7 @@
 {
   "name": "Piglin Trading Post Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_piglin_trading_post",
   "icon": "minecraft:gold_block",
   "sortnum": 12,
   "pages": [

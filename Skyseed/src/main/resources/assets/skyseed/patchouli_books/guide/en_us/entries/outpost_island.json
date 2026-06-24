@@ -1,6 +1,7 @@
 {
   "name": "Outpost Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_outpost",
   "icon": "minecraft:crossbow",
   "sortnum": 5,
   "pages": [

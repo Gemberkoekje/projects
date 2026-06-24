@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "LDL",
-    "DDD",
+    "DGD",
     "LDL"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "D": {
       "item": "minecraft:dirt"
+    },
+    "G": {
+      "item": "skyseed:forest_skyseed"
     }
   },
   "result": {

@@ -1,6 +1,7 @@
 {
   "name": "Dungeon Island",
   "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_dungeon",
   "icon": "minecraft:spawner",
   "sortnum": 0,
   "pages": [

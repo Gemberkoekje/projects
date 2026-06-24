@@ -1,6 +1,7 @@
 {
   "name": "Nether Soul Island",
   "category": "skyseed:nether",
+  "advancement": "skyseed:reveal_nether_soul",
   "icon": "minecraft:soul_sand",
   "sortnum": 6,
   "pages": [

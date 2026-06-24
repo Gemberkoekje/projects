@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "PSP",
-    "SSS",
+    "SGS",
     "PSP"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "S": {
       "item": "minecraft:snow_block"
+    },
+    "G": {
+      "item": "skyseed:frozen_skyseed"
     }
   },
   "result": {

@@ -1,6 +1,7 @@
 {
   "name": "Mushroom Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_mushroom",
   "icon": "minecraft:red_mushroom",
   "sortnum": 6,
   "pages": [

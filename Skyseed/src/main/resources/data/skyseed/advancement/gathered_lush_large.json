@@ -12,6 +12,9 @@
           },
           {
             "items": "minecraft:flowering_azalea"
+          },
+          {
+            "items": "skyseed:lush_skyseed"
           }
         ]
       }

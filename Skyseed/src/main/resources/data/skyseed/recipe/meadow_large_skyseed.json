@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "FDF",
-    "DDD",
+    "DGD",
     "FDF"
   ],
   "key": {
@@ -12,6 +12,9 @@
     },
     "D": {
       "item": "minecraft:dirt"
+    },
+    "G": {
+      "item": "skyseed:meadow_skyseed"
     }
   },
   "result": {

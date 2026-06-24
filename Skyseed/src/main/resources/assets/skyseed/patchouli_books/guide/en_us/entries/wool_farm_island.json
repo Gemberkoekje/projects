@@ -1,6 +1,7 @@
 {
   "name": "Wool Farm Island",
   "category": "skyseed:settlements",
+  "advancement": "skyseed:reveal_wool_farm",
   "icon": "minecraft:shears",
   "sortnum": 5,
   "pages": [

@@ -1,6 +1,7 @@
 {
   "name": "Large Mushroom Island",
   "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_mushroom_large",
   "icon": "minecraft:red_mushroom_block",
   "sortnum": 7,
   "pages": [
