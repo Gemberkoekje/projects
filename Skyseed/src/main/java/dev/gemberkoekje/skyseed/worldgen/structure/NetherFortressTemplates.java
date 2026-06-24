@@ -125,7 +125,7 @@ public final class NetherFortressTemplates {
     }
 
     /**
-     * The standalone surprise: a 7×7 nether-brick room — pitched roof, fence-grate windows, a doorway, a caged
+     * The standalone surprise: a 9×9 open-top nether-brick room — fence-grate windows, a doorway, a caged
      * <b>blaze spawner</b> on a plinth, soul-sand/wart braziers and a bridge-loot chest. The 5% rare roll on Large
      * Nether seeds, and the debug seed. The keep's design pulled out of the fortress to stand on its own.
      */
@@ -134,7 +134,7 @@ public final class NetherFortressTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
         final BlockState fence = Blocks.NETHER_BRICK_FENCE.defaultBlockState();
-        final int x0 = 0, x1 = 6, z0 = 0, z1 = 6, wallTop = 4;
+        final int x0 = 0, x1 = 8, z0 = 0, z1 = 8, wallTop = 4, mid = 4;
 
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
@@ -147,33 +147,31 @@ public final class NetherFortressTemplates {
                     if (x != x0 && x != x1 && z != z0 && z != z1) {
                         continue;
                     }
-                    if (x == x1 && z == 3 && (y == 1 || y == 2)) {
+                    if (x == x1 && z == mid && (y == 1 || y == 2)) {
                         continue; // doorway
                     }
                     m.put(new BlockPos(x, y, z), nb);
                 }
             }
         }
-        for (int[] w : new int[][] { {2, z0}, {4, z0}, {2, z1}, {4, z1}, {x0, 2}, {x0, 4} }) {
+        for (int[] w : new int[][] { {2, z0}, {6, z0}, {2, z1}, {6, z1}, {x0, 2}, {x0, 6}, {x1, 2}, {x1, 6} }) {
             m.put(new BlockPos(w[0], 3, w[1]), fence); // fence-grate windows
         }
         // Caged blaze spawner on a plinth, dead centre.
-        m.put(new BlockPos(3, 1, 3), nb);
-        m.put(new BlockPos(3, 2, 3), Blocks.SPAWNER.defaultBlockState());
-        bes.put(new BlockPos(3, 2, 3), StructureParts.mobSpawner("minecraft:blaze"));
+        m.put(new BlockPos(mid, 1, mid), nb);
+        m.put(new BlockPos(mid, 2, mid), Blocks.SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(mid, 2, mid), StructureParts.mobSpawner("minecraft:blaze"));
         // Soul-sand braziers with grown wart in two corners.
-        for (int[] c : new int[][] { {1, 1}, {5, 5} }) {
+        for (int[] c : new int[][] { {1, 1}, {7, 7} }) {
             m.put(new BlockPos(c[0], 1, c[1]), Blocks.SOUL_SAND.defaultBlockState());
             m.put(new BlockPos(c[0], 2, c[1]), grownWart());
         }
         // A bridge-loot chest in a corner.
-        m.put(new BlockPos(5, 1, 1), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
-        bes.put(new BlockPos(5, 1, 1), StructureParts.lootChest("minecraft:chests/nether_bridge"));
+        m.put(new BlockPos(7, 1, 1), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
+        bes.put(new BlockPos(7, 1, 1), StructureParts.lootChest("minecraft:chests/nether_bridge"));
 
-        StructureParts.gableRoof(m, x0, x1, z0, z1, wallTop + 1, nb,
-                Blocks.NETHER_BRICK_STAIRS, Blocks.NETHER_BRICK_SLAB, 0);
         StructureParts.linkFences(m);
-        StructureParts.anchor(m, bes, new BlockPos(3, 0, 3), "minecraft:nether_bricks");
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:nether_bricks");
         return new Built(m, bes);
     }
 

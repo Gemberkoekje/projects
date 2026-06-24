@@ -1,0 +1,23 @@
+{
+  "_comment": "Large Ladder Island — a bigger sibling of the Small Ladder Island, punching its shaft ~30 blocks down (vs 20). Biome/dimension-aware, grows in every dimension; 5% waterfall easter egg. See ShaftPlanner.",
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [],
+  "ladder_shaft": { "depth": 30, "landing_radius": 2, "waterfall_chance": 0.05 },
+  "biome_overrides": [
+    { "_comment": "Nether: a small netherrack foothold; the shaft still drops you toward the lava-sea mining level. Listed first so it wins in the Nether.",
+      "dimension": "minecraft:the_nether",
+      "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.25, "top_dome": { "min": 1, "max": 2 } } },
+    { "_comment": "End: a small end-stone foothold.",
+      "dimension": "minecraft:the_end",
+      "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.25, "top_dome": { "min": 1, "max": 2 } } },
+    { "_comment": "Biome-aware overworld surfaces.",
+      "biomes": [ "minecraft:desert" ],
+      "surface": "minecraft:sand", "fill": "minecraft:sand", "core": "minecraft:sandstone" },
+    { "biomes": [ "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands" ],
+      "surface": "minecraft:red_sand", "fill": "minecraft:red_sand", "core": "minecraft:red_sandstone" },
+    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:snowy_beach" ],
+      "surface": "minecraft:snow_block", "fill": "minecraft:dirt", "core": "minecraft:stone" }
+  ]
+}

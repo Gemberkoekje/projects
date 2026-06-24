@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.59.0] - 2026-06-24
+
+### Added
+- **Large Ladder Island.** A bigger sibling of the Ladder Island, punching its shaft a full **30 blocks** down (up
+  from 20) to the cobblestone landing — for when mining level is a long way below. A slightly larger island, same
+  biome/dimension-aware body and 5% waterfall easter egg. Crafted **3×3** (a row of dirt over a ladder ringed by
+  cobblestone). Guarded by the `largeLadderIslandPunchesDeeper` gametest.
+
+### Changed
+- **The standalone blaze spawner room is roomier.** Widened from 7×7 to **9×9** and the pitched roof removed — it was
+  cramped to fight a blaze in — leaving an open-top arena.
+- **The Ladder Island guide entry and recipe note no longer mention the waterfall**, so the 5% surprise stays a
+  surprise.
+
 ## [0.58.0] - 2026-06-24
 
 ### Added

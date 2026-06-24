@@ -1419,6 +1419,25 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void largeLadderIslandPunchesDeeper(GameTestHelper helper) {
+        // The Large Ladder Island drops further — its cobblestone landing hangs ~30 blocks below the island (vs ~20
+        // for the small one). The landing depth is the same whether it comes up as ladders or a waterfall.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 50, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "ladder_large"),
+                level.getBiome(center), RandomSource.create(7L));
+        int lowestCobbleY = Integer.MAX_VALUE;
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.COBBLESTONE)) {
+                lowestCobbleY = Math.min(lowestCobbleY, bp.pos().getY());
+            }
+        }
+        helper.assertTrue(lowestCobbleY != Integer.MAX_VALUE && center.getY() - lowestCobbleY > 27,
+                "the large ladder landing should hang ~30 below the island, dY=" + (center.getY() - lowestCobbleY));
+        helper.succeed();
+    }
+
     @GameTest(template = REGION, timeoutTicks = 200)
     public static void preciseSeedGerminatesAtTarget(GameTestHelper helper) {
         // A Precise throw germinates at its chosen target, not where the seed sits.

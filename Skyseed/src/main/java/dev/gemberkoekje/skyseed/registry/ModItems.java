@@ -30,7 +30,7 @@ public final class ModItems {
             "mushroom", "mushroom_large", "frozen", "frozen_large", "meadow", "meadow_large",
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
             "aquatic", "aquatic_large",
-            "ladder_small",
+            "ladder_small", "ladder_large",
             "nether_rocky", "nether_rocky_large", "nether_lava", "nether_lava_large", "nether_forest", "nether_forest_large",
             "nether_soul", "nether_soul_large", "nether_basalt", "nether_basalt_large", "nether_fortress",
             "hamlet", "trade_post", "village_center",

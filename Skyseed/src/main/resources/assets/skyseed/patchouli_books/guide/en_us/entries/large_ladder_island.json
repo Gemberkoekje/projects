@@ -1,0 +1,16 @@
+{
+  "name": "Large Ladder Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:ladder",
+  "advancement": "skyseed:craft_ladder_large",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The big sibling of the Small Ladder Island. A slightly larger island with a deeper shaft — its $(item)ladder$() drops a full $(bold)30 blocks$() to the cobblestone landing, for when mining level is a long way down."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Like the small one, it takes the look of wherever it lands — grass, sand, snow — and grows in every dimension (netherrack in the Nether, end stone in the End)."
+    }
+  ]
+}
