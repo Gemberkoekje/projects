@@ -1,16 +1,28 @@
 {
   "name": "Wool Farm Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:shears",
-  "advancement": "skyseed:craft_wool_farm",
+  "sortnum": 5,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A roomy hillside pen with a small flock of $(bold)sheep in assorted wool colours$() — renewable wool of every shade without hunting down dyes. The grass regrows as they graze, so shearing is endless."
+      "text": "The $(item)Wool Farm Skyseed$() — $(item)two Wool$() over an iron ingot and dirt. A flock in every colour."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:wool_farm_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_wool_farm"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Wool, in colour$()$(br)Made from $(item)2 Wool$() and an $(item)Iron Ingot$() (for shears — mine a Rocky island) plus dirt. Breed the colours you want; the colours you got are the luck of the throw, with a rare chance of the elusive pink sheep."
+      "text": "A roomy hillside pen with a small flock of $(bold)sheep in assorted wool colours$() — renewable wool of every shade without hunting down dyes. The grass regrows as they graze, so shearing is endless.",
+      "advancement": "skyseed:craft_wool_farm"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Wool, in colour$()$(br)Made from $(item)2 Wool$() and an $(item)Iron Ingot$() (for shears — mine a Rocky island) plus dirt. Breed the colours you want; the colours you got are the luck of the throw, with a rare chance of the elusive pink sheep.",
+      "advancement": "skyseed:craft_wool_farm"
     }
   ]
 }

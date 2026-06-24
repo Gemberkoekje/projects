@@ -1,20 +1,33 @@
 {
   "name": "Nether Rocky Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:blackstone",
-  "advancement": "skyseed:craft_nether_rocky",
+  "sortnum": 0,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The first $(bold)Nether-native$() Skyseed — and the first to grow a $(bold)full-size$() island down here, not the tiny foothold an overworld seed makes in the Nether. A netherrack isle over a $(item)blackstone$() core, built for one thing: mining."
+      "text": "The $(item)Nether Rocky Skyseed$() — a $(item)Rocky Skyseed$() infused with netherrack and nether quartz. The first $(bold)Nether-native$() seed: a full-size mining isle."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_rocky_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_rocky"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Ores$()$(br)$(item)Nether quartz$() and $(item)nether gold$() turn up on nearly every isle, in generous veins, with $(item)gilded blackstone$() and the odd $(item)ancient debris$() for the patient. $(bold)Throw it low$(), near the lava sea, and the deepest isles run richest — the best debris haul is down there."
+      "text": "The first $(bold)Nether-native$() Skyseed — and the first to grow a $(bold)full-size$() island down here, not the tiny foothold an overworld seed makes in the Nether. A netherrack isle over a $(item)blackstone$() core, built for one thing: mining.",
+      "advancement": "skyseed:craft_nether_rocky"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Worth the trip$()$(br)Crafted from a $(item)Rocky Skyseed$() infused with $(item)netherrack$() and nether $(item)quartz$(). A deliberate step up: commit to the Nether, and it pays you back in full-size islands."
+      "text": "$(bold)Ores$()$(br)$(item)Nether quartz$() and $(item)nether gold$() turn up on nearly every isle, in generous veins, with $(item)gilded blackstone$() and the odd $(item)ancient debris$() for the patient. $(bold)Throw it low$(), near the lava sea, and the deepest isles run richest — the best debris haul is down there.",
+      "advancement": "skyseed:craft_nether_rocky"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Worth the trip$()$(br)Crafted from a $(item)Rocky Skyseed$() infused with $(item)netherrack$() and nether $(item)quartz$(). A deliberate step up: commit to the Nether, and it pays you back in full-size islands.",
+      "advancement": "skyseed:craft_nether_rocky"
     }
   ]
 }

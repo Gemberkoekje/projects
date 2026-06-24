@@ -1,20 +1,33 @@
 {
   "name": "Desert Temple Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:tnt",
-  "advancement": "skyseed:craft_desert_temple",
+  "sortnum": 2,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A sealed sandstone chamber with four treasure chests — and a hidden 3×3 cache of $(item)TNT$() buried in the floor beneath them. Break in from above and loot the chests; mine the TNT out from the side if you want it."
+      "text": "The $(item)Desert Temple Skyseed$() — $(item)sandstone$() and $(item)TNT$() over two $(item)sand$(). Four chests above a buried cache of TNT."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_temple_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_desert_temple"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The haul$()$(br)Vanilla desert-pyramid loot: diamonds, gold, emerald, enchanted books, a golden apple — plus nine TNT for the taking. Keep open flame well away from that floor."
+      "text": "A sealed sandstone chamber with four treasure chests — and a hidden 3×3 cache of $(item)TNT$() buried in the floor beneath them. Break in from above and loot the chests; mine the TNT out from the side if you want it.",
+      "advancement": "skyseed:craft_desert_temple"
     },
     {
       "type": "patchouli:text",
-      "text": "Crafted from $(item)sand$(), $(item)sandstone$() and $(item)TNT$() — the TNT a fair warning of what's inside."
+      "text": "$(bold)The haul$()$(br)Vanilla desert-pyramid loot: diamonds, gold, emerald, enchanted books, a golden apple — plus nine TNT for the taking. Keep open flame well away from that floor.",
+      "advancement": "skyseed:craft_desert_temple"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Crafted from $(item)sand$(), $(item)sandstone$() and $(item)TNT$() — the TNT a fair warning of what's inside.",
+      "advancement": "skyseed:craft_desert_temple"
     }
   ]
 }

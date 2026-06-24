@@ -1,24 +1,38 @@
 {
   "name": "Outpost Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:crossbow",
-  "advancement": "skyseed:craft_outpost",
+  "sortnum": 5,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A wide $(o)pillager watchtower$() of cobblestone and dark oak, ringed by a small camp — tents, an archery target, a campfire and a banner. Walk in through the arched base, past the caged golem, and climb the corner ladder."
+      "text": "The $(item)Outpost Skyseed$() — $(item)dark oak planks$() around a $(item)crossbow$() and an $(item)iron ingot$(). A pillager watchtower over a caged iron golem, with a loot chest up top."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:outpost_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_outpost"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The pillager room$()$(br)The middle floor is an $(o)enclosed room$() with the $(item)pillager spawner$() and a loot chest — sealed so the pillagers fight you as you climb instead of tumbling off the island. Above it, an open watch platform sits under a pitched roof."
+      "text": "A wide $(o)pillager watchtower$() of cobblestone and dark oak, ringed by a small camp — tents, an archery target, a campfire and a banner. Walk in through the arched base, past the caged golem, and climb the corner ladder.",
+      "advancement": "skyseed:craft_outpost"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The caged golem$()$(br)An $(item)iron golem$() is penned behind dark-oak fences in the centre of the base. Break the cage and it joins the fight, turning on the pillagers — well worth the few seconds it takes."
+      "text": "$(bold)The pillager room$()$(br)The middle floor is an $(o)enclosed room$() with the $(item)pillager spawner$() and a loot chest — sealed so the pillagers fight you as you climb instead of tumbling off the island. Above it, an open watch platform sits under a pitched roof.",
+      "advancement": "skyseed:craft_outpost"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Loot$()$(br)The chest holds the vanilla outpost haul: a $(item)crossbow$(), tripwire hooks, dark oak, iron, an enchanted book, and $(item)ominous bottles$(). Raids are disabled up here, so treat ominous bottles as collectors' loot. Crafted from $(item)dark oak planks$(), a $(item)crossbow$() and an $(item)iron ingot$()."
+      "text": "$(bold)The caged golem$()$(br)An $(item)iron golem$() is penned behind dark-oak fences in the centre of the base. Break the cage and it joins the fight, turning on the pillagers — well worth the few seconds it takes.",
+      "advancement": "skyseed:craft_outpost"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Loot$()$(br)The chest holds the vanilla outpost haul: a $(item)crossbow$(), tripwire hooks, dark oak, iron, an enchanted book, and $(item)ominous bottles$(). Raids are disabled up here, so treat ominous bottles as collectors' loot. Crafted from $(item)dark oak planks$(), a $(item)crossbow$() and an $(item)iron ingot$().",
+      "advancement": "skyseed:craft_outpost"
     }
   ]
 }

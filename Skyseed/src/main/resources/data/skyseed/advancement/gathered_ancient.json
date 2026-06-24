@@ -1,0 +1,17 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:deepslate"
+          },
+          {
+            "items": "minecraft:cobbled_deepslate"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,10 +1,28 @@
 {
   "name": "Large Nether Soul Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:soul_sand",
-  "advancement": "skyseed:craft_nether_soul_large",
+  "sortnum": 7,
   "pages": [
-    { "type": "patchouli:text", "text": "A sprawling $(bold)Soul Sand Valley$() — soul sand and soul soil riddled with $(item)bone$() fossils, lit by soul fire, haunted by Skeletons." },
-    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Desert Skyseed$() in the centre of a 3x3 of $(item)soul sand$() and $(item)bone blocks$()." }
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Large Nether Soul Skyseed$() — a $(item)Large Desert Skyseed$() centred in soul sand + bone blocks. A sprawling Soul Sand Valley."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_soul_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_soul_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "A sprawling $(bold)Soul Sand Valley$() — soul sand and soul soil riddled with $(item)bone$() fossils, lit by soul fire, haunted by Skeletons.",
+      "advancement": "skyseed:craft_nether_soul_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Large Desert Skyseed$() in the centre of a 3x3 of $(item)soul sand$() and $(item)bone blocks$().",
+      "advancement": "skyseed:craft_nether_soul_large"
+    }
   ]
 }

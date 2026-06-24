@@ -1,16 +1,28 @@
 {
   "name": "Meadow Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:poppy",
-  "advancement": "skyseed:craft_meadow",
+  "sortnum": 10,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The flower isle — grass smothered in blooms. Wildflower, tulip, cornflower, and cherry-blossom looks, every dye-flower among them."
+      "text": "The $(item)Meadow Skyseed$() — dirt and any flower. Pick flowers off a $(bold)Forest or flower-forest$() island."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:meadow_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_meadow"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Bees$()$(br)Wildflower meadows sometimes carry a $(item)bee nest$() — the start of honey, wax, and honeycomb."
+      "text": "The flower isle — grass smothered in blooms. Wildflower, tulip, cornflower, and cherry-blossom looks, every dye-flower among them.",
+      "advancement": "skyseed:craft_meadow"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Bees$()$(br)Wildflower meadows sometimes carry a $(item)bee nest$() — the start of honey, wax, and honeycomb.",
+      "advancement": "skyseed:craft_meadow"
     }
   ]
 }

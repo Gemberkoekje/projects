@@ -1,20 +1,33 @@
 {
   "name": "Large Ancient Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:budding_amethyst",
-  "advancement": "skyseed:craft_ancient_large",
+  "sortnum": 15,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A massive slab of the deep — moss over tuff and deepslate, with a far larger core than the standard Ancient isle and proportionally more to mine."
+      "text": "The $(item)Large Ancient Skyseed$() — deepslate from a deep Rocky throw. A huge slab of the deep — diamonds and geodes."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ancient_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_ancient_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The deep payoff$()$(br)The full deepslate ore suite in quantity — $(item)iron$(), $(item)copper$(), coal and redstone in big veins, diamond and emerald in the deep core — plus larger amethyst geodes and dripstone clusters."
+      "text": "A massive slab of the deep — moss over tuff and deepslate, with a far larger core than the standard Ancient isle and proportionally more to mine.",
+      "advancement": "skyseed:craft_ancient_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Throw deep$()$(br)Germinated low it skews toward diamond and emerald; the deep-dark variant brings sculk. Lantern up before it gets loud."
+      "text": "$(bold)The deep payoff$()$(br)The full deepslate ore suite in quantity — $(item)iron$(), $(item)copper$(), coal and redstone in big veins, diamond and emerald in the deep core — plus larger amethyst geodes and dripstone clusters.",
+      "advancement": "skyseed:craft_ancient_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Throw deep$()$(br)Germinated low it skews toward diamond and emerald; the deep-dark variant brings sculk. Lantern up before it gets loud.",
+      "advancement": "skyseed:craft_ancient_large"
     }
   ]
 }

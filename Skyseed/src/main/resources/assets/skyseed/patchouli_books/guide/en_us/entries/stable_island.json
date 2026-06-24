@@ -1,16 +1,28 @@
 {
   "name": "Stable Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:saddle",
-  "advancement": "skyseed:craft_stable",
+  "sortnum": 6,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A roofed three-stall stable with $(bold)horses$(), $(bold)donkeys$(), or — rarely — a $(bold)mule$() inside. A source of leather, and mounts for crossing between your larger islands."
+      "text": "The $(item)Stable Skyseed$() — $(item)Leather$() and a $(item)Gold Ingot$() over two planks. Horses, and a chest that might hold a saddle."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:stable_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_stable"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Check the chest$()$(br)There's a chest in the stable with a chance of a $(item)Saddle$() or $(item)Horse Armor$() — neither of which you can craft, so this is the main reason to make one. Made from $(item)Leather$(), a $(item)Gold Ingot$() and planks."
+      "text": "A roofed three-stall stable with $(bold)horses$(), $(bold)donkeys$(), or — rarely — a $(bold)mule$() inside. A source of leather, and mounts for crossing between your larger islands.",
+      "advancement": "skyseed:craft_stable"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Check the chest$()$(br)There's a chest in the stable with a chance of a $(item)Saddle$() or $(item)Horse Armor$() — neither of which you can craft, so this is the main reason to make one. Made from $(item)Leather$(), a $(item)Gold Ingot$() and planks.",
+      "advancement": "skyseed:craft_stable"
     }
   ]
 }

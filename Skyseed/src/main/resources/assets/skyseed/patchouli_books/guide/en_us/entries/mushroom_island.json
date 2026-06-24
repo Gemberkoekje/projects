@@ -1,16 +1,28 @@
 {
   "name": "Mushroom Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:red_mushroom",
-  "advancement": "skyseed:craft_mushroom",
+  "sortnum": 6,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A mycelium isle crowned with huge mushrooms. Unlike on dirt, mushrooms stay put and spread on mycelium in any light, so it makes a tidy fungus farm. (It takes the biome it lands in, though — so it isn't mob-proof unless grown over mushroom fields.)"
+      "text": "The $(item)Mushroom Skyseed$() — dirt and both mushrooms. They sprout on a $(bold)Forest island's$() shady dark-oak or spruce floor."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:mushroom_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_mushroom"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Fungus$()$(br)Red and brown $(item)huge mushrooms$() give mushroom blocks and stems; small mushrooms dot the floor. Roll a red, brown, or mixed isle."
+      "text": "A mycelium isle crowned with huge mushrooms. Unlike on dirt, mushrooms stay put and spread on mycelium in any light, so it makes a tidy fungus farm. (It takes the biome it lands in, though — so it isn't mob-proof unless grown over mushroom fields.)",
+      "advancement": "skyseed:craft_mushroom"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Fungus$()$(br)Red and brown $(item)huge mushrooms$() give mushroom blocks and stems; small mushrooms dot the floor. Roll a red, brown, or mixed isle.",
+      "advancement": "skyseed:craft_mushroom"
     }
   ]
 }

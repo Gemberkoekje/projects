@@ -1,20 +1,33 @@
 {
   "name": "Frozen Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:ice",
-  "advancement": "skyseed:craft_frozen",
+  "sortnum": 8,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A snow-and-ice isle. Snowy, glacier, and deep-freeze looks; spruce trees on the snowy kind. Mind the hidden $(item)powder snow$() pockets."
+      "text": "The $(item)Frozen Skyseed$() — snow and ice. Gather them off a $(bold)snowy island$() — or a Rocky island's snow-capped peak (thrown high or over cold)."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:frozen_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_frozen"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Cold goods$()$(br)$(item)Packed ice$() runs through the core, with rare $(item)blue ice$() deep down. A little iron and coal too."
+      "text": "A snow-and-ice isle. Snowy, glacier, and deep-freeze looks; spruce trees on the snowy kind. Mind the hidden $(item)powder snow$() pockets.",
+      "advancement": "skyseed:craft_frozen"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A sealed dome$()$(br)Once in a rare while a Frozen isle grows an $(o)igloo$() — a dark snow hut. Dig in for a chest with a $(item)golden apple$()... and the trapped $(o)zombie villager$() you can cure with it."
+      "text": "$(bold)Cold goods$()$(br)$(item)Packed ice$() runs through the core, with rare $(item)blue ice$() deep down. A little iron and coal too.",
+      "advancement": "skyseed:craft_frozen"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A sealed dome$()$(br)Once in a rare while a Frozen isle grows an $(o)igloo$() — a dark snow hut. Dig in for a chest with a $(item)golden apple$()... and the trapped $(o)zombie villager$() you can cure with it.",
+      "advancement": "skyseed:craft_frozen"
     }
   ]
 }

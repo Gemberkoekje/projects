@@ -1,16 +1,28 @@
 {
   "name": "Witch Hut Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:cauldron",
-  "advancement": "skyseed:craft_witch_hut",
+  "sortnum": 4,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A little spruce hut on a muddy island, home to a $(item)witch$() and a stray $(item)cat$(). No chest here — the witch is the reward, dropping brewing ingredients when killed."
+      "text": "The $(item)Witch Hut Skyseed$() — a $(item)Cauldron$() and a $(item)brown mushroom$() over two $(item)oak planks$(). A witch, a cat, and brewing drops."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:witch_hut_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_witch_hut"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A brewer's bounty$()$(br)Witch drops — redstone, glowstone dust, spider eye, sugar, sticks, glass bottles, gunpowder — are exactly the mid-game brewing kit. The cat scares off creepers and phantoms, and tames with raw fish. Crafted from $(item)oak planks$(), a $(item)brown mushroom$() and a $(item)cauldron$()."
+      "text": "A little spruce hut on a muddy island, home to a $(item)witch$() and a stray $(item)cat$(). No chest here — the witch is the reward, dropping brewing ingredients when killed.",
+      "advancement": "skyseed:craft_witch_hut"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A brewer's bounty$()$(br)Witch drops — redstone, glowstone dust, spider eye, sugar, sticks, glass bottles, gunpowder — are exactly the mid-game brewing kit. The cat scares off creepers and phantoms, and tames with raw fish. Crafted from $(item)oak planks$(), a $(item)brown mushroom$() and a $(item)cauldron$().",
+      "advancement": "skyseed:craft_witch_hut"
     }
   ]
 }

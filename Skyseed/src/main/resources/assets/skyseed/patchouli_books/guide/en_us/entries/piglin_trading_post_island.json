@@ -1,16 +1,28 @@
 {
   "name": "Piglin Trading Post Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:gold_block",
-  "advancement": "skyseed:craft_piglin_trading_post",
+  "sortnum": 12,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The Nether's $(bold)trading post$() — a blackstone hall set adrift: an open colonnade around a $(item)gold$() trade pillar, lit by hanging lanterns, with $(item)gilded blackstone$() and two loot chests. Three to five $(bold)piglins$() keep it."
+      "text": "The $(item)Piglin Trading Post Skyseed$() — blackstone, gold and netherrack. The Nether's village: a blackstone hall around a $(item)gold$() trade pillar where 3-5 piglins barter. $(bold)Drop them gold$()."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:piglin_trading_post_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_piglin_trading_post"
     },
     {
       "type": "patchouli:text",
-      "text": "Wear gold and they stay neutral; $(bold)drop a gold ingot$() near one and it barters. The gold-economy hub. Nether-native, and best thrown there — though a topside throw won't go entirely to waste… Crafted from blackstone, gold and $(item)netherrack$()."
+      "text": "The Nether's $(bold)trading post$() — a blackstone hall set adrift: an open colonnade around a $(item)gold$() trade pillar, lit by hanging lanterns, with $(item)gilded blackstone$() and two loot chests. Three to five $(bold)piglins$() keep it.",
+      "advancement": "skyseed:craft_piglin_trading_post"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Wear gold and they stay neutral; $(bold)drop a gold ingot$() near one and it barters. The gold-economy hub. Nether-native, and best thrown there — though a topside throw won't go entirely to waste… Crafted from blackstone, gold and $(item)netherrack$().",
+      "advancement": "skyseed:craft_piglin_trading_post"
     }
   ]
 }

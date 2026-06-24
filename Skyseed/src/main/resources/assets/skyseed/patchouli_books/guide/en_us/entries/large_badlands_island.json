@@ -1,16 +1,28 @@
 {
   "name": "Large Badlands Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:gold_ore",
-  "advancement": "skyseed:craft_badlands_large",
+  "sortnum": 13,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A towering mesa — a tall, eroded butte of banded terracotta rising high above its rim, with thick strata you can read down the cliff face."
+      "text": "The $(item)Large Badlands Skyseed$() — red sand and terracotta. A towering, banded mesa rich in gold."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:badlands_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_badlands_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Gold country$()$(br)Badlands are the richest surface gold in the game, and this mesa carries it in quantity. Mesa, eroded, and wooded variants change the cap."
+      "text": "A towering mesa — a tall, eroded butte of banded terracotta rising high above its rim, with thick strata you can read down the cliff face.",
+      "advancement": "skyseed:craft_badlands_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Gold country$()$(br)Badlands are the richest surface gold in the game, and this mesa carries it in quantity. Mesa, eroded, and wooded variants change the cap.",
+      "advancement": "skyseed:craft_badlands_large"
     }
   ]
 }

@@ -1065,28 +1065,28 @@ public final class SkyseedGameTests {
     @GameTest(template = REGION)
     public static void everySeedRecipeAndBookEntryMatchesSeedKind(GameTestHelper helper) {
         // Auto-discovered from the registry maps, so a new seed is covered with no test edit. A regular seed must be
-        // craftable, listed in the recipe almanac, and have a field-notes entry; a debug seed must have none of those.
+        // craftable, have a field-notes entry that carries its recipe, and a `gathered_<seed>` advancement (the page
+        // gate that reveals the recipe once the player holds the makings); a debug seed must have none of those.
         final ServerLevel level = helper.getLevel();
         final java.util.Set<Item> craftable = new java.util.HashSet<>();
         for (var r : level.getRecipeManager().getRecipes()) {
             craftable.add(r.value().getResultItem(level.registryAccess()).getItem());
         }
-        final String almanac = readResource("/assets/skyseed/patchouli_books/guide/en_us/entries/recipes.json");
-        helper.assertTrue(almanac != null, "could not read the recipe almanac (recipes.json) from the classpath");
-
         for (var e : ModItems.SEEDS.entrySet()) {
             final String theme = e.getKey();
-            final String id = e.getValue().getId().toString();
             helper.assertTrue(craftable.contains(e.getValue().get()), "seed '" + theme + "' has no crafting recipe");
-            helper.assertTrue(almanac.contains(id), "seed '" + theme + "' is missing from the recipe almanac (recipes.json)");
-            helper.assertTrue(resourceExists(entryPath(theme)), "seed '" + theme + "' has no field-notes entry (" + entryPath(theme) + ")");
+            final String entry = readResource(entryPath(theme));
+            helper.assertTrue(entry != null, "seed '" + theme + "' has no field-notes entry (" + entryPath(theme) + ")");
+            helper.assertTrue(entry.contains(theme + "_skyseed"),
+                    "seed '" + theme + "' field-notes entry does not carry its crafting recipe");
+            helper.assertTrue(resourceExists(gatheredPath(theme)),
+                    "seed '" + theme + "' has no gathered-materials advancement (" + gatheredPath(theme) + ")");
         }
         for (var e : ModItems.DEBUG_SEEDS.entrySet()) {
             final String theme = e.getKey();
-            final String id = e.getValue().getId().toString();
             helper.assertTrue(!craftable.contains(e.getValue().get()), "debug seed '" + theme + "' must not be craftable");
-            helper.assertTrue(!almanac.contains(id), "debug seed '" + theme + "' must not be in the recipe almanac");
             helper.assertTrue(!resourceExists(entryPath(theme)), "debug seed '" + theme + "' must not have a field-notes entry");
+            helper.assertTrue(!resourceExists(gatheredPath(theme)), "debug seed '" + theme + "' must not have a gathered advancement");
         }
         helper.succeed();
     }
@@ -1150,6 +1150,11 @@ public final class SkyseedGameTests {
                 ? "large_" + theme.substring(0, theme.length() - "_large".length()) + "_island"
                 : theme + "_island";
         return "/assets/skyseed/patchouli_books/guide/en_us/entries/" + name + ".json";
+    }
+
+    /** Path to a seed's gathered-materials advancement — the Patchouli page gate that reveals its recipe. */
+    private static String gatheredPath(String theme) {
+        return "/data/skyseed/advancement/gathered_" + theme + ".json";
     }
 
     /** The {@code layer0} texture id from a seed's item model, or {@code null}. */

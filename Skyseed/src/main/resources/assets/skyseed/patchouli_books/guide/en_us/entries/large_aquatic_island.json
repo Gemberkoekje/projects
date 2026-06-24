@@ -1,20 +1,33 @@
 {
   "name": "Large Aquatic Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:heart_of_the_sea",
-  "advancement": "skyseed:craft_aquatic_large",
+  "sortnum": 19,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A broad island cradling a $(bold)proper deep lake$() — a wide, deep pool rather than the small pond of the standard Aquatic isle."
+      "text": "The $(item)Large Aquatic Skyseed$() — clay and sand. A broad island around a proper deep lake."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:aquatic_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_aquatic_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Life in deep water$()$(br)Squid and salmon swim the freshwater lake, and the depth is enough for $(item)glow squid$() to settle. Clay and gravel fill the body in quantity."
+      "text": "A broad island cradling a $(bold)proper deep lake$() — a wide, deep pool rather than the small pond of the standard Aquatic isle.",
+      "advancement": "skyseed:craft_aquatic_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Reefs and swamps$()$(br)Over a warm ocean the lake becomes a deep coral reef with tropical fish, cod and pufferfish; over a swamp, a lily-strewn pool with frogs."
+      "text": "$(bold)Life in deep water$()$(br)Squid and salmon swim the freshwater lake, and the depth is enough for $(item)glow squid$() to settle. Clay and gravel fill the body in quantity.",
+      "advancement": "skyseed:craft_aquatic_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Reefs and swamps$()$(br)Over a warm ocean the lake becomes a deep coral reef with tropical fish, cod and pufferfish; over a swamp, a lily-strewn pool with frogs.",
+      "advancement": "skyseed:craft_aquatic_large"
     }
   ]
 }

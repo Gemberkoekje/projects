@@ -1,20 +1,33 @@
 {
   "name": "Nether Basalt Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:gilded_blackstone",
-  "advancement": "skyseed:craft_nether_basalt",
+  "sortnum": 8,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Tier-2 of the Basalt Deltas, and the most $(bold)dangerous$() island there is: a full-size jumble of $(item)basalt$() over blackstone, bristling with jagged $(item)basalt$() columns, scarred with $(item)magma block$() patches and shallow lava wells. $(item)Magma Cubes$() bounce between the spires and a $(item)Ghast$() drifts overhead."
+      "text": "The $(item)Nether Basalt Skyseed$() — a $(item)Badlands Skyseed$(), basalt and a lump of $(item)gilded blackstone$(). A full-size $(bold)Basalt Deltas$(): columns, magma and gold-bearing gilded blackstone."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_basalt_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_basalt"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Yields$()$(br)Blackstone and basalt by the stack for building, magma cream from the cubes — and the prize: $(item)gilded blackstone$() salted through the core, dropping $(item)gold$() when you mine it. Watch your footing; the magma burns."
+      "text": "Tier-2 of the Basalt Deltas, and the most $(bold)dangerous$() island there is: a full-size jumble of $(item)basalt$() over blackstone, bristling with jagged $(item)basalt$() columns, scarred with $(item)magma block$() patches and shallow lava wells. $(item)Magma Cubes$() bounce between the spires and a $(item)Ghast$() drifts overhead.",
+      "advancement": "skyseed:craft_nether_basalt"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Crafted$()$(br)A $(item)Badlands Skyseed$() packed with $(item)basalt$() and a lump of $(item)gilded blackstone$(). $(br)$(br)Thrown topside it makes a tiny $(bold)badlands$() butte instead — red sand, terracotta and a glint of gold."
+      "text": "$(bold)Yields$()$(br)Blackstone and basalt by the stack for building, magma cream from the cubes — and the prize: $(item)gilded blackstone$() salted through the core, dropping $(item)gold$() when you mine it. Watch your footing; the magma burns.",
+      "advancement": "skyseed:craft_nether_basalt"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Badlands Skyseed$() packed with $(item)basalt$() and a lump of $(item)gilded blackstone$(). $(br)$(br)Thrown topside it makes a tiny $(bold)badlands$() butte instead — red sand, terracotta and a glint of gold.",
+      "advancement": "skyseed:craft_nether_basalt"
     }
   ]
 }

@@ -1,20 +1,33 @@
 {
   "name": "Nether Forest Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:crimson_fungus",
-  "advancement": "skyseed:craft_nether_forest",
+  "sortnum": 4,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Tier-2 of the fungal forest: a $(bold)full-size$() island thick with $(bold)huge fungi$(). By default it grows $(item)Crimson$() — crimson nylium, towering crimson fungi, weeping vines and shroomlight, with a pack of $(item)Hoglins$() and Piglins rooting about."
+      "text": "The $(item)Nether Forest Skyseed$() — a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight. A full-size $(bold)fungal forest$(): crimson by default, warped in a warped biome."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_forest_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_forest"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Warped instead$()$(br)Throw it in a $(item)Warped Forest$() biome and the whole isle turns teal — warped nylium, huge warped fungi, nether sprouts, and $(item)Endermen$() in place of the hoglins. Same seed, two forests."
+      "text": "Tier-2 of the fungal forest: a $(bold)full-size$() island thick with $(bold)huge fungi$(). By default it grows $(item)Crimson$() — crimson nylium, towering crimson fungi, weeping vines and shroomlight, with a pack of $(item)Hoglins$() and Piglins rooting about.",
+      "advancement": "skyseed:craft_nether_forest"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Yields$()$(br)Stems and shroomlight for building, fungi for breeding hoglins and steering striders, nylium to spread your own forest. $(br)$(br)Thrown $(bold)topside$() it shrugs and makes a tiny tuft of a grass island instead — a seed's a seed. Crafted from a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight."
+      "text": "$(bold)Warped instead$()$(br)Throw it in a $(item)Warped Forest$() biome and the whole isle turns teal — warped nylium, huge warped fungi, nether sprouts, and $(item)Endermen$() in place of the hoglins. Same seed, two forests.",
+      "advancement": "skyseed:craft_nether_forest"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Yields$()$(br)Stems and shroomlight for building, fungi for breeding hoglins and steering striders, nylium to spread your own forest. $(br)$(br)Thrown $(bold)topside$() it shrugs and makes a tiny tuft of a grass island instead — a seed's a seed. Crafted from a $(item)Forest Skyseed$() with crimson and warped stems and a shroomlight.",
+      "advancement": "skyseed:craft_nether_forest"
     }
   ]
 }

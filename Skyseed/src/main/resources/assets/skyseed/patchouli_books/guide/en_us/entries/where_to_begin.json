@@ -1,0 +1,20 @@
+{
+  "name": "Where to Begin",
+  "category": "skyseed:basics",
+  "icon": "skyseed:rocky_skyseed",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The first climb$()$(br)Start with a $(item)Forest$() seed — dirt and planks off your starter island. Forests give wood, saplings and more dirt.$(br2)Dig a grassy island's $(bold)core$() for stone and cobblestone, and craft a $(item)Rocky$() seed — your first mine."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Branch out$()$(br)Throw a Rocky isle $(bold)low$(), near the world's floor, for deepslate and diamonds — the makings of an $(item)Ancient$() seed. Throw one $(bold)high$() or into the cold for snow and a $(item)Frozen$() seed.$(br2)$(item)Desert$() gives sand and clay; $(item)Aquatic$() gives water. With a few emeralds and animals, the $(bold)Villages & Farms$() seeds open up."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Downward, then beyond$()$(br)A $(item)Ladder$() seed punches a shaft straight to mining level. The dungeons, temples and portals of $(bold)Ruins & Landmarks$() bring loot — and a $(item)Ruined Portal$() seed gives you a frame to repair.$(br2)Light it, step through, and $(bold)The Nether$() — sealed in this book until now — opens its own long climb."
+    }
+  ]
+}

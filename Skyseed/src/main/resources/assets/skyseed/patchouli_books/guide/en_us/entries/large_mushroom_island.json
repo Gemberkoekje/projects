@@ -1,16 +1,28 @@
 {
   "name": "Large Mushroom Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:red_mushroom_block",
-  "advancement": "skyseed:craft_mushroom_large",
+  "sortnum": 7,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A great mycelium isle crowded with giant mushrooms — many more huge caps than the standard island, and a herd of mooshrooms beneath them."
+      "text": "The $(item)Large Mushroom Skyseed$() — both mushrooms again, grown into a giant grove."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:mushroom_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_mushroom_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Red, brown, or mixed$()$(br)As with the standard island it rolls a red, brown, or mixed grove — but on this scale it reads as a true mushroom forest."
+      "text": "A great mycelium isle crowded with giant mushrooms — many more huge caps than the standard island, and a herd of mooshrooms beneath them.",
+      "advancement": "skyseed:craft_mushroom_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Red, brown, or mixed$()$(br)As with the standard island it rolls a red, brown, or mixed grove — but on this scale it reads as a true mushroom forest.",
+      "advancement": "skyseed:craft_mushroom_large"
     }
   ]
 }

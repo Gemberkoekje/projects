@@ -1,0 +1,42 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "#minecraft:wool"
+          },
+          {
+            "items": "#minecraft:planks"
+          },
+          {
+            "items": "minecraft:dirt"
+          }
+        ]
+      }
+    },
+    "has_1": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:beef"
+          },
+          {
+            "items": "#minecraft:planks"
+          },
+          {
+            "items": "minecraft:dirt"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_0",
+      "has_1"
+    ]
+  ]
+}

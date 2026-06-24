@@ -1,0 +1,20 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:sandstone"
+          },
+          {
+            "items": "minecraft:tnt"
+          },
+          {
+            "items": "minecraft:sand"
+          }
+        ]
+      }
+    }
+  }
+}

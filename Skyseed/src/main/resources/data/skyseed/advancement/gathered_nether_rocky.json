@@ -1,0 +1,20 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:netherrack"
+          },
+          {
+            "items": "skyseed:rocky_skyseed"
+          },
+          {
+            "items": "minecraft:quartz"
+          }
+        ]
+      }
+    }
+  }
+}

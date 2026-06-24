@@ -1,0 +1,20 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "#minecraft:planks"
+          },
+          {
+            "items": "minecraft:cobblestone"
+          },
+          {
+            "items": "minecraft:emerald"
+          }
+        ]
+      }
+    }
+  }
+}

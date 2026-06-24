@@ -1,16 +1,28 @@
 {
   "name": "Aquarium Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:sea_lantern",
-  "advancement": "skyseed:craft_aquarium",
+  "sortnum": 7,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A glass-walled tank, lit by sea lanterns, full of life: $(bold)turtles$(), $(bold)axolotls$(), $(bold)tropical fish$() and a $(bold)squid$(), over a coral-and-sand floor. As much a display as a farm — but scutes and ink sacs are real rewards."
+      "text": "The $(item)Aquarium Skyseed$() — a $(item)Turtle Scute$() and a $(item)Prismarine Shard$() over two sand. A glass tank of turtles, axolotls and fish."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:aquarium_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_aquarium"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A collector's island$()$(br)Made from a $(item)Turtle Scute$(), a $(item)Prismarine Shard$() and sand. Axolotls scoop into buckets, turtles lay scutes on sand, and the whole thing just looks lovely lit up at night."
+      "text": "A glass-walled tank, lit by sea lanterns, full of life: $(bold)turtles$(), $(bold)axolotls$(), $(bold)tropical fish$() and a $(bold)squid$(), over a coral-and-sand floor. As much a display as a farm — but scutes and ink sacs are real rewards.",
+      "advancement": "skyseed:craft_aquarium"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A collector's island$()$(br)Made from a $(item)Turtle Scute$(), a $(item)Prismarine Shard$() and sand. Axolotls scoop into buckets, turtles lay scutes on sand, and the whole thing just looks lovely lit up at night.",
+      "advancement": "skyseed:craft_aquarium"
     }
   ]
 }

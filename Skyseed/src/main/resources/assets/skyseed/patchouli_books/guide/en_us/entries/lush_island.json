@@ -1,20 +1,33 @@
 {
   "name": "Lush Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:flowering_azalea",
-  "advancement": "skyseed:craft_lush",
+  "sortnum": 16,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A cave garden afloat. Moss over rooted dirt, azalea trees above, and a tangle of roots, vines, and spore blossoms hanging beneath."
+      "text": "The $(item)Lush Skyseed$() — moss and azalea. Moss comes from an $(bold)Ancient island$(); the first azalea from a $(bold)Forest's$() bushes."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:lush_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_lush"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Greenery$()$(br)Big and small $(item)dripleaves$(), $(item)moss$(), $(item)glow berries$() on the underside, and the two sniffer plants — $(item)torchflower$() and $(item)pitcher plant$(). A small pool collects in the moss, where $(item)axolotls$() swim."
+      "text": "A cave garden afloat. Moss over rooted dirt, azalea trees above, and a tangle of roots, vines, and spore blossoms hanging beneath.",
+      "advancement": "skyseed:craft_lush"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Looks$()$(br)Garden, glow (berry-laden underside), and ancient-garden (spore blossoms). Moss comes from an Ancient island; the first azalea from a Forest sprinkle."
+      "text": "$(bold)Greenery$()$(br)Big and small $(item)dripleaves$(), $(item)moss$(), $(item)glow berries$() on the underside, and the two sniffer plants — $(item)torchflower$() and $(item)pitcher plant$(). A small pool collects in the moss, where $(item)axolotls$() swim.",
+      "advancement": "skyseed:craft_lush"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Looks$()$(br)Garden, glow (berry-laden underside), and ancient-garden (spore blossoms). Moss comes from an Ancient island; the first azalea from a Forest sprinkle.",
+      "advancement": "skyseed:craft_lush"
     }
   ]
 }

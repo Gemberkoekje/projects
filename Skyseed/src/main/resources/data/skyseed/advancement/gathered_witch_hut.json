@@ -1,0 +1,20 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:cauldron"
+          },
+          {
+            "items": "minecraft:brown_mushroom"
+          },
+          {
+            "items": "minecraft:oak_planks"
+          }
+        ]
+      }
+    }
+  }
+}

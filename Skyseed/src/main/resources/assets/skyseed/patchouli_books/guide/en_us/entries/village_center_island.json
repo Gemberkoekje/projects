@@ -1,24 +1,38 @@
 {
   "name": "Village Center Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:bell",
-  "advancement": "skyseed:craft_village_center",
+  "sortnum": 2,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The premium village island: a bell-topped plaza with four trading halls around it, an iron golem on guard, and a villager of $(bold)every$() one of the 13 professions. The complete trading economy in one throw."
+      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. All 13 professions and an iron golem — the whole economy in one throw."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:village_center_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The four halls$()$(br)$(li)Farm hall — farmer, shepherd, fletcher, butcher$(li)Smith hall — armorer, weaponsmith, toolsmith$(li)Scholar hall — librarian, cartographer, cleric$(li)Craft hall — mason, leatherworker, fisherman"
+      "text": "The premium village island: a bell-topped plaza with four trading halls around it, an iron golem on guard, and a villager of $(bold)every$() one of the 13 professions. The complete trading economy in one throw.",
+      "advancement": "skyseed:craft_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "Each villager has a bed and a job site, so the hall fills with trades on its own. The $(item)iron golem$() guards them — raids are disabled on Skyseed worlds, but mobs at night are not."
+      "text": "$(bold)The four halls$()$(br)$(li)Farm hall — farmer, shepherd, fletcher, butcher$(li)Smith hall — armorer, weaponsmith, toolsmith$(li)Scholar hall — librarian, cartographer, cleric$(li)Craft hall — mason, leatherworker, fisherman",
+      "advancement": "skyseed:craft_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A late-game reward$()$(br)Costs $(item)5 emeralds$(), an iron ingot, planks and cobblestone. You'll want an established Rocky or Ancient mining run before this is within reach — but it pays back the whole economy at once."
+      "text": "Each villager has a bed and a job site, so the hall fills with trades on its own. The $(item)iron golem$() guards them — raids are disabled on Skyseed worlds, but mobs at night are not.",
+      "advancement": "skyseed:craft_village_center"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A late-game reward$()$(br)Costs $(item)5 emeralds$(), an iron ingot, planks and cobblestone. You'll want an established Rocky or Ancient mining run before this is within reach — but it pays back the whole economy at once.",
+      "advancement": "skyseed:craft_village_center"
     }
   ]
 }

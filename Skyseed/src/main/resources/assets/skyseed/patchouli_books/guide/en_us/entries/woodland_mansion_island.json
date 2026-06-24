@@ -1,24 +1,38 @@
 {
   "name": "Woodland Mansion Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:dark_oak_door",
-  "advancement": "skyseed:craft_woodland_mansion",
+  "sortnum": 7,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A grand $(o)dark-oak manor$() two storeys tall, raised on a large grassy island ringed with dark oaks. A red-carpet hall, a staircase up to the loot rooms and library, glass windows, and a tall gabled roof — the headline overworld build."
+      "text": "The $(item)Woodland Mansion Skyseed$() — $(item)dark oak planks$() and $(item)diamonds$() around a $(item)Totem of Undying$(). A two-storey dark-oak manor of vindicators and an evoker."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:woodland_mansion_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_woodland_mansion"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The garrison$()$(br)An $(item)evoker$() and a pack of $(item)vindicators$() hold the hall. The evoker is the prize: kill it for a $(item)Totem of Undying$(). The mansion is a $(o)reliable totem destination$() — throw another seed whenever you want more."
+      "text": "A grand $(o)dark-oak manor$() two storeys tall, raised on a large grassy island ringed with dark oaks. A red-carpet hall, a staircase up to the loot rooms and library, glass windows, and a tall gabled roof — the headline overworld build.",
+      "advancement": "skyseed:craft_woodland_mansion"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Loot$()$(br)Three chests on the vanilla $(item)woodland mansion$() table are scattered through the rooms — enchanted books, gear, and the odd treasure."
+      "text": "$(bold)The garrison$()$(br)An $(item)evoker$() and a pack of $(item)vindicators$() hold the hall. The evoker is the prize: kill it for a $(item)Totem of Undying$(). The mansion is a $(o)reliable totem destination$() — throw another seed whenever you want more.",
+      "advancement": "skyseed:craft_woodland_mansion"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Crafting$()$(br)$(item)Dark oak planks$() and $(item)diamonds$() around a single $(item)Totem of Undying$(). Your first totem comes from an $(o)Evoker Cell$() (rarely on a dark-forest Forest island); after that the mansion farms its own."
+      "text": "$(bold)Loot$()$(br)Three chests on the vanilla $(item)woodland mansion$() table are scattered through the rooms — enchanted books, gear, and the odd treasure.",
+      "advancement": "skyseed:craft_woodland_mansion"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafting$()$(br)$(item)Dark oak planks$() and $(item)diamonds$() around a single $(item)Totem of Undying$(). Your first totem comes from an $(o)Evoker Cell$() (rarely on a dark-forest Forest island); after that the mansion farms its own.",
+      "advancement": "skyseed:craft_woodland_mansion"
     }
   ]
 }

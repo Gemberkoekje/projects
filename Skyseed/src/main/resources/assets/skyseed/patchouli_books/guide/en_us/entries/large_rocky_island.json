@@ -1,20 +1,33 @@
 {
   "name": "Large Rocky Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:emerald_ore",
-  "advancement": "skyseed:craft_rocky_large",
+  "sortnum": 3,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A true mountain — a tall, peaked Rocky island that rises well above its rim, far larger and richer than the standard isle."
+      "text": "The $(item)Large Rocky Skyseed$() — stone and cobblestone from any core. A tall mountain that yields $(item)emeralds$()."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:rocky_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_rocky_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Mountain riches$()$(br)The deep core carries the full Rocky ore suite — $(item)iron$() and $(item)copper$() in abundance, coal, lapis and gold — and being a mountain it also yields $(item)emerald ore$(), the reliable source for the trading economy. Goats roam the heights."
+      "text": "A true mountain — a tall, peaked Rocky island that rises well above its rim, far larger and richer than the standard isle.",
+      "advancement": "skyseed:craft_rocky_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Height matters$()$(br)Thrown high, or over a snowy biome, it caps with snow as an alpine peak; thrown deep near the world's floor it forms from $(item)deepslate$(), rich in diamond; in between, bare stone and scree."
+      "text": "$(bold)Mountain riches$()$(br)The deep core carries the full Rocky ore suite — $(item)iron$() and $(item)copper$() in abundance, coal, lapis and gold — and being a mountain it also yields $(item)emerald ore$(), the reliable source for the trading economy. Goats roam the heights.",
+      "advancement": "skyseed:craft_rocky_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Height matters$()$(br)Thrown high, or over a snowy biome, it caps with snow as an alpine peak; thrown deep near the world's floor it forms from $(item)deepslate$(), rich in diamond; in between, bare stone and scree.",
+      "advancement": "skyseed:craft_rocky_large"
     }
   ]
 }

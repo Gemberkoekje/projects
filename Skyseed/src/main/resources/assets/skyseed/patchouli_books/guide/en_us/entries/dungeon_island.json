@@ -1,20 +1,33 @@
 {
   "name": "Dungeon Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:spawner",
-  "advancement": "skyseed:craft_dungeon",
+  "sortnum": 0,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A sealed, mossy cobblestone cube with a $(item)mob spawner$() humming in the dark and a loot chest on either wall. Break in, clear it out, and grab the chests before the spawns overwhelm you."
+      "text": "The $(item)Dungeon Skyseed$() — cobblestone around a piece of $(item)rotten flesh$(). A sealed spawner cube with two loot chests."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:dungeon_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_dungeon"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)What's inside$()$(br)The spawner runs zombies, skeletons or spiders — the luck of the throw. The chests hold the classic dungeon haul: saddles, iron, redstone, enchanted books, and the music discs $(italic)Cat$() and $(italic)13$() found nowhere else."
+      "text": "A sealed, mossy cobblestone cube with a $(item)mob spawner$() humming in the dark and a loot chest on either wall. Break in, clear it out, and grab the chests before the spawns overwhelm you.",
+      "advancement": "skyseed:craft_dungeon"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A mob farm in a box$()$(br)Sealed and dark, the spawner keeps producing — light it up to stop it, or build around it for a steady supply of drops. Made from cobblestone around a piece of $(item)rotten flesh$()."
+      "text": "$(bold)What's inside$()$(br)The spawner runs zombies, skeletons or spiders — the luck of the throw. The chests hold the classic dungeon haul: saddles, iron, redstone, enchanted books, and the music discs $(italic)Cat$() and $(italic)13$() found nowhere else.",
+      "advancement": "skyseed:craft_dungeon"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A mob farm in a box$()$(br)Sealed and dark, the spawner keeps producing — light it up to stop it, or build around it for a steady supply of drops. Made from cobblestone around a piece of $(item)rotten flesh$().",
+      "advancement": "skyseed:craft_dungeon"
     }
   ]
 }

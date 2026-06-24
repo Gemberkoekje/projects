@@ -1,16 +1,28 @@
 {
   "name": "Wither Arena Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:nether_star",
-  "advancement": "skyseed:craft_wither_arena",
+  "sortnum": 13,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The Nether's capstone — an enclosed $(bold)obsidian arena$(), blast-resistant so the $(bold)Wither's$() skulls can't break it or blow you into the void. A soul-sand patch to summon on, a sheltered corner with a $(item)charged respawn anchor$() (set your spawn — die and you wake here, not home) and a reward chest behind an arrow slit."
+      "text": "The $(item)Wither Arena Skyseed$() — obsidian, nether bricks and soul sand. The Nether's capstone: a blast-resistant obsidian arena with a charged respawn anchor, the safe venue to fight the $(bold)Wither$() for a Nether Star."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:wither_arena_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_wither_arena"
     },
     {
       "type": "patchouli:text",
-      "text": "Bring your own boss: $(item)soul sand$() from the Soul islands, three $(item)wither skeleton skulls$() from the Fortress. Win the $(item)Nether Star$() and craft a $(item)Beacon$() — the Nether is done. Nether-native; it fizzles thrown elsewhere. Crafted from obsidian, nether bricks and soul sand."
+      "text": "The Nether's capstone — an enclosed $(bold)obsidian arena$(), blast-resistant so the $(bold)Wither's$() skulls can't break it or blow you into the void. A soul-sand patch to summon on, a sheltered corner with a $(item)charged respawn anchor$() (set your spawn — die and you wake here, not home) and a reward chest behind an arrow slit.",
+      "advancement": "skyseed:craft_wither_arena"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Bring your own boss: $(item)soul sand$() from the Soul islands, three $(item)wither skeleton skulls$() from the Fortress. Win the $(item)Nether Star$() and craft a $(item)Beacon$() — the Nether is done. Nether-native; it fizzles thrown elsewhere. Crafted from obsidian, nether bricks and soul sand.",
+      "advancement": "skyseed:craft_wither_arena"
     }
   ]
 }

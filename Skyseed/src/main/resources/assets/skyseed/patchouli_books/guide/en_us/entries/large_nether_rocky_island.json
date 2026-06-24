@@ -1,10 +1,28 @@
 {
   "name": "Large Nether Rocky Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:blackstone",
-  "advancement": "skyseed:craft_nether_rocky_large",
+  "sortnum": 1,
   "pages": [
-    { "type": "patchouli:text", "text": "The Nether Rocky island writ large — a broad deep-mining isle of netherrack over blackstone, with far more $(item)nether quartz$(), $(item)nether gold$(), $(item)gilded blackstone$() and $(item)ancient debris$() (richest near the lava sea)." },
-    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Rocky Skyseed$() in the centre of a 3x3 of $(item)netherrack$() and nether $(item)quartz$()." }
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Large Nether Rocky Skyseed$() — a $(item)Large Rocky Skyseed$() centred in netherrack + nether quartz. A broad deep-mining isle."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_rocky_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_rocky_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "The Nether Rocky island writ large — a broad deep-mining isle of netherrack over blackstone, with far more $(item)nether quartz$(), $(item)nether gold$(), $(item)gilded blackstone$() and $(item)ancient debris$() (richest near the lava sea).",
+      "advancement": "skyseed:craft_nether_rocky_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Large Rocky Skyseed$() in the centre of a 3x3 of $(item)netherrack$() and nether $(item)quartz$().",
+      "advancement": "skyseed:craft_nether_rocky_large"
+    }
   ]
 }

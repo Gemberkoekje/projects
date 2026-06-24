@@ -1,20 +1,33 @@
 {
   "name": "Rocky Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:stone",
-  "advancement": "skyseed:craft_rocky",
+  "sortnum": 2,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A bare stone isle with a cobblestone band — no trees, little grass. Built for mining."
+      "text": "The $(item)Rocky Skyseed$() — stone and cobblestone. Dig into the $(bold)core$() of any grassy island."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:rocky_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_rocky"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Ores$()$(br)A mining isle through and through. $(item)Iron$() and $(item)copper$() turn up on nearly every one, in generous veins, alongside coal and lapis and a little gold. Which ores — and how rich — depends on the height it forms at (next page); nothing is fully guaranteed, and a lean isle happens."
+      "text": "A bare stone isle with a cobblestone band — no trees, little grass. Built for mining.",
+      "advancement": "skyseed:craft_rocky"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Throw high or low$()$(br)A Rocky isle takes after the altitude it grows at, like the real underground — so aim your throw. $(bold)Deeper is richer.$()$(br)$(li)$(bold)Deep$(), near the world's floor: $(item)deepslate$() laced with $(item)diamond$(), redstone, gold and lapis — the best haul.$(li)$(bold)Mid-air$(): the broad spread — iron and copper aplenty, plus coal, lapis and gold.$(li)$(bold)High up$(): mostly coal and iron (and a chance of $(item)emerald$()), but none of the deep treasures — so a high isle gives less than one thrown low. Snow-capped if very high or grown in the cold."
+      "text": "$(bold)Ores$()$(br)A mining isle through and through. $(item)Iron$() and $(item)copper$() turn up on nearly every one, in generous veins, alongside coal and lapis and a little gold. Which ores — and how rich — depends on the height it forms at (next page); nothing is fully guaranteed, and a lean isle happens.",
+      "advancement": "skyseed:craft_rocky"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Throw high or low$()$(br)A Rocky isle takes after the altitude it grows at, like the real underground — so aim your throw. $(bold)Deeper is richer.$()$(br)$(li)$(bold)Deep$(), near the world's floor: $(item)deepslate$() laced with $(item)diamond$(), redstone, gold and lapis — the best haul.$(li)$(bold)Mid-air$(): the broad spread — iron and copper aplenty, plus coal, lapis and gold.$(li)$(bold)High up$(): mostly coal and iron (and a chance of $(item)emerald$()), but none of the deep treasures — so a high isle gives less than one thrown low. Snow-capped if very high or grown in the cold.",
+      "advancement": "skyseed:craft_rocky"
     }
   ]
 }

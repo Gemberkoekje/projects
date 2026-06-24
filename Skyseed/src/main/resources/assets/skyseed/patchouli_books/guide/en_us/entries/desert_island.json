@@ -1,20 +1,33 @@
 {
   "name": "Desert Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:sand",
-  "advancement": "skyseed:craft_desert",
+  "sortnum": 4,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A sun-baked isle of sand over sandstone, cored with smooth sandstone. Dead bushes and the odd cactus dot the surface."
+      "text": "The $(item)Desert Skyseed$() — sand and sandstone. Sand comes off a $(bold)beach or desert$() throw; craft it into sandstone."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_desert"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Buried treasure$()$(br)Dig the core for $(item)clay$(), the occasional $(item)gold$(), and rare buried $(item)bone$() — a fossil to find."
+      "text": "A sun-baked isle of sand over sandstone, cored with smooth sandstone. Dead bushes and the odd cactus dot the surface.",
+      "advancement": "skyseed:craft_desert"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Red dunes$()$(br)Throw a Desert Skyseed over a badlands and it grows from $(item)red sand$() and $(item)red sandstone$() instead — and carries badlands' richer gold."
+      "text": "$(bold)Buried treasure$()$(br)Dig the core for $(item)clay$(), the occasional $(item)gold$(), and rare buried $(item)bone$() — a fossil to find.",
+      "advancement": "skyseed:craft_desert"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Red dunes$()$(br)Throw a Desert Skyseed over a badlands and it grows from $(item)red sand$() and $(item)red sandstone$() instead — and carries badlands' richer gold.",
+      "advancement": "skyseed:craft_desert"
     }
   ]
 }

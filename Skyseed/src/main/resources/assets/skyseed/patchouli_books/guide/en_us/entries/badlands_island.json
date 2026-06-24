@@ -1,20 +1,33 @@
 {
   "name": "Badlands Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:terracotta",
-  "advancement": "skyseed:craft_badlands",
+  "sortnum": 12,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A mesa isle. Red sand over a striped body of $(item)terracotta$() — orange, yellow, white, gray, red, and brown bands cross its cliffs."
+      "text": "The $(item)Badlands Skyseed$() — red sand and terracotta. Red sand comes from a $(bold)Desert seed thrown over a badlands$(); bake clay into terracotta."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:badlands_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_badlands"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Looks$()$(br)Mesa (red sand), eroded (terracotta top), and wooded (a green, dark-oak-topped plateau) variants."
+      "text": "A mesa isle. Red sand over a striped body of $(item)terracotta$() — orange, yellow, white, gray, red, and brown bands cross its cliffs.",
+      "advancement": "skyseed:craft_badlands"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Gold$()$(br)Badlands run rich with $(item)gold$(), as in the vanilla mesa, with a little redstone besides."
+      "text": "$(bold)Looks$()$(br)Mesa (red sand), eroded (terracotta top), and wooded (a green, dark-oak-topped plateau) variants.",
+      "advancement": "skyseed:craft_badlands"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Gold$()$(br)Badlands run rich with $(item)gold$(), as in the vanilla mesa, with a little redstone besides.",
+      "advancement": "skyseed:craft_badlands"
     }
   ]
 }

@@ -1,10 +1,28 @@
 {
   "name": "Large Nether Lava Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:magma_block",
-  "advancement": "skyseed:craft_nether_lava_large",
+  "sortnum": 3,
   "pages": [
-    { "type": "patchouli:text", "text": "A broad $(bold)lava lagoon$() — a wide contained lake, a bigger $(item)Strider$() pack, magma shores. And like the normal Nether Lava, thrown $(bold)topside$() it grows a full-size $(bold)Large$() lava island, the overworld's only one." },
-    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Aquatic Skyseed$() in the centre of a 3x3 of $(item)basalt$() and buckets of $(item)lava$() (returned empty)." }
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Large Nether Lava Skyseed$() — a $(item)Large Aquatic Skyseed$() centred in basalt + lava buckets. A broad lagoon (and a Large lava island topside)."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_lava_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_lava_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "A broad $(bold)lava lagoon$() — a wide contained lake, a bigger $(item)Strider$() pack, magma shores. And like the normal Nether Lava, thrown $(bold)topside$() it grows a full-size $(bold)Large$() lava island, the overworld's only one.",
+      "advancement": "skyseed:craft_nether_lava_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Large Aquatic Skyseed$() in the centre of a 3x3 of $(item)basalt$() and buckets of $(item)lava$() (returned empty).",
+      "advancement": "skyseed:craft_nether_lava_large"
+    }
   ]
 }

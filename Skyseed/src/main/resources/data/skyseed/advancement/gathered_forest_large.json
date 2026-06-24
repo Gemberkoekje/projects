@@ -1,0 +1,17 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "#minecraft:logs_that_burn"
+          },
+          {
+            "items": "minecraft:dirt"
+          }
+        ]
+      }
+    }
+  }
+}

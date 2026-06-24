@@ -1,16 +1,28 @@
 {
   "name": "Jungle Temple Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:mossy_cobblestone",
-  "advancement": "skyseed:craft_jungle_temple",
+  "sortnum": 3,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A sealed mossy cobblestone room with two loot chests and an arrow $(item)dispenser$() set into the wall. Break in and clear it out."
+      "text": "The $(item)Jungle Temple Skyseed$() — $(item)two mossy cobblestone$() over $(item)jungle planks$() and a $(item)tripwire hook$(). A sealed room with two chests and a dispenser."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:jungle_temple_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_jungle_temple"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Two chests and a dispenser$()$(br)The chests hold diamonds, emerald, gold and iron, bamboo and enchanted books; the dispenser is worth breaking for its arrows. Crafted from $(item)jungle planks$(), $(item)mossy cobblestone$() and a $(item)tripwire hook$()."
+      "text": "A sealed mossy cobblestone room with two loot chests and an arrow $(item)dispenser$() set into the wall. Break in and clear it out.",
+      "advancement": "skyseed:craft_jungle_temple"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Two chests and a dispenser$()$(br)The chests hold diamonds, emerald, gold and iron, bamboo and enchanted books; the dispenser is worth breaking for its arrows. Crafted from $(item)jungle planks$(), $(item)mossy cobblestone$() and a $(item)tripwire hook$().",
+      "advancement": "skyseed:craft_jungle_temple"
     }
   ]
 }

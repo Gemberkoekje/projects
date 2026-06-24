@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.0] - 2026-06-24
+
+### Changed
+- **The Skyfarer's Almanac is rebuilt around progressive disclosure.** The single ~47‑page "Recipes" list and the
+  grid of locked "?" entries are gone. The book now has **five chapters** — Getting Started, Overworld Islands,
+  Villages & Farms, Ruins & Landmarks, and The Nether (hidden until you first set foot in the Nether). Every seed has
+  one always‑visible page that reveals in stages:
+  - a **hint** naming the materials to gather (always shown);
+  - the **crafting recipe**, once you're holding all the ingredients (a per‑seed `gathered_<seed>` advancement);
+  - the full **field notes** on what it grows, unlocked when you craft it.
+  A new **Where to Begin** progression guide rounds out Getting Started.
+
 ## [0.64.1] - 2026-06-24
 
 ### Added

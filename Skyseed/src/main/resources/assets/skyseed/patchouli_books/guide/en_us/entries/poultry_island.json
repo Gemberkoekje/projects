@@ -1,16 +1,28 @@
 {
   "name": "Poultry Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:egg",
-  "advancement": "skyseed:craft_poultry",
+  "sortnum": 4,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A little roofed coop — chickens jump fences, so this one is walled in. A small flock of $(bold)chickens$() comes with it, plus a composter for the seeds-and-eggs loop."
+      "text": "The $(item)Poultry Skyseed$() — a $(item)Feather$() and an $(item)Egg$() over two dirt. A walled coop of chickens."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:poultry_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_poultry"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Eggs and feathers$()$(br)Made from a $(item)Feather$() and an $(item)Egg$() off a wandering chicken, plus dirt. Eggs throw into more chickens; feathers make arrows. The cheapest animal island, and a fine first one."
+      "text": "A little roofed coop — chickens jump fences, so this one is walled in. A small flock of $(bold)chickens$() comes with it, plus a composter for the seeds-and-eggs loop.",
+      "advancement": "skyseed:craft_poultry"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Eggs and feathers$()$(br)Made from a $(item)Feather$() and an $(item)Egg$() off a wandering chicken, plus dirt. Eggs throw into more chickens; feathers make arrows. The cheapest animal island, and a fine first one.",
+      "advancement": "skyseed:craft_poultry"
     }
   ]
 }

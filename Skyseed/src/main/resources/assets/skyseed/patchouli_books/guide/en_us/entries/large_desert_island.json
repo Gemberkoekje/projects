@@ -1,20 +1,33 @@
 {
   "name": "Large Desert Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:cactus",
-  "advancement": "skyseed:craft_desert_large",
+  "sortnum": 5,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A sweeping dune field on a much larger scale — and, hidden among the sand, a small $(bold)oasis$()."
+      "text": "The $(item)Large Desert Skyseed$() — more sand and sandstone. A vast dune field hiding an oasis."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:desert_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_desert_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The oasis$()$(br)A little spring-fed pool with sugar cane along its banks breaks up the dunes — a patch of green and water in the desert."
+      "text": "A sweeping dune field on a much larger scale — and, hidden among the sand, a small $(bold)oasis$().",
+      "advancement": "skyseed:craft_desert_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Buried bounty$()$(br)More gold in the deep core and larger $(item)bone block$() fossils buried in the sandstone. Over badlands it turns to red sand and red sandstone."
+      "text": "$(bold)The oasis$()$(br)A little spring-fed pool with sugar cane along its banks breaks up the dunes — a patch of green and water in the desert.",
+      "advancement": "skyseed:craft_desert_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Buried bounty$()$(br)More gold in the deep core and larger $(item)bone block$() fossils buried in the sandstone. Over badlands it turns to red sand and red sandstone.",
+      "advancement": "skyseed:craft_desert_large"
     }
   ]
 }

@@ -1,24 +1,38 @@
 {
   "name": "Aquatic Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:lily_pad",
-  "advancement": "skyseed:craft_aquatic",
+  "sortnum": 18,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Half land, half water. An irregular pool sits in its centre — never a perfect circle — fed with whatever grows in the water it lands over. Thrown over a $(item)river$() it instead cuts a winding channel clean across the island."
+      "text": "The $(item)Aquatic Skyseed$() — clay and sand. Both come from a $(bold)Desert island$(): clay in its core, sand on top."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:aquatic_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_aquatic"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(); over an ocean, a small reef of $(item)coral$(), sea pickles and seagrass. $(item)Squid$() swim the freshwater, $(item)tropical fish$() the reef, and $(item)salmon$() a river."
+      "text": "Half land, half water. An irregular pool sits in its centre — never a perfect circle — fed with whatever grows in the water it lands over. Thrown over a $(item)river$() it instead cuts a winding channel clean across the island.",
+      "advancement": "skyseed:craft_aquatic"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Mud & banks$()$(br)Over a swamp or mangrove it grows $(item)mud$() and mangroves. The bed is thick with $(item)clay$() and gravel — the point of the island."
+      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(); over an ocean, a small reef of $(item)coral$(), sea pickles and seagrass. $(item)Squid$() swim the freshwater, $(item)tropical fish$() the reef, and $(item)salmon$() a river.",
+      "advancement": "skyseed:craft_aquatic"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Sunken stone$()$(br)Now and then the pool comes up an $(o)ocean ruin$() instead — a flooded stone-brick basin. Brush its $(item)suspicious sand$() for archaeology finds (a $(item)sniffer egg$(), if you're lucky) and loot the sunken chest."
+      "text": "$(bold)Mud & banks$()$(br)Over a swamp or mangrove it grows $(item)mud$() and mangroves. The bed is thick with $(item)clay$() and gravel — the point of the island.",
+      "advancement": "skyseed:craft_aquatic"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Sunken stone$()$(br)Now and then the pool comes up an $(o)ocean ruin$() instead — a flooded stone-brick basin. Brush its $(item)suspicious sand$() for archaeology finds (a $(item)sniffer egg$(), if you're lucky) and loot the sunken chest.",
+      "advancement": "skyseed:craft_aquatic"
     }
   ]
 }

@@ -1,24 +1,38 @@
 {
   "name": "Hamlet Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:emerald",
-  "advancement": "skyseed:craft_hamlet",
+  "sortnum": 0,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A little cottage on a grassy isle, home to one villager — the seed of a whole trading economy. The first of the village islands. The cottage comes in a few styles, each randomly turned and weathered, so no two hamlets look quite alike."
+      "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:hamlet_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_hamlet"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Put them to work$()$(br)The villager arrives $(item)unemployed$(). Set a job-site block beside them — a $(item)composter$(), $(item)lectern$(), $(item)cauldron$(), and so on — and they take up that trade. They dress to match the biome you grew them over."
+      "text": "A little cottage on a grassy isle, home to one villager — the seed of a whole trading economy. The first of the village islands. The cottage comes in a few styles, each randomly turned and weathered, so no two hamlets look quite alike.",
+      "advancement": "skyseed:craft_hamlet"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A home$()$(br)The cottage has a bed they will claim, so they restock and can breed (add more beds and food). $(br)Raids are switched off on Skyseed worlds — illagers would only path into the void — but $(item)iron golems$() still appear once a village grows large enough."
+      "text": "$(bold)Put them to work$()$(br)The villager arrives $(item)unemployed$(). Set a job-site block beside them — a $(item)composter$(), $(item)lectern$(), $(item)cauldron$(), and so on — and they take up that trade. They dress to match the biome you grew them over.",
+      "advancement": "skyseed:craft_hamlet"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A home gone wrong$()$(br)Rarely a Hamlet grows $(o)abandoned$() instead: a cobwebbed ruin with no bed and a $(o)zombie villager$() for a tenant. Cure them and you have a villager — often with a discount."
+      "text": "$(bold)A home$()$(br)The cottage has a bed they will claim, so they restock and can breed (add more beds and food). $(br)Raids are switched off on Skyseed worlds — illagers would only path into the void — but $(item)iron golems$() still appear once a village grows large enough.",
+      "advancement": "skyseed:craft_hamlet"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)A home gone wrong$()$(br)Rarely a Hamlet grows $(o)abandoned$() instead: a cobwebbed ruin with no bed and a $(o)zombie villager$() for a tenant. Cure them and you have a villager — often with a discount.",
+      "advancement": "skyseed:craft_hamlet"
     }
   ]
 }

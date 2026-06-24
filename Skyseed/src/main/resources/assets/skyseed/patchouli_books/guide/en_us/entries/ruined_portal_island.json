@@ -1,16 +1,28 @@
 {
   "name": "Ruined Portal Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:ruins",
   "icon": "minecraft:crying_obsidian",
-  "advancement": "skyseed:craft_ruined_portal",
+  "sortnum": 1,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A scorched basalt platform with a broken Nether portal frame and a loot chest. The reward worth the throw: $(item)crying obsidian$() — the seed of a respawn anchor, and otherwise unobtainable up here."
+      "text": "The $(item)Ruined Portal Skyseed$() — $(item)two obsidian$() over two $(item)gold ingots$(). A broken portal with a chest of Nether spoils."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ruined_portal_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_ruined_portal"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Nether-adjacent spoils$()$(br)The chest holds the vanilla ruined-portal haul: golden gear, flint and steel, fire charges, obsidian and crying obsidian. Crafted from $(item)two obsidian$() and two $(item)gold ingots$()."
+      "text": "A scorched basalt platform with a broken Nether portal frame and a loot chest. The reward worth the throw: $(item)crying obsidian$() — the seed of a respawn anchor, and otherwise unobtainable up here.",
+      "advancement": "skyseed:craft_ruined_portal"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Nether-adjacent spoils$()$(br)The chest holds the vanilla ruined-portal haul: golden gear, flint and steel, fire charges, obsidian and crying obsidian. Crafted from $(item)two obsidian$() and two $(item)gold ingots$().",
+      "advancement": "skyseed:craft_ruined_portal"
     }
   ]
 }

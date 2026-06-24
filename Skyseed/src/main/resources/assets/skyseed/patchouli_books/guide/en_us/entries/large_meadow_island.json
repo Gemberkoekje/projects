@@ -1,16 +1,28 @@
 {
   "name": "Large Meadow Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:bee_nest",
-  "advancement": "skyseed:craft_meadow_large",
+  "sortnum": 11,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A vast wildflower meadow — every flower variant on a larger canvas, dotted with oak and cherry trees."
+      "text": "The $(item)Large Meadow Skyseed$() — dirt and flowers. A vast bloom — the best start for $(item)bees$()."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:meadow_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_meadow_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)More bees$()$(br)With more flowers come more $(item)bee nests$() — the best Skyseed for starting an apiary. A full complement of farm animals grazes here too."
+      "text": "A vast wildflower meadow — every flower variant on a larger canvas, dotted with oak and cherry trees.",
+      "advancement": "skyseed:craft_meadow_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)More bees$()$(br)With more flowers come more $(item)bee nests$() — the best Skyseed for starting an apiary. A full complement of farm animals grazes here too.",
+      "advancement": "skyseed:craft_meadow_large"
     }
   ]
 }

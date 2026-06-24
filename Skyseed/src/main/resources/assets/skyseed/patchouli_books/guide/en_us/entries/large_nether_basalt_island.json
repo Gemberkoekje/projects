@@ -1,10 +1,28 @@
 {
   "name": "Large Nether Basalt Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:gilded_blackstone",
-  "advancement": "skyseed:craft_nether_basalt_large",
+  "sortnum": 9,
   "pages": [
-    { "type": "patchouli:text", "text": "A vast, hazardous $(bold)Basalt Deltas$() — a forest of basalt columns, magma underfoot, and $(item)gilded blackstone$() salted through the core for $(item)gold$()." },
-    { "type": "patchouli:text", "text": "$(bold)Crafted$()$(br)A $(item)Large Badlands Skyseed$() in the centre of a 3x3 of $(item)basalt$() and $(item)gilded blackstone$()." }
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Large Nether Basalt Skyseed$() — a $(item)Large Badlands Skyseed$() centred in basalt + gilded blackstone. A vast Basalt Deltas."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_basalt_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_basalt_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "A vast, hazardous $(bold)Basalt Deltas$() — a forest of basalt columns, magma underfoot, and $(item)gilded blackstone$() salted through the core for $(item)gold$().",
+      "advancement": "skyseed:craft_nether_basalt_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafted$()$(br)A $(item)Large Badlands Skyseed$() in the centre of a 3x3 of $(item)basalt$() and $(item)gilded blackstone$().",
+      "advancement": "skyseed:craft_nether_basalt_large"
+    }
   ]
 }

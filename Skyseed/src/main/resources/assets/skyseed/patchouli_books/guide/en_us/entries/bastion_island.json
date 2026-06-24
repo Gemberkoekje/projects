@@ -1,16 +1,28 @@
 {
   "name": "Bastion Remnant Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:gilded_blackstone",
-  "advancement": "skyseed:craft_bastion",
+  "sortnum": 11,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A piece of a $(bold)bastion remnant$() set adrift — one of three: a $(bold)bridge$() over a lava channel, a walled $(bold)housing$() block, or a $(bold)treasure$() room with a $(item)lodestone$() plinth and a caged $(item)magma cube$() spawner. Blackstone, gold and $(item)gilded blackstone$(), with bastion loot. Piglins, a brute and hoglins hold it; barter your way past in gold."
+      "text": "The $(item)Bastion Remnant Skyseed$() — blackstone, gold and crying obsidian. A blackstone bastion ruin with a $(item)lodestone$() treasure plinth, bastion loot and a $(bold)magma cube spawner$(); piglins included."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:bastion_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_bastion"
     },
     {
       "type": "patchouli:text",
-      "text": "Nether-native — it fizzles thrown anywhere else, and (like the real thing) $(bold)never takes in the basalt deltas$(). Crafted from blackstone, gold and $(item)crying obsidian$()."
+      "text": "A piece of a $(bold)bastion remnant$() set adrift — one of three: a $(bold)bridge$() over a lava channel, a walled $(bold)housing$() block, or a $(bold)treasure$() room with a $(item)lodestone$() plinth and a caged $(item)magma cube$() spawner. Blackstone, gold and $(item)gilded blackstone$(), with bastion loot. Piglins, a brute and hoglins hold it; barter your way past in gold.",
+      "advancement": "skyseed:craft_bastion"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Nether-native — it fizzles thrown anywhere else, and (like the real thing) $(bold)never takes in the basalt deltas$(). Crafted from blackstone, gold and $(item)crying obsidian$().",
+      "advancement": "skyseed:craft_bastion"
     }
   ]
 }

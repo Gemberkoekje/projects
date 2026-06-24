@@ -1,20 +1,33 @@
 {
   "name": "Ancient Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:deepslate",
-  "advancement": "skyseed:craft_ancient",
+  "sortnum": 14,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A shard of the deep, hung in the sky. Mossy deepslate and tuff, with dripstone teeth on its underside. Craft it from deepslate dug out of a low-thrown Rocky island."
+      "text": "The $(item)Ancient Skyseed$() — deepslate and cobbled deepslate. Dig the core of a $(bold)Rocky island thrown deep$(), down near the world's floor."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:ancient_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_ancient"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Riches$()$(br)Every deepslate ore lives here — $(item)iron$(), $(item)copper$(), coal and redstone in generous veins, down to diamond and emerald — plus $(item)amethyst$() geodes and $(item)dripstone$(). Like Rocky, height matters: grow it deep, toward the world's floor, and the diamond and emerald come thicker."
+      "text": "A shard of the deep, hung in the sky. Mossy deepslate and tuff, with dripstone teeth on its underside. Craft it from deepslate dug out of a low-thrown Rocky island.",
+      "advancement": "skyseed:craft_ancient"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Looks$()$(br)Deep cave (mossy, dripstone), geode (calcite), and a rare deep-dark variant with $(item)sculk$() — sensors, a catalyst, even a shrieker. And the moss to unlock the Lush island."
+      "text": "$(bold)Riches$()$(br)Every deepslate ore lives here — $(item)iron$(), $(item)copper$(), coal and redstone in generous veins, down to diamond and emerald — plus $(item)amethyst$() geodes and $(item)dripstone$(). Like Rocky, height matters: grow it deep, toward the world's floor, and the diamond and emerald come thicker.",
+      "advancement": "skyseed:craft_ancient"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Looks$()$(br)Deep cave (mossy, dripstone), geode (calcite), and a rare deep-dark variant with $(item)sculk$() — sensors, a catalyst, even a shrieker. And the moss to unlock the Lush island.",
+      "advancement": "skyseed:craft_ancient"
     }
   ]
 }

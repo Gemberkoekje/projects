@@ -1,16 +1,28 @@
 {
   "name": "Forest Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:oak_sapling",
-  "advancement": "skyseed:craft_forest",
+  "sortnum": 0,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A Forest Skyseed always grows a forest — grass and trees — and takes its cues from the biome it lands in: the local tree species, a pond in watery places, sandy ground on beaches and in deserts. Radius 7–10, flat-ish domed top, rocky underside. Coal is common in its core; iron a little rarer."
+      "text": "The $(item)Forest Skyseed$() — dirt and planks, both off your $(bold)starter island$(). The first seed you can make."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:forest_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_forest"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Where it lands matters$()$(br)$(li)Forest: oak and birch; savanna: acacia; taiga: spruce.$(li)Ocean, river, swamp: a wood around a pond.$(li)Beach / desert: a drier wood with sandy ground and dead bushes.$(li)Plains: a lighter, more open wood."
+      "text": "A Forest Skyseed always grows a forest — grass and trees — and takes its cues from the biome it lands in: the local tree species, a pond in watery places, sandy ground on beaches and in deserts. Radius 7–10, flat-ish domed top, rocky underside. Coal is common in its core; iron a little rarer.",
+      "advancement": "skyseed:craft_forest"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Where it lands matters$()$(br)$(li)Forest: oak and birch; savanna: acacia; taiga: spruce.$(li)Ocean, river, swamp: a wood around a pond.$(li)Beach / desert: a drier wood with sandy ground and dead bushes.$(li)Plains: a lighter, more open wood.",
+      "advancement": "skyseed:craft_forest"
     }
   ]
 }

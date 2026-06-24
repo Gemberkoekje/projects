@@ -1,16 +1,34 @@
 {
   "name": "Pasture Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:settlements",
   "icon": "minecraft:wheat",
-  "advancement": "skyseed:craft_pasture",
+  "sortnum": 3,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A fenced grass field with a hay bale, a water trough, and a small herd inside — the core early farm island. One throw gives you a breeding pair of $(bold)cows$(), $(bold)sheep$() or $(bold)pigs$() (or a mixed pair)."
+      "text": "The $(item)Pasture Skyseed$() — $(item)Wool$() and planks over two dirt. A fenced field of cows, sheep or pigs."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:pasture_skyseed_wool",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_pasture"
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:pasture_skyseed_beef",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_pasture"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Two ways to make it$()$(br)Whichever you catch first: $(item)Wool$() (from a sheep) or $(item)Raw Beef$() (from a cow), plus planks and dirt. Then breed the pair with wheat (cows/sheep) or carrots (pigs) and you're self-sufficient for food and leather."
+      "text": "A fenced grass field with a hay bale, a water trough, and a small herd inside — the core early farm island. One throw gives you a breeding pair of $(bold)cows$(), $(bold)sheep$() or $(bold)pigs$() (or a mixed pair).",
+      "advancement": "skyseed:craft_pasture"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Two ways to make it$()$(br)Whichever you catch first: $(item)Wool$() (from a sheep) or $(item)Raw Beef$() (from a cow), plus planks and dirt. Then breed the pair with wheat (cows/sheep) or carrots (pigs) and you're self-sufficient for food and leather.",
+      "advancement": "skyseed:craft_pasture"
     }
   ]
 }

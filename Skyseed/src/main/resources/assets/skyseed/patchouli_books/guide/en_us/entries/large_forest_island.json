@@ -1,12 +1,23 @@
 {
   "name": "Large Forest Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:oak_log",
-  "advancement": "skyseed:craft_large_forest",
+  "sortnum": 1,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The Forest Island writ large — radius 13–17, a deeper core, more coal and iron to match its size. Like the small one it always grows a forest and takes cues from the biome: the local tree species, a pond in watery biomes, sandy ground on beaches and in deserts.$(br2)Crafted from any logs — any tree — so harvest a tree first."
+      "text": "The $(item)Large Forest Skyseed$() — any logs and dirt. Fell a $(item)forest$() first; bigger and pricier."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:forest_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_forest_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "The Forest Island writ large — radius 13–17, a deeper core, more coal and iron to match its size. Like the small one it always grows a forest and takes cues from the biome: the local tree species, a pond in watery biomes, sandy ground on beaches and in deserts.$(br2)Crafted from any logs — any tree — so harvest a tree first.",
+      "advancement": "skyseed:craft_forest_large"
     }
   ]
 }

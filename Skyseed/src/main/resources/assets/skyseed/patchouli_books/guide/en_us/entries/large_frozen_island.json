@@ -1,20 +1,33 @@
 {
   "name": "Large Frozen Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:overworld",
   "icon": "minecraft:blue_ice",
-  "advancement": "skyseed:craft_frozen_large",
+  "sortnum": 9,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A grand frozen isle — tall and broad. It takes after the cold it lands in: deep powder snow and spruce over snowy lands, bare packed and blue ice with ice spikes over frozen ones."
+      "text": "The $(item)Large Frozen Skyseed$() — snow and packed ice. Snowy or icy by biome, with a frozen lake over frozen ones."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:frozen_large_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_frozen_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Snow or ice$()$(br)Packed ice, blue ice, and the hidden $(item)powder snow$() traps run through the core. Over a frozen biome — frozen ocean, peaks, ice spikes — it turns properly icy and a sheet-ice $(bold)frozen lake$() sets into its surface; over snowy biomes it stays deep powder and spruce, with no lake."
+      "text": "A grand frozen isle — tall and broad. It takes after the cold it lands in: deep powder snow and spruce over snowy lands, bare packed and blue ice with ice spikes over frozen ones.",
+      "advancement": "skyseed:craft_frozen_large"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Cold company$()$(br)Polar bears, rabbits, and foxes wander the snow."
+      "text": "$(bold)Snow or ice$()$(br)Packed ice, blue ice, and the hidden $(item)powder snow$() traps run through the core. Over a frozen biome — frozen ocean, peaks, ice spikes — it turns properly icy and a sheet-ice $(bold)frozen lake$() sets into its surface; over snowy biomes it stays deep powder and spruce, with no lake.",
+      "advancement": "skyseed:craft_frozen_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Cold company$()$(br)Polar bears, rabbits, and foxes wander the snow.",
+      "advancement": "skyseed:craft_frozen_large"
     }
   ]
 }

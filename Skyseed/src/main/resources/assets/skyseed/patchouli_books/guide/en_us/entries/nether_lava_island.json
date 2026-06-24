@@ -1,20 +1,33 @@
 {
   "name": "Nether Lava Island",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:nether",
   "icon": "minecraft:magma_block",
-  "advancement": "skyseed:craft_nether_lava",
+  "sortnum": 2,
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "Tier-2 of the Lava Lagoon: a $(bold)full-size$() basalt island built around a contained $(item)lava$() lake, with magma-block shores, a wandering pack of $(item)Striders$() and a $(item)Magma Cube$() or two. The molten cousin of the Aquatic isle."
+      "text": "The $(item)Nether Lava Skyseed$() — an $(item)Aquatic Skyseed$(), basalt and a $(item)bucket of lava$() (returned empty). A full-size $(bold)lava lagoon$() — and the overworld's only lava island, if you throw it topside."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:nether_lava_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_nether_lava"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Yields$()$(br)Striders for lava travel (saddle one and steer with a $(item)warped fungus on a stick$()), magma cream from the cubes, and a little nether quartz and gold in the body. The lake is a ready-made smelter and an obsidian source — bring a bucket of water."
+      "text": "Tier-2 of the Lava Lagoon: a $(bold)full-size$() basalt island built around a contained $(item)lava$() lake, with magma-block shores, a wandering pack of $(item)Striders$() and a $(item)Magma Cube$() or two. The molten cousin of the Aquatic isle.",
+      "advancement": "skyseed:craft_nether_lava"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Topside, too$()$(br)The overworld has no lava island of its own, so this seed grows a $(bold)full one$() there as well: a stone-bodied volcanic isle with the same lava lake — Striders and all. Crafted from an $(item)Aquatic Skyseed$(), basalt and a bucket of lava (you keep the bucket)."
+      "text": "$(bold)Yields$()$(br)Striders for lava travel (saddle one and steer with a $(item)warped fungus on a stick$()), magma cream from the cubes, and a little nether quartz and gold in the body. The lake is a ready-made smelter and an obsidian source — bring a bucket of water.",
+      "advancement": "skyseed:craft_nether_lava"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Topside, too$()$(br)The overworld has no lava island of its own, so this seed grows a $(bold)full one$() there as well: a stone-bodied volcanic isle with the same lava lake — Striders and all. Crafted from an $(item)Aquatic Skyseed$(), basalt and a bucket of lava (you keep the bucket).",
+      "advancement": "skyseed:craft_nether_lava"
     }
   ]
 }

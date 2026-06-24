@@ -1,8 +1,9 @@
 {
   "name": "Welcome, Skyfarer",
-  "category": "skyseed:skyseeds",
+  "category": "skyseed:basics",
   "icon": "minecraft:grass_block",
   "priority": true,
+  "sortnum": 0,
   "pages": [
     {
       "type": "patchouli:text",
@@ -14,7 +15,11 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A living world$()$(br)An island's look depends on the biome it lands in. The same Forest Skyseed grows oak in a forest, acacia in a savanna, sparse grass in plains, and dry dirt and sand in the desert.$(br2)See each seed's recipe under $(bold)Recipes$(). Craft one, and its field notes here will unlock."
+      "text": "$(bold)A living world$()$(br)An island's look depends on the biome it lands in. The same Forest Skyseed grows oak in a forest, acacia in a savanna, sparse grass in plains, and dry dirt and sand in the desert."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)How this book works$()$(br)Every seed has a page. It shows $(bold)what to gather$() right away; once you're holding the makings, its $(bold)recipe$() appears; craft it, and its full $(bold)field notes$() unlock.$(br2)A half-filled page is a to-do list — go find what it names."
     }
   ]
 }
