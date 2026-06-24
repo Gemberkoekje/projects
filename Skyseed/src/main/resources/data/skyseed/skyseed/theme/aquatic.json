@@ -50,6 +50,21 @@
       ],
       "variants": [] },
 
+    { "_comment": "Deep ocean — the one place sponge grows. A dark, sand-bottomed pool with wet sponge clinging to the bed (smelt it dry for an Ocean Monument seed), plus kelp, seagrass and cod. Listed before the shallow reef so deep oceans take it.",
+      "biomes": [ "#minecraft:is_deep_ocean" ], "surface": "minecraft:sand", "fill": "minecraft:sand",
+      "pond": {
+        "block": "minecraft:water", "radius": 4, "depth": 4,
+        "plants": [
+          { "block": "minecraft:wet_sponge", "chance": 0.06 },
+          { "block": "minecraft:kelp", "chance": 0.20 },
+          { "block": "minecraft:seagrass", "chance": 0.14 },
+          { "block": "minecraft:tall_seagrass", "chance": 0.06 },
+          { "block": "minecraft:sea_pickle", "chance": 0.04 }
+        ],
+        "water_mobs": [ { "entity": "minecraft:cod", "chance": 0.45, "count": { "min": 2, "max": 4 } }, { "entity": "minecraft:squid", "chance": 0.25, "count": { "min": 1, "max": 2 } } ]
+      },
+      "variants": [ { "weight": 1, "name": "deep", "decoration": {} } ] },
+
     { "biomes": [ "#minecraft:is_ocean", "#minecraft:is_deep_ocean" ], "surface": "minecraft:sand", "fill": "minecraft:sand",
       "pond": {
         "block": "minecraft:water", "radius": 4, "depth": 3,

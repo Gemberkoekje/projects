@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.3] - 2026-06-24
+
+### Added
+- **Sponge now comes from a deep‑ocean Aquatic island.** Thrown over a `#minecraft:is_deep_ocean` biome, an Aquatic
+  seed's pool comes up dark and sandy with **wet sponge on the bed** (smelt it dry) — closing the bootstrap gap where
+  the Ocean Monument seed needed sponge that, until now, only a monument could give. The Ocean Monument hint and the
+  Aquatic field notes point there.
+
 ## [0.65.2] - 2026-06-24
 
 ### Fixed

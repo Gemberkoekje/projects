@@ -21,7 +21,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(); over an ocean, a small reef of $(item)coral$(), sea pickles and seagrass. $(item)Squid$() swim the freshwater, $(item)tropical fish$() the reef, and $(item)salmon$() a river.",
+      "text": "$(bold)Waters$()$(br)Freshwater grows $(item)kelp$(), $(item)seagrass$(), and $(item)lily pads$(); over an ocean, a small reef of $(item)coral$(), sea pickles and seagrass. $(item)Squid$() swim the freshwater, $(item)tropical fish$() the reef, and $(item)salmon$() a river.$(br2)Over a $(bold)deep ocean$() the bed turns dark and sandy, dotted with $(item)wet sponge$() — smelt it dry for an $(item)Ocean Monument$() seed.",
       "advancement": "skyseed:craft_aquatic"
     },
     {
