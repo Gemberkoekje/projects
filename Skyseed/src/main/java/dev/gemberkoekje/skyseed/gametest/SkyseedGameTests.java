@@ -790,6 +790,41 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void piglinTradingPostIsNetherNativeWithItsJigsaw(GameTestHelper helper) {
+        // Nether-native Piglin Trading Post: a blackstone island that assembles the hand-built trading-post hall and
+        // grows anywhere in the Nether — including the basalt deltas, since (unlike the bastion) it has no fizzle rule.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme post = theme(overworld, "piglin_trading_post");
+        helper.assertTrue(post.baseValidIn(Level.NETHER.location()), "trading post must implement the_nether");
+        helper.assertTrue(!post.baseValidIn(Level.OVERWORLD.location()), "trading post must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(post, wastes, 64, Level.NETHER.location()),
+                "trading post should grow in the Nether");
+        final var deltas = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.BASALT_DELTAS);
+        helper.assertTrue(IslandGenerator.formValidFor(post, deltas, 64, Level.NETHER.location()),
+                "the trading post has no fizzle rule — it should grow in the basalt deltas too");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), post, wastes,
+                RandomSource.create(11L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the trading post island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream()
+                        .anyMatch(j -> j.pool().getPath().equals("piglin_trading_post/trading_post")),
+                "the trading post should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

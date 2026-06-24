@@ -180,6 +180,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:piglin_trading_post_skyseed",
+      "text": "The $(item)Piglin Trading Post Skyseed$() — blackstone, gold and netherrack. The Nether's village: a blackstone hall around a $(item)gold$() trade pillar where 3-5 piglins barter. $(bold)Drop them gold$()."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

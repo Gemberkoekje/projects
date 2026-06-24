@@ -43,6 +43,7 @@ public final class DevStructureGenerator {
             RuinedPortalTemplates.generateInto(base.resolve("ruined_portal"));
             NetherFortressTemplates.generateInto(base.resolve("nether_fortress"));
             BastionTemplates.generateInto(base.resolve("bastion"));
+            PiglinTradingPostTemplates.generateInto(base.resolve("piglin_trading_post"));
             DesertTempleTemplates.generateInto(base.resolve("desert_temple"));
             JungleTempleTemplates.generateInto(base.resolve("jungle_temple"));
             WitchHutTemplates.generateInto(base.resolve("witch_hut"));

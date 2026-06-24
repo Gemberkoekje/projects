@@ -1,0 +1,16 @@
+{
+  "name": "Piglin Trading Post Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:gold_block",
+  "advancement": "skyseed:craft_piglin_trading_post",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The Nether's $(bold)trading post$() — a blackstone hall set adrift: an open colonnade around a $(item)gold$() trade pillar, lit by hanging lanterns, with $(item)gilded blackstone$() and two loot chests. Three to five $(bold)piglins$() keep it."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Wear gold and they stay neutral; $(bold)drop a gold ingot$() near one and it barters. The gold-economy hub. Nether-native — it fizzles thrown anywhere else. Crafted from blackstone, gold and $(item)netherrack$()."
+    }
+  ]
+}

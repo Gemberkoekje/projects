@@ -1,9 +1,8 @@
 # Skyseed — Nether Chapter Plan
 
 The Nether is **built out end to end** as of v0.57.0 — every overworld seed adapts or fizzles, all five Nether
-biomes have a full-size native seed (+ a Large variant), and the first Nether structure (the Fortress + its blaze
-spawner room) is in. What's left: the remaining structures (Bastion, Trading Post, Wither Arena), then the handoff
-to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
+biomes have a full-size native seed (+ a Large variant), and the first Nether structures (the Fortress + blaze room, the Bastion Remnant, the Piglin Trading Post)
+are in. What's left: the Wither Arena, then the handoff to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -56,15 +55,8 @@ to the End. Per-release detail is in [CHANGELOG.md](CHANGELOG.md).
 
 Genuinely new seeds with no overworld parallel, on the existing jigsaw + mob-pack machinery:
 
-### 🏯 Bastion Remnant Island
-- Recipe: Blackstone + Gold Ingot + Crying Obsidian. **Fizzles over Basalt Deltas** (the vanilla rule) with its own
-  message.
-- Weighted variants: Bridge (brutes, hoglin stables) · Housing (piglins, central loot) · Treasure (brutes, gilded
-  blackstone, magma-cube spawner, best loot). Loot `chests/bastion_treasure` / `bastion_other` — lodestone, Pigstep.
-
-### 🐷 Piglin Trading Post Island *(the Nether's "village")*
-- Recipe: Gold Ingot + Blackstone + Netherrack. A blackstone hall with gold accents + 3-5 gold-armoured (neutral)
-  Piglins; drop gold to barter (barter table is fixed by vanilla). The gold-economy hub.
+_Shipped: the **Bastion Remnant** (3 weighted variants + the basalt-deltas fizzle, v0.62.0) and the **Piglin Trading
+Post** (v0.63.0) — see the [CHANGELOG](CHANGELOG.md)._
 
 ### ☠️ Wither Arena Island
 - Recipe: Obsidian + Nether Brick + Soul Sand — a **blast-resistant** arena so the Wither can't blow you into the

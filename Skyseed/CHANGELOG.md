@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.63.0] - 2026-06-24
+
+### Added
+- **Piglin Trading Post Island** — the Nether's "village". A new Nether‑native seed (gold ingot + blackstone +
+  netherrack) that grows a blackstone island carrying a trading‑post hall: an open colonnade with rafter beams and
+  hanging lanterns around a central gold trade pillar, gilded‑blackstone accents and two loot chests. Three to five
+  neutral piglins keep it — wear gold and drop a gold ingot to barter (vanilla). The gold‑economy hub. Unlike the
+  bastion it has no fizzle rule, so it grows anywhere in the Nether.
+
 ## [0.62.0] - 2026-06-24
 
 ### Added

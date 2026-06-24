@@ -33,6 +33,7 @@ public final class ModItems {
             "ladder_small", "ladder_large",
             "nether_rocky", "nether_rocky_large", "nether_lava", "nether_lava_large", "nether_forest", "nether_forest_large",
             "nether_soul", "nether_soul_large", "nether_basalt", "nether_basalt_large", "nether_fortress", "bastion",
+            "piglin_trading_post",
             "hamlet", "trade_post", "village_center",
             "pasture", "poultry", "wool_farm", "stable", "aquarium",
             "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
