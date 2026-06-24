@@ -755,6 +755,37 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void bastionIsNetherNativeWithBastionJigsaw(GameTestHelper helper) {
+        // Nether-native bastion remnant island: a blackstone island that assembles the hand-built bastion (a
+        // lodestone treasure plinth, a magma-cube spawner, bastion loot). The structure is placed later by the
+        // generation job, so the plan carries it as a jigsaw site.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme bastion = theme(overworld, "bastion");
+        helper.assertTrue(bastion.baseValidIn(Level.NETHER.location()), "bastion must implement the_nether");
+        helper.assertTrue(!bastion.baseValidIn(Level.OVERWORLD.location()), "bastion must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(bastion, wastes, 64, Level.NETHER.location()),
+                "bastion should grow in the Nether");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), bastion, wastes,
+                RandomSource.create(7L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the bastion island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/bastion")),
+                "the bastion should assemble the bastion jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
         // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
         // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.

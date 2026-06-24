@@ -1,0 +1,16 @@
+{
+  "name": "Bastion Remnant Island",
+  "category": "skyseed:skyseeds",
+  "icon": "minecraft:gilded_blackstone",
+  "advancement": "skyseed:craft_bastion",
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "A piece of a $(bold)bastion remnant$() set adrift — a blackstone ruin of gold and $(item)gilded blackstone$() around a $(item)lodestone$() treasure plinth, with bastion loot and a caged $(item)magma cube$() spawner. Piglins and a brute hold it; tread carefully, or barter your way past in gold."
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Nether-native — it fizzles if thrown anywhere else. Crafted from blackstone, gold and $(item)crying obsidian$()."
+    }
+  ]
+}

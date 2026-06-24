@@ -175,6 +175,11 @@
     },
     {
       "type": "patchouli:crafting",
+      "recipe": "skyseed:bastion_skyseed",
+      "text": "The $(item)Bastion Remnant Skyseed$() — blackstone, gold and crying obsidian. A blackstone bastion ruin with a $(item)lodestone$() treasure plinth, bastion loot and a $(bold)magma cube spawner$(); piglins included."
+    },
+    {
+      "type": "patchouli:crafting",
       "recipe": "skyseed:hamlet_skyseed",
       "text": "The $(item)Hamlet Skyseed$() — planks, cobblestone and an $(item)emerald$() (mine a Rocky mountain for emeralds). A villager's cottage — the start of trading."
     },

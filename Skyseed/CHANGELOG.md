@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.61.0] - 2026-06-24
+
+### Added
+- **Bastion Remnant Island — a new Nether seed.** A blackstone island carrying a bastion ruin: gold and gilded
+  blackstone around a **lodestone treasure plinth**, a `bastion_treasure` and a `bastion_other` chest, and a caged
+  **magma-cube spawner** — with piglins, a brute and magma cubes drifting across it. Nether-native (fizzles
+  elsewhere). Crafted from blackstone, gold and crying obsidian. New item, recipe, advancement, guide entry and a
+  dark-gold icon. Guarded by the `bastionIsNetherNativeWithBastionJigsaw` gametest. *(This is the first,
+  treasure-flavoured variant; the Bridge / Housing variants and the "fizzles over Basalt Deltas" rule are next.)*
+
 ## [0.60.0] - 2026-06-24
 
 ### Changed
