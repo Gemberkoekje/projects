@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.65.4] - 2026-06-24
+
+### Changed
+- Reverted the deep‑ocean sponge drop from 0.65.3. It duplicated what the **Large Aquatic** island already does (3%
+  wet sponge on its ocean pool bed, plus a 5% Ocean Monument roll) and wasn't fixing a circular dependency — there
+  wasn't one. Sponge stays a Large Aquatic reward; the Ocean Monument hint and the Large Aquatic field notes now
+  point there.
+
 ## [0.65.3] - 2026-06-24
 
 ### Added

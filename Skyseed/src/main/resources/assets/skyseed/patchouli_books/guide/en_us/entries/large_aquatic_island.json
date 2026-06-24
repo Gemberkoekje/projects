@@ -26,7 +26,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Reefs and swamps$()$(br)Over a warm ocean the lake becomes a deep coral reef with tropical fish, cod and pufferfish; over a swamp, a lily-strewn pool with frogs.",
+      "text": "$(bold)Reefs and swamps$()$(br)Over an ocean the lake becomes a deep coral reef with tropical fish, cod and pufferfish — and the bed holds $(item)wet sponge$() to smelt dry (and, rarely, a whole $(o)Ocean Monument$() rises from it). Over a swamp, a lily-strewn pool with frogs.",
       "advancement": "skyseed:craft_aquatic_large"
     }
   ]

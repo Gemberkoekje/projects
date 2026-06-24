@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Ocean Monument Skyseed$() — $(item)gold blocks$() and $(item)sponge$() around a $(item)diamond$(). A prismarine temple with guardians, a sponge room and a buried $(item)Heart of the Sea$(). Best thrown over a deep ocean.$(br2)$(bold)Where to look$()$(br)Gold from a $(item)Badlands$() isle, diamond from the $(bold)deep$(); wet sponge clings to the bed of a $(bold)deep-ocean$() $(item)Aquatic$() isle — smelt it dry."
+      "text": "The $(item)Ocean Monument Skyseed$() — $(item)gold blocks$() and $(item)sponge$() around a $(item)diamond$(). A prismarine temple with guardians, a sponge room and a buried $(item)Heart of the Sea$(). Best thrown over a deep ocean.$(br2)$(bold)Where to look$()$(br)Gold from a $(item)Badlands$() isle, diamond from the $(bold)deep$(); wet sponge dots the bed of a $(item)Large Aquatic$() isle thrown over an ocean — smelt it dry."
     },
     {
       "type": "patchouli:crafting",
