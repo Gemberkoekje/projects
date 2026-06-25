@@ -3,6 +3,27 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.70.0] - 2026-06-25
+
+### Added
+- **Per-element caps on jigsaw assembly** (`JigsawConfig.cap_prefix` / `cap_count`). Vanilla's jigsaw has no native
+  limit on how many of an element it places, so a pool allowed to run long places as many shops as fit. The compat
+  layer now mirrors `generateJigsaw` but, after assembling the full piece list, drops any piece whose element name
+  contains `cap_prefix` beyond the `cap_count` nearest the centre — keeping the central ones — before stamping. The
+  spare lots simply don't get their (capped) building.
+
+### Changed
+- **The Trade Post is now a proper 2–4 building trade post.** Its streets run long and branch (so plenty of lots,
+  fields, and over-void piers form), but a `shop_` cap of 4 holds the shops to a tidy handful while the remaining
+  lots fall to wheat fields and gardens. Rebalanced the lot pool toward fields (fields were too rare before — three
+  villages in a row could have none).
+
+### Fixed
+- **Buildings and piers no longer float over the void.** A new post-assembly pass (`PathSurfacer.supportFloatingFloors`)
+  drops a short dirt foundation under any building or bridge floor left hanging over an open drop, so a lot or pier
+  that ran off the island edge reads as anchored rather than floating in mid-air (e.g. the garden-on-a-lantern that
+  hung in the sky).
+
 ## [0.69.2] - 2026-06-25
 
 ### Fixed

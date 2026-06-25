@@ -247,12 +247,14 @@ public final class GenerationJob {
     private void placeStructures() {
         for (IslandPlan.JigsawSite js : plan.jigsaws()) {
             final Holder<StructureTemplatePool> pool = Lookup.templatePool(level.registryAccess(), js.pool());
-            Jigsaw.place(level, pool, js.target(), js.depth(), js.origin(), false);
+            Jigsaw.placeCapped(level, pool, js.target(), js.depth(), js.origin(), false, js.capPrefix(), js.capCount());
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
             Traps.applyAfterJigsaw(level, js.origin());
-            // Resolve a connective structure's path markers into terrain-aware paths / over-void bridges (§3a).
+            // Resolve a connective structure's path markers into terrain-aware paths / over-void bridges (§3a),
+            // then drop foundations under any building or pier floor that ended up hanging over the void.
             if (js.reach() > 0) {
                 PathSurfacer.resolve(level, js.origin(), js.reach());
+                PathSurfacer.supportFloatingFloors(level, js.origin(), js.reach());
             }
             // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.
             linkConnections(level, js.origin(), Math.max(LINK_RADIUS, js.reach()));

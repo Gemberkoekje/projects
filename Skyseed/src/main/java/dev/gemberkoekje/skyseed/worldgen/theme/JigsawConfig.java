@@ -17,11 +17,14 @@ import net.minecraft.resources.ResourceLocation;
  * connection-link pass and, when {@code reach > 0}, the path/bridge marker surfacing (SKYJIGSAWPLAN §3a). It is
  * the size of the assembled structure, so a deep, sprawling jigsaw (a village, a fortress) must declare a reach
  * wide enough to cover where its pieces land; {@code 0} (the default) means a solid structure that lays no path
- * markers and links within the normal radius. See {@code SKYVILLAGESPLAN.md} / {@code SKYSTRUCTURESPLAN.md} /
- * {@code SKYJIGSAWPLAN.md}.
+ * markers and links within the normal radius. Finally {@code capPrefix} / {@code capCount} bound a family of
+ * elements: after the jigsaw assembles, any piece whose element name contains {@code capPrefix} beyond the
+ * {@code capCount} nearest the centre is dropped before stamping, so a trade post can run long streets full of
+ * fields yet keep its shops to a handful (vanilla has no native per-element limit). {@code capCount = 0} (the
+ * default) disables it. See {@code SKYVILLAGESPLAN.md} / {@code SKYSTRUCTURESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
  */
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,
-                           int sink, int reach) {
+                           int sink, int reach, String capPrefix, int capCount) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
@@ -29,6 +32,8 @@ public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int d
             Codec.INT.optionalFieldOf("pad", 6).forGetter(JigsawConfig::pad),
             Codec.INT.optionalFieldOf("iron_golems", 0).forGetter(JigsawConfig::ironGolems),
             Codec.INT.optionalFieldOf("sink", 0).forGetter(JigsawConfig::sink),
-            Codec.INT.optionalFieldOf("reach", 0).forGetter(JigsawConfig::reach)
+            Codec.INT.optionalFieldOf("reach", 0).forGetter(JigsawConfig::reach),
+            Codec.STRING.optionalFieldOf("cap_prefix", "").forGetter(JigsawConfig::capPrefix),
+            Codec.INT.optionalFieldOf("cap_count", 0).forGetter(JigsawConfig::capCount)
     ).apply(i, JigsawConfig::new));
 }

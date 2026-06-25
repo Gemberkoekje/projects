@@ -815,6 +815,28 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void pathSurfacerSupportsFloatingFloors(GameTestHelper helper) {
+        // A building/pier floor left over the void gets a dirt foundation dropped under it (so a lot or pier that ran
+        // off the island edge reads as anchored, not floating in mid-air); a floor on solid ground is left alone.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0));
+        final int deckY = 11; // supportFloatingFloors reads origin.Y - 1 as the floor level
+        level.setBlock(base.offset(18, deckY, 20), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // over void
+        level.setBlock(base.offset(22, deckY - 1, 20), Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS);     // ground
+        level.setBlock(base.offset(22, deckY, 20), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS);   // on ground
+
+        PathSurfacer.supportFloatingFloors(level, base.offset(20, deckY + 1, 20), 6);
+
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 1, 20)).is(Blocks.DIRT),
+                "the over-void floor should gain a foundation");
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 3, 20)).is(Blocks.DIRT),
+                "the foundation should drop several blocks");
+        helper.assertTrue(level.getBlockState(base.offset(22, deckY - 2, 20)).isAir(),
+                "a floor already on solid ground should not be stilted");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void tradePostIsAStreetVillage(GameTestHelper helper) {
         // SKYJIGSAWPLAN Phase 1: the Trade Post is now a street village — a square radiating a depth-6 street
         // network with shops + fields hung off lot connectors, surfaced by PathSurfacer (dirt paths on the island,
@@ -835,11 +857,12 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void tradePostVillagePlacesShops(GameTestHelper helper) {
-        // Regression: assemble the Trade Post village five times on a flat platform and confirm shops appear in
-        // aggregate (a shop carries a RED_BED), not just fields — guards against building lots being overlap-rejected
-        // by the jigsaw (a too-dense or too-short street network produced shop-less villages). Five samples make it
-        // robust to the per-village RNG. (Loads dev-generated .nbt; the syncDevStructures build task keeps the
-        // Stonecutter node copy current, so this no longer flakes on a stale .nbt.)
+        // Regression: assemble the Trade Post village five times on a flat platform with the shop cap engaged, and
+        // confirm each village has both shops (a shop carries a RED_BED = 2 blocks) and fields, while no village
+        // exceeds the 4-shop cap. Long streets place many lots; placeCapped keeps only the 4 shops nearest the centre
+        // and lets the rest fall to fields/gardens — so this checks the cap holds (<= 8 red_bed/village) without
+        // starving the village of shops or fields. (Loads dev-generated .nbt; syncDevStructures keeps the node copy
+        // current, so this no longer flakes on a stale .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
@@ -853,21 +876,26 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.place(level, pool, Ids.mc("bottom"), 5, origin, false);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4);
+            int villageBeds = 0;
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
                         final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
                         if (s.is(Blocks.RED_BED)) {
-                            beds++;
+                            villageBeds++;
                         } else if (s.is(Blocks.WHEAT)) {
                             wheat++;
                         }
                     }
                 }
             }
+            helper.assertTrue(villageBeds <= 8,
+                    "village " + iter + " exceeded the 4-shop cap (red_bed=" + villageBeds + ")");
+            beds += villageBeds;
         }
         helper.assertTrue(beds > 0, "5 villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
+        helper.assertTrue(wheat > 0, "5 villages placed no wheat fields (beds=" + beds + " wheat=" + wheat + ")");
         helper.succeed();
     }
 

@@ -5,6 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -37,6 +38,7 @@ public final class PathSurfacer {
     private static final int SCAN_DOWN = 2;
     private static final int SCAN_UP = 4;
     private static final int FLAGS = Block.UPDATE_CLIENTS; // no physics — fences are linked separately afterwards
+    private static final int SUPPORT_DEPTH = 6; // how far a foundation hangs under a floor left over the void
 
     /** Resolve every path marker within {@code reach} (horizontal half-extent) of {@code origin}. */
     public static void resolve(ServerLevel level, BlockPos origin, int reach) {
@@ -89,4 +91,33 @@ public final class PathSurfacer {
         }
     }
 
+    /**
+     * Drop a short dirt foundation under any building or pier floor left hanging over the void, so a lot or a bridge
+     * that ran off the island edge reads as anchored rather than floating in mid-air. Scans the structure's deck
+     * level (one below {@code origin}) for solid floor blocks (planks / grass / dirt / farmland — building floors and
+     * bridge edge beams; the thin slab deck is carried by those beams) sitting over an open drop, and stilts each
+     * one down a few blocks. Called after {@link #resolve} so the bridges it just laid get supported too.
+     */
+    public static void supportFloatingFloors(ServerLevel level, BlockPos origin, int reach) {
+        final int deckY = origin.getY() - 1; // the structure floor sits one below the jigsaw origin
+        final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                p.set(origin.getX() + dx, deckY, origin.getZ() + dz);
+                if (!level.isLoaded(p) || !isFloorBlock(level.getBlockState(p))
+                        || !level.getBlockState(p.below()).isAir()) {
+                    continue;
+                }
+                for (int d = 1; d <= SUPPORT_DEPTH; d++) {
+                    level.setBlock(new BlockPos(p.getX(), deckY - d, p.getZ()), Blocks.DIRT.defaultBlockState(), FLAGS);
+                }
+            }
+        }
+    }
+
+    /** Blocks that read as a building/pier floor — what a foundation should hang under when it's over the void. */
+    private static boolean isFloorBlock(BlockState s) {
+        return s.is(Blocks.OAK_PLANKS) || s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.DIRT)
+                || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.FARMLAND);
+    }
 }

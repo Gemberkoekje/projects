@@ -199,7 +199,8 @@ public final class IslandGenerator {
             // structure's floor (the anchor layer) flush on the pad at gy — otherwise it sinks a block into it.
             // `sink` buries it further: each block lowers the whole piece so the island's own surface covers it.
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
-                    new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach()));
+                    new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach(),
+                    jc.capPrefix(), jc.capCount()));
             // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack onto the pad (gy),
             // spawned a block above, so the mob lands on the structure floor that now sits at gy.
             if (!animalPacks.isEmpty()) {
@@ -340,7 +341,8 @@ public final class IslandGenerator {
         final ResourceLocation netherPool = Ids.of(
                 jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
         if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
-            return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink(), jc.reach());
+            return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink(), jc.reach(),
+                    jc.capPrefix(), jc.capCount());
         }
         return jc;
     }
