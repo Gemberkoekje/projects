@@ -13,15 +13,22 @@ import net.minecraft.resources.ResourceLocation;
  * {@code ironGolems} how many golems to spawn at the centre once assembled (the Village Center's guard), and
  * {@code sink} how many blocks below the levelled surface to seat the structure (0 = flush on the pad; 1 buries
  * it one block under the island's own surface, so e.g. a temple roof hides under the sand and only its hole
- * shows). See {@code SKYVILLAGESPLAN.md} / {@code SKYSTRUCTURESPLAN.md}.
+ * shows), and {@code reach} the horizontal half-extent the post-assembly passes scan around the origin — the
+ * connection-link pass and, when {@code reach > 0}, the path/bridge marker surfacing (SKYJIGSAWPLAN §3a). It is
+ * the size of the assembled structure, so a deep, sprawling jigsaw (a village, a fortress) must declare a reach
+ * wide enough to cover where its pieces land; {@code 0} (the default) means a solid structure that lays no path
+ * markers and links within the normal radius. See {@code SKYVILLAGESPLAN.md} / {@code SKYSTRUCTURESPLAN.md} /
+ * {@code SKYJIGSAWPLAN.md}.
  */
-public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems, int sink) {
+public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,
+                           int sink, int reach) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
             Codec.INT.optionalFieldOf("depth", 1).forGetter(JigsawConfig::depth),
             Codec.INT.optionalFieldOf("pad", 6).forGetter(JigsawConfig::pad),
             Codec.INT.optionalFieldOf("iron_golems", 0).forGetter(JigsawConfig::ironGolems),
-            Codec.INT.optionalFieldOf("sink", 0).forGetter(JigsawConfig::sink)
+            Codec.INT.optionalFieldOf("sink", 0).forGetter(JigsawConfig::sink),
+            Codec.INT.optionalFieldOf("reach", 0).forGetter(JigsawConfig::reach)
     ).apply(i, JigsawConfig::new));
 }

@@ -54,8 +54,9 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
     /**
      * A jigsaw structure to assemble at {@code origin} (the anchor tile) once the terrain is down.
      * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed);
-     * {@code ironGolems} golems are spawned at the centre once assembled.
+     * {@code ironGolems} golems are spawned at the centre once assembled; {@code reach} is the half-extent the
+     * post-assembly connection-link and (when {@code > 0}) path/bridge surfacing passes scan (SKYJIGSAWPLAN §3a).
      */
     public record JigsawSite(ResourceLocation pool, ResourceLocation target,
-                             int depth, int pad, int ironGolems, BlockPos origin) {}
+                             int depth, int pad, int ironGolems, BlockPos origin, int reach) {}
 }

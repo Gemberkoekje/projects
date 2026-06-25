@@ -11,6 +11,7 @@ import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
+import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
@@ -769,6 +770,42 @@ public final class SkyseedGameTests {
                 RandomSource.create(42L));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("debug_streets/start")),
                 "the debug streets seed should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void pathSurfacerResolvesMarkersIntoPathsAndBridges(GameTestHelper helper) {
+        // SKYJIGSAWPLAN §3a: a connective piece leaves a PURPLE_WOOL marker one block above each path tile;
+        // PathSurfacer turns a marker over ground into a dirt path and a marker over void into a self-railing
+        // wooden bridge, then clears the markers. Hand-build a strip: ground for x=5..7, open void for x=8..9.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0));
+        final int y = 5, z = 7;
+        for (int x = 5; x <= 7; x++) { // ground: dirt fill under a grass deck tile
+            level.setBlock(base.offset(x, y - 1, z), Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS);
+            level.setBlock(base.offset(x, y, z), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+        for (int x = 5; x <= 9; x++) { // a marker one block above every path tile (ground x5..7, void x8..9)
+            level.setBlock(base.offset(x, y + 1, z), PathSurfacer.MARKER.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+
+        PathSurfacer.resolve(level, base.offset(7, y, z), 6);
+
+        for (int x = 5; x <= 7; x++) { // ground tiles -> a path block
+            final BlockState s = level.getBlockState(base.offset(x, y, z));
+            helper.assertTrue(s.is(Blocks.DIRT_PATH) || s.is(Blocks.GRAVEL),
+                    "ground deck x=" + x + " should be a path block, was " + s);
+        }
+        helper.assertTrue(level.getBlockState(base.offset(8, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
+        helper.assertTrue(level.getBlockState(base.offset(9, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
+        // The exposed (over-void) side of a bridge tile gets an edge beam + a fence railing.
+        helper.assertTrue(level.getBlockState(base.offset(8, y, z + 1)).is(Blocks.OAK_PLANKS), "bridge edge beam");
+        helper.assertTrue(level.getBlockState(base.offset(8, y + 1, z + 1)).is(Blocks.OAK_FENCE), "bridge railing");
+        // Markers are all gone.
+        for (int x = 5; x <= 9; x++) {
+            helper.assertTrue(!level.getBlockState(base.offset(x, y + 1, z)).is(PathSurfacer.MARKER),
+                    "marker at x=" + x + " should be cleared");
+        }
         helper.succeed();
     }
 

@@ -3,6 +3,24 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.68.0] - 2026-06-25
+
+### Added
+- **Terrain-aware path / over-void bridge surfacing — SKYJIGSAWPLAN Phase 1 foundation.** A new `PathSurfacer`
+  pass turns the markers a connective jigsaw piece leaves behind into a context-matched surface: a `dirt_path`
+  (with a little gravel) where the deck sits on ground, and a self-railing wooden-slab **bridge** — edge beams +
+  fence railings on every open-drop side, capped dead-ends, scaling with path width — where it runs out over the
+  void. Two-phase (snapshot the markers, resolve decks + edges, clear the markers last) and decides
+  void-vs-ground from the block *under* the deck, so it's robust to a connector clearing the deck tile.
+  Unit-tested.
+
+### Changed
+- Jigsaw structures gained a `reach` config knob — the half-extent the post-assembly passes scan around the
+  origin. The connection-link pass now scans `reach` (so railings link across a *sprawling* structure, not just
+  a fixed 16-block box), and the path-surfacing pass runs only when `reach > 0`. Default `0` preserves every
+  existing structure's behaviour. Wired into `GenerationJob`, dormant until the street-based structures start
+  laying markers (next).
+
 ## [0.67.1] - 2026-06-25
 
 ### Added (dev)

@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
+import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.Traps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -249,8 +250,12 @@ public final class GenerationJob {
             Jigsaw.place(level, pool, js.target(), js.depth(), js.origin(), false);
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
             Traps.applyAfterJigsaw(level, js.origin());
-            // Link up any fences / panes / walls the jigsaw pasted in their default (unconnected) state.
-            linkConnections(level, js.origin());
+            // Resolve a connective structure's path markers into terrain-aware paths / over-void bridges (§3a).
+            if (js.reach() > 0) {
+                PathSurfacer.resolve(level, js.origin(), js.reach());
+            }
+            // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.
+            linkConnections(level, js.origin(), Math.max(LINK_RADIUS, js.reach()));
             spawnVillagersAtBeds(js.origin(), js.pad());
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);
@@ -272,10 +277,15 @@ public final class GenerationJob {
      * a no-op wherever there is nothing to link. Scans a box around the jigsaw origin large enough for our templates.
      */
     public static void linkConnections(ServerLevel level, BlockPos origin) {
+        linkConnections(level, origin, LINK_RADIUS);
+    }
+
+    /** As {@link #linkConnections(ServerLevel, BlockPos)} but scanning {@code radius} out — sized to the structure. */
+    public static void linkConnections(ServerLevel level, BlockPos origin, int radius) {
         final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int dy = -LINK_DOWN; dy <= LINK_UP; dy++) {
-            for (int dx = -LINK_RADIUS; dx <= LINK_RADIUS; dx++) {
-                for (int dz = -LINK_RADIUS; dz <= LINK_RADIUS; dz++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
                     p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
                     final BlockState state = level.getBlockState(p);
                     if (state.getBlock() instanceof CrossCollisionBlock || state.getBlock() instanceof WallBlock) {
