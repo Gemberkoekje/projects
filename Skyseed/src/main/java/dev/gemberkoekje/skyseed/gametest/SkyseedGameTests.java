@@ -726,6 +726,32 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void bastionRemnantRollsOnBastionBiomeLargeSeedsAndDebugSeed(GameTestHelper helper) {
+        // A ruined bastion remnant (crying obsidian + cracked polished blackstone) is a 5% rare_structures roll on the
+        // three bastion-biome Large Nether seeds — the Nether-wastes Rocky, the crimson/warped Forest and the soul-sand
+        // Soul — but NOT the basalt deltas or the lava sea (the vanilla rule). The debug_bastion_remnant seed germinates
+        // it as a whole island.
+        final ServerLevel overworld = helper.getLevel();
+        for (String t : new String[] { "nether_rocky_large", "nether_forest_large", "nether_soul_large" }) {
+            helper.assertTrue(theme(overworld, t).rareStructures().stream().anyMatch(
+                            rs -> rs.jigsaw().pool().getPath().equals("bastion/remnant")),
+                    t + " should carry the 5% bastion remnant rare structure");
+        }
+        for (String t : new String[] { "nether_basalt_large", "nether_lava_large" }) {
+            helper.assertTrue(theme(overworld, t).rareStructures().stream().noneMatch(
+                            rs -> rs.jigsaw().pool().getPath().equals("bastion/remnant")),
+                    t + " must not carry the bastion remnant (no bastions in the basalt deltas or the lava sea)");
+        }
+        final IslandTheme dbg = theme(overworld, "debug_bastion_remnant");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, dbg, overworld.getBiome(c),
+                RandomSource.create(77L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/remnant")),
+                "the debug bastion remnant seed should assemble the bastion remnant jigsaw");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
         // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation

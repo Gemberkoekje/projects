@@ -60,6 +60,7 @@
   "item.skyseed.debug_vault_cell_skyseed": "Debug: Vault Cell",
   "item.skyseed.debug_trail_ruins_skyseed": "Debug: Trail Ruins",
   "item.skyseed.debug_blaze_spawner_skyseed": "Debug: Blaze Spawner",
+  "item.skyseed.debug_bastion_remnant_skyseed": "Debug: Bastion Remnant",
   "item.skyseed.debug_small_waterfall_skyseed": "Debug: Small Waterfall",
   "item.skyseed.debug_large_waterfall_skyseed": "Debug: Large Waterfall",
   "entity.skyseed.island_seed": "Skyseed",

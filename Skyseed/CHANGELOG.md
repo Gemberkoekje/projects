@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.67.0] - 2026-06-25
+
+### Added
+- **Bastion remnant rare structure.** A ruined bastion — crumbling cracked polished-blackstone-brick ramparts on a
+  polished-blackstone floor, weeping crying-obsidian corner buttresses and a wept central shard, gilded/gold accents,
+  a caged magma-cube spawner and a bastion loot chest, garrisoned by two piglins and a brute — now has a **5% chance**
+  of germinating on the three bastion-*biome* Large Nether seeds: Large Nether Rocky (Nether wastes), Large Nether
+  Forest (crimson/warped) and Large Nether Soul (soul sand valley). It deliberately does **not** roll on the Basalt or
+  Lava larges, matching vanilla's rule that bastions shun the basalt deltas. It lives in its own
+  `skyseed:bastion/remnant` pool, separate from the dedicated Bastion seed's treasure/bridge/housing variants, and a
+  creative-only `debug_bastion_remnant` seed germinates it on demand.
+
 ## [0.66.5] - 2026-06-24
 
 ### Changed

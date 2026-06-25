@@ -18,7 +18,12 @@
     { "weight": 1, "name": "fossil", "decoration": {
       "ground": [ { "block": "minecraft:soul_fire", "chance": 0.08 }, { "block": "minecraft:bone_block", "chance": 0.04 }, { "block": "minecraft:basalt", "chance": 0.06 } ] } }
   ],
-  "rare_structures": [ { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } } ],
+  "rare_structures": [
+    { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } },
+    { "chance": 0.05, "suppress_pond": true,
+      "jigsaw": { "pool": "skyseed:bastion/remnant", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:piglin", "adults": 2 }, { "entity": "minecraft:piglin_brute", "adults": 1 } ] } ] }
+  ],
   "biome_overrides": [
     { "_comment": "Overworld easter egg — a small (~1.5x the Tier-2 tiny) plain desert island, not the soul sand valley.",
       "dimension": "minecraft:overworld",

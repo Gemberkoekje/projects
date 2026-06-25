@@ -23,7 +23,10 @@ import java.util.Map;
  *   <li><b>Housing</b> — a walled blackstone unit partitioned into rooms around a central chamber with a
  *       {@code bastion_other} chest.</li>
  * </ul>
- * Piglins, a brute, hoglins and magma cubes drift across whichever lands (the theme's {@code mobs}). See SKYNETHERPLAN.
+ * Piglins, a brute, hoglins and magma cubes drift across whichever lands (the theme's {@code mobs}).
+ * A fourth, more ruined {@link #remnant()} lives in its own {@code skyseed:bastion/remnant} pool: the rare-structure
+ * roll on the bastion-biome Large Nether seeds (crying obsidian + cracked polished blackstone), distinct from the
+ * dedicated seed's pool. See SKYNETHERPLAN.
  */
 public final class BastionTemplates {
     private BastionTemplates() {}
@@ -32,6 +35,7 @@ public final class BastionTemplates {
         StructureParts.writeIfAbsent(dir.resolve("treasure.nbt"), treasure());
         StructureParts.writeIfAbsent(dir.resolve("bridge.nbt"), bridge());
         StructureParts.writeIfAbsent(dir.resolve("housing.nbt"), housing());
+        StructureParts.writeIfAbsent(dir.resolve("remnant.nbt"), remnant());
     }
 
     /** A 9×9 ruin with a lodestone treasure plinth, a caged magma-cube spawner and the best loot. */
@@ -202,5 +206,73 @@ public final class BastionTemplates {
 
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:blackstone");
         return new Built(m, bes);
+    }
+
+    /**
+     * A ruined bastion <b>remnant</b> for the rare-structure roll (its own {@code skyseed:bastion/remnant} pool, not
+     * part of the dedicated seed's treasure/bridge/housing): a crumbling rampart of cracked polished-blackstone
+     * bricks on a polished-blackstone floor, with weeping {@code crying_obsidian} corner buttresses and a wept
+     * central shard, gilded/gold accents, a caged magma-cube spawner and a {@code bastion_other} chest. A piglin
+     * garrison spawns in (the rare structure's {@code mobs} pack). Open-topped, so the garrison stands on the floor.
+     */
+    private static Built remnant() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState floor = Blocks.POLISHED_BLACKSTONE.defaultBlockState();
+        final BlockState crying = Blocks.CRYING_OBSIDIAN.defaultBlockState();
+        final BlockState gild = Blocks.GILDED_BLACKSTONE.defaultBlockState();
+        final BlockState gold = Blocks.GOLD_BLOCK.defaultBlockState();
+        final int max = 8, mid = 4;
+
+        // Polished-blackstone floor.
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), floor);
+            }
+        }
+        // Crumbling rampart of cracked polished-blackstone bricks: north wall tallest, tapering to a near-gone south,
+        // with crying-obsidian corner buttresses, a north gateway breach and a wholly collapsed east span.
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                if (x != 0 && x != max && z != 0 && z != max) {
+                    continue;
+                }
+                int h = z == 0 ? 5 : x == 0 ? 4 : x == max ? 3 : 2;
+                if (z == 0 && (x == 3 || x == 4)) {
+                    h = 1; // gateway breach
+                }
+                if (x == max && z >= 4 && z <= 5) {
+                    h = 0; // a collapsed span
+                }
+                final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
+                for (int y = 1; y <= h; y++) {
+                    m.put(new BlockPos(x, y, z), corner ? crying : ruinedBrick(x, y + z));
+                }
+            }
+        }
+        // The wept heart: a chiseled dais under a crying-obsidian shard, flanked by gold and gilded blackstone.
+        m.put(new BlockPos(mid, 1, mid), Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState());
+        m.put(new BlockPos(mid, 2, mid), crying);
+        m.put(new BlockPos(mid - 1, 1, mid), gold);
+        m.put(new BlockPos(mid + 1, 1, mid), gild);
+        // A caged magma-cube spawner chained over one corner; a bastion chest in another.
+        m.put(new BlockPos(2, 1, 2), Blocks.SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(2, 1, 2), StructureParts.mobSpawner("minecraft:magma_cube"));
+        m.put(new BlockPos(2, 2, 2), Blocks.CHAIN.defaultBlockState());
+        m.put(new BlockPos(6, 1, 6), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
+        bes.put(new BlockPos(6, 1, 6), StructureParts.lootChest("minecraft:chests/bastion_other"));
+        // Fallen rubble: a gilded chunk and a crying-obsidian shard knocked loose into the yard.
+        m.put(new BlockPos(6, 1, 2), gild);
+        m.put(new BlockPos(2, 1, 6), crying);
+
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:polished_blackstone");
+        return new Built(m, bes);
+    }
+
+    /** A deterministic cracked/intact polished-blackstone-brick mix for the ruined rampart (mostly cracked). */
+    private static BlockState ruinedBrick(int a, int b) {
+        return Math.floorMod(a * 7 + b * 5, 3) == 0
+                ? Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState()
+                : Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
     }
 }

@@ -17,7 +17,12 @@
       "ground": [ { "block": "minecraft:crimson_roots", "chance": 0.30 }, { "block": "minecraft:crimson_fungus", "chance": 0.10 }, { "block": "minecraft:nether_wart_block", "chance": 0.04 }, { "block": "minecraft:twisting_vines", "chance": 0.08 }, { "block": "minecraft:shroomlight", "chance": 0.05 } ],
       "underside": [ { "block": "minecraft:weeping_vines", "chance": 0.25 } ] } }
   ],
-  "rare_structures": [ { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } } ],
+  "rare_structures": [
+    { "chance": 0.05, "suppress_pond": true, "jigsaw": { "pool": "skyseed:nether_fortress/blaze_room", "target": "minecraft:bottom", "depth": 1, "pad": 4 } },
+    { "chance": 0.05, "suppress_pond": true,
+      "jigsaw": { "pool": "skyseed:bastion/remnant", "target": "minecraft:bottom", "depth": 1, "pad": 5 },
+      "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:piglin", "adults": 2 }, { "entity": "minecraft:piglin_brute", "adults": 1 } ] } ] }
+  ],
   "biome_overrides": [
     { "_comment": "Warped fungal forest — a warped_forest biome flips the isle teal (warped nylium, huge warped fungi, nether sprouts, Endermen). Inherits the base shape / fill / core / ores; only surface, mobs and decoration change.",
       "dimension": "minecraft:the_nether", "biomes": [ "minecraft:warped_forest" ],
