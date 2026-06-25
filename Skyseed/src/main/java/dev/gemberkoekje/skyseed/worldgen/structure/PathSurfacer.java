@@ -47,6 +47,10 @@ public final class PathSurfacer {
         final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int dx = -reach; dx <= reach; dx++) {
             for (int dz = -reach; dz <= reach; dz++) {
+                p.set(origin.getX() + dx, origin.getY(), origin.getZ() + dz);
+                if (!level.isLoaded(p)) {
+                    continue; // never force-load chunks the structure didn't reach — a wide reach stays cheap
+                }
                 for (int dy = -SCAN_DOWN; dy <= SCAN_UP; dy++) {
                     p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
                     if (level.getBlockState(p).is(MARKER)) {

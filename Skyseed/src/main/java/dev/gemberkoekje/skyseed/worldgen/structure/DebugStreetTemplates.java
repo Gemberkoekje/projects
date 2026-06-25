@@ -15,12 +15,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * THROWAWAY spike pieces (SKYJIGSAWPLAN Phase 0): a self-connecting "street" pool to prove the jigsaw really
- * sprawls — branching, twisting, and (on a real island) running straight out over the void. A {@code plaza}
- * start piece carries four outward street connectors; the {@code streets} pool ({@code straight} / {@code corner}
- * / {@code cross} / {@code end} + a weighted empty terminator) chains off them at depth 6. Plain cobblestone
- * decks for now — the terrain-aware path / self-railing-bridge surfacing (SKYJIGSAWPLAN §3a) is Phase 1.
- * Reached only by the creative {@code debug_streets} seed; delete the lot once the real village system lands.
+ * THROWAWAY spike pieces (SKYJIGSAWPLAN Phase 0/1): a self-connecting "street" pool that proves the jigsaw
+ * sprawls AND drives the path/bridge marker surfacing. A solid {@code plaza} start piece carries four outward
+ * connectors; the {@code streets} pool ({@code straight}/{@code corner}/{@code cross}/{@code end} + a weighted
+ * empty terminator) chains off them at depth 6. The street pieces bake NO floor — each lays a
+ * {@link PathSurfacer#MARKER} one block above every deck tile and clears its connector tile to air, so
+ * {@link PathSurfacer} turns the run into a terrain-aware dirt path on the island and a self-railing wooden
+ * bridge out over the void. Reached only by the creative {@code debug_streets} seed; delete the lot once the
+ * real village system lands.
  */
 public final class DebugStreetTemplates {
     private DebugStreetTemplates() {}
@@ -36,77 +38,76 @@ public final class DebugStreetTemplates {
         writeIfAbsent(dir.resolve("end.nbt"), end());
     }
 
-    /** 5×5 cobblestone start plaza: the island anchor + a lantern, and four outward street connectors. */
+    /** 5×5 solid-cobblestone start plaza: the island anchor + a lantern, and four outward street connectors. */
     private static Built plaza() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        floor(m, 4);
-        street(m, bes, new BlockPos(2, 0, 0), FrontAndTop.NORTH_UP);
-        street(m, bes, new BlockPos(2, 0, 4), FrontAndTop.SOUTH_UP);
-        street(m, bes, new BlockPos(0, 0, 2), FrontAndTop.WEST_UP);
-        street(m, bes, new BlockPos(4, 0, 2), FrontAndTop.EAST_UP);
+        final BlockState cob = Blocks.COBBLESTONE.defaultBlockState();
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 4; z++) {
+                m.put(new BlockPos(x, 0, z), cob);
+            }
+        }
+        street(m, bes, new BlockPos(2, 0, 0), FrontAndTop.NORTH_UP, "minecraft:cobblestone");
+        street(m, bes, new BlockPos(2, 0, 4), FrontAndTop.SOUTH_UP, "minecraft:cobblestone");
+        street(m, bes, new BlockPos(0, 0, 2), FrontAndTop.WEST_UP, "minecraft:cobblestone");
+        street(m, bes, new BlockPos(4, 0, 2), FrontAndTop.EAST_UP, "minecraft:cobblestone");
         m.put(new BlockPos(2, 1, 2), Blocks.LANTERN.defaultBlockState());
         anchor(m, bes, new BlockPos(2, 0, 2), "minecraft:cobblestone"); // last, so the floor loop can't clobber it
         return new Built(m, bes);
     }
 
-    /** A straight 3×3 segment: connectors west and east, so it passes through. */
+    /** A straight marker segment: connectors west and east, so it passes through. */
     private static Built straight() {
-        final Map<BlockPos, BlockState> m = new HashMap<>();
-        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        floor(m, 2);
-        street(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP);
-        street(m, bes, new BlockPos(2, 0, 1), FrontAndTop.EAST_UP);
-        return new Built(m, bes);
+        return segment(FrontAndTop.WEST_UP, FrontAndTop.EAST_UP);
     }
 
-    /** An L-corner 3×3 segment: connectors west and south, so the run turns. */
+    /** An L-corner marker segment: connectors west and south, so the run turns. */
     private static Built corner() {
-        final Map<BlockPos, BlockState> m = new HashMap<>();
-        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        floor(m, 2);
-        street(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP);
-        street(m, bes, new BlockPos(1, 0, 2), FrontAndTop.SOUTH_UP);
-        return new Built(m, bes);
+        return segment(FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP);
     }
 
-    /** A 4-way crossing 3×3 segment: connectors on all sides — the branch points. */
+    /** A 4-way crossing marker segment: connectors on all sides — the branch points. */
     private static Built cross() {
-        final Map<BlockPos, BlockState> m = new HashMap<>();
-        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        floor(m, 2);
-        street(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP);
-        street(m, bes, new BlockPos(1, 0, 2), FrontAndTop.SOUTH_UP);
-        street(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP);
-        street(m, bes, new BlockPos(2, 0, 1), FrontAndTop.EAST_UP);
-        return new Built(m, bes);
+        return segment(FrontAndTop.WEST_UP, FrontAndTop.EAST_UP, FrontAndTop.NORTH_UP, FrontAndTop.SOUTH_UP);
     }
 
-    /** A dead-end cap 3×3: one connector (west) and a little lamp post so the end of a run reads clearly. */
+    /** A dead-end stub: one connector (west). PathSurfacer rails its open sides if it ends over the void. */
     private static Built end() {
-        final Map<BlockPos, BlockState> m = new HashMap<>();
-        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        floor(m, 2);
-        street(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP);
-        m.put(new BlockPos(1, 1, 1), Blocks.OAK_FENCE.defaultBlockState());
-        m.put(new BlockPos(1, 2, 1), Blocks.OAK_FENCE.defaultBlockState());
-        m.put(new BlockPos(1, 3, 1), Blocks.LANTERN.defaultBlockState());
-        return new Built(m, bes);
+        return segment(FrontAndTop.WEST_UP);
     }
 
-    /** A square cobblestone deck on y=0 from (0,0,0) to (max,0,max). */
-    private static void floor(Map<BlockPos, BlockState> m, int max) {
-        final BlockState cob = Blocks.COBBLESTONE.defaultBlockState();
-        for (int x = 0; x <= max; x++) {
-            for (int z = 0; z <= max; z++) {
-                m.put(new BlockPos(x, 0, z), cob);
+    /** A 3×3 marker deck (no baked floor) with a street connector on each given side. */
+    private static Built segment(FrontAndTop... sides) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
+        for (int x = 0; x <= 2; x++) {
+            for (int z = 0; z <= 2; z++) {
+                m.put(new BlockPos(x, 1, z), wool); // a path marker one block above every deck tile
             }
         }
+        for (final FrontAndTop side : sides) {
+            street(m, bes, edge(side), side, "minecraft:air"); // connector tile is left to PathSurfacer to fill
+        }
+        return new Built(m, bes);
+    }
+
+    /** The edge-midpoint connector position on a 3×3 deck for a given outward facing. */
+    private static BlockPos edge(FrontAndTop side) {
+        return switch (side) {
+            case NORTH_UP -> new BlockPos(1, 0, 0);
+            case SOUTH_UP -> new BlockPos(1, 0, 2);
+            case WEST_UP -> new BlockPos(0, 0, 1);
+            case EAST_UP -> new BlockPos(2, 0, 1);
+            default -> throw new IllegalArgumentException("unsupported street side " + side);
+        };
     }
 
     /** A street connector at {@code p} facing {@code dir}, self-linking into the streets pool. */
-    private static void street(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p, FrontAndTop dir) {
+    private static void street(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p,
+                               FrontAndTop dir, String finalState) {
         m.put(p, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
-        bes.put(p, jig("skyseed:street", "skyseed:street", POOL, "minecraft:cobblestone"));
+        bes.put(p, jig("skyseed:street", "skyseed:street", POOL, finalState));
     }
 }

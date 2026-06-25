@@ -765,6 +765,8 @@ public final class SkyseedGameTests {
                 "debug_streets must start from its start pool");
         helper.assertTrue(streets.jigsaw().get().depth() >= 5,
                 "debug_streets must recurse deep enough to sprawl (got depth " + streets.jigsaw().get().depth() + ")");
+        helper.assertTrue(streets.jigsaw().get().reach() > 0,
+                "debug_streets must set reach > 0 so the path/bridge surfacing pass runs");
         final BlockPos c = new BlockPos(40, 80, 40);
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, streets, overworld.getBiome(c),
                 RandomSource.create(42L));

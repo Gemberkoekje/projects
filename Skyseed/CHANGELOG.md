@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.68.1] - 2026-06-25
+
+### Changed (dev)
+- **The `debug_streets` spike now lays path markers instead of baked cobblestone**, driving the new
+  `PathSurfacer` end to end in-world: the street pieces bake no floor — each lays a `purple_wool` marker above its
+  deck and clears its connector tile — so the surfacing pass turns the run into a terrain-aware dirt path (with a
+  little gravel) on the island and a self-railing wooden-slab bridge out over the void. The seed declares
+  `reach: 96` so the pass covers the full sprawl, and `PathSurfacer` now skips unloaded chunks so a wide reach
+  never force-loads terrain. Throw it to see the paths + bridges.
+
 ## [0.68.0] - 2026-06-25
 
 ### Added
