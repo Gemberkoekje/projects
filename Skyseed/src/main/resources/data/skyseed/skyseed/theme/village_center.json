@@ -1,10 +1,30 @@
 {
   "dimensions": ["minecraft:overworld"],
-  "_comment": "The big village: essentially a bigger Trade Post. A HUGE island whose teardrop underside is depth-capped (max_under_depth) so it stays a wide plateau, not a bottomless cone. Reuses the trade_post village pieces, but runs the street network deeper (depth 6) and guarantees 4-6 shops (cap_min 4). Compare with village_cluster (the same village across 2-3 smaller islands).",
-  "shape": { "radius": { "min": 22, "max": 26 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "max_under_depth": 16 },
+  "_comment": "The big village, as a CLUSTER of 3 small islands ringed around a void centre (the village's central square sits on a small pad over the void hole and spans them on its own bridges/piers). Reuses the trade_post village pieces, runs the street network deeper (depth 6), guarantees 4-6 shops (cap_min 4), and posts an iron golem. Biome-styled like the trade post: desert/savanna/snowy/taiga swap in their piece sets (and the cluster islands take that biome's surface).",
+  "shape": { "radius": { "min": 10, "max": 12 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "cluster_offsets": [ [0, 0, 19], [-16, 0, -10], [16, 0, -10] ] },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
-  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 6, "pad": 5, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers" },
+  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers" },
+  "biome_overrides": [
+    { "_comment": "Desert: a sand cluster with the sand/sandstone village pieces.",
+      "biomes": ["minecraft:desert"],
+      "surface": "minecraft:sand", "fill": "minecraft:sandstone",
+      "jigsaw": { "pool": "skyseed:trade_post_desert/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post_desert/fillers" },
+      "variants": [ { "weight": 1, "name": "dune", "decoration": { "ground": [ { "block": "minecraft:dead_bush", "chance": 0.05 } ] } } ] },
+    { "_comment": "Savanna: acacia village.",
+      "biomes": ["minecraft:savanna", "minecraft:savanna_plateau", "minecraft:windswept_savanna"],
+      "jigsaw": { "pool": "skyseed:trade_post_savanna/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post_savanna/fillers" },
+      "variants": [ { "weight": 1, "name": "dry", "decoration": { "trees": [ { "feature": "minecraft:acacia", "tries": 4, "spacing": 3 } ], "ground": [ { "block": "minecraft:short_grass", "chance": 0.22 } ] } } ] },
+    { "_comment": "Snowy: spruce village, snow-capped by the snow post-pass. Listed before taiga so snowy_taiga takes this.",
+      "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
+      "surface": "minecraft:grass_block", "snow": 1.0,
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "variants": [ { "weight": 1, "name": "snowy", "decoration": { "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ] } } ] },
+    { "_comment": "Taiga: the same spruce set on grass, with ferns.",
+      "biomes": ["minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "variants": [ { "weight": 1, "name": "pine", "decoration": { "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ], "ground": [ { "block": "minecraft:fern", "chance": 0.18 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.04 } ] } } ] }
+  ],
   "variants": [
     { "weight": 1, "name": "green", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 6, "spacing": 3 } ],

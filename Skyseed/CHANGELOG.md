@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.92.0] - 2026-06-25
+
+### Changed
+- **The Village Center is now the 3-small-islands cluster, and biome-styled like the trade post.** The big village
+  adopts the cluster layout — 3 small islands ringed around a void centre, the central square on a pad over the hole —
+  instead of one huge depth-capped island. It now also carries the trade post's biome overrides, so a Village Center in
+  a desert / savanna / snowy / taiga biome swaps in that biome's piece set (and the cluster islands take its surface).
+  Added per-biome Village Center debug seeds (plains / desert / savanna / snowy / taiga) to eyeball each.
+
+### Removed
+- The standalone `village_cluster` experiment theme and its debug seed — folded into `village_center`.
+
 ## [0.91.0] - 2026-06-25
 
 ### Changed

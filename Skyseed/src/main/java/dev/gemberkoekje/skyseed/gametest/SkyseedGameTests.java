@@ -986,22 +986,23 @@ public final class SkyseedGameTests {
 
     @GameTest(template = REGION)
     public static void villageCenterIsABigVillage(GameTestHelper helper) {
-        // The village_center seed is now "a bigger Trade Post": the SAME village pieces (trade_post/start), but a deeper
-        // street network and a guaranteed 4+ shops, on a HUGE island whose teardrop underside is depth-capped so it
-        // stays a wide plateau. village_cluster is the same village spread across a few smaller islands.
+        // The village_center seed is "a bigger Trade Post" laid out as a CLUSTER: the SAME village pieces
+        // (trade_post/start), a deeper street network and a guaranteed 4+ shops, spread over 3 small islands ringed
+        // around a void centre (cluster_offsets). Like the trade post it's biome-styled -- a desert one pulls the
+        // desert pieces -- which is what the per-biome debug seeds exercise.
         final ServerLevel level = helper.getLevel();
         final IslandTheme vc = theme(level, "village_center");
         helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().getPath().equals("trade_post/start"),
                 "village_center must reuse the trade post village pieces");
         helper.assertTrue(vc.jigsaw().get().depth() > 4, "village_center must run a deeper street network than the trade post (depth 4)");
         helper.assertTrue(vc.jigsaw().get().capMin() >= 4, "village_center must guarantee at least 4 shops");
-        helper.assertTrue(vc.shape().radius().min() >= 22, "village_center must be a huge island");
-        helper.assertTrue(vc.shape().maxUnderDepth().isPresent()
-                        && vc.shape().maxUnderDepth().get() < vc.shape().radius().min(),
-                "village_center's underside must be depth-capped below its radius (a wide plateau, not a deep cone)");
-        final IslandTheme cluster = theme(level, "village_cluster");
-        helper.assertTrue(!cluster.shape().clusterOffsets().isEmpty(),
-                "village_cluster must stamp extra islands via cluster_offsets");
+        helper.assertTrue(!vc.shape().clusterOffsets().isEmpty(),
+                "village_center must be a cluster of small islands (cluster_offsets), not one huge island");
+        final var desert = level.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), vc, desert, RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start")),
+                "a desert village_center must use the desert village pieces (biome-styled like the trade post)");
         helper.succeed();
     }
 

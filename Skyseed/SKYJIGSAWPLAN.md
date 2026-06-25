@@ -172,11 +172,12 @@ full-parameter `generateJigsaw` with an explicit radius. This is the only *likel
   post + a bench) so the walkway-over-void shows up naturally.
 
 ### 4b. Village Center → the grand version of the same
-**✅ Done differently (v0.89.0).** The Village Center seed became simply *a bigger Trade Post*: it REUSES the
-`trade_post/start` village pieces on a HUGE depth-capped island (`Shape.max_under_depth`), with deeper streets
-(depth 6), a guaranteed 4–6 shops (`cap_min 4`), and the iron golem — **not** the multi-hall, all-13-professions
-build the plan below imagined. A `village_cluster` experiment (`Shape.cluster_offsets` → the same village across a
-few small islands) exists alongside it for comparison. The original plan below is **superseded**:
+**✅ Done differently (v0.89.0; reshaped in v0.92.0).** The Village Center seed became simply *a bigger Trade Post*:
+it REUSES the `trade_post/start` village pieces with deeper streets (depth 6), a guaranteed 4–6 shops (`cap_min 4`),
+and the iron golem — **not** the multi-hall, all-13-professions build the plan below imagined. As of v0.92.0 it's laid
+out as a **cluster** (`Shape.cluster_offsets`): 3 small islands ringed around a void centre, with the central square on
+a pad over the hole — and it's biome-styled like the trade post (desert/savanna/snowy/taiga swap their piece sets). The
+original plan below is **superseded**:
 - Same street system, richer **start** (a bell + green), and the four trading halls become a **`halls` pool**
   with **2–3 shape variants each** (currently 1 each — the worst offender). Keep all 13 professions reachable
   by ensuring the hall set still covers them across whatever rolls.
