@@ -256,7 +256,7 @@ public final class GenerationJob {
             }
             // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.
             linkConnections(level, js.origin(), Math.max(LINK_RADIUS, js.reach()));
-            spawnVillagersAtBeds(js.origin(), js.pad());
+            spawnVillagersAtBeds(js.origin(), Math.max(js.pad(), js.reach()));
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);
                 if (golem != null) {
@@ -332,10 +332,14 @@ public final class GenerationJob {
      * arrive unemployed; a villager beside an unclaimed job-site block (the shops carry them) takes up
      * that profession on its own, exactly as in a natural village.
      */
-    private void spawnVillagersAtBeds(BlockPos origin, int pad) {
+    private void spawnVillagersAtBeds(BlockPos origin, int radius) {
         final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
-        for (int dx = -pad; dx <= pad; dx++) {
-            for (int dz = -pad; dz <= pad; dz++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                p.set(origin.getX() + dx, origin.getY(), origin.getZ() + dz);
+                if (!level.isLoaded(p)) {
+                    continue; // a village's reach is wide — don't force-load the empty void around it
+                }
                 for (int dy = -1; dy <= 6; dy++) {
                     p.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
                     final BlockState state = level.getBlockState(p);

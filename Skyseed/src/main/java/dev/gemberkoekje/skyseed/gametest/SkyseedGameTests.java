@@ -811,6 +811,25 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void tradePostIsAStreetVillage(GameTestHelper helper) {
+        // SKYJIGSAWPLAN Phase 1: the Trade Post is now a street village — a square radiating a depth-6 street
+        // network with shops + fields hung off lot connectors, surfaced by PathSurfacer (dirt paths on the island,
+        // self-railing bridges over the void). Guard the wiring; the village's look is an in-world smoke test. The
+        // streets/lots pools are validated by the datapack load (a bad element reference fails the run).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        helper.assertTrue(tp.jigsaw().isPresent() && tp.jigsaw().get().pool().getPath().equals("trade_post/start"),
+                "trade_post must start from its start pool");
+        helper.assertTrue(tp.jigsaw().get().depth() >= 5, "trade_post must recurse into a street network");
+        helper.assertTrue(tp.jigsaw().get().reach() > 0, "trade_post must set reach for surfacing + the bed scan");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, overworld.getBiome(c), RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post/start")),
+                "trade_post should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
         // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation

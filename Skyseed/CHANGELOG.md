@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.69.0] - 2026-06-25
+
+### Changed
+- **The Trade Post is now a real street village (SKYJIGSAWPLAN Phase 1).** Its fixed plaza‑plus‑four‑shops gave
+  way to a jigsaw village: a cobblestone **square** radiates a `streets` pool (straight / corner / cross + an
+  empty terminator) that branches and twists at **depth 6**, with buildings hung off side `lot` connectors from a
+  `lots` pool — the five trade shops plus non‑shop scenery (a fenced, watered, grown **wheat field** and a flower
+  **garden**) and a weighted empty terminator so the village breathes. The lanes are marker‑surfaced by
+  `PathSurfacer`, so they read as terrain‑aware **dirt paths** on the island and **self‑railing wooden bridges**
+  where a lane runs out over the void — little piers off the village edge, for free.
+- The villager bed scan and the connection‑link pass now follow the structure's `reach` instead of a fixed
+  16‑block box (SKYJIGSAWPLAN §5.1), so every shop across the sprawl still gets its villager and its fences
+  linked — and both skip unloaded chunks so a wide reach never force‑loads the void.
+
 ## [0.68.2] - 2026-06-25
 
 ### Fixed
