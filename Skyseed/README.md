@@ -63,6 +63,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 The overworld and Nether chapters are built; what's planned next:
 
+- **More varied structures** — villages, mansions and Nether fortresses that actually differ each throw (organic streets, little wheat fields, piers and bridges out over the void, different mansion footprints), by using the jigsaw system *deeply* (street/connective pools + real recursion depth) instead of one shallow single-piece pool per structure. Designed in `SKYJIGSAWPLAN.md`.
 - **The rest of the Nether's structures** — a Bastion Remnant, a Piglin Trading Post and a Wither arena, designed in `SKYNETHERPLAN.md` (the Nether Fortress is already in).
 - **The End** — after the Nether's structures. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
