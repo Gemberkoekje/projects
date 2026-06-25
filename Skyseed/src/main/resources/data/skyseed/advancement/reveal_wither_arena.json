@@ -21,9 +21,18 @@
           }
         ]
       }
+    },
+    "entered": {
+      "trigger": "minecraft:changed_dimension",
+      "conditions": {
+        "to": "minecraft:the_nether"
+      }
     }
   },
   "requirements": [
+    [
+      "entered"
+    ],
     [
       "prereq",
       "has_0"

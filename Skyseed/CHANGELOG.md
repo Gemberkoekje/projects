@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.4] - 2026-06-24
+
+### Fixed
+- **The Nether chapter is now actually hidden until you enter the Nether.** Patchouli categories don't honour an
+  `advancement` lock (the one on the chapter was a no‑op), so the Nether seeds were showing early. The chapter is now a
+  `secret` category, and each Nether seed's reveal additionally requires having entered the Nether (a
+  `changed_dimension` to `the_nether`) — so the whole chapter, and its seeds, stay out of the book until you step
+  through a portal.
+
 ## [0.66.3] - 2026-06-24
 
 ### Added
