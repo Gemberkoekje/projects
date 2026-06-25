@@ -857,18 +857,17 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void tradePostVillagePlacesShops(GameTestHelper helper) {
-        // Regression: assemble the Trade Post village five times on a flat platform with the shop cap engaged, and
-        // confirm each village has both shops (a shop carries a RED_BED = 2 blocks) and fields, while no village
-        // exceeds the 4-shop cap. Long streets place many lots; placeCapped keeps only the 4 shops nearest the centre
-        // and lets the rest fall to fields/gardens — so this checks the cap holds (<= 8 red_bed/village) without
-        // starving the village of shops or fields. (Loads dev-generated .nbt; syncDevStructures keeps the node copy
-        // current, so this no longer flakes on a stale .nbt.)
+        // Regression: assemble the Trade Post village on a flat platform once for each shop cap the 2–4 roll can
+        // produce, and confirm no village exceeds its cap (a shop carries a RED_BED = 2 blocks, so cap c => <= 2c)
+        // while shops and fields both still appear. Long streets place many lots; placeCapped keeps only the c shops
+        // nearest the centre and lets the rest fall to fields/gardens. (Loads dev-generated .nbt; syncDevStructures
+        // keeps the node copy current, so this no longer flakes on a stale .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         int beds = 0;
         int wheat = 0;
-        for (int iter = 0; iter < 5; iter++) {
+        for (int cap = 2; cap <= 4; cap++) {
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -876,7 +875,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", cap);
             int villageBeds = 0;
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
@@ -890,12 +889,12 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            helper.assertTrue(villageBeds <= 8,
-                    "village " + iter + " exceeded the 4-shop cap (red_bed=" + villageBeds + ")");
+            helper.assertTrue(villageBeds <= 2 * cap,
+                    "village exceeded its " + cap + "-shop cap (red_bed=" + villageBeds + ")");
             beds += villageBeds;
         }
-        helper.assertTrue(beds > 0, "5 villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
-        helper.assertTrue(wheat > 0, "5 villages placed no wheat fields (beds=" + beds + " wheat=" + wheat + ")");
+        helper.assertTrue(beds > 0, "villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
+        helper.assertTrue(wheat > 0, "villages placed no wheat fields (beds=" + beds + " wheat=" + wheat + ")");
         helper.succeed();
     }
 

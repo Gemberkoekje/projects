@@ -198,9 +198,16 @@ public final class IslandGenerator {
             // JigsawPlacement lands the start piece's anchor block at origin.y - 1, so pass gy + 1 to seat the
             // structure's floor (the anchor layer) flush on the pad at gy — otherwise it sinks a block into it.
             // `sink` buries it further: each block lowers the whole piece so the island's own surface covers it.
+            // Decide up front how many of the capped element (e.g. shops) this structure keeps: a fixed cap_count, or
+            // — when cap_min is set below it — a target rolled now in [cap_min, cap_count] from the island RNG, so a
+            // trade post lands a reproducible-but-varied 2–4 shops. The long streets place more lots than that; the
+            // surplus fall to fields/gardens.
+            final int cap = jc.capMin() > 0 && jc.capMin() < jc.capCount()
+                    ? jc.capMin() + random.nextInt(jc.capCount() - jc.capMin() + 1)
+                    : jc.capCount();
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach(),
-                    jc.capPrefix(), jc.capCount()));
+                    jc.capPrefix(), cap));
             // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack onto the pad (gy),
             // spawned a block above, so the mob lands on the structure floor that now sits at gy.
             if (!animalPacks.isEmpty()) {
@@ -342,7 +349,7 @@ public final class IslandGenerator {
                 jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
         if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
             return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink(), jc.reach(),
-                    jc.capPrefix(), jc.capCount());
+                    jc.capPrefix(), jc.capCount(), jc.capMin());
         }
         return jc;
     }

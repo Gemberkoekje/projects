@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.70.1] - 2026-06-25
+
+### Changed
+- **A trade post now rolls a target of 2–4 shops up front**, instead of always landing exactly 4. The target is
+  rolled from the island RNG when the plan is built — so it's reproducible per seed but varies between trade posts —
+  and the shop cap then trims to it. Most trade posts land 2–4 shops (occasionally fewer if a lot can't attach).
+  New `JigsawConfig.cap_min`: when set in `[1, cap_count)`, the generator rolls the cap in `[cap_min, cap_count]`;
+  left unset it keeps the fixed `cap_count` behaviour.
+
 ## [0.70.0] - 2026-06-25
 
 ### Added
