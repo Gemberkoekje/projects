@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Village Center Skyseed$() — $(item)2 Trade Post Skyseeds$(), dirt and timber. The grand village: a bigger Trade Post on a huge island, with a guardian iron golem.$(br2)$(bold)Where to look$()$(br)Build up two Trade Posts first, then fold them into a Village Center — the emeralds are already in those."
+      "text": "The $(item)Village Center Skyseed$() — $(item)2 Trade Post Skyseeds$(), an $(item)anvil$(), dirt and timber. The grand village: a bigger Trade Post spread across a cluster of small islands, an anvil set at its heart and an iron golem on guard.$(br2)$(bold)Where to look$()$(br)Build up two Trade Posts first, then fold them into a Village Center — the emeralds are already in those."
     },
     {
       "type": "patchouli:crafting",
@@ -17,12 +17,12 @@
     },
     {
       "type": "patchouli:text",
-      "text": "The premium village island: the same street village as a Trade Post, but bigger in every way — a $(bold)huge$() island, a deeper street network, and a guaranteed $(bold)4 to 6$() shops, with an iron golem on guard. One throw, a whole settled village.",
+      "text": "The premium village island: the same street village as a Trade Post, but bigger in every way — spread across a $(bold)cluster$() of small islands ringed around a void centre, a deeper street network, and a guaranteed $(bold)4 to 6$() shops, with an iron golem on guard. One throw, a whole settled village.",
       "advancement": "skyseed:craft_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A bigger Trade Post$()$(br)Streets branch off a central square, lined with profession cottages — farmer, librarian, fisherman, fletcher — and larger landmark builds: a blacksmith's $(item)forge$() and an open meeting hall with a $(item)bell$(). Fields, gardens and lamp-lit plazas fill the gaps; the huge island is kept a wide plateau, not a deep cone.",
+      "text": "$(bold)A bigger Trade Post$()$(br)Streets branch off a central square, lined with profession cottages — farmer, librarian, fisherman, fletcher — and larger landmark builds: a blacksmith's $(item)forge$() and an open meeting hall with a $(item)bell$(). Fields, gardens and lamp-lit plazas fill the gaps, and an $(item)anvil$() stands as the capstone at the very centre — out over the void, bridged to the ring of islands.",
       "advancement": "skyseed:craft_village_center"
     },
     {
@@ -32,7 +32,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A late-game reward$()$(br)Costs $(item)2 Trade Post Skyseeds$(), dirt and timber — and each Trade Post is itself two Hamlets, so it's four hamlets' worth of emeralds folded in. A real investment, but it pays back a whole big village at once.",
+      "text": "$(bold)A late-game reward$()$(br)Costs $(item)2 Trade Post Skyseeds$(), an $(item)anvil$(), dirt and timber — each Trade Post is itself two Hamlets, so it's four hamlets' worth of emeralds folded in, plus the iron for the anvil. A real investment, but it pays back a whole big village at once.",
       "advancement": "skyseed:craft_village_center"
     }
   ]

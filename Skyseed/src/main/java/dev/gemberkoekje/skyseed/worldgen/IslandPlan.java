@@ -59,8 +59,9 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      * {@code pad} is the half-width searched afterwards for beds (one villager spawns per bed);
      * {@code ironGolems} golems are spawned at the centre once assembled; {@code reach} is the half-extent the
      * post-assembly connection-link and (when {@code > 0}) path/bridge surfacing passes scan (SKYJIGSAWPLAN §3a).
+     * {@code centerpiece}, when present, is a block stamped at the centre (origin + 1) as a capstone.
      */
     public record JigsawSite(ResourceLocation pool, ResourceLocation target,
                              int depth, int pad, int ironGolems, BlockPos origin, int reach,
-                             String capPrefix, int capCount, String capFiller) {}
+                             String capPrefix, int capCount, String capFiller, Optional<ResourceLocation> centerpiece) {}
 }

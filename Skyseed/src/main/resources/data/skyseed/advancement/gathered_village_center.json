@@ -6,7 +6,7 @@
         "items": [
           { "items": "skyseed:trade_post_skyseed" },
           { "items": "minecraft:dirt" },
-          { "items": "minecraft:cobblestone" },
+          { "items": "minecraft:anvil" },
           { "items": "#minecraft:planks" }
         ]
       }

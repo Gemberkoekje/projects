@@ -3,7 +3,7 @@
   "category": "misc",
   "pattern": [
     "DPD",
-    "TCT",
+    "TAT",
     "DPD"
   ],
   "key": {
@@ -16,8 +16,8 @@
     "T": {
       "item": "skyseed:trade_post_skyseed"
     },
-    "C": {
-      "item": "minecraft:cobblestone"
+    "A": {
+      "item": "minecraft:anvil"
     }
   },
   "result": {

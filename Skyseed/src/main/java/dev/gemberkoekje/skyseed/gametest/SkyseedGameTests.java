@@ -998,6 +998,8 @@ public final class SkyseedGameTests {
         helper.assertTrue(vc.jigsaw().get().capMin() >= 4, "village_center must guarantee at least 4 shops");
         helper.assertTrue(!vc.shape().clusterOffsets().isEmpty(),
                 "village_center must be a cluster of small islands (cluster_offsets), not one huge island");
+        helper.assertTrue(vc.jigsaw().get().centerpiece().map(cp -> cp.getPath().equals("anvil")).orElse(false),
+                "village_center must set an anvil centerpiece (the capstone at the cluster's centre)");
         final var desert = level.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
         final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), vc, desert, RandomSource.create(8L));

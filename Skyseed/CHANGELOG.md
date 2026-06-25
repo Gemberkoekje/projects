@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.0] - 2026-06-25
+
+### Added
+- **An anvil capstone at the Village Center's centre.** A new optional `centerpiece` block on a theme's jigsaw config is
+  stamped at the dead centre of the assembled structure (the start square's lantern spot — supported by the foundation
+  below, so a falling block like an anvil won't drop); any centre guard golem is posted a couple of blocks aside so it
+  stands beside the capstone rather than on it. The Village Center sets it to an anvil.
+
+### Changed
+- The Village Center recipe now takes an **anvil** in its centre slot (replacing the cobblestone) — a real iron cost to
+  match the capstone, and a nice echo of the anvil that lands at the village's heart. Advancements and the guide entry
+  were updated to match (and the guide's stale "huge island" wording corrected to the cluster).
+
 ## [0.92.0] - 2026-06-25
 
 ### Changed

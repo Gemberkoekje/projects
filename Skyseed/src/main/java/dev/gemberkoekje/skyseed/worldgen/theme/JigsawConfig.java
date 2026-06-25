@@ -5,6 +5,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.Optional;
+
 /**
  * A theme's jigsaw building config: the generator levels a pad and assembles a structure from the
  * {@code pool} (a vanilla {@code worldgen/template_pool}) at the island centre, exactly like a vanilla
@@ -26,10 +28,14 @@ import net.minecraft.resources.ResourceLocation;
  * count rather than only trim a surplus, make the lot pool entirely the capped element and set {@code capFiller} to
  * a pool of replacements (fields/gardens): the surplus lots beyond the cap are re-stamped from that pool, so the
  * planned number of shops always lands when that many lots placed. {@code capCount = 0} (the default) disables it,
- * and an empty {@code capFiller} drops the surplus instead. See {@code SKYVILLAGESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
+ * and an empty {@code capFiller} drops the surplus instead. Finally {@code centerpiece} is an optional block stamped
+ * at the very centre of the assembled structure (one above the origin — the start piece's floor, where its lantern
+ * sits), with any centre guard golem posted a couple of blocks aside: the Village Center's anvil capstone.
+ * See {@code SKYVILLAGESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
  */
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,
-                           int sink, int reach, String capPrefix, int capCount, int capMin, String capFiller) {
+                           int sink, int reach, String capPrefix, int capCount, int capMin, String capFiller,
+                           Optional<ResourceLocation> centerpiece) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
@@ -41,6 +47,7 @@ public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int d
             Codec.STRING.optionalFieldOf("cap_prefix", "").forGetter(JigsawConfig::capPrefix),
             Codec.INT.optionalFieldOf("cap_count", 0).forGetter(JigsawConfig::capCount),
             Codec.INT.optionalFieldOf("cap_min", 0).forGetter(JigsawConfig::capMin),
-            Codec.STRING.optionalFieldOf("cap_filler", "").forGetter(JigsawConfig::capFiller)
+            Codec.STRING.optionalFieldOf("cap_filler", "").forGetter(JigsawConfig::capFiller),
+            ResourceLocation.CODEC.optionalFieldOf("centerpiece").forGetter(JigsawConfig::centerpiece)
     ).apply(i, JigsawConfig::new));
 }
