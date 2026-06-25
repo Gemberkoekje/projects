@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.66.5] - 2026-06-24
+
+### Changed
+- The Nether chapter is **visible again** (its seeds shown as locked "?"), not hidden entirely — only the early
+  *unlocking* was the bug. The `changed_dimension` reveal gate from 0.66.4 stays, so Nether seeds still don't unlock
+  until you've entered the Nether; the chapter just isn't `secret` anymore.
+
 ## [0.66.4] - 2026-06-24
 
 ### Fixed
