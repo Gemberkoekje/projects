@@ -115,11 +115,16 @@ public final class IslandGenerator {
         final List<BlockPos> coreList = new ArrayList<>();
         final List<BlockPos> surfaceList = new ArrayList<>();
         final List<BlockPos> bottomList = new ArrayList<>(); // lowest block of each column, for underside hangs
-        final ShapeBuilder.Result sh = ShapeBuilder.build(center, shape, surface, fill, core, scatter, bands,
+        // A ring cluster (cluster_offsets set) stamps the shape at each offset and leaves the CENTRE void — the jigsaw's
+        // start then sits on a small levelled pad over that void hole and spans the ring on its own bridges/piers. A
+        // normal island (no offsets) is just stamped once at the centre. The first island built gives the shape Result.
+        final List<BlockPos> clusterOffsets = shape.clusterOffsets();
+        final BlockPos firstCentre = clusterOffsets.isEmpty() ? center
+                : center.offset(clusterOffsets.get(0).getX(), 0, clusterOffsets.get(0).getZ());
+        final ShapeBuilder.Result sh = ShapeBuilder.build(firstCentre, shape, surface, fill, core, scatter, bands,
                 bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
-        // Cluster: stamp the same shape again at each offset (a little archipelago of smaller islands). The jigsaw at
-        // the centre then spans them on its own bridges/piers. The first build above is the centre island.
-        for (final BlockPos off : shape.clusterOffsets()) {
+        for (int k = 1; k < clusterOffsets.size(); k++) {
+            final BlockPos off = clusterOffsets.get(k);
             ShapeBuilder.build(center.offset(off.getX(), 0, off.getZ()), shape, surface, fill, core, scatter, bands,
                     bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
         }

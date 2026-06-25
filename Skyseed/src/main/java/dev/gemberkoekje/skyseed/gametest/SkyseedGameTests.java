@@ -1161,7 +1161,10 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", cap, fillers);
+            // Deterministic featureSeed + a deep network, so the village reliably places ≥ cap lots — the cap only
+            // TRIMS to the nearest cap, it can't conjure shops a too-small village never placed. (level.getRandom()
+            // here would flake on a small village; see tradePostBlacksmithPlaces for the same fix.)
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 6, origin, false, "shop_", cap, fillers, 1L);
             int villageShops = 0;
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {

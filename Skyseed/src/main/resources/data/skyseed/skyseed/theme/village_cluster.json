@@ -1,10 +1,10 @@
 {
   "dimensions": ["minecraft:overworld"],
-  "_comment": "Experiment: the SAME big village, but spread across 3 smaller islands (a little archipelago) instead of one huge island. Each small island is shallow (no deep teardrop, so no max_under_depth needed); the village at the centre spans them on its own bridges/piers. Compare with village_center (one huge island).",
-  "shape": { "radius": { "min": 12, "max": 14 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "cluster_offsets": [ [34, 0, 0], [17, 0, 29] ] },
+  "_comment": "Experiment: the SAME big village spread across 3 smaller islands arranged in a RING around the pop point, with the centre left VOID — the village's central square sits on a small pad over that void hole and spans the ring on its own bridges/piers. Each small island is shallow (no deep teardrop). Compare with village_center (one huge island). cluster_offsets = a triangle ~19 out from the centre; there is NO island at the centre.",
+  "shape": { "radius": { "min": 10, "max": 12 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "cluster_offsets": [ [0, 0, 19], [-16, 0, -10], [16, 0, -10] ] },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
-  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 6, "pad": 5, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers" },
+  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers" },
   "variants": [
     { "weight": 1, "name": "green", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 6, "spacing": 3 } ],

@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.90.0] - 2026-06-25
+
+### Changed
+- **Village Cluster: a ring of 3 islands around a void centre.** Reworked the cluster so the three small islands sit in
+  a tight triangle around the pop point, with the *centre left void* — the village's central square sits on a small pad
+  over the void hole and spans the ring on its own bridges/piers (was one island at the centre plus two satellites).
+  `planIsland` now stamps a cluster shape at the offsets only, never at the centre.
+
+### Fixed
+- The trade-post shop-count gametest was flaky — it drew its village from the random world seed, and the smaller
+  villages from the road tuning sometimes placed fewer than `cap` lots (which the cap can only trim, not conjure). Made
+  it deterministic, with an explicit `featureSeed` and a deeper network so it reliably has enough lots.
+
 ## [0.89.1] - 2026-06-25
 
 ### Fixed
