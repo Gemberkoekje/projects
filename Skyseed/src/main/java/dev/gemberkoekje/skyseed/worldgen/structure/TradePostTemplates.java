@@ -224,7 +224,6 @@ public final class TradePostTemplates {
         // 7×7 shell (was 5×5): vanilla's smallest village house is ~7×7, and the wider streets now space lots far
         // enough apart for it. max = the far wall index, mid = the centred door/window column.
         final int n = 7, max = 6, mid = 3;
-        final boolean forge = d.feature() == Feature.FORGE;
         for (int x = 0; x < n; x++) {
             for (int z = 0; z < n; z++) {
                 m.put(new BlockPos(x, 0, z), wall);
@@ -232,8 +231,9 @@ public final class TradePostTemplates {
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
                 if (perim) {
                     for (int h = 1; h <= 3; h++) {
-                        // the forge faces its lowest course in stone (a smithy look); corners stay posts
-                        m.put(new BlockPos(x, h, z), corner ? post : (forge && h == 1 ? stone : wall));
+                        // the vanilla village-house frame: a cobble/stone foundation course, plank walls above,
+                        // log corner posts the full height
+                        m.put(new BlockPos(x, h, z), corner ? post : (h == 1 ? stone : wall));
                     }
                 }
                 m.put(new BlockPos(x, 4, z), wall); // a flat ceiling; the roof switch builds on top of it
@@ -328,8 +328,8 @@ public final class TradePostTemplates {
                 final boolean perim = x == 0 || x == mx || z == 0 || z == mz;
                 final boolean corner = (x == 0 || x == mx) && (z == 0 || z == mz);
                 if (perim) {
-                    for (int h = 1; h <= 5; h++) { // tall walls (open hall inside), corners as posts
-                        m.put(new BlockPos(x, h, z), corner ? post : wall);
+                    for (int h = 1; h <= 5; h++) { // tall walls: stone foundation course, planks above, log corners
+                        m.put(new BlockPos(x, h, z), corner ? post : (h == 1 ? stone : wall));
                     }
                 }
                 m.put(new BlockPos(x, 6, z), wall); // ceiling

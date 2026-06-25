@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.85.0] - 2026-06-25
+
+### Changed
+- **Village houses get a stone foundation course.** A step toward the vanilla look: the profession shops and the great
+  hall now have a cobble/stone foundation course under their plank walls (with the full-height log corner posts) — the
+  frame every vanilla village house has — instead of being plain plank boxes. More building polish to follow.
+
 ## [0.84.0] - 2026-06-25
 
 ### Added
