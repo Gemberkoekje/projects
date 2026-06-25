@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.75.0] - 2026-06-25
+
+### Added
+- **Bigger buildings (experiment): the blacksmith is now a 5×7 L-shaped forge.** It replaces the 5×5 toolsmith cabin
+  with a larger L-shaped building — a stone-faced forge room with a furnace + chimney, and an open cobblestone patio
+  in the notch with an anvil and a fence railing. It stays 5 wide (so it fits between lots ~6 apart on a street) but
+  runs 7 deep into the open space beside the lane, proving the jigsaw can place larger footprints. A gametest confirms
+  it attaches and places (its anvil appears). Being bigger it's more often overlap-rejected in tight spots, so it
+  shows up less than the 5×5 shops — the "jeopardy" of bigger pieces; wider buildings would need lots spaced further
+  apart (a follow-up). Applies across every biome palette.
+
 ## [0.74.1] - 2026-06-25
 
 ### Added

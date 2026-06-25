@@ -846,6 +846,39 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void tradePostBlacksmithPlaces(GameTestHelper helper) {
+        // The blacksmith is a deliberately bigger (5×7, L-shaped) building. On open ground it should still attach to a
+        // lot and place — recognisable by its anvil — proving the jigsaw can take the larger footprint. (Five villages
+        // make it robust to which shops the cap keeps. Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int anvils = 0;
+        for (int iter = 0; iter < 5; iter++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.ANVIL)) {
+                            anvils++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(anvils > 0, "5 villages placed no blacksmith (anvil count=" + anvils + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void tradePostIsAStreetVillage(GameTestHelper helper) {
         // SKYJIGSAWPLAN Phase 1: the Trade Post is now a street village — a square radiating a depth-6 street

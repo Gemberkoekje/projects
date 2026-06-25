@@ -75,8 +75,7 @@ public final class TradePostTemplates {
                 shop(p, new ShopDesign(Blocks.BARREL.defaultBlockState(), Roof.GABLE, Feature.NONE)));
         writeIfAbsent(dir.resolve("shop_fletcher.nbt"),
                 shop(p, new ShopDesign(Blocks.FLETCHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.HAY)));
-        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"),
-                shop(p, new ShopDesign(Blocks.SMITHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.FORGE)));
+        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), blacksmith(p));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
         // A tiny hamlet green that reuses this set's shops — the Hamlet theme starts from it (see hamlet/start pool).
@@ -247,6 +246,80 @@ public final class TradePostTemplates {
             }
             case NONE -> { }
         }
+    }
+
+    /** The forge's footprint: an L (a 5-wide × 3-deep front wing + a 3-wide × 7-deep left wing); the back-right
+     *  notch (x≥3, z≥3) is left open as the patio. {@code false} for anything outside the 5×7 footprint. */
+    private static boolean forgeRoom(int x, int z) {
+        return x >= 0 && x <= 4 && z >= 0 && z <= 6 && (x <= 2 || z <= 2);
+    }
+
+    /**
+     * The blacksmith — a deliberately bigger, L-shaped building (5 wide × 7 deep) to test the jigsaw with larger
+     * footprints. The roofed forge is an L with a stone-faced base, a furnace and a chimney; the back-right notch is
+     * an open cobblestone patio with an anvil and a fence railing. Stays 5 wide (so it fits between lots ~6 apart on a
+     * street) but runs deeper, into the open space away from the lane. Built from the palette like the other shops.
+     */
+    private static Built blacksmith(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState wall = p.wall().defaultBlockState();
+        final BlockState stone = p.foundation().defaultBlockState();
+        final BlockState slab = p.slab().defaultBlockState();
+        final BlockState glass = p.glass().defaultBlockState();
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 0; z <= 6; z++) {
+                if (!forgeRoom(x, z)) {
+                    m.put(new BlockPos(x, 0, z), stone); // the open cobblestone patio in the notch
+                    continue;
+                }
+                m.put(new BlockPos(x, 0, z), wall);  // room floor
+                m.put(new BlockPos(x, 4, z), wall);  // flat ceiling; the roof sits on it
+                boolean edge = false;
+                for (final Direction d : Direction.Plane.HORIZONTAL) {
+                    if (!forgeRoom(x + d.getStepX(), z + d.getStepZ())) {
+                        edge = true;
+                        break;
+                    }
+                }
+                if (edge) {
+                    m.put(new BlockPos(x, 1, z), stone); // a stone base course — a smithy look
+                    m.put(new BlockPos(x, 2, z), wall);
+                    m.put(new BlockPos(x, 3, z), wall);
+                    m.put(new BlockPos(x, 5, z), slab);  // a low parapet around the flat roof
+                }
+            }
+        }
+        // Door + lot connector on the front-centre wall (faces the street once the jigsaw rotates the piece).
+        m.put(new BlockPos(2, 1, 0), p.door().defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, Direction.NORTH));
+        m.put(new BlockPos(2, 2, 0), p.door().defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
+        conn(m, bes, new BlockPos(2, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", id(p.wall()));
+        m.put(new BlockPos(0, 2, 1), glass);
+        m.put(new BlockPos(0, 2, 4), glass);
+        // The forge: a furnace with a stone chimney up through the roof.
+        m.put(new BlockPos(3, 1, 1), Blocks.FURNACE.defaultBlockState());
+        m.put(new BlockPos(3, 4, 1), stone);
+        m.put(new BlockPos(3, 5, 1), stone);
+        m.put(new BlockPos(3, 6, 1), stone);
+        m.put(new BlockPos(1, 2, 1), Blocks.TORCH.defaultBlockState());
+        // A bed in the left wing and the smithing table.
+        m.put(new BlockPos(1, 1, 4), Blocks.RED_BED.defaultBlockState()
+                .setValue(BedBlock.PART, BedPart.FOOT).setValue(BedBlock.FACING, Direction.SOUTH));
+        m.put(new BlockPos(1, 1, 5), Blocks.RED_BED.defaultBlockState()
+                .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
+        m.put(new BlockPos(1, 1, 2), Blocks.SMITHING_TABLE.defaultBlockState());
+        // The patio: an anvil and a fence railing along its open (right + back) edges.
+        m.put(new BlockPos(3, 1, 4), Blocks.ANVIL.defaultBlockState());
+        m.put(new BlockPos(4, 1, 4), Blocks.OAK_FENCE.defaultBlockState());
+        m.put(new BlockPos(4, 1, 5), Blocks.OAK_FENCE.defaultBlockState());
+        m.put(new BlockPos(4, 1, 6), Blocks.OAK_FENCE.defaultBlockState());
+        m.put(new BlockPos(3, 1, 6), Blocks.OAK_FENCE.defaultBlockState());
+        m.put(new BlockPos(3, 2, 6), Blocks.LANTERN.defaultBlockState());
+        StructureParts.linkFences(m);
+        return new Built(m, bes);
     }
 
     /** A 5×5 fenced wheat field — tilled, watered and grown — with a gate onto the street. No villager (scenery). */
