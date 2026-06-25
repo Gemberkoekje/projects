@@ -62,6 +62,9 @@ public final class ModItems {
     public static final List<BiomeDebugSeed> BIOME_DEBUG_SEEDS = List.of(
             new BiomeDebugSeed("debug_trade_post_plains", "trade_post", "minecraft:plains"),
             new BiomeDebugSeed("debug_trade_post_desert", "trade_post", "minecraft:desert"),
+            new BiomeDebugSeed("debug_trade_post_savanna", "trade_post", "minecraft:savanna"),
+            new BiomeDebugSeed("debug_trade_post_taiga", "trade_post", "minecraft:taiga"),
+            new BiomeDebugSeed("debug_trade_post_snowy", "trade_post", "minecraft:snowy_plains"),
             new BiomeDebugSeed("debug_forest_taiga", "forest", "minecraft:taiga"),
             new BiomeDebugSeed("debug_forest_dark", "forest", "minecraft:dark_forest"),
             new BiomeDebugSeed("debug_desert_badlands", "desert", "minecraft:badlands"),

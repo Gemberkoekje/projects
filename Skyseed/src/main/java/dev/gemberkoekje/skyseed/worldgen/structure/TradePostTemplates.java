@@ -48,6 +48,13 @@ public final class TradePostTemplates {
     public static final Palette DESERT = new Palette("skyseed:trade_post_desert", Blocks.SMOOTH_SANDSTONE,
             Blocks.CUT_SANDSTONE, Blocks.SANDSTONE_STAIRS, Blocks.SANDSTONE_SLAB, Blocks.OAK_DOOR,
             Blocks.SANDSTONE, Blocks.GLASS, Blocks.OAK_FENCE, Blocks.SAND);
+    public static final Palette SAVANNA = new Palette("skyseed:trade_post_savanna", Blocks.ACACIA_PLANKS,
+            Blocks.ACACIA_LOG, Blocks.ACACIA_STAIRS, Blocks.ACACIA_SLAB, Blocks.ACACIA_DOOR,
+            Blocks.COBBLESTONE, Blocks.GLASS, Blocks.ACACIA_FENCE, Blocks.DIRT);
+    /** Spruce set shared by the taiga and snowy overrides (they currently diverge only by island surface). */
+    public static final Palette SPRUCE = new Palette("skyseed:trade_post_spruce", Blocks.SPRUCE_PLANKS,
+            Blocks.SPRUCE_LOG, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR,
+            Blocks.COBBLESTONE, Blocks.GLASS, Blocks.SPRUCE_FENCE, Blocks.DIRT);
 
     public static void generateInto(Path dir, Palette p) throws IOException {
         writeIfAbsent(dir.resolve("square.nbt"), square(p));

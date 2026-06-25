@@ -18,6 +18,30 @@
           "ground": [
             { "block": "minecraft:dead_bush", "chance": 0.05 }
           ] } }
+      ] },
+    { "_comment": "Savanna: acacia houses on grass.",
+      "biomes": ["minecraft:savanna", "minecraft:savanna_plateau", "minecraft:windswept_savanna"],
+      "jigsaw": { "pool": "skyseed:trade_post_savanna/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_savanna/fillers" },
+      "variants": [
+        { "weight": 1, "name": "dry", "decoration": {
+          "ground": [
+            { "block": "minecraft:short_grass", "chance": 0.22 }
+          ] } }
+      ] },
+    { "_comment": "Snowy: spruce houses on a snow island (listed before taiga so snowy_taiga takes this).",
+      "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
+      "surface": "minecraft:snow_block",
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "variants": [] },
+    { "_comment": "Taiga: the same spruce set on grass, with ferns.",
+      "biomes": ["minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "variants": [
+        { "weight": 1, "name": "pine", "decoration": {
+          "ground": [
+            { "block": "minecraft:fern", "chance": 0.18 },
+            { "block": "minecraft:sweet_berry_bush", "chance": 0.04 }
+          ] } }
       ] }
   ],
   "variants": [

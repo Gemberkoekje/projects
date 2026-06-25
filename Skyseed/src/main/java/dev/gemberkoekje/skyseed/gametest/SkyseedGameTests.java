@@ -871,6 +871,70 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void tradePostBiomeStylesSelectTheirPools(GameTestHelper helper) {
+        // The remaining village styles: savanna gets its acacia pool; taiga and snowy share the spruce pool.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final String[][] cases = {
+                {"minecraft:savanna", "trade_post_savanna/start"},
+                {"minecraft:taiga", "trade_post_spruce/start"},
+                {"minecraft:snowy_plains", "trade_post_spruce/start"}};
+        for (String[] cs : cases) {
+            final var biome = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                    .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(cs[0])));
+            final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, biome, RandomSource.create(8L));
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals(cs[1])),
+                    cs[0] + " trade post should use pool " + cs[1]);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void tradePostBiomePiecesUseTheirWood(GameTestHelper helper) {
+        // The savanna set is acacia and the shared spruce set is spruce — confirm the palette produced the right wood
+        // (not oak) and the villages still place shops via the same cap/filler machinery.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        checkWood(helper, level, origin, "trade_post_savanna", Blocks.ACACIA_PLANKS);
+        checkWood(helper, level, origin, "trade_post_spruce", Blocks.SPRUCE_PLANKS);
+        helper.succeed();
+    }
+
+    private static void checkWood(GameTestHelper helper, ServerLevel level, BlockPos origin, String pool, Block wood) {
+        for (int x = 4; x <= 44; x++) {
+            for (int z = 4; z <= 44; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                }
+            }
+        }
+        final var startPool = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/fillers"));
+        Jigsaw.placeCapped(level, startPool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers);
+        int beds = 0;
+        int rightWood = 0;
+        int oak = 0;
+        for (int x = 4; x <= 44; x++) {
+            for (int z = 4; z <= 44; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.RED_BED)) {
+                        beds++;
+                    } else if (s.is(wood)) {
+                        rightWood++;
+                    } else if (s.is(Blocks.OAK_PLANKS)) {
+                        oak++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, pool + " placed no shops (red_bed=" + beds + ")");
+        helper.assertTrue(rightWood > 0, pool + " has no " + wood + " walls (count=" + rightWood + ")");
+        helper.assertTrue(oak == 0, pool + " still has oak plank walls (oak=" + oak + ")");
+    }
+
     @GameTest(template = BIG_REGION)
     public static void tradePostVillagePlacesShops(GameTestHelper helper) {
         // Regression: assemble the Trade Post village on a flat platform once for each shop count the 2–4 roll can

@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.72.0] - 2026-06-25
+
+### Added
+- **All five vanilla village styles for the trade post.** Following the desert slice, added savanna (acacia) and a
+  shared spruce set used by both taiga and snowy — which diverge by island surface for now (taiga on grass with
+  ferns, snowy on snow) and can split into separate sets later for snow caps. So a trade post germinating in a
+  desert/savanna/taiga/snowy biome builds from biome-matched materials on a biome-matched island; plains stays the
+  oak default. Added debug seeds for savanna/taiga/snowy in the Skyseed Debug tab to spawn each on demand.
+
 ## [0.71.1] - 2026-06-25
 
 ### Added

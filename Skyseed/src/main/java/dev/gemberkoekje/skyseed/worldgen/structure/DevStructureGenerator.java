@@ -38,6 +38,8 @@ public final class DevStructureGenerator {
             HamletTemplates.generateInto(base.resolve("hamlet"));
             TradePostTemplates.generateInto(base.resolve("trade_post"), TradePostTemplates.PLAINS);
             TradePostTemplates.generateInto(base.resolve("trade_post_desert"), TradePostTemplates.DESERT);
+            TradePostTemplates.generateInto(base.resolve("trade_post_savanna"), TradePostTemplates.SAVANNA);
+            TradePostTemplates.generateInto(base.resolve("trade_post_spruce"), TradePostTemplates.SPRUCE);
             VillageCenterTemplates.generateInto(base.resolve("village_center"));
             AnimalTemplates.generateInto(base.resolve("animal"));
             DungeonTemplates.generateInto(base.resolve("dungeon"));
