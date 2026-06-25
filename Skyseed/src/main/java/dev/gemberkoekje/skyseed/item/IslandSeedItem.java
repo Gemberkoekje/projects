@@ -32,15 +32,26 @@ public class IslandSeedItem extends Item {
     public static final double MAX_DISTANCE = 40.0; // Precise: a full charge places it this far
 
     private final ResourceLocation theme;
+    private final ResourceLocation forcedBiome;
 
     public IslandSeedItem(Properties properties, ResourceLocation theme) {
+        this(properties, theme, null);
+    }
+
+    public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome) {
         super(properties);
         this.theme = theme;
+        this.forcedBiome = forcedBiome;
     }
 
     /** The island theme this seed germinates into (a {@code skyseed:theme} datapack-registry id). */
     public ResourceLocation theme() {
         return theme;
+    }
+
+    /** A biome this (debug) seed forces its island to germinate as, ignoring where it's thrown; null = normal. */
+    public ResourceLocation forcedBiome() {
+        return forcedBiome;
     }
 
     @Override

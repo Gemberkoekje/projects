@@ -16,6 +16,8 @@ import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -52,6 +54,9 @@ import java.util.List;
  */
 public class IslandSeedEntity extends ThrowableItemProjectile {
     private static final EntityDataAccessor<String> DATA_THEME =
+            SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
+    /** Optional: a biome id a debug seed forces the island to germinate as, in place of the planting biome. */
+    private static final EntityDataAccessor<String> DATA_FORCED_BIOME =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
 
     /** Ticks from spawn to germination (~2 s at 20 tps). */
@@ -93,6 +98,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder); // defines the projectile's item-stack data; required
         builder.define(DATA_THEME, "");
+        builder.define(DATA_FORCED_BIOME, "");
     }
 
     public void setTheme(ResourceLocation theme) {
@@ -103,6 +109,35 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     public ResourceLocation getTheme() {
         String s = this.entityData.get(DATA_THEME);
         return s.isEmpty() ? null : Ids.parse(s);
+    }
+
+    /** Force the germinating island to read as this biome (debug seeds only); {@code null} = use the planting biome. */
+    public void setForcedBiome(ResourceLocation biome) {
+        this.entityData.set(DATA_FORCED_BIOME, biome == null ? "" : biome.toString());
+    }
+
+    /** @return the forced biome id, or {@code null} for the normal planting-biome behaviour. */
+    public ResourceLocation getForcedBiome() {
+        String s = this.entityData.get(DATA_FORCED_BIOME);
+        return s.isEmpty() ? null : Ids.parse(s);
+    }
+
+    /** A debug seed's forced biome resolved to a holder, or {@code null} for the normal planting-biome behaviour. */
+    private Holder<Biome> forcedBiomeHolder(ServerLevel level) {
+        ResourceLocation forced = getForcedBiome();
+        if (forced == null) {
+            return null;
+        }
+        return level.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolder(ResourceKey.create(Registries.BIOME, forced))
+                .<Holder<Biome>>map(ref -> ref)
+                .orElse(null);
+    }
+
+    /** The biome the island should generate as at {@code pos}: a debug seed's forced biome, else the planting biome. */
+    private Holder<Biome> biomeAt(ServerLevel level, BlockPos pos) {
+        Holder<Biome> forced = forcedBiomeHolder(level);
+        return forced != null ? forced : level.getBiome(pos);
     }
 
     /** Mark this a Precise-mode throw: it flies through everything and germinates at {@code target}. */
@@ -163,7 +198,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // Placement: grow at the rest point / target if it's clear, else nudge horizontally off whatever it would
         // grow into (so islands sit adjacent, not stacked), and only lift up/down if there's no horizontal room.
         final BlockPos base = this.blockPosition();
-        final Holder<Biome> biome = level.getBiome(base);
+        final Holder<Biome> biome = biomeAt(level, base);
         // Dimension gate: a seed only grows where it has an implementation (its base dimensions, or a dimension-keyed
         // override). Thrown into a dimension it doesn't implement — an overworld seed in the Nether, say — it fizzles
         // rather than growing the wrong, foreign base island here. A `fizzle` biome rule also excludes specific biomes
@@ -273,13 +308,13 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             return !s.isAir() && !s.canBeReplaced();
         };
         for (BlockPos c : twinSearchSpots(linked)) {
-            final IslandPlan candidate = planAt(level, theme, c);
+            final IslandPlan candidate = planAt(level, theme, c, null); // twin keeps its own (linked-dimension) biome
             if (IslandPlacement.check(candidate, players, occupied).ok()) {
                 return candidate;
             }
         }
         // No clear spot close by — grow it at the linked coordinate anyway; sitting on the link is the whole point.
-        return planAt(level, theme, linked);
+        return planAt(level, theme, linked, null);
     }
 
     /** The linked spot first, then a tight ring (small horizontal steps), then a couple of small vertical lifts. */
@@ -313,7 +348,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
                                      List<Vec3> players, IslandPlacement.Occupancy occupied) {
         BlockPos cursor = base;
         for (int attempt = 0; attempt < MAX_H_ATTEMPTS; attempt++) {
-            final IslandPlan candidate = planAt(level, theme, cursor);
+            final IslandPlan candidate = planAt(level, theme, cursor, forcedBiomeHolder(level));
             final IslandPlacement.Fit fit = IslandPlacement.check(candidate, players, occupied);
             if (fit.ok()) {
                 this.setPos(cursor.getX() + 0.5, cursor.getY() + 0.5, cursor.getZ() + 0.5);
@@ -334,7 +369,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         }
         for (int lift : V_FALLBACK) {
             final BlockPos c = base.above(lift);
-            final IslandPlan candidate = planAt(level, theme, c);
+            final IslandPlan candidate = planAt(level, theme, c, forcedBiomeHolder(level));
             if (IslandPlacement.check(candidate, players, occupied).ok()) {
                 this.setPos(c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5);
                 return candidate;
@@ -343,11 +378,11 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         return null;
     }
 
-    /** Plan the island at {@code c}; RNG is decorrelated per island via {@code worldSeed ^ centre}. */
-    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c) {
+    /** Plan the island at {@code c} as {@code forced} (a debug seed's biome) or, when null, the planting biome at
+     *  {@code c}; RNG is decorrelated per island via {@code worldSeed ^ centre}. */
+    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c, Holder<Biome> forced) {
         final RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-        // Island look can vary with the biome it lands in (README → Configuration → Biome overrides).
-        return IslandGenerator.planIsland(level, c, theme, level.getBiome(c), random);
+        return IslandGenerator.planIsland(level, c, theme, forced != null ? forced : level.getBiome(c), random);
     }
 
     /**
@@ -414,6 +449,10 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (theme != null) {
             tag.putString("Theme", theme.toString());
         }
+        ResourceLocation forced = getForcedBiome();
+        if (forced != null) {
+            tag.putString("ForcedBiome", forced.toString());
+        }
         tag.putBoolean("Precise", this.precise);
         if (this.precise) {
             tag.putDouble("TX", this.targetX);
@@ -428,6 +467,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         this.armTicks = tag.getInt("ArmTicks");
         if (tag.contains("Theme")) {
             setTheme(Ids.parse(tag.getString("Theme")));
+        }
+        if (tag.contains("ForcedBiome")) {
+            setForcedBiome(Ids.parse(tag.getString("ForcedBiome")));
         }
         this.precise = tag.getBoolean("Precise");
         if (this.precise) {

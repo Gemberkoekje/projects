@@ -51,6 +51,26 @@ public final class ModItems {
             "debug_evoker_cell", "debug_vault_cell", "debug_trail_ruins", "debug_blaze_spawner",
             "debug_bastion_remnant", "debug_streets", "debug_small_waterfall", "debug_large_waterfall");
 
+    /**
+     * Hidden debug seeds that germinate an <em>existing</em> theme but force the island to read as a specific biome,
+     * regardless of where they're thrown — so a biome-adaptive island (the trade post's desert style, and any theme
+     * with biome overrides) can be inspected on demand without flying to that biome. Same creative-only treatment as
+     * {@link #DEBUG_SEED_THEMES}: registered into {@link #DEBUG_SEEDS}, shown in the debug tab, but no recipe/tag/guide.
+     */
+    public record BiomeDebugSeed(String name, String theme, String biome) {}
+
+    public static final List<BiomeDebugSeed> BIOME_DEBUG_SEEDS = List.of(
+            new BiomeDebugSeed("debug_trade_post_plains", "trade_post", "minecraft:plains"),
+            new BiomeDebugSeed("debug_trade_post_desert", "trade_post", "minecraft:desert"),
+            new BiomeDebugSeed("debug_forest_taiga", "forest", "minecraft:taiga"),
+            new BiomeDebugSeed("debug_forest_dark", "forest", "minecraft:dark_forest"),
+            new BiomeDebugSeed("debug_desert_badlands", "desert", "minecraft:badlands"),
+            new BiomeDebugSeed("debug_rocky_snowy", "rocky", "minecraft:snowy_plains"),
+            new BiomeDebugSeed("debug_aquatic_ocean", "aquatic", "minecraft:ocean"),
+            new BiomeDebugSeed("debug_aquatic_swamp", "aquatic", "minecraft:mangrove_swamp"),
+            new BiomeDebugSeed("debug_frozen_ice_spikes", "frozen_large", "minecraft:ice_spikes"),
+            new BiomeDebugSeed("debug_ladder_desert", "ladder_small", "minecraft:desert"));
+
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();
 
@@ -60,6 +80,12 @@ public final class ModItems {
     static {
         registerSeeds(SEED_THEMES, SEEDS);
         registerSeeds(DEBUG_SEED_THEMES, DEBUG_SEEDS);
+        for (BiomeDebugSeed s : BIOME_DEBUG_SEEDS) {
+            final ResourceLocation themeId = Ids.mod(s.theme());
+            final ResourceLocation biomeId = Ids.parse(s.biome());
+            DEBUG_SEEDS.put(s.name(), ITEMS.registerItem(s.name() + "_skyseed",
+                    props -> new IslandSeedItem(props, themeId, biomeId), new Item.Properties().stacksTo(16)));
+        }
     }
 
     private static void registerSeeds(List<String> themes, Map<String, DeferredItem<IslandSeedItem>> into) {

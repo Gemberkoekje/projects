@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.71.1] - 2026-06-25
+
+### Added
+- **Forced-biome debug seeds** (creative-only, in the "Skyseed Debug" tab). A seed can now carry an optional forced
+  biome: the debug seed germinates an existing theme *as if* it were planted in that biome, so the real biome
+  overrides fire — no duplicated theme files. Lets you inspect any biome-adaptive island on demand without flying to
+  the biome. Added: trade post (plains / desert), forest (taiga / dark forest), desert (badlands), rocky (snowy),
+  aquatic (ocean / swamp), frozen (ice spikes), ladder (desert). Like the other debug seeds: no recipe/tag/guide.
+
 ## [0.71.0] - 2026-06-25
 
 ### Added

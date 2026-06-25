@@ -43,6 +43,7 @@ public final class SkyseedNetwork {
             final IslandSeedEntity seed = new IslandSeedEntity(level, player);
             seed.setItem(stack);
             seed.setTheme(seedItem.theme());
+            seed.setForcedBiome(seedItem.forcedBiome());
 
             if (pkt.precise()) {
                 final Vec3 eye = player.getEyePosition();

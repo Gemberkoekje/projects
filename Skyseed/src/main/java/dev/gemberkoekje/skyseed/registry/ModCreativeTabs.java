@@ -31,7 +31,7 @@ public final class ModCreativeTabs {
                     .icon(() -> ModItems.DEBUG_SEEDS.get("debug_igloo").get().getDefaultInstance())
                     .withTabsBefore(SKYSEED_TAB.getId())
                     .displayItems((parameters, output) ->
-                            ModItems.DEBUG_SEED_THEMES.forEach(theme -> output.accept(ModItems.DEBUG_SEEDS.get(theme).get())))
+                            ModItems.DEBUG_SEEDS.values().forEach(seed -> output.accept(seed.get().getDefaultInstance())))
                     .build());
 
     private ModCreativeTabs() {}

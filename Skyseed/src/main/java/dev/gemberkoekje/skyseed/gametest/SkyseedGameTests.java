@@ -27,6 +27,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -852,6 +853,21 @@ public final class SkyseedGameTests {
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, overworld.getBiome(c), RandomSource.create(8L));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post/start")),
                 "trade_post should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void tradePostDesertBiomeSelectsDesertPool(GameTestHelper helper) {
+        // Biome-override wiring — what a forced-biome debug seed exercises. Planning the trade post in a desert biome
+        // must select the desert jigsaw pool (and a sand surface), not the default plains/oak start.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        final var desert = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, desert, RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start")),
+                "a trade post in a desert biome should use the desert jigsaw pool");
         helper.succeed();
     }
 
