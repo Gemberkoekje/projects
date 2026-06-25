@@ -56,6 +56,7 @@ public final class DevStructureGenerator {
             OceanMonumentTemplates.generateInto(base.resolve("ocean_monument"));
             RareStructureTemplates.generateInto(base);
             writeGameTestRegion(base.resolve("gametest").resolve("region.nbt"));
+            writeBigGameTestRegion(base.resolve("gametest").resolve("big_region.nbt"));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] dev structure template generation skipped: {}", e.toString());
         }
@@ -79,5 +80,27 @@ public final class DevStructureGenerator {
         }
         StructureWriter.write(m, file);
         Skyseed.LOGGER.info("[skyseed] generated gametest region template");
+    }
+
+    /** A 48×24×48 solid-dirt platform (3 deep) + air, for assembling sprawling jigsaw structures in a gametest. */
+    private static void writeBigGameTestRegion(Path file) throws IOException {
+        if (Files.exists(file)) {
+            return;
+        }
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final BlockState dirt = Blocks.DIRT.defaultBlockState();
+        final BlockState air = Blocks.AIR.defaultBlockState();
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y <= 2; y++) {
+                    m.put(new BlockPos(x, y, z), dirt);
+                }
+                for (int y = 3; y < 24; y++) {
+                    m.put(new BlockPos(x, y, z), air);
+                }
+            }
+        }
+        StructureWriter.write(m, file);
+        Skyseed.LOGGER.info("[skyseed] generated big gametest region template");
     }
 }

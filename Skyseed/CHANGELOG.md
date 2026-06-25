@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.69.1] - 2026-06-25
+
+### Fixed
+- **Trade Post villages now reliably place shops.** The streets branched into a dense grid (a 4‑way *cross*
+  piece), and a 5×5 building lot hung off a 3‑wide street collided with neighbouring streets/lots — the jigsaw
+  overlap check then rejected it, so most lots (and often *every* shop) silently dropped, leaving a square with a
+  couple of fields and no houses. Dropped the cross piece — streets are now straights + corners, so lots have
+  open space along the sides and shops/fields/gardens place reliably. A new gametest assembles a village on a
+  flat platform and asserts shops actually appear (guards the regression). The underlying jigsaw treats shops and
+  fields identically; the fix is purely about giving lots room.
+
 ## [0.69.0] - 2026-06-25
 
 ### Changed

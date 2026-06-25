@@ -44,9 +44,8 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("street_corner.nbt"), streetSegment(
                 new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP},
                 new FrontAndTop[]{FrontAndTop.NORTH_UP}));
-        writeIfAbsent(dir.resolve("street_cross.nbt"), streetSegment(
-                new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.EAST_UP, FrontAndTop.NORTH_UP, FrontAndTop.SOUTH_UP},
-                new FrontAndTop[]{}));
+        // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
+        // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
         writeIfAbsent(dir.resolve("shop_farmer.nbt"), shop(Blocks.COMPOSTER.defaultBlockState()));
         writeIfAbsent(dir.resolve("shop_librarian.nbt"), shop(Blocks.LECTERN.defaultBlockState()));
         writeIfAbsent(dir.resolve("shop_fisherman.nbt"), shop(Blocks.BARREL.defaultBlockState()));
@@ -122,18 +121,15 @@ public final class TradePostTemplates {
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", "minecraft:oak_planks");
-        // Windows on the side/back walls.
         m.put(new BlockPos(0, 2, mid), glass);
         m.put(new BlockPos(max, 2, mid), glass);
         m.put(new BlockPos(mid, 2, max), glass);
-        // Bed, job site, torch.
         m.put(new BlockPos(1, 1, 2), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.FOOT).setValue(BedBlock.FACING, Direction.SOUTH));
         m.put(new BlockPos(1, 1, 3), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
         m.put(new BlockPos(3, 1, 3), jobSite);
         m.put(new BlockPos(3, 1, 1), Blocks.TORCH.defaultBlockState());
-        // Pitched gable roof (flush eaves — the door wall is a gable end facing the street).
         StructureParts.gableRoof(m, 0, max, 0, max, 4, floor, Blocks.OAK_STAIRS, Blocks.OAK_SLAB, 0);
         return new Built(m, bes);
     }

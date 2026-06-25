@@ -1,6 +1,9 @@
 package dev.gemberkoekje.skyseed.gametest;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Jigsaw;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.command.SkyseedCommands;
 import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
@@ -61,6 +64,7 @@ public final class SkyseedGameTests {
 
     // The @GameTestHolder namespace (skyseed) is prepended automatically → skyseed:gametest/region.
     private static final String REGION = "gametest/region";
+    private static final String BIG_REGION = "gametest/big_region";
 
     private static ResourceLocation skyseed(String path) {
         return ResourceLocation.fromNamespaceAndPath(Skyseed.MODID, path);
@@ -826,6 +830,35 @@ public final class SkyseedGameTests {
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, overworld.getBiome(c), RandomSource.create(8L));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post/start")),
                 "trade_post should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void tradePostVillagePlacesShops(GameTestHelper helper) {
+        // Regression: assemble the Trade Post village on a flat platform and confirm it actually places shops (a
+        // shop carries a RED_BED), not just fields — guards against building lots being overlap-rejected by the
+        // jigsaw (the reason a too-dense street grid produced shop-less villages). Depth 5 stays in the 48-block
+        // region. NB this loads the dev-generated .nbt: on an INCREMENTAL dev build it can read a STALE Stonecutter
+        // node copy (versions/<v>/src) and spuriously fail — run a clean build, or re-sync the node src, if it does.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        Jigsaw.place(level, pool, Ids.mc("bottom"), 5, origin, false);
+        int beds = 0;
+        int wheat = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.RED_BED)) {
+                        beds++;
+                    } else if (s.is(Blocks.WHEAT)) {
+                        wheat++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, "village placed no shops (beds=" + beds + " wheat=" + wheat + ")");
         helper.succeed();
     }
 
