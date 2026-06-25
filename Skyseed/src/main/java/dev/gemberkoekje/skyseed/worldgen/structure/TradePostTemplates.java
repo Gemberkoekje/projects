@@ -83,6 +83,8 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("forge.nbt"), blacksmith(p));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
+        // A tiny lamp-post plot, the lots' fallback: a lot too tight for a shop/field gets this instead of a bare gap.
+        writeIfAbsent(dir.resolve("terminator.nbt"), terminator(p));
         // A tiny hamlet green that reuses this set's shops — the Hamlet theme starts from it (see hamlet/start pool).
         writeIfAbsent(dir.resolve("hamlet_hub.nbt"), hamletHub(p));
     }
@@ -404,6 +406,28 @@ public final class TradePostTemplates {
         m.put(new BlockPos(mid, 1, mid), p.fence().defaultBlockState()); // lamp post
         m.put(new BlockPos(mid, 2, mid), Blocks.LANTERN.defaultBlockState());
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", "minecraft:grass_block");
+        return new Built(m, bes);
+    }
+
+    /**
+     * A tiny 3×3 lot terminator: a lamp post on a small grass plot with a couple of flowers. It's the lots' fallback —
+     * smaller than any building or field, so a lot the jigsaw couldn't squeeze a (taller, wider) shop or field into
+     * still gets a tidy little decoration instead of a bare gap, the way vanilla drops a lamp/patch on a leftover plot.
+     */
+    private static Built terminator(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int x = 0; x <= 2; x++) {
+            for (int z = 0; z <= 2; z++) {
+                m.put(new BlockPos(x, 0, z), Blocks.GRASS_BLOCK.defaultBlockState());
+            }
+        }
+        m.put(new BlockPos(0, 1, 0), Blocks.POPPY.defaultBlockState());
+        m.put(new BlockPos(2, 1, 2), Blocks.OXEYE_DAISY.defaultBlockState());
+        m.put(new BlockPos(1, 1, 1), p.fence().defaultBlockState());    // lamp post
+        m.put(new BlockPos(1, 2, 1), Blocks.LANTERN.defaultBlockState());
+        conn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", "minecraft:grass_block");
         return new Built(m, bes);
     }

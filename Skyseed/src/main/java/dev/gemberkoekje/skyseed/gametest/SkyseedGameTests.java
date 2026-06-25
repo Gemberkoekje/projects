@@ -882,7 +882,11 @@ public final class SkyseedGameTests {
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int anvils = 0;
-        for (int iter = 0; iter < 10; iter++) {
+        // The forge is a probabilistic feature (a shallow large section that rolls it), and the jigsaw seeds its
+        // assembly RNG from the world seed + origin — so a fixed origin always builds the SAME village, and the
+        // gametest's world seed varies per run. Pass an explicit, varying featureSeed to sample many deterministic
+        // villages: across these fixed seeds the forge reliably lands at least once, so the test can never flake.
+        for (int iter = 0; iter < 16; iter++) {
             for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing the forge out
                 for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -890,11 +894,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            // The forge is a probabilistic feature (a shallow large section that rolls it), and placeCapped draws from
-            // level.getRandom() — non-deterministic across runs. Seed it per iteration so this test can never flake:
-            // across these fixed villages the forge reliably lands at least once.
-            level.getRandom().setSeed(0x5EEDL + iter);
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
             for (int x = 0; x <= 47; x++) {
                 for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -905,7 +905,7 @@ public final class SkyseedGameTests {
                 }
             }
         }
-        helper.assertTrue(anvils > 0, "10 villages placed no blacksmith (anvil count=" + anvils + ")");
+        helper.assertTrue(anvils > 0, "16 villages placed no blacksmith (anvil count=" + anvils + ")");
         helper.succeed();
     }
 

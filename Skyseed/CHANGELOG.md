@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.78.0] - 2026-06-25
+
+### Added
+- **Lamp-plaza terminators add variety to a village's filler lots.** Borrowing vanilla's idea of small "terminator"
+  decorations on leftover plots: a tiny 3×3 lamp-post plot joins the filler pool (alongside wheat fields and gardens),
+  so a village's non-shop lots aren't only fields — some are a little lamp plaza. (Vanilla uses terminators as the
+  jigsaw *fallback* for a lot a house can't fit; Skyseed already fills lots via the shop cap's filler pool, so adding
+  it there keeps the guaranteed 2–4 shops and the forge intact rather than competing with them for space.) All biomes.
+
+### Fixed
+- The blacksmith gametest could flake: the jigsaw seeds its assembly from the world seed + the origin (so a fixed
+  origin always builds the same village) and the gametest's world seed varies per run. `placeCapped` gained an explicit
+  `featureSeed` overload so the test samples 16 deterministic villages and the forge reliably appears.
+
 ## [0.77.0] - 2026-06-25
 
 ### Changed

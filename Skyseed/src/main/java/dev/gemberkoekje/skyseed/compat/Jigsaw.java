@@ -58,13 +58,25 @@ public final class Jigsaw {
     public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, ResourceLocation target,
                                    int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
                                    Holder<StructureTemplatePool> fillerPool) {
+        placeCapped(level, pool, target, depth, origin, keepJigsaws, capPrefix, capCount, fillerPool, level.getSeed());
+    }
+
+    /**
+     * As {@link #placeCapped(ServerLevel, Holder, ResourceLocation, int, BlockPos, boolean, String, int, Holder)} but
+     * with an explicit {@code featureSeed} driving the jigsaw assembly RNG (vanilla seeds it from the world seed and
+     * the origin's chunk, so a fixed origin always assembles the same village). Production passes the world seed; a
+     * test can pass a varying seed to sample many different villages deterministically.
+     */
+    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, ResourceLocation target,
+                                   int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
+                                   Holder<StructureTemplatePool> fillerPool, long featureSeed) {
         final ChunkGenerator generator = level.getChunkSource().getGenerator();
         final StructureTemplateManager templates = level.getStructureManager();
         final StructureManager structureManager = level.structureManager();
         final RandomSource random = level.getRandom();
         final Structure.GenerationContext context = new Structure.GenerationContext(
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
-                templates, level.getSeed(), new ChunkPos(origin), level, biome -> true);
+                templates, featureSeed, new ChunkPos(origin), level, biome -> true);
         final Optional<Structure.GenerationStub> stub = JigsawPlacement.addPieces(
                 context, pool, Optional.of(target), depth, origin, false, Optional.empty(), 128,
                 PoolAliasLookup.EMPTY, JigsawStructure.DEFAULT_DIMENSION_PADDING, JigsawStructure.DEFAULT_LIQUID_SETTINGS);
