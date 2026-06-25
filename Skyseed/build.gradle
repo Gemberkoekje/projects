@@ -28,6 +28,20 @@ tasks.withType(ProcessResources).configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// DevStructureGenerator writes its code-authored .nbt templates into the REPO-ROOT src (see the runs config below),
+// but under Stonecutter processResources stages THIS version node's own copy (versions/<v>/src) and the EXCLUDE above
+// keeps it. That node copy is only refreshed when Stonecutter re-chisels, so a freshly generated — or freshly pulled —
+// structure template gets silently shadowed by a stale node copy (a footgun that cost real debugging time). Refresh
+// the node's structure dir from the repo root before resources are processed, so a single `runClient` always sees the
+// current templates with no manual wipe of versions/<v>/src.
+if (project != rootProject) {
+    def syncDevStructures = tasks.register('syncDevStructures', Copy) {
+        from rootProject.file('src/main/resources/data/skyseed/structure')
+        into project.file('src/main/resources/data/skyseed/structure')
+    }
+    tasks.withType(ProcessResources).configureEach { dependsOn(syncDevStructures) }
+}
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)

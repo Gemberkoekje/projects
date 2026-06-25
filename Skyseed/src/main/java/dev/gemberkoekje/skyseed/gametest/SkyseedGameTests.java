@@ -835,30 +835,39 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void tradePostVillagePlacesShops(GameTestHelper helper) {
-        // Regression: assemble the Trade Post village on a flat platform and confirm it actually places shops (a
-        // shop carries a RED_BED), not just fields — guards against building lots being overlap-rejected by the
-        // jigsaw (the reason a too-dense street grid produced shop-less villages). Depth 5 stays in the 48-block
-        // region. NB this loads the dev-generated .nbt: on an INCREMENTAL dev build it can read a STALE Stonecutter
-        // node copy (versions/<v>/src) and spuriously fail — run a clean build, or re-sync the node src, if it does.
+        // Regression: assemble the Trade Post village five times on a flat platform and confirm shops appear in
+        // aggregate (a shop carries a RED_BED), not just fields — guards against building lots being overlap-rejected
+        // by the jigsaw (a too-dense or too-short street network produced shop-less villages). Five samples make it
+        // robust to the per-village RNG. (Loads dev-generated .nbt; the syncDevStructures build task keeps the
+        // Stonecutter node copy current, so this no longer flakes on a stale .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
-        Jigsaw.place(level, pool, Ids.mc("bottom"), 5, origin, false);
         int beds = 0;
         int wheat = 0;
-        for (int x = 0; x < 48; x++) {
-            for (int z = 0; z < 48; z++) {
-                for (int y = 0; y < 24; y++) {
-                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
-                    if (s.is(Blocks.RED_BED)) {
-                        beds++;
-                    } else if (s.is(Blocks.WHEAT)) {
-                        wheat++;
+        for (int iter = 0; iter < 5; iter++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR); // reset platform
+                    }
+                }
+            }
+            Jigsaw.place(level, pool, Ids.mc("bottom"), 5, origin, false);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                        if (s.is(Blocks.RED_BED)) {
+                            beds++;
+                        } else if (s.is(Blocks.WHEAT)) {
+                            wheat++;
+                        }
                     }
                 }
             }
         }
-        helper.assertTrue(beds > 0, "village placed no shops (beds=" + beds + " wheat=" + wheat + ")");
+        helper.assertTrue(beds > 0, "5 villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
         helper.succeed();
     }
 

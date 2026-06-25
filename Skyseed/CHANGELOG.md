@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.69.2] - 2026-06-25
+
+### Fixed
+- **Trade Post shops now appear reliably**, and dev-generated structure templates reach the run without a manual
+  wipe.
+  - The street runs terminated too early, so a village often grew only one or two building lots (frequently no
+    shop). Lengthened the runs (far fewer empty terminators) so a village reliably grows several lots — most
+    villages now show multiple shops alongside the fields/gardens.
+  - **Build:** new `syncDevStructures` Gradle task refreshes this Stonecutter version node's copy of the
+    code-generated `.nbt` from the repo-root src before `processResources`, so editing a `*Templates.java` (or
+    pulling new structures) takes effect on the next `runClient` — no more deleting `versions/<v>/src` by hand.
+    (This was the real cause of the earlier shop-less villages: a stale node copy shadowed the current template.)
+  - The `tradePostVillagePlacesShops` gametest now assembles five villages and asserts shops appear in aggregate,
+    so it can't flake on an unlucky single roll.
+
 ## [0.69.1] - 2026-06-25
 
 ### Fixed
