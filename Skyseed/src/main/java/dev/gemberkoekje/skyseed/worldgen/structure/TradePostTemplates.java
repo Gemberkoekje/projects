@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.JigsawBlock;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -81,6 +82,8 @@ public final class TradePostTemplates {
         // The blacksmith is named "forge" (not "shop_") so the shop cap leaves it alone — it's a feature building
         // that a large section hosts, not one of the capped 2–4 small shops.
         writeIfAbsent(dir.resolve("forge.nbt"), blacksmith(p));
+        // A second large-section landmark alongside the forge: a tall open meeting hall with a bell.
+        writeIfAbsent(dir.resolve("great_hall.nbt"), greatHall(p));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
         // A tiny lamp-post plot, the lots' fallback: a lot too tight for a shop/field gets this instead of a bare gap.
@@ -301,6 +304,60 @@ public final class TradePostTemplates {
             }
             case NONE -> { }
         }
+    }
+
+    /**
+     * A great hall — a tall, open meeting house (5 wide × 9 deep) for the large sections: higher walls than a shop, a
+     * steep gable, benches down both sides of a central aisle and a bell at the head. A second big-building option
+     * alongside the forge, so a large lot reads as a real landmark. Stays 5 wide (the large section's clear span, same
+     * as the forge); the extra size is depth + height.
+     */
+    private static Built greatHall(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState wall = p.wall().defaultBlockState();
+        final BlockState post = p.post().defaultBlockState();
+        final BlockState stone = p.foundation().defaultBlockState();
+        final BlockState glass = p.glass().defaultBlockState();
+        final int mx = 4, mz = 8, mid = 2; // 5 wide (X 0-4) × 9 deep (Z 0-8)
+        for (int x = 0; x <= mx; x++) {
+            for (int z = 0; z <= mz; z++) {
+                m.put(new BlockPos(x, 0, z), stone); // a stone footing
+                final boolean perim = x == 0 || x == mx || z == 0 || z == mz;
+                final boolean corner = (x == 0 || x == mx) && (z == 0 || z == mz);
+                if (perim) {
+                    for (int h = 1; h <= 5; h++) { // tall walls (open hall inside), corners as posts
+                        m.put(new BlockPos(x, h, z), corner ? post : wall);
+                    }
+                }
+                m.put(new BlockPos(x, 6, z), wall); // ceiling
+            }
+        }
+        StructureParts.gableRoof(m, 0, mx, 0, mz, 6, wall, p.stairs(), p.slab(), 0); // a steep gable over the tall walls
+        // Door + lot connector on the −Z wall (faces the lane once rotated into place).
+        m.put(new BlockPos(mid, 1, 0), p.door().defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, Direction.NORTH));
+        m.put(new BlockPos(mid, 2, 0), p.door().defaultBlockState()
+                .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
+        conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", id(p.wall()));
+        // tall windows down both long walls
+        for (int z = 2; z <= mz - 2; z += 2) {
+            m.put(new BlockPos(0, 2, z), glass);
+            m.put(new BlockPos(0, 3, z), glass);
+            m.put(new BlockPos(mx, 2, z), glass);
+            m.put(new BlockPos(mx, 3, z), glass);
+        }
+        // benches (upside-down... bottom stairs) down each side, facing the central aisle
+        for (int z = 2; z <= mz - 2; z++) {
+            m.put(new BlockPos(1, 1, z), p.stairs().defaultBlockState().setValue(StairBlock.FACING, Direction.EAST));
+            m.put(new BlockPos(mx - 1, 1, z), p.stairs().defaultBlockState().setValue(StairBlock.FACING, Direction.WEST));
+        }
+        // a bell at the head of the hall, flanked by lanterns
+        m.put(new BlockPos(mid, 1, mz - 1), Blocks.BELL.defaultBlockState());
+        m.put(new BlockPos(1, 1, mz - 1), Blocks.LANTERN.defaultBlockState());
+        m.put(new BlockPos(mx - 1, 1, mz - 1), Blocks.LANTERN.defaultBlockState());
+        return new Built(m, bes);
     }
 
     /** The forge's footprint: an L (a 5-wide × 3-deep front wing + a 3-wide × 7-deep left wing); the back-right

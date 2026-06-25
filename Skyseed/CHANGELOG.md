@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.80.0] - 2026-06-25
+
+### Added
+- **Great hall — a second big landmark for large sections.** Alongside the blacksmith forge, a large lot can now host
+  a great hall: a tall, open meeting house (5 wide × 9 deep, ~9 high) with a steep gable, benches down a central aisle
+  and a bell at the head. It joins the `large_lots` pool, so a village's large sections vary — a forge or a hall. This
+  completes "wider lots for bigger buildings": 7×7 shops line the streets, and the large sections host the landmarks.
+
 ## [0.79.0] - 2026-06-25
 
 ### Changed

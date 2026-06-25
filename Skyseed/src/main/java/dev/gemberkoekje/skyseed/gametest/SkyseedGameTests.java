@@ -874,20 +874,20 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void tradePostBlacksmithPlaces(GameTestHelper helper) {
-        // The blacksmith is a deliberately bigger (5×7, L-shaped) building. On open ground it should still attach to a
-        // lot and place — recognisable by its anvil — proving the jigsaw can take the larger footprint. (Five villages
-        // make it robust to which shops the cap keeps. Loads dev-generated .nbt.)
+        // The two large-section landmarks — the L-shaped forge (its anvil) and the great hall (its bell) — should both
+        // attach to a large lot and place, proving the jigsaw takes the bigger footprints. (Loads dev-generated .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int anvils = 0;
-        // The forge is a probabilistic feature (a shallow large section that rolls it), and the jigsaw seeds its
-        // assembly RNG from the world seed + origin — so a fixed origin always builds the SAME village, and the
-        // gametest's world seed varies per run. Pass an explicit, varying featureSeed to sample many deterministic
-        // villages: across these fixed seeds the forge reliably lands at least once, so the test can never flake.
+        int bells = 0;
+        // The landmarks are probabilistic (a shallow large section that rolls one), and the jigsaw seeds its assembly
+        // RNG from the world seed + origin — so a fixed origin always builds the SAME village, and the gametest's world
+        // seed varies per run. Pass an explicit, varying featureSeed to sample many deterministic villages: across
+        // these fixed seeds the forge and the hall each reliably land at least once, so the test can never flake.
         for (int iter = 0; iter < 16; iter++) {
-            for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing the forge out
+            for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing landmarks out
                 for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
                         helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
@@ -898,13 +898,17 @@ public final class SkyseedGameTests {
             for (int x = 0; x <= 47; x++) {
                 for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
-                        if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.ANVIL)) {
+                        final var state = helper.getBlockState(new BlockPos(x, y, z));
+                        if (state.is(Blocks.ANVIL)) {
                             anvils++;
+                        } else if (state.is(Blocks.BELL)) {
+                            bells++;
                         }
                     }
                 }
             }
         }
+        helper.assertTrue(bells > 0, "16 villages placed no great hall (bell count=" + bells + ")");
         helper.assertTrue(anvils > 0, "16 villages placed no blacksmith (anvil count=" + anvils + ")");
         helper.succeed();
     }
