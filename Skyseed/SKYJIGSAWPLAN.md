@@ -84,7 +84,7 @@ behaves:
 - The island only needs to support the **start** piece (that is all `pad` levels). Everything the path reaches
   beyond the pad is free to hang in the air.
 
-### 3a. Marker-driven path surfacing — terrain-aware paths *and* piers (preferred)
+### 3a. Marker-driven path surfacing — terrain-aware paths *and* free bridges (preferred)
 
 Rather than bake a fixed plank floor into every path piece (wrong-looking on grass, oddly floating over void),
 the **connective path pieces place only a sentinel marker** — a reserved block (e.g. `purple_wool`) one block
@@ -93,8 +93,14 @@ directly **under** it:
 
 - under = **dirt / grass / sand / terrain** → set that tile to a **path surface** (`dirt_path`, with a little
   `gravel` / `cobblestone` mixed in for texture) — the path *becomes* the island's ground, re-textured;
-- under = **air (void)** → place a **wooden slab** there — an instant boardwalk plank out over the nothing;
-- then delete the marker.
+- under = **air (void)** → build a **bridge**, not just a plank: lay a **wooden slab** for the deck, and for
+  each horizontal neighbour that is **not** itself a path tile *and* is also over void (an open edge), add a
+  **fence railing** with a **full wood block** beneath it as the edge beam. That one neighbour rule yields a
+  free, barebones-but-complete bridge — a slab deck, railings down both exposed sides, and a railed cap
+  wherever a run dead-ends over the void — and it **scales with path width automatically**: a 1-wide path rails
+  both sides, a 3-wide path rails only its two outer columns, and where the deck meets island ground or
+  continues as more path that side *has* a neighbour, so it gets no railing and the path stays walkable;
+- finally delete the markers (two-phase — see below).
 
 Why this is the right tool:
 
@@ -111,9 +117,17 @@ Why this is the right tool:
 
 Details to mind:
 
-- **Height step.** `dirt_path` is ~0.94 tall; a bottom slab is 0.5, so a boardwalk-meets-path seam shows a
-  half-step. Use a **top slab** (or a full plank) over void to line the tops up, or accept the step as a
-  boardwalk lip — a tuning call.
+- **Two-phase, snapshot first.** The bridge rule reads each marker's **neighbours** *and* writes to non-marker
+  side columns, so the pass must (1) scan the bbox and snapshot the full marker set, (2) resolve decks + edges
+  reading from that snapshot, then (3) clear the markers **last**. Removing markers as you go would make an
+  already-resolved neighbour look like "not a path" and rail the wrong edges.
+- **Rail only an actual drop.** Count a side as exposed only when the neighbour column is itself over void; a
+  neighbour that is solid ground means the bridge is meeting the island, so leave it open (no fence post
+  stranded on the grass).
+- **Height step / cross-section.** `dirt_path` is ~0.94 tall and a bottom slab is 0.5, so a boardwalk-meets-
+  path seam shows a half-step, and a full-block edge beam stands ~0.5 proud of the slab deck (a curb under the
+  railing — fine for a bridge). Use a **top slab** / full plank for the deck if you want the tops flush; tune
+  in the spike.
 - **Reserved marker.** `purple_wool` works as a sentinel *if* we never use it decoratively in structures (we
   don't); document it as reserved, or pick any block we'll never place for real.
 - **Optional stilts.** Over deep void the pass can occasionally drop a fence/post under the slab so long piers
@@ -287,8 +301,9 @@ Each phase ships independently and is committed on its own (one feature per comm
   for **every** bed in the placed bounding box (guards the §5.1 scan-bounds fix).
 - A **fence-link** spot check across a multi-piece span (guards §5.1 for `linkConnections`).
 - A **marker-resolution** test (§3a): assemble a path that runs off the island edge in the gametest region,
-  then assert **no sentinel markers remain**, on-terrain tiles became a path block, and over-void tiles became
-  a slab.
+  then assert **no sentinel markers remain**, on-terrain tiles became a path block, over-void tiles became a
+  slab deck, and an exposed over-void edge gained a railing + edge beam (while a deck tile that meets ground
+  did **not**).
 - Keep the golden master as-is (it stays green; §5.7).
 
 ---
