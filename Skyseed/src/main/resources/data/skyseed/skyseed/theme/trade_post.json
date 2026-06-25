@@ -7,12 +7,12 @@
     { "chance": 0.05,
       "jigsaw": { "pool": "skyseed:outpost/tower", "target": "minecraft:bottom", "depth": 1, "pad": 9, "iron_golems": 1 } }
   ],
-  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post/fillers" },
+  "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post/fillers" },
   "biome_overrides": [
     { "_comment": "Desert: a sand island with its own sand/sandstone trade-post pool (flat-roofed houses can diverge from this set later).",
       "biomes": ["minecraft:desert"],
       "surface": "minecraft:sand", "fill": "minecraft:sandstone",
-      "jigsaw": { "pool": "skyseed:trade_post_desert/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_desert/fillers" },
+      "jigsaw": { "pool": "skyseed:trade_post_desert/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_desert/fillers" },
       "variants": [
         { "weight": 1, "name": "dune", "decoration": {
           "ground": [
@@ -21,7 +21,7 @@
       ] },
     { "_comment": "Savanna: acacia houses on grass.",
       "biomes": ["minecraft:savanna", "minecraft:savanna_plateau", "minecraft:windswept_savanna"],
-      "jigsaw": { "pool": "skyseed:trade_post_savanna/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_savanna/fillers" },
+      "jigsaw": { "pool": "skyseed:trade_post_savanna/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_savanna/fillers" },
       "variants": [
         { "weight": 1, "name": "dry", "decoration": {
           "ground": [
@@ -31,11 +31,11 @@
     { "_comment": "Snowy: spruce houses on a grass island, snow dusted onto every highest block (roofs + ground) by the snow post-pass. Listed before taiga so snowy_taiga takes this.",
       "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
       "surface": "minecraft:grass_block", "snow": 1.0,
-      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
       "variants": [] },
     { "_comment": "Taiga: the same spruce set on grass, with ferns.",
       "biomes": ["minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
-      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
+      "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
       "variants": [
         { "weight": 1, "name": "pine", "decoration": {
           "ground": [

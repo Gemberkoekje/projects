@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.83.0] - 2026-06-25
+
+### Changed
+- **More compact trade post — fewer roads.** The road network sprawled too wide (the longer 7-block street sections
+  compounded it), so the road recursion depth dropped 5→4 and the street terminator weight rose (1→3) so roads end
+  sooner. A tighter village footprint, still with its 2–4 shops and large-section landmarks.
+
 ## [0.82.0] - 2026-06-25
 
 ### Changed
