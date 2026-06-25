@@ -31,7 +31,8 @@ final class ShapeBuilder {
         final int baseRadius = Math.max(1, shape.radius().sample(random));
         final double rimNoise = shape.rimNoise();
         final int topDome = shape.topDome().sample(random);
-        final double maxDepth = baseRadius * 1.05;
+        // The teardrop normally hangs ~radius deep; a per-shape cap keeps a huge island a wide plateau, not a deep cone.
+        final double maxDepth = Math.min(baseRadius * 1.05, shape.maxUnderDepth().orElse(Integer.MAX_VALUE));
 
         // Irregular rim from a few angular harmonics (decorrelated per island via the RandomSource).
         final RimNoise edge = RimNoise.sample(random, rimNoise);

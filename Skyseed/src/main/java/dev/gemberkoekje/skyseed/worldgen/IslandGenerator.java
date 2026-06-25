@@ -57,7 +57,8 @@ public final class IslandGenerator {
     /** Blocks of headroom cleared above a structure pad, so an assembled building isn't clipped by island terrain. */
     private static final int PAD_CLEAR_HEIGHT = 10;
     /** Fallback shape for a dimension override that omits one — small, so it never inherits the overworld silhouette. */
-    private static final Shape NEUTRAL_SHAPE = new Shape(new IntRange(3, 3), 0.2f, Underside.TEARDROP, new IntRange(1, 1));
+    private static final Shape NEUTRAL_SHAPE =
+            new Shape(new IntRange(3, 3), 0.2f, Underside.TEARDROP, new IntRange(1, 1), java.util.Optional.empty());
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {

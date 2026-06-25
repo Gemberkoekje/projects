@@ -985,6 +985,24 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void bigVillageIsADeeperTradePost(GameTestHelper helper) {
+        // The Big Village is "a bigger Trade Post": the SAME village pieces (trade_post/start), but a deeper street
+        // network and a guaranteed 4+ shops, on a HUGE island whose teardrop underside is depth-capped so it stays a
+        // wide plateau rather than a bottomless cone.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme bv = theme(level, "big_village");
+        helper.assertTrue(bv.jigsaw().isPresent() && bv.jigsaw().get().pool().getPath().equals("trade_post/start"),
+                "big_village must reuse the trade post village pieces");
+        helper.assertTrue(bv.jigsaw().get().depth() > 4, "big_village must run a deeper street network than the trade post (depth 4)");
+        helper.assertTrue(bv.jigsaw().get().capMin() >= 4, "big_village must guarantee at least 4 shops");
+        helper.assertTrue(bv.shape().radius().min() >= 22, "big_village must be a huge island");
+        helper.assertTrue(bv.shape().maxUnderDepth().isPresent()
+                        && bv.shape().maxUnderDepth().get() < bv.shape().radius().min(),
+                "big_village's underside must be depth-capped below its radius (a wide plateau, not a deep cone)");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void tradePostDesertBiomeSelectsDesertPool(GameTestHelper helper) {
         // Biome-override wiring — what a forced-biome debug seed exercises. Planning the trade post in a desert biome
         // must select the desert jigsaw pool (and a sand surface), not the default plains/oak start.

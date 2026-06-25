@@ -65,6 +65,7 @@ public final class ModItems {
             new BiomeDebugSeed("debug_trade_post_savanna", "trade_post", "minecraft:savanna"),
             new BiomeDebugSeed("debug_trade_post_taiga", "trade_post", "minecraft:taiga"),
             new BiomeDebugSeed("debug_trade_post_snowy", "trade_post", "minecraft:snowy_plains"),
+            new BiomeDebugSeed("debug_big_village", "big_village", "minecraft:plains"),
             new BiomeDebugSeed("debug_forest_taiga", "forest", "minecraft:taiga"),
             new BiomeDebugSeed("debug_forest_dark", "forest", "minecraft:dark_forest"),
             new BiomeDebugSeed("debug_desert_badlands", "desert", "minecraft:badlands"),
