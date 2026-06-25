@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.81.0] - 2026-06-25
+
+### Changed
+- **Snowy forest islands now use the same snow pass as villages.** A forest island in a snowy or grove biome used the
+  old patchy ground-scatter snow — the same "snow doesn't cap the highest block" problem the village had. Those
+  overrides now opt into the whole-island `snow` post-pass instead, so snow caps the open ground and the spruce
+  canopies uniformly rather than in scattered ground patches. (The frozen and rocky islands keep their snow_block
+  surface with drifts — a deliberately icier look.)
+
 ## [0.80.0] - 2026-06-25
 
 ### Added
