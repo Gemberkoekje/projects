@@ -818,22 +818,27 @@ public final class SkyseedGameTests {
     @GameTest(template = REGION)
     public static void pathSurfacerSupportsFloatingFloors(GameTestHelper helper) {
         // A solid lot floor over the void gets a dirt foundation (any material — here sandstone, proving it is not
-        // oak-specific); a floor already on solid ground is left alone; and an empty (air) deck — a connective lane
-        // before it is bridged — gets NO foundation, so the bridges stay floating.
+        // oak-specific). Over PURE void it's a short stub (no long pillar into nothing); over ground within reach it
+        // connects down to that ground. A floor already on solid ground is left alone, and an empty (air) lane deck
+        // gets NO foundation, so the bridges stay floating.
         final ServerLevel level = helper.getLevel();
         final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0));
         final int deckY = 11; // supportFloatingFloors reads origin.Y - 1 as the floor level
-        level.setBlock(base.offset(18, deckY, 20), Blocks.SANDSTONE.defaultBlockState(), Block.UPDATE_CLIENTS); // over void
+        level.setBlock(base.offset(18, deckY, 20), Blocks.SANDSTONE.defaultBlockState(), Block.UPDATE_CLIENTS); // pure void below
+        level.setBlock(base.offset(14, deckY, 20), Blocks.SPRUCE_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // over ground
+        level.setBlock(base.offset(14, deckY - 5, 20), Blocks.STONE.defaultBlockState(), Block.UPDATE_CLIENTS);  // the ground below it
         level.setBlock(base.offset(22, deckY - 1, 20), Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS);  // ground
-        level.setBlock(base.offset(22, deckY, 20), Blocks.SPRUCE_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // on ground
+        level.setBlock(base.offset(22, deckY, 20), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // on ground
         level.setBlock(base.offset(16, deckY, 20), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS); // a lane deck (air) over void
 
         PathSurfacer.supportFloatingFloors(level, base.offset(20, deckY + 1, 20), 6);
 
-        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 1, 20)).is(Blocks.DIRT),
-                "the over-void (sandstone) floor should gain a foundation");
-        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 3, 20)).is(Blocks.DIRT),
-                "the foundation should drop several blocks");
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 2, 20)).is(Blocks.DIRT),
+                "the pure-void floor should get a short stub foundation");
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 3, 20)).isAir(),
+                "the pure-void stub should stop short, not pillar into nothing");
+        helper.assertTrue(level.getBlockState(base.offset(14, deckY - 4, 20)).is(Blocks.DIRT),
+                "a floor over ground should connect its foundation down to that ground");
         helper.assertTrue(level.getBlockState(base.offset(22, deckY - 2, 20)).isAir(),
                 "a floor already on solid ground should not be stilted");
         helper.assertTrue(level.getBlockState(base.offset(16, deckY - 1, 20)).isAir(),

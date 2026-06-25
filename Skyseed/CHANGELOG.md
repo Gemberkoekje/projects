@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.74.1] - 2026-06-25
+
+### Added
+- **Snow layer on snowy villages.** The snowy trade post and hamlet now sit on snow-covered grass (a `minecraft:snow`
+  ground decoration) instead of a solid snow-block surface, so the snow reads as a thin layer like a real snow biome.
+
+### Fixed
+- **Over-void foundations no longer pillar down into nothing.** The foundation pass dropped a fixed 6 blocks even over
+  pure void; it now searches a short way down for ground and connects its foundation to it, or — finding none — drops
+  just a 2-block stub.
+
 ## [0.74.0] - 2026-06-25
 
 ### Changed

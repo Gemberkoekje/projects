@@ -15,9 +15,9 @@
       "variants": [ { "weight": 1, "name": "dry", "decoration": { "ground": [ { "block": "minecraft:short_grass", "chance": 0.22 } ] } } ] },
     { "_comment": "Snowy before taiga so snowy_taiga takes the snow style.",
       "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
-      "surface": "minecraft:snow_block",
+      "surface": "minecraft:grass_block",
       "jigsaw": { "pool": "skyseed:hamlet_spruce/start", "target": "minecraft:bottom", "depth": 2, "pad": 5, "reach": 12, "cap_prefix": "shop_", "cap_min": 1, "cap_count": 2, "cap_filler": "skyseed:trade_post_spruce/fillers" },
-      "variants": [] },
+      "variants": [ { "weight": 1, "name": "snow", "decoration": { "ground": [ { "block": "minecraft:snow", "chance": 0.9 } ] } } ] },
     { "biomes": ["minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
       "jigsaw": { "pool": "skyseed:hamlet_spruce/start", "target": "minecraft:bottom", "depth": 2, "pad": 5, "reach": 12, "cap_prefix": "shop_", "cap_min": 1, "cap_count": 2, "cap_filler": "skyseed:trade_post_spruce/fillers" },
       "variants": [ { "weight": 1, "name": "pine", "decoration": { "ground": [ { "block": "minecraft:fern", "chance": 0.18 }, { "block": "minecraft:sweet_berry_bush", "chance": 0.04 } ] } } ] }

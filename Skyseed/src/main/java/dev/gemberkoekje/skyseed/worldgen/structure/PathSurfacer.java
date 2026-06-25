@@ -37,7 +37,8 @@ public final class PathSurfacer {
     private static final int SCAN_DOWN = 2;
     private static final int SCAN_UP = 4;
     private static final int FLAGS = Block.UPDATE_CLIENTS; // no physics — fences are linked separately afterwards
-    private static final int SUPPORT_DEPTH = 6; // how far a foundation hangs under a floor left over the void
+    private static final int SUPPORT_SEARCH = 8; // how far below a floating floor to look for ground to anchor onto
+    private static final int SUPPORT_STUB = 2;   // over pure void (no ground found within the search): a short stub only
 
     /** Resolve every path marker within {@code reach} (horizontal half-extent) of {@code origin}. */
     public static void resolve(ServerLevel level, BlockPos origin, int reach) {
@@ -108,7 +109,16 @@ public final class PathSurfacer {
                         || !level.getBlockState(p.below()).isAir()) {
                     continue;
                 }
-                for (int d = 1; d <= SUPPORT_DEPTH; d++) {
+                // Look for ground below to rest the foundation on: connect down to it, or — over pure void, where
+                // nothing's found within the search — drop only a short stub instead of a long pillar into nothing.
+                int gap = SUPPORT_STUB;
+                for (int d = 2; d <= SUPPORT_SEARCH; d++) {
+                    if (!level.getBlockState(new BlockPos(p.getX(), deckY - d, p.getZ())).isAir()) {
+                        gap = d - 1;
+                        break;
+                    }
+                }
+                for (int d = 1; d <= gap; d++) {
                     level.setBlock(new BlockPos(p.getX(), deckY - d, p.getZ()), Blocks.DIRT.defaultBlockState(), FLAGS);
                 }
             }
