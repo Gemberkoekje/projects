@@ -846,6 +846,32 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void snowCoverCapsHighestBlock(GameTestHelper helper) {
+        // The snow post-pass lays a layer on the HIGHEST block of every column — so it lands on a building roof and a
+        // tree canopy, not just the open ground beneath them. Full blocks / stairs / slabs / leaves receive it; a fence
+        // (thin) does not, and an open-void column gets nothing.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0)); // region is 16x24x16 — keep everything inside
+        final int y = 6;
+        level.setBlock(base.offset(4, y, 4), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS); // open ground
+        level.setBlock(base.offset(6, y + 4, 4), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // a roof, higher up
+        level.setBlock(base.offset(8, y + 3, 4), Blocks.OAK_LEAVES.defaultBlockState(), Block.UPDATE_CLIENTS); // a tree canopy
+        level.setBlock(base.offset(10, y, 4), Blocks.OAK_FENCE.defaultBlockState(), Block.UPDATE_CLIENTS); // thin — no snow
+
+        PathSurfacer.snowCover(level, base.offset(2, y - 2, 2), base.offset(13, y + 12, 6));
+
+        helper.assertTrue(level.getBlockState(base.offset(4, y + 1, 4)).is(Blocks.SNOW),
+                "snow should cap the open ground");
+        helper.assertTrue(level.getBlockState(base.offset(6, y + 5, 4)).is(Blocks.SNOW),
+                "snow should land on the roof (the column's highest block), not the ground below it");
+        helper.assertTrue(level.getBlockState(base.offset(8, y + 4, 4)).is(Blocks.SNOW),
+                "snow should land on a tree canopy (leaves)");
+        helper.assertTrue(level.getBlockState(base.offset(10, y + 1, 4)).isAir(),
+                "a thin fence should not hold a snow layer");
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void tradePostBlacksmithPlaces(GameTestHelper helper) {
         // The blacksmith is a deliberately bigger (5×7, L-shaped) building. On open ground it should still attach to a
@@ -856,7 +882,7 @@ public final class SkyseedGameTests {
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int anvils = 0;
-        for (int iter = 0; iter < 5; iter++) {
+        for (int iter = 0; iter < 10; iter++) {
             for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing the forge out
                 for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -864,6 +890,10 @@ public final class SkyseedGameTests {
                     }
                 }
             }
+            // The forge is a probabilistic feature (a shallow large section that rolls it), and placeCapped draws from
+            // level.getRandom() — non-deterministic across runs. Seed it per iteration so this test can never flake:
+            // across these fixed villages the forge reliably lands at least once.
+            level.getRandom().setSeed(0x5EEDL + iter);
             Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers);
             for (int x = 0; x <= 47; x++) {
                 for (int z = 0; z <= 47; z++) {
@@ -875,7 +905,7 @@ public final class SkyseedGameTests {
                 }
             }
         }
-        helper.assertTrue(anvils > 0, "5 villages placed no blacksmith (anvil count=" + anvils + ")");
+        helper.assertTrue(anvils > 0, "10 villages placed no blacksmith (anvil count=" + anvils + ")");
         helper.succeed();
     }
 

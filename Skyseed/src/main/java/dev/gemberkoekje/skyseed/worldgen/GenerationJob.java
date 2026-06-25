@@ -122,6 +122,9 @@ public final class GenerationJob {
             spawnEnclosureAnimals();
             populateHives();
             kickFluids();
+            if (plan.snow()) {
+                snowIsland(); // final step: snow-cap the whole island — ground, roofs and tree tops
+            }
             mobsSpawned = true;
         }
         return true;
@@ -274,6 +277,39 @@ public final class GenerationJob {
                 }
             }
         }
+    }
+
+    /**
+     * Snow-cap a cold-biome island once everything else is down: a snow layer on the highest block of every column,
+     * from the island terrain out to wherever a town's streets/bridges sprawled (the jigsaw reach). The terrain bounds
+     * come from the planned blocks; the scan covers a band near the top, deep enough for any roof/canopy and the
+     * sloped island edges, so open-void columns inside the box stay cheap.
+     */
+    private void snowIsland() {
+        if (plan.blocks().isEmpty()) {
+            return;
+        }
+        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+        for (IslandPlan.BlockPlacement bp : plan.blocks()) {
+            final BlockPos p = bp.pos();
+            minX = Math.min(minX, p.getX());
+            maxX = Math.max(maxX, p.getX());
+            minZ = Math.min(minZ, p.getZ());
+            maxZ = Math.max(maxZ, p.getZ());
+            minY = Math.min(minY, p.getY());
+            maxY = Math.max(maxY, p.getY());
+        }
+        for (IslandPlan.JigsawSite js : plan.jigsaws()) {
+            minX = Math.min(minX, js.origin().getX() - js.reach());
+            maxX = Math.max(maxX, js.origin().getX() + js.reach());
+            minZ = Math.min(minZ, js.origin().getZ() - js.reach());
+            maxZ = Math.max(maxZ, js.origin().getZ() + js.reach());
+            maxY = Math.max(maxY, js.origin().getY());
+        }
+        final int top = maxY + 16;                      // headroom above the tallest roof / tree canopy
+        final int bottom = Math.max(minY, maxY - 24);   // a band near the top — covers sloped edges, skips the deep void
+        PathSurfacer.snowCover(level, new BlockPos(minX, bottom, minZ), new BlockPos(maxX, top, maxZ));
     }
 
     /**

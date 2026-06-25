@@ -26,6 +26,7 @@ public record BiomeOverride(
         List<String> biomes,
         Optional<Integer> minY,
         Optional<Integer> maxY,
+        Optional<Boolean> snow,
         Optional<ResourceLocation> surface,
         Optional<ResourceLocation> fill,
         Optional<ResourceLocation> core,
@@ -41,18 +42,20 @@ public record BiomeOverride(
         Optional<List<ResourceLocation>> fillBands,
         Optional<JigsawConfig> jigsaw) {
 
-    /** {@code min_y}/{@code max_y} folded into one codec slot (still two top-level JSON keys) so the record codec
-     *  stays within RecordCodecBuilder's 16-field group limit while gaining the {@code jigsaw} override. */
-    private record YBounds(Optional<Integer> min, Optional<Integer> max) {
-        static final MapCodec<YBounds> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-                Codec.INT.optionalFieldOf("min_y").forGetter(YBounds::min),
-                Codec.INT.optionalFieldOf("max_y").forGetter(YBounds::max)
-        ).apply(i, YBounds::new));
+    /** {@code min_y}/{@code max_y}/{@code snow} folded into one codec slot (still separate top-level JSON keys) so the
+     *  record codec stays within RecordCodecBuilder's 16-field group limit while keeping the {@code jigsaw} override.
+     *  {@code snow}, when set, overrides whether the generator snow-caps this island (see {@link Palette#snow()}). */
+    private record Scalars(Optional<Integer> minY, Optional<Integer> maxY, Optional<Boolean> snow) {
+        static final MapCodec<Scalars> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.INT.optionalFieldOf("min_y").forGetter(Scalars::minY),
+                Codec.INT.optionalFieldOf("max_y").forGetter(Scalars::maxY),
+                Codec.BOOL.optionalFieldOf("snow").forGetter(Scalars::snow)
+        ).apply(i, Scalars::new));
     }
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
-            YBounds.CODEC.forGetter(o -> new YBounds(o.minY(), o.maxY())),
+            Scalars.CODEC.forGetter(o -> new Scalars(o.minY(), o.maxY(), o.snow())),
             ResourceLocation.CODEC.optionalFieldOf("surface").forGetter(BiomeOverride::surface),
             ResourceLocation.CODEC.optionalFieldOf("fill").forGetter(BiomeOverride::fill),
             ResourceLocation.CODEC.optionalFieldOf("core").forGetter(BiomeOverride::core),
@@ -67,10 +70,10 @@ public record BiomeOverride(
             Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension),
             ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands),
             JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(BiomeOverride::jigsaw)
-    ).apply(i, (biomes, yb, surface, fill, core, fillDepth, surfaceScatter, shape, ores, variants, pond,
+    ).apply(i, (biomes, sc, surface, fill, core, fillDepth, surfaceScatter, shape, ores, variants, pond,
                 waterfalls, mobs, dimension, fillBands, jigsaw) ->
-            new BiomeOverride(biomes, yb.min(), yb.max(), surface, fill, core, fillDepth, surfaceScatter, shape,
-                    ores, variants, pond, waterfalls, mobs, dimension, fillBands, jigsaw)));
+            new BiomeOverride(biomes, sc.minY(), sc.maxY(), sc.snow(), surface, fill, core, fillDepth, surfaceScatter,
+                    shape, ores, variants, pond, waterfalls, mobs, dimension, fillBands, jigsaw)));
 
     /** True if {@code dim} (when dimension is set), {@code biome} (when biomes is set) and {@code y} (when a range is set) all match. */
     public boolean matches(Holder<Biome> biome, int y, ResourceLocation dim) {

@@ -3,8 +3,10 @@ package dev.gemberkoekje.skyseed.worldgen.structure;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -120,6 +122,39 @@ public final class PathSurfacer {
                 }
                 for (int d = 1; d <= gap; d++) {
                     level.setBlock(new BlockPos(p.getX(), deckY - d, p.getZ()), Blocks.DIRT.defaultBlockState(), FLAGS);
+                }
+            }
+        }
+    }
+
+    /**
+     * Snow post-pass over the finished island: drop a snow layer on the highest block of every column in the
+     * {@code [min, max]} box — so it lands on ground, building roofs and tree tops alike, the way a player expects
+     * "snow on the highest block" to behave. Scans each column from {@code max.y} down to {@code min.y} for the first
+     * non-air block; the caller bounds {@code min.y} to a band near the top so open-void columns stay cheap. Only full
+     * blocks, stairs, slabs and leaves receive it (skips fences, lanterns, crops, fluids, lamp posts); placed
+     * no-physics so it stays put.
+     */
+    public static void snowCover(ServerLevel level, BlockPos min, BlockPos max) {
+        final BlockState snow = Blocks.SNOW.defaultBlockState();
+        final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int z = min.getZ(); z <= max.getZ(); z++) {
+                if (!level.isLoaded(new BlockPos(x, max.getY(), z))) {
+                    continue;
+                }
+                for (int y = max.getY(); y >= min.getY(); y--) {
+                    p.set(x, y, z);
+                    final BlockState s = level.getBlockState(p);
+                    if (s.isAir()) {
+                        continue;
+                    }
+                    final boolean receives = s.isCollisionShapeFullBlock(level, p)
+                            || s.is(BlockTags.STAIRS) || s.is(BlockTags.SLABS) || s.is(BlockTags.LEAVES);
+                    if (receives && level.getBlockState(p.above()).isAir()) {
+                        level.setBlock(p.above(), snow, FLAGS);
+                    }
+                    break; // only the highest block of the column
                 }
             }
         }

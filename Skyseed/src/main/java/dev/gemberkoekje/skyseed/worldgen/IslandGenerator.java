@@ -97,6 +97,8 @@ public final class IslandGenerator {
         final BlockState surface = resolveBlock(surfaceId, Blocks.GRASS_BLOCK).defaultBlockState();
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
+        // Snow-cap the finished island? The matching override decides; else the base palette — never a foreign-dimension leak.
+        final boolean snow = (ov != null && ov.snow().isPresent()) ? ov.snow().get() : (useBase && pal.snow());
         final List<Scatter> scatter = resolveScatter(scatterCfg);
         // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
         // replace the bands, or clear them with an empty list; a foreign-dimension override never inherits them.
@@ -266,7 +268,8 @@ public final class IslandGenerator {
         // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
         final Optional<ResourceLocation> twinTheme =
                 (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks, scatterPositions);
+        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks,
+                scatterPositions, snow);
     }
 
     /** Flatten a {@code pad}-radius disc to {@code gy} for a building: clear above, solid below, no decoration. */

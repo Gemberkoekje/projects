@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.77.0] - 2026-06-25
+
+### Changed
+- **Snow now caps the whole island — roofs included.** The snowy biome's snow used to be a ground-scatter decoration,
+  so it only dusted the open ground and tree tops, never the buildings (their roofs sat bare). It's now a proper final
+  generation step: once the island, town, decorations and ground fixes are all down, a snow layer is laid on the
+  *highest* block of every column — ground, building roofs and tree canopies alike (full blocks, stairs, slabs and
+  leaves take it; fences, lamps, crops and water don't). This is an island property (`snow`, resolved from the biome
+  override or the base palette), applied across the island and any town that sprawls out from it, not tied to the
+  jigsaw. The snowy trade post and hamlet opt in.
+
 ## [0.76.0] - 2026-06-25
 
 ### Added
