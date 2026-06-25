@@ -30,13 +30,14 @@ import java.util.Set;
  *                   island has landed — e.g. a Ladder Island waterfall. {@link GenerationJob} schedules each a tick.
  * @param scatterPositions ground-cover positions (a subset of {@code blocks}) that {@link GenerationJob} places AFTER
  *                   the trees, skipping any a tree has taken — so a snow layer can't block a tree from forming.
- * @param snow when true, {@link GenerationJob} drapes a snow layer over the highest block of every column of the
- *                   finished island as the final step — ground, building roofs and tree tops alike (a cold-biome island)
+ * @param snow per-column probability (0–1; 0 = off) that {@link GenerationJob} drapes a snow layer over the highest
+ *                   block of a column of the finished island as the final step — ground, building roofs and tree tops
+ *                   alike (a cold-biome island); below 1 it leaves icy patches showing
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
                          List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
                          RandomSource random, Optional<ResourceLocation> twinTheme, List<BlockPos> fluidTicks,
-                         Set<BlockPos> scatterPositions, boolean snow) {
+                         Set<BlockPos> scatterPositions, float snow) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 
     public record TreeSite(ConfiguredFeature<?, ?> feature, BlockPos pos) {}

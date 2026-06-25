@@ -26,7 +26,7 @@ public record BiomeOverride(
         List<String> biomes,
         Optional<Integer> minY,
         Optional<Integer> maxY,
-        Optional<Boolean> snow,
+        Optional<Float> snow,
         Optional<ResourceLocation> surface,
         Optional<ResourceLocation> fill,
         Optional<ResourceLocation> core,
@@ -44,12 +44,12 @@ public record BiomeOverride(
 
     /** {@code min_y}/{@code max_y}/{@code snow} folded into one codec slot (still separate top-level JSON keys) so the
      *  record codec stays within RecordCodecBuilder's 16-field group limit while keeping the {@code jigsaw} override.
-     *  {@code snow}, when set, overrides whether the generator snow-caps this island (see {@link Palette#snow()}). */
-    private record Scalars(Optional<Integer> minY, Optional<Integer> maxY, Optional<Boolean> snow) {
+     *  {@code snow}, when set, overrides this island's per-column snow-cap chance 0–1 (see {@link Palette#snow()}). */
+    private record Scalars(Optional<Integer> minY, Optional<Integer> maxY, Optional<Float> snow) {
         static final MapCodec<Scalars> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
                 Codec.INT.optionalFieldOf("min_y").forGetter(Scalars::minY),
                 Codec.INT.optionalFieldOf("max_y").forGetter(Scalars::maxY),
-                Codec.BOOL.optionalFieldOf("snow").forGetter(Scalars::snow)
+                Codec.FLOAT.optionalFieldOf("snow").forGetter(Scalars::snow)
         ).apply(i, Scalars::new));
     }
 

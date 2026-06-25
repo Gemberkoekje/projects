@@ -30,7 +30,7 @@
       ] },
     { "_comment": "Snowy: spruce houses on a grass island, snow dusted onto every highest block (roofs + ground) by the snow post-pass. Listed before taiga so snowy_taiga takes this.",
       "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
-      "surface": "minecraft:grass_block", "snow": true,
+      "surface": "minecraft:grass_block", "snow": 1.0,
       "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
       "variants": [] },
     { "_comment": "Taiga: the same spruce set on grass, with ferns.",

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.82.0] - 2026-06-25
+
+### Changed
+- **One snow function for every snowy island.** All snow layers now go through the single whole-island snow post-pass
+  (`snowCover`); the old patchy ground-scatter snow (`snowColumnTop`) is removed. The `snow` flag became a per-column
+  *chance* (0–1) settable on a palette, biome override or variant — so the frozen island's icy variants keep their
+  light dusting (glacier 0.30, deep_freeze 0.20, leaving the packed-/blue-ice showing) while a snowy village or forest
+  caps every column (1.0). Snow always lands on the highest block — ground, roof or canopy — uniformly across village,
+  forest, frozen and rocky islands.
+
 ## [0.81.0] - 2026-06-25
 
 ### Changed

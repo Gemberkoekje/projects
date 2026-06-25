@@ -20,36 +20,29 @@
     { "entity": "minecraft:fox", "chance": 0.20, "count": { "min": 1, "max": 1 } }
   ],
   "variants": [
-    { "weight": 3, "name": "snowy", "decoration": {
-      "trees": [ { "feature": "minecraft:spruce", "tries": 5, "spacing": 2 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } },
-    { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
-      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.30 } ] } },
-    { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
-      "trees": [ { "feature": "skyseed:ice_spike", "tries": 4, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.20 } ] } }
+    { "weight": 3, "name": "snowy", "snow": 0.85, "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 5, "spacing": 2 } ] } },
+    { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "snow": 0.30, "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ] } },
+    { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "snow": 0.20, "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 4, "spacing": 3 } ] } }
   ],
   "biome_overrides": [
     { "biomes": [ "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_ocean", "minecraft:deep_frozen_ocean", "minecraft:frozen_river" ],
       "pond": { "block": "minecraft:ice", "radius": 5, "depth": 2 },
       "variants": [
-        { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
-          "trees": [ { "feature": "skyseed:ice_spike", "tries": 5, "spacing": 2 } ],
-          "ground": [ { "block": "minecraft:snow", "chance": 0.25 } ] } },
-        { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
-          "trees": [ { "feature": "skyseed:ice_spike", "tries": 6, "spacing": 2 } ],
-          "ground": [ { "block": "minecraft:snow", "chance": 0.15 } ] } }
+        { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "snow": 0.25, "decoration": {
+          "trees": [ { "feature": "skyseed:ice_spike", "tries": 5, "spacing": 2 } ] } },
+        { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "snow": 0.15, "decoration": {
+          "trees": [ { "feature": "skyseed:ice_spike", "tries": 6, "spacing": 2 } ] } }
       ] },
 
     { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:snowy_beach", "minecraft:grove" ],
       "variants": [
-        { "weight": 3, "name": "snowy", "decoration": {
-          "trees": [ { "feature": "minecraft:spruce", "tries": 6, "spacing": 2 } ],
-          "ground": [ { "block": "minecraft:snow", "chance": 0.90 } ] } },
-        { "weight": 1, "name": "powdery", "decoration": {
-          "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
-          "ground": [ { "block": "minecraft:snow", "chance": 0.95 } ] } }
+        { "weight": 3, "name": "snowy", "snow": 0.90, "decoration": {
+          "trees": [ { "feature": "minecraft:spruce", "tries": 6, "spacing": 2 } ] } },
+        { "weight": 1, "name": "powdery", "snow": 0.95, "decoration": {
+          "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ] } }
       ] }
   ]
 }

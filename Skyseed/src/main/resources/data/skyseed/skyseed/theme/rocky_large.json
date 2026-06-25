@@ -28,9 +28,8 @@
     { "weight": 3, "name": "mountain", "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } },
-    { "weight": 2, "name": "snowcapped", "surface_override": "minecraft:snow_block", "decoration": {
-      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.70 } ] } },
+    { "weight": 2, "name": "snowcapped", "surface_override": "minecraft:snow_block", "snow": 0.70, "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ] } },
     { "weight": 1, "name": "scree", "surface_override": "minecraft:gravel", "decoration": {
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }
   ],
@@ -69,9 +68,8 @@
       "shape": { "radius": { "min": 10, "max": 14 }, "rim_noise": 0.30, "top_dome": { "min": 9, "max": 13 } },
       "surface": "minecraft:snow_block", "fill": "minecraft:stone", "core": "minecraft:stone",
       "surface_scatter": [ { "block": "minecraft:stone", "chance": 0.22 } ],
-      "variants": [ { "weight": 1, "name": "alpine", "decoration": {
-        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ],
-        "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } } ],
+      "variants": [ { "weight": 1, "name": "alpine", "snow": 0.85, "decoration": {
+        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ] } } ],
       "ores": [
         { "block": "minecraft:coal_ore", "chance": 0.95, "count": { "min": 10, "max": 15 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
         { "block": "minecraft:iron_ore", "chance": 0.75, "count": { "min": 9, "max": 13 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
@@ -82,9 +80,8 @@
       "shape": { "radius": { "min": 10, "max": 14 }, "rim_noise": 0.30, "top_dome": { "min": 9, "max": 13 } },
       "surface": "minecraft:snow_block", "fill": "minecraft:stone", "core": "minecraft:stone",
       "surface_scatter": [ { "block": "minecraft:stone", "chance": 0.22 } ],
-      "variants": [ { "weight": 1, "name": "alpine", "decoration": {
-        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ],
-        "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } } ],
+      "variants": [ { "weight": 1, "name": "alpine", "snow": 0.85, "decoration": {
+        "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ] } } ],
       "ores": [
         { "block": "minecraft:coal_ore", "chance": 0.95, "count": { "min": 10, "max": 15 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
         { "block": "minecraft:iron_ore", "chance": 0.75, "count": { "min": 9, "max": 13 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },

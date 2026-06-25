@@ -20,14 +20,11 @@
     { "entity": "minecraft:polar_bear", "chance": 0.20, "count": { "min": 1, "max": 1 } }
   ],
   "variants": [
-    { "weight": 3, "name": "snowy", "decoration": {
-      "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 2 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.85 } ] } },
-    { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "decoration": {
-      "trees": [ { "feature": "skyseed:ice_spike", "tries": 2, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.30 } ] } },
-    { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "decoration": {
-      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:snow", "chance": 0.20 } ] } }
+    { "weight": 3, "name": "snowy", "snow": 0.85, "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 2 } ] } },
+    { "weight": 2, "name": "glacier", "surface_override": "minecraft:packed_ice", "snow": 0.30, "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 2, "spacing": 3 } ] } },
+    { "weight": 1, "name": "deep_freeze", "surface_override": "minecraft:blue_ice", "snow": 0.20, "decoration": {
+      "trees": [ { "feature": "skyseed:ice_spike", "tries": 3, "spacing": 3 } ] } }
   ]
 }

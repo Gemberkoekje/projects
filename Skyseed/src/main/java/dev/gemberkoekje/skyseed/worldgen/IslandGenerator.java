@@ -97,8 +97,10 @@ public final class IslandGenerator {
         final BlockState surface = resolveBlock(surfaceId, Blocks.GRASS_BLOCK).defaultBlockState();
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
-        // Snow-cap the finished island? The matching override decides; else the base palette — never a foreign-dimension leak.
-        final boolean snow = (ov != null && ov.snow().isPresent()) ? ov.snow().get() : (useBase && pal.snow());
+        // Snow-cap the finished island, and how heavily (0–1)? The rolled variant decides, else the matching override,
+        // else the base palette — but never a foreign-dimension leak.
+        final float snow = variant != null && variant.snow().isPresent() ? variant.snow().get()
+                : (ov != null && ov.snow().isPresent() ? ov.snow().get() : (useBase ? pal.snow() : 0f));
         final List<Scatter> scatter = resolveScatter(scatterCfg);
         // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
         // replace the bands, or clear them with an empty list; a foreign-dimension override never inherits them.

@@ -96,8 +96,8 @@ public final class GenerationJob {
             }
         }
 
-        // Ground cover, placed now (after the trees) onto the bare terrain, skipping any spot a tree has taken — so a
-        // snow layer never makes a tree fail. Same blocks() list, re-scanned for the deferred scatter positions.
+        // Ground cover, placed now (after the trees) onto the bare terrain, skipping any spot a tree has taken — so
+        // ground cover never makes a tree fail. Same blocks() list, re-scanned for the deferred scatter positions.
         if (scatterIndex < blockCount) {
             int scatterBudget = BLOCKS_PER_TICK;
             while (scatterBudget-- > 0 && scatterIndex < blockCount) {
@@ -105,9 +105,7 @@ public final class GenerationJob {
                 if (!plan.scatterPositions().contains(bp.pos())) {
                     continue; // terrain, already placed
                 }
-                if (bp.state().is(Blocks.SNOW)) {
-                    snowColumnTop(bp.pos(), bp.state()); // cap the column's highest block (a tree's canopy), bare beneath
-                } else if (level.getBlockState(bp.pos()).isAir()) {
+                if (level.getBlockState(bp.pos()).isAir()) {
                     level.setBlock(bp.pos(), bp.state(), Block.UPDATE_CLIENTS);
                 }
             }
@@ -122,7 +120,7 @@ public final class GenerationJob {
             spawnEnclosureAnimals();
             populateHives();
             kickFluids();
-            if (plan.snow()) {
+            if (plan.snow() > 0.0f) {
                 snowIsland(); // final step: snow-cap the whole island — ground, roofs and tree tops
             }
             mobsSpawned = true;
@@ -142,21 +140,6 @@ public final class GenerationJob {
         }
     }
 
-    /** Lay a snow layer on the highest block of a column (a tree's canopy in a snowy biome), leaving the ground bare. */
-    private void snowColumnTop(BlockPos scatterPos, BlockState snow) {
-        final BlockPos surface = scatterPos.below();
-        BlockPos top = surface;
-        for (int y = 1; y <= 24; y++) { // tall enough for any tree's canopy
-            final BlockPos p = surface.above(y);
-            if (!level.getBlockState(p).isAir()) {
-                top = p;
-            }
-        }
-        final BlockPos snowPos = top.above();
-        if (level.getBlockState(snowPos).isAir()) {
-            level.setBlock(snowPos, snow, Block.UPDATE_CLIENTS);
-        }
-    }
 
     /**
      * Nudge planned water sources (a Ladder Island waterfall) into flowing. The block fill places everything with
@@ -309,7 +292,8 @@ public final class GenerationJob {
         }
         final int top = maxY + 16;                      // headroom above the tallest roof / tree canopy
         final int bottom = Math.max(minY, maxY - 24);   // a band near the top — covers sloped edges, skips the deep void
-        PathSurfacer.snowCover(level, new BlockPos(minX, bottom, minZ), new BlockPos(maxX, top, maxZ));
+        PathSurfacer.snowCover(level, new BlockPos(minX, bottom, minZ), new BlockPos(maxX, top, maxZ),
+                plan.snow(), plan.random());
     }
 
     /**

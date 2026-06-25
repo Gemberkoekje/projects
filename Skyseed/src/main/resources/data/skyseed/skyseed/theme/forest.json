@@ -61,7 +61,7 @@
       "trees": [ { "feature": "minecraft:cherry", "tries": 4, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.25 }, { "block": "minecraft:pink_petals", "chance": 0.15 }, { "block": "minecraft:dandelion", "chance": 0.04 } ] } } ] },
 
-    { "biomes": [ "minecraft:grove" ], "snow": true, "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "minecraft:grove" ], "snow": 1.0, "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 2 } ] } } ] },
 
     { "biomes": [ "minecraft:mangrove_swamp" ], "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.30 } ], "pond": { "block": "minecraft:water", "radius": 3, "depth": 2 }, "variants": [ { "weight": 1, "decoration": {
@@ -96,7 +96,7 @@
       "trees": [ { "feature": "minecraft:oak", "tries": 5, "spacing": 2 }, { "feature": "minecraft:huge_red_mushroom", "tries": 1, "spacing": 3 }, { "feature": "minecraft:huge_brown_mushroom", "tries": 1, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.25 }, { "block": "minecraft:red_mushroom", "chance": 0.06 }, { "block": "minecraft:brown_mushroom", "chance": 0.06 } ] } } ] },
 
-    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:snowy_beach" ], "snow": true, "variants": [ { "weight": 1, "decoration": {
+    { "biomes": [ "minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:snowy_beach" ], "snow": 1.0, "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 2 } ] } } ] },
 
     { "biomes": [ "#minecraft:is_taiga" ], "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.30 } ], "variants": [ { "weight": 1, "decoration": {

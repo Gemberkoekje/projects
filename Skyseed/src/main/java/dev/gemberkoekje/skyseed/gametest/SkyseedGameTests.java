@@ -859,7 +859,7 @@ public final class SkyseedGameTests {
         level.setBlock(base.offset(8, y + 3, 4), Blocks.OAK_LEAVES.defaultBlockState(), Block.UPDATE_CLIENTS); // a tree canopy
         level.setBlock(base.offset(10, y, 4), Blocks.OAK_FENCE.defaultBlockState(), Block.UPDATE_CLIENTS); // thin — no snow
 
-        PathSurfacer.snowCover(level, base.offset(2, y - 2, 2), base.offset(13, y + 12, 6));
+        PathSurfacer.snowCover(level, base.offset(2, y - 2, 2), base.offset(13, y + 12, 6), 1.0f, level.getRandom());
 
         helper.assertTrue(level.getBlockState(base.offset(4, y + 1, 4)).is(Blocks.SNOW),
                 "snow should cap the open ground");
