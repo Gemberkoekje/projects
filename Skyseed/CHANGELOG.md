@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.89.1] - 2026-06-25
+
+### Fixed
+- **Guide book: the village-seed entries were out of date.** Brought the Hamlet, Trade Post and Village Center entries
+  in line with what they actually build now: the Hamlet is one or two profession cottages around a green (not "one
+  unemployed villager"); the Trade Post is a *street village* with fields and large-section landmarks (not a "plaza");
+  and the Village Center is the *big village* — a bigger Trade Post on a huge island, 4–6 shops + an iron golem — not
+  the old four-hall, all-13-professions meeting place. The README and the jigsaw plan doc were updated to match. (The
+  village seeds' advancements are crafting-based, so none broke.)
+
 ## [0.89.0] - 2026-06-25
 
 ### Changed

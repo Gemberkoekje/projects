@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A plaza of shops, several trades in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds come from a $(item)Rocky$() isle — taller, and thrown higher, gives more."
+      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A little street village of shops, several trades in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds come from a $(item)Rocky$() isle — taller, and thrown higher, gives more."
     },
     {
       "type": "patchouli:crafting",
@@ -17,17 +17,17 @@
     },
     {
       "type": "patchouli:text",
-      "text": "A small commercial district — a lantern-lit plaza ringed by shops, each with its own villager. The mid-tier village island: one throw, several trades.",
+      "text": "A small street village — a central square radiating lanes lined with shops, fields and gardens, each shop with its own villager. The mid-tier village island: one throw, $(bold)2 to 4$() trades.",
       "advancement": "skyseed:craft_trade_post"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The shops$()$(br)Each cabin comes with a $(item)job-site block$() and a bed, so its villager takes up that trade and settles in — farmer, librarian, fisherman, fletcher, toolsmith, and more. Which shops you get is the luck of the throw.",
+      "text": "$(bold)The shops$()$(br)Each cottage comes with a $(item)job-site block$() and a bed, so its villager takes up that trade and settles in — farmer, librarian, fisherman, fletcher. Larger lots may host a landmark: a blacksmith's $(item)forge$() or a meeting hall. Which you get is the luck of the throw, and they're styled to the biome.",
       "advancement": "skyseed:craft_trade_post"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Assembled by jigsaw$()$(br)The plaza and its shops are pieced together like a real village, so no two trade posts share a layout. Costs planks, cobblestone, and $(item)3 emeralds$() — bring a mountain's worth of mining.",
+      "text": "$(bold)Assembled by jigsaw$()$(br)The square and its streets are pieced together like a real village — shops on the lots, fields and gardens between, bridges out over the void — so no two trade posts share a layout. Costs planks, cobblestone, and $(item)3 emeralds$() — bring a mountain's worth of mining.",
       "advancement": "skyseed:craft_trade_post"
     }
   ]

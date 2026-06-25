@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. All 13 professions and an iron golem — the whole economy in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds and iron both come off a $(item)Rocky$() isle (throw it $(bold)high$() for emeralds)."
+      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. The grand village: a bigger Trade Post on a huge island, with a guardian iron golem.$(br2)$(bold)Where to look$()$(br)Emeralds and iron both come off a $(item)Rocky$() isle (throw it $(bold)high$() for emeralds)."
     },
     {
       "type": "patchouli:crafting",
@@ -17,17 +17,17 @@
     },
     {
       "type": "patchouli:text",
-      "text": "The premium village island: a bell-topped plaza with four trading halls around it, an iron golem on guard, and a villager of $(bold)every$() one of the 13 professions. The complete trading economy in one throw.",
+      "text": "The premium village island: the same street village as a Trade Post, but bigger in every way — a $(bold)huge$() island, a deeper street network, and a guaranteed $(bold)4 to 6$() shops, with an iron golem on guard. One throw, a whole settled village.",
       "advancement": "skyseed:craft_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The four halls$()$(br)$(li)Farm hall — farmer, shepherd, fletcher, butcher$(li)Smith hall — armorer, weaponsmith, toolsmith$(li)Scholar hall — librarian, cartographer, cleric$(li)Craft hall — mason, leatherworker, fisherman",
+      "text": "$(bold)A bigger Trade Post$()$(br)Streets branch off a central square, lined with profession cottages — farmer, librarian, fisherman, fletcher — and larger landmark builds: a blacksmith's $(item)forge$() and an open meeting hall with a $(item)bell$(). Fields, gardens and lamp-lit plazas fill the gaps; the huge island is kept a wide plateau, not a deep cone.",
       "advancement": "skyseed:craft_village_center"
     },
     {
       "type": "patchouli:text",
-      "text": "Each villager has a bed and a job site, so the hall fills with trades on its own. The $(item)iron golem$() guards them — raids are disabled on Skyseed worlds, but mobs at night are not.",
+      "text": "Each villager has a bed and a job site, so the village fills with trades on its own. The $(item)iron golem$() guards them — raids are disabled on Skyseed worlds, but mobs at night are not.",
       "advancement": "skyseed:craft_village_center"
     },
     {
