@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.74.0] - 2026-06-25
+
+### Changed
+- **The hamlet is now biome-aware and reuses the trade post's buildings.** It was a single generic cottage; now it
+  starts from a small village green whose lot connectors pull the trade post's `lots` pool — so a hamlet places 1–2
+  of the same diverse profession shops (forge / library / fletcher / farmer / fisherman), capped, in the biome's
+  materials, reusing the over-void foundation pass and villager spawning. Biome overrides mirror the trade post
+  (desert sand/sandstone, savanna acacia, taiga/snowy spruce). The only new piece is a tiny per-biome hub — no new
+  building designs were authored. (The old cottages remain as gametest fixtures.)
+
 ## [0.73.0] - 2026-06-25
 
 ### Added

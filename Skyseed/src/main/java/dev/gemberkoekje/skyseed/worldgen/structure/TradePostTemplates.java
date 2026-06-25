@@ -79,6 +79,33 @@ public final class TradePostTemplates {
                 shop(p, new ShopDesign(Blocks.SMITHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.FORGE)));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
+        // A tiny hamlet green that reuses this set's shops — the Hamlet theme starts from it (see hamlet/start pool).
+        writeIfAbsent(dir.resolve("hamlet_hub.nbt"), hamletHub(p));
+    }
+
+    /**
+     * A 3×3 hamlet green: a lamp post and three lot connectors that pull this palette's {@code lots} pool — i.e. the
+     * very same profession shops the trade post uses. The Hamlet theme starts from this hub (capped to 1–2 shops),
+     * so a hamlet shows the trade post's building diversity in miniature, in the biome's materials.
+     */
+    private static Built hamletHub(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int x = 0; x <= 2; x++) {
+            for (int z = 0; z <= 2; z++) {
+                m.put(new BlockPos(x, 0, z), Blocks.GRASS_BLOCK.defaultBlockState());
+            }
+        }
+        conn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/lots", "minecraft:grass_block");
+        conn(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/lots", "minecraft:grass_block");
+        conn(m, bes, new BlockPos(2, 0, 1), FrontAndTop.EAST_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/lots", "minecraft:grass_block");
+        m.put(new BlockPos(1, 1, 1), p.fence().defaultBlockState());      // a lamp post on the green
+        m.put(new BlockPos(1, 2, 1), Blocks.LANTERN.defaultBlockState());
+        anchor(m, bes, new BlockPos(1, 0, 1), "minecraft:grass_block"); // the start's bottom anchor, under the lamp
+        return new Built(m, bes);
     }
 
     /** 7×7 solid village square: the island anchor + a lantern, and four outward street connectors. */

@@ -895,6 +895,61 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void hamletBiomeStylesSelectTheirPools(GameTestHelper helper) {
+        // The hamlet is biome-aware like the trade post: each biome selects its own hamlet hub pool (which in turn
+        // pulls that biome's trade-post shops).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme h = theme(overworld, "hamlet");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final String[][] cases = {
+                {"minecraft:plains", "hamlet/start"},
+                {"minecraft:desert", "hamlet_desert/start"},
+                {"minecraft:savanna", "hamlet_savanna/start"},
+                {"minecraft:taiga", "hamlet_spruce/start"},
+                {"minecraft:snowy_plains", "hamlet_spruce/start"}};
+        for (String[] cs : cases) {
+            final var biome = overworld.registryAccess().registryOrThrow(Registries.BIOME)
+                    .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(cs[0])));
+            final IslandPlan p = IslandGenerator.planIsland(overworld, c, h, biome, RandomSource.create(8L));
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals(cs[1])),
+                    cs[0] + " hamlet should use pool " + cs[1]);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void hamletReusesTradePostShops(GameTestHelper helper) {
+        // The hamlet starts from a small green whose lot connectors pull the trade post's lots pool, so it places the
+        // same diverse profession shops, capped to 1–2. Five hamlets should land at least one shop (a RED_BED).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int beds = 0;
+        for (int iter = 0; iter < 5; iter++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "shop_", 2, fillers);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.RED_BED)) {
+                            beds++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, "5 hamlets placed no shops (red_bed=" + beds + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void tradePostBiomePiecesUseTheirWood(GameTestHelper helper) {
         // The savanna set is acacia and the shared spruce set is spruce — confirm the palette produced the right wood
