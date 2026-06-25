@@ -2,34 +2,19 @@
   "criteria": {
     "prereq": {
       "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:trade_post_skyseed"
-      }
+      "conditions": { "recipe_id": "skyseed:trade_post_skyseed" }
     },
     "has_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
-          {
-            "items": "minecraft:emerald"
-          },
-          {
-            "items": "minecraft:cobblestone"
-          },
-          {
-            "items": "#minecraft:planks"
-          },
-          {
-            "items": "minecraft:iron_ingot"
-          }
+          { "items": "skyseed:trade_post_skyseed" },
+          { "items": "minecraft:dirt" },
+          { "items": "minecraft:cobblestone" },
+          { "items": "#minecraft:planks" }
         ]
       }
     }
   },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  "requirements": [ [ "prereq", "has_0" ] ]
 }

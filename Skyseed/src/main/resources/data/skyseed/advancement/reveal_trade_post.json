@@ -2,31 +2,19 @@
   "criteria": {
     "prereq": {
       "trigger": "minecraft:recipe_crafted",
-      "conditions": {
-        "recipe_id": "skyseed:hamlet_skyseed"
-      }
+      "conditions": { "recipe_id": "skyseed:hamlet_skyseed" }
     },
     "has_0": {
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
-          {
-            "items": "minecraft:emerald"
-          },
-          {
-            "items": "#minecraft:planks"
-          },
-          {
-            "items": "minecraft:cobblestone"
-          }
+          { "items": "skyseed:hamlet_skyseed" },
+          { "items": "minecraft:dirt" },
+          { "items": "#minecraft:planks" },
+          { "items": "minecraft:cobblestone" }
         ]
       }
     }
   },
-  "requirements": [
-    [
-      "prereq",
-      "has_0"
-    ]
-  ]
+  "requirements": [ [ "prereq", "has_0" ] ]
 }

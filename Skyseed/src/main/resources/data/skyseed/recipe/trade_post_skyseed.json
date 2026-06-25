@@ -2,16 +2,19 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "EPE",
-    "PCP",
-    " E "
+    "DPD",
+    "HCH",
+    "DPD"
   ],
   "key": {
-    "E": {
-      "item": "minecraft:emerald"
+    "D": {
+      "item": "minecraft:dirt"
     },
     "P": {
       "tag": "minecraft:planks"
+    },
+    "H": {
+      "item": "skyseed:hamlet_skyseed"
     },
     "C": {
       "item": "minecraft:cobblestone"

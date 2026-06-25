@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.91.0] - 2026-06-25
+
+### Changed
+- **The village seeds are now a crafting progression.** The Trade Post recipe takes **2 Hamlet seeds** (plus dirt and
+  timber — no extra emeralds), and the Village Center takes **2 Trade Post seeds** (plus dirt and timber). So the
+  emeralds flow up the chain — hamlet → trade post → village center — rather than each tier piling on more, and the
+  bigger villages cost the smaller ones. The reveal/gathered advancements and the two guide entries were updated to the
+  new ingredients.
+
 ## [0.90.0] - 2026-06-25
 
 ### Changed

@@ -4,18 +4,10 @@
       "trigger": "minecraft:inventory_changed",
       "conditions": {
         "items": [
-          {
-            "items": "minecraft:emerald"
-          },
-          {
-            "items": "minecraft:cobblestone"
-          },
-          {
-            "items": "#minecraft:planks"
-          },
-          {
-            "items": "minecraft:iron_ingot"
-          }
+          { "items": "skyseed:trade_post_skyseed" },
+          { "items": "minecraft:dirt" },
+          { "items": "minecraft:cobblestone" },
+          { "items": "#minecraft:planks" }
         ]
       }
     }

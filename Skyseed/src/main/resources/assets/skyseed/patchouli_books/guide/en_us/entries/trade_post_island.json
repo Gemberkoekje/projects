@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Trade Post Skyseed$() — planks, cobblestone and $(item)3 emeralds$(). A little street village of shops, several trades in one throw.$(br2)$(bold)Where to look$()$(br)Emeralds come from a $(item)Rocky$() isle — taller, and thrown higher, gives more."
+      "text": "The $(item)Trade Post Skyseed$() — $(item)2 Hamlet Skyseeds$(), dirt and a little timber. A little street village of shops, several trades in one throw.$(br2)$(bold)Where to look$()$(br)Craft up two Hamlets first (each wants an emerald off a $(item)Rocky$() isle), then fold them into a Trade Post."
     },
     {
       "type": "patchouli:crafting",
@@ -27,7 +27,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Assembled by jigsaw$()$(br)The square and its streets are pieced together like a real village — shops on the lots, fields and gardens between, bridges out over the void — so no two trade posts share a layout. Costs planks, cobblestone, and $(item)3 emeralds$() — bring a mountain's worth of mining.",
+      "text": "$(bold)Assembled by jigsaw$()$(br)The square and its streets are pieced together like a real village — shops on the lots, fields and gardens between, bridges out over the void — so no two trade posts share a layout. Costs $(item)2 Hamlet Skyseeds$(), dirt and timber — two cottages grown into a whole street.",
       "advancement": "skyseed:craft_trade_post"
     }
   ]

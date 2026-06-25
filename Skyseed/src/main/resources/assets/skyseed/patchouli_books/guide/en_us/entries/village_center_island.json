@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Village Center Skyseed$() — $(item)5 emeralds$(), an iron ingot, planks and cobblestone. The grand village: a bigger Trade Post on a huge island, with a guardian iron golem.$(br2)$(bold)Where to look$()$(br)Emeralds and iron both come off a $(item)Rocky$() isle (throw it $(bold)high$() for emeralds)."
+      "text": "The $(item)Village Center Skyseed$() — $(item)2 Trade Post Skyseeds$(), dirt and timber. The grand village: a bigger Trade Post on a huge island, with a guardian iron golem.$(br2)$(bold)Where to look$()$(br)Build up two Trade Posts first, then fold them into a Village Center — the emeralds are already in those."
     },
     {
       "type": "patchouli:crafting",
@@ -32,7 +32,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)A late-game reward$()$(br)Costs $(item)5 emeralds$(), an iron ingot, planks and cobblestone. You'll want an established Rocky or Ancient mining run before this is within reach — but it pays back the whole economy at once.",
+      "text": "$(bold)A late-game reward$()$(br)Costs $(item)2 Trade Post Skyseeds$(), dirt and timber — and each Trade Post is itself two Hamlets, so it's four hamlets' worth of emeralds folded in. A real investment, but it pays back a whole big village at once.",
       "advancement": "skyseed:craft_village_center"
     }
   ]

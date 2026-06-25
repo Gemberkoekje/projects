@@ -2,22 +2,22 @@
   "type": "minecraft:crafting_shaped",
   "category": "misc",
   "pattern": [
-    "EEE",
-    "ECE",
-    "PIP"
+    "DPD",
+    "TCT",
+    "DPD"
   ],
   "key": {
-    "E": {
-      "item": "minecraft:emerald"
-    },
-    "C": {
-      "item": "minecraft:cobblestone"
+    "D": {
+      "item": "minecraft:dirt"
     },
     "P": {
       "tag": "minecraft:planks"
     },
-    "I": {
-      "item": "minecraft:iron_ingot"
+    "T": {
+      "item": "skyseed:trade_post_skyseed"
+    },
+    "C": {
+      "item": "minecraft:cobblestone"
     }
   },
   "result": {
