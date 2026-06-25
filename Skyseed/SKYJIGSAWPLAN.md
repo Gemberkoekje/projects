@@ -77,11 +77,52 @@ behaves:
 - Every element is `"projection": "rigid"` → placed at the **exact** connector-aligned position, with **no
   heightmap snapping and no ground-support check**. Vanilla rejects an overlapping piece; it does **not** reject
   a piece that floats over air.
-- Each of our templates **carries its own floor course**. So a street/bridge piece that recurses past the
-  island's edge simply lays its own planks **out over the void** — an instant pier or walkway, exactly the
-  "village making a little pier over the void" the brief asks for.
+- **Buildings carry their own floor course**, so a shop or house that lands past the island's edge brings its
+  planks with it. **Paths don't bake a floor at all** — they use the marker-surfacing pass in §3a below, so a
+  street that recurses out over the void becomes a boardwalk and over grass becomes a worn dirt path. Either
+  way the "village making a little pier over the void" the brief asks for comes essentially for free.
 - The island only needs to support the **start** piece (that is all `pad` levels). Everything the path reaches
   beyond the pad is free to hang in the air.
+
+### 3a. Marker-driven path surfacing — terrain-aware paths *and* piers (preferred)
+
+Rather than bake a fixed plank floor into every path piece (wrong-looking on grass, oddly floating over void),
+the **connective path pieces place only a sentinel marker** — a reserved block (e.g. `purple_wool`) one block
+**above** the intended path tile — and a post-assembly pass resolves each marker by looking at what sits
+directly **under** it:
+
+- under = **dirt / grass / sand / terrain** → set that tile to a **path surface** (`dirt_path`, with a little
+  `gravel` / `cobblestone` mixed in for texture) — the path *becomes* the island's ground, re-textured;
+- under = **air (void)** → place a **wooden slab** there — an instant boardwalk plank out over the nothing;
+- then delete the marker.
+
+Why this is the right tool:
+
+- **Terrain-aware for free.** One path adapts to grass, sand, snow *or* void — so it also matches the **biome**
+  of whatever island it grows on, not just the void case. That's a bonus the baked-floor approach can't give.
+- **The order already supports it.** `tick()` places terrain + scatter first and only then runs
+  `placeStructures()` (≈ line 117), so when the pass reads "the block below," the island ground is already in
+  the world and the void is genuinely air. The pass slots in beside the existing post-jigsaw passes
+  (`linkConnections`, `Traps.applyAfterJigsaw`) and **reuses the same structure-bbox scan** as the §5.1 fix.
+- **Marker one block *above* the tile, on purpose** — so the tile we need to read (terrain or air) is left
+  untouched and unambiguous; a marker placed *on* the tile would erase the very information we read.
+- **Buildings keep their solid baked floors.** Markers are only for the path/street network — exactly the part
+  that sprawls over void.
+
+Details to mind:
+
+- **Height step.** `dirt_path` is ~0.94 tall; a bottom slab is 0.5, so a boardwalk-meets-path seam shows a
+  half-step. Use a **top slab** (or a full plank) over void to line the tops up, or accept the step as a
+  boardwalk lip — a tuning call.
+- **Reserved marker.** `purple_wool` works as a sentinel *if* we never use it decoratively in structures (we
+  don't); document it as reserved, or pick any block we'll never place for real.
+- **Optional stilts.** Over deep void the pass can occasionally drop a fence/post under the slab so long piers
+  read as supported (cheap; no engine support needed).
+- **Vanilla processors can't quite do this.** A `RuleProcessor` can swap dirt → `dirt_path` (its
+  `location_predicate` tests the world block at the *same* position), but it has no neighbour predicate to test
+  the block **below**, so it can't choose slab-over-void. The custom post-pass is the justified tool.
+- **Generalises later.** Other marker colours could drive other context rules (a "wall-base" marker that
+  becomes a stilt over void, say). Keep v1 to the path case.
 
 To make overhangs read as *intentional* rather than glitchy:
 
@@ -245,6 +286,9 @@ Each phase ships independently and is committed on its own (one feature per comm
 - A **villager-coverage** test for the village: assemble in the gametest region and assert a villager spawned
   for **every** bed in the placed bounding box (guards the §5.1 scan-bounds fix).
 - A **fence-link** spot check across a multi-piece span (guards §5.1 for `linkConnections`).
+- A **marker-resolution** test (§3a): assemble a path that runs off the island edge in the gametest region,
+  then assert **no sentinel markers remain**, on-terrain tiles became a path block, and over-void tiles became
+  a slab.
 - Keep the golden master as-is (it stays green; §5.7).
 
 ---
