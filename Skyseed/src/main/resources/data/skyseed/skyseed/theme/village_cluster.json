@@ -1,7 +1,7 @@
 {
   "dimensions": ["minecraft:overworld"],
-  "_comment": "The big village: essentially a bigger Trade Post. A HUGE island whose teardrop underside is depth-capped (max_under_depth) so it stays a wide plateau, not a bottomless cone. Reuses the trade_post village pieces, but runs the street network deeper (depth 6) and guarantees 4-6 shops (cap_min 4). Compare with village_cluster (the same village across 2-3 smaller islands).",
-  "shape": { "radius": { "min": 22, "max": 26 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "max_under_depth": 16 },
+  "_comment": "Experiment: the SAME big village, but spread across 3 smaller islands (a little archipelago) instead of one huge island. Each small island is shallow (no deep teardrop, so no max_under_depth needed); the village at the centre spans them on its own bridges/piers. Compare with village_center (one huge island).",
+  "shape": { "radius": { "min": 12, "max": 14 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "cluster_offsets": [ [34, 0, 0], [17, 0, 29] ] },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
   "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 6, "pad": 5, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers" },

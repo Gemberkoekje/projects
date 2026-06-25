@@ -57,8 +57,8 @@ public final class IslandGenerator {
     /** Blocks of headroom cleared above a structure pad, so an assembled building isn't clipped by island terrain. */
     private static final int PAD_CLEAR_HEIGHT = 10;
     /** Fallback shape for a dimension override that omits one — small, so it never inherits the overworld silhouette. */
-    private static final Shape NEUTRAL_SHAPE =
-            new Shape(new IntRange(3, 3), 0.2f, Underside.TEARDROP, new IntRange(1, 1), java.util.Optional.empty());
+    private static final Shape NEUTRAL_SHAPE = new Shape(new IntRange(3, 3), 0.2f, Underside.TEARDROP,
+            new IntRange(1, 1), java.util.Optional.empty(), java.util.List.of());
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
@@ -117,6 +117,12 @@ public final class IslandGenerator {
         final List<BlockPos> bottomList = new ArrayList<>(); // lowest block of each column, for underside hangs
         final ShapeBuilder.Result sh = ShapeBuilder.build(center, shape, surface, fill, core, scatter, bands,
                 bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
+        // Cluster: stamp the same shape again at each offset (a little archipelago of smaller islands). The jigsaw at
+        // the centre then spans them on its own bridges/piers. The first build above is the centre island.
+        for (final BlockPos off : shape.clusterOffsets()) {
+            ShapeBuilder.build(center.offset(off.getX(), 0, off.getZ()), shape, surface, fill, core, scatter, bands,
+                    bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
+        }
         final int baseRadius = sh.baseRadius();
         final int topDome = sh.topDome();
 

@@ -3,14 +3,25 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
-## [0.88.0] - 2026-06-25
+## [0.89.0] - 2026-06-25
+
+### Changed
+- **The Village Center seed is now the big village.** Folded the big-village idea into the existing `village_center`
+  seed (rather than a separate one): a HUGE island, the trade-post village pieces run deeper (depth 6), a guaranteed
+  4–6 shops, plus its iron golem. The island's teardrop underside is depth-capped (`max_under_depth` 16) so the huge
+  island stays a wide plateau, not a bottomless cone. (Replaces the old village_center meeting-place build.)
 
 ### Added
-- **Big Village — a bigger trade post on a huge, depth-capped island.** A new theme that reuses the trade-post village
-  pieces but runs the street network deeper (depth 6) and guarantees 4–6 shops, on a HUGE island (radius 22–26). So the
-  huge island doesn't dangle a bottomless teardrop, the island shape gained `max_under_depth` — a per-shape cap on how
-  far the underside hangs below the centre (16 here, vs the usual ~radius) — so it reads as a wide plateau, not a deep
-  cone. A creative "Debug: Big Village" seed lets you eyeball it; biome-style overrides for it can follow.
+- **Island clusters, and a Village Cluster to compare.** `Shape.cluster_offsets` stamps the same shape again at each
+  (x,z) offset, turning one island into a little archipelago. The new `village_cluster` theme uses it for the *same*
+  big village spread across 3 smaller — and therefore shallow — islands, the jigsaw spanning them on its bridges/piers.
+  Two creative debug seeds, "Village Center (one huge island)" and "Village Cluster (3 small islands)", to feel out the
+  difference.
+- **`Shape.max_under_depth`** — a per-shape cap on how far the teardrop underside hangs (it normally scales with the
+  radius, ~radius deep), so a very wide island reads as a plateau instead of a deep cone.
+
+## [0.88.0] - 2026-06-25 [removed]
+- Superseded by 0.89.0 (the big village became the village_center seed, not a separate one).
 
 ## [0.87.0] - 2026-06-25
 
