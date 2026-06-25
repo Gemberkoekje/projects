@@ -207,7 +207,7 @@ public final class IslandGenerator {
                     : jc.capCount();
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach(),
-                    jc.capPrefix(), cap));
+                    jc.capPrefix(), cap, jc.capFiller()));
             // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack onto the pad (gy),
             // spawned a block above, so the mob lands on the structure floor that now sits at gy.
             if (!animalPacks.isEmpty()) {
@@ -349,7 +349,7 @@ public final class IslandGenerator {
                 jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
         if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
             return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink(), jc.reach(),
-                    jc.capPrefix(), jc.capCount(), jc.capMin());
+                    jc.capPrefix(), jc.capCount(), jc.capMin(), jc.capFiller());
         }
         return jc;
     }

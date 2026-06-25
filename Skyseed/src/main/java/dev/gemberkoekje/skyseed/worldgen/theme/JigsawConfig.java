@@ -22,11 +22,14 @@ import net.minecraft.resources.ResourceLocation;
  * nearest the centre is dropped before stamping, so a trade post can run long streets full of fields yet keep its
  * shops to a handful (vanilla has no native per-element limit). The cap is {@code capCount}, unless {@code capMin}
  * is set in {@code [1, capCount)}, in which case the generator rolls a target in {@code [capMin, capCount]} from the
- * island RNG up front (so e.g. a trade post lands a reproducible-but-varied 2–4 shops). {@code capCount = 0} (the
- * default) disables it. See {@code SKYVILLAGESPLAN.md} / {@code SKYSTRUCTURESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
+ * island RNG up front (so e.g. a trade post lands a reproducible-but-varied 2–4 shops). To <em>guarantee</em> the
+ * count rather than only trim a surplus, make the lot pool entirely the capped element and set {@code capFiller} to
+ * a pool of replacements (fields/gardens): the surplus lots beyond the cap are re-stamped from that pool, so the
+ * planned number of shops always lands when that many lots placed. {@code capCount = 0} (the default) disables it,
+ * and an empty {@code capFiller} drops the surplus instead. See {@code SKYVILLAGESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
  */
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,
-                           int sink, int reach, String capPrefix, int capCount, int capMin) {
+                           int sink, int reach, String capPrefix, int capCount, int capMin, String capFiller) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
@@ -37,6 +40,7 @@ public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int d
             Codec.INT.optionalFieldOf("reach", 0).forGetter(JigsawConfig::reach),
             Codec.STRING.optionalFieldOf("cap_prefix", "").forGetter(JigsawConfig::capPrefix),
             Codec.INT.optionalFieldOf("cap_count", 0).forGetter(JigsawConfig::capCount),
-            Codec.INT.optionalFieldOf("cap_min", 0).forGetter(JigsawConfig::capMin)
+            Codec.INT.optionalFieldOf("cap_min", 0).forGetter(JigsawConfig::capMin),
+            Codec.STRING.optionalFieldOf("cap_filler", "").forGetter(JigsawConfig::capFiller)
     ).apply(i, JigsawConfig::new));
 }

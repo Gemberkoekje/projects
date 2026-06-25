@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.70.2] - 2026-06-25
+
+### Changed
+- **A trade post now reliably lands its rolled 2–4 shops**, instead of sometimes ending up with 0–1. A cap can only
+  trim a surplus — it can't conjure shops when the random assembly happens to roll few — so the lot pool is now made
+  entirely of shops and the assembled piece list is normalised before stamping: the rolled number of shops nearest
+  the centre are kept, and every surplus lot is re-stamped in place from a new `fillers` pool (wheat fields / gardens).
+  So the planned house count is guaranteed whenever that many lots placed (a tiny island may still place fewer, which
+  is acceptable), and the remaining lots become the fields. New `JigsawConfig.cap_filler` names the replacement pool.
+
 ## [0.70.1] - 2026-06-25
 
 ### Changed

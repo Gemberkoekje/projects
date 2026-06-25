@@ -857,14 +857,16 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void tradePostVillagePlacesShops(GameTestHelper helper) {
-        // Regression: assemble the Trade Post village on a flat platform once for each shop cap the 2–4 roll can
-        // produce, and confirm no village exceeds its cap (a shop carries a RED_BED = 2 blocks, so cap c => <= 2c)
-        // while shops and fields both still appear. Long streets place many lots; placeCapped keeps only the c shops
-        // nearest the centre and lets the rest fall to fields/gardens. (Loads dev-generated .nbt; syncDevStructures
-        // keeps the node copy current, so this no longer flakes on a stale .nbt.)
+        // Regression: assemble the Trade Post village on a flat platform once for each shop count the 2–4 roll can
+        // produce, and confirm each village lands EXACTLY that many shops (a shop carries a RED_BED = 2 blocks, so
+        // count c => 2c) with fields appearing too. Every lot is a shop; placeCapped keeps the c nearest the centre
+        // and re-stamps the surplus from the fillers pool (wheat/garden) — so the planned count is guaranteed when
+        // enough lots place, not merely capped. (Loads dev-generated .nbt; syncDevStructures keeps the node copy
+        // current, so this no longer flakes on a stale .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int beds = 0;
         int wheat = 0;
         for (int cap = 2; cap <= 4; cap++) {
@@ -875,7 +877,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", cap);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", cap, fillers);
             int villageBeds = 0;
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
@@ -889,8 +891,11 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            helper.assertTrue(villageBeds <= 2 * cap,
-                    "village exceeded its " + cap + "-shop cap (red_bed=" + villageBeds + ")");
+            // On open ground far more lots place than the cap, so every village lands EXACTLY the target: a shop is
+            // one bed = two RED_BED blocks, so cap c => 2c. (In-world a tiny island may place fewer lots than the
+            // target, which is acceptable — but here the flat platform always has plenty.)
+            helper.assertTrue(villageBeds == 2 * cap,
+                    "village did not land exactly " + cap + " shops (red_bed=" + villageBeds + ", expected " + (2 * cap) + ")");
             beds += villageBeds;
         }
         helper.assertTrue(beds > 0, "villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
