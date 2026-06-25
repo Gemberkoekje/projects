@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.71.0] - 2026-06-25
+
+### Added
+- **Biome-styled trade posts — first slice: desert.** A trade post that germinates in a desert now builds from its
+  own sand/sandstone piece set on a sand island, instead of always grass + oak buildings. The trade-post generator is
+  now palette-driven, so each biome gets a *distinct* piece set rather than a recolour — the shapes are near-copies
+  for now, but this is the structure that lets building details (flat roofs, snow caps, …) diverge per biome later.
+  `BiomeOverride` gained an optional `jigsaw`, so a biome can swap the whole jigsaw build (here: the desert pool +
+  a sand surface + dead-bush ground). Working toward vanilla's five styles (desert / plains / savanna / snowy / taiga).
+
 ## [0.70.2] - 2026-06-25
 
 ### Changed

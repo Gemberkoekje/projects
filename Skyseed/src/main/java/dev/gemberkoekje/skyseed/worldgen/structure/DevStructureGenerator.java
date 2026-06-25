@@ -36,7 +36,8 @@ public final class DevStructureGenerator {
                     : Path.of(System.getProperty("user.dir"))
                             .resolveSibling("src").resolve("main/resources/data/skyseed/structure");
             HamletTemplates.generateInto(base.resolve("hamlet"));
-            TradePostTemplates.generateInto(base.resolve("trade_post"));
+            TradePostTemplates.generateInto(base.resolve("trade_post"), TradePostTemplates.PLAINS);
+            TradePostTemplates.generateInto(base.resolve("trade_post_desert"), TradePostTemplates.DESERT);
             VillageCenterTemplates.generateInto(base.resolve("village_center"));
             AnimalTemplates.generateInto(base.resolve("animal"));
             DungeonTemplates.generateInto(base.resolve("dungeon"));

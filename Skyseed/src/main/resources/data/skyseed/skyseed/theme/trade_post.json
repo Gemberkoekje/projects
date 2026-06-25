@@ -8,6 +8,18 @@
       "jigsaw": { "pool": "skyseed:outpost/tower", "target": "minecraft:bottom", "depth": 1, "pad": 9, "iron_golems": 1 } }
   ],
   "jigsaw": { "pool": "skyseed:trade_post/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post/fillers" },
+  "biome_overrides": [
+    { "_comment": "Desert: a sand island with its own sand/sandstone trade-post pool (flat-roofed houses can diverge from this set later).",
+      "biomes": ["minecraft:desert"],
+      "surface": "minecraft:sand", "fill": "minecraft:sandstone",
+      "jigsaw": { "pool": "skyseed:trade_post_desert/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_desert/fillers" },
+      "variants": [
+        { "weight": 1, "name": "dune", "decoration": {
+          "ground": [
+            { "block": "minecraft:dead_bush", "chance": 0.05 }
+          ] } }
+      ] }
+  ],
   "variants": [
     { "weight": 1, "name": "green", "decoration": {
       "ground": [

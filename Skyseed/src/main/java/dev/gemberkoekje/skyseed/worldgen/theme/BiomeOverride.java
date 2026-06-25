@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.core.Holder;
@@ -18,7 +19,8 @@ import java.util.Optional;
  * Y to be within {@code min_y}..{@code max_y} (each optional) AND, when {@code dimension} is set, the
  * germination dimension to equal it (e.g. {@code minecraft:the_nether} — this is how an overworld seed
  * adapts to its Nether form, see SKYNETHERPLAN). Every other field is optional and, when present, replaces
- * the base theme's corresponding field for that island. First matching override wins.
+ * the base theme's corresponding field for that island — including {@code jigsaw}, which swaps the whole
+ * jigsaw build (a desert biome can thus get its own sand/sandstone trade-post pool). First matching override wins.
  */
 public record BiomeOverride(
         List<String> biomes,
@@ -36,12 +38,21 @@ public record BiomeOverride(
         Optional<Integer> waterfalls,
         Optional<List<MobEntry>> mobs,
         Optional<String> dimension,
-        Optional<List<ResourceLocation>> fillBands) {
+        Optional<List<ResourceLocation>> fillBands,
+        Optional<JigsawConfig> jigsaw) {
+
+    /** {@code min_y}/{@code max_y} folded into one codec slot (still two top-level JSON keys) so the record codec
+     *  stays within RecordCodecBuilder's 16-field group limit while gaining the {@code jigsaw} override. */
+    private record YBounds(Optional<Integer> min, Optional<Integer> max) {
+        static final MapCodec<YBounds> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
+                Codec.INT.optionalFieldOf("min_y").forGetter(YBounds::min),
+                Codec.INT.optionalFieldOf("max_y").forGetter(YBounds::max)
+        ).apply(i, YBounds::new));
+    }
 
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
-            Codec.INT.optionalFieldOf("min_y").forGetter(BiomeOverride::minY),
-            Codec.INT.optionalFieldOf("max_y").forGetter(BiomeOverride::maxY),
+            YBounds.CODEC.forGetter(o -> new YBounds(o.minY(), o.maxY())),
             ResourceLocation.CODEC.optionalFieldOf("surface").forGetter(BiomeOverride::surface),
             ResourceLocation.CODEC.optionalFieldOf("fill").forGetter(BiomeOverride::fill),
             ResourceLocation.CODEC.optionalFieldOf("core").forGetter(BiomeOverride::core),
@@ -54,8 +65,12 @@ public record BiomeOverride(
             Codec.INT.optionalFieldOf("waterfalls").forGetter(BiomeOverride::waterfalls),
             MobEntry.CODEC.listOf().optionalFieldOf("mobs").forGetter(BiomeOverride::mobs),
             Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension),
-            ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands)
-    ).apply(i, BiomeOverride::new));
+            ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands),
+            JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(BiomeOverride::jigsaw)
+    ).apply(i, (biomes, yb, surface, fill, core, fillDepth, surfaceScatter, shape, ores, variants, pond,
+                waterfalls, mobs, dimension, fillBands, jigsaw) ->
+            new BiomeOverride(biomes, yb.min(), yb.max(), surface, fill, core, fillDepth, surfaceScatter, shape,
+                    ores, variants, pond, waterfalls, mobs, dimension, fillBands, jigsaw)));
 
     /** True if {@code dim} (when dimension is set), {@code biome} (when biomes is set) and {@code y} (when a range is set) all match. */
     public boolean matches(Holder<Biome> biome, int y, ResourceLocation dim) {

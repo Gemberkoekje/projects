@@ -188,8 +188,11 @@ public final class IslandGenerator {
         // and a villager is spawned at every bed in it.
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
         final List<IslandPlan.AnimalSpawn> animals = new ArrayList<>();
-        // A rolled rare structure replaces the theme's normal jigsaw + animal packs for this island.
-        final JigsawConfig jcRaw = rare != null ? rare.jigsaw() : theme.jigsaw().orElse(null);
+        // A rolled rare structure replaces the theme's normal jigsaw + animal packs for this island; otherwise a
+        // matching biome override may swap the jigsaw build (e.g. a desert's sand/sandstone trade post).
+        final JigsawConfig jcBase = (ov != null && ov.jigsaw().isPresent()) ? ov.jigsaw().get()
+                : theme.jigsaw().orElse(null);
+        final JigsawConfig jcRaw = rare != null ? rare.jigsaw() : jcBase;
         final JigsawConfig jc = jcRaw != null ? dimensionVariant(level, jcRaw) : null;
         final List<AnimalPack> animalPacks = rare != null ? rare.mobs() : theme.animals();
         if (jc != null) {

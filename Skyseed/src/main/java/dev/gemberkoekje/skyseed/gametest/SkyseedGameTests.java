@@ -903,6 +903,46 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void tradePostDesertVillageIsSandstone(GameTestHelper helper) {
+        // Biome diversity: a desert biome override swaps in the sand/sandstone piece set (its own jigsaw pool), built
+        // by the same generator from a desert palette. Assemble it and confirm the buildings are sandstone — not oak —
+        // while the shop cap + filler machinery still place shops and fields. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/fillers"));
+        for (int x = 4; x <= 44; x++) {
+            for (int z = 4; z <= 44; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                }
+            }
+        }
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers);
+        int beds = 0;
+        int sandstone = 0;
+        int oakWall = 0;
+        for (int x = 4; x <= 44; x++) {
+            for (int z = 4; z <= 44; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.RED_BED)) {
+                        beds++;
+                    } else if (s.is(Blocks.SMOOTH_SANDSTONE)) {
+                        sandstone++;
+                    } else if (s.is(Blocks.OAK_PLANKS)) {
+                        oakWall++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, "desert village placed no shops (red_bed=" + beds + ")");
+        helper.assertTrue(sandstone > 0, "desert village has no sandstone walls (smooth_sandstone=" + sandstone + ")");
+        helper.assertTrue(oakWall == 0, "desert village still has oak plank walls (oak_planks=" + oakWall + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress

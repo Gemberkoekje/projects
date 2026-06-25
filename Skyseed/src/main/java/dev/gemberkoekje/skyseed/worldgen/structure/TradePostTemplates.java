@@ -5,8 +5,10 @@ import static dev.gemberkoekje.skyseed.worldgen.structure.StructureParts.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.JigsawBlock;
@@ -21,61 +23,73 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Trade Post — a real little jigsaw village (SKYJIGSAWPLAN Phase 1). A solid cobblestone {@code square} start
- * piece radiates a {@code streets} pool ({@code straight}/{@code corner}/{@code cross} + an empty terminator)
- * that branches and twists at depth 6, and the streets hang {@code lot}s off their sides from a {@code lots}
- * pool — the five trade shops plus non-shop scenery (a fenced {@code wheat_field}, a {@code garden}) and a
- * weighted empty terminator so the village breathes. The street pieces bake no floor: each lays
- * {@link PathSurfacer#MARKER} markers, so {@link PathSurfacer} renders the lanes as terrain-aware dirt paths on
- * the island and self-railing wooden bridges where a lane runs out over the void. A villager spawns at every
- * shop bed (the fields and garden carry none).
+ * Trade Post — a real little jigsaw village (SKYJIGSAWPLAN Phase 1). A solid {@code square} start piece radiates a
+ * {@code streets} pool ({@code straight}/{@code corner} + an empty terminator) that branches and twists, and the
+ * streets hang {@code lot}s off their sides from a {@code lots} pool (the five trade shops; the surplus beyond the
+ * shop cap is re-stamped from {@code fillers} = a {@code wheat_field}/{@code garden}). The street pieces bake no
+ * floor: each lays {@link PathSurfacer#MARKER} markers, so {@link PathSurfacer} renders the lanes as terrain-aware
+ * dirt paths and self-railing wooden bridges over the void. A villager spawns at every shop bed.
+ *
+ * <p>The piece set is built from a {@link Palette} so each biome gets its own. The shapes are shared (near-copies)
+ * for now, but generating a distinct set per biome — rather than recolouring one — is what lets the building
+ * <em>details</em> (flat sandstone roofs, snow caps, …) diverge per biome later. {@link #PLAINS} reproduces the
+ * original oak/cobblestone pieces exactly; {@link #DESERT} is the first variant (sand/sandstone).
  */
 public final class TradePostTemplates {
     private TradePostTemplates() {}
 
-    private static final String STREETS = "skyseed:trade_post/streets";
-    private static final String LOTS = "skyseed:trade_post/lots";
+    /** The pool namespace prefix + the material set a trade-post piece set is built from. */
+    public record Palette(String pool, Block wall, Block post, Block stairs, Block slab, Block door,
+                          Block foundation, Block glass, Block fence, Block fieldBorder) {}
 
-    public static void generateInto(Path dir) throws IOException {
-        writeIfAbsent(dir.resolve("square.nbt"), square());
-        writeIfAbsent(dir.resolve("street_straight.nbt"), streetSegment(
+    public static final Palette PLAINS = new Palette("skyseed:trade_post", Blocks.OAK_PLANKS, Blocks.OAK_LOG,
+            Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR, Blocks.COBBLESTONE, Blocks.GLASS,
+            Blocks.OAK_FENCE, Blocks.DIRT);
+    public static final Palette DESERT = new Palette("skyseed:trade_post_desert", Blocks.SMOOTH_SANDSTONE,
+            Blocks.CUT_SANDSTONE, Blocks.SANDSTONE_STAIRS, Blocks.SANDSTONE_SLAB, Blocks.OAK_DOOR,
+            Blocks.SANDSTONE, Blocks.GLASS, Blocks.OAK_FENCE, Blocks.SAND);
+
+    public static void generateInto(Path dir, Palette p) throws IOException {
+        writeIfAbsent(dir.resolve("square.nbt"), square(p));
+        writeIfAbsent(dir.resolve("street_straight.nbt"), streetSegment(p,
                 new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.EAST_UP},
                 new FrontAndTop[]{FrontAndTop.NORTH_UP, FrontAndTop.SOUTH_UP}));
-        writeIfAbsent(dir.resolve("street_corner.nbt"), streetSegment(
+        writeIfAbsent(dir.resolve("street_corner.nbt"), streetSegment(p,
                 new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP},
                 new FrontAndTop[]{FrontAndTop.NORTH_UP}));
         // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
         // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
-        writeIfAbsent(dir.resolve("shop_farmer.nbt"), shop(Blocks.COMPOSTER.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_librarian.nbt"), shop(Blocks.LECTERN.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_fisherman.nbt"), shop(Blocks.BARREL.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_fletcher.nbt"), shop(Blocks.FLETCHING_TABLE.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), shop(Blocks.SMITHING_TABLE.defaultBlockState()));
-        writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField());
-        writeIfAbsent(dir.resolve("garden.nbt"), garden());
+        writeIfAbsent(dir.resolve("shop_farmer.nbt"), shop(p, Blocks.COMPOSTER.defaultBlockState()));
+        writeIfAbsent(dir.resolve("shop_librarian.nbt"), shop(p, Blocks.LECTERN.defaultBlockState()));
+        writeIfAbsent(dir.resolve("shop_fisherman.nbt"), shop(p, Blocks.BARREL.defaultBlockState()));
+        writeIfAbsent(dir.resolve("shop_fletcher.nbt"), shop(p, Blocks.FLETCHING_TABLE.defaultBlockState()));
+        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), shop(p, Blocks.SMITHING_TABLE.defaultBlockState()));
+        writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
+        writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
     }
 
-    /** 7×7 solid-cobblestone village square: the island anchor + a lantern, and four outward street connectors. */
-    private static Built square() {
+    /** 7×7 solid village square: the island anchor + a lantern, and four outward street connectors. */
+    private static Built square(Palette p) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final BlockState cob = Blocks.COBBLESTONE.defaultBlockState();
+        final BlockState base = p.foundation().defaultBlockState();
         for (int x = 0; x <= 6; x++) {
             for (int z = 0; z <= 6; z++) {
-                m.put(new BlockPos(x, 0, z), cob);
+                m.put(new BlockPos(x, 0, z), base);
             }
         }
-        streetConn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, "minecraft:cobblestone");
-        streetConn(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP, "minecraft:cobblestone");
-        streetConn(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP, "minecraft:cobblestone");
-        streetConn(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP, "minecraft:cobblestone");
+        final String floor = id(p.foundation());
+        streetConn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, p, floor);
+        streetConn(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP, p, floor);
+        streetConn(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP, p, floor);
+        streetConn(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP, p, floor);
         m.put(new BlockPos(3, 1, 3), Blocks.LANTERN.defaultBlockState());
-        anchor(m, bes, new BlockPos(3, 0, 3), "minecraft:cobblestone"); // last, so the floor loop can't clobber it
+        anchor(m, bes, new BlockPos(3, 0, 3), floor); // last, so the floor loop can't clobber it
         return new Built(m, bes);
     }
 
     /** A 3×3 marker street deck with through-connectors on {@code streetSides} and lot connectors on {@code lotSides}. */
-    private static Built streetSegment(FrontAndTop[] streetSides, FrontAndTop[] lotSides) {
+    private static Built streetSegment(Palette p, FrontAndTop[] streetSides, FrontAndTop[] lotSides) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
@@ -85,42 +99,42 @@ public final class TradePostTemplates {
             }
         }
         for (final FrontAndTop s : streetSides) {
-            streetConn(m, bes, edge(s), s, "minecraft:air");
+            streetConn(m, bes, edge(s), s, p, "minecraft:air");
         }
         for (final FrontAndTop s : lotSides) {
-            conn(m, bes, edge(s), s, "skyseed:lot", "skyseed:lot_door", LOTS, "minecraft:air");
+            conn(m, bes, edge(s), s, "skyseed:lot", "skyseed:lot_door", p.pool() + "/lots", "minecraft:air");
         }
         return new Built(m, bes);
     }
 
-    /** A 5×5 oak shop: a bed and a job-site block inside, a door + lot connector on the −Z wall facing the street. */
-    private static Built shop(BlockState jobSite) {
+    /** A 5×5 shop: a bed and a job-site block inside, a door + lot connector on the −Z wall facing the street. */
+    private static Built shop(Palette p, BlockState jobSite) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final BlockState floor = Blocks.OAK_PLANKS.defaultBlockState();
-        final BlockState post = Blocks.OAK_LOG.defaultBlockState();
-        final BlockState glass = Blocks.GLASS.defaultBlockState();
+        final BlockState wall = p.wall().defaultBlockState();
+        final BlockState post = p.post().defaultBlockState();
+        final BlockState glass = p.glass().defaultBlockState();
         final int n = 5, max = 4, mid = 2;
         for (int x = 0; x < n; x++) {
             for (int z = 0; z < n; z++) {
-                m.put(new BlockPos(x, 0, z), floor);
+                m.put(new BlockPos(x, 0, z), wall);
                 final boolean perim = x == 0 || x == max || z == 0 || z == max;
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
                 if (perim) {
                     for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? post : floor);
+                        m.put(new BlockPos(x, h, z), corner ? post : wall);
                     }
                 }
-                m.put(new BlockPos(x, 4, z), floor);
+                m.put(new BlockPos(x, 4, z), wall);
             }
         }
         // Door + lot connector on the −Z wall (faces the street once the jigsaw rotates the piece into place).
-        m.put(new BlockPos(mid, 1, 0), Blocks.OAK_DOOR.defaultBlockState()
+        m.put(new BlockPos(mid, 1, 0), p.door().defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER).setValue(DoorBlock.FACING, Direction.NORTH));
-        m.put(new BlockPos(mid, 2, 0), Blocks.OAK_DOOR.defaultBlockState()
+        m.put(new BlockPos(mid, 2, 0), p.door().defaultBlockState()
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
-                "minecraft:empty", "minecraft:oak_planks");
+                "minecraft:empty", id(p.wall()));
         m.put(new BlockPos(0, 2, mid), glass);
         m.put(new BlockPos(max, 2, mid), glass);
         m.put(new BlockPos(mid, 2, max), glass);
@@ -130,23 +144,23 @@ public final class TradePostTemplates {
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
         m.put(new BlockPos(3, 1, 3), jobSite);
         m.put(new BlockPos(3, 1, 1), Blocks.TORCH.defaultBlockState());
-        StructureParts.gableRoof(m, 0, max, 0, max, 4, floor, Blocks.OAK_STAIRS, Blocks.OAK_SLAB, 0);
+        StructureParts.gableRoof(m, 0, max, 0, max, 4, wall, p.stairs(), p.slab(), 0);
         return new Built(m, bes);
     }
 
     /** A 5×5 fenced wheat field — tilled, watered and grown — with a gate onto the street. No villager (scenery). */
-    private static Built wheatField() {
+    private static Built wheatField(Palette p) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final BlockState dirt = Blocks.DIRT.defaultBlockState();
+        final BlockState border = p.fieldBorder().defaultBlockState();
         final BlockState farmland = Blocks.FARMLAND.defaultBlockState().setValue(BlockStateProperties.MOISTURE, 7);
         final BlockState wheat = Blocks.WHEAT.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7);
-        final BlockState fence = Blocks.OAK_FENCE.defaultBlockState();
+        final BlockState fence = p.fence().defaultBlockState();
         final int max = 4, mid = 2;
         for (int x = 0; x <= max; x++) {
             for (int z = 0; z <= max; z++) {
                 final boolean perim = x == 0 || x == max || z == 0 || z == max;
-                m.put(new BlockPos(x, 0, z), perim ? dirt : farmland);
+                m.put(new BlockPos(x, 0, z), perim ? border : farmland);
             }
         }
         m.put(new BlockPos(mid, 0, mid), Blocks.WATER.defaultBlockState()); // hydrates the field, contained by farmland
@@ -167,13 +181,13 @@ public final class TradePostTemplates {
             }
         }
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
-                "minecraft:empty", "minecraft:dirt");
+                "minecraft:empty", id(p.fieldBorder()));
         StructureParts.linkFences(m);
         return new Built(m, bes);
     }
 
     /** A 5×5 flower garden with a central lamp post. No villager (scenery). */
-    private static Built garden() {
+    private static Built garden(Palette p) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final int max = 4, mid = 2;
@@ -186,7 +200,7 @@ public final class TradePostTemplates {
         m.put(new BlockPos(3, 1, 1), Blocks.DANDELION.defaultBlockState());
         m.put(new BlockPos(1, 1, 3), Blocks.AZURE_BLUET.defaultBlockState());
         m.put(new BlockPos(3, 1, 3), Blocks.OXEYE_DAISY.defaultBlockState());
-        m.put(new BlockPos(mid, 1, mid), Blocks.OAK_FENCE.defaultBlockState()); // lamp post
+        m.put(new BlockPos(mid, 1, mid), p.fence().defaultBlockState()); // lamp post
         m.put(new BlockPos(mid, 2, mid), Blocks.LANTERN.defaultBlockState());
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", "minecraft:grass_block");
@@ -204,16 +218,21 @@ public final class TradePostTemplates {
         };
     }
 
-    /** A self-linking street connector at {@code p} facing {@code dir}. */
-    private static void streetConn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p,
-                                   FrontAndTop dir, String finalState) {
-        conn(m, bes, p, dir, "skyseed:street", "skyseed:street", STREETS, finalState);
+    /** A self-linking street connector at {@code pos} facing {@code dir}, drawing from this palette's street pool. */
+    private static void streetConn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos pos,
+                                   FrontAndTop dir, Palette p, String finalState) {
+        conn(m, bes, pos, dir, "skyseed:street", "skyseed:street", p.pool() + "/streets", finalState);
     }
 
-    /** A jigsaw connector block-entity at {@code p}. */
-    private static void conn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p,
+    /** A jigsaw connector block-entity at {@code pos}. */
+    private static void conn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos pos,
                              FrontAndTop dir, String name, String target, String pool, String finalState) {
-        m.put(p, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
-        bes.put(p, jig(name, target, pool, finalState));
+        m.put(pos, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
+        bes.put(pos, jig(name, target, pool, finalState));
+    }
+
+    /** The registry id of a block, for a jigsaw connector's final (replacement) state. */
+    private static String id(Block b) {
+        return BuiltInRegistries.BLOCK.getKey(b).toString();
     }
 }
