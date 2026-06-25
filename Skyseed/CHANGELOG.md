@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.72.1] - 2026-06-25
+
+### Fixed
+- **Over-void roads no longer grow a sizable dirt floor.** The foundation pass ran *after* the lanes were bridged and
+  treated the bridge's plank edge-beams as floor to support, stilting dirt under lanes that are meant to float. It now
+  runs *before* the bridges are laid (a lane is still a marker over an empty deck, so it's skipped) and is
+  material-agnostic — so only buildings/fields/gardens over the void get a foundation (in any biome's materials), and
+  the lanes stay floating bridges.
+
 ## [0.72.0] - 2026-06-25
 
 ### Added

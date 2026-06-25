@@ -5,7 +5,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -92,11 +91,12 @@ public final class PathSurfacer {
     }
 
     /**
-     * Drop a short dirt foundation under any building or pier floor left hanging over the void, so a lot or a bridge
+     * Drop a short dirt foundation under any building / field / garden floor left hanging over the void, so a lot
      * that ran off the island edge reads as anchored rather than floating in mid-air. Scans the structure's deck
-     * level (one below {@code origin}) for solid floor blocks (planks / grass / dirt / farmland — building floors and
-     * bridge edge beams; the thin slab deck is carried by those beams) sitting over an open drop, and stilts each
-     * one down a few blocks. Called after {@link #resolve} so the bridges it just laid get supported too.
+     * level (one below {@code origin}) for any solid (non-air) block sitting over an open drop and stilts it down a
+     * few blocks. Run this BEFORE {@link #resolve}: a connective lane is still just a marker with an empty (air)
+     * deck at that point, so the lanes are skipped and stay floating bridges — only the solid lot floors get a
+     * foundation. Material-agnostic, so it supports every biome's wood/stone/farmland floors, not just oak.
      */
     public static void supportFloatingFloors(ServerLevel level, BlockPos origin, int reach) {
         final int deckY = origin.getY() - 1; // the structure floor sits one below the jigsaw origin
@@ -104,7 +104,7 @@ public final class PathSurfacer {
         for (int dx = -reach; dx <= reach; dx++) {
             for (int dz = -reach; dz <= reach; dz++) {
                 p.set(origin.getX() + dx, deckY, origin.getZ() + dz);
-                if (!level.isLoaded(p) || !isFloorBlock(level.getBlockState(p))
+                if (!level.isLoaded(p) || level.getBlockState(p).isAir()
                         || !level.getBlockState(p.below()).isAir()) {
                     continue;
                 }
@@ -113,11 +113,5 @@ public final class PathSurfacer {
                 }
             }
         }
-    }
-
-    /** Blocks that read as a building/pier floor — what a foundation should hang under when it's over the void. */
-    private static boolean isFloorBlock(BlockState s) {
-        return s.is(Blocks.OAK_PLANKS) || s.is(Blocks.GRASS_BLOCK) || s.is(Blocks.DIRT)
-                || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.FARMLAND);
     }
 }

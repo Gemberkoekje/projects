@@ -254,11 +254,12 @@ public final class GenerationJob {
                     js.capPrefix(), js.capCount(), fillerPool);
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).
             Traps.applyAfterJigsaw(level, js.origin());
-            // Resolve a connective structure's path markers into terrain-aware paths / over-void bridges (§3a),
-            // then drop foundations under any building or pier floor that ended up hanging over the void.
+            // Foundation any solid lot floor left over the void FIRST (while the connective lanes are still markers
+            // with empty decks, so they're skipped), THEN resolve the lane markers into terrain-aware paths and
+            // over-void bridges — the lanes stay floating bridges, only buildings/fields/gardens get a foundation (§3a).
             if (js.reach() > 0) {
-                PathSurfacer.resolve(level, js.origin(), js.reach());
                 PathSurfacer.supportFloatingFloors(level, js.origin(), js.reach());
+                PathSurfacer.resolve(level, js.origin(), js.reach());
             }
             // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.
             linkConnections(level, js.origin(), Math.max(LINK_RADIUS, js.reach()));
