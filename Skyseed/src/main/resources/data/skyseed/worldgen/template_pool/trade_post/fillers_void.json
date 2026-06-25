@@ -1,0 +1,8 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/pier", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/garden", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/terminator", "processors": "minecraft:empty", "projection": "rigid" } }
+  ]
+}

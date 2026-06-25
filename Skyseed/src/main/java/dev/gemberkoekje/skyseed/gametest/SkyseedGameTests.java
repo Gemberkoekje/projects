@@ -913,6 +913,58 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void tradePostOverVoidUsesPiers(GameTestHelper helper) {
+        // A surplus lot that lands over the void gets a plank pier (its signature: a mooring chain) from the _void
+        // filler pool, instead of a floating farm; the same lot on solid ground gets the normal fields (no chain).
+        // Sample several seeds (a small village may place no surplus at all) — over the void at least one should pier,
+        // and on the island none ever should.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int voidChains = 0;
+        int islandChains = 0;
+        for (int iter = 0; iter < 8; iter++) {
+            // (1) over the void — clear the whole region to air (incl. y0, so nothing solid sits below a lot)
+            fillRegion(helper, true);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            voidChains += countChains(helper);
+            // (2) on solid ground — surplus lots should be fields, never piers
+            fillRegion(helper, false);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            islandChains += countChains(helper);
+        }
+        helper.assertTrue(voidChains > 0, "over the void, surplus lots should be piers (chain count=" + voidChains + ")");
+        helper.assertTrue(islandChains == 0, "on the island, surplus lots should be fields, not piers (chain=" + islandChains + ")");
+        helper.succeed();
+    }
+
+    /** Reset the big region: {@code void} clears every block to air; otherwise a solid dirt floor (y≤2) under air. */
+    private static void fillRegion(GameTestHelper helper, boolean toVoid) {
+        for (int x = 0; x <= 47; x++) {
+            for (int z = 0; z <= 47; z++) {
+                for (int y = 0; y <= 14; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), toVoid ? Blocks.AIR : (y <= 2 ? Blocks.DIRT : Blocks.AIR));
+                }
+            }
+        }
+    }
+
+    private static int countChains(GameTestHelper helper) {
+        int chains = 0;
+        for (int x = 0; x <= 47; x++) {
+            for (int z = 0; z <= 47; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.CHAIN)) {
+                        chains++;
+                    }
+                }
+            }
+        }
+        return chains;
+    }
+
     @GameTest(template = REGION)
     public static void tradePostIsAStreetVillage(GameTestHelper helper) {
         // SKYJIGSAWPLAN Phase 1: the Trade Post is now a street village — a square radiating a depth-4 street

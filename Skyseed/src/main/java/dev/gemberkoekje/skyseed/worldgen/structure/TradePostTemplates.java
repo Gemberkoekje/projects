@@ -88,6 +88,8 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
         // A tiny lamp-post plot, the lots' fallback: a lot too tight for a shop/field gets this instead of a bare gap.
         writeIfAbsent(dir.resolve("terminator.nbt"), terminator(p));
+        // A plank pier for lots that land over the void — used by the _void filler pool instead of a floating farm.
+        writeIfAbsent(dir.resolve("pier.nbt"), pier(p));
         // A tiny hamlet green that reuses this set's shops — the Hamlet theme starts from it (see hamlet/start pool).
         writeIfAbsent(dir.resolve("hamlet_hub.nbt"), hamletHub(p));
     }
@@ -512,6 +514,37 @@ public final class TradePostTemplates {
         m.put(new BlockPos(1, 2, 1), Blocks.LANTERN.defaultBlockState());
         conn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", "minecraft:grass_block");
+        return new Built(m, bes);
+    }
+
+    /**
+     * An "over the void" lot decoration — a 5×5 plank pier (matching the wooden bridges, not a floating grass farm)
+     * with a fence railing open at the entrance, a lamp post and a couple of barrels: a small supply dock. The
+     * generator swaps the normal field/garden fillers for these on lots that sit over the void (see the {@code _void}
+     * filler pool).
+     */
+    private static Built pier(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState plank = p.wall().defaultBlockState();
+        final BlockState fence = p.fence().defaultBlockState();
+        final int max = 4, mid = 2;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), plank); // a plank deck, like the bridges that reach it
+                final boolean edge = x == 0 || x == max || z == 0 || z == max;
+                if (edge && !(x == mid && z == 0)) { // a fence railing, open at the front-centre entrance
+                    m.put(new BlockPos(x, 1, z), fence);
+                }
+            }
+        }
+        m.put(new BlockPos(1, 1, 2), fence); // a lamp post
+        m.put(new BlockPos(1, 2, 2), Blocks.LANTERN.defaultBlockState());
+        m.put(new BlockPos(3, 1, 1), Blocks.BARREL.defaultBlockState()); // a little dockside storage
+        m.put(new BlockPos(3, 1, 3), Blocks.BARREL.defaultBlockState());
+        m.put(new BlockPos(3, 1, 2), Blocks.CHAIN.defaultBlockState()); // a mooring chain (the pier's signature)
+        conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", id(p.wall()));
         return new Built(m, bes);
     }
 

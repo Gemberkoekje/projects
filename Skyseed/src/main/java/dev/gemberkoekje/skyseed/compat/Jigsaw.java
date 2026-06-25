@@ -85,7 +85,17 @@ public final class Jigsaw {
         }
         final List<StructurePiece> pieces = new ArrayList<>(stub.get().getPiecesBuilder().build().pieces());
         if (capCount > 0 && !capPrefix.isEmpty()) {
-            normaliseCappedPieces(pieces, origin, capPrefix, capCount, fillerPool, templates, random);
+            // A parallel "over the void" filler pool, by naming convention <filler>_void: lots that land over the void
+            // draw from it (plank piers) instead of the on-island fields/gardens. The terrain is already in the world
+            // at this point, so we can tell island from void below each lot. Falls back to the normal pool if absent.
+            Holder<StructureTemplatePool> voidFillerPool = fillerPool;
+            if (fillerPool != null && fillerPool.unwrapKey().isPresent()) {
+                final ResourceLocation voidId = fillerPool.unwrapKey().get().location().withSuffix("_void");
+                if (Lookup.hasTemplatePool(level.registryAccess(), voidId)) {
+                    voidFillerPool = Lookup.templatePool(level.registryAccess(), voidId);
+                }
+            }
+            normaliseCappedPieces(pieces, origin, capPrefix, capCount, fillerPool, voidFillerPool, templates, random, level);
         }
         for (final StructurePiece piece : pieces) {
             if (piece instanceof PoolElementStructurePiece poolPiece) {
@@ -101,7 +111,8 @@ public final class Jigsaw {
      */
     private static void normaliseCappedPieces(List<StructurePiece> pieces, BlockPos origin, String capPrefix, int cap,
                                               Holder<StructureTemplatePool> fillerPool,
-                                              StructureTemplateManager templates, RandomSource random) {
+                                              Holder<StructureTemplatePool> voidFillerPool,
+                                              StructureTemplateManager templates, RandomSource random, ServerLevel level) {
         final List<PoolElementStructurePiece> capped = new ArrayList<>();
         for (final StructurePiece piece : pieces) {
             if (piece instanceof PoolElementStructurePiece poolPiece
@@ -125,11 +136,26 @@ public final class Jigsaw {
                 pieces.remove(index);
                 continue;
             }
-            final StructurePoolElement filler = fillerPool.value().getRandomTemplate(random);
+            // A lot over the void gets the over-void filler set (piers); one on the island gets the normal fields.
+            final Holder<StructureTemplatePool> pool = overVoid(level, keep.getBoundingBox()) ? voidFillerPool : fillerPool;
+            final StructurePoolElement filler = pool.value().getRandomTemplate(random);
             final BlockPos pos = keep.getPosition();
             final Rotation rotation = keep.getRotation();
             pieces.set(index, new PoolElementStructurePiece(templates, filler, pos, filler.getGroundLevelDelta(),
                     rotation, filler.getBoundingBox(templates, pos, rotation), JigsawStructure.DEFAULT_LIQUID_SETTINGS));
         }
+    }
+
+    /** True if nothing solid sits within a few blocks below the centre of {@code box} — i.e. the lot is over the void
+     *  (the island terrain is already placed when this runs, and a lot's own foundation isn't dropped until later). */
+    private static boolean overVoid(ServerLevel level, BoundingBox box) {
+        final int cx = (box.minX() + box.maxX()) / 2;
+        final int cz = (box.minZ() + box.maxZ()) / 2;
+        for (int d = 1; d <= 2; d++) { // the island's fill sits right under a lot; a couple of blocks is enough to tell
+            if (!level.getBlockState(new BlockPos(cx, box.minY() - d, cz)).isAir()) {
+                return false; // island ground below
+            }
+        }
+        return true;
     }
 }

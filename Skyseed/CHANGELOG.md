@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.84.0] - 2026-06-25
+
+### Added
+- **Over-the-void lots get piers, not floating farms.** A trade-post lot that sprawls out over the void used to get a
+  grass platform with a wheat field or garden — odd, floating in the sky. The generator now checks whether a filler
+  lot sits over the void (the terrain is already down when fillers are chosen) and swaps to a `_void` filler pool: a
+  wooden plank pier matching the bridges — fence railing, a lamp, barrels and a mooring chain. On-island lots keep
+  their fields. The void pool is found by naming convention (`<filler>_void`), so any theme can opt in.
+
 ## [0.83.0] - 2026-06-25
 
 ### Changed
