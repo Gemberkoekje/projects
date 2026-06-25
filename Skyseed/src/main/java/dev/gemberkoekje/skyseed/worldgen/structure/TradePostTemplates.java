@@ -66,6 +66,9 @@ public final class TradePostTemplates {
                 new FrontAndTop[]{FrontAndTop.NORTH_UP}));
         // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
         // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
+        // A longer "large" section whose single lot is isolated enough for a bigger building (the L-shaped forge);
+        // it draws from the large_lots pool (big buildings + small ones for variety).
+        writeIfAbsent(dir.resolve("street_large.nbt"), largeStreet(p));
         // Each profession gets a distinct building: roof shape + a profession feature, the blacksmith set well apart.
         writeIfAbsent(dir.resolve("shop_farmer.nbt"),
                 shop(p, new ShopDesign(Blocks.COMPOSTER.defaultBlockState(), Roof.GABLE, Feature.NONE)));
@@ -75,7 +78,9 @@ public final class TradePostTemplates {
                 shop(p, new ShopDesign(Blocks.BARREL.defaultBlockState(), Roof.GABLE, Feature.NONE)));
         writeIfAbsent(dir.resolve("shop_fletcher.nbt"),
                 shop(p, new ShopDesign(Blocks.FLETCHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.HAY)));
-        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), blacksmith(p));
+        // The blacksmith is named "forge" (not "shop_") so the shop cap leaves it alone — it's a feature building
+        // that a large section hosts, not one of the capped 2–4 small shops.
+        writeIfAbsent(dir.resolve("forge.nbt"), blacksmith(p));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
         // A tiny hamlet green that reuses this set's shops — the Hamlet theme starts from it (see hamlet/start pool).
@@ -143,6 +148,28 @@ public final class TradePostTemplates {
         for (final FrontAndTop s : lotSides) {
             conn(m, bes, edge(s), s, "skyseed:lot", "skyseed:lot_door", p.pool() + "/lots", "minecraft:air");
         }
+        return new Built(m, bes);
+    }
+
+    /**
+     * A 3×7 "large" street section: the lane runs through its two ends, and a single lot connector sits at the
+     * isolated middle of its long side, drawing from the {@code large_lots} pool. Because the section is 7 long, its
+     * lot is well clear of the neighbouring sections' lots, so a bigger building (the L-shaped forge) has room to
+     * spread along the lane without overlapping anything.
+     */
+    private static Built largeStreet(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
+        for (int x = 0; x <= 2; x++) {
+            for (int z = 0; z <= 6; z++) {
+                m.put(new BlockPos(x, 1, z), wool); // a 3×7 path-marker deck
+            }
+        }
+        streetConn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, p, "minecraft:air"); // lane continues
+        streetConn(m, bes, new BlockPos(1, 0, 6), FrontAndTop.SOUTH_UP, p, "minecraft:air");
+        conn(m, bes, new BlockPos(2, 0, 3), FrontAndTop.EAST_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/large_lots", "minecraft:air"); // one large lot at the isolated middle
         return new Built(m, bes);
     }
 

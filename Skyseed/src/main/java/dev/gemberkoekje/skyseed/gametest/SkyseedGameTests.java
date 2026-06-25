@@ -857,16 +857,16 @@ public final class SkyseedGameTests {
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int anvils = 0;
         for (int iter = 0; iter < 5; iter++) {
-            for (int x = 4; x <= 44; x++) {
-                for (int z = 4; z <= 44; z++) {
+            for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing the forge out
+                for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
                         helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
                     }
                 }
             }
             Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers);
-            for (int x = 4; x <= 44; x++) {
-                for (int z = 4; z <= 44; z++) {
+            for (int x = 0; x <= 47; x++) {
+                for (int z = 0; z <= 47; z++) {
                     for (int y = 1; y <= 14; y++) {
                         if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.ANVIL)) {
                             anvils++;
@@ -1044,7 +1044,7 @@ public final class SkyseedGameTests {
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
-        int beds = 0;
+        int shops = 0;
         int wheat = 0;
         for (int cap = 2; cap <= 4; cap++) {
             for (int x = 4; x <= 44; x++) {
@@ -1055,28 +1055,29 @@ public final class SkyseedGameTests {
                 }
             }
             Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", cap, fillers);
-            int villageBeds = 0;
+            int villageShops = 0;
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
                         final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
-                        if (s.is(Blocks.RED_BED)) {
-                            villageBeds++;
+                        // one job-site per capped small shop; the forge's smithing table is a separate, exempt feature
+                        if (s.is(Blocks.COMPOSTER) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)
+                                || s.is(Blocks.FLETCHING_TABLE)) {
+                            villageShops++;
                         } else if (s.is(Blocks.WHEAT)) {
                             wheat++;
                         }
                     }
                 }
             }
-            // On open ground far more lots place than the cap, so every village lands EXACTLY the target: a shop is
-            // one bed = two RED_BED blocks, so cap c => 2c. (In-world a tiny island may place fewer lots than the
-            // target, which is acceptable — but here the flat platform always has plenty.)
-            helper.assertTrue(villageBeds == 2 * cap,
-                    "village did not land exactly " + cap + " shops (red_bed=" + villageBeds + ", expected " + (2 * cap) + ")");
-            beds += villageBeds;
+            // The cap keeps EXACTLY `cap` small shops nearest the centre and re-stamps the surplus as fillers; on the
+            // flat platform there are always plenty. (The forge, a large-section feature, is exempt and not counted.)
+            helper.assertTrue(villageShops == cap,
+                    "village did not land exactly " + cap + " small shops (shops=" + villageShops + ")");
+            shops += villageShops;
         }
-        helper.assertTrue(beds > 0, "villages placed no shops (beds=" + beds + " wheat=" + wheat + ")");
-        helper.assertTrue(wheat > 0, "villages placed no wheat fields (beds=" + beds + " wheat=" + wheat + ")");
+        helper.assertTrue(shops > 0, "villages placed no shops (shops=" + shops + " wheat=" + wheat + ")");
+        helper.assertTrue(wheat > 0, "villages placed no wheat fields (shops=" + shops + " wheat=" + wheat + ")");
         helper.succeed();
     }
 

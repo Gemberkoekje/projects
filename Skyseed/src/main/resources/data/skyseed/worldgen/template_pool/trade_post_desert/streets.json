@@ -3,6 +3,7 @@
   "elements": [
     { "weight": 9, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/street_straight", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/street_corner", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/street_large", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:empty_pool_element" } }
   ]
 }

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.76.0] - 2026-06-25
+
+### Added
+- **Variable street sections — large lots for bigger buildings.** Streets now mix the usual small sections (5×5 lots)
+  with a longer "large" section whose single, isolated lot has room for a bigger building. It draws from a new
+  `large_lots` pool weighted toward the blacksmith forge but keeping the small shops too, so a large lot may hold the
+  forge *or* a small building (the variety you suggested). The blacksmith is renamed `forge` — exempt from the 2–4
+  `shop_` cap, so it's a feature building a large section hosts, on top of the capped small shops (rather than being
+  the one the cap trims). This is the foundation for more big buildings: just add them to `large_lots`. All biomes.
+
 ## [0.75.0] - 2026-06-25
 
 ### Added
