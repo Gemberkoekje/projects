@@ -24,6 +24,7 @@
       "jigsaw": { "pool": "skyseed:trade_post_savanna/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_savanna/fillers" },
       "variants": [
         { "weight": 1, "name": "dry", "decoration": {
+          "trees": [ { "feature": "minecraft:acacia", "tries": 4, "spacing": 3 } ],
           "ground": [
             { "block": "minecraft:short_grass", "chance": 0.22 }
           ] } }
@@ -32,12 +33,13 @@
       "biomes": ["minecraft:snowy_plains", "minecraft:snowy_taiga", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:grove", "minecraft:frozen_peaks", "minecraft:jagged_peaks"],
       "surface": "minecraft:grass_block", "snow": 1.0,
       "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
-      "variants": [] },
+      "variants": [ { "weight": 1, "name": "snowy", "decoration": { "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ] } } ] },
     { "_comment": "Taiga: the same spruce set on grass, with ferns.",
       "biomes": ["minecraft:taiga", "minecraft:old_growth_pine_taiga", "minecraft:old_growth_spruce_taiga"],
       "jigsaw": { "pool": "skyseed:trade_post_spruce/start", "target": "minecraft:bottom", "depth": 4, "pad": 5, "reach": 48, "cap_prefix": "shop_", "cap_min": 2, "cap_count": 4, "cap_filler": "skyseed:trade_post_spruce/fillers" },
       "variants": [
         { "weight": 1, "name": "pine", "decoration": {
+          "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 3 } ],
           "ground": [
             { "block": "minecraft:fern", "chance": 0.18 },
             { "block": "minecraft:sweet_berry_bush", "chance": 0.04 }
@@ -46,6 +48,7 @@
   ],
   "variants": [
     { "weight": 1, "name": "green", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 4, "spacing": 3 } ],
       "ground": [
         { "block": "minecraft:short_grass", "chance": 0.20 },
         { "block": "minecraft:dandelion", "chance": 0.03 },

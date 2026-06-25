@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.87.0] - 2026-06-25
+
+### Added
+- **Trade-post variety: potato & carrot fields, and trees on the island.** The filler fields now come in three crops
+  (wheat / potato / carrot) instead of only wheat. And the trade-post island grows a few biome-relevant trees around
+  the village — oak (plains), acacia (savanna), spruce (snowy/taiga) — for a less bare, more lived-in island.
+
+## [0.86.0] - 2026-06-25
+
+### Fixed
+- **The starting island's tree now sheds leaves like any other.** Its curated oak was hand-built with *persistent*
+  leaves (so they'd never decay), which meant fast-leaf-decay mods skipped it. It's now placed with the vanilla
+  `minecraft:oak` tree feature — natural, distance-tracked leaves that decay normally. The hand-built version remains
+  only as a defensive fallback, so the island can still never roll without wood.
+
 ## [0.85.0] - 2026-06-25
 
 ### Changed

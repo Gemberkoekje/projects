@@ -84,7 +84,13 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("forge.nbt"), blacksmith(p));
         // A second large-section landmark alongside the forge: a tall open meeting hall with a bell.
         writeIfAbsent(dir.resolve("great_hall.nbt"), greatHall(p));
-        writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
+        // Three crop fields for variety (wheat / potato / carrot), all the same fenced, water-hydrated 5×5 plot.
+        writeIfAbsent(dir.resolve("wheat_field.nbt"),
+                field(p, Blocks.WHEAT.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7)));
+        writeIfAbsent(dir.resolve("potato_field.nbt"),
+                field(p, Blocks.POTATOES.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7)));
+        writeIfAbsent(dir.resolve("carrot_field.nbt"),
+                field(p, Blocks.CARROTS.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7)));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
         // A tiny lamp-post plot, the lots' fallback: a lot too tight for a shop/field gets this instead of a bare gap.
         writeIfAbsent(dir.resolve("terminator.nbt"), terminator(p));
@@ -437,12 +443,11 @@ public final class TradePostTemplates {
     }
 
     /** A 5×5 fenced wheat field — tilled, watered and grown — with a gate onto the street. No villager (scenery). */
-    private static Built wheatField(Palette p) {
+    private static Built field(Palette p, BlockState crop) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState border = p.fieldBorder().defaultBlockState();
         final BlockState farmland = Blocks.FARMLAND.defaultBlockState().setValue(BlockStateProperties.MOISTURE, 7);
-        final BlockState wheat = Blocks.WHEAT.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7);
         final BlockState fence = p.fence().defaultBlockState();
         final int max = 4, mid = 2;
         for (int x = 0; x <= max; x++) {
@@ -457,7 +462,7 @@ public final class TradePostTemplates {
                 if (x == mid && z == mid) {
                     continue; // the water tile
                 }
-                m.put(new BlockPos(x, 1, z), wheat);
+                m.put(new BlockPos(x, 1, z), crop);
             }
         }
         for (int x = 0; x <= max; x++) {

@@ -1131,7 +1131,7 @@ public final class SkyseedGameTests {
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
         int shops = 0;
-        int wheat = 0;
+        int crops = 0;
         for (int cap = 2; cap <= 4; cap++) {
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
@@ -1150,8 +1150,8 @@ public final class SkyseedGameTests {
                         if (s.is(Blocks.COMPOSTER) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)
                                 || s.is(Blocks.FLETCHING_TABLE)) {
                             villageShops++;
-                        } else if (s.is(Blocks.WHEAT)) {
-                            wheat++;
+                        } else if (s.is(Blocks.WHEAT) || s.is(Blocks.POTATOES) || s.is(Blocks.CARROTS)) {
+                            crops++; // a wheat / potato / carrot field tile
                         }
                     }
                 }
@@ -1162,8 +1162,8 @@ public final class SkyseedGameTests {
                     "village did not land exactly " + cap + " small shops (shops=" + villageShops + ")");
             shops += villageShops;
         }
-        helper.assertTrue(shops > 0, "villages placed no shops (shops=" + shops + " wheat=" + wheat + ")");
-        helper.assertTrue(wheat > 0, "villages placed no wheat fields (shops=" + shops + " wheat=" + wheat + ")");
+        helper.assertTrue(shops > 0, "villages placed no shops (shops=" + shops + " crops=" + crops + ")");
+        helper.assertTrue(crops > 0, "villages placed no crop fields (shops=" + shops + " crops=" + crops + ")");
         helper.succeed();
     }
 
