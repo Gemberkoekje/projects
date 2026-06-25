@@ -58,12 +58,12 @@ public final class TradePostTemplates {
 
     public static void generateInto(Path dir, Palette p) throws IOException {
         writeIfAbsent(dir.resolve("square.nbt"), square(p));
-        writeIfAbsent(dir.resolve("street_straight.nbt"), streetSegment(p,
-                new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.EAST_UP},
-                new FrontAndTop[]{FrontAndTop.NORTH_UP, FrontAndTop.SOUTH_UP}));
+        // A 7-long straight spaces lots ~7 apart so the wider 7×7 shops fit side by side; corners are pure turns
+        // (no lot — a 7×7 shop on a tight 3×3 corner would just overlap its neighbours and be rejected).
+        writeIfAbsent(dir.resolve("street_straight.nbt"), straightStreet(p));
         writeIfAbsent(dir.resolve("street_corner.nbt"), streetSegment(p,
                 new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP},
-                new FrontAndTop[]{FrontAndTop.NORTH_UP}));
+                new FrontAndTop[]{}));
         // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
         // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
         // A longer "large" section whose single lot is isolated enough for a bigger building (the L-shaped forge);
@@ -175,7 +175,31 @@ public final class TradePostTemplates {
         return new Built(m, bes);
     }
 
-    /** A profession building's look on the shared 5×5 shell: a roof shape + a feature, so each shop reads differently. */
+    /**
+     * A 7-long straight street (was a 3×3 segment): the lane runs through its two ends, and a lot connector sits on
+     * each long side at the centre. Because the section is 7 long, neighbouring sections' lots are ~7 apart — clear
+     * enough for the wider 7×7 shops to sit side by side along the lane without overlapping (vanilla streets space
+     * houses out the same way). Draws from the regular {@code lots} pool.
+     */
+    private static Built straightStreet(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
+        for (int x = 0; x <= 6; x++) {
+            for (int z = 0; z <= 2; z++) {
+                m.put(new BlockPos(x, 1, z), wool); // a 7×3 path-marker deck
+            }
+        }
+        streetConn(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP, p, "minecraft:air");
+        streetConn(m, bes, new BlockPos(6, 0, 1), FrontAndTop.EAST_UP, p, "minecraft:air");
+        conn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/lots", "minecraft:air");
+        conn(m, bes, new BlockPos(3, 0, 2), FrontAndTop.SOUTH_UP, "skyseed:lot", "skyseed:lot_door",
+                p.pool() + "/lots", "minecraft:air");
+        return new Built(m, bes);
+    }
+
+    /** A profession building's look on the shared 7×7 shell: a roof shape + a feature, so each shop reads differently. */
     private enum Roof { GABLE, FLAT, STEPPED }
     private enum Feature { NONE, FORGE, BOOKS, HAY }
     private record ShopDesign(BlockState jobSite, Roof roof, Feature feature) {}
@@ -192,7 +216,9 @@ public final class TradePostTemplates {
         final BlockState post = p.post().defaultBlockState();
         final BlockState stone = p.foundation().defaultBlockState();
         final BlockState glass = p.glass().defaultBlockState();
-        final int n = 5, max = 4, mid = 2;
+        // 7×7 shell (was 5×5): vanilla's smallest village house is ~7×7, and the wider streets now space lots far
+        // enough apart for it. max = the far wall index, mid = the centred door/window column.
+        final int n = 7, max = 6, mid = 3;
         final boolean forge = d.feature() == Feature.FORGE;
         for (int x = 0; x < n; x++) {
             for (int z = 0; z < n; z++) {
@@ -215,23 +241,22 @@ public final class TradePostTemplates {
                 .setValue(DoorBlock.HALF, DoubleBlockHalf.UPPER).setValue(DoorBlock.FACING, Direction.NORTH));
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", id(p.wall()));
-        m.put(new BlockPos(0, 2, mid), glass);
+        m.put(new BlockPos(0, 2, mid), glass);       // a window centred on each of the three non-door walls
         m.put(new BlockPos(max, 2, mid), glass);
         m.put(new BlockPos(mid, 2, max), glass);
-        m.put(new BlockPos(1, 1, 2), Blocks.RED_BED.defaultBlockState()
+        m.put(new BlockPos(1, 1, max - 2), Blocks.RED_BED.defaultBlockState()  // bed in the back-left corner
                 .setValue(BedBlock.PART, BedPart.FOOT).setValue(BedBlock.FACING, Direction.SOUTH));
-        m.put(new BlockPos(1, 1, 3), Blocks.RED_BED.defaultBlockState()
+        m.put(new BlockPos(1, 1, max - 1), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
-        m.put(new BlockPos(3, 1, 3), d.jobSite());
-        m.put(new BlockPos(3, 1, 1), Blocks.TORCH.defaultBlockState());
-        roof(m, p, d.roof(), wall);
-        feature(m, d.feature(), stone);
+        m.put(new BlockPos(max - 1, 1, max - 1), d.jobSite()); // the job site in the back-right corner
+        m.put(new BlockPos(1, 1, 1), Blocks.TORCH.defaultBlockState());
+        roof(m, p, d.roof(), wall, max);
+        feature(m, d.feature(), stone, max);
         return new Built(m, bes);
     }
 
-    /** Build the per-design roof on top of the y4 ceiling. */
-    private static void roof(Map<BlockPos, BlockState> m, Palette p, Roof roof, BlockState wall) {
-        final int max = 4;
+    /** Build the per-design roof on top of the y4 ceiling of a {@code max+1}-wide shell. */
+    private static void roof(Map<BlockPos, BlockState> m, Palette p, Roof roof, BlockState wall, int max) {
         switch (roof) {
             case GABLE -> StructureParts.gableRoof(m, 0, max, 0, max, 4, wall, p.stairs(), p.slab(), 0);
             case FLAT -> {
@@ -244,34 +269,35 @@ public final class TradePostTemplates {
                     }
                 }
             }
-            case STEPPED -> { // a stepped pyramid: the 5×5 ceiling, then a 3×3, then a 1×1 cap
-                for (int x = 1; x <= 3; x++) {
-                    for (int z = 1; z <= 3; z++) {
-                        m.put(new BlockPos(x, 5, z), wall);
+            case STEPPED -> { // a stepped ziggurat: filled layers shrinking by one ring each level up to the cap
+                for (int lo = 1, hi = max - 1, y = 5; lo <= hi; lo++, hi--, y++) {
+                    for (int x = lo; x <= hi; x++) {
+                        for (int z = lo; z <= hi; z++) {
+                            m.put(new BlockPos(x, y, z), wall);
+                        }
                     }
                 }
-                m.put(new BlockPos(2, 6, 2), wall);
             }
         }
     }
 
-    /** Add a per-profession feature inside / on the building. */
-    private static void feature(Map<BlockPos, BlockState> m, Feature feature, BlockState stone) {
+    /** Add a per-profession feature inside a {@code max+1}-wide shell, set against the back-right wall. */
+    private static void feature(Map<BlockPos, BlockState> m, Feature feature, BlockState stone, int max) {
         switch (feature) {
             case FORGE -> { // a furnace forge with a stone chimney up through the roof
                 m.put(new BlockPos(1, 1, 1), Blocks.FURNACE.defaultBlockState());
-                m.put(new BlockPos(1, 4, 1), stone);
-                m.put(new BlockPos(1, 5, 1), stone);
-                m.put(new BlockPos(1, 6, 1), stone);
+                for (int y = 4; y <= max; y++) {
+                    m.put(new BlockPos(1, y, 1), stone);
+                }
             }
             case BOOKS -> { // a small library against the side wall
-                m.put(new BlockPos(3, 1, 2), Blocks.BOOKSHELF.defaultBlockState());
-                m.put(new BlockPos(3, 2, 2), Blocks.BOOKSHELF.defaultBlockState());
-                m.put(new BlockPos(2, 2, 3), Blocks.BOOKSHELF.defaultBlockState());
+                m.put(new BlockPos(max - 1, 1, 2), Blocks.BOOKSHELF.defaultBlockState());
+                m.put(new BlockPos(max - 1, 2, 2), Blocks.BOOKSHELF.defaultBlockState());
+                m.put(new BlockPos(max - 1, 1, 3), Blocks.BOOKSHELF.defaultBlockState());
             }
             case HAY -> { // a hay store
-                m.put(new BlockPos(2, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
-                m.put(new BlockPos(3, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
+                m.put(new BlockPos(max - 1, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
+                m.put(new BlockPos(max - 1, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
             }
             case NONE -> { }
         }

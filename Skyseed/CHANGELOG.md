@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.79.0] - 2026-06-25
+
+### Changed
+- **Bigger shops on wider streets (lot spacing toward vanilla's).** The profession shops grew from 5×5 to 7×7 —
+  vanilla's smallest village house is ~7×7 — and the straight street sections are now 7 long, so lots sit ~7 apart,
+  far enough for the wider shops to line a lane without overlapping. Corners became pure turns (a 7×7 shop won't fit a
+  tight 3×3 corner, so it carries no lot). The roof and feature builders scale with the shell, so every profession and
+  biome gets the larger building. First half of "wider lots for bigger buildings"; big feature buildings follow.
+
 ## [0.78.0] - 2026-06-25
 
 ### Added
