@@ -43,6 +43,7 @@ public final class DevStructureGenerator {
             RuinedPortalTemplates.generateInto(base.resolve("ruined_portal"));
             NetherFortressTemplates.generateInto(base.resolve("nether_fortress"));
             BastionTemplates.generateInto(base.resolve("bastion"));
+            DebugStreetTemplates.generateInto(base.resolve("debug_streets")); // SKYJIGSAWPLAN Phase 0 spike
             PiglinTradingPostTemplates.generateInto(base.resolve("piglin_trading_post"));
             WitherArenaTemplates.generateInto(base.resolve("wither_arena"));
             DesertTempleTemplates.generateInto(base.resolve("desert_temple"));

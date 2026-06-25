@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.67.1] - 2026-06-25
+
+### Added (dev)
+- **Jigsaw diversity spike — SKYJIGSAWPLAN Phase 0.** A throwaway creative-only `debug_streets` seed that grows
+  a self-connecting cobblestone **street network**: a plaza start piece + a `straight` / `corner` / `cross` /
+  `end` pool with a weighted empty terminator, recursing at `depth: 6`. It exists to prove the jigsaw really
+  sprawls — branching, twisting, and (on a real island) running straight out **over the void** from rigid
+  pieces that need no ground support. Throw it to eyeball the effective sprawl reach (the
+  `maxDistanceFromCenter` cap). Plain decks for now; the terrain-aware path / self-railing-bridge surfacing
+  (SKYJIGSAWPLAN §3a) is Phase 1. To be deleted when the real village system lands.
+
 ## [0.67.0] - 2026-06-25
 
 ### Added

@@ -752,6 +752,27 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void debugStreetsSeedIsADeepJigsawSpike(GameTestHelper helper) {
+        // SKYJIGSAWPLAN Phase 0 spike: a throwaway creative seed whose jigsaw recurses (depth 6) through a
+        // self-connecting street pool, so the network branches, twists and — on a real island — runs out over the
+        // void. The over-void sprawl and its reach are an in-world smoke test (throw the seed); here we just guard
+        // the wiring — a deep jigsaw into the start pool, carried as a jigsaw site on the plan.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme streets = theme(overworld, "debug_streets");
+        helper.assertTrue(streets.jigsaw().isPresent(), "debug_streets must have a jigsaw config");
+        helper.assertTrue(streets.jigsaw().get().pool().getPath().equals("debug_streets/start"),
+                "debug_streets must start from its start pool");
+        helper.assertTrue(streets.jigsaw().get().depth() >= 5,
+                "debug_streets must recurse deep enough to sprawl (got depth " + streets.jigsaw().get().depth() + ")");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, streets, overworld.getBiome(c),
+                RandomSource.create(42L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("debug_streets/start")),
+                "the debug streets seed should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
         // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
         // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation
