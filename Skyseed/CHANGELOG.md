@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.68.2] - 2026-06-25
+
+### Fixed
+- Path tiles surface as a **uniform worn `dirt_path`** instead of a dirt/gravel mix. The old scatter formula
+  degenerated — `x*7 + z*5 mod 5` reduces to depend only on `x` — so gravel came up in regular stripes ("weird
+  lines"). Dropped the gravel; the on-island paths now read like a natural village trail.
+
 ## [0.68.1] - 2026-06-25
 
 ### Changed (dev)

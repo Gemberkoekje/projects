@@ -5,7 +5,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,7 +17,7 @@ import java.util.Set;
  * the void. Connective pieces bake no floor; they place a reserved {@link #MARKER} one block <em>above</em> each
  * path tile, and this pass reads what is under each marker and fills it in:
  * <ul>
- *   <li>solid ground under the deck → a {@code dirt_path} (with a little {@code gravel} for texture);</li>
+ *   <li>solid ground under the deck → a worn {@code dirt_path};</li>
  *   <li>void under the deck → a wooden-slab deck, and for every side that is itself an open drop (a neighbour
  *       that is not a path tile and is also over void) a full-block edge beam + a fence railing — a free,
  *       barebones bridge that rails its exposed sides and caps its dead-ends, scaling with path width.</li>
@@ -69,7 +68,7 @@ public final class PathSurfacer {
             if (level.getBlockState(deck.below()).isAir()) {
                 bridge(level, deck, deckTiles);
             } else {
-                level.setBlock(deck, pathSurface(deck), FLAGS);
+                level.setBlock(deck, Blocks.DIRT_PATH.defaultBlockState(), FLAGS); // a uniform worn path (no stripes)
             }
         }
         // Phase C — clear the markers (after every neighbour has been read).
@@ -90,9 +89,4 @@ public final class PathSurfacer {
         }
     }
 
-    /** A terrain deck tile: mostly a worn dirt path, with a little gravel mixed in for texture. */
-    private static BlockState pathSurface(BlockPos deck) {
-        final boolean gravel = Math.floorMod(deck.getX() * 7 + deck.getZ() * 5, 5) == 0;
-        return (gravel ? Blocks.GRAVEL : Blocks.DIRT_PATH).defaultBlockState();
-    }
 }

@@ -793,10 +793,9 @@ public final class SkyseedGameTests {
 
         PathSurfacer.resolve(level, base.offset(7, y, z), 6);
 
-        for (int x = 5; x <= 7; x++) { // ground tiles -> a path block
-            final BlockState s = level.getBlockState(base.offset(x, y, z));
-            helper.assertTrue(s.is(Blocks.DIRT_PATH) || s.is(Blocks.GRAVEL),
-                    "ground deck x=" + x + " should be a path block, was " + s);
+        for (int x = 5; x <= 7; x++) { // ground tiles -> a worn dirt path
+            helper.assertTrue(level.getBlockState(base.offset(x, y, z)).is(Blocks.DIRT_PATH),
+                    "ground deck x=" + x + " should be a dirt path");
         }
         helper.assertTrue(level.getBlockState(base.offset(8, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
         helper.assertTrue(level.getBlockState(base.offset(9, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
