@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.73.0] - 2026-06-25
+
+### Added
+- **Per-profession trade-post buildings** (first slice). The five shops were identical 5×5 cabins differing only by
+  their job-site block; now each has a distinct design — a roof shape (gable cottage / flat / stepped pyramid) plus a
+  profession feature. The blacksmith stands well apart: a stone-fronted forge with a furnace and a chimney up through
+  a flat roof. Farmer and fisherman keep gable cottages (composter / barrel), the librarian gets a stepped roof and
+  bookshelves, the fletcher a flat roof and a hay store. Applies across every biome style (built from each palette).
+
 ## [0.72.1] - 2026-06-25
 
 ### Fixed

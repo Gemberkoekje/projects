@@ -66,11 +66,17 @@ public final class TradePostTemplates {
                 new FrontAndTop[]{FrontAndTop.NORTH_UP}));
         // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
         // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
-        writeIfAbsent(dir.resolve("shop_farmer.nbt"), shop(p, Blocks.COMPOSTER.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_librarian.nbt"), shop(p, Blocks.LECTERN.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_fisherman.nbt"), shop(p, Blocks.BARREL.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_fletcher.nbt"), shop(p, Blocks.FLETCHING_TABLE.defaultBlockState()));
-        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"), shop(p, Blocks.SMITHING_TABLE.defaultBlockState()));
+        // Each profession gets a distinct building: roof shape + a profession feature, the blacksmith set well apart.
+        writeIfAbsent(dir.resolve("shop_farmer.nbt"),
+                shop(p, new ShopDesign(Blocks.COMPOSTER.defaultBlockState(), Roof.GABLE, Feature.NONE)));
+        writeIfAbsent(dir.resolve("shop_librarian.nbt"),
+                shop(p, new ShopDesign(Blocks.LECTERN.defaultBlockState(), Roof.STEPPED, Feature.BOOKS)));
+        writeIfAbsent(dir.resolve("shop_fisherman.nbt"),
+                shop(p, new ShopDesign(Blocks.BARREL.defaultBlockState(), Roof.GABLE, Feature.NONE)));
+        writeIfAbsent(dir.resolve("shop_fletcher.nbt"),
+                shop(p, new ShopDesign(Blocks.FLETCHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.HAY)));
+        writeIfAbsent(dir.resolve("shop_toolsmith.nbt"),
+                shop(p, new ShopDesign(Blocks.SMITHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.FORGE)));
         writeIfAbsent(dir.resolve("wheat_field.nbt"), wheatField(p));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
     }
@@ -114,14 +120,25 @@ public final class TradePostTemplates {
         return new Built(m, bes);
     }
 
-    /** A 5×5 shop: a bed and a job-site block inside, a door + lot connector on the −Z wall facing the street. */
-    private static Built shop(Palette p, BlockState jobSite) {
+    /** A profession building's look on the shared 5×5 shell: a roof shape + a feature, so each shop reads differently. */
+    private enum Roof { GABLE, FLAT, STEPPED }
+    private enum Feature { NONE, FORGE, BOOKS, HAY }
+    private record ShopDesign(BlockState jobSite, Roof roof, Feature feature) {}
+
+    /**
+     * A 5×5 shop: a bed and the job-site inside, a door + lot connector on the −Z wall facing the street, and a
+     * per-profession {@code roof} (gable cottage / flat / stepped) and {@code feature} (a forge with a stone front +
+     * chimney, a library of bookshelves, a hay store) so a farmer, a librarian and a blacksmith read differently.
+     */
+    private static Built shop(Palette p, ShopDesign d) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState wall = p.wall().defaultBlockState();
         final BlockState post = p.post().defaultBlockState();
+        final BlockState stone = p.foundation().defaultBlockState();
         final BlockState glass = p.glass().defaultBlockState();
         final int n = 5, max = 4, mid = 2;
+        final boolean forge = d.feature() == Feature.FORGE;
         for (int x = 0; x < n; x++) {
             for (int z = 0; z < n; z++) {
                 m.put(new BlockPos(x, 0, z), wall);
@@ -129,10 +146,11 @@ public final class TradePostTemplates {
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
                 if (perim) {
                     for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? post : wall);
+                        // the forge faces its lowest course in stone (a smithy look); corners stay posts
+                        m.put(new BlockPos(x, h, z), corner ? post : (forge && h == 1 ? stone : wall));
                     }
                 }
-                m.put(new BlockPos(x, 4, z), wall);
+                m.put(new BlockPos(x, 4, z), wall); // a flat ceiling; the roof switch builds on top of it
             }
         }
         // Door + lot connector on the −Z wall (faces the street once the jigsaw rotates the piece into place).
@@ -149,10 +167,59 @@ public final class TradePostTemplates {
                 .setValue(BedBlock.PART, BedPart.FOOT).setValue(BedBlock.FACING, Direction.SOUTH));
         m.put(new BlockPos(1, 1, 3), Blocks.RED_BED.defaultBlockState()
                 .setValue(BedBlock.PART, BedPart.HEAD).setValue(BedBlock.FACING, Direction.SOUTH));
-        m.put(new BlockPos(3, 1, 3), jobSite);
+        m.put(new BlockPos(3, 1, 3), d.jobSite());
         m.put(new BlockPos(3, 1, 1), Blocks.TORCH.defaultBlockState());
-        StructureParts.gableRoof(m, 0, max, 0, max, 4, wall, p.stairs(), p.slab(), 0);
+        roof(m, p, d.roof(), wall);
+        feature(m, d.feature(), stone);
         return new Built(m, bes);
+    }
+
+    /** Build the per-design roof on top of the y4 ceiling. */
+    private static void roof(Map<BlockPos, BlockState> m, Palette p, Roof roof, BlockState wall) {
+        final int max = 4;
+        switch (roof) {
+            case GABLE -> StructureParts.gableRoof(m, 0, max, 0, max, 4, wall, p.stairs(), p.slab(), 0);
+            case FLAT -> {
+                final BlockState slab = p.slab().defaultBlockState();
+                for (int x = 0; x <= max; x++) {
+                    for (int z = 0; z <= max; z++) {
+                        if (x == 0 || x == max || z == 0 || z == max) {
+                            m.put(new BlockPos(x, 5, z), slab); // a low parapet ringing the flat roof
+                        }
+                    }
+                }
+            }
+            case STEPPED -> { // a stepped pyramid: the 5×5 ceiling, then a 3×3, then a 1×1 cap
+                for (int x = 1; x <= 3; x++) {
+                    for (int z = 1; z <= 3; z++) {
+                        m.put(new BlockPos(x, 5, z), wall);
+                    }
+                }
+                m.put(new BlockPos(2, 6, 2), wall);
+            }
+        }
+    }
+
+    /** Add a per-profession feature inside / on the building. */
+    private static void feature(Map<BlockPos, BlockState> m, Feature feature, BlockState stone) {
+        switch (feature) {
+            case FORGE -> { // a furnace forge with a stone chimney up through the roof
+                m.put(new BlockPos(1, 1, 1), Blocks.FURNACE.defaultBlockState());
+                m.put(new BlockPos(1, 4, 1), stone);
+                m.put(new BlockPos(1, 5, 1), stone);
+                m.put(new BlockPos(1, 6, 1), stone);
+            }
+            case BOOKS -> { // a small library against the side wall
+                m.put(new BlockPos(3, 1, 2), Blocks.BOOKSHELF.defaultBlockState());
+                m.put(new BlockPos(3, 2, 2), Blocks.BOOKSHELF.defaultBlockState());
+                m.put(new BlockPos(2, 2, 3), Blocks.BOOKSHELF.defaultBlockState());
+            }
+            case HAY -> { // a hay store
+                m.put(new BlockPos(2, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
+                m.put(new BlockPos(3, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
+            }
+            case NONE -> { }
+        }
     }
 
     /** A 5×5 fenced wheat field — tilled, watered and grown — with a gate onto the street. No villager (scenery). */
