@@ -1,0 +1,10 @@
+{
+  "_comment": "Gametest fixture for planIsland's per-field override resolution: a desert biome override replaces the base palette's surface/fill/core and sets a snow chance, so a desert island must carry those and a non-matching biome (plains) must keep the base.",
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 6, "max": 6 }, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone" },
+  "biome_overrides": [
+    { "biomes": ["minecraft:desert"],
+      "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:red_sandstone", "snow": 1.0 }
+  ]
+}
