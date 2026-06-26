@@ -33,23 +33,22 @@ mod. Then you plant the seed and **the whole portal grows** (option 2 — no mov
 - **Plant it → the full 12-frame portal chamber island grows**; fill with **12 Eyes of Ender** (Nether — blaze rods +
   enderman pearls) → activate → the End.
 
-**The eight sources (proposal — one rare material each, spanning the mod; tune the exact set):** Woodland Mansion +
-Ocean Monument (the grand structures) · Desert Temple + Jungle Temple (the temples) · Trial Chamber + Pillager Outpost
-(the hostile camps) · Nether Fortress + Bastion Remnant (the Nether). Candidates to swap in: Witch Hut, Wither Arena, or
-a biome relic (Mushroom / Badlands). Make them **rare but farmable** — you can re-grow that seed and re-loot, so it's a
-hunt, never a permanent RNG wall.
+**The eight sources (working set — exact picks + rarities are perpetual playtest balance):** Woodland Mansion + Ocean
+Monument (the grand structures) · Desert Temple + Jungle Temple (the temples) · Trial Chamber + Pillager Outpost (the
+hostile camps) · Nether Fortress + Bastion Remnant (the Nether). Swappable: Witch Hut, Wither Arena, or a biome relic
+(Mushroom / Badlands). Make them **rare but farmable** — re-grow that seed and re-loot, so it's a hunt, never a
+permanent RNG wall (worth making one or two *guaranteed* so a completionist can't be stranded on the very last item).
 
-**The four edges (proposal — each pairs one domain):** *Grand* = shard + Mansion + Monument · *Temple* = shard + Desert
-+ Jungle · *Camp* = shard + Trial Chamber + Outpost · *Nether* = shard + Fortress + Bastion. The four → the End Portal
-Seed.
+**The four edges (working set — each pairs one domain):** *Grand* = shard + Mansion + Monument · *Temple* = shard +
+Desert + Jungle · *Camp* = shard + Trial Chamber + Outpost · *Nether* = shard + Fortress + Bastion. The four → the End
+Portal Seed.
 
-**Why this is the gate:** the End becomes a true *finale* — you can't shortcut it, you must have looted the breadth of
-Skyseed *and* done the Nether (for the eyes). The shard is the early "what is this?"; the eight materials are the long
-tail that pulls you back through the whole mod.
-
-**Open to tune:** the exact eight sources + their drop rarity; whether one or two are *guaranteed* (so a completionist
-is never RNG-stranded on the very last item); the edge pairings; the shard's dungeon-roll chance; and whether the End
-Portal Seed island is the bare portal or carries a little stronghold flavour (silverfish, library).
+**It's the gate — but it's opt-in.** For a player driving at the End it's a true *finale*: you can't shortcut it, you
+must have looted the breadth of Skyseed *and* done the Nether (for the eyes); the shard is the early "what is this?", the
+eight materials the long tail that pulls you back through the whole mod. For **everyone else it simply doesn't matter** —
+the materials are passive rare drops you might idly find and never need. Someone just building a beautiful sky base never
+has to think about it; nothing here gates non-End play, it only rewards the player who *wants* the End. That's also why
+the exact balance can stay loose: it's low-stakes, perpetual playtest tuning, not a load-bearing number.
 
 **Deliverables:** the **Portal Frame Shard** (dungeon drop) + **8 structure-material** items + their loot-table hooks;
 the **4 Edge** recipes + the **End Portal Seed** recipe (+ `skyseeds` tag/guide); the End Portal Seed island-gen (grows
