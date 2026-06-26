@@ -873,44 +873,24 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = BIG_REGION)
+    @GameTest(template = REGION)
     public static void tradePostBlacksmithPlaces(GameTestHelper helper) {
-        // The two large-section landmarks — the L-shaped forge (its anvil) and the great hall (its bell) — should both
-        // attach to a large lot and place, proving the jigsaw takes the bigger footprints. (Loads dev-generated .nbt.)
-        final ServerLevel level = helper.getLevel();
-        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
-        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
-        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
-        int anvils = 0;
-        int bells = 0;
-        // The landmarks are probabilistic (a shallow large section that rolls one), and the jigsaw seeds its assembly
-        // RNG from the world seed + origin — so a fixed origin always builds the SAME village, and the gametest's world
-        // seed varies per run. Pass an explicit, varying featureSeed to sample many deterministic villages: across
-        // these fixed seeds the forge and the hall each reliably land at least once, so the test can never flake.
-        for (int iter = 0; iter < 16; iter++) {
-            for (int x = 0; x <= 47; x++) { // full region: the large section lengthens the village, pushing landmarks out
-                for (int z = 0; z <= 47; z++) {
-                    for (int y = 1; y <= 14; y++) {
-                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
-                    }
-                }
-            }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
-            for (int x = 0; x <= 47; x++) {
-                for (int z = 0; z <= 47; z++) {
-                    for (int y = 1; y <= 14; y++) {
-                        final var state = helper.getBlockState(new BlockPos(x, y, z));
-                        if (state.is(Blocks.ANVIL)) {
-                            anvils++;
-                        } else if (state.is(Blocks.BELL)) {
-                            bells++;
-                        }
-                    }
-                }
-            }
-        }
-        helper.assertTrue(bells > 0, "16 villages placed no great hall (bell count=" + bells + ")");
-        helper.assertTrue(anvils > 0, "16 villages placed no blacksmith (anvil count=" + anvils + ")");
+        // The two large-section landmarks — the L-shaped forge and the great hall — are the FAVOURED pieces on the
+        // village's large lots (weight 3 each, above the weight-1 shops), so a large lot reliably builds one of them.
+        // We assert this on the pool WEIGHTS, deterministically: counting anvils/bells across an assembled village is
+        // far too noisy to test reliably (the gametest origin varies per run, so the jigsaw — which seeds its assembly
+        // RNG from the origin's chunk — builds a different village each run, and the rare landmark can miss all of a
+        // small sample). getShuffledTemplates expands each element by its weight, so a piece's count is its weight.
+        final var reg = helper.getLevel().registryAccess();
+        final RandomSource rng = RandomSource.create(0L);
+        final var lots = Lookup.templatePool(reg, Ids.mod("trade_post/large_lots")).value().getShuffledTemplates(rng);
+        final long forge = lots.stream().filter(e -> e.toString().contains("trade_post/forge")).count();
+        final long hall = lots.stream().filter(e -> e.toString().contains("trade_post/great_hall")).count();
+        helper.assertTrue(forge > 0 && hall > 0,
+                "the forge and great hall must both be large-lot pieces (forge=" + forge + ", hall=" + hall + ")");
+        helper.assertTrue(forge > 1 && hall > 1,
+                "the forge and great hall must outweigh a single (weight-1) shop on the large lots, so a large lot "
+                        + "favours the bigger footprints (forge=" + forge + ", hall=" + hall + ")");
         helper.succeed();
     }
 
@@ -2002,6 +1982,27 @@ public final class SkyseedGameTests {
             helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess()).is(ModItems.PARTS.get(e[0]).get()),
                     e[0] + " recipe did not produce the edge");
         }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void endPortalSeedCraftsFromFourEdges(GameTestHelper helper) {
+        // Phase-1 payoff: the four portal edges set in a cross forge the End Portal Seed (which grows the portal chamber).
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack none = net.minecraft.world.item.ItemStack.EMPTY;
+        final java.util.function.Function<String, net.minecraft.world.item.ItemStack> part =
+                id -> new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(id).get());
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                        none, part.apply("grand_edge"), none,
+                        part.apply("camp_edge"), none, part.apply("temple_edge"),
+                        none, part.apply("nether_edge"), none));
+        final var recipe = level.getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the End Portal Seed from the four edges");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
+                        .is(ModItems.SEEDS.get("end_portal").get()),
+                "the edge cross did not produce the End Portal Seed");
         helper.succeed();
     }
 

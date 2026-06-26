@@ -10,14 +10,17 @@ capstone collect-a-thon; the rest is the shape of the chapter that follows.
 
 ---
 
-## Phase 1 — Getting to the End  ✅ *shape decided (tuning open)*
+## Phase 1 — Getting to the End  ✅ *built (v0.101.0–0.104.0; balance tuning open)*
 
-> **Build progress (v0.101.0–0.102.0):** the crafting items — **Portal Frame Shard**, the 8 structure relics, the 4
-> portal edges (PowerShell-painted icons) — and the shapeless **edge recipes** (v0.101.0), plus the **loot-table drops**
-> (v0.102.0): a `skyseed:add_drop` global loot modifier seeds the shard into dungeon loot (~40%) and each relic into its
-> structure's table (~25%) — re-grow a structure to re-roll. The **portal-chamber structure + `end_portal` theme**
-> (v0.103.0): a stronghold room with the vanilla 12-frame ring (frames empty) grows on a stone island. **Remaining:**
-> the **End Portal Seed** item (4 edges → seed, planting the `end_portal` theme) + its guide thread.
+> **Build progress — Phase 1 is functionally complete.** The crafting items — **Portal Frame Shard**, the 8 structure
+> relics, the 4 portal edges (PowerShell-painted icons) — and the shapeless **edge recipes** (v0.101.0); the **loot-table
+> drops** (v0.102.0): a `skyseed:add_drop` global loot modifier seeds the shard into dungeon loot (~40%) and each relic
+> into its structure's table (~25%) — re-grow a structure to re-roll; the **portal-chamber structure + `end_portal`
+> theme** (v0.103.0): a stronghold room with the vanilla 12-frame ring (frames empty) grows on a stone island; and the
+> **End Portal Seed** (v0.104.0): the craftable seed (4 edges in a cross → seed) that plants that chamber, with full
+> survival onboarding (recipe, unique icon, `skyseeds` tag, gated field-notes guide entry, reveal/gathered/craft
+> advancements). The loop is closed: structure drops → 4 edges → seed → grown portal → fill with 12 Eyes of Ender → the
+> End. **Open:** drop-rate / recipe balance (playtesting), and the End Gateway void-landing safeguard (flagged for Phase 6).
 
 **The problem.** In vanilla you reach the End through a Stronghold's portal room — 12 End Portal Frames you fill with
 Eyes of Ender. Skyseed is skyblock: there is nothing to explore to, and End Portal Frames aren't craftable. So the

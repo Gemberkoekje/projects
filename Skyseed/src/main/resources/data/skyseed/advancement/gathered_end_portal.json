@@ -1,0 +1,11 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [
+        { "items": "skyseed:grand_edge" }, { "items": "skyseed:temple_edge" },
+        { "items": "skyseed:camp_edge" }, { "items": "skyseed:nether_edge" }
+      ] }
+    }
+  }
+}

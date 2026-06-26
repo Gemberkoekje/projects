@@ -1,0 +1,34 @@
+{
+  "name": "End Portal Seed",
+  "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_end_portal",
+  "icon": "minecraft:end_portal_frame",
+  "sortnum": 9,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)End Portal Skyseed$() — the long way round to the End. It comes together from $(o)four portal edges$(), and each edge is forged from a $(item)Portal Frame Shard$() and two $(o)structure relics$().$(br2)$(bold)Where to look$()$(br)Shards turn up in $(item)dungeon$() chests. The eight relics are rare chest drops from across the mod — the $(item)Mansion$(), $(item)Monument$(), both temples, the $(item)Trial Chamber$(), the $(item)Outpost$(), the $(item)Fortress$() and the $(item)Bastion$(). Re-grow a structure to re-roll its loot."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:end_portal_skyseed",
+      "text": "All four edges in hand — cross them to forge the seed.",
+      "advancement": "skyseed:gathered_end_portal"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "Plant it and a $(o)stronghold portal chamber$() grows on a small stone island: a stone-brick room, lit and aged, built around the vanilla $(item)12-frame End portal$(). The frames start $(bold)empty$() — the chamber is the frame, not the key.",
+      "advancement": "skyseed:craft_end_portal"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Lighting it$()$(br)Fill all twelve frames with $(item)Eyes of Ender$() — Blaze Rods from a $(item)Nether Fortress$() island, crushed with $(item)Ender Pearls$(). The portal opens in the centre. Step through and you are in the End.$(br2)Throw a few spare seeds in your pack first — the End grows empty.",
+      "advancement": "skyseed:craft_end_portal"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crafting$()$(br)The four portal edges set in a cross: $(item)Grand$() on top, $(item)Camp$() and $(item)Temple$() to the sides, $(item)Nether$() below. The centre stays open — that is where the portal will be.",
+      "advancement": "skyseed:craft_end_portal"
+    }
+  ]
+}

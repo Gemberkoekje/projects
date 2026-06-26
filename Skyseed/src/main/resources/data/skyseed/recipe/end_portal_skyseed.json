@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ " G ", "C T", " N " ],
+  "key": {
+    "G": { "item": "skyseed:grand_edge" },
+    "C": { "item": "skyseed:camp_edge" },
+    "T": { "item": "skyseed:temple_edge" },
+    "N": { "item": "skyseed:nether_edge" }
+  },
+  "result": { "id": "skyseed:end_portal_skyseed" }
+}
