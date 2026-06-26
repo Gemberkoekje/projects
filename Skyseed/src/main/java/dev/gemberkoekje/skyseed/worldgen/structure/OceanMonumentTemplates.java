@@ -82,8 +82,10 @@ public final class OceanMonumentTemplates {
             m.put(new BlockPos(1, 2, z), SPONGE);
         }
 
-        // Treasure in the back corner, ringed with sea lanterns: a gold-block cache + a buried-treasure chest
-        // (Heart of the Sea + nautilus shells → a conduit). The elder guardian roams the centre, guarding it.
+        // Treasure in the back corner, ringed with sea lanterns: a gold-block cache + two buried-treasure chests
+        // (Heart of the Sea + nautilus shells → a conduit) flanking it, west and north. The elder guardian roams the
+        // centre, guarding them. Two chests so the End-chapter monument relic — gated to this buried-treasure table —
+        // gets two rolls per monument (a lone chest left it the rarest relic to find; see SKYENDPLAN Phase 1).
         for (final int[] g : new int[][]{{9, 9}, {10, 9}, {9, 10}, {10, 10}}) {
             m.put(new BlockPos(g[0], 1, g[1]), Blocks.GOLD_BLOCK.defaultBlockState());
         }
@@ -91,6 +93,8 @@ public final class OceanMonumentTemplates {
         m.put(new BlockPos(10, 0, 10), LAMP);
         m.put(new BlockPos(8, 1, 9), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
         bes.put(new BlockPos(8, 1, 9), lootChest("minecraft:chests/buried_treasure"));
+        m.put(new BlockPos(9, 1, 8), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
+        bes.put(new BlockPos(9, 1, 8), lootChest("minecraft:chests/buried_treasure"));
 
         // Anchor at the centre base; the guardians spawn in the open water just above it.
         anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:prismarine");

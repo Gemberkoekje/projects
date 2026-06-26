@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.105.0] - 2026-06-26
+
+### Changed
+- **Ocean Monument and Pillager Outpost each carry a second loot chest now**, so their End-chapter relics drop at a
+  fair rate. Both placed a single chest — one ~25% relic roll per structure — so the **monument** and **outpost relics**
+  could miss 5–6 structures in a row (playtest feedback), where the multi-chest temples / fortress / bastion give 2–5
+  rolls. A second buried-treasure / pillager-outpost chest (two separate chests, not a double) brings each to ~44% per
+  structure, in line with the jungle temple. The loot tables were already correct; this is purely roll count. (The
+  Woodland Mansion is also a single chest at ~25% — same situation, left as-is for now.)
+
 ## [0.104.0] - 2026-06-26
 
 ### Added

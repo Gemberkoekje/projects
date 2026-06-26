@@ -87,6 +87,12 @@ public final class OutpostTemplates {
         }
         m.put(new BlockPos(mid, 0, mid), MOSSY); // cage floor (overwritten by the anchor below)
 
+        // A supply chest in a base corner, beside the golem cage. The End-chapter outpost relic is gated to this
+        // pillager-outpost table, so a second chest (with the watch-room one) gives the relic two rolls per outpost —
+        // a lone chest left it tied for the rarest relic to find (see SKYENDPLAN Phase 1).
+        m.put(new BlockPos(4, 1, 8), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
+        bes.put(new BlockPos(4, 1, 8), lootChest("minecraft:chests/pillager_outpost"));
+
         // Mid floor slab (y4) with the ladder hole at corner (4,4).
         for (int x = 4; x <= 8; x++) {
             for (int z = 4; z <= 8; z++) {
