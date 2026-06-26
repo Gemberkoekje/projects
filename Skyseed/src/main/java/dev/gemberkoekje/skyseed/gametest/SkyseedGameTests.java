@@ -1546,6 +1546,39 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void shapeBuilderCapsSurfaceAndBuriesCore(GameTestHelper helper) {
+        // Backs ShapeBuilder.build's terrain + column-list outputs (the buffers a parameter-object refactor bundles and
+        // must keep distinct): the SURFACE block caps each column (never buried), and ORE — placed by OrePlanner from
+        // the CORE column list — is always buried inside the body, never surfaced. A core/surface list mix-up would
+        // expose the ore (or bury the grass), so this guards the refactor without reaching into the package-private
+        // builder. (dim_leak in the overworld = grass/dirt/stone body, coal in the core, no decoration to muddy it.)
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme t = theme(level, "gametest/dim_leak");
+        final var plains = level.registryAccess().registryOrThrow(Registries.BIOME)
+                .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:plains")));
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), t, plains, RandomSource.create(5L));
+        final java.util.Set<BlockPos> solid = new java.util.HashSet<>();
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            solid.add(bp.pos());
+        }
+        int grass = 0, coal = 0;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) {
+                grass++;
+                helper.assertTrue(!solid.contains(bp.pos().above()),
+                        "a surface (grass) block must cap its column — found one buried under solid");
+            } else if (bp.state().is(Blocks.COAL_ORE)) {
+                coal++;
+                helper.assertTrue(solid.contains(bp.pos().above()),
+                        "a core ore block must be buried (solid above it), never surfaced");
+            }
+        }
+        helper.assertTrue(grass > 0 && coal > 0,
+                "expected a grass-capped body with buried coal (grass=" + grass + " coal=" + coal + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void islandIsDeterministic(GameTestHelper helper) {
         final IslandPlan a = plan(helper, "rocky", 42L);
         final IslandPlan b = plan(helper, "rocky", 42L);
