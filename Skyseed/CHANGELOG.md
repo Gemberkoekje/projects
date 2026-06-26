@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.1] - 2026-06-26
+
+### Fixed
+- **Woodland Mansion: removed the exposed birch ledge between the two storeys.** The upper floor's birch reached the
+  outside wall, so the mid-floor line read as a birch band/awning with no wall behind it. The upper floor is now inset
+  one block and the wall runs flush (plank field, log corners) across that line.
+
 ## [0.100.0] - 2026-06-26
 
 ### Changed

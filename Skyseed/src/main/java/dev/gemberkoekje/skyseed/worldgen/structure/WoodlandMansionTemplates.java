@@ -75,11 +75,12 @@ public final class WoodlandMansionTemplates {
         final int cx = W / 2, cz = D / 2, top = STOREY * 2 + 2;
 
         birchFloor(m, 0, W, 0, D, 0);
-        birchFloor(m, 0, W, 0, D, STOREY + 1);
+        birchFloor(m, 1, W - 1, 1, D - 1, STOREY + 1);   // upper floor inset 1 block: no exposed birch ledge on the wall
         carpetRunner(m, W, D, 0);
         carpetRunner(m, W, D, STOREY + 1);
         vanillaWalls(m, W, D, 1, true);
         vanillaWalls(m, W, D, STOREY + 2, true);
+        midFloorBand(m, W, D, STOREY + 1);               // run the wall flush across the mid-floor line (was the ledge)
 
         // Entrance: a dark-oak door on the front (−Z) wall, a torch either side.
         door(m, cx, 1, 0, Direction.NORTH);
@@ -249,6 +250,19 @@ public final class WoodlandMansionTemplates {
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 m.put(new BlockPos(x, y, z), BIRCH);
+            }
+        }
+    }
+
+    /** Fill the perimeter at the mid-floor {@code y} with wall (log corners, plank field) so the upper floor sits flush
+     *  in the wall instead of showing as an exposed birch ledge between the two storeys. */
+    private static void midFloorBand(Map<BlockPos, BlockState> m, int maxX, int maxZ, int y) {
+        for (int x = 0; x <= maxX; x++) {
+            for (int z = 0; z <= maxZ; z++) {
+                if (x == 0 || x == maxX || z == 0 || z == maxZ) {
+                    final boolean corner = (x == 0 || x == maxX) && (z == 0 || z == maxZ);
+                    m.put(new BlockPos(x, y, z), corner ? LOG : PLANKS);
+                }
             }
         }
     }
