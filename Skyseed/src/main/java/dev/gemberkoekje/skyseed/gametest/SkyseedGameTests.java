@@ -1888,6 +1888,36 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void mansionAssemblesWithFlushWings(GameTestHelper helper) {
+        // Assemble the mansion jigsaw and confirm the wings attach FLUSH (the overlap fix): the core lays a birch floor,
+        // dark-oak walls and glass-pane windows, and the wings actually connect — the jigsaw only accepts a wing whose
+        // box doesn't overlap the core's, so a wing-specific block (iron bars / lectern / barrel) landing beyond the
+        // core proves the connection resolved instead of being rejected. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("woodland_mansion/start"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "", 0, null, 1L);
+        int birch = 0, darkOak = 0, glass = 0, wingBlocks = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 18; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.BIRCH_PLANKS)) birch++;
+                    else if (s.is(Blocks.DARK_OAK_PLANKS)) darkOak++;
+                    else if (s.is(Blocks.GLASS_PANE)) glass++;
+                    else if (s.is(Blocks.IRON_BARS) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)) wingBlocks++;
+                }
+            }
+        }
+        helper.assertTrue(birch > 80, "the mansion should lay a birch-plank floor (got " + birch + ")");
+        helper.assertTrue(darkOak > 80, "the mansion should have dark-oak walls (got " + darkOak + ")");
+        helper.assertTrue(glass > 0, "the mansion should have glass-pane windows (got " + glass + ")");
+        helper.assertTrue(wingBlocks > 0,
+                "at least one wing must attach flush — no wing block found means the wings were rejected for overlap");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator

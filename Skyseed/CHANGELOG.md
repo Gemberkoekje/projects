@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.96.0] - 2026-06-26
+
+### Changed
+- **The Woodland Mansion is rebuilt in vanilla's style, with flush wings.** Restyled straight from the real vanilla
+  mansion's block data: **birch-plank floors** with red/white carpet runners, **dark-oak-plank walls on a cobblestone
+  base course** with a **cobblestone cornice**, dark-oak-log corner posts, and **glass-pane windows with dark-oak-fence
+  bars**. The wings are now a **library / prison** (iron bars + cauldrons) **/ storeroom**.
+- **Fixed the wing-overlap gap.** Previously a roof overhang sat between the core wall and an attached wing, leaving a
+  stray block of floor. Now the walls sit at the template's bounding-box edges (no overhang on the wing sides) and each
+  wing connector is a floor-level jigsaw on the wall with nothing behind it, while the wing's matching side is left
+  open — so a wing butts flush onto one shared wall.
+
 ## [0.95.1] - 2026-06-26
 
 ### Changed

@@ -186,6 +186,13 @@ Village Center became *a bigger Trade Post* — a 3-island cluster around a void
 shops, **not** the multi-hall, all-13-professions build §4b first imagined. Versions in *Shipped*.
 
 ### 4c. Woodland Mansion → different shapes
+> **Restyle + flush-wings ✅ shipped (v0.96.0).** Rebuilt from the real vanilla mansion's block data (birch floors +
+> red/white carpet, dark-oak walls on a cobblestone base + cornice, log posts, glass-pane/fence windows) with three
+> wing types (library / prison / storeroom). Fixed the long-standing wing-overlap gap: walls sit AT the box edges (no
+> overhang on the wing sides), the connector is a floor-level jigsaw on the wall with nothing behind it, and the wing's
+> matching side is open — so it butts onto one shared wall, flush, with no stray floor block. Still open below: real
+> footprint variety (multiple core start-pieces + a room graph).
+
 - **2–3 core start variants** (different hall footprints / entrance sides) instead of the one `core`.
 - Turn `wings` into a small **room graph**: wings expose their *own* onward connectors into a `rooms` pool
   (corridor, library, checker hall, prison, balcony, stair-up to a partial second storey), `depth: 4–5`, with
