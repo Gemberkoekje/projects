@@ -38,6 +38,7 @@ public final class NetherFortressTemplates {
         StructureParts.writeIfAbsent(dir.resolve("span_bridge.nbt"), spanBridge());
         StructureParts.writeIfAbsent(dir.resolve("span_balcony.nbt"), spanBalcony());
         StructureParts.writeIfAbsent(dir.resolve("span_crossing.nbt"), spanCrossing());
+        StructureParts.writeIfAbsent(dir.resolve("span_stair_down.nbt"), spanStairDown());
         StructureParts.writeIfAbsent(dir.resolve("end.nbt"), end());
         StructureParts.writeIfAbsent(dir.resolve("blaze_room.nbt"), blazeRoom());
     }
@@ -184,6 +185,55 @@ public final class NetherFortressTemplates {
         bridgeConn(m, bes, new BlockPos(4, DECK, 3), FrontAndTop.EAST_UP, SPANS);
         bridgeConn(m, bes, new BlockPos(2, DECK, 1), FrontAndTop.NORTH_UP, SPANS);
         bridgeConn(m, bes, new BlockPos(2, DECK, 5), FrontAndTop.SOUTH_UP, SPANS);
+        StructureParts.linkFences(m);
+        return new Built(m, bes);
+    }
+
+    /**
+     * A descending span: the deck steps down a level over its length (a stair on the central walkway), so the fortress
+     * walks down toward the lava sea (models vanilla's stairs room). The exit connector sits one block below the entry,
+     * so every span after it hangs a level deeper. A {@code span_} piece, capped like the rest.
+     */
+    private static Built spanStairDown() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
+        final BlockState fence = Blocks.NETHER_BRICK_FENCE.defaultBlockState();
+        final BlockState magma = Blocks.MAGMA_BLOCK.defaultBlockState();
+        // High half (x = 0..1) at y = DECK, on a near pillar.
+        for (int z = 1; z <= 5; z += 4) {
+            m.put(new BlockPos(0, 0, z), nb);
+            m.put(new BlockPos(0, 1, z), nb);
+        }
+        for (int x = 0; x <= 1; x++) {
+            m.put(new BlockPos(x, 1, 3), magma);
+            for (int z = 1; z <= 5; z++) {
+                m.put(new BlockPos(x, DECK, z), nb);
+            }
+            m.put(new BlockPos(x, DECK + 1, 1), fence);
+            m.put(new BlockPos(x, DECK + 1, 5), fence);
+        }
+        m.put(new BlockPos(0, DECK + 1, 1), nb);
+        m.put(new BlockPos(0, DECK + 2, 1), nb);
+        m.put(new BlockPos(0, DECK + 1, 5), nb);
+        m.put(new BlockPos(0, DECK + 2, 5), nb);
+        // Low half (x = 2..3) at y = DECK - 1, on a pillar; a stair on the central walkway makes the drop walkable.
+        for (int z = 1; z <= 5; z += 4) {
+            m.put(new BlockPos(2, 0, z), nb);
+        }
+        for (int x = 2; x <= 3; x++) {
+            m.put(new BlockPos(x, 0, 3), magma);
+            for (int z = 1; z <= 5; z++) {
+                m.put(new BlockPos(x, DECK - 1, z), nb);
+            }
+            m.put(new BlockPos(x, DECK, 1), fence);
+            m.put(new BlockPos(x, DECK, 5), fence);
+        }
+        for (int z = 2; z <= 4; z++) {
+            m.put(new BlockPos(2, DECK - 1, z), stair(Direction.WEST));
+        }
+        bridgeConn(m, bes, new BlockPos(0, DECK, 3), FrontAndTop.WEST_UP, SPANS);       // entry (high)
+        bridgeConn(m, bes, new BlockPos(3, DECK - 1, 3), FrontAndTop.EAST_UP, SPANS);   // exit (one lower)
         StructureParts.linkFences(m);
         return new Built(m, bes);
     }

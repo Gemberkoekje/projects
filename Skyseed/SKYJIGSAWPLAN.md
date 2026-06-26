@@ -195,11 +195,11 @@ shops, **not** the multi-hall, all-13-professions build §4b first imagined. Ver
 - Keep the guaranteed evoker (the Totem source) on the core so the reward is unconditional regardless of shape.
 
 ### 4d. Nether Fortress → sprawl over the void
-> **Increments 1–2 ✅ shipped (v0.94.0, v0.95.0).** The monolith is a bounded jigsaw network — `keep` (start, blaze
-> spawner), self-connecting `span_bridge`, a 4-way `span_crossing` (branching), a garden `span_balcony`, and a
-> wart-garden `end` terminator. `depth: 5` plus the **`span_` cap** (≤ 8 span pieces, surplus re-stamped as ends) bound
-> the total across all branches (modelled on vanilla's `NetherFortressPieces` but ~4 piece types vs 13, depth 5 vs
-> MAX_DEPTH 30). Still to add: `stair_down` (descend a level over the lava sea).
+> **✅ DONE (v0.94.0–0.95.1).** The monolith is a bounded jigsaw network — `keep` (start, blaze spawner), self-connecting
+> `span_bridge`, a 4-way `span_crossing` (branching), a garden `span_balcony`, a `span_stair_down` (descends a level
+> over the lava sea), and a wart-garden `end` terminator. `depth: 5` plus the **`span_` cap** (≤ 8 span pieces, surplus
+> re-stamped as ends) bound the total across all branches (modelled on vanilla's `NetherFortressPieces` but ~5 piece
+> types vs 13, depth 5 vs MAX_DEPTH 30). The over-void spans carry their own arcade, so no `PathSurfacer` needed.
 
 - Break the monolith into a **`nether_fortress` pool**: `bridge_span` (4–6 long, self-connecting), `crossing`
   (4-way bridge junction), `tower_keep` (the current keep, with the blaze spawner), `balcony` (wart garden +

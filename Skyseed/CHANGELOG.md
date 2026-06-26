@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.95.1] - 2026-06-26
+
+### Changed
+- **The Nether Fortress can now step down over the lava sea.** Added a `span_stair_down` piece — its deck descends a
+  level over its length (a stair on the central walkway), so the spans after it hang a level deeper, giving the fortress
+  vertical relief instead of staying on one plane. It's a capped `span_` piece like the rest. This completes the
+  fortress's jigsaw vocabulary (keep + straight / crossing / balcony / stair spans + ends).
+
 ## [0.95.0] - 2026-06-26
 
 ### Changed
