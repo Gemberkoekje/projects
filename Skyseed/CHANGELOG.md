@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.97.0] - 2026-06-26
+
+### Added
+- **The Woodland Mansion now has real footprint variety.** The start pool offers **three core shapes** — a square hall
+  (3 wings), and long and wide halls (4 wings each) — so the manor's silhouette differs each throw. The core builder is
+  parameterised (`W × D` + a list of flush wing connectors) so all three share one vanilla-styled shell.
+
 ## [0.96.0] - 2026-06-26
 
 ### Changed

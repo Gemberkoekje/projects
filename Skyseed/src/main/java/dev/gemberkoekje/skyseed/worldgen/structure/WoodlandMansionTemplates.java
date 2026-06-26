@@ -52,68 +52,74 @@ public final class WoodlandMansionTemplates {
     private static final BlockState LANTERN = Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true);
     private static final String BIRCH_ID = "minecraft:birch_planks";
 
-    private static final int W = 10;      // core footprint: walls at x,z = 0..W (the box edges — no overhang)
     private static final int STOREY = 4;  // wall height per floor (floors at y = 0 and y = STOREY+1)
 
     public static void generateInto(Path dir) throws IOException {
-        writeIfAbsent(dir.resolve("core.nbt"), core());
+        // Three core start variants → real footprint variety (different hall shapes + wing counts each throw).
+        writeIfAbsent(dir.resolve("core_square.nbt"), buildCore(10, 10, new int[][]{{0, 5}, {10, 5}, {5, 10}}));
+        writeIfAbsent(dir.resolve("core_long.nbt"), buildCore(10, 16, new int[][]{{0, 5}, {0, 11}, {10, 5}, {10, 11}}));
+        writeIfAbsent(dir.resolve("core_wide.nbt"), buildCore(16, 10, new int[][]{{0, 5}, {16, 5}, {4, 10}, {12, 10}}));
         writeIfAbsent(dir.resolve("wing_library.nbt"), wing("library"));
         writeIfAbsent(dir.resolve("wing_prison.nbt"), wing("prison"));
         writeIfAbsent(dir.resolve("wing_storeroom.nbt"), wing("storeroom"));
     }
 
-    /** The start piece: the two-storey 11×11 manor, with a floor-level wing connector on each of three walls. */
-    private static Built core() {
+    /**
+     * A two-storey {@code W×D} manor start piece with a flush floor-level wing connector at each {@code (x,z)} in
+     * {@code wings} (the facing is derived from which box edge it sits on). Birch floor + carpet runner, vanilla walls
+     * with windows + a cornice, a dark-oak entrance, an open garrison hall, a corner staircase, loot, lanterns, a roof.
+     */
+    private static Built buildCore(int W, int D, int[][] wings) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final int top = STOREY * 2 + 2;   // roof slab height (two storeys + the mid floor)
+        final int cx = W / 2, cz = D / 2, top = STOREY * 2 + 2;
 
-        birchFloor(m, 0, W, 0, W, 0);
-        birchFloor(m, 0, W, 0, W, STOREY + 1);
-        carpetRunner(m, 0);
-        carpetRunner(m, STOREY + 1);
+        birchFloor(m, 0, W, 0, D, 0);
+        birchFloor(m, 0, W, 0, D, STOREY + 1);
+        carpetRunner(m, W, D, 0);
+        carpetRunner(m, W, D, STOREY + 1);
+        vanillaWalls(m, W, D, 1, true);
+        vanillaWalls(m, W, D, STOREY + 2, true);
 
-        vanillaWalls(m, 1, true);              // ground floor: windows + the cornice band
-        vanillaWalls(m, STOREY + 2, true);     // upper floor
+        // Entrance: a dark-oak door on the front (−Z) wall, a torch either side.
+        door(m, cx, 1, 0, Direction.NORTH);
+        m.put(new BlockPos(cx - 1, 3, 0), Blocks.WALL_TORCH.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
+        m.put(new BlockPos(cx + 1, 3, 0), Blocks.WALL_TORCH.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
 
-        // The entrance: a dark-oak door on the front (−Z) wall with a torch either side.
-        door(m, 5, 1, 0, Direction.NORTH);
-        m.put(new BlockPos(4, 3, 0), Blocks.WALL_TORCH.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-        m.put(new BlockPos(6, 3, 0), Blocks.WALL_TORCH.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH));
-
-        // Three flush wing doorways — one per wall, on the box edge (see class doc).
-        wingConnector(m, bes, 0, 5, FrontAndTop.WEST_UP);
-        wingConnector(m, bes, W, 5, FrontAndTop.EAST_UP);
-        wingConnector(m, bes, 5, W, FrontAndTop.SOUTH_UP);
-
-        // Ground-floor garrison hall: open, lantern-lit. A loot chest in a corner.
-        chest(m, bes, 1, 1, 1, Direction.EAST);
-        // Staircase up the SE corner (rises south, x = 7..8, z = 6..9 → y = 1..4) and an opening above it.
-        for (int s = 0; s < STOREY; s++) {
-            m.put(new BlockPos(7, 1 + s, 6 + s), darkStair(Direction.SOUTH, Half.BOTTOM));
-            m.put(new BlockPos(8, 1 + s, 6 + s), darkStair(Direction.SOUTH, Half.BOTTOM));
+        // Flush wing doorways, facing derived from the wall the connector sits on.
+        for (final int[] w : wings) {
+            final FrontAndTop f = w[0] == 0 ? FrontAndTop.WEST_UP : w[0] == W ? FrontAndTop.EAST_UP
+                    : w[1] == D ? FrontAndTop.SOUTH_UP : FrontAndTop.NORTH_UP;
+            wingConnector(m, bes, w[0], w[1], f);
         }
-        for (int x = 7; x <= 8; x++) {
-            for (int z = 7; z <= 9; z++) {
+
+        // Garrison hall (open) + a corner staircase up the back-right, with the upper floor opened above it.
+        chest(m, bes, 1, 1, 1, Direction.EAST);
+        for (int s = 0; s < STOREY; s++) {
+            m.put(new BlockPos(W - 3, 1 + s, cz + s), darkStair(Direction.SOUTH, Half.BOTTOM));
+            m.put(new BlockPos(W - 2, 1 + s, cz + s), darkStair(Direction.SOUTH, Half.BOTTOM));
+        }
+        for (int x = W - 3; x <= W - 2; x++) {
+            for (int z = cz + 1; z <= cz + STOREY; z++) {
                 m.put(new BlockPos(x, STOREY + 1, z), AIR);
             }
         }
 
-        // Upper floor: a small library + two loot chests.
+        // Upper floor: two loot chests + a small library along the back wall.
         chest(m, bes, 1, STOREY + 2, 1, Direction.EAST);
         chest(m, bes, W - 1, STOREY + 2, 1, Direction.WEST);
-        for (int z = 8; z <= 9; z++) {
+        for (int z = D - 2; z <= D - 1; z++) {
             m.put(new BlockPos(W - 1, STOREY + 2, z), BOOKSHELF);
             m.put(new BlockPos(W - 1, STOREY + 3, z), BOOKSHELF);
         }
 
-        for (final int[] l : new int[][]{{2, 2}, {8, 2}, {2, 8}}) {  // corner lanterns (skip the stairwell corner)
+        for (final int[] l : new int[][]{{2, 2}, {W - 2, 2}, {2, D - 2}}) {   // corner lanterns (skip the stairwell)
             m.put(new BlockPos(l[0], STOREY, l[1]), LANTERN);
             m.put(new BlockPos(l[0], top - 1, l[1]), LANTERN);
         }
 
-        StructureParts.gableRoof(m, 0, W, 0, W, top, PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 0);
-        StructureParts.anchor(m, bes, new BlockPos(5, 0, 5), BIRCH_ID);
+        StructureParts.gableRoof(m, 0, W, 0, D, top, PLANKS, Blocks.DARK_OAK_STAIRS, Blocks.DARK_OAK_SLAB, 0);
+        StructureParts.anchor(m, bes, new BlockPos(cx, 0, cz), BIRCH_ID);
         return new Built(m, bes);
     }
 
@@ -186,35 +192,38 @@ public final class WoodlandMansionTemplates {
 
     /** A storey of the core's 11×11 wall ring at base {@code y0}: cobblestone base course, dark-oak field + log posts,
      *  glass-pane windows mid-wall, and a cobblestone cornice band on top. */
-    private static void vanillaWalls(Map<BlockPos, BlockState> m, int y0, boolean windows) {
+    private static void vanillaWalls(Map<BlockPos, BlockState> m, int maxX, int maxZ, int y0, boolean windows) {
         for (int y = y0; y < y0 + STOREY; y++) {
-            for (int x = 0; x <= W; x++) {
-                final boolean edgeX = x == 0 || x == W;
-                place(m, x, y, 0, wallBlock(x, y - y0, true));
-                place(m, x, y, W, wallBlock(x, y - y0, true));
-                if (edgeX) {
-                    for (int z = 1; z < W; z++) {
-                        place(m, x, y, z, wallBlock(z, y - y0, false));
-                    }
-                }
+            for (int x = 0; x <= maxX; x++) {
+                place(m, x, y, 0, wallBlock(y - y0));
+                place(m, x, y, maxZ, wallBlock(y - y0));
+            }
+            for (int z = 1; z < maxZ; z++) {
+                place(m, 0, y, z, wallBlock(y - y0));
+                place(m, maxX, y, z, wallBlock(y - y0));
             }
         }
         // Log corner posts.
-        for (final int[] c : new int[][]{{0, 0}, {W, 0}, {0, W}, {W, W}}) {
+        for (final int[] c : new int[][]{{0, 0}, {maxX, 0}, {0, maxZ}, {maxX, maxZ}}) {
             for (int y = y0; y < y0 + STOREY; y++) {
                 m.put(new BlockPos(c[0], y, c[1]), LOG);
             }
         }
         if (windows) {
-            for (final int[] w : new int[][]{{3, 0}, {7, 0}, {3, W}, {7, W}, {0, 3}, {0, 7}, {W, 3}, {W, 7}}) {
-                window(m, w[0], y0 + 1, w[1], w[0] == 0 || w[0] == W);
+            for (final int wx : new int[]{3, maxX - 3}) {       // windows on the front + back walls
+                window(m, wx, y0 + 1, 0, false);
+                window(m, wx, y0 + 1, maxZ, false);
+            }
+            for (final int wz : new int[]{3, maxZ - 3}) {       // and the side walls
+                window(m, 0, y0 + 1, wz, true);
+                window(m, maxX, y0 + 1, wz, true);
             }
         }
-        wallCornice(m, 0, W, 0, W, y0 + STOREY - 1);
+        wallCornice(m, 0, maxX, 0, maxZ, y0 + STOREY - 1);
     }
 
     /** Field block for a wall column: cobblestone on the base course (relative y 0), dark-oak planks above. */
-    private static BlockState wallBlock(int along, int relY, boolean perimeter) {
+    private static BlockState wallBlock(int relY) {
         return relY == 0 ? COBBLE : PLANKS;
     }
 
@@ -244,15 +253,18 @@ public final class WoodlandMansionTemplates {
         }
     }
 
-    /** The vanilla hall runner: a red-carpet cross down the middle with a white-carpet border. */
-    private static void carpetRunner(Map<BlockPos, BlockState> m, int y) {
-        for (int t = 1; t < W; t++) {
-            m.put(new BlockPos(5, y + 1, t), RED_CARPET);
-            m.put(new BlockPos(t, y + 1, 5), RED_CARPET);
-            m.put(new BlockPos(4, y + 1, t), WHITE_CARPET);
-            m.put(new BlockPos(6, y + 1, t), WHITE_CARPET);
-            m.put(new BlockPos(t, y + 1, 4), WHITE_CARPET);
-            m.put(new BlockPos(t, y + 1, 6), WHITE_CARPET);
+    /** The vanilla hall runner: a red-carpet cross down the middle of an {@code maxX×maxZ} floor, white border. */
+    private static void carpetRunner(Map<BlockPos, BlockState> m, int maxX, int maxZ, int y) {
+        final int cx = maxX / 2, cz = maxZ / 2;
+        for (int t = 1; t < maxZ; t++) {
+            m.put(new BlockPos(cx, y + 1, t), RED_CARPET);
+            m.put(new BlockPos(cx - 1, y + 1, t), WHITE_CARPET);
+            m.put(new BlockPos(cx + 1, y + 1, t), WHITE_CARPET);
+        }
+        for (int t = 1; t < maxX; t++) {
+            m.put(new BlockPos(t, y + 1, cz), RED_CARPET);
+            m.put(new BlockPos(t, y + 1, cz - 1), WHITE_CARPET);
+            m.put(new BlockPos(t, y + 1, cz + 1), WHITE_CARPET);
         }
     }
 

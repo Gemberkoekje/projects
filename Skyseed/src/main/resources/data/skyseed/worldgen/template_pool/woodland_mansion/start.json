@@ -1,6 +1,8 @@
 {
   "fallback": "minecraft:empty",
   "elements": [
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/core", "processors": "minecraft:empty", "projection": "rigid" } }
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/core_square", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/core_long",   "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/core_wide",   "processors": "minecraft:empty", "projection": "rigid" } }
   ]
 }

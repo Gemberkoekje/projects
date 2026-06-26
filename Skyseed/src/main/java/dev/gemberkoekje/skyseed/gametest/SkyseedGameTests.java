@@ -1919,6 +1919,23 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void mansionCoresHaveDistinctFootprints(GameTestHelper helper) {
+        // Real footprint variety: the start pool offers three core shapes, so the silhouette differs each throw.
+        // Load each core template and require three distinct X×Z footprints. (Loads dev-generated .nbt.)
+        final var mgr = helper.getLevel().getServer().getStructureManager();
+        final var footprints = new java.util.HashSet<String>();
+        for (final String name : new String[]{"core_square", "core_long", "core_wide"}) {
+            final var t = mgr.get(Ids.mod("woodland_mansion/" + name));
+            helper.assertTrue(t.isPresent(), "missing mansion core template: " + name);
+            final var sz = t.get().getSize();
+            footprints.add(sz.getX() + "x" + sz.getZ());
+        }
+        helper.assertTrue(footprints.size() == 3,
+                "the three mansion cores must have distinct footprints, saw " + footprints);
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.

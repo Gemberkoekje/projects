@@ -186,17 +186,19 @@ Village Center became *a bigger Trade Post* — a 3-island cluster around a void
 shops, **not** the multi-hall, all-13-professions build §4b first imagined. Versions in *Shipped*.
 
 ### 4c. Woodland Mansion → different shapes
-> **Restyle + flush-wings ✅ shipped (v0.96.0).** Rebuilt from the real vanilla mansion's block data (birch floors +
-> red/white carpet, dark-oak walls on a cobblestone base + cornice, log posts, glass-pane/fence windows) with three
-> wing types (library / prison / storeroom). Fixed the long-standing wing-overlap gap: walls sit AT the box edges (no
-> overhang on the wing sides), the connector is a floor-level jigsaw on the wall with nothing behind it, and the wing's
-> matching side is open — so it butts onto one shared wall, flush, with no stray floor block. Still open below: real
-> footprint variety (multiple core start-pieces + a room graph).
+> **Restyle + flush-wings ✅ (v0.96.0) · footprint variety ✅ (v0.97.0).** Rebuilt from the real vanilla mansion's block
+> data (birch floors + red/white carpet, dark-oak walls on a cobblestone base + cornice, log posts, glass-pane/fence
+> windows) with three wing types (library / prison / storeroom). Fixed the long-standing wing-overlap gap: walls sit AT
+> the box edges (no overhang on the wing sides), the connector is a floor-level jigsaw on the wall with nothing behind
+> it, and the wing's matching side is open — so it butts onto one shared wall, flush, with no stray floor block. The
+> start pool now offers **three core shapes** — square (3 wings), long and wide halls (4 wings) — from one
+> parameterised `buildCore(W, D, wings)`, so the silhouette differs each throw (`mansionCoresHaveDistinctFootprints`).
 
-- **2–3 core start variants** (different hall footprints / entrance sides) instead of the one `core`.
-- Turn `wings` into a small **room graph**: wings expose their *own* onward connectors into a `rooms` pool
-  (corridor, library, checker hall, prison, balcony, stair-up to a partial second storey), `depth: 4–5`, with
-  an empty terminator so the manor ends raggedly — a different silhouette each throw.
+- ~~**2–3 core start variants** (different hall footprints).~~ ✅ Done — square / long / wide halls, 3–4 wings each.
+- *Still open — a recursive room graph.* Turn `wings` into a `rooms` pool where rooms expose their *own* onward
+  connectors for deeper sprawl. The blocker is the doorway-hole problem: a carved doorway whose onward connector rolls
+  empty leaves a hole in the outer wall — needs a wall-cap terminator piece (cf. the fortress `end`) to close unused
+  onward doorways, not a plain `minecraft:empty` fallback.
 - Optional **second-storey** pieces via a vertical (`up`) connector, reusing the proven vertical-jigsaw trick
   (memory: connector must sit at the `.nbt` bbox **edge**, not flush on an inset wall, or it's rejected).
 - Keep the guaranteed evoker (the Totem source) on the core so the reward is unconditional regardless of shape.
