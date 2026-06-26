@@ -50,4 +50,10 @@ public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int d
             Codec.STRING.optionalFieldOf("cap_filler", "").forGetter(JigsawConfig::capFiller),
             ResourceLocation.CODEC.optionalFieldOf("centerpiece").forGetter(JigsawConfig::centerpiece)
     ).apply(i, JigsawConfig::new));
+
+    /** A copy with a different {@code pool}, every other field preserved — for swapping in a dimension's pool variant. */
+    public JigsawConfig withPool(ResourceLocation newPool) {
+        return new JigsawConfig(newPool, target, depth, pad, ironGolems, sink, reach,
+                capPrefix, capCount, capMin, capFiller, centerpiece);
+    }
 }

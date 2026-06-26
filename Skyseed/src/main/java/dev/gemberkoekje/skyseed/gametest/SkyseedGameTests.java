@@ -14,6 +14,7 @@ import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
+import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
@@ -666,10 +667,10 @@ public final class SkyseedGameTests {
                 "the Nether ruined portal should swap to the no-goodies pool ruined_portal/portal_nether");
 
         // Linked-coordinate maths: overworld/8 and nether*8 (vanilla's portal map).
-        final BlockPos toNether = IslandSeedEntity.linkedPortalPos(new BlockPos(800, 80, 80), Level.NETHER, nether);
+        final BlockPos toNether = TwinPlacer.linkedPortalPos(new BlockPos(800, 80, 80), Level.NETHER, nether);
         helper.assertTrue(toNether.getX() == 100 && toNether.getZ() == 10,
                 "overworld->nether twin should divide X/Z by 8, was " + toNether);
-        final BlockPos toOverworld = IslandSeedEntity.linkedPortalPos(new BlockPos(100, 70, 10), Level.OVERWORLD, overworld);
+        final BlockPos toOverworld = TwinPlacer.linkedPortalPos(new BlockPos(100, 70, 10), Level.OVERWORLD, overworld);
         helper.assertTrue(toOverworld.getX() == 800 && toOverworld.getZ() == 80,
                 "nether->overworld twin should multiply X/Z by 8, was " + toOverworld);
         helper.succeed();
@@ -1019,6 +1020,20 @@ public final class SkyseedGameTests {
         Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
         helper.assertTrue(helper.getBlockState(new BlockPos(24, 3, 24)).is(Blocks.LANTERN),
                 "the start square's centre tile must land at origin (where the centerpiece capstone is stamped)");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void jigsawConfigWithPoolSwapsOnlyThePool(GameTestHelper helper) {
+        // Backs JigsawConfig.withPool (the wither dimensionVariant uses to swap in a _nether pool): it must change ONLY
+        // the pool. Round-trip — withPool(other).withPool(original) equalling the original — proves every other field
+        // (depth, cap, golems, centerpiece, …) survived the copy.
+        final var jc = theme(helper.getLevel(), "village_center").jigsaw().orElseThrow();
+        final ResourceLocation other = ResourceLocation.parse("skyseed:trade_post_desert/start");
+        final var swapped = jc.withPool(other);
+        helper.assertTrue(swapped.pool().equals(other), "withPool must set the new pool");
+        helper.assertTrue(swapped.withPool(jc.pool()).equals(jc),
+                "withPool must change only the pool (round-trip to the original pool must equal the original)");
         helper.succeed();
     }
 

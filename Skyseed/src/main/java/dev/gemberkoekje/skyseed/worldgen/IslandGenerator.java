@@ -451,8 +451,7 @@ public final class IslandGenerator {
         final ResourceLocation netherPool = Ids.of(
                 jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
         if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
-            return new JigsawConfig(netherPool, jc.target(), jc.depth(), jc.pad(), jc.ironGolems(), jc.sink(), jc.reach(),
-                    jc.capPrefix(), jc.capCount(), jc.capMin(), jc.capFiller(), jc.centerpiece());
+            return jc.withPool(netherPool);
         }
         return jc;
     }

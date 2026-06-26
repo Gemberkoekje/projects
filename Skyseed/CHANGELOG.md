@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.5] - 2026-06-26
+
+### Changed
+- **Internal cleanup (the last two review minors):**
+  - `JigsawConfig` gains a `withPool(newPool)` wither, so `dimensionVariant` swaps in a dimension's `_nether` pool with
+    one call instead of a 12-field positional copy (the copy that made adding `centerpiece` touch two call sites).
+  - Extracted the ~80 lines of cross-dimension twin/portal placement out of the `IslandSeedEntity` projectile into a new
+    `TwinPlacer`, so the thrown seed keeps a single responsibility. A pure move — no logic change.
+  Backed by a new `withPool` round-trip test (proves it changes only the pool) and the existing 8:1 linked-coordinate
+  math test, re-pointed at `TwinPlacer`. All 80 gametests pass, including the golden master.
+
 ## [0.93.4] - 2026-06-26
 
 ### Changed
