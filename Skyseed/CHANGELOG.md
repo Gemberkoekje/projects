@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.110.0] - 2026-06-27
+
+### Added
+- **`/emptyend` now also repairs an already-void End that's missing its central island** (a save voided before
+  v0.109.0). Instead of reporting "nothing to do", it regenerates just the central chunks around 0,0 — precise `.mca`
+  chunk-entry surgery, so the surrounding void End and any islands you've grown out from the centre are untouched — and
+  resets the dragon fight, so the central island grows back and the dragon can be fought again. (It still converts a
+  pre-void End as before; "nothing to do" now means the End is void *and* islanded.) A converted End also resets its
+  dragon fight now, so it hosts a fresh dragon on the new island.
+
+### Changed
+- **The first-join warning is now per-dimension and points at the right fix:** a still-vanilla Nether → `/emptynether`;
+  an End that's vanilla or void-but-island-less → `/emptyend`. It also warns that these one-time fix commands will be
+  **removed in Skyseed 1.0**, so an old world must be repaired before updating past then.
+
 ## [0.109.0] - 2026-06-27
 
 ### Added

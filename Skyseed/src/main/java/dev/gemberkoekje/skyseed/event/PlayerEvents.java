@@ -1,9 +1,9 @@
 package dev.gemberkoekje.skyseed.event;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.command.SkyseedCommands;
 import dev.gemberkoekje.skyseed.item.SkyseedGuide;
 import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
-import dev.gemberkoekje.skyseed.worldgen.WorldSetupEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -63,18 +63,23 @@ public final class PlayerEvents {
             player.setRespawnPosition(overworld.dimension(), spawn, 0.0F, true, false);
         }
 
-        // Skyseed world made before the Nether/End were voided (pre-0.35.x): those dimensions are baked
-        // into the save as vanilla terrain. Offer the in-place /emptynether|/emptyend conversion as a genuine
-        // equal to starting fresh — the reset is hardened against interruption (only level.dat + that
-        // dimension's chunks are touched), so it's a normal way to fix an old world, not a last resort.
-        if (WorldSetupEvents.hasLegacyDimensions(server)) {
-            player.sendSystemMessage(Component.literal(
-                    "[Skyseed] This world predates the empty Nether and End, so those two are still the vanilla "
-                  + "dimensions (your overworld is unaffected). Two one-time fixes, both fine to use: start a new "
-                  + "world, or keep this one and convert it in place with /emptynether and /emptyend (needs "
-                  + "cheats/op) — that safely wipes and regenerates just that dimension on the next reload, "
-                  + "costing only what you've built there.")
-                  .withStyle(ChatFormatting.GOLD));
+        // A world made before the Nether/End were voided still has them as vanilla terrain; a world voided before
+        // v0.109.0 has a void End with no central island (no dragon arena / exit fountain). Point the player at the
+        // matching one-time in-place fix — each safely wipes/regenerates only what it must on the next reload.
+        boolean netherFix = SkyseedCommands.netherNeedsFix(server);
+        boolean endFix = SkyseedCommands.endNeedsFix(server);
+        if (netherFix || endFix) {
+            StringBuilder sb = new StringBuilder("[Skyseed] One-time world fix available (needs cheats/op):");
+            if (netherFix) {
+                sb.append(" your Nether is still the vanilla dimension — run /emptynether to make it the empty Skyseed Nether.");
+            }
+            if (endFix) {
+                sb.append(" your End is missing its Skyseed centre (the dragon's island + exit portal) — run /emptyend to grow it back.");
+            }
+            sb.append(" Each regenerates only what it must on the next reload (your overworld is untouched). NOTE: these fix "
+                    + "commands will be REMOVED in Skyseed 1.0 — run them before updating, or an un-updated old world can't be "
+                    + "repaired this way afterward.");
+            player.sendSystemMessage(Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD));
         }
     }
 }
