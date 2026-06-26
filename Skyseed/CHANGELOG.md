@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.101.0] - 2026-06-26
+
+### Added
+- **The End chapter begins — Phase 1, the portal collect-a-thon (crafting layer).** Added the components that will
+  assemble the End Portal Seed: the **Portal Frame Shard**, eight **structure relics** (one per major structure —
+  Woodland Mansion, Ocean Monument, Desert/Jungle Temple, Trial Chamber, Pillager Outpost, Nether Fortress, Bastion),
+  and four **portal edges**. Each edge is a shapeless craft of one shard + two relics, paired by domain (Grand / Temple
+  / Camp / Nether). Not yet obtainable in survival — the loot-table drops, the End Portal Seed recipe, and the grown
+  portal chamber follow in later increments (see SKYENDPLAN.md).
+
 ## [0.100.5] - 2026-06-26
 
 ### Changed

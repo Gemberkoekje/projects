@@ -85,9 +85,26 @@ public final class ModItems {
     /** theme id → its debug seed item, in {@link #DEBUG_SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> DEBUG_SEEDS = new LinkedHashMap<>();
 
+    /**
+     * End-chapter crafting components (the Phase-1 collect-a-thon, see SKYENDPLAN.md): the Portal Frame Shard, the
+     * eight structure relics, and the four portal edges. Plain items (not seeds) that combine — shard + 2 relics → an
+     * edge, four edges → the End Portal Seed. No {@code skyseeds} tag (they aren't seeds).
+     */
+    public static final List<String> END_PORTAL_PARTS = List.of(
+            "portal_frame_shard",
+            "mansion_relic", "monument_relic", "desert_relic", "jungle_relic",
+            "trial_relic", "outpost_relic", "fortress_relic", "bastion_relic",
+            "grand_edge", "temple_edge", "camp_edge", "nether_edge");
+
+    /** part id → its item, in {@link #END_PORTAL_PARTS} order. */
+    public static final Map<String, DeferredItem<Item>> PARTS = new LinkedHashMap<>();
+
     static {
         registerSeeds(SEED_THEMES, SEEDS);
         registerSeeds(DEBUG_SEED_THEMES, DEBUG_SEEDS);
+        for (final String part : END_PORTAL_PARTS) {
+            PARTS.put(part, ITEMS.registerItem(part, Item::new, new Item.Properties()));
+        }
         for (BiomeDebugSeed s : BIOME_DEBUG_SEEDS) {
             final ResourceLocation themeId = Ids.mod(s.theme());
             final ResourceLocation biomeId = Ids.parse(s.biome());

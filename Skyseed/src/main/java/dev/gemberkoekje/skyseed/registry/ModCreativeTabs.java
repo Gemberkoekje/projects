@@ -21,6 +21,7 @@ public final class ModCreativeTabs {
                     .displayItems((parameters, output) -> {
                         output.accept(SkyseedGuide.book());
                         ModItems.SEED_THEMES.forEach(theme -> output.accept(ModItems.SEEDS.get(theme).get()));
+                        ModItems.PARTS.values().forEach(part -> output.accept(part.get()));
                     })
                     .build());
 

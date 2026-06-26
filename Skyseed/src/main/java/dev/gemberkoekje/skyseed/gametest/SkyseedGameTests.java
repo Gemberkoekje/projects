@@ -1983,6 +1983,29 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void endPortalEdgesCraftFromShardAndRelics(GameTestHelper helper) {
+        // Phase-1 (End chapter) collect-a-thon: each of the four portal edges is a shapeless craft of one Portal Frame
+        // Shard + two structure relics. Resolving the recipe also proves every ingredient id is a registered item.
+        final ServerLevel level = helper.getLevel();
+        final String[][] edges = {
+                {"grand_edge", "mansion_relic", "monument_relic"}, {"temple_edge", "desert_relic", "jungle_relic"},
+                {"camp_edge", "trial_relic", "outpost_relic"}, {"nether_edge", "fortress_relic", "bastion_relic"}};
+        for (final String[] e : edges) {
+            final net.minecraft.world.item.crafting.CraftingInput input =
+                    net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get("portal_frame_shard").get()),
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(e[1]).get()),
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(e[2]).get())));
+            final var recipe = level.getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+            helper.assertTrue(recipe.isPresent(), "no crafting recipe for " + e[0] + " (shard + " + e[1] + " + " + e[2] + ")");
+            helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess()).is(ModItems.PARTS.get(e[0]).get()),
+                    e[0] + " recipe did not produce the edge");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.
