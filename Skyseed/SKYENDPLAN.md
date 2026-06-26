@@ -5,51 +5,56 @@ The End is **already pre-voided** (v0.35.1 — terrain emptied, the standard End
 forces **no re-save**. The Nether chapter already hands off to here: *Warped enderman pearls + Fortress blaze rods →
 Eyes of Ender → the End* (see `SKYNETHERPLAN.md` → "Then → the End"). The whole arc ends, as it should, with a dragon.
 
-This is a **first draft to decide against**, not a contract. Phase 1 is an open decision; the rest is the shape of the
-chapter once we've decided how players get in.
+This is a **first draft to decide against**, not a contract. Phase 1 (how you get in) is now decided in shape — a
+capstone collect-a-thon; the rest is the shape of the chapter that follows.
 
 ---
 
-## Phase 1 — Getting to the End  ⟵ *decide this first*
+## Phase 1 — Getting to the End  ✅ *shape decided (tuning open)*
 
 **The problem.** In vanilla you reach the End through a Stronghold's portal room — 12 End Portal Frames you fill with
 Eyes of Ender. Skyseed is skyblock: there is nothing to explore to, and End Portal Frames aren't craftable. So the
 chapter's gate is "how do you obtain a working End portal," and that gate must sit *behind the Nether* (Eyes of Ender
 already require blaze rods + enderman pearls — a clean, earned prerequisite).
 
-**Decided design — shards → edges → a Portal Frame *Seed*.** Peak on-theme: in Skyseed everything is a seed, so the End
-Portal Frame is too — you don't get it as a drop, you *grow* it. You build it up a crafting ladder, then plant it:
+**Decided design — the End is the mod's capstone collect-a-thon.** You don't *find* the portal, you *assemble its seed*
+from one ingredient out of nearly every corner of Skyseed — so reaching the End means you've engaged with most of the
+mod. Then you plant the seed and **the whole portal grows** (option 2 — no movable-frame mechanic).
 
-- **The ladder.** Find/farm **12 Portal Frame Shards** → combine into **4 Portal Frame Edges** (3 shards each) →
-  combine into **1 Portal Frame Seed** (4 edges). The shards are the scarce, farmable currency; the 12→4→1 ladder is
-  the satisfying multi-tier endgame craft.
-- **The seed grows the frame.** A **Portal Frame Seed**, planted, grows a **small portal-chamber island bearing an End
-  Portal Frame** — you *find* it on a grown island, the Skyseed echo of stumbling on the portal room in a vanilla
-  stronghold (and consistent with how every other structure here arrives).
-- **Bootstrap (the only RNG):** the **Dungeon** seed (the main source, a solid chance) + a **thin chance on Ancient**
-  (the deep, old places) roll a **stronghold fragment** alongside their normal output — mossy stone-brick corridors,
-  silverfish, loot — that drops the **shards**. This is the only way to get started; the ladder (and an optional shard
-  farm) does the rest. (No debug seed gets it — standing rule: debug seeds gate nothing.)
-- **The ring → the End.** You need **12 frames**, so the loop runs ~12 times; assemble the 12-frame ring, fill with
-  **12 Eyes of Ender** (from the Nether — blaze rods + enderman pearls) → activate → the End.
+**The recipe tree (math is exact — 4 edges × (1 shard + 2 materials) = 4 shards + 8 materials):**
 
-**The open fork (your call) — how 12 frames become one activatable ring:**
+- **4× Portal Frame Shard** — the base, a random **Dungeon** roll (+ a thin **Ancient** chance). The early-game mystery:
+  *"what the hell is this Portal Frame Shard I just found?"*
+- **8× structure/biome materials** — a *unique rare drop*, one from each of eight major Skyseed structures/biomes (one
+  in the **Woodland Mansion**, one in the **Ocean Monument**, …). The late-game checklist: *"where do I find the last
+  one I'm missing?"*
+- **4 Edges** — four distinct items, each = **1 Portal Frame Shard + 2 of the structure materials** (paired by domain).
+- **1 End Portal Seed** = the four Edges combined.
+- **Plant it → the full 12-frame portal chamber island grows**; fill with **12 Eyes of Ender** (Nether — blaze rods +
+  enderman pearls) → activate → the End.
 
-1. **One frame per island** (the literal version): each Portal Frame Seed grows an island with a single, *collectable*
-   frame (vanilla's frame can't be picked up, so Skyseed mints a movable one); harvest 12, lay the ring. Keeps the neat
-   12→12 symmetry and makes every frame earned — but it's the heaviest grind (up to ~144 shards for a portal).
-2. **The whole portal per seed**: 12 shards → 1 Portal Frame Seed → an island holding the **full 12-frame ring**; one
-   grow, fill with eyes, done. No movable-frame mechanic, much lighter. Reads as "grow the portal room," not "grow a
-   frame." *Leaning this way for sanity* unless the heavier farm is the point.
+**The eight sources (proposal — one rare material each, spanning the mod; tune the exact set):** Woodland Mansion +
+Ocean Monument (the grand structures) · Desert Temple + Jungle Temple (the temples) · Trial Chamber + Pillager Outpost
+(the hostile camps) · Nether Fortress + Bastion Remnant (the Nether). Candidates to swap in: Witch Hut, Wither Arena, or
+a biome relic (Mushroom / Badlands). Make them **rare but farmable** — you can re-grow that seed and re-loot, so it's a
+hunt, never a permanent RNG wall.
 
-**Open numbers to tune:** the bootstrap chances (Dungeon vs Ancient) and shards per fragment; the ladder ratios (12→4→1
-as given, or cheaper); under option 1, frames per island (1 vs 2–3) and total grind; and whether the grown island is a
-bare frame or a small loot-bearing chamber.
+**The four edges (proposal — each pairs one domain):** *Grand* = shard + Mansion + Monument · *Temple* = shard + Desert
++ Jungle · *Camp* = shard + Trial Chamber + Outpost · *Nether* = shard + Fortress + Bastion. The four → the End Portal
+Seed.
 
-**Deliverables:** the **Portal Frame Shard** + **Portal Frame Edge** items and the two combine recipes; the **Portal
-Frame Seed** (grows the portal-chamber island on the island-gen machinery) + its `skyseeds` tag/guide; under option 1, a
-movable **End Portal Frame** item; the `stronghold` bootstrap fragment (jigsaw set + the shard drop) hooked onto Dungeon
-+ Ancient; and gametests for the roll chance, the ladder recipes, and the grown portal/frame.
+**Why this is the gate:** the End becomes a true *finale* — you can't shortcut it, you must have looted the breadth of
+Skyseed *and* done the Nether (for the eyes). The shard is the early "what is this?"; the eight materials are the long
+tail that pulls you back through the whole mod.
+
+**Open to tune:** the exact eight sources + their drop rarity; whether one or two are *guaranteed* (so a completionist
+is never RNG-stranded on the very last item); the edge pairings; the shard's dungeon-roll chance; and whether the End
+Portal Seed island is the bare portal or carries a little stronghold flavour (silverfish, library).
+
+**Deliverables:** the **Portal Frame Shard** (dungeon drop) + **8 structure-material** items + their loot-table hooks;
+the **4 Edge** recipes + the **End Portal Seed** recipe (+ `skyseeds` tag/guide); the End Portal Seed island-gen (grows
+the 12-frame portal chamber on the island-gen machinery); the guide thread (early "mystery shard" → late "collection
+checklist → assemble → plant"); and gametests for each loot drop, the recipe tree, and the grown portal.
 
 ---
 
