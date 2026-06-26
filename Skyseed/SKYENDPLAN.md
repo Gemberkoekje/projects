@@ -17,33 +17,39 @@ Eyes of Ender. Skyseed is skyblock: there is nothing to explore to, and End Port
 chapter's gate is "how do you obtain a working End portal," and that gate must sit *behind the Nether* (Eyes of Ender
 already require blaze rods + enderman pearls — a clean, earned prerequisite).
 
-**Decided design — bootstrap, then farm.** A **Stronghold** piece set on the jigsaw machinery (like the bastion /
-mansion), reached two ways: a lucky random roll to *get started*, and a recipe loop to *finish the job*.
+**Decided design — shards → edges → a Portal Frame *Seed*.** Peak on-theme: in Skyseed everything is a seed, so the End
+Portal Frame is too — you don't get it as a drop, you *grow* it. You build it up a crafting ladder, then plant it:
 
-- **The frame is a real, collectable item.** Vanilla `end_portal_frame` isn't obtainable, so Skyseed mints a loose
-  **End Portal Frame** you can carry and re-place. It's the scarce currency: you need **12** to lay the ring, then fill
-  them with **Eyes of Ender** (from the Nether — blaze rods + enderman pearls) → activate → the End.
-- **Bootstrap (the only RNG):** the **Dungeon** seed (the main source, a solid chance) and a **thin chance on Ancient**
-  (the deep, old places) roll a **stronghold fragment** alongside their normal output — a mossy stone-brick corridor
-  knot with silverfish, a library/loot, and **1–2 loose frames**. This is the *only* way to get your **first** frame.
-  (No debug seed gets it — standing rule: debug seeds gate nothing.)
-- **Farm loop (deterministic backstop):** once you hold a frame, a **recipe consumes 1 End Portal Frame → a Stronghold
-  seed**. That seed grows a full stronghold whose portal room is **guaranteed to yield at least 1 frame** (and typically
-  a few) — so the loop **never net-loses** and, returning more than it costs, lets you **farm the remaining frames up to
-  12**. The lucky roll bootstraps; the seed farms. The End is therefore *always reachable* once you've found one frame,
-  but never hard-gated on continued luck.
-- **Portal mechanic:** vanilla End-portal activation works as-is once 12 frames are placed + eyed; the void End means you
-  arrive on the standard obsidian platform. Confirm the activated portal teleports correctly out of a floating overworld
-  island (it should — block-state driven, not terrain).
+- **The ladder.** Find/farm **12 Portal Frame Shards** → combine into **4 Portal Frame Edges** (3 shards each) →
+  combine into **1 Portal Frame Seed** (4 edges). The shards are the scarce, farmable currency; the 12→4→1 ladder is
+  the satisfying multi-tier endgame craft.
+- **The seed grows the frame.** A **Portal Frame Seed**, planted, grows a **small portal-chamber island bearing an End
+  Portal Frame** — you *find* it on a grown island, the Skyseed echo of stumbling on the portal room in a vanilla
+  stronghold (and consistent with how every other structure here arrives).
+- **Bootstrap (the only RNG):** the **Dungeon** seed (the main source, a solid chance) + a **thin chance on Ancient**
+  (the deep, old places) roll a **stronghold fragment** alongside their normal output — mossy stone-brick corridors,
+  silverfish, loot — that drops the **shards**. This is the only way to get started; the ladder (and an optional shard
+  farm) does the rest. (No debug seed gets it — standing rule: debug seeds gate nothing.)
+- **The ring → the End.** You need **12 frames**, so the loop runs ~12 times; assemble the 12-frame ring, fill with
+  **12 Eyes of Ender** (from the Nether — blaze rods + enderman pearls) → activate → the End.
 
-**Open numbers to tune:** the bootstrap chances (Dungeon vs Ancient), frames per fragment (1–2) and per farmed seed
-(≥1, target net-positive ~3–4), and the Stronghold-seed recipe's *other* inputs (stone bricks + an eye/ender component,
-so it reads as "stronghold," and is gated behind the Nether).
+**The open fork (your call) — how 12 frames become one activatable ring:**
 
-**Deliverables:** the loose **End Portal Frame** item (custom obtainable, places as the vanilla block) + its drop from
-the fragment loot; a `stronghold` jigsaw piece set + pool (corridors / library / portal-room / silverfish cell), the
-random-roll hook on Dungeon + Ancient, the **frame → Stronghold-seed** recipe (+ tag/guide), and gametests for the roll
-chance, the guaranteed-frame floor on the farmed seed, and the net-positive farm economy.
+1. **One frame per island** (the literal version): each Portal Frame Seed grows an island with a single, *collectable*
+   frame (vanilla's frame can't be picked up, so Skyseed mints a movable one); harvest 12, lay the ring. Keeps the neat
+   12→12 symmetry and makes every frame earned — but it's the heaviest grind (up to ~144 shards for a portal).
+2. **The whole portal per seed**: 12 shards → 1 Portal Frame Seed → an island holding the **full 12-frame ring**; one
+   grow, fill with eyes, done. No movable-frame mechanic, much lighter. Reads as "grow the portal room," not "grow a
+   frame." *Leaning this way for sanity* unless the heavier farm is the point.
+
+**Open numbers to tune:** the bootstrap chances (Dungeon vs Ancient) and shards per fragment; the ladder ratios (12→4→1
+as given, or cheaper); under option 1, frames per island (1 vs 2–3) and total grind; and whether the grown island is a
+bare frame or a small loot-bearing chamber.
+
+**Deliverables:** the **Portal Frame Shard** + **Portal Frame Edge** items and the two combine recipes; the **Portal
+Frame Seed** (grows the portal-chamber island on the island-gen machinery) + its `skyseeds` tag/guide; under option 1, a
+movable **End Portal Frame** item; the `stronghold` bootstrap fragment (jigsaw set + the shard drop) hooked onto Dungeon
++ Ancient; and gametests for the roll chance, the ladder recipes, and the grown portal/frame.
 
 ---
 
