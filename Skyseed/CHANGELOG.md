@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.103.0] - 2026-06-26
+
+### Added
+- **End Phase 1: the portal chamber grows.** A new `end_portal` theme (`PortalChamberTemplates`) builds the payoff — a
+  small stone island carrying a stronghold-styled room with the vanilla **12-frame End portal ring** (frames empty,
+  facing inward, over a 3×3 portal void), plus a doorway, corner torches, a bookshelf nook, and lurking silverfish
+  bricks. Fill the twelve frames with Eyes of Ender to light the portal to the End. (The End Portal Seed that plants
+  it — the `4 edges → seed` recipe — is the next increment.)
+
 ## [0.102.0] - 2026-06-26
 
 ### Added

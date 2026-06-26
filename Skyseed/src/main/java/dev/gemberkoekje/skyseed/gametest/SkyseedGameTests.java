@@ -2033,6 +2033,33 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void endPortalChamberHasTwelveEmptyFrames(GameTestHelper helper) {
+        // The End Portal Seed grows the portal chamber: a stronghold room with the vanilla 12-frame End portal ring,
+        // frames empty so the player lights it with Eyes of Ender. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_portal/chamber"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int frames = 0, eyed = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 12; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.END_PORTAL_FRAME)) {
+                        frames++;
+                        if (s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.EYE)) {
+                            eyed++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(frames == 12, "the portal chamber must have exactly 12 end-portal frames (got " + frames + ")");
+        helper.assertTrue(eyed == 0, "the frames must start empty so the player lights the portal (eyed=" + eyed + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
