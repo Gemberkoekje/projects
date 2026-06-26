@@ -73,7 +73,11 @@ public final class Jigsaw {
         final ChunkGenerator generator = level.getChunkSource().getGenerator();
         final StructureTemplateManager templates = level.getStructureManager();
         final StructureManager structureManager = level.structureManager();
-        final RandomSource random = level.getRandom();
+        // Seed the cap's filler selection + the piece stamping deterministically from (featureSeed, origin) instead of
+        // the shared world RNG (level.getRandom()), so the same call always produces the same structure. In-game the
+        // featureSeed is the world seed and the origin varies per island, so structures still differ by location; in
+        // gametests the explicit featureSeed + fixed origin make the whole placement reproducible (no more flaky runs).
+        final RandomSource random = RandomSource.create(featureSeed ^ origin.asLong());
         final Structure.GenerationContext context = new Structure.GenerationContext(
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
                 templates, featureSeed, new ChunkPos(origin), level, biome -> true);

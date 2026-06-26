@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.3] - 2026-06-26
+
+### Fixed
+- **Gametests are now deterministic.** `Jigsaw.placeCapped` seeded its cap filler selection and piece stamping from the
+  shared world RNG (`level.getRandom()`), so a capped structure's output varied run-to-run (and with test execution
+  order). It now seeds from `featureSeed ^ origin`: the same call always produces the same structure — reproducible in
+  tests (explicit seed + fixed origin), still varied per island in-game (world seed + per-island origin), and a re-grown
+  island now yields the same result.
+
 ## [0.100.2] - 2026-06-26
 
 ### Fixed
