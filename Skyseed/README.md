@@ -64,7 +64,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 The overworld and Nether chapters are built; what's planned next:
 
 - **More varied structures** — the **villages** now differ each throw (street villages with fields, gardens, and piers/bridges out over the void, by using the jigsaw system *deeply* — street/connective pools + real recursion depth; `SKYJIGSAWPLAN.md`, **shipped v0.68–0.93**). Still to do, same approach: different **mansion** footprints and **Nether-fortress** sprawl over the void.
-- **The End** — after the Nether's structures. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
+- **The End** — after the Nether's structures. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save. The chapter plan is drafted in `SKYENDPLAN.md` (access via a Stronghold portal-frame bootstrap-then-farm loop, End-native seeds, biome interactions, and the dragon capstone).
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
 - **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
 - **Remaining vanilla blocks** — now down to essentially the copper bulb (the Nether-gated set became reachable when the Nether chapter completed), tracked in `MISSINGBLOCKSPLAN.md`.
