@@ -29,8 +29,8 @@ import java.util.Optional;
  * a pool of replacements (fields/gardens): the surplus lots beyond the cap are re-stamped from that pool, so the
  * planned number of shops always lands when that many lots placed. {@code capCount = 0} (the default) disables it,
  * and an empty {@code capFiller} drops the surplus instead. Finally {@code centerpiece} is an optional block stamped
- * at the very centre of the assembled structure (one above the origin — the start piece's floor, where its lantern
- * sits), with any centre guard golem posted a couple of blocks aside: the Village Center's anvil capstone.
+ * at the very centre of the assembled structure (at the origin — the centre of the start piece's floor, where its
+ * lantern sits), with any centre guard golem posted a couple of blocks aside: the Village Center's anvil capstone.
  * See {@code SKYVILLAGESPLAN.md} / {@code SKYJIGSAWPLAN.md}.
  */
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,

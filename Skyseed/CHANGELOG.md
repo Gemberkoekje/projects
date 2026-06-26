@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.1] - 2026-06-26
+
+### Fixed
+- The anvil capstone was stamped one block too high — at `origin.above()` rather than `origin`. The start square's
+  centre tile (its lantern) lands exactly at the jigsaw origin, so the anvil ended up perched on top of the retained
+  lantern at head height instead of replacing it on the floor. Now placed at `origin`. Added a gametest pinning that
+  the square's centre tile lands at origin, and unified the "has a centerpiece" check the golem-offset uses so an
+  unknown block id can't shove the golem aside without a capstone being placed.
+
 ## [0.93.0] - 2026-06-25
 
 ### Added

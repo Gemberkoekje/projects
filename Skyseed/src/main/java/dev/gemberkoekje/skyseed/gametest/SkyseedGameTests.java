@@ -1008,6 +1008,20 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void villageCenterpieceLandsOnSquareCentre(GameTestHelper helper) {
+        // The anvil capstone (GenerationJob) is stamped at the jigsaw origin, which must be the start square's centre
+        // tile — its lantern. Assemble just the start square and confirm the lantern sits exactly at origin: the spot
+        // the capstone replaces. Guards against the jigsaw seating shifting and the capstone landing off-centre/floating.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        helper.assertTrue(helper.getBlockState(new BlockPos(24, 3, 24)).is(Blocks.LANTERN),
+                "the start square's centre tile must land at origin (where the centerpiece capstone is stamped)");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void tradePostDesertBiomeSelectsDesertPool(GameTestHelper helper) {
         // Biome-override wiring — what a forced-biome debug seed exercises. Planning the trade post in a desert biome

@@ -250,10 +250,12 @@ public final class GenerationJob {
             // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.
             linkConnections(level, js.origin(), Math.max(LINK_RADIUS, js.reach()));
             spawnVillagersAtBeds(js.origin(), Math.max(js.pad(), js.reach()));
-            // A capstone block at the very centre (the start square's lantern spot, origin + 1), if the theme set one.
-            // It sits on the foundation block below it, so a falling block like an anvil is supported and won't drop.
+            // A capstone block at the very centre, if the theme set one. The start square's centre tile — its lantern —
+            // sits exactly at the origin (the jigsaw seats the floor at origin.y - 1, so the block one above the floor
+            // lands at origin), and the anvil replaces it, resting on that floor block so a falling block won't drop.
+            final boolean hasCenterpiece = js.centerpiece().filter(Lookup::hasBlock).isPresent();
             js.centerpiece().filter(Lookup::hasBlock).ifPresent(cp ->
-                    level.setBlock(js.origin().above(), Lookup.blockState(cp), 3));
+                    level.setBlock(js.origin(), Lookup.blockState(cp), 3));
             // Guard golems spawn at the centre — unless a centerpiece holds it, in which case post them a couple of
             // blocks aside (the start square is 7 wide) so they stand on the floor beside the capstone, not on it.
             final BlockPos[] guardSpots = {
@@ -262,7 +264,7 @@ public final class GenerationJob {
             for (int i = 0; i < js.ironGolems(); i++) {
                 final IronGolem golem = EntityType.IRON_GOLEM.create(level);
                 if (golem != null) {
-                    final BlockPos base = js.centerpiece().isPresent() ? guardSpots[i % guardSpots.length] : js.origin();
+                    final BlockPos base = hasCenterpiece ? guardSpots[i % guardSpots.length] : js.origin();
                     final BlockPos spot = golemSpot(base);
                     golem.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
                     golem.setPersistenceRequired();
