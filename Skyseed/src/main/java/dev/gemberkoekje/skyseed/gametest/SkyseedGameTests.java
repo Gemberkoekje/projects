@@ -2037,18 +2037,23 @@ public final class SkyseedGameTests {
     @GameTest(template = BIG_REGION)
     public static void endPortalChamberHasTwelveEmptyFrames(GameTestHelper helper) {
         // The End Portal Seed grows the portal chamber: a stronghold room with the vanilla 12-frame End portal ring,
-        // frames empty so the player lights it with Eyes of Ender. (Loads dev-generated .nbt.)
+        // frames empty so the player lights it with Eyes of Ender. Assert exactly 12 frames, all empty, AND that every
+        // frame faces the ring's centre — the inward-facing layout vanilla requires, so dropping the 12th eye in-game
+        // actually opens the portal (a flipped frame would leave 12 frames that never form a portal). (Loads .nbt.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_portal/chamber"));
         Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
-        int frames = 0, eyed = 0;
+        final java.util.List<BlockPos> frames = new java.util.ArrayList<>();
+        final java.util.List<net.minecraft.core.Direction> facings = new java.util.ArrayList<>();
+        int eyed = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
                 for (int y = 1; y <= 12; y++) {
                     final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
                     if (s.is(Blocks.END_PORTAL_FRAME)) {
-                        frames++;
+                        frames.add(new BlockPos(x, y, z));
+                        facings.add(s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING));
                         if (s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.EYE)) {
                             eyed++;
                         }
@@ -2056,8 +2061,26 @@ public final class SkyseedGameTests {
                 }
             }
         }
-        helper.assertTrue(frames == 12, "the portal chamber must have exactly 12 end-portal frames (got " + frames + ")");
+        helper.assertTrue(frames.size() == 12, "the portal chamber must have exactly 12 end-portal frames (got " + frames.size() + ")");
         helper.assertTrue(eyed == 0, "the frames must start empty so the player lights the portal (eyed=" + eyed + ")");
+        double sx = 0;
+        double sz = 0;
+        for (final BlockPos p : frames) {
+            sx += p.getX();
+            sz += p.getZ();
+        }
+        final double cx = sx / frames.size(); // the ring centre (rotation-invariant — works at any placed orientation)
+        final double cz = sz / frames.size();
+        for (int i = 0; i < frames.size(); i++) {
+            final BlockPos p = frames.get(i);
+            final double dx = p.getX() - cx;
+            final double dz = p.getZ() - cz;
+            final net.minecraft.core.Direction want = Math.abs(dz) > Math.abs(dx)
+                    ? (dz < 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH)
+                    : (dx < 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST);
+            helper.assertTrue(facings.get(i) == want,
+                    "frame at " + p + " faces " + facings.get(i) + " but must face the ring centre (" + want + ") to form the portal");
+        }
         helper.succeed();
     }
 
