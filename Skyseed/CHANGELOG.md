@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.4] - 2026-06-26
+
+### Fixed
+- **Woodland Mansion: the upper-floor staircase no longer has a fall hazard.** The stairwell opening ran one block past
+  the top step, so the spot you step onto was open air; it's now a solid landing, with a dark-oak-fence railing around
+  the open shaft.
+
 ## [0.100.3] - 2026-06-26
 
 ### Fixed

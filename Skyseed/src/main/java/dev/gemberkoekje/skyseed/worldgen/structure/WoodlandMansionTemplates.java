@@ -101,9 +101,18 @@ public final class WoodlandMansionTemplates {
             m.put(new BlockPos(W - 2, 1 + s, cz + s), darkStair(Direction.SOUTH, Half.BOTTOM));
         }
         for (int x = W - 3; x <= W - 2; x++) {
-            for (int z = cz + 1; z <= cz + STOREY; z++) {
+            for (int z = cz + 1; z <= cz + STOREY - 1; z++) {   // the stairwell shaft; z=cz+STOREY stays a solid landing
                 m.put(new BlockPos(x, STOREY + 1, z), AIR);
             }
+        }
+        // A fence railing around the open stairwell on the upper floor (open only on the stair side) so the top
+        // landing isn't a fall hazard. Placed before the bookshelves, which solidly cap the one shared corner.
+        final BlockState rail = Blocks.DARK_OAK_FENCE.defaultBlockState();
+        m.put(new BlockPos(W - 3, STOREY + 2, cz), rail);              // the far (north) edge of the shaft
+        m.put(new BlockPos(W - 2, STOREY + 2, cz), rail);
+        for (int z = cz + 1; z <= cz + STOREY - 1; z++) {
+            m.put(new BlockPos(W - 4, STOREY + 2, z), rail);          // the two long sides
+            m.put(new BlockPos(W - 1, STOREY + 2, z), rail);
         }
 
         // Upper floor: two loot chests + a small library along the back wall.
