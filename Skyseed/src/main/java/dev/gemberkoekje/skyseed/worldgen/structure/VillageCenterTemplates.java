@@ -97,8 +97,10 @@ public final class VillageCenterTemplates {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState floor = Blocks.OAK_PLANKS.defaultBlockState();
-        final BlockState post = Blocks.OAK_LOG.defaultBlockState();
-        final BlockState glass = Blocks.GLASS.defaultBlockState();
+        final BlockState post = Blocks.STRIPPED_OAK_LOG.defaultBlockState();   // vanilla houses' stripped-log frame
+        final BlockState glass = Blocks.GLASS_PANE.defaultBlockState();
+        final BlockState base = Blocks.COBBLESTONE.defaultBlockState();        // cobble foundation course
+        final BlockState accent = Blocks.WHITE_TERRACOTTA.defaultBlockState(); // plaster upper course
         final int n = 7, max = 6, mid = 3;
         for (int x = 0; x < n; x++) {
             for (int z = 0; z < n; z++) {
@@ -107,7 +109,7 @@ public final class VillageCenterTemplates {
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
                 if (perim) {
                     for (int h = 1; h <= 3; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? post : floor);
+                        m.put(new BlockPos(x, h, z), corner ? post : (h == 1 ? base : h == 3 ? accent : floor));
                     }
                 }
                 m.put(new BlockPos(x, 4, z), floor);

@@ -1935,6 +1935,31 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void villageHousesUseVanillaBlocks(GameTestHelper helper) {
+        // The village houses follow the vanilla village frame: stripped-log corner posts, a cobblestone foundation,
+        // and glass-pane windows. Assemble a hamlet cottage and confirm all three landed. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/cottages"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        boolean strippedPost = false, pane = false, cobble = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 12; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.STRIPPED_OAK_LOG) || s.is(Blocks.STRIPPED_SPRUCE_LOG) || s.is(Blocks.STRIPPED_BIRCH_LOG)) strippedPost = true;
+                    else if (s.is(Blocks.GLASS_PANE)) pane = true;
+                    else if (s.is(Blocks.COBBLESTONE)) cobble = true;
+                }
+            }
+        }
+        helper.assertTrue(strippedPost, "village house must use stripped-log corner posts (the vanilla frame)");
+        helper.assertTrue(pane, "village house windows must be glass panes");
+        helper.assertTrue(cobble, "village house must sit on a cobblestone foundation");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator

@@ -41,21 +41,23 @@ public final class TradePostTemplates {
 
     /** The pool namespace prefix + the material set a trade-post piece set is built from. */
     public record Palette(String pool, Block wall, Block post, Block stairs, Block slab, Block door,
-                          Block foundation, Block glass, Block fence, Block fieldBorder) {}
+                          Block foundation, Block glass, Block fence, Block fieldBorder, Block accent) {}
 
-    public static final Palette PLAINS = new Palette("skyseed:trade_post", Blocks.OAK_PLANKS, Blocks.OAK_LOG,
-            Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR, Blocks.COBBLESTONE, Blocks.GLASS,
-            Blocks.OAK_FENCE, Blocks.DIRT);
+    // Materials mirror the vanilla village houses: a cobblestone foundation, plank walls with a contrasting
+    // plaster/accent upper course (the plains white-terracotta look), STRIPPED-log corner posts, glass-PANE windows.
+    public static final Palette PLAINS = new Palette("skyseed:trade_post", Blocks.OAK_PLANKS, Blocks.STRIPPED_OAK_LOG,
+            Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR, Blocks.COBBLESTONE, Blocks.GLASS_PANE,
+            Blocks.OAK_FENCE, Blocks.DIRT, Blocks.WHITE_TERRACOTTA);
     public static final Palette DESERT = new Palette("skyseed:trade_post_desert", Blocks.SMOOTH_SANDSTONE,
             Blocks.CUT_SANDSTONE, Blocks.SANDSTONE_STAIRS, Blocks.SANDSTONE_SLAB, Blocks.OAK_DOOR,
-            Blocks.SANDSTONE, Blocks.GLASS, Blocks.OAK_FENCE, Blocks.SAND);
+            Blocks.SANDSTONE, Blocks.GLASS_PANE, Blocks.OAK_FENCE, Blocks.SAND, Blocks.CUT_SANDSTONE);
     public static final Palette SAVANNA = new Palette("skyseed:trade_post_savanna", Blocks.ACACIA_PLANKS,
-            Blocks.ACACIA_LOG, Blocks.ACACIA_STAIRS, Blocks.ACACIA_SLAB, Blocks.ACACIA_DOOR,
-            Blocks.COBBLESTONE, Blocks.GLASS, Blocks.ACACIA_FENCE, Blocks.DIRT);
+            Blocks.STRIPPED_ACACIA_LOG, Blocks.ACACIA_STAIRS, Blocks.ACACIA_SLAB, Blocks.ACACIA_DOOR,
+            Blocks.COBBLESTONE, Blocks.GLASS_PANE, Blocks.ACACIA_FENCE, Blocks.DIRT, Blocks.ACACIA_PLANKS);
     /** Spruce set shared by the taiga and snowy overrides (they currently diverge only by island surface). */
     public static final Palette SPRUCE = new Palette("skyseed:trade_post_spruce", Blocks.SPRUCE_PLANKS,
-            Blocks.SPRUCE_LOG, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR,
-            Blocks.COBBLESTONE, Blocks.GLASS, Blocks.SPRUCE_FENCE, Blocks.DIRT);
+            Blocks.STRIPPED_SPRUCE_LOG, Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR,
+            Blocks.COBBLESTONE, Blocks.GLASS_PANE, Blocks.SPRUCE_FENCE, Blocks.DIRT, Blocks.SPRUCE_PLANKS);
 
     public static void generateInto(Path dir, Palette p) throws IOException {
         writeIfAbsent(dir.resolve("square.nbt"), square(p));
@@ -227,6 +229,7 @@ public final class TradePostTemplates {
         final BlockState post = p.post().defaultBlockState();
         final BlockState stone = p.foundation().defaultBlockState();
         final BlockState glass = p.glass().defaultBlockState();
+        final BlockState accent = p.accent().defaultBlockState();
         // 7×7 shell (was 5×5): vanilla's smallest village house is ~7×7, and the wider streets now space lots far
         // enough apart for it. max = the far wall index, mid = the centred door/window column.
         final int n = 7, max = 6, mid = 3;
@@ -237,9 +240,9 @@ public final class TradePostTemplates {
                 final boolean corner = (x == 0 || x == max) && (z == 0 || z == max);
                 if (perim) {
                     for (int h = 1; h <= 3; h++) {
-                        // the vanilla village-house frame: a cobble/stone foundation course, plank walls above,
-                        // log corner posts the full height
-                        m.put(new BlockPos(x, h, z), corner ? post : (h == 1 ? stone : wall));
+                        // the vanilla village-house timber frame: a cobblestone foundation course (h1), a plank lower
+                        // wall (h2), a plaster/accent upper course (h3), and stripped-log corner posts the full height
+                        m.put(new BlockPos(x, h, z), corner ? post : (h == 1 ? stone : h == 3 ? accent : wall));
                     }
                 }
                 m.put(new BlockPos(x, 4, z), wall); // a flat ceiling; the roof switch builds on top of it

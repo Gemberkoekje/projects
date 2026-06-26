@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.98.0] - 2026-06-26
+
+### Changed
+- **The village houses now match the vanilla village block details.** Studied the real plains-village house templates
+  and brought our trade-post shops, hamlet cottages, and village-center halls in line: **stripped-log corner posts**
+  (were plain logs), **glass-pane windows** (were full glass blocks), a **cobblestone foundation course**, and — on the
+  trade-post shops and village halls — a **white-terracotta plaster upper course** (the plains-cottage look). Desert
+  keeps its sandstone frame. Materials stay per-biome via the trade-post `Palette` (now with an `accent` field).
+
 ## [0.97.0] - 2026-06-26
 
 ### Added

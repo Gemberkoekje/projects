@@ -34,12 +34,13 @@ public final class HamletTemplates {
     /** A wood palette for one cottage variant: body planks, corner-post log, roof stairs, ridge slab, door. */
     private record Wood(BlockState planks, BlockState log, Block stairs, Block slab, Block door) {}
 
+    // Corner posts use STRIPPED logs, matching the vanilla village houses' visible timber frame.
     private static final Wood OAK = new Wood(Blocks.OAK_PLANKS.defaultBlockState(),
-            Blocks.OAK_LOG.defaultBlockState(), Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR);
+            Blocks.STRIPPED_OAK_LOG.defaultBlockState(), Blocks.OAK_STAIRS, Blocks.OAK_SLAB, Blocks.OAK_DOOR);
     private static final Wood SPRUCE = new Wood(Blocks.SPRUCE_PLANKS.defaultBlockState(),
-            Blocks.SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR);
+            Blocks.STRIPPED_SPRUCE_LOG.defaultBlockState(), Blocks.SPRUCE_STAIRS, Blocks.SPRUCE_SLAB, Blocks.SPRUCE_DOOR);
     private static final Wood BIRCH = new Wood(Blocks.BIRCH_PLANKS.defaultBlockState(),
-            Blocks.BIRCH_LOG.defaultBlockState(), Blocks.BIRCH_STAIRS, Blocks.BIRCH_SLAB, Blocks.BIRCH_DOOR);
+            Blocks.STRIPPED_BIRCH_LOG.defaultBlockState(), Blocks.BIRCH_STAIRS, Blocks.BIRCH_SLAB, Blocks.BIRCH_DOOR);
 
     public static void generateInto(Path structureDir) throws IOException {
         writeIfAbsent(structureDir.resolve("cottage_oak.nbt"), cottage(7, OAK, true));
@@ -57,7 +58,8 @@ public final class HamletTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState planks = w.planks();
         final BlockState log = w.log();
-        final BlockState glass = Blocks.GLASS.defaultBlockState();
+        final BlockState cobble = Blocks.COBBLESTONE.defaultBlockState();   // vanilla houses sit on a cobble base
+        final BlockState glass = Blocks.GLASS_PANE.defaultBlockState();
         final int lo = 1, hi = n;               // building spans [1..n]; the border at 0 / n+1 carries the eaves
         final int mid = (n + 1) / 2;            // centre column (ridge line)
         final int wallTop = 3, ceil = 4;        // walls y1..3, flat ceiling at y4
@@ -71,7 +73,7 @@ public final class HamletTemplates {
                 final boolean corner = (x == lo || x == hi) && (z == lo || z == hi);
                 if (perim) {
                     for (int h = 1; h <= wallTop; h++) {
-                        m.put(new BlockPos(x, h, z), corner ? log : planks);
+                        m.put(new BlockPos(x, h, z), corner ? log : (h == 1 ? cobble : planks));
                     }
                 }
                 m.put(new BlockPos(x, ceil, z), planks);
