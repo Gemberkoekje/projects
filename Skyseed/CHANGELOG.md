@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.2] - 2026-06-26
+
+### Changed
+- **Internal refactor (review Finding 2):** deduplicated `planIsland`'s per-field biome-override resolution. The ~11
+  copy-pasted `override ? value : (base-when-home-dimension : neutral)` ternaries are now one generic `eff(...)` helper,
+  so adding an overridable field is a single line and the "a foreign-dimension override is a complete spec and never
+  inherits overworld content" rule lives in one place instead of being re-encoded per field. Behaviour-preserving — the
+  full gametest suite (including the override-resolution tests) is unchanged.
+
+### Tests
+- Hardened `tradePostVillagePlacesShops`: it asserted an exact shop count off a single assembled village, but the
+  village is seeded from the grid-allocated origin chunk, so the count shifted when the test set changed. Now samples a
+  few deterministic villages per cap over the whole template and asserts the two robust halves of the cap guarantee
+  (never exceeds the cap; the cap is reachable). Added `biomeOverrideReplacesBodyFields` (+ `gametest/override_wins`
+  theme) pinning the override-wins branch the refactor touches.
+
 ## [0.93.1] - 2026-06-26
 
 ### Fixed

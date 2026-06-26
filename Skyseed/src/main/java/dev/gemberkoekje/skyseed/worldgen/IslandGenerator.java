@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Computes an island (README → Generation algorithm) from an {@link IslandTheme}, with the theme's base config overlaid
@@ -74,24 +76,16 @@ public final class IslandGenerator {
         final ResourceLocation neutralBlock = Ids.mc(
                 dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
         final Palette pal = theme.palette();
-        final Shape shape = (ov != null && ov.shape().isPresent()) ? ov.shape().get()
-                : (useBase ? theme.shape() : NEUTRAL_SHAPE);
-        final List<OreEntry> ores = (ov != null && ov.ores().isPresent()) ? ov.ores().get()
-                : (useBase ? theme.ores() : List.<OreEntry>of());
-        final List<Variant> variants = (ov != null && ov.variants().isPresent()) ? ov.variants().get()
-                : (useBase ? theme.variants() : List.<Variant>of());
-        final ResourceLocation fillId = (ov != null && ov.fill().isPresent()) ? ov.fill().get()
-                : (useBase ? pal.fill() : neutralBlock);
-        final ResourceLocation coreId = (ov != null && ov.core().isPresent()) ? ov.core().get()
-                : (useBase ? pal.core() : neutralBlock);
-        final int baseFill = (ov != null && ov.fillDepth().isPresent()) ? ov.fillDepth().get()
-                : (useBase ? pal.fillDepth() : 2);
-        final List<GroundEntry> scatterCfg = (ov != null && ov.surfaceScatter().isPresent()) ? ov.surfaceScatter().get()
-                : (useBase ? pal.surfaceScatter() : List.<GroundEntry>of());
+        final Shape shape = eff(ov, BiomeOverride::shape, useBase, theme::shape, NEUTRAL_SHAPE);
+        final List<OreEntry> ores = eff(ov, BiomeOverride::ores, useBase, theme::ores, List.<OreEntry>of());
+        final List<Variant> variants = eff(ov, BiomeOverride::variants, useBase, theme::variants, List.<Variant>of());
+        final ResourceLocation fillId = eff(ov, BiomeOverride::fill, useBase, pal::fill, neutralBlock);
+        final ResourceLocation coreId = eff(ov, BiomeOverride::core, useBase, pal::core, neutralBlock);
+        final int baseFill = eff(ov, BiomeOverride::fillDepth, useBase, pal::fillDepth, 2);
+        final List<GroundEntry> scatterCfg = eff(ov, BiomeOverride::surfaceScatter, useBase, pal::surfaceScatter, List.<GroundEntry>of());
 
         final Variant variant = pickVariant(variants, random);
-        ResourceLocation surfaceId = (ov != null && ov.surface().isPresent()) ? ov.surface().get()
-                : (useBase ? pal.surface() : neutralBlock);
+        ResourceLocation surfaceId = eff(ov, BiomeOverride::surface, useBase, pal::surface, neutralBlock);
         if (variant != null && variant.surfaceOverride().isPresent()) {
             surfaceId = variant.surfaceOverride().get();
         }
@@ -101,13 +95,12 @@ public final class IslandGenerator {
         // Snow-cap the finished island, and how heavily (0–1)? The rolled variant decides, else the matching override,
         // else the base palette — but never a foreign-dimension leak.
         final float snow = variant != null && variant.snow().isPresent() ? variant.snow().get()
-                : (ov != null && ov.snow().isPresent() ? ov.snow().get() : (useBase ? pal.snow() : 0f));
+                : eff(ov, BiomeOverride::snow, useBase, pal::snow, 0f);
         final List<Scatter> scatter = resolveScatter(scatterCfg);
         // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
         // replace the bands, or clear them with an empty list; a foreign-dimension override never inherits them.
-        final List<BlockState> bands = (ov != null && ov.fillBands().isPresent())
-                ? resolveBands(ov.fillBands().get())
-                : (useBase ? resolveBands(pal.fillBands()) : List.<BlockState>of());
+        final List<BlockState> bands = resolveBands(
+                eff(ov, BiomeOverride::fillBands, useBase, pal::fillBands, List.<ResourceLocation>of()));
         final int bandThickness = Math.max(1, pal.bandThickness());
 
         // --- pass 1: solid island terrain ---
@@ -248,8 +241,7 @@ public final class IslandGenerator {
         }
 
         // Mobs: theme/override sprinkles plus any variant-specific ones, spawned after the island lands.
-        final List<MobEntry> baseMobs = (ov != null && ov.mobs().isPresent()) ? ov.mobs().get()
-                : (useBase ? theme.mobs() : List.<MobEntry>of());
+        final List<MobEntry> baseMobs = eff(ov, BiomeOverride::mobs, useBase, theme::mobs, List.<MobEntry>of());
         final List<MobEntry> mobCfg = new ArrayList<>(baseMobs);
         if (variant != null) {
             mobCfg.addAll(variant.decoration().mobs());
@@ -284,6 +276,18 @@ public final class IslandGenerator {
                 (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
         return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks,
                 scatterPositions, snow);
+    }
+
+    /**
+     * The effective value of one per-island field: the matching biome override's value when it sets that field, else
+     * the base theme's value when the base config is valid in this dimension ({@code useBase}), else a dimension-neutral
+     * default — so a foreign-dimension override is a complete spec and never inherits overworld content. The single
+     * place planIsland's per-field "override over base over neutral" resolution lives (one call per overridable field).
+     */
+    private static <T> T eff(BiomeOverride ov, Function<BiomeOverride, Optional<T>> field,
+                             boolean useBase, Supplier<T> base, T neutral) {
+        final Optional<T> overridden = ov != null ? field.apply(ov) : Optional.empty();
+        return overridden.orElseGet(() -> useBase ? base.get() : neutral);
     }
 
     /** Flatten a {@code pad}-radius disc to {@code gy} for a building: clear above, solid below, no decoration. */
