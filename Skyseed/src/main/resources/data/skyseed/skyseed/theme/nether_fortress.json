@@ -6,7 +6,7 @@
     { "block": "minecraft:nether_gold_ore", "chance": 0.40, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 3 }, "depth": "core" },
     { "block": "minecraft:nether_quartz_ore", "chance": 0.40, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
-  "jigsaw": { "pool": "skyseed:nether_fortress/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48 },
+  "jigsaw": { "pool": "skyseed:nether_fortress/start", "target": "minecraft:bottom", "depth": 5, "pad": 5, "reach": 48, "cap_prefix": "span_", "cap_min": 4, "cap_count": 8, "cap_filler": "skyseed:nether_fortress/ends" },
   "mobs": [
     { "entity": "minecraft:wither_skeleton", "chance": 0.60, "count": { "min": 1, "max": 2 } },
     { "entity": "minecraft:blaze", "chance": 0.40, "count": { "min": 1, "max": 2 } },

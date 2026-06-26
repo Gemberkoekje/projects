@@ -2,6 +2,8 @@
   "fallback": "minecraft:empty",
   "elements": [
     { "weight": 5, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:nether_fortress/span_bridge", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:nether_fortress/span_balcony", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:nether_fortress/span_crossing", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:nether_fortress/end", "processors": "minecraft:empty", "projection": "rigid" } }
   ]
 }

@@ -1293,14 +1293,16 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void netherFortressAssemblesABoundedBridge(GameTestHelper helper) {
-        // Assemble the fortress jigsaw and confirm the pieces actually chain: the keep places exactly one (blaze)
-        // spawner, the self-connecting arcaded spans lay a run of nether brick out from it, and depth 5 + the
-        // wart-garden end terminator keep it BOUNDED — a handful of pieces in-region, not a runaway sprawl that fills
-        // (or overflows) the 48² template. (Loads dev-generated .nbt; syncDevStructures keeps the node copy current.)
+        // Assemble the fortress jigsaw with the production span_ cap and confirm the pieces actually chain AND stay
+        // bounded: the keep places exactly one (blaze) spawner, the self-connecting arcaded spans (incl. branching
+        // crossings) lay a run of nether brick out from it, and the cap (≤ 8 span_ pieces, surplus re-stamped as
+        // wart-garden ends) keeps it a compact fortress — not a runaway sprawl that fills the 48² template. (Loads
+        // dev-generated .nbt; syncDevStructures keeps the node copy current.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "", 0, null, 1L);
+        final var ends = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/ends"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "span_", 8, ends, 1L);
         int spawners = 0, netherBrick = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -1313,7 +1315,7 @@ public final class SkyseedGameTests {
         }
         helper.assertTrue(spawners == 1, "the keep must place exactly one blaze spawner (got " + spawners + ")");
         helper.assertTrue(netherBrick > 60, "the keep + bridge should lay nether brick (got " + netherBrick + ")");
-        helper.assertTrue(netherBrick < 900, "depth 5 + the end terminator should keep it bounded, not sprawling (got " + netherBrick + ")");
+        helper.assertTrue(netherBrick < 1400, "the span_ cap should keep it bounded, not sprawling (got " + netherBrick + ")");
         helper.succeed();
     }
 

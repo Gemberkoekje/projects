@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.95.0] - 2026-06-26
+
+### Changed
+- **The Nether Fortress now branches and stays bounded (jigsaw Increment 2).** Added a 4-way **crossing** (so the bridge
+  forks, like vanilla's BridgeCrossing) and a garden **balcony** span (soul-sand/wart braziers + a bridge-loot chest on
+  the deck). The whole thing is bounded by the **`span_` cap** — at most ~8 span pieces, with surplus branches
+  re-stamped as wart-garden ends — so a fortress is now a compact, *varied branching network* of arcaded bridges over
+  the void rather than a single straight run. (Still to come: a `stair_down` that descends a level over the lava sea.)
+
 ## [0.94.0] - 2026-06-26
 
 ### Changed

@@ -36,6 +36,8 @@ public final class NetherFortressTemplates {
     public static void generateInto(Path dir) throws IOException {
         StructureParts.writeIfAbsent(dir.resolve("keep.nbt"), keep());
         StructureParts.writeIfAbsent(dir.resolve("span_bridge.nbt"), spanBridge());
+        StructureParts.writeIfAbsent(dir.resolve("span_balcony.nbt"), spanBalcony());
+        StructureParts.writeIfAbsent(dir.resolve("span_crossing.nbt"), spanCrossing());
         StructureParts.writeIfAbsent(dir.resolve("end.nbt"), end());
         StructureParts.writeIfAbsent(dir.resolve("blaze_room.nbt"), blazeRoom());
     }
@@ -98,17 +100,8 @@ public final class NetherFortressTemplates {
         return new Built(m, bes);
     }
 
-    /**
-     * One arcaded bridge bay (x = 0..3): a 5-wide nether-brick deck carried on an arch springing off a pillar, over a
-     * glowing magma channel, with fence railings. A {@code bridge} connector at each end self-connects into the spans
-     * pool, so a run of these marches out over the void.
-     */
-    private static Built spanBridge() {
-        final Map<BlockPos, BlockState> m = new HashMap<>();
-        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
-        final BlockState fence = Blocks.NETHER_BRICK_FENCE.defaultBlockState();
-
+    /** One arcaded bridge bay (x = 0..3): a 5-wide deck on an arch springing off a pillar, over a magma channel. */
+    private static void arcadeBay(Map<BlockPos, BlockState> m, BlockState nb, BlockState fence) {
         for (int z = 1; z <= 5; z += 4) {
             m.put(new BlockPos(0, 0, z), nb);                 // a pillar at the near end
             m.put(new BlockPos(0, 1, z), nb);
@@ -127,9 +120,70 @@ public final class NetherFortressTemplates {
         m.put(new BlockPos(0, DECK + 2, 1), nb);
         m.put(new BlockPos(0, DECK + 1, 5), nb);
         m.put(new BlockPos(0, DECK + 2, 5), nb);
+    }
 
+    /** A straight span: one arcade bay, self-connecting via a {@code bridge} connector at each end — the staple. */
+    private static Built spanBridge() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
+        arcadeBay(m, nb, Blocks.NETHER_BRICK_FENCE.defaultBlockState());
         bridgeConn(m, bes, new BlockPos(0, DECK, 3), FrontAndTop.WEST_UP, SPANS);       // entry
         bridgeConn(m, bes, new BlockPos(BAY - 1, DECK, 3), FrontAndTop.EAST_UP, SPANS); // onward
+        StructureParts.linkFences(m);
+        return new Built(m, bes);
+    }
+
+    /**
+     * A garden span: one arcade bay with soul-sand/wart braziers and a bridge-loot chest set along its edges — a little
+     * wart garden hung on the bridge (models vanilla's stalk room). A {@code span_} piece, so the cap counts it.
+     */
+    private static Built spanBalcony() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
+        arcadeBay(m, nb, Blocks.NETHER_BRICK_FENCE.defaultBlockState());
+        m.put(new BlockPos(1, DECK + 1, 1), Blocks.SOUL_SAND.defaultBlockState());  // braziers on the edges
+        m.put(new BlockPos(1, DECK + 2, 1), grownWart());
+        m.put(new BlockPos(2, DECK + 1, 5), Blocks.SOUL_SAND.defaultBlockState());
+        m.put(new BlockPos(2, DECK + 2, 5), grownWart());
+        m.put(new BlockPos(1, DECK + 1, 5), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.SOUTH));
+        bes.put(new BlockPos(1, DECK + 1, 5), StructureParts.lootChest("minecraft:chests/nether_bridge"));
+        bridgeConn(m, bes, new BlockPos(0, DECK, 3), FrontAndTop.WEST_UP, SPANS);
+        bridgeConn(m, bes, new BlockPos(BAY - 1, DECK, 3), FrontAndTop.EAST_UP, SPANS);
+        StructureParts.linkFences(m);
+        return new Built(m, bes);
+    }
+
+    /**
+     * A 4-way bridge junction: a 5×5 deck on a corner-pillared arch base with a {@code bridge} connector on each side,
+     * so the fortress branches (models vanilla's BridgeCrossing). A {@code span_} piece capped low so it can't fork
+     * endlessly — that, with the cap on the total span count, is what bounds the sprawl.
+     */
+    private static Built spanCrossing() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
+        for (int x = 0; x <= 4; x += 4) {
+            for (int z = 1; z <= 5; z += 4) {
+                m.put(new BlockPos(x, 0, z), nb);             // corner pillars
+                m.put(new BlockPos(x, 1, z), nb);
+            }
+        }
+        m.put(new BlockPos(2, 1, 3), Blocks.MAGMA_BLOCK.defaultBlockState());
+        for (int x = 0; x <= 4; x++) {
+            for (int z = 1; z <= 5; z++) {
+                m.put(new BlockPos(x, DECK, z), nb);          // 5×5 deck
+            }
+        }
+        for (int[] c : new int[][] { {0, 1}, {0, 5}, {4, 1}, {4, 5} }) {
+            m.put(new BlockPos(c[0], DECK + 1, c[1]), nb);    // corner posts (sides stay open for the bridges)
+            m.put(new BlockPos(c[0], DECK + 2, c[1]), nb);
+        }
+        bridgeConn(m, bes, new BlockPos(0, DECK, 3), FrontAndTop.WEST_UP, SPANS);
+        bridgeConn(m, bes, new BlockPos(4, DECK, 3), FrontAndTop.EAST_UP, SPANS);
+        bridgeConn(m, bes, new BlockPos(2, DECK, 1), FrontAndTop.NORTH_UP, SPANS);
+        bridgeConn(m, bes, new BlockPos(2, DECK, 5), FrontAndTop.SOUTH_UP, SPANS);
         StructureParts.linkFences(m);
         return new Built(m, bes);
     }
