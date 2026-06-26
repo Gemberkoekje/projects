@@ -60,18 +60,12 @@ public final class TradePostTemplates {
             Blocks.COBBLESTONE, Blocks.GLASS_PANE, Blocks.SPRUCE_FENCE, Blocks.DIRT, Blocks.SPRUCE_PLANKS);
 
     public static void generateInto(Path dir, Palette p) throws IOException {
-        writeIfAbsent(dir.resolve("square.nbt"), square(p));
-        // A 7-long straight spaces lots ~7 apart so the wider 7×7 shops fit side by side; corners are pure turns
-        // (no lot — a 7×7 shop on a tight 3×3 corner would just overlap its neighbours and be rejected).
-        writeIfAbsent(dir.resolve("street_straight.nbt"), straightStreet(p));
-        writeIfAbsent(dir.resolve("street_corner.nbt"), streetSegment(p,
-                new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP},
-                new FrontAndTop[]{}));
-        // No 4-way cross piece on purpose: crossings pack parallel streets only 3 apart, so the 5-wide lots
-        // between them overlap and get rejected. Straight + corner runs keep open space along the sides for lots.
-        // A longer "large" section whose single lot is isolated enough for a bigger building (the L-shaped forge);
-        // it draws from the large_lots pool (big buildings + small ones for variety).
-        writeIfAbsent(dir.resolve("street_large.nbt"), largeStreet(p));
+        // Two street skeletons sharing the same lot/building pools, differing only in which streets pool their lanes
+        // recurse into: the normal set (the trade post) and a "_dense" set that recurses into "streets_dense", which
+        // weights the large (big-building) section higher — so the village_center, pointed at start_dense, reads as
+        // having more of the bigger buildings. See street_straight/large below for the lot spacing rationale.
+        writeStreetSkeleton(dir, p, p.pool() + "/streets", "");
+        writeStreetSkeleton(dir, p, p.pool() + "/streets_dense", "_dense");
         // Each profession gets a distinct building: roof shape + a profession feature, the blacksmith set well apart.
         writeIfAbsent(dir.resolve("shop_farmer.nbt"),
                 shop(p, new ShopDesign(Blocks.COMPOSTER.defaultBlockState(), Roof.GABLE, Feature.NONE)));
@@ -116,6 +110,23 @@ public final class TradePostTemplates {
     }
 
     /**
+     * Write one street skeleton (the square + the three street sections) whose lanes recurse into {@code streetsPool},
+     * suffixing each file with {@code suffix}. The lot connectors still draw from this palette's shared lot/building
+     * pools, so both skeletons place the same buildings — they differ only in how often a large section comes up.
+     *
+     * <p>A 7-long straight spaces lots ~7 apart so the wider 7×7 shops fit side by side; corners are pure turns (a 7×7
+     * shop on a tight 3×3 corner would just overlap its neighbours). No 4-way cross: parallel streets 3 apart would
+     * make the 5-wide lots between them overlap. The large section's single, isolated lot draws the large_lots pool.
+     */
+    private static void writeStreetSkeleton(Path dir, Palette p, String streetsPool, String suffix) throws IOException {
+        writeIfAbsent(dir.resolve("square" + suffix + ".nbt"), square(p, streetsPool));
+        writeIfAbsent(dir.resolve("street_straight" + suffix + ".nbt"), straightStreet(p, streetsPool));
+        writeIfAbsent(dir.resolve("street_corner" + suffix + ".nbt"), streetSegment(p, streetsPool,
+                new FrontAndTop[]{FrontAndTop.WEST_UP, FrontAndTop.SOUTH_UP}, new FrontAndTop[]{}));
+        writeIfAbsent(dir.resolve("street_large" + suffix + ".nbt"), largeStreet(p, streetsPool));
+    }
+
+    /**
      * A 3×3 hamlet green: a lamp post and three lot connectors that pull this palette's {@code lots} pool — i.e. the
      * very same profession shops the trade post uses. The Hamlet theme starts from this hub (capped to 1–2 shops),
      * so a hamlet shows the trade post's building diversity in miniature, in the biome's materials.
@@ -140,8 +151,8 @@ public final class TradePostTemplates {
         return new Built(m, bes);
     }
 
-    /** 7×7 solid village square: the island anchor + a lantern, and four outward street connectors. */
-    private static Built square(Palette p) {
+    /** 7×7 solid village square: the island anchor + a lantern, and four outward street connectors into {@code streetsPool}. */
+    private static Built square(Palette p, String streetsPool) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState base = p.foundation().defaultBlockState();
@@ -151,17 +162,17 @@ public final class TradePostTemplates {
             }
         }
         final String floor = id(p.foundation());
-        streetConn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, p, floor);
-        streetConn(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP, p, floor);
-        streetConn(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP, p, floor);
-        streetConn(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP, p, floor);
+        streetConn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, streetsPool, floor);
+        streetConn(m, bes, new BlockPos(3, 0, 6), FrontAndTop.SOUTH_UP, streetsPool, floor);
+        streetConn(m, bes, new BlockPos(0, 0, 3), FrontAndTop.WEST_UP, streetsPool, floor);
+        streetConn(m, bes, new BlockPos(6, 0, 3), FrontAndTop.EAST_UP, streetsPool, floor);
         m.put(new BlockPos(3, 1, 3), Blocks.LANTERN.defaultBlockState());
         anchor(m, bes, new BlockPos(3, 0, 3), floor); // last, so the floor loop can't clobber it
         return new Built(m, bes);
     }
 
     /** A 3×3 marker street deck with through-connectors on {@code streetSides} and lot connectors on {@code lotSides}. */
-    private static Built streetSegment(Palette p, FrontAndTop[] streetSides, FrontAndTop[] lotSides) {
+    private static Built streetSegment(Palette p, String streetsPool, FrontAndTop[] streetSides, FrontAndTop[] lotSides) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
@@ -171,7 +182,7 @@ public final class TradePostTemplates {
             }
         }
         for (final FrontAndTop s : streetSides) {
-            streetConn(m, bes, edge(s), s, p, "minecraft:air");
+            streetConn(m, bes, edge(s), s, streetsPool, "minecraft:air");
         }
         for (final FrontAndTop s : lotSides) {
             conn(m, bes, edge(s), s, "skyseed:lot", "skyseed:lot_door", p.pool() + "/lots", "minecraft:air");
@@ -185,7 +196,7 @@ public final class TradePostTemplates {
      * lot is well clear of the neighbouring sections' lots, so a bigger building (the L-shaped forge) has room to
      * spread along the lane without overlapping anything.
      */
-    private static Built largeStreet(Palette p) {
+    private static Built largeStreet(Palette p, String streetsPool) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
@@ -194,8 +205,8 @@ public final class TradePostTemplates {
                 m.put(new BlockPos(x, 1, z), wool); // a 3×7 path-marker deck
             }
         }
-        streetConn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, p, "minecraft:air"); // lane continues
-        streetConn(m, bes, new BlockPos(1, 0, 6), FrontAndTop.SOUTH_UP, p, "minecraft:air");
+        streetConn(m, bes, new BlockPos(1, 0, 0), FrontAndTop.NORTH_UP, streetsPool, "minecraft:air"); // lane continues
+        streetConn(m, bes, new BlockPos(1, 0, 6), FrontAndTop.SOUTH_UP, streetsPool, "minecraft:air");
         conn(m, bes, new BlockPos(2, 0, 3), FrontAndTop.EAST_UP, "skyseed:lot", "skyseed:lot_door",
                 p.pool() + "/large_lots", "minecraft:air"); // one large lot at the isolated middle
         return new Built(m, bes);
@@ -207,7 +218,7 @@ public final class TradePostTemplates {
      * enough for the wider 7×7 shops to sit side by side along the lane without overlapping (vanilla streets space
      * houses out the same way). Draws from the regular {@code lots} pool.
      */
-    private static Built straightStreet(Palette p) {
+    private static Built straightStreet(Palette p, String streetsPool) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState wool = PathSurfacer.MARKER.defaultBlockState();
@@ -216,8 +227,8 @@ public final class TradePostTemplates {
                 m.put(new BlockPos(x, 1, z), wool); // a 7×3 path-marker deck
             }
         }
-        streetConn(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP, p, "minecraft:air");
-        streetConn(m, bes, new BlockPos(6, 0, 1), FrontAndTop.EAST_UP, p, "minecraft:air");
+        streetConn(m, bes, new BlockPos(0, 0, 1), FrontAndTop.WEST_UP, streetsPool, "minecraft:air");
+        streetConn(m, bes, new BlockPos(6, 0, 1), FrontAndTop.EAST_UP, streetsPool, "minecraft:air");
         conn(m, bes, new BlockPos(3, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot", "skyseed:lot_door",
                 p.pool() + "/lots", "minecraft:air");
         conn(m, bes, new BlockPos(3, 0, 2), FrontAndTop.SOUTH_UP, "skyseed:lot", "skyseed:lot_door",
@@ -676,8 +687,8 @@ public final class TradePostTemplates {
 
     /** A self-linking street connector at {@code pos} facing {@code dir}, drawing from this palette's street pool. */
     private static void streetConn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos pos,
-                                   FrontAndTop dir, Palette p, String finalState) {
-        conn(m, bes, pos, dir, "skyseed:street", "skyseed:street", p.pool() + "/streets", finalState);
+                                   FrontAndTop dir, String streetsPool, String finalState) {
+        conn(m, bes, pos, dir, "skyseed:street", "skyseed:street", streetsPool, finalState);
     }
 
     /** A jigsaw connector block-entity at {@code pos}. */

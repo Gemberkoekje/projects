@@ -1,0 +1,9 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 7, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_spruce/street_straight_dense", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_spruce/street_corner_dense", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 5, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_spruce/street_large_dense", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:empty_pool_element" } }
+  ]
+}

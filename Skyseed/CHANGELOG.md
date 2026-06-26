@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.0] - 2026-06-26
+
+### Changed
+- **The village center now favours bigger buildings more than the trade post.** It assembles from a denser street
+  skeleton (`start_dense`) whose lanes weight the large, big-building section higher (5 vs 3) than the trade post's, so
+  a village center reads as having more forges and great halls. Both still draw the same building pieces — only the
+  street mix differs. A gametest confirms the village center places strictly more big buildings over a fixed seed set.
+
 ## [0.99.0] - 2026-06-26
 
 ### Added

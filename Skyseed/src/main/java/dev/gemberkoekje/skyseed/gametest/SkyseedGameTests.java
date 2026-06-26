@@ -987,14 +987,14 @@ public final class SkyseedGameTests {
 
     @GameTest(template = REGION)
     public static void villageCenterIsABigVillage(GameTestHelper helper) {
-        // The village_center seed is "a bigger Trade Post" laid out as a CLUSTER: the SAME village pieces
-        // (trade_post/start), a deeper street network and a guaranteed 4+ shops, spread over 3 small islands ringed
-        // around a void centre (cluster_offsets). Like the trade post it's biome-styled -- a desert one pulls the
-        // desert pieces -- which is what the per-biome debug seeds exercise.
+        // The village_center seed is "a bigger Trade Post" laid out as a CLUSTER: the SAME building pieces via a
+        // denser street skeleton (trade_post/start_dense, whose lanes weight the large/big-building section higher),
+        // a deeper street network and a guaranteed 4+ shops, spread over 3 small islands ringed around a void centre
+        // (cluster_offsets). Like the trade post it's biome-styled -- a desert one pulls the desert pieces.
         final ServerLevel level = helper.getLevel();
         final IslandTheme vc = theme(level, "village_center");
-        helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().getPath().equals("trade_post/start"),
-                "village_center must reuse the trade post village pieces");
+        helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().getPath().equals("trade_post/start_dense"),
+                "village_center must reuse the trade post village pieces (via the denser start_dense skeleton)");
         helper.assertTrue(vc.jigsaw().get().depth() > 4, "village_center must run a deeper street network than the trade post (depth 4)");
         helper.assertTrue(vc.jigsaw().get().capMin() >= 4, "village_center must guarantee at least 4 shops");
         helper.assertTrue(!vc.shape().clusterOffsets().isEmpty(),
@@ -1004,9 +1004,53 @@ public final class SkyseedGameTests {
         final var desert = level.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
         final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), vc, desert, RandomSource.create(8L));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start_dense")),
                 "a desert village_center must use the desert village pieces (biome-styled like the trade post)");
         helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void villageCenterFavoursBigBuildings(GameTestHelper helper) {
+        // The village_center's dense street skeleton (start_dense) weights the big-building "large" section higher
+        // than the trade post's, so over a fixed set of seeds it places more forges + great halls (anvils + bells).
+        // Same depth/cap for both, so only the streets pool differs — deterministic. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        int denseBig = 0, normalBig = 0;
+        for (long seed = 1; seed <= 16; seed++) {
+            denseBig += assembleAndCountBig(helper, level, "trade_post/start_dense", seed);
+            normalBig += assembleAndCountBig(helper, level, "trade_post/start", seed);
+        }
+        helper.assertTrue(denseBig > normalBig, "the village_center's dense skeleton should place more big buildings "
+                + "than the trade post (dense=" + denseBig + " vs trade post=" + normalBig + ")");
+        helper.succeed();
+    }
+
+    /** Clear the region, assemble {@code poolName} (depth 5, cap 4) at origin with {@code seed}, count forges +
+     *  great halls (their anvil + bell). */
+    private static int assembleAndCountBig(GameTestHelper helper, ServerLevel level, String poolName, long seed) {
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod(poolName));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                }
+            }
+        }
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, helper.absolutePos(new BlockPos(24, 3, 24)),
+                false, "shop_", 4, fillers, seed);
+        int big = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.ANVIL) || s.is(Blocks.BELL)) {
+                        big++;
+                    }
+                }
+            }
+        }
+        return big;
     }
 
     @GameTest(template = BIG_REGION)
