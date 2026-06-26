@@ -141,6 +141,13 @@ finale.
 - **The rewards close the chapter:** the **dragon egg** (trophy), **dragon's breath** (lingering potions), the **End
   Gateway** opening to the outer islands → **End Cities → elytra + shulkers** (Phase 3). Flight is the literal and
   thematic top of the progression.
+- **End Gateways over the void — must solve here.** Vanilla gateways open when the dragon dies and fling you ~1000 blocks
+  out to the **outer islands** — which, in a void End, **don't exist**, so you'd arrive in empty sky and fall. Two fixes:
+  **(a)** make the gateway land you safe — drop you onto a generated End island, or auto-place a small landing platform at
+  the destination (the robust fix; hook the gateway block-entity's exit placement); **(b)** a guide warning to throw an
+  End seed at the far side first (fragile — you can't easily seed a spot you haven't reached). *Recommend (a).* The
+  pressure is low, though: because **End Cities are themselves a grown seed** (Phase 3), the gateway no longer *gates*
+  content — it just needs to not kill you, so a safe landing platform is enough and the real outer-End loot you grow.
 
 ---
 
