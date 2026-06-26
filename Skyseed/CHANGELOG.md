@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.2] - 2026-06-26
+
+### Fixed
+- **Woodland Mansion: closed the see-through gap and overhanging eave where a wing meets the core.** The wing's −Z side
+  (facing the core) was left fully open, so its corner posts stopped one block short of the core wall — a see-through
+  gap — and the roof hung over the open threshold as an eave. That −Z side is now a full wall with a doorway carved
+  through it, so the wing butts flush onto the core.
+
 ## [0.100.1] - 2026-06-26
 
 ### Fixed

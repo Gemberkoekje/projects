@@ -136,27 +136,30 @@ public final class WoodlandMansionTemplates {
         bes.put(new BlockPos(connX, 0, connZ), jig("skyseed:mansion_wall", "skyseed:wing_door", "skyseed:woodland_mansion/wings", BIRCH_ID));
     }
 
-    /** A 7×7 single-storey wing room, OPEN on its −Z side (it butts flush onto the core's wall), styled + themed. */
+    /** A 7×7 single-storey wing room; its −Z wall butts flush onto the core (a doorway carved through it), styled + themed. */
     private static Built wing(String kind) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        final int mx = 6, mid = 3;       // 7×7 footprint (0..6); −Z (z=0) is the open connecting side
+        final int mx = 6, mid = 3;       // 7×7 footprint (0..6); −Z (z=0) is the wall that butts onto the core
 
         birchFloor(m, 0, mx, 0, mx, 0);
         for (int y = 1; y <= STOREY; y++) {
             for (int x = 0; x <= mx; x++) {
-                for (int z = 1; z <= mx; z++) {                 // z starts at 1 — z=0 is OPEN (abuts the core wall)
-                    if (x != 0 && x != mx && z != mx) {
-                        continue;                                // interior + the open −Z side stay clear
+                for (int z = 0; z <= mx; z++) {                 // FULL perimeter, incl. the −Z side that meets the core
+                    if (x != 0 && x != mx && z != 0 && z != mx) {
+                        continue;                                // interior stays clear
                     }
-                    final boolean corner = (x == 0 || x == mx) && z == mx;
+                    final boolean corner = (x == 0 || x == mx) && (z == 0 || z == mx);
                     final BlockState s = corner ? LOG : (y == 1 ? COBBLE : PLANKS);  // cobblestone base course
                     m.put(new BlockPos(x, y, z), s);
                 }
             }
         }
-        wallCornice(m, 0, mx, 1, mx, STOREY);                   // cobblestone cornice on the three closed walls
-        // A connector + doorway opening on the −Z (open) side so the wing reads as a doorway into the core.
+        wallCornice(m, 0, mx, 0, mx, STOREY);                   // cobblestone cornice around all four walls
+        // The −Z wall sits flush against the core (no corner gap, no overhanging eave); carve a doorway through it,
+        // aligned with the core's, with the connector at the floor edge so the jigsaw seats it against the wall.
+        m.put(new BlockPos(mid, 1, 0), AIR);
+        m.put(new BlockPos(mid, 2, 0), AIR);
         m.put(new BlockPos(mid, 0, 0), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.NORTH_UP));
         bes.put(new BlockPos(mid, 0, 0), jig("skyseed:wing_door", "skyseed:mansion_wall", "minecraft:empty", BIRCH_ID));
         // Glass-pane windows with fence bars on the two side walls.
