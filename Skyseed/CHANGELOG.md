@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.107.0] - 2026-06-27
+
+### Changed
+- **The End Portal chamber is now a proper temple, not a box.** Rebuilt `PortalChamberTemplates` as an open peristyle:
+  a stepped blackstone plinth, a polished-diorite floor with a gilded portal dais, quartz columns and four arched
+  dark-oak-lintelled entrances, four blackstone corner spires (gilded bands, lancet windows, tapered end-rod tips), and
+  four dark-oak canopy posts rising to a glowing quartz **cupola** — windowed drum, stepped open cap, gilded finial —
+  that funnels light straight down onto the portal. Gilded-blackstone and dark-oak accents throughout; a stepped quartz
+  hip roof ties it together and tucks around the spires. The island grew to fit (radius 8–9, pad 7). Portal mechanics
+  unchanged — 12 inward-facing frames, gametest-verified.
+
 ## [0.106.0] - 2026-06-27
 
 ### Added

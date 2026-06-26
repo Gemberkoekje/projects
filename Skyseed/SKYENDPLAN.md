@@ -16,7 +16,8 @@ capstone collect-a-thon; the rest is the shape of the chapter that follows.
 > relics, the 4 portal edges (PowerShell-painted icons) — and the shapeless **edge recipes** (v0.101.0); the **loot-table
 > drops** (v0.102.0): a `skyseed:add_drop` global loot modifier seeds the shard into dungeon loot (~40%) and each relic
 > into its structure's table (~25%) — re-grow a structure to re-roll; the **portal-chamber structure + `end_portal`
-> theme** (v0.103.0): a stronghold room with the vanilla 12-frame ring (frames empty) grows on a stone island; and the
+> theme** (v0.103.0, rebuilt as a diorite/quartz/blackstone peristyle temple with corner spires + a glowing cupola in
+> v0.107.0): the vanilla 12-frame ring (frames empty) grows on a stone island; and the
 > **End Portal Seed** (v0.104.0): the craftable seed (4 edges in a cross → seed) that plants that chamber, with full
 > survival onboarding (recipe, unique icon, `skyseeds` tag, gated field-notes guide entry, reveal/gathered/craft
 > advancements). The loop is closed: structure drops → 4 edges → seed → grown portal → fill with 12 Eyes of Ender → the
