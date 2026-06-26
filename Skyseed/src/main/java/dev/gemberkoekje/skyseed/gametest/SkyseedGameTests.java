@@ -1264,9 +1264,9 @@ public final class SkyseedGameTests {
 
     @GameTest(template = REGION)
     public static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
-        // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the hand-built fortress
-        // (arcaded bridge + keep with a caged blaze spawner). The structure itself is placed later by the generation
-        // job, so the plan carries it as a jigsaw site.
+        // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the fortress jigsaw — a keep
+        // with a caged blaze spawner, self-connecting arcaded bridge spans out over the void, wart-garden ends. The
+        // structure itself is placed later by the generation job, so the plan carries it as a jigsaw site.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme nf = theme(overworld, "nether_fortress");
         helper.assertTrue(nf.baseValidIn(Level.NETHER.location()), "nether_fortress must implement the_nether");
@@ -1286,8 +1286,34 @@ public final class SkyseedGameTests {
             if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
         }
         helper.assertTrue(netherrack, "the nether fortress island should be a netherrack island");
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/fortress")),
-                "the nether fortress island should assemble the fortress jigsaw");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/start")),
+                "the nether fortress island should assemble the fortress jigsaw (start pool = the keep)");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void netherFortressAssemblesABoundedBridge(GameTestHelper helper) {
+        // Assemble the fortress jigsaw and confirm the pieces actually chain: the keep places exactly one (blaze)
+        // spawner, the self-connecting arcaded spans lay a run of nether brick out from it, and depth 5 + the
+        // wart-garden end terminator keep it BOUNDED — a handful of pieces in-region, not a runaway sprawl that fills
+        // (or overflows) the 48² template. (Loads dev-generated .nbt; syncDevStructures keeps the node copy current.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/start"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "", 0, null, 1L);
+        int spawners = 0, netherBrick = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 16; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.SPAWNER)) spawners++;
+                    else if (s.is(Blocks.NETHER_BRICKS)) netherBrick++;
+                }
+            }
+        }
+        helper.assertTrue(spawners == 1, "the keep must place exactly one blaze spawner (got " + spawners + ")");
+        helper.assertTrue(netherBrick > 60, "the keep + bridge should lay nether brick (got " + netherBrick + ")");
+        helper.assertTrue(netherBrick < 900, "depth 5 + the end terminator should keep it bounded, not sprawling (got " + netherBrick + ")");
         helper.succeed();
     }
 

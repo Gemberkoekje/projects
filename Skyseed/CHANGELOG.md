@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.94.0] - 2026-06-26
+
+### Changed
+- **The Nether Fortress is now a small jigsaw network, not a fixed monolith.** Modelled on vanilla's
+  `NetherFortressPieces` but with a deliberately tight, *bounded* vocabulary: a **keep** with the caged blaze spawner is
+  the start, self-connecting arcaded **bridge spans** (a 5-wide nether-brick deck on arches over a glowing magma
+  channel) march out over the void in a random direction, and a **wart-garden end** with a loot chest caps each run.
+  A low `depth` (5) plus the end terminator keep it compact and varied — no two fortresses share a layout — rather than
+  vanilla's depth-30 sprawl to the horizon. (More piece types — crossings, side balconies — to follow; the standalone
+  blaze room, the 5% rare roll, is unchanged.)
+
 ## [0.93.5] - 2026-06-26
 
 ### Changed
