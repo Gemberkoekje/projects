@@ -25,8 +25,11 @@ final class ShapeBuilder {
 
     static Result build(BlockPos center, Shape shape, BlockState surface, BlockState fill, BlockState core,
                         List<Scatter> scatter, List<BlockState> bands, int bandThickness, int baseFill, RandomSource random,
-                        Map<BlockPos, BlockState> blockMap, List<BlockPos> coreList, List<BlockPos> surfaceList,
-                        List<BlockPos> bottomList) {
+                        TerrainBuffers buffers) {
+        final Map<BlockPos, BlockState> blockMap = buffers.blockMap();
+        final List<BlockPos> coreList = buffers.coreList();
+        final List<BlockPos> surfaceList = buffers.surfaceList();
+        final List<BlockPos> bottomList = buffers.bottomList();
         // --- shape parameters ---
         final int baseRadius = Math.max(1, shape.radius().sample(random));
         final double rimNoise = shape.rimNoise();

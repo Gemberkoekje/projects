@@ -35,7 +35,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -104,10 +103,14 @@ public final class IslandGenerator {
         final int bandThickness = Math.max(1, pal.bandThickness());
 
         // --- pass 1: solid island terrain ---
-        final Map<BlockPos, BlockState> blockMap = new LinkedHashMap<>();
-        final List<BlockPos> coreList = new ArrayList<>();
-        final List<BlockPos> surfaceList = new ArrayList<>();
-        final List<BlockPos> bottomList = new ArrayList<>(); // lowest block of each column, for underside hangs
+        // Pass-1 output buffers (placed blocks + the per-column lists later planners read), bundled so ShapeBuilder.build
+        // takes one named output rather than four loose accumulators and a cluster shares one set across its stamps. The
+        // locals below alias the same collections so the rest of this method (and its planners) is unchanged.
+        final TerrainBuffers buffers = TerrainBuffers.create();
+        final Map<BlockPos, BlockState> blockMap = buffers.blockMap();
+        final List<BlockPos> coreList = buffers.coreList();
+        final List<BlockPos> surfaceList = buffers.surfaceList();
+        final List<BlockPos> bottomList = buffers.bottomList(); // lowest block of each column, for underside hangs
         // A ring cluster (cluster_offsets set) stamps the shape at each offset and leaves the CENTRE void — the jigsaw's
         // start then sits on a small levelled pad over that void hole and spans the ring on its own bridges/piers. A
         // normal island (no offsets) is just stamped once at the centre. The first island built gives the shape Result.
@@ -115,11 +118,11 @@ public final class IslandGenerator {
         final BlockPos firstCentre = clusterOffsets.isEmpty() ? center
                 : center.offset(clusterOffsets.get(0).getX(), 0, clusterOffsets.get(0).getZ());
         final ShapeBuilder.Result sh = ShapeBuilder.build(firstCentre, shape, surface, fill, core, scatter, bands,
-                bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
+                bandThickness, baseFill, random, buffers);
         for (int k = 1; k < clusterOffsets.size(); k++) {
             final BlockPos off = clusterOffsets.get(k);
             ShapeBuilder.build(center.offset(off.getX(), 0, off.getZ()), shape, surface, fill, core, scatter, bands,
-                    bandThickness, baseFill, random, blockMap, coreList, surfaceList, bottomList);
+                    bandThickness, baseFill, random, buffers);
         }
         final int baseRadius = sh.baseRadius();
         final int topDome = sh.topDome();

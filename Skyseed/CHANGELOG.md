@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.3] - 2026-06-26
+
+### Changed
+- **Internal refactor (review Finding 3):** bundled `ShapeBuilder.build`'s four output-accumulator collections — the
+  block map plus the core/surface/bottom per-column lists — into a single `TerrainBuffers` parameter object. The method
+  drops from 14 parameters to 11 and no longer takes four loose "collections passed in to be filled" (the output-
+  parameter smell); a cluster passes one shared buffer set across its stamps. Behaviour-preserving — the full gametest
+  suite is unchanged — and backed by a new invariant test (the surface block caps each column; core ore stays buried,
+  so a core/surface list mix-up is caught).
+
 ## [0.93.2] - 2026-06-26
 
 ### Changed
