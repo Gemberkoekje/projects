@@ -195,6 +195,11 @@ shops, **not** the multi-hall, all-13-professions build §4b first imagined. Ver
 - Keep the guaranteed evoker (the Totem source) on the core so the reward is unconditional regardless of shape.
 
 ### 4d. Nether Fortress → sprawl over the void
+> **Increment 1 ✅ shipped (v0.94.0).** The monolith is split into a bounded jigsaw network — `keep` (start, blaze
+> spawner), self-connecting `span_bridge` (arcaded deck over the void), and a wart-garden `end` terminator; `depth: 5`
+> keeps it compact (modelled on vanilla's `NetherFortressPieces` but ~3 piece types vs 13, depth 5 vs MAX_DEPTH 30).
+> Still to add: `crossing` (branching) + a `span_` cap to bound the total across branches, a side `balcony`, `stair_down`.
+
 - Break the monolith into a **`nether_fortress` pool**: `bridge_span` (4–6 long, self-connecting), `crossing`
   (4-way bridge junction), `tower_keep` (the current keep, with the blaze spawner), `balcony` (wart garden +
   loot, hung off a span), `stair_down` (descends a level so the fortress steps down over the lava), and a
