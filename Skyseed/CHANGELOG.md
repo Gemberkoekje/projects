@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.109.0] - 2026-06-27
+
+### Added
+- **The void End grows its central island back** (playtest fix). A new worldgen feature
+  (`skyseed:central_end_island`, added to the `the_end` biome at raw_generation) lays a domed end-stone disk (radius 42,
+  surface y63) at the world origin. Skyseed's void End is `final_density: 0` — no terrain anywhere — so the dragon's
+  central island never generated and only the bare bedrock egg-spike was placed over the void; that's why the exit
+  fountain came out degenerate (no frame to seat respawn crystals on) and the fight happened over nothing. With the
+  island restored, the vanilla dragon fight, its exit-portal fountain, the way-home portal, and the four-crystal
+  respawn all have a floor again. **A new world gets this automatically; an existing End must be regenerated
+  (`/emptyend force`, then exit to the title screen) to grow the island — which wipes the current End.**
+
 ## [0.108.1] - 2026-06-27
 
 ### Fixed

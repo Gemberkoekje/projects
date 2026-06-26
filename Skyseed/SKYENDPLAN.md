@@ -149,10 +149,16 @@ finale.
   idea is **out** (a setup grown elsewhere would just sit empty while the dragon spawns at origin regardless). Lean into
   it: the fight is free and already functional. What we *can* still grow are **set pieces** that don't touch the fight or
   `EndDragonFight` — decorative end-stone islands, an approach causeway, a trophy room for the egg, a beacon plinth.
+- **The central island — built (v0.109.0).** The root cause of the broken End was that the void End is `final_density:0`
+  (no terrain), so the dragon's arena and the exit fountain's footing were pure void — only the bare bedrock egg-spike
+  generated, which is why the fountain came out frameless and the fight happened over nothing. A worldgen feature
+  (`skyseed:central_end_island`, added to `the_end` at raw_generation) now grows a domed end-stone disk (radius 42,
+  surface y63) back at the origin, so the vanilla fountain, the four-crystal respawn, and the way-home portal all have a
+  floor again. New worlds get it automatically; an existing End must be regenerated (`/emptyend force`) to grow it.
 - **Respawn loop.** Re-summoning is a vanilla mechanic at the origin portal (four End Crystals on its frame) — nothing to
   relocate. The job is just making **End Crystals / obsidian obtainable** (a crystal recipe, or a "pillars" set-piece
-  seed) for a repeatable fight. *Caveat to verify:* the void End may not generate the bedrock exit-portal frame, so the
-  crystal-placement spots might be missing — check before relying on it.
+  seed) for a repeatable fight. With the central island back (above), the bedrock exit-portal frame should now generate
+  on it — *verify in-game* that the crystal-placement spots are there.
 - **The rewards close the chapter:** the **dragon egg** (trophy), **dragon's breath** (lingering potions), the **End
   Gateway** opening to the outer islands → **End Cities → elytra + shulkers** (Phase 3). Flight is the literal and
   thematic top of the progression.

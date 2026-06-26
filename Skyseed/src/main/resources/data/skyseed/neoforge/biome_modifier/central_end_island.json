@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:add_features",
+  "biomes": "minecraft:the_end",
+  "features": "skyseed:central_end_island",
+  "step": "raw_generation"
+}

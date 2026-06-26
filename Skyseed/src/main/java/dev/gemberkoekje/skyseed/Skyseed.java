@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import dev.gemberkoekje.skyseed.network.SkyseedNetwork;
 import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
+import dev.gemberkoekje.skyseed.registry.ModFeatures;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.ModLoot;
 import dev.gemberkoekje.skyseed.registry.ModRecipes;
@@ -30,6 +31,7 @@ public class Skyseed {
         ModItems.register(modEventBus);
         ModLoot.register(modEventBus);
         ModEntities.register(modEventBus);
+        ModFeatures.register(modEventBus);
         ModRecipes.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         modEventBus.addListener(SkyseedRegistries::onNewDataPackRegistry);
