@@ -63,17 +63,82 @@ public final class IslandGenerator {
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
-        final ResourceLocation dim = level.dimension().location();
-        final boolean baseValidHere = theme.baseValidIn(dim);
-        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, baseValidHere);
+        // Pass 0: resolve the per-island config (palette/shape/variant/snow…) from the theme + matching biome override.
+        final Resolved cfg = resolveConfig(level, center, theme, biome, random);
+        final boolean useBase = cfg.useBase(); // false off the theme's home dimension — gates the home-only lava pass
+        final List<OreEntry> ores = cfg.ores();
+        final float snow = cfg.snow();
 
-        // --- effective config: the matching override, over the base theme ONLY where the base is valid in this
-        // dimension. A Nether/End override is a complete spec: when the base config is the wrong dimension
-        // (`baseValidHere` false) an unset field is neutral/empty, NEVER the overworld value — overworld content
-        // (ores, palette, decoration, mobs, …) can't leak across the portal.
-        final boolean useBase = baseValidHere;
-        final ResourceLocation neutralBlock = Ids.mc(
-                dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
+        // --- pass 1: solid island terrain. The buffers (block map + per-column lists the later passes read) are shared
+        // across a cluster's stamps; blockMap/coreList are aliased for the ore + ladder + assembly passes still inline. ---
+        final TerrainBuffers buffers = TerrainBuffers.create();
+        final Map<BlockPos, BlockState> blockMap = buffers.blockMap();
+        final List<BlockPos> coreList = buffers.coreList();
+        final ShapeBuilder.Result sh = buildTerrain(center, cfg, random, buffers);
+        final int baseRadius = sh.baseRadius();
+        final int topDome = sh.topDome();
+
+        // Lava content (orthogonal to the override bands): a vein appended to the ore pass, plus the Y-banded
+        // lava lakes rolled below before the normal pond.
+        // The theme's lava veins/lakes are tuned for its home (overworld) dimension and would swamp a tiny adapted
+        // island; an adaptation supplies its own lava (e.g. Aquatic's lava pond), so the field is home-dimension only.
+        final Lava lava = useBase ? theme.lava().orElse(null) : null;
+        final List<OreEntry> oreList = (lava != null && lava.veinChance() > 0f) ? withLavaVein(ores, lava) : ores;
+        if (!coreList.isEmpty()) {
+            OrePlanner.planOres(blockMap, oreList, coreList, sh.minCoreY(), sh.maxCoreY(), random);
+        }
+
+        // Rare structures: at most one germinates in place of the usual island. Rolled here, before the pond, so a
+        // flooded ruin can suppress the pond it stands in for.
+        final RareStructure rare = rollRare(theme, biome, cfg, random);
+
+        // Water: a Y-banded lava lake (rolled first; a hit suppresses the pond) or the theme/override pond/river.
+        final Water water = planWater(buffers, cfg, theme, center, sh, lava, rare, random);
+
+        // Curated structure: a jigsaw building/cluster on a levelled pad (assembled later by GenerationJob), or a rare
+        // structure's jigsaw + animal packs in its place.
+        final StructurePlan structure = planStructure(level, buffers, cfg, theme, rare, center, topDome, random);
+        final List<IslandPlan.JigsawSite> jigsaws = structure.jigsaws();
+        final List<IslandPlan.AnimalSpawn> animals = structure.animals();
+
+        // Decoration: the variant's trees + ground cover, then any rim waterfalls.
+        final Decor decor = planDecoration(level, buffers, cfg, center, baseRadius, random);
+
+        // Mobs: theme/override + variant sprinkles, plus pond/river mobs for a carved pool.
+        final List<IslandPlan.MobSpawn> mobs = planMobs(cfg, theme, buffers, center, water, random);
+
+        // Ladder shaft: punch a climbable way down through the centre to a landing far below — a "home-grown" route
+        // to mining level. Applied in every dimension the seed grows in (it's structure, not biome content), and
+        // carved last so it cuts cleanly through the finished terrain.
+        final List<BlockPos> fluidTicks = new ArrayList<>();
+        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks));
+
+        final List<BlockPlacement> blocks = sortedBlocks(blockMap);
+        final List<BlockPos> hives = beeNests(blockMap);
+
+        // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
+        final Optional<ResourceLocation> twinTheme =
+                (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
+        return new IslandPlan(blocks, decor.trees(), mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks,
+                decor.scatterPositions(), snow);
+    }
+
+    /** The per-island config resolved from the theme + the matching biome override (see {@link #resolveConfig}). */
+    private record Resolved(BiomeOverride ov, boolean useBase, ResourceLocation dim, Shape shape, List<OreEntry> ores,
+                            Variant variant, BlockState surface, BlockState fill, BlockState core, float snow,
+                            List<Scatter> scatter, List<BlockState> bands, int bandThickness, int baseFill) {}
+
+    /**
+     * Pass 0: resolve every per-island field from the theme and the matching biome override (each via {@link #eff}),
+     * roll the variant, and turn the block ids into states. {@code useBase} is false off the theme's home dimension, so
+     * an unset field falls to a neutral default rather than leaking overworld content across the portal.
+     */
+    private static Resolved resolveConfig(ServerLevel level, BlockPos center, IslandTheme theme, Holder<Biome> biome,
+                                          RandomSource random) {
+        final ResourceLocation dim = level.dimension().location();
+        final boolean useBase = theme.baseValidIn(dim);
+        final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, useBase);
+        final ResourceLocation neutralBlock = Ids.mc(dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
         final Palette pal = theme.palette();
         final Shape shape = eff(ov, BiomeOverride::shape, useBase, theme::shape, NEUTRAL_SHAPE);
         final List<OreEntry> ores = eff(ov, BiomeOverride::ores, useBase, theme::ores, List.<OreEntry>of());
@@ -91,68 +156,85 @@ public final class IslandGenerator {
         final BlockState surface = resolveBlock(surfaceId, Blocks.GRASS_BLOCK).defaultBlockState();
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();
         final BlockState core = resolveBlock(coreId, Blocks.STONE).defaultBlockState();
-        // Snow-cap the finished island, and how heavily (0–1)? The rolled variant decides, else the matching override,
-        // else the base palette — but never a foreign-dimension leak.
         final float snow = variant != null && variant.snow().isPresent() ? variant.snow().get()
                 : eff(ov, BiomeOverride::snow, useBase, pal::snow, 0f);
         final List<Scatter> scatter = resolveScatter(scatterCfg);
-        // Optional banded body (badlands-style strata): a Y-cycled palette replacing fill + core. An override may
-        // replace the bands, or clear them with an empty list; a foreign-dimension override never inherits them.
         final List<BlockState> bands = resolveBands(
                 eff(ov, BiomeOverride::fillBands, useBase, pal::fillBands, List.<ResourceLocation>of()));
         final int bandThickness = Math.max(1, pal.bandThickness());
+        return new Resolved(ov, useBase, dim, shape, ores, variant, surface, fill, core, snow, scatter, bands,
+                bandThickness, baseFill);
+    }
 
-        // --- pass 1: solid island terrain ---
-        // Pass-1 output buffers (placed blocks + the per-column lists later planners read), bundled so ShapeBuilder.build
-        // takes one named output rather than four loose accumulators and a cluster shares one set across its stamps. The
-        // locals below alias the same collections so the rest of this method (and its planners) is unchanged.
-        final TerrainBuffers buffers = TerrainBuffers.create();
-        final Map<BlockPos, BlockState> blockMap = buffers.blockMap();
-        final List<BlockPos> coreList = buffers.coreList();
-        final List<BlockPos> surfaceList = buffers.surfaceList();
-        final List<BlockPos> bottomList = buffers.bottomList(); // lowest block of each column, for underside hangs
-        // A ring cluster (cluster_offsets set) stamps the shape at each offset and leaves the CENTRE void — the jigsaw's
-        // start then sits on a small levelled pad over that void hole and spans the ring on its own bridges/piers. A
-        // normal island (no offsets) is just stamped once at the centre. The first island built gives the shape Result.
-        final List<BlockPos> clusterOffsets = shape.clusterOffsets();
+    /**
+     * Pass 1: stamp the island body into {@code buffers}. A ring cluster ({@code cluster_offsets} set) stamps the shape
+     * at each offset and leaves the centre void; a normal island stamps once at the centre. The first stamp gives the
+     * shape {@link ShapeBuilder.Result} (rolled radius/dome + core Y-range) the later passes reuse.
+     */
+    private static ShapeBuilder.Result buildTerrain(BlockPos center, Resolved cfg, RandomSource random,
+                                                    TerrainBuffers buffers) {
+        final List<BlockPos> clusterOffsets = cfg.shape().clusterOffsets();
         final BlockPos firstCentre = clusterOffsets.isEmpty() ? center
                 : center.offset(clusterOffsets.get(0).getX(), 0, clusterOffsets.get(0).getZ());
-        final ShapeBuilder.Result sh = ShapeBuilder.build(firstCentre, shape, surface, fill, core, scatter, bands,
-                bandThickness, baseFill, random, buffers);
+        final ShapeBuilder.Result sh = ShapeBuilder.build(firstCentre, cfg.shape(), cfg.surface(), cfg.fill(),
+                cfg.core(), cfg.scatter(), cfg.bands(), cfg.bandThickness(), cfg.baseFill(), random, buffers);
         for (int k = 1; k < clusterOffsets.size(); k++) {
             final BlockPos off = clusterOffsets.get(k);
-            ShapeBuilder.build(center.offset(off.getX(), 0, off.getZ()), shape, surface, fill, core, scatter, bands,
-                    bandThickness, baseFill, random, buffers);
+            ShapeBuilder.build(center.offset(off.getX(), 0, off.getZ()), cfg.shape(), cfg.surface(), cfg.fill(),
+                    cfg.core(), cfg.scatter(), cfg.bands(), cfg.bandThickness(), cfg.baseFill(), random, buffers);
         }
-        final int baseRadius = sh.baseRadius();
-        final int topDome = sh.topDome();
+        return sh;
+    }
 
-        // Lava content (orthogonal to the override bands): a vein appended to the ore pass, plus the Y-banded
-        // lava lakes rolled below before the normal pond.
-        // The theme's lava veins/lakes are tuned for its home (overworld) dimension and would swamp a tiny adapted
-        // island; an adaptation supplies its own lava (e.g. Aquatic's lava pond), so the field is home-dimension only.
-        final Lava lava = baseValidHere ? theme.lava().orElse(null) : null;
-        final List<OreEntry> oreList = (lava != null && lava.veinChance() > 0f) ? withLavaVein(ores, lava) : ores;
-        if (!coreList.isEmpty()) {
-            OrePlanner.planOres(blockMap, oreList, coreList, sh.minCoreY(), sh.maxCoreY(), random);
-        }
-
-        // Rare structures: at most one germinates in place of the usual island (the first whose chance rolls).
-        // Rolled here, before the pond, so a flooded ruin can suppress the pond it stands in for. Gated to the theme's
-        // home dimension by default (overworld ruins/cells don't roll on an adapted Nether island) — unless a rare
-        // structure names its own `dimension`, an overworld easter egg on a Nether-native seed (see RareStructure).
-        RareStructure rolledRare = null;
+    /**
+     * Roll for a rare structure (the first whose chance hits) that germinates in place of the usual island. Gated to the
+     * theme's home dimension unless the structure names its own. Consumes one RNG roll per candidate up to the hit.
+     */
+    private static RareStructure rollRare(IslandTheme theme, Holder<Biome> biome, Resolved cfg, RandomSource random) {
         for (final RareStructure rs : theme.rareStructures()) {
-            if (rs.rollsIn(dim, baseValidHere) && rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
-                rolledRare = rs;
-                break;
+            if (rs.rollsIn(cfg.dim(), cfg.useBase()) && rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
+                return rs;
             }
         }
-        final RareStructure rare = rolledRare;
+        return null;
+    }
 
-        // Lava lake (Y-banded, rolled before the normal pond): the first height band that matches rolls, and a
-        // hit carves a lava pool and suppresses the water pond — so e.g. a sub-zero Aquatic comes up as a stone
-        // island with a lava lake instead of a water one.
+    /** Materialise the block map into the plan's placement list, sorted bottom-up so the grow-in animation rises. */
+    private static List<BlockPlacement> sortedBlocks(Map<BlockPos, BlockState> blockMap) {
+        final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
+        for (final Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
+            blocks.add(new BlockPlacement(e.getKey(), e.getValue()));
+        }
+        blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY()));
+        return blocks;
+    }
+
+    /** The positions of every bee nest/hive in the block map (populated with bees once placed in the world). */
+    private static List<BlockPos> beeNests(Map<BlockPos, BlockState> blockMap) {
+        final List<BlockPos> hives = new ArrayList<>();
+        for (final Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
+            if (e.getValue().is(Blocks.BEE_NEST) || e.getValue().is(Blocks.BEEHIVE)) {
+                hives.add(e.getKey());
+            }
+        }
+        return hives;
+    }
+
+    /** The carved water the mob pass needs: the resolved pond config + its carved columns + the water surface Y. */
+    private record Water(Optional<Pond> pondCfg, Set<Long> pondColumns, int pondSurfaceY) {}
+
+    /**
+     * Carve the island's water. A Y-banded lava lake (home dimension only) rolls first and, on a hit, carves a lava pool
+     * and suppresses the water pond — so a sub-zero Aquatic comes up with a lava lake, not a pond. Otherwise the
+     * theme/override pond (or river) is carved, contained and dressed. A rare structure that suppresses the pond skips
+     * both. Returns what the later mob pass needs to seed pond/river mobs.
+     */
+    private static Water planWater(TerrainBuffers buffers, Resolved cfg, IslandTheme theme, BlockPos center,
+                                   ShapeBuilder.Result sh, Lava lava, RareStructure rare, RandomSource random) {
+        final Map<BlockPos, BlockState> blockMap = buffers.blockMap();
+        final List<BlockPos> surfaceList = buffers.surfaceList();
+        final int topDome = sh.topDome();
+        final int baseRadius = sh.baseRadius();
         boolean lavaLake = false;
         if (lava != null && (rare == null || !rare.suppressPond())) {
             for (final Lava.Lake lk : lava.lakes()) {
@@ -163,7 +245,7 @@ public final class IslandGenerator {
                         final int lakeBottom = lakeY - Math.max(0, pool.depth() - 1);
                         final BlockState lavaState = resolveBlock(pool.block(), Blocks.LAVA).defaultBlockState();
                         final Set<Long> carved = PondCarver.carvePond(blockMap, surfaceList, center, topDome, lakeY, baseRadius, pool, lavaState, random);
-                        PondCarver.containPond(blockMap, surfaceList, center, lakeY, lakeBottom, surface, fill, carved, random);
+                        PondCarver.containPond(blockMap, surfaceList, center, lakeY, lakeBottom, cfg.surface(), cfg.fill(), carved, random);
                         lavaLake = true;
                     }
                     break; // only the first matching height band rolls
@@ -171,114 +253,108 @@ public final class IslandGenerator {
             }
         }
 
-        // Pond: carve a contained pool into the top centre (placed before trees so mangroves see water).
-        final Optional<Pond> pondCfg = (ov != null && ov.pond().isPresent()) ? ov.pond()
-                : (useBase ? theme.pond() : Optional.<Pond>empty());
+        final Optional<Pond> pondCfg = (cfg.ov() != null && cfg.ov().pond().isPresent()) ? cfg.ov().pond()
+                : (cfg.useBase() ? theme.pond() : Optional.<Pond>empty());
         final Set<Long> pondColumns = new HashSet<>();
-        int pondSurfaceTmp = center.getY();
+        int pondSurfaceY = center.getY();
         if (!lavaLake && pondCfg.isPresent() && (rare == null || !rare.suppressPond())) {
             final Pond pond = pondCfg.get();
             // Ponds sit flush with the surface; rivers cut a channel down through it.
             final int waterY = pond.isRiver() ? center.getY() : PondCarver.pondWaterY(center, topDome, baseRadius, pond);
-            pondSurfaceTmp = waterY;
+            pondSurfaceY = waterY;
             final int bottomY = waterY - Math.max(0, pond.depth() - 1);
             final BlockState pondWater = resolveBlock(pond.block(), Blocks.WATER).defaultBlockState();
             final Set<Long> carved = PondCarver.carvePond(blockMap, surfaceList, center, topDome, waterY, baseRadius, pond, pondWater, random);
             // Wall up any open edge to the water surface (a containing ring) and dress the bed/shore with
             // sand/clay/gravel — before decorations, so cane and lily pads sit on contained ground.
-            PondCarver.containPond(blockMap, surfaceList, center, waterY, bottomY, surface, fill, carved, random);
+            PondCarver.containPond(blockMap, surfaceList, center, waterY, bottomY, cfg.surface(), cfg.fill(), carved, random);
             // Soften the banks (steep / sloped / mixed per island) so a sheer channel can become a gentle shore.
-            PondCarver.terraceBanks(blockMap, surfaceList, center, waterY, carved, surface, random);
+            PondCarver.terraceBanks(blockMap, surfaceList, center, waterY, carved, cfg.surface(), random);
             PondCarver.placePondPlants(blockMap, center, waterY, pond, carved, random);
             PondCarver.placePondBanks(blockMap, surfaceList, center, pond, carved, random);
             pondColumns.addAll(carved);
         }
-        final int pondSurfaceY = pondSurfaceTmp;
+        return new Water(pondCfg, pondColumns, pondSurfaceY);
+    }
 
-        // Curated structure: level a pad and reserve the footprint now (so trees/ground skip it); a jigsaw
-        // building (or cluster) is assembled centred on the island after the terrain lands (GenerationJob),
-        // and a villager is spawned at every bed in it.
+    /** The curated structure pass's output: the jigsaw site(s) to assemble and any guaranteed animal spawns. */
+    private record StructurePlan(List<IslandPlan.JigsawSite> jigsaws, List<IslandPlan.AnimalSpawn> animals) {}
+
+    /**
+     * Curated structure: level a pad and reserve a jigsaw building (or cluster) centred on the island, assembled later
+     * by {@link GenerationJob}. A rolled rare structure replaces the theme's jigsaw + animal packs; otherwise a matching
+     * biome override may swap the jigsaw build. The shop/lot cap is rolled here from the island RNG so it's reproducible.
+     */
+    private static StructurePlan planStructure(ServerLevel level, TerrainBuffers buffers, Resolved cfg,
+                                               IslandTheme theme, RareStructure rare, BlockPos center, int topDome,
+                                               RandomSource random) {
         final List<IslandPlan.JigsawSite> jigsaws = new ArrayList<>();
         final List<IslandPlan.AnimalSpawn> animals = new ArrayList<>();
-        // A rolled rare structure replaces the theme's normal jigsaw + animal packs for this island; otherwise a
-        // matching biome override may swap the jigsaw build (e.g. a desert's sand/sandstone trade post).
-        final JigsawConfig jcBase = (ov != null && ov.jigsaw().isPresent()) ? ov.jigsaw().get()
+        final JigsawConfig jcBase = (cfg.ov() != null && cfg.ov().jigsaw().isPresent()) ? cfg.ov().jigsaw().get()
                 : theme.jigsaw().orElse(null);
         final JigsawConfig jcRaw = rare != null ? rare.jigsaw() : jcBase;
         final JigsawConfig jc = jcRaw != null ? dimensionVariant(level, jcRaw) : null;
         final List<AnimalPack> animalPacks = rare != null ? rare.mobs() : theme.animals();
         if (jc != null) {
             final int gy = center.getY() + topDome;
-            levelStructurePad(blockMap, surfaceList, center, gy, jc.pad(), surface, fill);
-            // JigsawPlacement lands the start piece's anchor block at origin.y - 1, so pass gy + 1 to seat the
-            // structure's floor (the anchor layer) flush on the pad at gy — otherwise it sinks a block into it.
-            // `sink` buries it further: each block lowers the whole piece so the island's own surface covers it.
-            // Decide up front how many of the capped element (e.g. shops) this structure keeps: a fixed cap_count, or
-            // — when cap_min is set below it — a target rolled now in [cap_min, cap_count] from the island RNG, so a
-            // trade post lands a reproducible-but-varied 2–4 shops. The long streets place more lots than that; the
-            // surplus fall to fields/gardens.
+            levelStructurePad(buffers.blockMap(), buffers.surfaceList(), center, gy, jc.pad(), cfg.surface(), cfg.fill());
+            // JigsawPlacement lands the start piece's anchor block at origin.y - 1, so pass gy + 1 to seat the floor flush
+            // on the pad; `sink` buries it further. The cap: a fixed cap_count, or — when cap_min is set below it — a
+            // target rolled in [cap_min, cap_count] now, so a trade post lands a reproducible-but-varied 2–4 shops.
             final int cap = jc.capMin() > 0 && jc.capMin() < jc.capCount()
                     ? jc.capMin() + random.nextInt(jc.capCount() - jc.capMin() + 1)
                     : jc.capCount();
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach(),
                     jc.capPrefix(), cap, jc.capFiller(), jc.centerpiece()));
-            // Dedicated Animal Islands (and rare-structure mobs): roll one weighted pack onto the pad (gy),
-            // spawned a block above, so the mob lands on the structure floor that now sits at gy.
+            // An Animal Island (or a rare structure's mobs): roll one weighted pack onto the pad, a block above its floor.
             if (!animalPacks.isEmpty()) {
                 MobPlanner.rollAnimals(animalPacks, new BlockPos(center.getX(), gy, center.getZ()), animals, random);
             }
         }
+        return new StructurePlan(jigsaws, animals);
+    }
 
+    /** The decoration pass's output: the planned trees and the surface-scatter positions reserved from later passes. */
+    private record Decor(List<TreeSite> trees, Set<BlockPos> scatterPositions) {}
+
+    /**
+     * Decoration: the rolled variant's trees + ground cover (placed before water-side passes have run their course), then
+     * any rim waterfalls. Both are no-ops when the variant/override doesn't ask for them.
+     */
+    private static Decor planDecoration(ServerLevel level, TerrainBuffers buffers, Resolved cfg, BlockPos center,
+                                        int baseRadius, RandomSource random) {
         final List<TreeSite> trees = new ArrayList<>();
         final Set<BlockPos> scatterPositions = new HashSet<>();
-        if (variant != null) {
-            DecorationPlanner.planDecoration(level, blockMap, trees, surfaceList, bottomList, variant.decoration(),
-                    scatterPositions, random);
+        if (cfg.variant() != null) {
+            DecorationPlanner.planDecoration(level, buffers.blockMap(), trees, buffers.surfaceList(),
+                    buffers.bottomList(), cfg.variant().decoration(), scatterPositions, random);
         }
-
         // Waterfalls: short static cascades off the rim (block placements, no flow physics).
-        final int waterfalls = (ov != null && ov.waterfalls().isPresent()) ? ov.waterfalls().get() : 0;
+        final int waterfalls = (cfg.ov() != null && cfg.ov().waterfalls().isPresent()) ? cfg.ov().waterfalls().get() : 0;
         if (waterfalls > 0) {
-            DecorationPlanner.placeWaterfalls(blockMap, surfaceList, center, baseRadius, waterfalls, random);
+            DecorationPlanner.placeWaterfalls(buffers.blockMap(), buffers.surfaceList(), center, baseRadius, waterfalls, random);
         }
+        return new Decor(trees, scatterPositions);
+    }
 
-        // Mobs: theme/override sprinkles plus any variant-specific ones, spawned after the island lands.
-        final List<MobEntry> baseMobs = eff(ov, BiomeOverride::mobs, useBase, theme::mobs, List.<MobEntry>of());
-        final List<MobEntry> mobCfg = new ArrayList<>(baseMobs);
-        if (variant != null) {
-            mobCfg.addAll(variant.decoration().mobs());
+    /**
+     * Mobs: the theme/override sprinkles plus any variant-specific ones, then pond/river mobs for a carved pool. Spawned
+     * (by {@link GenerationJob}) once the island lands.
+     */
+    private static List<IslandPlan.MobSpawn> planMobs(Resolved cfg, IslandTheme theme, TerrainBuffers buffers,
+                                                      BlockPos center, Water water, RandomSource random) {
+        final List<MobEntry> mobCfg = new ArrayList<>(
+                eff(cfg.ov(), BiomeOverride::mobs, cfg.useBase(), theme::mobs, List.<MobEntry>of()));
+        if (cfg.variant() != null) {
+            mobCfg.addAll(cfg.variant().decoration().mobs());
         }
-        final List<IslandPlan.MobSpawn> mobs = new ArrayList<>(MobPlanner.planMobs(mobCfg, surfaceList, random));
-        if (pondCfg.isPresent() && !pondColumns.isEmpty()) {
-            mobs.addAll(MobPlanner.planPondMobs(center, pondSurfaceY, pondCfg.get(), pondColumns, random));
+        final List<IslandPlan.MobSpawn> mobs = new ArrayList<>(MobPlanner.planMobs(mobCfg, buffers.surfaceList(), random));
+        if (water.pondCfg().isPresent() && !water.pondColumns().isEmpty()) {
+            mobs.addAll(MobPlanner.planPondMobs(center, water.pondSurfaceY(), water.pondCfg().get(),
+                    water.pondColumns(), random));
         }
-
-        // Ladder shaft: punch a climbable way down through the centre to a landing far below — a "home-grown" route
-        // to mining level. Applied in every dimension the seed grows in (it's structure, not biome content), and
-        // carved last so it cuts cleanly through the finished terrain.
-        final List<BlockPos> fluidTicks = new ArrayList<>();
-        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks));
-
-        final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
-        for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
-            blocks.add(new BlockPlacement(e.getKey(), e.getValue()));
-        }
-        blocks.sort(Comparator.comparingInt(bp -> bp.pos().getY())); // bottom-up grow-in
-
-        // Bee nests are populated with bees once placed (they need a real block entity in the world).
-        final List<BlockPos> hives = new ArrayList<>();
-        for (Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
-            if (e.getValue().is(Blocks.BEE_NEST) || e.getValue().is(Blocks.BEEHIVE)) {
-                hives.add(e.getKey());
-            }
-        }
-
-        // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
-        final Optional<ResourceLocation> twinTheme =
-                (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
-        return new IslandPlan(blocks, trees, mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks,
-                scatterPositions, snow);
+        return mobs;
     }
 
     /**

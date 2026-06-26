@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.93.4] - 2026-06-26
+
+### Changed
+- **Internal refactor (review Finding 1):** split the ~220-line `planIsland` god method into a named pipeline. It now
+  reads as an ordered sequence of passes — `resolveConfig` → `buildTerrain` → ores → `rollRare` → `planWater` (lava lake
+  + pond) → `planStructure` (jigsaw / cap / animals) → `planDecoration` (trees + ground + waterfalls) → `planMobs` →
+  ladder → `sortedBlocks` / `beeNests` → assemble — each a focused method that returns a small record where it produces
+  several values. `planIsland` drops from ~220 lines to ~60. Provably behaviour-preserving: the `islandOutputIsStable`
+  golden master (exact block-level fingerprints for five themes) stayed byte-identical at every extraction step, and all
+  79 gametests pass.
+
 ## [0.93.3] - 2026-06-26
 
 ### Changed
