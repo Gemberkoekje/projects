@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.99.0] - 2026-06-26
+
+### Added
+- **More village variety — four new shops and three new decorations.** Drawing on the vanilla village roster, the
+  trade-post lots can now also roll a **butcher** (smoker), **shepherd** (loom + wool), **mason** (stonecutter), and
+  **cartographer** (cartography table); the surplus-lot fillers can place a **village well** (water + a slab-roofed
+  cobble box), a **fenced animal pen** (hay + a water trough), or a **market stall** (a striped wool awning over
+  produce). The forge and great hall are weighted up in the large-lot pool so they stay reliable landmarks amid the
+  added variety. All adapt to the four biome palettes.
+
 ## [0.98.0] - 2026-06-26
 
 ### Changed

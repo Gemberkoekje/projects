@@ -1201,9 +1201,13 @@ public final class SkyseedGameTests {
                     for (int z = 0; z < 48; z++) {
                         for (int y = 1; y <= 14; y++) {
                             final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
-                            // one job-site per capped small shop; the forge's smithing table is a separate, exempt feature
+                            // One job-site block per capped small shop (all eight professions). The forge (furnace /
+                            // smithing table / anvil), the great hall (bell) and the fillers use none of these, so the
+                            // count is exactly the kept shops. Decorations must not reuse a job site (the market stall
+                            // sells produce, not a barrel/composter), or they'd be miscounted as shops.
                             if (s.is(Blocks.COMPOSTER) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)
-                                    || s.is(Blocks.FLETCHING_TABLE)) {
+                                    || s.is(Blocks.FLETCHING_TABLE) || s.is(Blocks.SMOKER) || s.is(Blocks.LOOM)
+                                    || s.is(Blocks.STONECUTTER) || s.is(Blocks.CARTOGRAPHY_TABLE)) {
                                 villageShops++;
                             } else if (s.is(Blocks.WHEAT) || s.is(Blocks.POTATOES) || s.is(Blocks.CARROTS)) {
                                 crops++; // a wheat / potato / carrot field tile

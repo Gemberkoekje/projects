@@ -1,11 +1,15 @@
 {
   "fallback": "minecraft:empty",
   "elements": [
-    { "weight": 4, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/forge", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/forge", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/great_hall", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_farmer", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_librarian", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_fisherman", "processors": "minecraft:empty", "projection": "rigid" } },
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_fletcher", "processors": "minecraft:empty", "projection": "rigid" } }
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_fletcher", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_butcher", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_shepherd", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_mason", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post_desert/shop_cartographer", "processors": "minecraft:empty", "projection": "rigid" } }
   ]
 }

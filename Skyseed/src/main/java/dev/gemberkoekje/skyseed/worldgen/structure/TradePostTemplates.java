@@ -81,6 +81,15 @@ public final class TradePostTemplates {
                 shop(p, new ShopDesign(Blocks.BARREL.defaultBlockState(), Roof.GABLE, Feature.NONE)));
         writeIfAbsent(dir.resolve("shop_fletcher.nbt"),
                 shop(p, new ShopDesign(Blocks.FLETCHING_TABLE.defaultBlockState(), Roof.FLAT, Feature.HAY)));
+        // More professions for variety — each a distinct job-site + roof + feature on the shared 7×7 shell.
+        writeIfAbsent(dir.resolve("shop_butcher.nbt"),
+                shop(p, new ShopDesign(Blocks.SMOKER.defaultBlockState(), Roof.GABLE, Feature.HAY)));
+        writeIfAbsent(dir.resolve("shop_shepherd.nbt"),
+                shop(p, new ShopDesign(Blocks.LOOM.defaultBlockState(), Roof.FLAT, Feature.WOOL)));
+        writeIfAbsent(dir.resolve("shop_mason.nbt"),
+                shop(p, new ShopDesign(Blocks.STONECUTTER.defaultBlockState(), Roof.STEPPED, Feature.NONE)));
+        writeIfAbsent(dir.resolve("shop_cartographer.nbt"),
+                shop(p, new ShopDesign(Blocks.CARTOGRAPHY_TABLE.defaultBlockState(), Roof.GABLE, Feature.BOOKS)));
         // The blacksmith is named "forge" (not "shop_") so the shop cap leaves it alone — it's a feature building
         // that a large section hosts, not one of the capped 2–4 small shops.
         writeIfAbsent(dir.resolve("forge.nbt"), blacksmith(p));
@@ -94,6 +103,10 @@ public final class TradePostTemplates {
         writeIfAbsent(dir.resolve("carrot_field.nbt"),
                 field(p, Blocks.CARROTS.defaultBlockState().setValue(BlockStateProperties.AGE_7, 7)));
         writeIfAbsent(dir.resolve("garden.nbt"), garden(p));
+        // More scenery plots for the surplus-lot fillers: a village well, an animal pen, a market stall.
+        writeIfAbsent(dir.resolve("well.nbt"), well(p));
+        writeIfAbsent(dir.resolve("animal_pen.nbt"), animalPen(p));
+        writeIfAbsent(dir.resolve("market_stall.nbt"), marketStall(p));
         // A tiny lamp-post plot, the lots' fallback: a lot too tight for a shop/field gets this instead of a bare gap.
         writeIfAbsent(dir.resolve("terminator.nbt"), terminator(p));
         // A plank pier for lots that land over the void — used by the _void filler pool instead of a floating farm.
@@ -214,7 +227,7 @@ public final class TradePostTemplates {
 
     /** A profession building's look on the shared 7×7 shell: a roof shape + a feature, so each shop reads differently. */
     private enum Roof { GABLE, FLAT, STEPPED }
-    private enum Feature { NONE, FORGE, BOOKS, HAY }
+    private enum Feature { NONE, FORGE, BOOKS, HAY, WOOL }
     private record ShopDesign(BlockState jobSite, Roof roof, Feature feature) {}
 
     /**
@@ -312,6 +325,11 @@ public final class TradePostTemplates {
             case HAY -> { // a hay store
                 m.put(new BlockPos(max - 1, 1, 1), Blocks.HAY_BLOCK.defaultBlockState());
                 m.put(new BlockPos(max - 1, 1, 2), Blocks.HAY_BLOCK.defaultBlockState());
+            }
+            case WOOL -> { // a shepherd's wool store
+                m.put(new BlockPos(max - 1, 1, 1), Blocks.WHITE_WOOL.defaultBlockState());
+                m.put(new BlockPos(max - 1, 2, 1), Blocks.WHITE_WOOL.defaultBlockState());
+                m.put(new BlockPos(max - 1, 1, 2), Blocks.LIGHT_GRAY_WOOL.defaultBlockState());
             }
             case NONE -> { }
         }
@@ -500,6 +518,95 @@ public final class TradePostTemplates {
         m.put(new BlockPos(mid, 2, mid), Blocks.LANTERN.defaultBlockState());
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", "minecraft:grass_block");
+        return new Built(m, bes);
+    }
+
+    /** A 5×5 village well: a cobble (biome foundation) rim around a central water pool, four posts, a slab roof, a lantern. */
+    private static Built well(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState cobble = p.foundation().defaultBlockState();
+        final BlockState fence = p.fence().defaultBlockState();
+        final int max = 4, mid = 2;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), cobble);            // a paved apron
+            }
+        }
+        for (int x = 1; x <= 3; x++) {                            // the well box: a rim around a central water pool
+            for (int z = 1; z <= 3; z++) {
+                m.put(new BlockPos(x, 1, z), (x == mid && z == mid) ? Blocks.WATER.defaultBlockState() : cobble);
+            }
+        }
+        for (final int[] c : new int[][]{{1, 1}, {3, 1}, {1, 3}, {3, 3}}) {   // corner posts holding a slab roof
+            m.put(new BlockPos(c[0], 2, c[1]), fence);
+            m.put(new BlockPos(c[0], 3, c[1]), fence);
+        }
+        for (int x = 1; x <= 3; x++) {
+            for (int z = 1; z <= 3; z++) {
+                m.put(new BlockPos(x, 4, z), p.slab().defaultBlockState());
+            }
+        }
+        m.put(new BlockPos(mid, 3, mid), Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true));
+        conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", id(p.foundation()));
+        return new Built(m, bes);
+    }
+
+    /** A 7×7 fenced animal pen: a grass paddock ringed by fence (open at the front gate), with hay, a trough, a lamp. */
+    private static Built animalPen(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState fence = p.fence().defaultBlockState();
+        final int max = 6, mid = 3;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), Blocks.GRASS_BLOCK.defaultBlockState());
+                final boolean edge = x == 0 || x == max || z == 0 || z == max;
+                if (edge && !(x == mid && z == 0)) {             // fence ring, open at the front-centre gate
+                    m.put(new BlockPos(x, 1, z), fence);
+                }
+            }
+        }
+        m.put(new BlockPos(1, 1, max - 1), Blocks.HAY_BLOCK.defaultBlockState());           // feed
+        m.put(new BlockPos(2, 1, max - 1), Blocks.HAY_BLOCK.defaultBlockState());
+        m.put(new BlockPos(max - 1, 1, max - 1), Blocks.CAULDRON.defaultBlockState());      // a water trough
+        m.put(new BlockPos(max - 1, 1, 1), fence);                                          // a lamp post
+        m.put(new BlockPos(max - 1, 2, 1), Blocks.LANTERN.defaultBlockState());
+        m.put(new BlockPos(mid, 1, mid), Blocks.SHORT_GRASS.defaultBlockState());
+        conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", "minecraft:grass_block");
+        return new Built(m, bes);
+    }
+
+    /** A 5×5 open-air market stall: a striped wool awning on fence posts over a counter of barrels and a composter. */
+    private static Built marketStall(Palette p) {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState floor = p.foundation().defaultBlockState();
+        final BlockState fence = p.fence().defaultBlockState();
+        final int max = 4, mid = 2;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), floor);
+            }
+        }
+        for (final int[] c : new int[][]{{0, 0}, {max, 0}, {0, max}, {max, max}}) {   // posts holding the awning
+            m.put(new BlockPos(c[0], 1, c[1]), fence);
+            m.put(new BlockPos(c[0], 2, c[1]), fence);
+        }
+        for (int x = 0; x <= max; x++) {                                              // a striped wool awning
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 3, z), (x + z) % 2 == 0 ? Blocks.WHITE_WOOL.defaultBlockState()
+                        : Blocks.RED_WOOL.defaultBlockState());
+            }
+        }
+        m.put(new BlockPos(1, 1, max - 1), Blocks.HAY_BLOCK.defaultBlockState());      // a counter of produce
+        m.put(new BlockPos(2, 1, max - 1), Blocks.MELON.defaultBlockState());          // (no barrel/composter — those
+        m.put(new BlockPos(3, 1, max - 1), Blocks.PUMPKIN.defaultBlockState());        //  read as a shop job-site)
+        m.put(new BlockPos(mid, 2, mid), Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true));
+        conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
+                "minecraft:empty", id(p.foundation()));
         return new Built(m, bes);
     }
 

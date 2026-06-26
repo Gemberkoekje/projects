@@ -5,6 +5,9 @@
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/potato_field", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/carrot_field", "processors": "minecraft:empty", "projection": "rigid" } },
     { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/garden", "processors": "minecraft:empty", "projection": "rigid" } },
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/terminator", "processors": "minecraft:empty", "projection": "rigid" } }
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/terminator", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/well", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/animal_pen", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:trade_post/market_stall", "processors": "minecraft:empty", "projection": "rigid" } }
   ]
 }
