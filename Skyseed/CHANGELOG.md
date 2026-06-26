@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.108.1] - 2026-06-27
+
+### Fixed
+- **End Portal temple roof and cupola stairs faced the wrong way** (playtest catch) — outward instead of toward the
+  ridge, so every eave's tall side pointed out and the thin step pointed in: an inverted, funnel-shaped roof. Flipped the
+  `hipRing` runs and the spire-cap stairs to face inward (matching `gableRoof`), so the eaves now taper thin to the
+  outside as a roof should. Verified the regenerated `.nbt`'s stair facings.
+
 ## [0.108.0] - 2026-06-27
 
 ### Changed

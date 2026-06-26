@@ -116,8 +116,8 @@ public final class PortalChamberTemplates {
             }
         }
         box(m, x0, x1, 10, 10, z0, z1, SMOOTH);                      // cap base
-        for (final Direction d : Direction.Plane.HORIZONTAL) {
-            m.put(new BlockPos(cx + d.getStepX(), 11, cz + d.getStepZ()), qStair(d, false));
+        for (final Direction d : Direction.Plane.HORIZONTAL) {       // stairs slope up toward the centre peak (face inward)
+            m.put(new BlockPos(cx + d.getStepX(), 11, cz + d.getStepZ()), qStair(d.getOpposite(), false));
         }
         m.put(new BlockPos(cx, 11, cz), CHISELED);
         m.put(new BlockPos(cx, 12, cz), GILDED);
@@ -233,13 +233,13 @@ public final class PortalChamberTemplates {
     /** A roof tier: outward-sloping quartz stairs on the four straight runs, solid quartz at the hip corners; any
      *  position inside a corner spire's 3×3 is left alone so the spires rise cleanly through the roofline. */
     private static void hipRing(Map<BlockPos, BlockState> m, int x0, int x1, int z0, int z1, int y) {
-        for (int x = x0; x <= x1; x++) {
-            tile(m, x, y, z0, qStair(Direction.NORTH, false));
-            tile(m, x, y, z1, qStair(Direction.SOUTH, false));
+        for (int x = x0; x <= x1; x++) {   // stairs face INWARD toward the ridge, so each eave tapers thin to the outside
+            tile(m, x, y, z0, qStair(Direction.SOUTH, false));
+            tile(m, x, y, z1, qStair(Direction.NORTH, false));
         }
         for (int z = z0; z <= z1; z++) {
-            tile(m, x0, y, z, qStair(Direction.WEST, false));
-            tile(m, x1, y, z, qStair(Direction.EAST, false));
+            tile(m, x0, y, z, qStair(Direction.EAST, false));
+            tile(m, x1, y, z, qStair(Direction.WEST, false));
         }
         for (final int[] c : new int[][]{{x0, z0}, {x1, z0}, {x0, z1}, {x1, z1}}) {
             tile(m, c[0], y, c[1], SMOOTH);
