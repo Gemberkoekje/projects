@@ -1,0 +1,8 @@
+{
+  "type": "skyseed:add_drop",
+  "conditions": [
+    { "condition": "neoforge:loot_table_id", "loot_table_id": "minecraft:chests/simple_dungeon" }
+  ],
+  "item": "skyseed:portal_frame_shard",
+  "chance": 0.4
+}

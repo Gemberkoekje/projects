@@ -12,10 +12,11 @@ capstone collect-a-thon; the rest is the shape of the chapter that follows.
 
 ## Phase 1 — Getting to the End  ✅ *shape decided (tuning open)*
 
-> **Build progress (v0.101.0):** the crafting items — **Portal Frame Shard**, the 8 structure relics, the 4 portal
-> edges (with PowerShell-painted icons) — and the shapeless **edge recipes** (shard + 2 relics → edge) are in, with a
-> gametest. **Remaining increments:** the loot-table drops (shard from Dungeon/Ancient, relics from their structures),
-> the **End Portal Seed** (4 edges → seed) + its grown portal-chamber island, and the guide thread.
+> **Build progress (v0.101.0–0.102.0):** the crafting items — **Portal Frame Shard**, the 8 structure relics, the 4
+> portal edges (PowerShell-painted icons) — and the shapeless **edge recipes** (v0.101.0), plus the **loot-table drops**
+> (v0.102.0): a `skyseed:add_drop` global loot modifier seeds the shard into dungeon loot (~40%) and each relic into its
+> structure's table (~25%) — re-grow a structure to re-roll. **Remaining increments:** the **End Portal Seed** (4 edges
+> → seed) + its grown portal-chamber island, and the guide thread.
 
 **The problem.** In vanilla you reach the End through a Stronghold's portal room — 12 End Portal Frames you fill with
 Eyes of Ender. Skyseed is skyblock: there is nothing to explore to, and End Portal Frames aren't craftable. So the

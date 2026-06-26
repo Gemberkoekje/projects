@@ -1,0 +1,8 @@
+{
+  "type": "skyseed:add_drop",
+  "conditions": [
+    { "condition": "neoforge:loot_table_id", "loot_table_id": "minecraft:chests/bastion_treasure" }
+  ],
+  "item": "skyseed:bastion_relic",
+  "chance": 0.25
+}

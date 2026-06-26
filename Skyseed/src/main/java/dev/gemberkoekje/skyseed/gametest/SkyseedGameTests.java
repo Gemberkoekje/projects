@@ -2006,6 +2006,34 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void endPortalDropsSeedIntoStructureLoot(GameTestHelper helper) {
+        // Phase-1 collect-a-thon: a global loot modifier seeds the Portal Frame Shard into dungeon loot and each relic
+        // into its structure's loot table. Roll a couple of the targeted tables across fixed seeds (deterministic) and
+        // confirm the modifier's item appears — proving the GLM is registered, loaded, and gated to the right table.
+        final ServerLevel level = helper.getLevel();
+        final String[][] cases = {
+                {"minecraft:chests/simple_dungeon", "portal_frame_shard"},
+                {"minecraft:chests/woodland_mansion", "mansion_relic"}};
+        for (final String[] c : cases) {
+            final var table = level.getServer().reloadableRegistries().getLootTable(
+                    net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.LOOT_TABLE,
+                            net.minecraft.resources.ResourceLocation.parse(c[0])));
+            final var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(level)
+                    .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN,
+                            net.minecraft.world.phys.Vec3.ZERO)
+                    .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.CHEST);
+            boolean found = false;
+            for (long seed = 1; seed <= 80 && !found; seed++) {
+                for (final net.minecraft.world.item.ItemStack s : table.getRandomItems(params, seed)) {
+                    if (s.is(ModItems.PARTS.get(c[1]).get())) { found = true; break; }
+                }
+            }
+            helper.assertTrue(found, "the loot modifier never added " + c[1] + " to " + c[0] + " over 80 rolls");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.

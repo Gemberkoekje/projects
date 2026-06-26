@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.102.0] - 2026-06-26
+
+### Added
+- **End Phase 1: the portal components are now survival-obtainable.** A global loot modifier (`skyseed:add_drop`) seeds
+  the **Portal Frame Shard** into dungeon loot (~40%) and each **structure relic** into its structure's loot table
+  (~25%): Woodland Mansion, Ocean Monument (buried treasure), Desert / Jungle Temple, Pillager Outpost, Nether Fortress,
+  Bastion, and the Trial Chamber vaults. Re-grow a structure island to re-roll — rare but farmable. Chances are
+  playtest-tunable.
+
 ## [0.101.0] - 2026-06-26
 
 ### Added

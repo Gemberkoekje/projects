@@ -1,0 +1,8 @@
+{
+  "type": "skyseed:add_drop",
+  "conditions": [
+    { "condition": "neoforge:loot_table_id", "loot_table_id": "minecraft:chests/desert_pyramid" }
+  ],
+  "item": "skyseed:desert_relic",
+  "chance": 0.25
+}

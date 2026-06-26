@@ -1,0 +1,8 @@
+{
+  "type": "skyseed:add_drop",
+  "conditions": [
+    { "condition": "neoforge:loot_table_id", "loot_table_id": "minecraft:chests/woodland_mansion" }
+  ],
+  "item": "skyseed:mansion_relic",
+  "chance": 0.25
+}

@@ -5,6 +5,7 @@ import dev.gemberkoekje.skyseed.network.SkyseedNetwork;
 import dev.gemberkoekje.skyseed.registry.ModCreativeTabs;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
+import dev.gemberkoekje.skyseed.registry.ModLoot;
 import dev.gemberkoekje.skyseed.registry.ModRecipes;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.structure.DevStructureGenerator;
@@ -27,6 +28,7 @@ public class Skyseed {
     public Skyseed(IEventBus modEventBus, ModContainer modContainer) {
         VERSION = modContainer.getModInfo().getVersion().toString();
         ModItems.register(modEventBus);
+        ModLoot.register(modEventBus);
         ModEntities.register(modEventBus);
         ModRecipes.register(modEventBus);
         ModCreativeTabs.register(modEventBus);

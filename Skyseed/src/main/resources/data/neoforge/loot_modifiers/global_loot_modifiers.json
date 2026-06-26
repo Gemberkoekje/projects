@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "entries": [
+    "skyseed:portal_frame_shard",
+    "skyseed:mansion_relic",
+    "skyseed:monument_relic",
+    "skyseed:desert_relic",
+    "skyseed:jungle_relic",
+    "skyseed:outpost_relic",
+    "skyseed:fortress_relic",
+    "skyseed:bastion_relic",
+    "skyseed:trial_relic",
+    "skyseed:trial_relic_ominous"
+  ]
+}
