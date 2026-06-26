@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ByGalacticAccord.Engine</AssemblyName>
+    <RootNamespace>ByGalacticAccord.Engine</RootNamespace>
+  </PropertyGroup>
+
+</Project>

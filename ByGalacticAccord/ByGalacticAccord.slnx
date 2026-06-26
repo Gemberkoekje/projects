@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ByGalacticAccord.Cli/ByGalacticAccord.Cli.csproj" />
+    <Project Path="src/ByGalacticAccord.Engine/ByGalacticAccord.Engine.csproj" />
+    <Project Path="src/ByGalacticAccord.Wpf/ByGalacticAccord.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ByGalacticAccord.Tests/ByGalacticAccord.Tests.csproj" />
+  </Folder>
+</Solution>

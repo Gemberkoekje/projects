@@ -1,0 +1,15 @@
+{
+  "minecraft": {
+    "version": "1.21.1",
+    "modLoaders": [
+      { "id": "neoforge-21.1.233", "primary": true }
+    ]
+  },
+  "manifestType": "minecraftModpack",
+  "manifestVersion": 1,
+  "name": "Skyseed",
+  "version": "1.0.0",
+  "author": "gemberkoekje",
+  "overrides": "overrides",
+  "files": []
+}
