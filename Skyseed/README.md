@@ -2,7 +2,7 @@
 
 A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**; the Nether chapter — built out as of v0.57.0 — and its remaining structures are tracked in `SKYNETHERPLAN.md`.
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**; the Nether chapter (complete as of v0.57.0) is summarised in `SKYNETHERPLAN.md`, and the deeper-jigsaw structure work in `SKYJIGSAWPLAN.md`.
 
 ---
 
@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.57.0** — see [CHANGELOG.md](CHANGELOG.md). The **overworld chapter** is built end to end (every island type and its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, the rare surprises) and the **Nether chapter** is built out too (overworld seeds adapt or fizzle across the portal, all five Nether biomes have a full-size native seed + a Large variant, a Nether Fortress with a caged blaze spawner, ruined-portal twins linked across dimensions). What exists today:
+**Version 0.93.5** — see [CHANGELOG.md](CHANGELOG.md). The **overworld chapter** is built end to end (every island type and its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, the rare surprises) and the **Nether chapter** is complete (overworld seeds adapt or fizzle across the portal, all five Nether biomes have a full-size native seed + a Large variant, all four Nether structures — the Fortress + blaze room, the Bastion Remnant, the Piglin Trading Post, the Wither Arena — and ruined-portal twins linked across dimensions). The villages now assemble as varied **street villages** (Hamlet / Trade Post / Village Center) through deep jigsaw use — see `SKYJIGSAWPLAN.md`. What exists today:
 
 | Area | Built |
 |---|---|
@@ -55,7 +55,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); block-overlap fit + horizontal nudge-off (islands sit flush), player-aware, fizzle-and-drop |
 
-**The overworld is feature-complete and the Nether is built out** — all the overworld islands/structures, plus the full Nether chapter (adaptations, the five Tier-2 native seeds + their Large variants, the Fortress + blaze room, ruined-portal twins). What remains is the rest of the Nether's structures and then the End; see **Roadmap** below.
+**The overworld and Nether chapters are both feature-complete** — all the overworld islands/structures, plus the full Nether chapter (adaptations, the five Tier-2 native seeds + their Large variants, all four Nether structures, ruined-portal twins). What remains is the non-village structural diversity (mansion footprints, fortress sprawl over the void) and then the End; see **Roadmap** below.
 
 ---
 
@@ -63,13 +63,12 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 The overworld and Nether chapters are built; what's planned next:
 
-- **More varied structures** — villages, mansions and Nether fortresses that actually differ each throw (organic streets, little wheat fields, piers and bridges out over the void, different mansion footprints), by using the jigsaw system *deeply* (street/connective pools + real recursion depth) instead of one shallow single-piece pool per structure. Designed in `SKYJIGSAWPLAN.md`.
-- **The rest of the Nether's structures** — a Bastion Remnant, a Piglin Trading Post and a Wither arena, designed in `SKYNETHERPLAN.md` (the Nether Fortress is already in).
+- **More varied structures** — the **villages** now differ each throw (street villages with fields, gardens, and piers/bridges out over the void, by using the jigsaw system *deeply* — street/connective pools + real recursion depth; `SKYJIGSAWPLAN.md`, **shipped v0.68–0.93**). Still to do, same approach: different **mansion** footprints and **Nether-fortress** sprawl over the void.
 - **The End** — after the Nether's structures. Already pre-voided as of v0.35.1 (terrain emptied, the standard End biome source kept), so growing it out later won't force a new save.
 - **A "Huge" island tier** — huge versions of the terrain islands, gated behind rare Nether ingredients.
 - **A few more structures** that sit better later: a Stronghold (End-adjacent), a Mineshaft or Ancient City as deep-Ancient variants, and Buried Treasure / Shipwreck as Aquatic features.
-- **Remaining vanilla blocks** — a short list (a copper bulb, a few Nether-gated blocks), tracked in `MISSINGBLOCKSPLAN.md`.
-- **Multi-version support** — building against multiple Minecraft / NeoForge versions from one codebase, planned in `REFACTORPLAN.md`: isolate the version-volatile API calls behind a `compat` facade, then drive the version matrix with **Stonecutter** (NeoForge-only; no new runtime dependency; Fabric is a separate future concern).
+- **Remaining vanilla blocks** — now down to essentially the copper bulb (the Nether-gated set became reachable when the Nether chapter completed), tracked in `MISSINGBLOCKSPLAN.md`.
+- **Multi-version support** — building against multiple Minecraft / NeoForge versions from one codebase (`REFACTORPLAN.md`): the **Stonecutter skeleton + the `compat` facade are done** (Stages 0–1); adding the second version is deferred until 1.21.1 is feature-complete (NeoForge-only; no new runtime dependency; Fabric is a separate future concern).
 
 > **⚠ Before 1.0 (cleanup):** **remove the `/emptynether` and `/emptyend` rescue commands** (`SkyseedCommands.java`, offered by the legacy-world warning in `PlayerEvents`). They're a one-time stopgap for worlds created *before* the void dimensions landed (v0.35.x) — by 1.0 there should be no pre-void world left to rescue — and the in-place conversion leans on Minecraft's **experimental-features** path, which is acceptable as a rescue route now but should **not** ship in a 1.0 release.
 

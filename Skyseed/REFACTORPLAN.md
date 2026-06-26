@@ -54,40 +54,17 @@ changes between versions the Stonecutter directives live in a handful of named f
 
 ## Migration stages (each ends green: `runGameTestServer` passes on the active version)
 
-0. **Stonecutter skeleton + build proof.** ✅ **DONE — spike succeeded** (branch `refactor/stonecutter-spike`).
-   Stonecutter **0.9.6** wraps the existing **ModDevGradle 2.0.141** build cleanly on **Gradle 9.2.1** *with the
-   configuration cache on*. Verified on the single 1.21.1 node: configure ✓ · `compileJava` ✓ · `runGameTestServer`
-   **52/52** ✓ · `build` → a correct jar (`neoforge.mods.toml` + all 317 `data/skyseed/` entries, no dupes) ✓.
-   - **Setup:** `settings.gradle` declares the matrix (`stonecutter { create(rootProject) { versions("1.21.1");
-     vcsVersion = "1.21.1" } }`) + the kikugie maven; Stonecutter auto-generated the `stonecutter.gradle.kts`
-     controller (`stonecutter active "1.21.1"`); `dev.kikugie.stonecutter.hard_mode=true` acknowledges Groovy DSL.
-   - **Build-script adaptations (the only files touched — `build.gradle` runs in the per-version node now):** dropped
-     the root-only `wrapper` task; pointed explicit `src/...` paths (generated resources, templates, datagen) at
-     `rootProject.file(...)`; added `duplicatesStrategy = EXCLUDE` on `ProcessResources` (Stonecutter copies
-     `src/main` into the node, so each resource shows up twice — identical for one version); gitignored
-     `versions/` + `.stonecutter/`.
-   - **Workflow change:** tasks now run under the node — `./gradlew :1.21.1:runGameTestServer` / `:1.21.1:build`
-     (bare `runGameTestServer` is gone); `chiseledBuild` builds every node. `runClient` not launched headlessly, but
-     the gameTestServer run loads the full mod on a real server, which covers the integration.
-   - **Note for later:** the ecosystem is Kotlin-DSL-centric (Stonecutter even warns about Groovy). Groovy works for
-     now; reconsider a `.kts` move if the controller/`parameters` config gets fiddly in Stage 2.
-1. **Concentrate the volatile surface into `compat`.** ✅ **DONE** — behaviour-preserving; all 52 gametests pass,
-   including the `islandOutputIsStable` golden master (byte-identical generation).
-   - **The facade** (`compat/`, alongside the existing `PatchouliCompat`): `Ids` (every `ResourceLocation` —
-     `mod`/`mc`/`of`/`parse`), `Lookup` (registry access — `block`/`blockState`/`blockId`/`hasBlock`,
-     `entityType`/`hasEntityType`, `registry`, `templatePool`/`hasTemplatePool`, `configuredFeature`), and `Jigsaw`
-     (`place`, wrapping `JigsawPlacement.generateJigsaw`). Each method reproduces exactly what its former call sites
-     did, so a future API rename lands here (a Stonecutter directive in `compat/`) instead of in the algorithm.
-   - **Routed:** every production `ResourceLocation` construction (`fromNamespaceAndPath`/`withDefaultNamespace`/
-     `tryParse`), every `BuiltInRegistries`/`registryAccess().registryOrThrow|lookupOrThrow` call (the code even
-     mixed the old + new names — now unified in `Lookup`), and the one `generateJigsaw` site. ~18 files; unused
-     imports cleaned.
-   - **Deliberately not wrapped (already localized):** the NeoForge registration / network / config glue
-     (`DeferredRegister`, the payload registrar, `ModConfigSpec`) already lives in dedicated classes (`ModItems`,
-     `ModEntities`, `ModRecipes`, `ModCreativeTabs`, `SkyseedNetwork`/`ThrowSeedPayload`, `SkyseedClientConfig`) —
-     those *are* the facade for their concern, so Stage-2 directives sit there without a new wrapper. The gametest
-     (`SkyseedGameTests`) keeps its direct calls: it's the golden-master witness (don't refactor the oracle while it's
-     guarding the refactor) and will need per-version expected values anyway — route it when Stage 2 lands.
+0. **Stonecutter skeleton + build proof.** ✅ **DONE** (branch `refactor/stonecutter-spike`) — Stonecutter 0.9.6 wraps
+   the existing ModDevGradle build cleanly on Gradle 9.2.1 with the configuration cache on. Tasks now run under the node
+   (`./gradlew :1.21.1:runGameTestServer` / `:1.21.1:build`; bare `runGameTestServer` is gone; `chiseledBuild` builds
+   every node); `versions/` + `.stonecutter/` are gitignored. The build script needed only minor adaptations
+   (`rootProject.file(...)` paths, `duplicatesStrategy = EXCLUDE`).
+1. **Concentrate the volatile surface into `compat`.** ✅ **DONE** — `Ids` (every `ResourceLocation`), `Lookup`
+   (registry access) and `Jigsaw` (the one `generateJigsaw` site) now front the version-volatile calls across ~18 files;
+   the algorithm / codecs / templates call the facade and never touch the volatile APIs. Behaviour-preserving — the
+   `islandOutputIsStable` golden master stays byte-identical. The NeoForge registration / network / config glue already
+   lives in its own classes (those *are* the facade for that concern), and the gametest keeps direct calls as the
+   golden-master oracle (route it when Stage 2 lands).
 2. **Add the second MC/NeoForge version** (target **TBD — you pick**: latest 1.21.x, 1.22, …). Add the Stonecutter
    node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get **both** versions
    building and each one's gametests passing.

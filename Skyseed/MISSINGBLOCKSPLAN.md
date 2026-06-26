@@ -62,6 +62,10 @@ warden) or **Stronghold** (infested) — for the experience, not the block. Othe
 
 ## Nether-gated (handle in the Nether plan — see `SKYNETHERPLAN.md`)
 
+> **Update: the Nether chapter is complete (v0.57.0+)** — its five biomes and four structures are in, so this set is now
+> reachable in-game (the Wither Arena enables the wither → wither rose; frogs + Nether magma cubes give froglight; the
+> Nether block sets are minable in their biomes). The copper bulb above is the last *overworld* gap.
+
 These naturally come with the Nether and shouldn't be forced into the overworld:
 - **Wither rose** (needs a wither), **Froglight ×3** (frogs — which you have — eating tiny magma cubes), **Copper bulb**
   (blaze rod, unless placed in the Trial Chamber above), and the whole Nether block set (quartz family, soul sand/

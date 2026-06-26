@@ -53,9 +53,9 @@ Each Large variant is its own separate seed, so the ten terrain types are really
 
 Build up a trading town one seed at a time. Each tier is assembled with the same jigsaw system vanilla villages use, so they all come out a little different.
 
-- 🏡 **Hamlet.** One cottage and a villager to get you going.
-- 🏪 **Trade Post.** A lantern-lit plaza ringed with shops, each villager taking up its own trade.
-- ⛪ **Village Center.** A bell-topped plaza with four trading halls, a villager for all 13 professions, and an iron golem standing guard. (Raids are off on Skyseed worlds, so your villagers stay safe.)
+- 🏡 **Hamlet.** A little green with a cottage or two and their villagers, to get you going.
+- 🏪 **Trade Post.** A small street village — a central square radiating lanes lined with shops, fields and gardens, with a landmark or two (a blacksmith's forge, a meeting hall) and little piers reaching out over the void. Each shop's villager takes up its own trade.
+- ⛪ **Village Center.** The same village scaled up — a cluster of islands with a deeper street network, four to six shops and an iron golem standing guard, an anvil set at its heart. (Raids are off on Skyseed worlds, so your villagers stay safe.)
 
 ---
 
@@ -123,7 +123,7 @@ With **Patchouli** installed you get the full illustrated version. Without it, t
 
 Skyseed is still in active development, with a fair bit of sky left to fill:
 
-- **More Nether structures.** The Fortress is in; a Bastion, a Piglin Trading Post and a Wither arena come next.
+- **Richer structures.** The villages already come out as varied little street villages; different mansion shapes and Nether fortresses that sprawl out over the void are next.
 - **The End.** Already pre-voided and waiting in the background, so it'll grow out the same way — End islands, the city, the dragon — without anyone needing a fresh save.
 - **More creatures, island types and surprises** as it goes.
 

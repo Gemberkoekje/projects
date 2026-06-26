@@ -5,7 +5,25 @@
 > village / mansion / fortress is nearly identical because each structure has one shallow pool that always
 > lands the same way. This plan turns that into varied, organic, over-the-void layouts.
 
-Status: **proposed** (not started). Companion to `SKYNETHERPLAN.md`; the README is the living index.
+Status: **the villages are shipped; mansion / fortress / structure-corridor diversity remain.** Companion to
+`SKYNETHERPLAN.md`; the README is the living index. Per-release detail in [CHANGELOG.md](CHANGELOG.md).
+
+## Shipped (one line each)
+
+- **Marker path/bridge surfacing + bbox-scaled post-assembly scans** (§3a, §5.1) — `PathSurfacer` resolves a connective
+  piece's markers into terrain-aware dirt paths on the island and self-railing wooden-slab bridges out over the void,
+  and the villager / connection-link / path passes follow the structure's `reach` instead of a fixed box — **v0.68.0**.
+- **Trade Post → a real street village** (§4a) — a `streets` pool (straights / corners / tees / crosses + empty
+  terminators) at `depth`, `lot` connectors pulling shops / fields / gardens / over-void piers, a `shop_` cap holding
+  it to a tidy 2–4 shops, biome-styled (desert / savanna / snowy / taiga) — **v0.69.0–0.70.0**.
+- **Hamlet → a green + a short lane**, reusing the trade post's `lots` pool, biome-aware — **v0.74.0**.
+- **Village Center → a bigger Trade Post**, reshaped into a 3-island cluster around a void centre with an anvil
+  capstone and a guaranteed 4–6 shops (§4b) — **v0.89.0–0.93.0**.
+
+What's left is the **non-village** diversity: Woodland Mansion footprints (§4c), Nether Fortress sprawl over the void
+(§4d, reusing `PathSurfacer` for the bridges), and the cheap corridor-pool reuse for Trial Chamber / Ocean Monument /
+Bastion (§4e). The diagnosis + technique (§1–3) and support notes (§5–7) below stand as the reference those reuse; the
+shipped sections are kept only for that context.
 
 ---
 
@@ -16,7 +34,8 @@ The engine is not the problem. `GenerationJob.placeStructures()` calls `Jigsaw.p
 **full vanilla recursive jigsaw assembler** — the same code villages and bastions use. It already supports
 deep recursion, random rotation, weighted pools, and per-piece structure processors.
 
-What we feed it is shallow and singular. Current state (`data/skyseed/skyseed/theme/*.json` →
+What we fed it was shallow and singular. The **original** state below (the **Hamlet / Trade Post / Village Center** rows
+are now fixed — see *Shipped*; the **Mansion / Fortress / Trial Chamber** rows still stand) (`data/skyseed/skyseed/theme/*.json` →
 `data/skyseed/worldgen/template_pool/*`):
 
 | Structure | `depth` | Start pool | Onward pools | Result |
@@ -85,6 +104,9 @@ behaves:
   beyond the pad is free to hang in the air.
 
 ### 3a. Marker-driven path surfacing — terrain-aware paths *and* free bridges (preferred)
+
+> **✅ Implemented as `PathSurfacer` (v0.68.0).** The design below stands as the reference the Nether Fortress (§4d)
+> reuses for its over-void bridges; the code is now the source of truth for the details.
 
 Rather than bake a fixed plank floor into every path piece (wrong-looking on grass, oddly floating over void),
 the **connective path pieces place only a sentinel marker** — a reserved block (e.g. `purple_wool`) one block
@@ -158,30 +180,10 @@ full-parameter `generateJigsaw` with an explicit radius. This is the only *likel
 
 ## 4. Per-structure deliverables
 
-### 4a. Trade Post → a real little village
-- Replace the single plaza with a **`village/streets` pool**: `street_straight`, `street_corner`,
-  `street_tee`, `street_cross`, `street_end`, weighted, each a 1-wide-ish dirt/gravel path with side `lot`
-  connectors and its own ground.
-- Start pool `village/well` with 2–3 variants (a well, a market cross, a campfire green).
-- **Lot/building pool**: the existing shops + new **non-shop** lots for texture: a **wheat field** (tilled
-  soil + water + crops, fenced — the "little wheat fields" ask), a **small house**, an **animal pen stub**, a
-  **lamppost/garden** filler. Fields and gardens have no villager, so they read as connective scenery.
-- `depth: 6`. Add a weighted `minecraft:empty` to the streets pool so paths fork and stop unevenly → twists
-  and turns.
-- A **`pier` street variant** that the path can roll when heading off the island edge (railings + a mooring
-  post + a bench) so the walkway-over-void shows up naturally.
-
-### 4b. Village Center → the grand version of the same
-**✅ Done differently (v0.89.0; reshaped in v0.92.0).** The Village Center seed became simply *a bigger Trade Post*:
-it REUSES the `trade_post/start` village pieces with deeper streets (depth 6), a guaranteed 4–6 shops (`cap_min 4`),
-and the iron golem — **not** the multi-hall, all-13-professions build the plan below imagined. As of v0.92.0 it's laid
-out as a **cluster** (`Shape.cluster_offsets`): 3 small islands ringed around a void centre, with the central square on
-a pad over the hole — and it's biome-styled like the trade post (desert/savanna/snowy/taiga swap their piece sets). The
-original plan below is **superseded**:
-- Same street system, richer **start** (a bell + green), and the four trading halls become a **`halls` pool**
-  with **2–3 shape variants each** (currently 1 each — the worst offender). Keep all 13 professions reachable
-  by ensuring the hall set still covers them across whatever rolls.
-- Keep `iron_golems: 1` at the centre; raise `pad` only enough to seat the start (sprawl handles the rest).
+### 4a. Trade Post · 4b. Village Center — ✅ shipped (see *Shipped* above)
+The Trade Post became the street village (streets / lots / fields / gardens / piers, a `shop_` cap, biome variants); the
+Village Center became *a bigger Trade Post* — a 3-island cluster around a void centre with an anvil capstone and 4–6
+shops, **not** the multi-hall, all-13-professions build §4b first imagined. Versions in *Shipped*.
 
 ### 4c. Woodland Mansion → different shapes
 - **2–3 core start variants** (different hall footprints / entrance sides) instead of the one `core`.
@@ -206,8 +208,7 @@ original plan below is **superseded**:
 ### 4e. Reuse for the rest (cheap follow-on)
 - **Trial Chamber / Ocean Monument / Bastion**: once the connective-pool pattern exists, give each a small
   `corridor`/`gallery` connective pool + an empty terminator + a `depth` bump for free layout variety.
-- **Hamlet**: smallest touch — `depth: 2` and a one-path `streets` micro-pool so a hamlet is a cottage **plus**
-  a short lane with a garden or a single field, still tiny but no longer a lone box.
+- **Hamlet**: ✅ shipped (v0.74.0) — a green + a short lane reusing the trade post's `lots` pool.
 
 ---
 
@@ -215,17 +216,12 @@ original plan below is **superseded**:
 
 These are concrete and must be handled or sprawling structures will half-break:
 
-1. **Bounded post-assembly scans don't follow the sprawl.** After `Jigsaw.place`, `GenerationJob` runs three
-   passes that scan a **fixed box around the origin**:
-   - `linkConnections(level, origin)` with `LINK_RADIUS = 16`, `LINK_DOWN = 2` — links fences/panes/walls.
-   - `Traps.applyAfterJigsaw(level, origin)` — re-adds plates/tripwire.
-   - `spawnVillagersAtBeds(origin, pad)` — spawns a villager at every bed, scanned by **`pad`**.
-
-   A structure that now reaches 40+ blocks out will have **beds with no villager**, **unlinked railings** and
-   **dropped trap blocks** beyond the scan box. **Fix:** derive the scan bounds from the **actual placed
-   structure bounding box** (capture the assembled `StructurePiecesBuilder`/`BoundingBox` from the jigsaw call
-   and pass it to the three passes), or at minimum scale `LINK_RADIUS` / the villager scan with the structure's
-   `maxDistance`. This is the single most important support change.
+1. **Bounded post-assembly scans don't follow the sprawl.** **✅ Fixed (v0.68.0): a `reach` knob** — the villager-bed,
+   connection-link and path passes now scan the structure's declared `reach` instead of a fixed box (and skip unloaded
+   chunks so a wide reach never force-loads the void), so a sprawling structure's beds, railings and trap blocks are all
+   covered. (The original problem, for context: those passes scanned a fixed box around the origin —
+   `linkConnections` at `LINK_RADIUS = 16`, the villager scan at `pad` — so a structure reaching 40+ blocks out left
+   beds with no villager and unlinked railings beyond the box.)
 
 2. **`maxDistanceFromCenter` cap** of the convenience `generateJigsaw` overload (§3). Add an explicit-radius
    overload in `compat/Jigsaw.java` if the default is too tight for fortress/village sprawl.
@@ -284,12 +280,8 @@ Keep these optional with backward-compatible defaults so every existing theme is
 
 ## 8. Phasing
 
-- **Phase 0 — Spike (½ day).** A throwaway `streets` pool with 3 pieces + a debug seed at `depth: 6`. Confirm:
-  (a) rigid pieces place over void, (b) the real `maxDistance` cap, (c) which post-assembly scans miss the
-  sprawl. Decide the §5.1 scan-bounds fix here.
-- **Phase 1 — Scan-bounds + Trade Post village.** Implement §5.1 (structure-bbox-driven scans), then build the
-  Trade Post street/lot system incl. the **wheat field** and a **pier** variant. First visible payoff.
-- **Phase 2 — Village Center.** Multi-variant halls + the street system; keep all 13 professions + golem.
+- **Phases 0–2 — ✅ shipped (the spike, the scan-bounds/`reach` fix, the Trade Post street village, and the Village
+  Center).** See *Shipped* up top for versions.
 - **Phase 3 — Woodland Mansion footprint variety.** Multiple cores + room graph (+ optional 2nd storey).
 - **Phase 4 — Nether Fortress sprawl.** Span/crossing/tower/stair-down pool over the void + loot/spawner cap.
 - **Phase 5 — Reuse & polish.** Hamlet lane, Trial Chamber / Ocean Monument / Bastion corridor pools,
