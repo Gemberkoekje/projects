@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.108.0] - 2026-06-27
+
+### Changed
+- **The End Portal temple's island is bigger** (radius 8–9 → 11–12, pad 7 → 9) so there's a walkway to stand on around
+  the building — the corner spires had been sitting right at the cliff edge. (Playtest feedback.)
+- **SKYENDPLAN Phase 6 rethought** after playtesting: the void End auto-spawns the (working) vanilla dragon fight at the
+  world origin and it can't be relocated, so the "grow the dragon arena from a seed" idea is dropped — the plan now grows
+  only decorative End set pieces and leaves the fight alone. The Return Portal Seed stands as the way home, not a stopgap.
+
 ## [0.107.0] - 2026-06-27
 
 ### Changed

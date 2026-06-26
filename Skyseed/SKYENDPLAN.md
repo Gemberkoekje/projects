@@ -142,13 +142,17 @@ both* — it reuses proven machinery and makes the End feel mapped, not uniform.
 **Yes.** The Ender Dragon is the End capstone — the parallel to the Wither Arena (Nether Star → Beacon). The whole mod's
 finale.
 
-- **The arena.** A dedicated capstone seed that grows the **central-island dragon setup**: the end-stone island + the
-  obsidian **pillars topped with End Crystals** + the central **exit-portal fountain** (bedrock + the portal frame the
-  dragon's death lights). This is the hardest piece — the vanilla dragon fight is tightly coupled to these features and
-  to `EndDragonFight`; growing it from a seed in a *voided* End needs care (the fight expects the central-island
-  features at the world origin). **Biggest open risk; prototype early.**
-- **Respawn loop.** Four End Crystals on the portal re-summon the dragon — so the seed should make crystals/obsidian
-  obtainable (a crystal recipe, or a "pillars" seed) for a repeatable fight, not a one-shot.
+- **The arena — the dragon fight is fixed; we don't touch its location.** *Playtest finding (revised plan):* entering
+  the void End spawns the vanilla dragon fight automatically at the world origin, and it **works** — egg drops, a real
+  fight, just harder without creative flight. `EndDragonFight` owns the central island, the pillars/crystals and the
+  dragon, and we **cannot** relocate it — so the original "a dedicated arena seed that *grows* the central dragon setup"
+  idea is **out** (a setup grown elsewhere would just sit empty while the dragon spawns at origin regardless). Lean into
+  it: the fight is free and already functional. What we *can* still grow are **set pieces** that don't touch the fight or
+  `EndDragonFight` — decorative end-stone islands, an approach causeway, a trophy room for the egg, a beacon plinth.
+- **Respawn loop.** Re-summoning is a vanilla mechanic at the origin portal (four End Crystals on its frame) — nothing to
+  relocate. The job is just making **End Crystals / obsidian obtainable** (a crystal recipe, or a "pillars" set-piece
+  seed) for a repeatable fight. *Caveat to verify:* the void End may not generate the bedrock exit-portal frame, so the
+  crystal-placement spots might be missing — check before relying on it.
 - **The rewards close the chapter:** the **dragon egg** (trophy), **dragon's breath** (lingering potions), the **End
   Gateway** opening to the outer islands → **End Cities → elytra + shulkers** (Phase 3). Flight is the literal and
   thematic top of the progression.
@@ -163,9 +167,9 @@ finale.
   **egg** but lit **no central exit portal** — only an End Gateway out to the (pregenerated, kept) edge islands —
   because the bedrock exit fountain never generated at the origin. The **Return Portal Seed** (End-only, *end stone +
   ender pearls* → an end-stone shrine around an `end_portal` exit block) is the stopgap way out, independent of the
-  dragon: plant it, step through, land at your overworld spawn. When the arena seed grows the exit fountain proper this
-  becomes a convenience; until then it's the only non-lethal way back. *(The dragon fight itself already works in the
-  void — playtested, harder without creative flight.)*
+  dragon: plant it, step through, land at your overworld spawn. Since the dragon's own exit fountain doesn't generate in
+  the void End (and per the revised arena note above we won't try to grow one the fight uses), this **is** the way home,
+  not a stopgap.
 
 ---
 
