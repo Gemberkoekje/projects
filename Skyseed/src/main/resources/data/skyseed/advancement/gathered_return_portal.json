@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [
+        { "items": "minecraft:end_stone" }, { "items": "minecraft:ender_pearl" }
+      ] }
+    }
+  }
+}

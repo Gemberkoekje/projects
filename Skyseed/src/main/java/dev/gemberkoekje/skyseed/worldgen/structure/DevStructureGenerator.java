@@ -58,6 +58,7 @@ public final class DevStructureGenerator {
             WoodlandMansionTemplates.generateInto(base.resolve("woodland_mansion"));
             OceanMonumentTemplates.generateInto(base.resolve("ocean_monument"));
             PortalChamberTemplates.generateInto(base.resolve("end_portal")); // SKYENDPLAN Phase 1
+            ReturnPortalTemplates.generateInto(base.resolve("return_portal")); // SKYENDPLAN — the way home
             RareStructureTemplates.generateInto(base);
             writeGameTestRegion(base.resolve("gametest").resolve("region.nbt"));
             writeBigGameTestRegion(base.resolve("gametest").resolve("big_region.nbt"));

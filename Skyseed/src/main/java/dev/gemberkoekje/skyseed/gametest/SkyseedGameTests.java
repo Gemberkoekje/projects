@@ -2084,6 +2084,46 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void returnPortalShrineHasEndPortal(GameTestHelper helper) {
+        // The Return Portal Seed (End-only) grows an end-stone shrine around an End exit portal; in the End that
+        // end_portal block sends the player home to the overworld. Verify the 3x3 portal assembles. (Loads .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("return_portal/shrine"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int portal = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 6; y++) {
+                    if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.END_PORTAL)) {
+                        portal++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(portal == 9, "the return shrine should hold a 3x3 End exit portal (got " + portal + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
+        // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a
+        // stranded player can build their way home without a trip back to the Nether.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack s = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(s, p, s, p, s, p, s, p, s));
+        final var recipe = level.getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Return Portal Seed from end stone + ender pearls");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
+                        .is(ModItems.SEEDS.get("return_portal").get()),
+                "the end stone + ender pearl ring did not produce the Return Portal Seed");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator

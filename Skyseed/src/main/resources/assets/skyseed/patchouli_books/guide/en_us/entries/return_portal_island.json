@@ -1,0 +1,24 @@
+{
+  "name": "Return Portal Seed",
+  "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_return_portal",
+  "icon": "minecraft:ender_pearl",
+  "sortnum": 10,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "Stuck in the End? The $(item)Return Portal Skyseed$() is the way home. Plant it on the End's end stone and a small obsidian-framed shrine grows around an $(o)exit portal$() — step in and it drops you back in the overworld, the same way beating the dragon would.$(br2)$(bold)Materials$()$(br)Only what the End already gives you: $(item)end stone$() (mine it) and $(item)ender pearls$() (from the endermen). No trip back to the Nether required."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:return_portal_skyseed",
+      "text": "End stone and ender pearls, ringed.",
+      "advancement": "skyseed:gathered_return_portal"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Stepping through$()$(br)The shrine's gateway is a real End exit portal, so it lands you wherever you last slept (or world spawn). Pack a few Skyseeds before you go — the overworld grows empty too.$(br2)And like the dragon's own portal, the first trip out may roll the $(o)end credits$(). You earned them.",
+      "advancement": "skyseed:craft_return_portal"
+    }
+  ]
+}

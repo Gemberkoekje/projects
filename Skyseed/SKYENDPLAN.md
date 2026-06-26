@@ -158,6 +158,13 @@ finale.
   End seed at the far side first (fragile — you can't easily seed a spot you haven't reached). *Recommend (a).* The
   pressure is low, though: because **End Cities are themselves a grown seed** (Phase 3), the gateway no longer *gates*
   content — it just needs to not kill you, so a safe landing platform is enough and the real outer-End loot you grow.
+- **The way home — built (v0.106.0).** Playtesting confirmed the void-End gap above: defeating the dragon dropped the
+  **egg** but lit **no central exit portal** — only an End Gateway out to the (pregenerated, kept) edge islands —
+  because the bedrock exit fountain never generated at the origin. The **Return Portal Seed** (End-only, *end stone +
+  ender pearls* → an end-stone shrine around an `end_portal` exit block) is the stopgap way out, independent of the
+  dragon: plant it, step through, land at your overworld spawn. When the arena seed grows the exit fountain proper this
+  becomes a convenience; until then it's the only non-lethal way back. *(The dragon fight itself already works in the
+  void — playtested, harder without creative flight.)*
 
 ---
 

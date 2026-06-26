@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.106.0] - 2026-06-27
+
+### Added
+- **Return Portal Seed — the way home from the End.** A new End-only seed (`return_portal`) crafted from **end stone +
+  ender pearls** (both End-obtainable — no trip back to the Nether). Plant it and a small end-stone shrine grows around
+  an obsidian-framed **End exit portal** (a 3×3 of `end_portal` blocks, lit by end rods) — step through and it drops you
+  back at your overworld spawn, the same block the dragon's exit fountain uses. Skyseed's void End grows no natural exit
+  fountain (confirmed by playtesting: defeating the dragon dropped the egg but lit no portal home), so this is how you
+  leave without dying. Full onboarding: shaped recipe, a unique icon, the `skyseeds` tag, a gated field-notes guide
+  entry, and the reveal/gathered/craft advancements (reveal on holding end stone).
+
 ## [0.105.0] - 2026-06-26
 
 ### Changed
