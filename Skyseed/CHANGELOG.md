@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.100.5] - 2026-06-26
+
+### Changed
+- **Nether Fortress: the keep now uses the wider, open-top blaze chamber.** It was still the old narrow, roofed 5×5;
+  it's now the same 9×9 open-top nether-brick room as the standalone blaze-spawner seed (and the rare Large-Nether
+  structure) — raised on the arch base, with the caged blaze spawner open to the sky and a doorway onto the bridge.
+
 ## [0.100.4] - 2026-06-26
 
 ### Fixed

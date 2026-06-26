@@ -44,60 +44,57 @@ public final class NetherFortressTemplates {
     }
 
     /**
-     * The start: a 5×5 keep on a short arch base, with a caged blaze spawner, fence windows, a pitched roof, and a
-     * doorway onto a {@code bridge} connector out the +X side. The island anchor ({@code bottom}) sits at its base.
+     * The start: a 9×9 open-top keep on a short arch base — the same wider, sky-open chamber as the standalone
+     * {@code blaze_room} — with the caged blaze spawner, fence windows, and a doorway onto a {@code bridge} connector
+     * out the +X side. The island anchor ({@code bottom}) sits at its base.
      */
     private static Built keep() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         final BlockState nb = Blocks.NETHER_BRICKS.defaultBlockState();
         final BlockState fence = Blocks.NETHER_BRICK_FENCE.defaultBlockState();
-        final int x0 = 0, x1 = 4, z0 = 1, z1 = 5, wallTop = DECK + 4;
+        final int x0 = 0, x1 = 8, z0 = 0, z1 = 8, mid = 4, wallTop = DECK + 4;
 
-        // Arch base + 5×5 deck under the tower (corner pillars carry it; a brazier of magma glows at the centre).
-        for (int x = x0; x <= x1; x += 4) {
-            for (int z = z0; z <= z1; z += 4) {
-                m.put(new BlockPos(x, 0, z), nb);
-                m.put(new BlockPos(x, 1, z), nb);
-            }
+        // Arch base: four corner pillars carry the 9×9 deck over the void; a magma brazier glows under the centre.
+        for (final int[] c : new int[][] { {x0, z0}, {x1, z0}, {x0, z1}, {x1, z1} }) {
+            m.put(new BlockPos(c[0], 0, c[1]), nb);
+            m.put(new BlockPos(c[0], 1, c[1]), nb);
         }
-        m.put(new BlockPos(2, 1, 3), Blocks.MAGMA_BLOCK.defaultBlockState());
+        m.put(new BlockPos(mid, 1, mid), Blocks.MAGMA_BLOCK.defaultBlockState());
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 m.put(new BlockPos(x, DECK, z), nb);
             }
         }
-        // Walls (perimeter only), with the doorway out onto the bridge on the +X wall.
+        // Open-top walls (perimeter only), with the doorway out onto the bridge on the +X wall.
         for (int y = DECK + 1; y <= wallTop; y++) {
             for (int x = x0; x <= x1; x++) {
                 for (int z = z0; z <= z1; z++) {
                     if (x != x0 && x != x1 && z != z0 && z != z1) {
                         continue;
                     }
-                    if (x == x1 && z == 3 && (y == DECK + 1 || y == DECK + 2)) {
+                    if (x == x1 && z == mid && (y == DECK + 1 || y == DECK + 2)) {
                         continue; // doorway
                     }
                     m.put(new BlockPos(x, y, z), nb);
                 }
             }
         }
-        for (int[] w : new int[][] { {1, z0}, {3, z0}, {1, z1}, {3, z1}, {x0, 2}, {x0, 4} }) {
+        for (final int[] w : new int[][] { {2, z0}, {6, z0}, {2, z1}, {6, z1}, {x0, 2}, {x0, 6}, {x1, 2}, {x1, 6} }) {
             m.put(new BlockPos(w[0], DECK + 3, w[1]), fence); // fence-grate windows
         }
-        // Caged blaze spawner on a plinth, dead centre; soul-sand/wart braziers in two corners.
-        m.put(new BlockPos(2, DECK + 1, 3), nb);
-        m.put(new BlockPos(2, DECK + 2, 3), Blocks.SPAWNER.defaultBlockState());
-        bes.put(new BlockPos(2, DECK + 2, 3), StructureParts.mobSpawner("minecraft:blaze"));
-        for (int[] c : new int[][] { {1, 2}, {3, 4} }) {
+        // Caged blaze spawner on a plinth, dead centre, open to the sky above; soul-sand/wart braziers in two corners.
+        m.put(new BlockPos(mid, DECK + 1, mid), nb);
+        m.put(new BlockPos(mid, DECK + 2, mid), Blocks.SPAWNER.defaultBlockState());
+        bes.put(new BlockPos(mid, DECK + 2, mid), StructureParts.mobSpawner("minecraft:blaze"));
+        for (final int[] c : new int[][] { {1, 1}, {7, 7} }) {
             m.put(new BlockPos(c[0], DECK + 1, c[1]), Blocks.SOUL_SAND.defaultBlockState());
             m.put(new BlockPos(c[0], DECK + 2, c[1]), grownWart());
         }
-        StructureParts.gableRoof(m, x0, x1, z0, z1, wallTop + 1, nb,
-                Blocks.NETHER_BRICK_STAIRS, Blocks.NETHER_BRICK_SLAB, 0);
 
-        bridgeConn(m, bes, new BlockPos(x1, DECK, 3), FrontAndTop.EAST_UP, SPANS); // the bridge out
+        bridgeConn(m, bes, new BlockPos(x1, DECK, mid), FrontAndTop.EAST_UP, SPANS); // the bridge out
         StructureParts.linkFences(m);
-        StructureParts.anchor(m, bes, new BlockPos(2, 0, 3), "minecraft:nether_bricks");
+        StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:nether_bricks");
         return new Built(m, bes);
     }
 
