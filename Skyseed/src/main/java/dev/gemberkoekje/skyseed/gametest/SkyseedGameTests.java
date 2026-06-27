@@ -712,10 +712,21 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    /** The index of the first rare structure in {@code theme} whose jigsaw pool path equals {@code poolPath}, or -1. */
+    private static int rareIndex(IslandTheme theme, String poolPath) {
+        final var list = theme.rareStructures();
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).jigsaw().pool().getPath().equals(poolPath)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     @GameTest(template = REGION)
-    public static void blazeRoomRollsOnLargeNetherSeedsAndDebugSeed(GameTestHelper helper) {
+    public static void blazeRoomRollsOnLargeNetherSeeds(GameTestHelper helper) {
         // The surprise blaze spawner room (SKYNETHERPLAN): a 5% rare_structures roll on each of the 5 Large Nether
-        // seeds, and the dedicated debug_blaze_spawner seed germinates it as a whole island.
+        // seeds. (Its on-demand debug seed is auto-generated from these hosts now, not a hand-made theme.)
         final ServerLevel overworld = helper.getLevel();
         for (String t : new String[] { "nether_rocky_large", "nether_lava_large", "nether_forest_large",
                 "nether_soul_large", "nether_basalt_large" }) {
@@ -724,21 +735,25 @@ public final class SkyseedGameTests {
                             rs -> rs.jigsaw().pool().getPath().equals("nether_fortress/blaze_room")),
                     t + " should carry the 5% blaze spawner room rare structure");
         }
-        final IslandTheme dbg = theme(overworld, "debug_blaze_spawner");
-        final BlockPos c = new BlockPos(40, 80, 40);
-        final IslandPlan p = IslandGenerator.planIsland(overworld, c, dbg, overworld.getBiome(c),
-                RandomSource.create(140L));
+        // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandTheme host = theme(nether, "nether_rocky_large");
+        final int idx = rareIndex(host, "nether_fortress/blaze_room");
+        helper.assertTrue(idx >= 0, "nether_rocky_large should host the blaze room rare structure");
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
+                RandomSource.create(140L), idx);
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/blaze_room")),
-                "the debug blaze spawner seed should assemble the blaze room jigsaw");
+                "forcing the blaze-room rare structure should assemble its jigsaw");
         helper.succeed();
     }
 
     @GameTest(template = REGION)
-    public static void bastionRemnantRollsOnBastionBiomeLargeSeedsAndDebugSeed(GameTestHelper helper) {
+    public static void bastionRemnantRollsOnBastionBiomeLargeSeeds(GameTestHelper helper) {
         // A ruined bastion remnant (crying obsidian + cracked polished blackstone) is a 5% rare_structures roll on the
         // three bastion-biome Large Nether seeds — the Nether-wastes Rocky, the crimson/warped Forest and the soul-sand
-        // Soul — but NOT the basalt deltas or the lava sea (the vanilla rule). The debug_bastion_remnant seed germinates
-        // it as a whole island.
+        // Soul — but NOT the basalt deltas or the lava sea (the vanilla rule). Its on-demand debug seed is auto-generated.
         final ServerLevel overworld = helper.getLevel();
         for (String t : new String[] { "nether_rocky_large", "nether_forest_large", "nether_soul_large" }) {
             helper.assertTrue(theme(overworld, t).rareStructures().stream().anyMatch(
@@ -750,12 +765,17 @@ public final class SkyseedGameTests {
                             rs -> rs.jigsaw().pool().getPath().equals("bastion/remnant")),
                     t + " must not carry the bastion remnant (no bastions in the basalt deltas or the lava sea)");
         }
-        final IslandTheme dbg = theme(overworld, "debug_bastion_remnant");
-        final BlockPos c = new BlockPos(40, 80, 40);
-        final IslandPlan p = IslandGenerator.planIsland(overworld, c, dbg, overworld.getBiome(c),
-                RandomSource.create(77L));
+        // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.NETHER_WASTES);
+        final IslandTheme host = theme(nether, "nether_rocky_large");
+        final int idx = rareIndex(host, "bastion/remnant");
+        helper.assertTrue(idx >= 0, "nether_rocky_large should host the bastion remnant rare structure");
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
+                RandomSource.create(77L), idx);
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/remnant")),
-                "the debug bastion remnant seed should assemble the bastion remnant jigsaw");
+                "forcing the bastion-remnant rare structure should assemble its jigsaw");
         helper.succeed();
     }
 

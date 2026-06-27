@@ -3,6 +3,18 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.128.0] - 2026-06-27
+
+### Removed
+- **The 8 dedicated debug *themes* that just duplicated rare structures are gone — the auto scan already covers them.**
+  `debug_igloo`, `debug_abandoned_cottage`, `debug_ocean_ruin`, `debug_evoker_cell`, `debug_vault_cell`,
+  `debug_trail_ruins`, `debug_blaze_spawner`, and `debug_bastion_remnant` each existed only because the structure
+  appears by percentage chance — and since 0.127.0 `ThemeScanner` generates a debug seed for each from its host theme's
+  `rare_structures` (e.g. `debug_frozen_igloo`, `debug_nether_rocky_large_nether_fortress`). So the hand-made
+  `debug_<x>.json` themes + their item models + lang are removed (16 files). The 3 genuinely non-rare debug themes stay
+  (`debug_streets` jigsaw spike + the two waterfall feature tests). The blaze-room + bastion-remnant gametests now force
+  the structure via `forcedRare` on a host theme rather than the deleted debug seed; 108 pass.
+
 ## [0.127.0] - 2026-06-27
 
 ### Changed

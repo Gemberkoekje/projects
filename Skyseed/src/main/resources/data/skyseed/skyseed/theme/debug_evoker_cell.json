@@ -1,8 +1,0 @@
-{
-  "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 6, "max": 7 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
-  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2,
-    "surface_scatter": [ { "block": "minecraft:coarse_dirt", "chance": 0.20 } ] },
-  "jigsaw": { "pool": "skyseed:evoker_cell/cell", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 0 },
-  "animals": [ { "weight": 1, "entries": [ { "entity": "minecraft:evoker", "adults": 1, "babies": 0 } ] } ]
-}

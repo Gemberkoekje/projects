@@ -1,7 +1,0 @@
-{
-  "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 7, "max": 8 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
-  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 2,
-    "surface_scatter": [ { "block": "minecraft:podzol", "chance": 0.25 }, { "block": "minecraft:coarse_dirt", "chance": 0.10 } ] },
-  "jigsaw": { "pool": "skyseed:trail_ruins/ruins", "target": "minecraft:bottom", "depth": 1, "pad": 4, "sink": 3 }
-}

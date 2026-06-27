@@ -43,16 +43,15 @@ public final class ModItems {
             "dragon_trophy");
 
     /**
-     * Hidden debug seeds — one per rare structure that otherwise <em>only</em> appears by chance (igloo,
-     * abandoned cottage, ocean ruin, evoker cell, vault cell, trail ruins). Each germinates that structure as a
-     * dedicated island, so it can be spawned on demand instead of throwing 30 seeds to roll it. These are
-     * <b>creative-only</b>: registered (and shown in the separate "Skyseed Debug" tab) but deliberately given
-     * <b>no recipe</b>, kept out of the {@code #skyseed:skyseeds} tag, and given no guide entry.
+     * Hand-made debug <em>themes</em> for the few things the auto scan ({@link ThemeScanner}) does not cover — each
+     * germinates a dedicated island that is neither a per-theme biome override nor a rare structure: the
+     * {@code debug_streets} jigsaw spike (SKYJIGSAWPLAN) and the small/large waterfall feature tests. (Rare structures
+     * that appear by chance — igloo, cottage, bastion, … — are now auto-generated from their host themes' own
+     * {@code rare_structures}, so they no longer each need a dedicated theme here.) Same creative-only treatment as the
+     * auto debug seeds: registered into {@link #DEBUG_SEEDS} and shown in the "Skyseed Debug" tab, but no recipe/tag/guide.
      */
     public static final List<String> DEBUG_SEED_THEMES = List.of(
-            "debug_igloo", "debug_abandoned_cottage", "debug_ocean_ruin",
-            "debug_evoker_cell", "debug_vault_cell", "debug_trail_ruins", "debug_blaze_spawner",
-            "debug_bastion_remnant", "debug_streets", "debug_small_waterfall", "debug_large_waterfall");
+            "debug_streets", "debug_small_waterfall", "debug_large_waterfall");
 
     /**
      * Auto-generated debug seeds, derived at construction by {@link ThemeScanner} from the shipped theme JSON: one per

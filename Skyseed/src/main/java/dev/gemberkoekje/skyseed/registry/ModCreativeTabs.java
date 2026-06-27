@@ -29,7 +29,7 @@ public final class ModCreativeTabs {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SKYSEED_DEBUG_TAB =
             CREATIVE_MODE_TABS.register("skyseed_debug", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.skyseed.debug"))
-                    .icon(() -> ModItems.DEBUG_SEEDS.get("debug_igloo").get().getDefaultInstance())
+                    .icon(() -> ModItems.DEBUG_SEEDS.get("debug_streets").get().getDefaultInstance())
                     .withTabsBefore(SKYSEED_TAB.getId())
                     .displayItems((parameters, output) ->
                             ModItems.DEBUG_SEEDS.values().forEach(seed -> output.accept(seed.get().getDefaultInstance())))
