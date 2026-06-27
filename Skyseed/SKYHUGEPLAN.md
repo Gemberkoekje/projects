@@ -66,9 +66,17 @@ Huge islands have a thick body (capped teardrop / mountain), so there's room to 
   differ from undersides.
 - **Ores for free:** the theme's `ores` already seed the fill/core; caves simply *expose* them (rocky/ancient caves are
   worth mining). No new ore work.
-- **Reachability — decision:** caves are enclosed by default (you mine in — fine for skyblock), with an **occasional
-  surface sinkhole** (carve one cave up through the surface skin) for discoverability. *Recommend: ~1 sinkhole per huge
-  island, plus the cave entrance any rare structure punches.*
+- **Reachability — varied per island (the carver rolls one of three styles):**
+  1. **Hidden / caved-in** — the cave is fully enclosed; you mine in (no breach). The quiet "is there even a cave?"
+     island.
+  2. **An obvious entrance** — a sinkhole shaft punched straight down through the surface skin, or a cave-mouth opened
+     on the rim, leading in. Clearly findable.
+  3. **A gash** — a long, deep **ravine-like cut** slicing through the surface into the cave volume, dramatically
+     exposing the interior and letting daylight down into it. The showpiece.
+
+  Roll a style per huge island on a tunable weight split (start ~40 / 35 / 25 hidden / entrance / gash). A rolled rare
+  structure punches its own entrance regardless of style. Containment still holds — a breach is a *deliberate* carve
+  through the skin (shaft / mouth / gash), everything else stays solid so the island never accidentally opens to the void.
 - Gate caves to huge islands via a `caves` block on the shape/theme (e.g. `"caves": { "rooms": {min,max}, "decoration":
   "underside" }`); absent = no caves (every existing island stays solid, unchanged).
 
@@ -115,7 +123,8 @@ Because a rare structure is *rare*, most huge islands are just big terrain + cav
   huge islands are too heavy, clusters (smaller bodies) are the pressure valve — another reason to allow per-seed choice.
 - **Cluster spacing/count** — Village Center uses 3 isles ~16–19 apart; huge clusters may want 4–5 and wider. The
   centre-void gap matters (you bridge it yourself, or a rare structure spans it).
-- **Cave reachability** — enclosed + a sinkhole (recommended) vs always an obvious entrance.
+- **Cave reachability — DECIDED: varied.** Per huge island the carver rolls **hidden / obvious-entrance / gash**
+  (see §2); tune the weight split + the gash dimensions in playtest.
 - **Cave decoration source** — reuse `decoration.underside` (recommended, free theming) vs a dedicated
   `decoration.caves` list (more control, more JSON).
 - **Recipe cost / gate — DECIDED.** Middle row `ender pearl / <theme>_large_skyseed / blaze powder`, surrounded by six
