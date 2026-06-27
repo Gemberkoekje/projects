@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.137.0] - 2026-06-27
+
+### Fixed
+- **Dungeon stairs and ladder shafts now only go *down*, never up.** The descending pieces had two self-linking
+  connectors, so the jigsaw could enter via the low one and make the stair climb. The descending exit now uses a
+  one-way connector name (`skyseed:dungeon_down`) that no ordinary piece targets, so a parent can only ever enter from
+  the top — the stair always descends. New `dungeonStairsOnlyDescend` gametest; 118 pass.
+
 ## [0.136.0] - 2026-06-27
 
 ### Added

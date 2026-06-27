@@ -133,7 +133,9 @@ surface tell.
    > 400 = sprawled past the hub). Depth 4, sink 6, pad 12. **v0.134.0: added verticality** — a descending **stairs_down**
    (drops 4) and a **shaft** ladder room (drops 6); their two connectors sit at different nbt-Y, so the next piece
    attaches lower and the complex goes down, not just out (`dungeonComplexGoesVertical` gametest; assembly tests sample
-   multiple seeds since the jigsaw is position-seeded). *(Remaining idea: a `centerpiece` to guarantee one treasure_vault.)*
+   multiple seeds since the jigsaw is position-seeded). **v0.137.0: the descending exit uses a one-way connector name
+   (`skyseed:dungeon_down`, which no ordinary piece targets) so a parent can only ever enter from the top — stairs/shafts
+   go DOWN only, never up** (`dungeonStairsOnlyDescend` gametest). *(Remaining idea: a `centerpiece` to guarantee one treasure_vault.)*
 2. **Mineshaft (oak) — DONE (v0.133.0).** `MineshaftTemplates` (start hub w/ stair, corridor, corridor_loot [chest
    minecart], corridor_spawner [cave-spider nest], cross, room, dead_end) + the self-linking `mineshaft/parts` pool.
    Pieces **carve tunnels** (bake floor + arches + rails + air, NOT walls/ceiling), self-linking on `skyseed:mineshaft`

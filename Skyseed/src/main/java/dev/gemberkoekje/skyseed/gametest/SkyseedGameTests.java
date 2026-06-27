@@ -2414,6 +2414,36 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void dungeonStairsOnlyDescend(GameTestHelper helper) {
+        // Stairs/shafts must only go DOWN: the entry connector (skyseed:dungeon, which any parent targets) sits at the
+        // piece TOP, and the descending exit uses a one-way name (skyseed:dungeon_down, which nothing targets) at the
+        // BOTTOM — so a parent can never enter from the low connector and make the stair climb. Checked on the templates.
+        final ServerLevel level = helper.getLevel();
+        for (final String id : new String[]{"dungeon_complex/stairs_down", "dungeon_complex/shaft"}) {
+            final StructureTemplate t = level.getStructureManager().get(skyseed(id)).orElseThrow();
+            int entryY = Integer.MIN_VALUE;
+            int downY = Integer.MAX_VALUE;
+            int entries = 0;
+            int downs = 0;
+            for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+                final String name = j.nbt() == null ? "" : j.nbt().getString("name");
+                if (name.equals("skyseed:dungeon")) {
+                    entries++;
+                    entryY = Math.max(entryY, j.pos().getY());
+                } else if (name.equals("skyseed:dungeon_down")) {
+                    downs++;
+                    downY = Math.min(downY, j.pos().getY());
+                }
+            }
+            helper.assertTrue(entries == 1, id + " should have exactly one entry connector (got " + entries + ")");
+            helper.assertTrue(downs == 1, id + " should have exactly one one-way descending exit (got " + downs + ")");
+            helper.assertTrue(downY < entryY,
+                    id + " descending exit (y" + downY + ") must sit below the entry (y" + entryY + ")");
+        }
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void abandonedMineshaftAssembles(GameTestHelper helper) {
         // SKYDUNGEONPLAN Part B: the mineshaft jigsaw must sprawl past its start hub (the rail connectors align). The

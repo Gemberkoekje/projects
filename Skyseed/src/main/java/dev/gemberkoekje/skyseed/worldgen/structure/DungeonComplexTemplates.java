@@ -84,6 +84,18 @@ public final class DungeonComplexTemplates {
         m.put(new BlockPos(x, y + 1, z), AIR);
     }
 
+    /**
+     * A one-way DESCENDING exit for the staircase/shaft, at the piece's low end: its name is {@code skyseed:dungeon_down},
+     * which no ordinary piece <em>targets</em> — so a parent can never enter the stair from this low connector (which
+     * would make it climb). It only ever expands downward (its target is {@code skyseed:dungeon}, so it still spawns the
+     * ordinary pieces below). The entry stays the normal {@link #doorAt} at the high end, so stairs only ever go down.
+     */
+    private static void doorAtDown(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        m.put(new BlockPos(x, y, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
+        bes.put(new BlockPos(x, y, z), jig("skyseed:dungeon_down", "skyseed:dungeon", POOL, "minecraft:air"));
+        m.put(new BlockPos(x, y + 1, z), AIR);
+    }
+
     /** A solid cobble fill (with the same mossy speckle as {@link #box}) — carved afterwards for descending pieces. */
     private static void fill(Map<BlockPos, BlockState> m, int x0, int x1, int z0, int z1, int y0, int y1) {
         for (int x = x0; x <= x1; x++) {
@@ -276,8 +288,8 @@ public final class DungeonComplexTemplates {
             m.put(new BlockPos(1, tread + 1, z), AIR); // headroom over each tread
             m.put(new BlockPos(1, tread + 2, z), AIR);
         }
-        doorAt(m, bes, 1, 5, 0, FrontAndTop.NORTH_UP); // top
-        doorAt(m, bes, 1, 1, 4, FrontAndTop.SOUTH_UP); // bottom, 4 lower
+        doorAt(m, bes, 1, 5, 0, FrontAndTop.NORTH_UP);     // top — the entry (a parent connects here)
+        doorAtDown(m, bes, 1, 1, 4, FrontAndTop.SOUTH_UP); // bottom — one-way descending exit (4 lower)
         return new Built(m, bes);
     }
 
@@ -291,8 +303,8 @@ public final class DungeonComplexTemplates {
             m.put(new BlockPos(1, y, 1), Blocks.LADDER.defaultBlockState()
                     .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // backed by the east wall
         }
-        doorAt(m, bes, 1, 7, 0, FrontAndTop.NORTH_UP); // top
-        doorAt(m, bes, 1, 1, 2, FrontAndTop.SOUTH_UP); // bottom, 6 lower
+        doorAt(m, bes, 1, 7, 0, FrontAndTop.NORTH_UP);     // top — the entry
+        doorAtDown(m, bes, 1, 1, 2, FrontAndTop.SOUTH_UP); // bottom — one-way descending exit (6 lower)
         return new Built(m, bes);
     }
 }
