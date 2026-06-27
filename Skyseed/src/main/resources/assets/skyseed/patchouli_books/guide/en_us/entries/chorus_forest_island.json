@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Chorus Forest Skyseed$() — your own corner of the End highlands. Plant it for an end-stone island studded with $(item)chorus plants$() and veined with $(item)purpur$(), an $(item)enderman$() pack roaming it.$(br2)$(bold)Where to look$()$(br)Bootstrap from the End's outer islands: harvest a wild $(item)chorus plant$() for $(item)chorus fruit$(), then ring it with $(item)end stone$(). After that it's renewable — your own chorus never runs out."
+      "text": "The $(item)Chorus Forest Skyseed$() — your own corner of the End highlands. Plant it for an end-stone island studded with $(item)chorus plants$() and veined with $(item)purpur$(), an $(item)enderman$() pack roaming it.$(br2)$(bold)Where to look$()$(br)The void End has no wild chorus — so throw a $(item)Forest$() or $(item)Lush$() seed here first: its end-stone island grows $(item)chorus$() to harvest. Ring that $(item)chorus fruit$() with $(item)end stone$() to craft this, and after that it's renewable — your own chorus never runs out."
     },
     {
       "type": "patchouli:crafting",
@@ -17,7 +17,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)The economy$()$(br)Chorus plants regrow, so the island is a renewable farm. $(item)Chorus fruit$() is teleport-food; smelt it to $(item)popped chorus fruit$() → $(item)purpur$() blocks, pillars, stairs and slabs. And the resident $(item)endermen$() are a steady source of $(item)ender pearls$() — for Eyes of Ender and the Return Portal Seed.",
+      "text": "$(bold)The economy$()$(br)Chorus plants regrow, so the island is a renewable farm. $(item)Chorus fruit$() is teleport-food; smelt it to $(item)popped chorus fruit$() → $(item)purpur$(). The resident $(item)endermen$() drop $(item)ender pearls$() (Eyes of Ender, the Return Portal Seed), and the odd $(item)shulker$() that drifts in drops a $(item)shell$() — slowly stocking the purpur + shells for your first $(item)End City$().",
       "advancement": "skyseed:craft_chorus_forest"
     }
   ]

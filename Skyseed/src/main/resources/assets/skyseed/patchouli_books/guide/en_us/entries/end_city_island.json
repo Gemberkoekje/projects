@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)End City Skyseed$() — the End's grand prize, the way the Mansion and Bastion crown their chapters. Plant it for a $(o)purpur tower$() with a cantilevered $(o)End ship$() on an end-stone island, $(item)shulkers$() drifting around it.$(br2)$(bold)Where to look$()$(br)Bootstrap from the End's outer islands: their vanilla $(item)End Cities$() are where you first find $(item)shulkers$() (for $(item)shells$()) and $(item)purpur$(). Bring those home to seed your own."
+      "text": "The $(item)End City Skyseed$() — the End's grand prize, the way the Mansion and Bastion crown their chapters. Plant it for a $(o)purpur tower$() with a cantilevered $(o)End ship$() on an end-stone island, $(item)shulkers$() drifting around it.$(br2)$(bold)Where to look$()$(br)Work up to it from chorus islands — a $(item)Forest$() or $(item)Lush$() seed's End form, or your own $(item)Chorus Forest$(). Smelt chorus to $(item)purpur$(), and the rare $(item)shulker$() that drifts onto those islands drops the $(item)shells$(). Gather enough of both and you can seed your own city."
     },
     {
       "type": "patchouli:crafting",

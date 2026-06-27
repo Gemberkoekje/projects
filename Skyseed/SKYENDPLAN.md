@@ -120,11 +120,16 @@ Genuinely new seeds with no overworld parallel, the way the Nether got Bastion /
   carries its own shape, so a forest dome still reads differently from a rocky crag), and Aquatic's pond becomes an
   empty carved basin — an "empty lake" — for a touch of character. (End stone is the End's neutral default block, so the
   override only needs to carry the shape.) Other utility/structure seeds still refuse the End (the cleaner default).
-- **End materials feeding overworld seeds.** Chorus fruit / purpur / shulker boxes are the new craft inputs; check
-  whether any existing recipe wants them, and whether a "chorus farm" belongs as an overworld-grown seed fed by End
-  chorus (probably End-only — keep it there).
+- **The chorus bootstrap — built (v0.114.0).** **Forest and Lush** (+ their large variants) are the exception to the
+  bare-end-stone rule: their `the_end` form grows **chorus plants** (chorus fruit) and carries a **small shulker chance**
+  (shells). This is the whole End economy's bootstrap — a fresh void End grows *no* outer islands (`final_density 0`)
+  and *no* End Cities (`generate-structures false`), so there is no natural chorus or shulker anywhere; the player
+  brings a Forest/Lush seed from the overworld and throws it in the End to start the chain. Progression:
+  **overworld Forest/Lush seed → End chorus island (chorus + rare shulker) → Chorus Forest seed** (renewable chorus →
+  purpur, plus its own rare shulker) **→ purpur + shells → End City** (the reliable shulker source + elytra). Recipes
+  stay thematic (chorus fruit / shulker shells); the guide entries + the End-Portal arrival hint point the player at it.
 - **Standing rule:** every real seed gets a recipe + `skyseeds` tag + guide entry; debug seeds get none. End seeds
-  inherit this.
+  inherit this. **Phase 4 is complete** (ladder transit + bare-end adaptation + the chorus bootstrap).
 
 ---
 

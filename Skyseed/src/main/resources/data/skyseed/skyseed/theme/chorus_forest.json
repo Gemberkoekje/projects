@@ -5,7 +5,10 @@
   "palette": { "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone", "fill_depth": 4,
     "surface_scatter": [ { "block": "minecraft:purpur_block", "chance": 0.10 } ] },
   "ores": [],
-  "mobs": [ { "entity": "minecraft:enderman", "chance": 0.40, "count": { "min": 2, "max": 4 } } ],
+  "mobs": [
+    { "entity": "minecraft:enderman", "chance": 0.40, "count": { "min": 2, "max": 4 } },
+    { "_comment": "A small shulker chance — the renewable trickle of shells that bootstraps the End City (the reliable source).", "entity": "minecraft:shulker", "chance": 0.2, "count": { "min": 1, "max": 1 } }
+  ],
   "variants": [
     { "weight": 1, "name": "chorus", "decoration": {
       "trees": [ { "feature": "minecraft:chorus_plant", "tries": 6, "spacing": 2 } ] } }

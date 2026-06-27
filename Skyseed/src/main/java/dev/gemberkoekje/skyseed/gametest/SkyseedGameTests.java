@@ -16,6 +16,7 @@ import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
+import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
@@ -2207,6 +2208,30 @@ public final class SkyseedGameTests {
                         .anyMatch(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false));
                 helper.assertTrue(hasEnd, "theme '" + name + "' has no the_end biome override — it won't grow in the End");
             }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void forestAndLushEndFormsGrowChorus(GameTestHelper helper) {
+        // Phase 4 bootstrap: a Forest/Lush seed thrown in the End grows chorus (chorus fruit) + the rare shulker
+        // (shells) — the only source of either in the otherwise-void End, where no outer islands or End Cities
+        // generate (final_density 0 + structures off). Guard that their the_end overrides keep that config.
+        final ServerLevel level = helper.getLevel();
+        for (final String name : new String[]{"forest", "forest_large", "lush", "lush_large"}) {
+            final IslandTheme t = theme(level, name);
+            helper.assertTrue(t != null, "missing theme '" + name + "'");
+            final BiomeOverride end = t.biomeOverrides().stream()
+                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false))
+                    .findFirst().orElse(null);
+            helper.assertTrue(end != null, "theme '" + name + "' has no the_end override");
+            final boolean chorus = end.variants().map(vs -> vs.stream().anyMatch(
+                    v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().getPath().equals("chorus_plant"))))
+                    .orElse(false);
+            helper.assertTrue(chorus, "the End form of '" + name + "' must grow chorus (the bootstrap)");
+            final boolean shulker = end.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().getPath().equals("shulker")))
+                    .orElse(false);
+            helper.assertTrue(shulker, "the End form of '" + name + "' must carry a shulker chance (shell bootstrap)");
         }
         helper.succeed();
     }

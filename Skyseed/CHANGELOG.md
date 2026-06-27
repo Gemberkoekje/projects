@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.114.0] - 2026-06-27
+
+### Changed
+- **The End economy now bootstraps without natural End content (Phase 4 complete).** A fresh void End grows no outer
+  islands (`final_density 0`) and no End Cities (structures off), so there was no natural chorus or shulker to start the
+  Chorus Forest / End City chain. Fixed by making the **Forest and Lush** seeds' **End form** grow **chorus** (chorus
+  fruit) and carry a **small shulker chance** (shells) — bring one from the overworld and throw it in the End to start.
+  The **Chorus Forest** seed also gained a small shulker chance (a renewable shell trickle). Progression: overworld
+  Forest/Lush seed → End chorus island → Chorus Forest → purpur + shells → End City. Recipes stay thematic; guide
+  entries and the End-Portal arrival page now point the player at the bootstrap.
+
 ## [0.113.0] - 2026-06-27
 
 ### Added

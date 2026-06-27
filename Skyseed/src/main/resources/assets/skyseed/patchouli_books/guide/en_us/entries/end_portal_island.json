@@ -22,7 +22,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Lighting it$()$(br)Fill all twelve frames with $(item)Eyes of Ender$() — Blaze Rods from a $(item)Nether Fortress$() island, crushed with $(item)Ender Pearls$(). The portal opens in the centre. Step through and you are in the End.$(br2)Pack spare seeds — the End grows empty — and know there is $(bold)no respawn$() there: no beds, no anchors, so dying drops you back at your overworld spawn. Stage from home.",
+      "text": "$(bold)Lighting it$()$(br)Fill all twelve frames with $(item)Eyes of Ender$() — Blaze Rods from a $(item)Nether Fortress$() island, crushed with $(item)Ender Pearls$(). The portal opens in the centre. Step through and you are in the End.$(br2)Pack spare seeds — the End grows empty — and know there is $(bold)no respawn$() there: no beds, no anchors, so dying drops you back at your overworld spawn. Stage from home.$(br2)First harvest up here: a $(item)Forest$() or $(item)Lush$() seed grows $(item)chorus$() in the End — the start of the chorus → purpur → End City path.",
       "advancement": "skyseed:craft_end_portal"
     },
     {
