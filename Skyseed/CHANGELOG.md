@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.116.0] - 2026-06-27
+
+### Added
+- **Dragon Trophy seed — the End chapter's capstone (Phase 6 set-piece).** Beat the dragon, then grow a **Dragon
+  Monument** to show off the egg: a stepped end-stone-brick dais, a purpur-capped pedestal left **empty** (you set your
+  one unique egg on it — the structure never hands out a second), and four obsidian obelisks crowned with inward-facing
+  **dragon heads**, end-rod lit. A pure set-piece — it never touches the fixed dragon fight. Crafted from **dragon's
+  breath** (bottled from the fight) ringed in obsidian and end stone; plant it anywhere in the End. Full onboarding
+  (recipe, painted icon, skyseeds tag, gated guide entry under the End category, reveal/gathered/craft advancements)
+  plus recipe and structure-assembly gametests.
+
 ## [0.115.0] - 2026-06-27
 
 ### Changed

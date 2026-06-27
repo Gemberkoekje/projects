@@ -1,0 +1,8 @@
+{
+  "_comment": "Dragon Trophy / Monument (SKYENDPLAN Phase 6 capstone): a stepped end-stone-brick dais with a purpur-capped pedestal for the dragon egg + four dragon-head obelisks. A personal set-piece — grows anywhere in the End (plant it near your base). End-only.",
+  "dimensions": ["minecraft:the_end"],
+  "shape": { "radius": { "min": 8, "max": 9 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+  "palette": { "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone", "fill_depth": 4 },
+  "ores": [],
+  "jigsaw": { "pool": "skyseed:dragon_trophy/monument", "target": "minecraft:bottom", "depth": 1, "pad": 6 }
+}

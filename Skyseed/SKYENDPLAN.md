@@ -173,6 +173,12 @@ finale.
   idea is **out** (a setup grown elsewhere would just sit empty while the dragon spawns at origin regardless). Lean into
   it: the fight is free and already functional. What we *can* still grow are **set pieces** that don't touch the fight or
   `EndDragonFight` — decorative end-stone islands, an approach causeway, a trophy room for the egg, a beacon plinth.
+- **Dragon Trophy — built (v0.116.0).** The `dragon_trophy` seed grows a **Dragon Monument**: a stepped
+  end-stone-brick dais, a purpur-capped pedestal for the egg (left **empty** — the egg is unique, so the player sets
+  their own rather than the structure handing out a second), and four obsidian obelisks crowned with inward-facing
+  **dragon heads**, end-rod lit. A pure set-piece (never touches the fight / `EndDragonFight`). Crafted from **dragon's
+  breath** (bottled from the fight — post-dragon by construction) ringed in obsidian + end stone; grows anywhere in the
+  End. The other suggested set-pieces (causeway, beacon plinth) are optional flavor, not built.
 - **The central island — built (v0.109.0).** The root cause of the broken End was that the void End is `final_density:0`
   (no terrain), so the dragon's arena and the exit fountain's footing were pure void — only the bare bedrock egg-spike
   generated, which is why the fountain came out frameless and the fight happened over nothing. A worldgen feature

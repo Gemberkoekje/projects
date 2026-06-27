@@ -60,6 +60,7 @@ public final class DevStructureGenerator {
             PortalChamberTemplates.generateInto(base.resolve("end_portal")); // SKYENDPLAN Phase 1
             ReturnPortalTemplates.generateInto(base.resolve("return_portal")); // SKYENDPLAN — the way home
             EndCityTemplates.generateInto(base.resolve("end_city")); // SKYENDPLAN Phase 3 — the flagship
+            DragonTrophyTemplates.generateInto(base.resolve("dragon_trophy")); // SKYENDPLAN Phase 6 — the capstone trophy
             RareStructureTemplates.generateInto(base);
             writeGameTestRegion(base.resolve("gametest").resolve("region.nbt"));
             writeBigGameTestRegion(base.resolve("gametest").resolve("big_region.nbt"));

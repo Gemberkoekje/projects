@@ -2137,6 +2137,39 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void dragonTrophyMonumentHasEmptyEggPedestal(GameTestHelper helper) {
+        // Phase 6 capstone: the Dragon Trophy grows a monument — a purpur-capped pedestal + four dragon heads — but
+        // NO dragon egg (the egg is unique; the player sets their own). Verify it assembles and carries no egg. (Loads .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dragon_trophy/monument"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int heads = 0;
+        boolean purpur = false, egg = false, brick = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.DRAGON_HEAD)) {
+                        heads++;
+                    } else if (st.is(Blocks.PURPUR_BLOCK)) {
+                        purpur = true;
+                    } else if (st.is(Blocks.DRAGON_EGG)) {
+                        egg = true;
+                    } else if (st.is(Blocks.END_STONE_BRICKS)) {
+                        brick = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(brick, "the trophy dais should be end-stone bricks");
+        helper.assertTrue(purpur, "the trophy pedestal should have a purpur cap");
+        helper.assertTrue(heads >= 4, "the trophy should have four dragon heads (got " + heads + ")");
+        helper.assertTrue(!egg, "the trophy must NOT include a dragon egg (it would duplicate the unique egg)");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a
@@ -2189,6 +2222,25 @@ public final class SkyseedGameTests {
         helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
                         .is(ModItems.SEEDS.get("end_city").get()),
                 "the purpur + shulker shell + end stone frame did not produce the End City Seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void dragonTrophySeedCraftsFromDragonBreath(GameTestHelper helper) {
+        // Phase 6 capstone: the Dragon Trophy seed crafts from dragon's breath (the fight souvenir) ringed in obsidian
+        // and end stone — post-dragon by construction, so the trophy is earned, not handed out.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.ItemStack o = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.OBSIDIAN);
+        final net.minecraft.world.item.ItemStack d = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DRAGON_BREATH);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(e, o, e, o, d, o, e, o, e));
+        final var recipe = level.getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Dragon Trophy Seed from dragon's breath + obsidian + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
+                        .is(ModItems.SEEDS.get("dragon_trophy").get()),
+                "the dragon's breath + obsidian + end stone ring did not produce the Dragon Trophy Seed");
         helper.succeed();
     }
 

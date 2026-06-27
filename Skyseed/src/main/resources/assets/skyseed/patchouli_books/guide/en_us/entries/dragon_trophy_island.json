@@ -1,0 +1,24 @@
+{
+  "name": "Dragon Trophy Seed",
+  "category": "skyseed:end",
+  "advancement": "skyseed:reveal_dragon_trophy",
+  "icon": "minecraft:dragon_head",
+  "sortnum": 13,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "You beat the dragon. The $(item)Dragon Trophy Skyseed$() is where the $(item)dragon egg$() belongs — a grand $(o)monument$(): a stepped end-stone dais, a purpur-capped pedestal, and four obsidian obelisks crowned with $(item)dragon heads$() that watch over it.$(br2)$(bold)Where to look$()$(br)Bottle the $(item)dragon's breath$() from the fight (catch the lingering cloud in a glass bottle) — that, with $(item)end stone$() and $(item)obsidian$(), forges the seed. Plant it anywhere in the End, near your base."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:dragon_trophy_skyseed",
+      "text": "The dragon's breath, ringed in obsidian and end stone.",
+      "advancement": "skyseed:gathered_dragon_trophy"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Crowning it$()$(br)The pedestal is left $(o)empty$() — set your one hard-won $(item)dragon egg$() on the purpur cap yourself (the egg is unique, so the monument never hands you a second). $(br2)A fitting end to the chapter: the dragon's heads keep watch, the egg on its plinth, and you with an $(item)elytra$() on your back.",
+      "advancement": "skyseed:craft_dragon_trophy"
+    }
+  ]
+}
