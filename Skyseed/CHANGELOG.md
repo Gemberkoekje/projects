@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.150.0] - 2026-06-27
+
+### Fixed
+- **Sand and gravel can no longer fall off islands.** A final generation pass guarantees every gravity-affected
+  block (sand, red sand, gravel, the suspicious pair) has a solid block directly beneath it. Any that would hang
+  over the void — at the island underside, a deep pond/cave/ladder-shaft floor, or an exposed gravel/clay vein —
+  gets its natural base stamped under it (sandstone / red sandstone / stone). Placement is bottom-up, so the base
+  lands before the block it holds and nothing drops mid-grow. +1 invariant test (desert / badlands / aquatic); the
+  golden-master `water` island re-captured (gained 3 pond-bed supports).
+
 ## [0.149.0] - 2026-06-27
 
 ### Changed

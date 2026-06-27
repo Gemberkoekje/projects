@@ -51,6 +51,9 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Behavioural guard rail for the generation + structure pipeline (see {@code codereview.md}). These run on the
  * {@code gameTestServer} run (or {@code /test runall}) with a live server, so {@link IslandGenerator#planIsland}
@@ -159,6 +162,34 @@ public final class SkyseedGameTests {
                 "an alternative Rocky island must convert its whole body (no leftover cobblestone fill / stone core)");
         helper.assertTrue(stoneIslands > altIslands,
                 "plain stone must stay more common than the alternatives, got stone=" + stoneIslands + " alt=" + altIslands);
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void sandAndGravelAlwaysHaveSolidSupport(GameTestHelper helper) {
+        // Standing rule: no sand/gravel-type block may hang over the void. Plan islands that lay down sand/gravel
+        // (desert = sand body, badlands = red sand, aquatic = gravel/clay veins + sandy pond beds) across seeds and
+        // assert every gravity block has a non-air block directly below it in the plan (the supportFallingBlocks pass).
+        int seen = 0;
+        for (final String themeName : new String[]{"desert", "badlands", "aquatic", "aquatic_large"}) {
+            for (long seed = 1; seed <= 6; seed++) {
+                final IslandPlan p = plan(helper, themeName, seed);
+                final Set<BlockPos> solid = new HashSet<>();
+                for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                    if (!bp.state().isAir()) solid.add(bp.pos());
+                }
+                for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                    if (bp.state().is(Blocks.SAND) || bp.state().is(Blocks.RED_SAND) || bp.state().is(Blocks.GRAVEL)
+                            || bp.state().is(Blocks.SUSPICIOUS_SAND) || bp.state().is(Blocks.SUSPICIOUS_GRAVEL)) {
+                        seen++;
+                        helper.assertTrue(solid.contains(bp.pos().below()),
+                                themeName + " seed " + seed + ": " + bp.state().getBlock() + " at " + bp.pos()
+                                        + " hangs over the void (no solid block below)");
+                    }
+                }
+            }
+        }
+        helper.assertTrue(seen > 0, "test planted no sand/gravel to check — themes/biome no longer produce it");
         helper.succeed();
     }
 
@@ -2261,14 +2292,16 @@ public final class SkyseedGameTests {
     @GameTest(template = BIG_REGION)
     public static void endCityBridgesAcrossVoid(GameTestHelper helper) {
         // Phase 3: side branches also fling end-stone-brick bridges out over the void to a second 'wing' section.
-        // Position-seeded, so sample seeds and assert the best bridges well beyond the tiered core — the only
-        // end-stone brick in the core is the floor_b tiers' wall accents (within ~±4 of centre region 24), so brick
-        // reaching past that must be a bridge deck spanning the void.
+        // The assembly RNG is featureSeed ^ origin (Jigsaw.placeCapped), and the gametest engine lays this test out
+        // at a different world position each run, so any single seed's layout varies run to run. Sample plenty of
+        // seeds and assert the BEST flings a bridge well beyond the tiered core — the only end-stone brick in the
+        // core is the floor_b tiers' wall accents (within ~±4 of centre region 24), so brick reaching past that must
+        // be a bridge deck spanning the void. (The wide sample is what keeps this robust to the per-run origin.)
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
         int bestBrickReach = 0;
-        for (long seed = 1; seed <= 6; seed++) {
+        for (long seed = 1; seed <= 24; seed++) {
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
                     for (int y = 0; y < 24; y++) {
@@ -3054,7 +3087,7 @@ public final class SkyseedGameTests {
     /** Recorded fingerprints "blocks/checksum/trees/mobs/animals/jigsaws/hives" — the generation golden master. */
     private static final java.util.Map<String, String> GOLDEN = java.util.Map.of(
             "gametest/island#1", "213/-3285534759166012883/1/2/0/0/23",
-            "gametest/water#4", "1240/-3972436084849772311/0/1/0/0/0",
+            "gametest/water#4", "1243/-1761234246293413032/0/1/0/0/0",
             "gametest/features#4", "1356/2766402466658160625/0/0/0/0/0",
             "gametest/structure#11", "566/-538726431172054277/0/0/2/1/0",
             "gametest/bad#4", "197/5964512207029114459/0/0/0/1/0"

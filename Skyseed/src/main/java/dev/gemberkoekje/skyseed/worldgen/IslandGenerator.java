@@ -129,6 +129,9 @@ public final class IslandGenerator {
         final List<BlockPos> fluidTicks = new ArrayList<>();
         theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks, force.waterfall()));
 
+        // Standing rule: no sand/gravel-type block may hang over the void. Stamp a solid base under any that would
+        // (the island underside, a carved pond/cave/shaft floor). Runs last, so it sees every block any pass placed.
+        supportFallingBlocks(blockMap);
         final List<BlockPlacement> blocks = sortedBlocks(blockMap);
         final List<BlockPos> hives = beeNests(blockMap);
 
@@ -224,6 +227,38 @@ public final class IslandGenerator {
     }
 
     /** Materialise the block map into the plan's placement list, sorted bottom-up so the grow-in animation rises. */
+    /**
+     * Guarantee that every sand/gravel-type block has a solid block directly beneath it, so none falls off the
+     * island's underside or into a carved pocket. Any gravity block sitting over air/void gets its natural base
+     * stamped under it (sand → sandstone, red sand → red sandstone, gravel → stone). Only the bottom of a stack is
+     * unsupported (the block above it rests on the one below), so exactly that cell gets a base. Placement is
+     * bottom-up ({@link #sortedBlocks}), so the base lands before the block it holds — nothing falls mid-grow.
+     */
+    private static void supportFallingBlocks(Map<BlockPos, BlockState> blockMap) {
+        final List<BlockPos> unsupported = new ArrayList<>();
+        for (final Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
+            if (!isFallingType(e.getValue())) continue;
+            final BlockState under = blockMap.get(e.getKey().below());
+            if (under == null || under.isAir()) unsupported.add(e.getKey());
+        }
+        for (final BlockPos p : unsupported) {
+            blockMap.put(p.below(), supportFor(blockMap.get(p)));
+        }
+    }
+
+    /** A gravity-affected terrain block (falls when the cell below is empty). */
+    private static boolean isFallingType(BlockState s) {
+        return s.is(Blocks.SAND) || s.is(Blocks.RED_SAND) || s.is(Blocks.GRAVEL)
+                || s.is(Blocks.SUSPICIOUS_SAND) || s.is(Blocks.SUSPICIOUS_GRAVEL);
+    }
+
+    /** The solid base to stamp under a falling block: its natural stone for sand kinds, plain stone for gravel. */
+    private static BlockState supportFor(BlockState s) {
+        if (s.is(Blocks.RED_SAND)) return Blocks.RED_SANDSTONE.defaultBlockState();
+        if (s.is(Blocks.SAND) || s.is(Blocks.SUSPICIOUS_SAND)) return Blocks.SANDSTONE.defaultBlockState();
+        return Blocks.STONE.defaultBlockState();
+    }
+
     private static List<BlockPlacement> sortedBlocks(Map<BlockPos, BlockState> blockMap) {
         final List<BlockPlacement> blocks = new ArrayList<>(blockMap.size());
         for (final Map.Entry<BlockPos, BlockState> e : blockMap.entrySet()) {
