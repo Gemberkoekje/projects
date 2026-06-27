@@ -2310,6 +2310,57 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void hugeForestSeedCraftsFromGate(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 1: a huge seed's middle row is ender pearl / <theme>_large seed / blaze powder (the End +
+        // Nether farm gate), wrapped in the theme's bulk block. Huge Forest = dirt around that gate.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack t = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIRT);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.ItemStack l = new net.minecraft.world.item.ItemStack(ModItems.SEEDS.get("forest_large").get());
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BLAZE_POWDER);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(t, t, t, e, l, p, t, t, t));
+        final var recipe = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Huge Forest Seed (dirt + ender pearl + large + blaze powder)");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess()).is(ModItems.SEEDS.get("huge_forest").get()),
+                "the gate recipe did not produce the Huge Forest Seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void hugeAquaticSeedCraftsFromGate(GameTestHelper helper) {
+        // Same gate, sand-wrapped, consuming the Large Aquatic seed.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack t = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SAND);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.ItemStack l = new net.minecraft.world.item.ItemStack(ModItems.SEEDS.get("aquatic_large").get());
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BLAZE_POWDER);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(t, t, t, e, l, p, t, t, t));
+        final var recipe = level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Huge Aquatic Seed");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess()).is(ModItems.SEEDS.get("huge_aquatic").get()),
+                "the gate recipe did not produce the Huge Aquatic Seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void hugeIslandsAreSignificantlyBiggerThanLarge(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 1: a huge island must dwarf its *_large counterpart, and plan without error — a basic
+        // sizing + perf guard (single forest + the aquatic cluster) before the rest of the tier rolls out.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var b = level.getBiome(c);
+        final int largeF = IslandGenerator.planIsland(level, c, theme(level, "forest_large"), b, RandomSource.create(1L)).blocks().size();
+        final int largeA = IslandGenerator.planIsland(level, c, theme(level, "aquatic_large"), b, RandomSource.create(1L)).blocks().size();
+        final int hugeF = IslandGenerator.planIsland(level, c, theme(level, "huge_forest"), b, RandomSource.create(1L)).blocks().size();
+        final int hugeA = IslandGenerator.planIsland(level, c, theme(level, "huge_aquatic"), b, RandomSource.create(1L)).blocks().size();
+        helper.assertTrue(hugeF > largeF * 3 / 2, "huge_forest (" + hugeF + ") should dwarf forest_large (" + largeF + ")");
+        helper.assertTrue(hugeA > largeA * 3 / 2, "huge_aquatic cluster (" + hugeA + ") should dwarf aquatic_large (" + largeA + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.

@@ -104,9 +104,14 @@ Because a rare structure is *rare*, most huge islands are just big terrain + cav
 
 ## 4. Phases (build order)
 
-1. **Huge tier (sizing).** Add the engine-free part first: `huge_*` themes/seeds using `radius` + `max_under_depth`
-   (single) and `cluster_offsets` (cluster). Ship two as proof — **`huge_forest`** (single) and **`huge_aquatic`**
-   (cluster) — with full onboarding. **Verify performance here** (see Open questions) before rolling out more.
+1. **Huge tier (sizing) — DONE (v0.118.0).** `huge_forest` (single: radius 24–30, `max_under_depth` 18, gentle dome,
+   central lake, scaled ores) and `huge_aquatic` (cluster: five isles via `cluster_offsets`, central lagoon) shipped
+   with full onboarding and the `ender pearl / *_large seed / blaze powder` gate. Gametests confirm both plan without
+   error and dwarf their `*_large` counterparts (>1.5×), in normal build time. **Findings:** (a) the centre-based pond
+   only carves the cluster's centre isle — **per-isle ponds for the outer isles are a Phase-2 carving item** (the outer
+   aquatic isles are dry green isles for now); (b) plan-time performance is fine — *in-world grow-in/streaming of a
+   ~tens-of-thousands-of-blocks island is still worth an in-game playtest* (placement can't be gametested: a huge
+   island/cluster exceeds the test region).
 2. **Cave systems.** `CaveCarver` + cave decoration (reuse underside palette), gated by a `caves` config. Make
    **`huge_lush`** / **`huge_ancient`** the showcases.
 3. **Rare large structures.** Author the jigsaw dungeon + large mansion; wire them as `rare_structures` on the huge

@@ -1,0 +1,30 @@
+{
+  "_comment": "Huge Forest (SKYHUGEPLAN Phase 1 — single huge island): a sprawling oak/birch forest landmass far larger than forest_large. radius ~24-30, a gentle dome, and max_under_depth capping the teardrop into a thick plateau (the body the Phase-2 caves will hollow). A central lake; scaled ores. Overworld.",
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 24, "max": 30 }, "rim_noise": 0.42, "underside": "teardrop", "top_dome": { "min": 2, "max": 3 }, "max_under_depth": 18 },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [
+    { "block": "minecraft:coal_ore", "chance": 1.0, "count": { "min": 10, "max": 18 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:iron_ore", "chance": 1.0, "count": { "min": 6, "max": 12 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
+    { "block": "minecraft:copper_ore", "chance": 0.8, "count": { "min": 4, "max": 8 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" }
+  ],
+  "pond": { "block": "minecraft:water", "radius": 9, "depth": 4,
+    "plants": [ { "block": "minecraft:lily_pad", "chance": 0.12 }, { "block": "minecraft:seagrass", "chance": 0.15 } ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.5 } ],
+    "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.3, "count": { "min": 1, "max": 3 } } ] },
+  "mobs": [
+    { "entity": "minecraft:cow", "chance": 0.5, "count": { "min": 2, "max": 4 } },
+    { "entity": "minecraft:pig", "chance": 0.4, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:sheep", "chance": 0.5, "count": { "min": 2, "max": 4 } },
+    { "entity": "minecraft:chicken", "chance": 0.4, "count": { "min": 1, "max": 3 } },
+    { "entity": "minecraft:wolf", "chance": 0.15, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 2, "name": "oak", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 38, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.02 } ] } },
+    { "weight": 1, "name": "birch_oak", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 22, "spacing": 3 }, { "feature": "minecraft:birch", "tries": 18, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.28 }, { "block": "minecraft:oxeye_daisy", "chance": 0.03 }, { "block": "minecraft:cornflower", "chance": 0.03 } ] } }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "Huge Forest Seed",
+  "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_huge_forest",
+  "icon": "skyseed:huge_forest_skyseed",
+  "sortnum": 50,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Huge Forest Skyseed$() — a sprawling oak-and-birch landmass, far bigger than a Large island, with a central lake and a deep, ore-rich body.$(br2)$(bold)The cost$()$(br)Huge islands are end-game: you must have worked both the Nether and the End. The recipe rings a $(item)Large Forest Skyseed$() between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in dirt — you want it, you farm for it."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:huge_forest_skyseed",
+      "text": "The large seed between an ender pearl and blaze powder, packed in dirt.",
+      "advancement": "skyseed:gathered_huge_forest"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)What you get$()$(br)A vast forest to build on — dozens of trees, a lake, and a thick stone body veined with coal, iron and copper. $(br2)Cave systems and the rare buried structure are coming in a later update.",
+      "advancement": "skyseed:craft_huge_forest"
+    }
+  ]
+}

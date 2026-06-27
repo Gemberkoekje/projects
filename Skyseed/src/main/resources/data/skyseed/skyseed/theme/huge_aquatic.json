@@ -1,0 +1,24 @@
+{
+  "_comment": "Huge Aquatic (SKYHUGEPLAN Phase 1 — cluster): an archipelago of five green isles via cluster_offsets (the Village-Center mechanism). The centre isle ([0,0,0], where the centre-based pond carves) is a lagoon; the four outer isles are dry for now — per-isle ponds are a Phase-2 carving item. Clay + gravel. Overworld.",
+  "dimensions": ["minecraft:overworld"],
+  "shape": { "radius": { "min": 11, "max": 13 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 }, "max_under_depth": 12,
+    "cluster_offsets": [ [0, 0, 0], [30, 0, 18], [-30, 0, 18], [30, 0, -18], [-30, 0, -18] ] },
+  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
+  "ores": [
+    { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 16, "max": 24 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:gravel", "chance": 1.0, "count": { "min": 6, "max": 12 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
+  ],
+  "pond": { "block": "minecraft:water", "radius": 8, "depth": 4,
+    "plants": [ { "block": "minecraft:lily_pad", "chance": 0.12 }, { "block": "minecraft:kelp", "chance": 0.15 }, { "block": "minecraft:seagrass", "chance": 0.18 }, { "block": "minecraft:tall_seagrass", "chance": 0.06 } ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.6 } ],
+    "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.4, "count": { "min": 2, "max": 4 } } ] },
+  "mobs": [
+    { "entity": "minecraft:cow", "chance": 0.3, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:chicken", "chance": 0.3, "count": { "min": 1, "max": 2 } }
+  ],
+  "variants": [
+    { "weight": 1, "name": "freshwater", "decoration": {
+      "trees": [ { "feature": "minecraft:oak", "tries": 6, "spacing": 4 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.03 } ] } }
+  ]
+}

@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.118.0] - 2026-06-27
+
+### Added
+- **Huge island tier — Phase 1 (`SKYHUGEPLAN.md`).** Two new overworld seeds well above `*_large`: **Huge Forest** —
+  a single sprawling oak/birch landmass (radius ~24–30, a capped underside so it's a thick plateau, a central lake,
+  scaled coal/iron/copper) — and **Huge Aquatic** — a five-isle **archipelago** (`cluster_offsets`) ringed around a
+  central lagoon. Both gated by the new huge recipe: the middle row `ender pearl / <theme>_large seed / blaze powder`
+  wrapped in the theme's bulk block, so a huge island demands you've farmed both the Nether and the End. Full
+  onboarding (recipe, painted icon, `skyseeds` tag, gated guide entry, advancements) + recipe/sizing gametests. Cave
+  systems, per-isle ponds for the cluster, and rare buried structures come in later phases.
+
 ## [0.117.0] - 2026-06-27
 
 ### Changed
