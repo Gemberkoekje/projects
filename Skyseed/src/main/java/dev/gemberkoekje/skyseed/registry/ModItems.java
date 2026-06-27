@@ -43,15 +43,13 @@ public final class ModItems {
             "dragon_trophy");
 
     /**
-     * Hand-made debug <em>themes</em> for the few things the auto scan ({@link ThemeScanner}) does not cover — each
-     * germinates a dedicated island that is neither a per-theme biome override nor a rare structure: the
-     * {@code debug_streets} jigsaw spike (SKYJIGSAWPLAN) and the small/large waterfall feature tests. (Rare structures
-     * that appear by chance — igloo, cottage, bastion, … — are now auto-generated from their host themes' own
-     * {@code rare_structures}, so they no longer each need a dedicated theme here.) Same creative-only treatment as the
-     * auto debug seeds: registered into {@link #DEBUG_SEEDS} and shown in the "Skyseed Debug" tab, but no recipe/tag/guide.
+     * Hand-made debug <em>themes</em> for the one thing the auto scan ({@link ThemeScanner}) cannot derive — a
+     * standalone island that is neither a per-theme biome override, a rare structure, nor a ladder-shaft waterfall:
+     * the {@code debug_streets} jigsaw spike (SKYJIGSAWPLAN). (Everything chance-based — biome overrides, rare
+     * structures, and the ladder waterfall — is auto-generated from the host theme now.) Same creative-only treatment
+     * as the auto debug seeds: registered into {@link #DEBUG_SEEDS} and shown in the "Skyseed Debug" tab, no recipe/tag/guide.
      */
-    public static final List<String> DEBUG_SEED_THEMES = List.of(
-            "debug_streets", "debug_small_waterfall", "debug_large_waterfall");
+    public static final List<String> DEBUG_SEED_THEMES = List.of("debug_streets");
 
     /**
      * Auto-generated debug seeds, derived at construction by {@link ThemeScanner} from the shipped theme JSON: one per
@@ -96,7 +94,7 @@ public final class ModItems {
         for (ThemeScanner.DebugSeedSpec s : AUTO_DEBUG_SEEDS) {
             final ResourceLocation themeId = Ids.mod(s.baseTheme());
             DEBUG_SEEDS.put(s.id(), ITEMS.registerItem(s.id() + "_skyseed",
-                    props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.label()),
+                    props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.forcedWaterfall(), s.label()),
                     new Item.Properties().stacksTo(16)));
             AUTO_DEBUG_BASE.put(s.id() + "_skyseed", s.baseTheme());
         }

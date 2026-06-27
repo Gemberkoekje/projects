@@ -28,7 +28,7 @@ final class ShaftPlanner {
     private ShaftPlanner() {}
 
     static void carve(Map<BlockPos, BlockState> blockMap, BlockPos center, LadderShaft cfg, RandomSource random,
-                      List<BlockPos> fluidTicks) {
+                      List<BlockPos> fluidTicks, boolean forceWaterfall) {
         final int cx = center.getX();
         final int cz = center.getZ();
 
@@ -45,7 +45,7 @@ final class ShaftPlanner {
             return; // no centre column to punch through (shouldn't happen for a real island)
         }
 
-        final boolean waterfall = random.nextFloat() < cfg.waterfallChance();
+        final boolean waterfall = forceWaterfall || random.nextFloat() < cfg.waterfallChance();
         // Pick one of the 4 directions to face — the cobblestone "stack" backs the shaft on the opposite side, so the
         // whole thing rotates per island rather than always facing the same way.
         final Direction facing = Direction.from2DDataValue(random.nextInt(4));

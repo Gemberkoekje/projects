@@ -6,6 +6,7 @@ import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
+import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandGrowth;
@@ -63,6 +64,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     private static final EntityDataAccessor<Integer> DATA_FORCED_RARE =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.INT);
 
+    private static final EntityDataAccessor<Boolean> DATA_FORCED_WATERFALL =
+            SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.BOOLEAN);
+
     /** Ticks from spawn to germination (~2 s at 20 tps). */
     public static final int ARM_DURATION = 40;
 
@@ -104,6 +108,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         builder.define(DATA_THEME, "");
         builder.define(DATA_FORCED_BIOME, "");
         builder.define(DATA_FORCED_RARE, -1);
+        builder.define(DATA_FORCED_WATERFALL, false);
     }
 
     public void setTheme(ResourceLocation theme) {
@@ -135,6 +140,21 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     /** @return the forced rare-structure index, or -1 for the normal chance roll. */
     public int getForcedRare() {
         return this.entityData.get(DATA_FORCED_RARE);
+    }
+
+    /** Force the ladder shaft's waterfall variant (debug seeds); false = the normal waterfall-chance roll. */
+    public void setForcedWaterfall(boolean force) {
+        this.entityData.set(DATA_FORCED_WATERFALL, force);
+    }
+
+    /** @return whether the ladder shaft's waterfall variant is forced. */
+    public boolean getForcedWaterfall() {
+        return this.entityData.get(DATA_FORCED_WATERFALL);
+    }
+
+    /** Bundle the debug forcing flags for {@link IslandGenerator#planIsland}. */
+    private DebugForce debugForce() {
+        return new DebugForce(getForcedRare(), getForcedWaterfall());
     }
 
     /** A debug seed's forced biome resolved to a holder, or {@code null} for the normal planting-biome behaviour. */
@@ -278,7 +298,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
                                      List<Vec3> players, IslandPlacement.Occupancy occupied) {
         BlockPos cursor = base;
         for (int attempt = 0; attempt < MAX_H_ATTEMPTS; attempt++) {
-            final IslandPlan candidate = planAt(level, theme, cursor, forcedBiomeHolder(level), getForcedRare());
+            final IslandPlan candidate = planAt(level, theme, cursor, forcedBiomeHolder(level), debugForce());
             final IslandPlacement.Fit fit = IslandPlacement.check(candidate, players, occupied);
             if (fit.ok()) {
                 this.setPos(cursor.getX() + 0.5, cursor.getY() + 0.5, cursor.getZ() + 0.5);
@@ -299,7 +319,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         }
         for (int lift : V_FALLBACK) {
             final BlockPos c = base.above(lift);
-            final IslandPlan candidate = planAt(level, theme, c, forcedBiomeHolder(level), getForcedRare());
+            final IslandPlan candidate = planAt(level, theme, c, forcedBiomeHolder(level), debugForce());
             if (IslandPlacement.check(candidate, players, occupied).ok()) {
                 this.setPos(c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5);
                 return candidate;
@@ -310,9 +330,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
 
     /** Plan the island at {@code c} as {@code forced} (a debug seed's biome) or, when null, the planting biome at
      *  {@code c}; RNG is decorrelated per island via {@code worldSeed ^ centre}. */
-    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c, Holder<Biome> forced, int forcedRare) {
+    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c, Holder<Biome> forced, DebugForce force) {
         final RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-        return IslandGenerator.planIsland(level, c, theme, forced != null ? forced : level.getBiome(c), random, forcedRare);
+        return IslandGenerator.planIsland(level, c, theme, forced != null ? forced : level.getBiome(c), random, force);
     }
 
     /**
@@ -386,6 +406,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (getForcedRare() >= 0) {
             tag.putInt("ForcedRare", getForcedRare());
         }
+        if (getForcedWaterfall()) {
+            tag.putBoolean("ForcedWaterfall", true);
+        }
         tag.putBoolean("Precise", this.precise);
         if (this.precise) {
             tag.putDouble("TX", this.targetX);
@@ -406,6 +429,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         }
         if (tag.contains("ForcedRare")) {
             setForcedRare(tag.getInt("ForcedRare"));
+        }
+        if (tag.contains("ForcedWaterfall")) {
+            setForcedWaterfall(tag.getBoolean("ForcedWaterfall"));
         }
         this.precise = tag.getBoolean("Precise");
         if (this.precise) {

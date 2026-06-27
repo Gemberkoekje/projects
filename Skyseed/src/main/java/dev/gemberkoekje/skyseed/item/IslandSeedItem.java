@@ -34,6 +34,7 @@ public class IslandSeedItem extends Item {
     private final ResourceLocation theme;
     private final ResourceLocation forcedBiome;
     private final int forcedRareIndex;
+    private final boolean forcedWaterfall;
     private final String debugLabel;
 
     public IslandSeedItem(Properties properties, ResourceLocation theme) {
@@ -41,20 +42,22 @@ public class IslandSeedItem extends Item {
     }
 
     public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome) {
-        this(properties, theme, forcedBiome, -1, null);
+        this(properties, theme, forcedBiome, -1, false, null);
     }
 
     /**
      * Full constructor for an auto-generated debug seed: {@code forcedRareIndex} (an index into the theme's
-     * {@code rare_structures}, or -1) forces a chance-gated structure, and {@code debugLabel} (non-null) gives it a
-     * composed, lang-free display name. See {@link dev.gemberkoekje.skyseed.registry.ThemeScanner}.
+     * {@code rare_structures}, or -1) forces a chance-gated structure, {@code forcedWaterfall} forces the ladder
+     * shaft's waterfall variant, and {@code debugLabel} (non-null) gives it a composed, lang-free display name. See
+     * {@link dev.gemberkoekje.skyseed.registry.ThemeScanner}.
      */
     public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome,
-                          int forcedRareIndex, String debugLabel) {
+                          int forcedRareIndex, boolean forcedWaterfall, String debugLabel) {
         super(properties);
         this.theme = theme;
         this.forcedBiome = forcedBiome;
         this.forcedRareIndex = forcedRareIndex;
+        this.forcedWaterfall = forcedWaterfall;
         this.debugLabel = debugLabel;
     }
 
@@ -71,6 +74,11 @@ public class IslandSeedItem extends Item {
     /** A rare-structure index this (debug) seed forces its island to germinate, bypassing the chance roll; -1 = none. */
     public int forcedRareIndex() {
         return forcedRareIndex;
+    }
+
+    /** Whether this (debug) seed forces the ladder shaft's waterfall variant (bypassing its chance). */
+    public boolean forcedWaterfall() {
+        return forcedWaterfall;
     }
 
     @Override

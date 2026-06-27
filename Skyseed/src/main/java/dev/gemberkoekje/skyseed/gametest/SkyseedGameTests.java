@@ -10,6 +10,7 @@ import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
+import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
@@ -743,7 +744,7 @@ public final class SkyseedGameTests {
         final int idx = rareIndex(host, "nether_fortress/blaze_room");
         helper.assertTrue(idx >= 0, "nether_rocky_large should host the blaze room rare structure");
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
-                RandomSource.create(140L), idx);
+                RandomSource.create(140L), DebugForce.rare(idx));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/blaze_room")),
                 "forcing the blaze-room rare structure should assemble its jigsaw");
         helper.succeed();
@@ -773,7 +774,7 @@ public final class SkyseedGameTests {
         final int idx = rareIndex(host, "bastion/remnant");
         helper.assertTrue(idx >= 0, "nether_rocky_large should host the bastion remnant rare structure");
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
-                RandomSource.create(77L), idx);
+                RandomSource.create(77L), DebugForce.rare(idx));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/remnant")),
                 "forcing the bastion-remnant rare structure should assemble its jigsaw");
         helper.succeed();
@@ -2286,9 +2287,23 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
         final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_ancient"), level.getBiome(c),
-                RandomSource.create(1L), 0);
+                RandomSource.create(1L), DebugForce.rare(0));
         helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().startsWith("ancient_city")),
                 "forcedRare=0 on huge_ancient should germinate the ancient_city structure");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void debugForcedWaterfallGerminatesWaterColumn(GameTestHelper helper) {
+        // forcedWaterfall pins the ladder island's rare water-column variant: the centre shaft comes up as water, not ladders.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "ladder_small"), level.getBiome(c),
+                RandomSource.create(1L), new DebugForce(-1, true));
+        helper.assertTrue(p.blocks().stream().anyMatch(b -> b.state().is(Blocks.WATER)),
+                "a forced-waterfall ladder island should drop a water column");
+        helper.assertTrue(p.blocks().stream().noneMatch(b -> b.state().is(Blocks.LADDER)),
+                "a forced-waterfall ladder island should have no ladders");
         helper.succeed();
     }
 

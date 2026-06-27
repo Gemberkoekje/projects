@@ -83,8 +83,6 @@
   "item.skyseed.nether_edge": "Nether End-Portal Edge",
   "item.skyseed.ocean_monument_skyseed": "Ocean Monument Skyseed",
   "item.skyseed.debug_streets_skyseed": "Debug: Streets (jigsaw spike)",
-  "item.skyseed.debug_small_waterfall_skyseed": "Debug: Small Waterfall",
-  "item.skyseed.debug_large_waterfall_skyseed": "Debug: Large Waterfall",
   "entity.skyseed.island_seed": "Skyseed",
   "itemGroup.skyseed": "Skyseed",
   "itemGroup.skyseed.debug": "Skyseed Debug",

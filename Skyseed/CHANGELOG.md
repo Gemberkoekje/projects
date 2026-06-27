@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.129.0] - 2026-06-27
+
+### Changed
+- **The debug scan now also covers the ladder island's waterfall rare roll** — the last hand-made debug theme that was
+  really just a chance variant. `ladder_shaft.waterfall_chance` (5% on `ladder_small` / `ladder_large`) is a rare roll
+  exactly like a `rare_structures` entry, so `ThemeScanner` emits a `debug_<theme>_waterfall` seed per ladder theme that
+  forces the water-column variant. Forcing flags are bundled into a small `DebugForce` record (rare index + waterfall)
+  threaded seed → entity → `planIsland` → `ShaftPlanner`, so the next chance-variant is one field, not another
+  parameter. Removed the hand-made `debug_small_waterfall` + `debug_large_waterfall` themes (+ their models/lang);
+  `DEBUG_SEED_THEMES` is now only `debug_streets` (the jigsaw spike — the one debug island that's genuinely neither a
+  biome override, a rare structure, nor a ladder waterfall). 145 auto debug seeds; new
+  `debugForcedWaterfallGerminatesWaterColumn` gametest; 109 pass.
+
 ## [0.128.0] - 2026-06-27
 
 ### Removed

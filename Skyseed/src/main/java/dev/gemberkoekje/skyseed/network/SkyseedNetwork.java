@@ -45,6 +45,7 @@ public final class SkyseedNetwork {
             seed.setTheme(seedItem.theme());
             seed.setForcedBiome(seedItem.forcedBiome());
             seed.setForcedRare(seedItem.forcedRareIndex());
+            seed.setForcedWaterfall(seedItem.forcedWaterfall());
 
             if (pkt.precise()) {
                 final Vec3 eye = player.getEyePosition();

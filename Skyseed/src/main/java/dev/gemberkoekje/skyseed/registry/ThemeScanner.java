@@ -29,10 +29,12 @@ public final class ThemeScanner {
 
     /**
      * One auto debug seed. {@code id} is the registered name (no {@code _skyseed} suffix); {@code baseTheme} is the
-     * theme it germinates; exactly one of {@code forcedBiome} (force this biome) or {@code forcedRare} &ge; 0 (force the
-     * rare structure at that index into the theme's {@code rare_structures}) drives what it shows.
+     * theme it germinates; exactly one forcing drives what it shows — {@code forcedBiome} (force this biome),
+     * {@code forcedRare} &ge; 0 (force the rare structure at that index into {@code rare_structures}), or
+     * {@code forcedWaterfall} (force the ladder shaft's waterfall variant).
      */
-    public record DebugSeedSpec(String id, String baseTheme, String label, ResourceLocation forcedBiome, int forcedRare) {}
+    public record DebugSeedSpec(String id, String baseTheme, String label, ResourceLocation forcedBiome,
+                                int forcedRare, boolean forcedWaterfall) {}
 
     public static List<DebugSeedSpec> scan() {
         final List<DebugSeedSpec> out = new ArrayList<>();
@@ -69,7 +71,7 @@ public final class ThemeScanner {
                         continue;
                     }
                     final String id = unique("debug_" + theme + "_" + biome.getPath(), ids);
-                    out.add(new DebugSeedSpec(id, theme, theme + " [" + biome.getPath() + "]", biome, -1));
+                    out.add(new DebugSeedSpec(id, theme, theme + " [" + biome.getPath() + "]", biome, -1, false));
                 }
             }
             if (root.has("rare_structures")) {
@@ -77,7 +79,16 @@ public final class ThemeScanner {
                 for (int i = 0; i < arr.size(); i++) {
                     final String tag = rareTag(arr.get(i).getAsJsonObject(), i);
                     final String id = unique("debug_" + theme + "_" + tag, ids);
-                    out.add(new DebugSeedSpec(id, theme, theme + " (" + tag + ")", null, i));
+                    out.add(new DebugSeedSpec(id, theme, theme + " (" + tag + ")", null, i, false));
+                }
+            }
+            // A ladder shaft with a non-zero waterfall_chance is a rare roll of the ladder island — cover its variant.
+            if (root.has("ladder_shaft")) {
+                final JsonObject shaft = root.getAsJsonObject("ladder_shaft");
+                final float chance = shaft.has("waterfall_chance") ? shaft.get("waterfall_chance").getAsFloat() : 0.05f;
+                if (chance > 0f) {
+                    final String id = unique("debug_" + theme + "_waterfall", ids);
+                    out.add(new DebugSeedSpec(id, theme, theme + " (waterfall)", null, -1, true));
                 }
             }
         } catch (Exception e) {

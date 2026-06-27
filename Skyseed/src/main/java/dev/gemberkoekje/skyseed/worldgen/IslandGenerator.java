@@ -63,15 +63,16 @@ public final class IslandGenerator {
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
-        return planIsland(level, center, theme, biome, random, -1);
+        return planIsland(level, center, theme, biome, random, DebugForce.NONE);
     }
 
     /**
-     * As above, but {@code forcedRare} (an index into the theme's {@code rare_structures}, or -1 for the normal chance
-     * roll) lets a debug seed force a specific otherwise chance-gated structure to germinate. See {@link #rollRare}.
+     * As above, but {@code force} lets a debug seed pin otherwise chance-based variants: a rare structure (by index
+     * into {@code rare_structures}, bypassing its chance) and/or the ladder shaft's waterfall. See {@link #rollRare}
+     * and {@link ShaftPlanner}.
      */
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
-                                        Holder<Biome> biome, RandomSource random, int forcedRare) {
+                                        Holder<Biome> biome, RandomSource random, DebugForce force) {
         // Pass 0: resolve the per-island config (palette/shape/variant/snow…) from the theme + matching biome override.
         final Resolved cfg = resolveConfig(level, center, theme, biome, random);
         final boolean useBase = cfg.useBase(); // false off the theme's home dimension — gates the home-only lava pass
@@ -99,7 +100,7 @@ public final class IslandGenerator {
 
         // Rare structures: at most one germinates in place of the usual island. Rolled here, before the pond, so a
         // flooded ruin can suppress the pond it stands in for.
-        final RareStructure rare = rollRare(theme, biome, cfg, random, forcedRare);
+        final RareStructure rare = rollRare(theme, biome, cfg, random, force.rareIndex());
 
         // Water: a Y-banded lava lake (rolled first; a hit suppresses the pond) or the theme/override pond/river.
         final Water water = planWater(buffers, cfg, theme, center, sh, lava, rare, random);
@@ -126,7 +127,7 @@ public final class IslandGenerator {
         // to mining level. Applied in every dimension the seed grows in (it's structure, not biome content), and
         // carved last so it cuts cleanly through the finished terrain.
         final List<BlockPos> fluidTicks = new ArrayList<>();
-        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks));
+        theme.ladderShaft().ifPresent(shaft -> ShaftPlanner.carve(blockMap, center, shaft, random, fluidTicks, force.waterfall()));
 
         final List<BlockPlacement> blocks = sortedBlocks(blockMap);
         final List<BlockPos> hives = beeNests(blockMap);
