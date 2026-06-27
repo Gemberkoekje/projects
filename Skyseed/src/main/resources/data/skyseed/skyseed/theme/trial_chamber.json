@@ -7,7 +7,7 @@
     { "block": "minecraft:copper_ore", "chance": 0.85, "count": { "min": 5, "max": 8 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
     { "block": "minecraft:iron_ore", "chance": 0.55, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
-  "jigsaw": { "pool": "skyseed:trial_chamber/start", "target": "minecraft:bottom", "depth": 2, "pad": 10, "sink": 7 },
+  "jigsaw": { "pool": "skyseed:trial_chamber/start", "target": "minecraft:bottom", "depth": 3, "pad": 10, "sink": 7 },
   "variants": [
     { "weight": 1, "name": "rocky", "decoration": {
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }

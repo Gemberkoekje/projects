@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.145.0] - 2026-06-27
+
+### Changed
+- **Trial Chamber layout variety (SKYJIGSAWPLAN Phase 5).** Added a connective `gallery` corridor to the chamber's
+  rooms pool — it mates the hub like a room but re-draws the rooms pool from its far end, so trial rooms now chain
+  through corridors instead of only spoking off the hub. Jigsaw depth 2 → 3 (dedicated seed + the huge-badlands rare).
+  +1 test; 123 pass.
+
 ## [0.144.0] - 2026-06-27
 
 ### Changed

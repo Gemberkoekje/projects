@@ -147,7 +147,7 @@
       "jigsaw": {
         "pool": "skyseed:trial_chamber/start",
         "target": "minecraft:bottom",
-        "depth": 2,
+        "depth": 3,
         "pad": 10,
         "sink": 7
       },

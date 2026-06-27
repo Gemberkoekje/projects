@@ -39,6 +39,7 @@ public final class TrialChamberTemplates {
         writeIfAbsent(dir.resolve("room_spider.nbt"), room("minecraft:spider", 1));
         writeIfAbsent(dir.resolve("room_breeze.nbt"), room("minecraft:breeze", 1));
         writeIfAbsent(dir.resolve("room_treasure.nbt"), room(null, 2));
+        writeIfAbsent(dir.resolve("gallery.nbt"), gallery());
     }
 
     /** A deterministic tuff/copper masonry mix (mostly tuff bricks). */
@@ -138,6 +139,34 @@ public final class TrialChamberTemplates {
         if (vaults > 1) {
             m.put(new BlockPos(3, 1, 3), Blocks.VAULT.defaultBlockState());
         }
+        m.put(new BlockPos(mid, ceil - 1, mid), LANTERN);
+        return new Built(m, bes);
+    }
+
+    /**
+     * A 5×5 connective gallery (Phase 5 layout variety): a straight tuff corridor with a room-style doorway on the
+     * −Z wall (mates the hub/parent) and a hub-style edge connector on the +Z wall that re-draws the rooms pool — so
+     * the chamber chains rooms through corridors rather than only spoking them off the hub.
+     */
+    private static Built gallery() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final int max = 4, mid = 2, ceil = 5;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), mix(x, z));
+                m.put(new BlockPos(x, ceil, z), mix(x, z));
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                for (int yy = 1; yy < ceil; yy++) {
+                    final boolean door = x == mid && (z == 0 || z == max) && yy <= 2; // both Z walls open through
+                    m.put(new BlockPos(x, yy, z), (perim && !door) ? mix(x, yy + z) : AIR);
+                }
+            }
+        }
+        m.put(new BlockPos(mid, 0, 0), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.NORTH_UP));
+        bes.put(new BlockPos(mid, 0, 0), jig("skyseed:room_door", "skyseed:chamber_edge", "minecraft:empty", TUFF));   // in
+        m.put(new BlockPos(mid, 0, max), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.SOUTH_UP));
+        bes.put(new BlockPos(mid, 0, max), jig("skyseed:chamber_edge", "skyseed:room_door", "skyseed:trial_chamber/rooms", TUFF));  // out → another room/gallery
         m.put(new BlockPos(mid, ceil - 1, mid), LANTERN);
         return new Built(m, bes);
     }

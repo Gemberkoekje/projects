@@ -3053,6 +3053,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void trialGalleryChainsTheRoomsPool(GameTestHelper helper) {
+        // Phase 5 layout variety: the connective gallery mates the hub like a room (a room_door connector) AND re-draws
+        // the rooms pool from its far end, so the chamber chains rooms through corridors. Checked on the template.
+        final ServerLevel level = helper.getLevel();
+        final StructureTemplate t = level.getStructureManager().get(skyseed("trial_chamber/gallery")).orElseThrow();
+        int in = 0, out = 0;
+        for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+            if (j.nbt() == null) {
+                continue;
+            }
+            if (j.nbt().getString("name").equals("skyseed:room_door")) {
+                in++;   // mates the hub/parent exactly like a room
+            }
+            if (j.nbt().getString("target").equals("skyseed:room_door")
+                    && j.nbt().getString("pool").equals("skyseed:trial_chamber/rooms")) {
+                out++;  // its far end re-draws the rooms pool → corridors, not just spokes
+            }
+        }
+        helper.assertTrue(in == 1, "the gallery should mate the hub like a room (1 room_door connector, got " + in + ")");
+        helper.assertTrue(out == 1, "the gallery should re-draw the rooms pool from its far end (got " + out + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void oceanMonumentHasPrismarineAndTreasure(GameTestHelper helper) {
         final BlockPos o = place(helper, "skyseed:ocean_monument/monument");
         helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.PRISMARINE_BRICKS), "monument lost its prismarine");
