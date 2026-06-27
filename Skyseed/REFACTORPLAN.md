@@ -61,17 +61,117 @@ changes between versions the Stonecutter directives live in a handful of named f
    access) and `Jigsaw` (the one `generateJigsaw` site) front the version-volatile calls across ~18 files;
    behaviour-preserving (the `islandOutputIsStable` golden master stays byte-identical). The gametest keeps direct calls
    as the golden-master oracle — route it when Stage 2 lands.
-2. **Add the second MC/NeoForge version** (target **TBD — you pick**: latest 1.21.x, 1.22, …). Add the Stonecutter
-   node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get **both** versions
-   building and each one's gametests passing.
+2. **Add the second MC/NeoForge version — target chosen: Minecraft `26.1.2` / NeoForge `26.1.2.76`.** Add the
+   Stonecutter node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get
+   **both** versions building and each one's gametests passing. **Detailed, data-driven plan: see
+   [Stage 2 in detail](#stage-2-in-detail--target-mc-2612--neoforge-261276) below.**
 3. **Generalize + document.** Add further versions as wanted; write the "how to add a version" recipe (a node + the
    expected directive sites); optionally a CI matrix (`chiseledBuild`).
 
-> **Priority (per the maintainer): 1.21.1 only for now.** Stages 0–1 (the structural value) land first and are useful
-> immediately; the **second version (Stage 2+) is deliberately deferred until Skyseed is feature-complete on 1.21.1**.
-> The eventual driver is adopting the **world-gen-impacting features** newer versions introduced — so when a target is
-> named it's chosen for what its worldgen brings, not merely to prove the matrix. Stage 1 is still worth doing now: it
-> is a pure, golden-master-guarded code-organization refactor (no behaviour change) and the on-ramp for that later work.
+> **Priority (per the maintainer): 1.21.1 was the only target while the chapters were built; Stage 2 is now active.**
+> Stages 0–1 (the structural value) landed first; the **second version's driver is the worldgen content newer versions
+> add** — and the jar diff below confirms `26.1.2` brings a real worldgen payload (the Pale Garden biome + the 1.21.5
+> vegetation) on top of ~18 months of API churn. Stage 1 (the golden-master-guarded `compat` refactor) was the on-ramp.
+
+---
+
+## Stage 2 in detail — target MC 26.1.2 / NeoForge 26.1.2.76
+
+> Every figure here is from **diffing the actual vanilla client jars** (1.21.1 vs 26.1.2, pulled from Mojang), not
+> from changelogs — the changelogs misled (they list Poplar / Cinnabar / Sulfur, which the jar shows are **26.2**, not
+> 26.1.2). `26.1.2` is a stable hotfix on the year-based 2026 line (1.21.1 → … → 1.21.11 → 26.1 → 26.1.2); 26.2 is in
+> beta. Verified prerequisites: **NeoForge `26.1.2.76` resolves** on `maven.neoforged.net` (pom 200); the dev box has
+> **JDK 26** (≥25) and **JDK 21**.
+
+### 2.1 Toolchain & build wiring
+
+- **Java 25 is mandatory** for 26.1.2 (the version JSON pins `javaVersion.majorVersion = 25`); 1.21.1 stays **Java 21**.
+  JDK 26 runs it (≥25) but Gradle toolchain matching is by exact major — install/pin a **JDK 25** for that node, or set
+  its `languageVersion` to 26 if you accept JDK 26 there.
+- **NeoForge** uses the 4-component `<mcMajor>.<mcMinor>.<mcPatch>.<build>` scheme → `26.1.2.76`.
+- **Patchouli** is version-pinned (`1.21.1-93-NEOFORGE`); needs a 26.1.2 build, else guard its `compileOnly`/
+  `localRuntime` off for that node (the mod already runs without it — the guide falls back to a written book).
+- **Parchment** for 26.1.2 may lag; omit it for that node if unpublished (Mojmap still compiles, just fewer param names).
+
+**Per-node version values can't live in `versions/<v>/gradle.properties`** — the whole `versions/` tree is gitignored
+and Stonecutter-regenerated. Keep them **version-keyed in the root `gradle.properties`** and select by
+`stonecutter.current.version` at the top of `build.gradle`:
+
+```properties
+# gradle.properties — per-node, selected in build.gradle
+mc_1.21.1=1.21.1
+neo_1.21.1=21.1.233
+java_1.21.1=21
+parchment_mc_1.21.1=1.21.1
+parchment_1.21.1=2024.11.17
+patchouli_1.21.1=1.21.1-93-NEOFORGE
+mc_26.1.2=26.1.2
+neo_26.1.2=26.1.2.76
+java_26.1.2=25
+# parchment_26.1.2 / patchouli_26.1.2 omitted until published → those features skip for this node
+```
+```groovy
+// settings.gradle
+stonecutter { create(rootProject) { versions("1.21.1", "26.1.2"); vcsVersion = "1.21.1" } }
+
+// build.gradle (top, before `version = ...`)
+def mcv = stonecutter.current.version
+ext.minecraft_version = property("mc_${mcv}")
+ext.neo_version       = property("neo_${mcv}")
+def javaVersion       = (property("java_${mcv}") as int)
+java.toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)   // was hard-coded 21
+// parchment { … } and the Patchouli compileOnly/localRuntime → wrap in `if (project.hasProperty("parchment_${mcv}"))` / `…("patchouli_${mcv}")`
+```
+
+> **Sequencing — important.** Adding the node makes ModDevGradle set up the 26.1.2 **NeoForm decompile** (downloads +
+> Java 25), and Skyseed will **not compile** against 26.1.2 until the `compat` directives in §2.2 exist. So the node
+> flip is the **start of the compat work**, not a free-standing "bootstrap": do it on a branch, keep
+> `:1.21.1:runGameTestServer` green as the guard, and don't merge until both nodes build.
+
+### 2.2 The version-volatile API surface (where the `//?` directives go)
+
+~18 months of MC + NeoForge churn (1.21.2 → 26.1). Expect directives **inside `compat` only**:
+
+- **`Ids` / `Lookup` / `Jigsaw`** (exist) — re-verify `ResourceLocation`, `RegistryAccess`, and `JigsawPlacement.generateJigsaw` signatures on 26.1.2.
+- **Registration** (`DeferredRegister`, registry keys) → likely a new `compat/Registration`.
+- **Network / payload registration** — NeoForge's most-churned area → `compat/Net`.
+- **Events** (mod bus, the datapack-registry event, spawn-placement) → `compat/Events`.
+- **Data components / `BlockBehaviour.Properties` / item `Properties`** → `compat/*Props`.
+- **`world_gen_settings.dat` (26.1):** WorldGenSettings moved out of `level.dat` into `data/<world>/world_gen_settings.dat`. Two impacts: (a) the legacy `/emptynether` `/emptyend` **level.dat-editing rescue commands break on 26.1.2** — they're already slated for removal pre-1.0, now also version-gated; (b) **re-verify the void dimensions load** — the `void` / `void_nether` / `void_end` noise-settings + the world-preset still drive the baked dimension generator, but the noise-settings/world-preset **codec shape may have shifted** (the vanilla `noise_settings` *names* are unchanged in the jar diff, which is reassuring). This is the **first concrete compat check** and touches the `void_*` standing rule.
+
+### 2.3 The worldgen delta 1.21.1 → 26.1.2 (jar diff) → Skyseed's response
+
+**1 new biome · 0 new structures · vanilla noise-settings stable in name · 109 new blocks**, bucketed:
+
+| Delta (from the jar diff) | Worldgen-generating? | Skyseed response |
+|---|---|---|
+| **Biome `pale_garden`** | yes | A `pale_garden` `biome_override` on the Forest line (a Forest seed over a pale garden → a pale variant), and/or a dedicated **Pale Garden island theme**. Version-inert on 1.21.1 (see §2.4). |
+| **Pale Garden blocks** — pale-oak wood set, pale moss / carpet / hanging moss, open/closed eyeblossom, creaking heart, resin block / bricks (+ slab/stairs/wall/chiseled) / clump (~40) | yes (generate in the pale garden) | Theme content: pale-oak trees, pale-moss surface + scatter, hanging-moss underside, eyeblossom/resin decoration; **Creaking** as a rare mob. Block-completeness: all obtainable. |
+| **1.21.5 vegetation** — bush, wildflowers, firefly bush, leaf litter, short/tall dry grass, cactus flower, golden dandelion (~8) | yes (generate in existing biomes) | Decoration entries on existing themes: forest/meadow → bush/wildflowers/firefly bush/leaf litter; desert/badlands → dry grass + cactus flower. |
+| **Copper expansion** — copper golem statue, copper bars/chains/chests/lanterns/torches + every oxidation + waxed state, **oxidizing lightning rods**, iron chain (~55) | no (crafted) | **Block-completeness only** — all craftable from copper, already obtainable. Copper Golem = a built mob. No worldgen work. |
+| **Wooden shelves** ×12, **dried ghast**, test blocks ×2 | no | Block-completeness (shelves/dried-ghast craftable); test blocks = parity exclusion (uncollectible). |
+
+So the actual **generation** work is exactly two things: a **Pale Garden theme** and the **1.21.5 vegetation** sprinkled into existing themes. Everything else is a **re-run of the block-completeness audit on 26.1.2** (the copper/shelf/ghast blocks are craftable, so they should already pass).
+
+### 2.4 The single-codebase data strategy (the key lever)
+
+A 1.21.1 build **must not reference an id that doesn't exist in 1.21.1** (`pale_garden`, `pale_oak_log`, `bush`, …) or
+its datapack fails to load. Rather than maintain per-version resource source-sets, **make Skyseed's theme /
+decoration / biome-override / ore codecs tolerant of unknown block/biome/feature ids — skip-with-log instead of
+hard-fail.** Then the **same dataset** (the Pale Garden override + the 1.21.5 decoration) ships to both nodes: active
+on 26.1.2, **inert on 1.21.1**. This is a small, testable loader change and removes almost all per-version data
+divergence. The residual hard cases — a renamed vanilla id, a shifted worldgen codec, the `void_*` settings if their
+codec moved — still take a guarded data variant or a `//?` directive; handle those when they bite.
+
+### 2.5 Stage 2 sub-steps (each ends with **both** nodes green)
+
+- **2a — node wiring + compile.** §2.1 config; run the 26.1.2 NeoForm; drive the compile errors into `compat`
+  directives (§2.2) until 26.1.2 compiles. 1.21.1 stays green throughout.
+- **2b — tolerant codecs** (§2.4) — the unknown-id skip; a gametest proving a forward-referencing theme loads inert.
+- **2c — re-audit blocks on 26.1.2** — the 109 new ids through the completeness rule (expect all craftable → pass).
+- **2d — worldgen content** — the Pale Garden theme + the 1.21.5 vegetation decoration, version-inert on 1.21.1.
+- **2e — per-version golden master + gametests**; write the "add a version" recipe. Route the gametest's remaining
+  direct API calls through `compat` (the Stage-1 to-do).
 
 ---
 
