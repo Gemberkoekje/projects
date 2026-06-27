@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "crafted": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "skyseed:dungeon_large_skyseed"
+      }
+    }
+  }
+}

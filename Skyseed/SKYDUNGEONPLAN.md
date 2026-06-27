@@ -124,10 +124,14 @@ surface tell.
   (test it from the creative tab).
 
 ## Phases (each its own commit)
-1. **Sprawling Dungeon (rare + dedicated seed)** — `DungeonComplexTemplates` + `dungeon_complex/` pool; wire as the
-   huge_rocky rare @ 2.5% (replacing `dungeon/lair`) **and** as the dedicated **`dungeon_large`** seed (new theme +
-   `CCC/EDP/CCC` recipe + full onboarding, Part D). Gametests (assembles with spawners/chests/varied rooms; the seed
-   crafts from the dungeon seed + ender pearl + blaze powder). 2-build dance.
+1. **Sprawling Dungeon (rare + dedicated seed) — DONE (v0.132.0).** `DungeonComplexTemplates` (start hub +
+   corridor/corner/cross + zombie/skeleton/spider spawner rooms + cell_block + flooded_room + lava_room +
+   treasure_vault + dead_end) + the self-linking `dungeon_complex/parts` pool (weighted + empty terminator, mossed by
+   `hamlet_weathering`). Solid boxes with doorway connectors (jigsaw blocks → air), self-linking on `skyseed:dungeon`.
+   Wired as the huge_rocky rare @ 2.5% (replacing `dungeon/lair`) AND as the dedicated `dungeon_large` seed
+   (`CCC/EDP/CCC` recipe + full onboarding). `sprawlingDungeonAssembles` gametest proves the connectors align (cobble
+   > 400 = sprawled past the hub). Depth 4, sink 6, pad 12. *(Follow-up ideas: corridor_stairs for level changes; a
+   `centerpiece` to guarantee one treasure_vault.)*
 2. **Mineshaft (oak)** — `MineshaftTemplates` + `mineshaft/` pool (corridor/cross/stairs/room/start/dead_end, with the
    arches/rails/cobwebs/spawner/chest), wire as huge_rocky 2nd rare @ 2.5%. **+ extend `StructureWriter` for entities**
    (chest minecarts). Gametest.

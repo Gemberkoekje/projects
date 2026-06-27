@@ -90,5 +90,6 @@
   "key.category.skyseed": "Skyseed",
   "key.skyseed.toggle_throw_mode": "Toggle Throw Mode",
   "skyseed.throw_mode.classic": "Throw mode: Classic",
-  "skyseed.throw_mode.precise": "Throw mode: Precise"
+  "skyseed.throw_mode.precise": "Throw mode: Precise",
+  "item.skyseed.dungeon_large_skyseed": "Large Dungeon Skyseed"
 }

@@ -38,7 +38,7 @@ public final class ModItems {
             "piglin_trading_post", "wither_arena",
             "hamlet", "trade_post", "village_center",
             "pasture", "poultry", "wool_farm", "stable", "aquarium",
-            "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
+            "dungeon", "dungeon_large", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
             "woodland_mansion", "ocean_monument", "end_portal", "return_portal", "chorus_forest", "end_city",
             "dragon_trophy");
 

@@ -1,0 +1,14 @@
+{
+  "criteria": {
+    "got_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "skyseed:dungeon_skyseed"
+          }
+        ]
+      }
+    }
+  }
+}

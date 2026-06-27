@@ -1,0 +1,24 @@
+{
+  "name": "Large Dungeon Island",
+  "category": "skyseed:ruins",
+  "advancement": "skyseed:reveal_dungeon_large",
+  "icon": "skyseed:dungeon_large_skyseed",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Large Dungeon Skyseed$() — not a single spawner cube but a whole $(item)sprawling dungeon$(): cobblestone rooms and corridors, mob spawners, prison cells, a flooded vault and a lava pit, all sunk into the island with one stepped stair down.$(br2)$(bold)The cost$()$(br)End-game, like the huge seeds: a $(item)Dungeon Skyseed$() ringed between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in cobblestone."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:dungeon_large_skyseed",
+      "text": "The dungeon seed between an ender pearl and blaze powder.",
+      "advancement": "skyseed:gathered_dungeon_large"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)What you get$()$(br)A maze of spawner rooms (zombie, skeleton, spider), cells, and a $(item)treasure vault$() — loot and a renewable mob-farm core, with the surface stair the only tell.",
+      "advancement": "skyseed:craft_dungeon_large"
+    }
+  ]
+}

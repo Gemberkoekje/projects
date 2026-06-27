@@ -1,0 +1,17 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 5, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/corridor", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/corner", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/cross", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/spawner_zombie", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/spawner_skeleton", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/spawner_spider", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/cell_block", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/flooded_room", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/lava_room", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/treasure_vault", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:dungeon_complex/dead_end", "processors": "skyseed:hamlet_weathering", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:empty_pool_element" } }
+  ]
+}

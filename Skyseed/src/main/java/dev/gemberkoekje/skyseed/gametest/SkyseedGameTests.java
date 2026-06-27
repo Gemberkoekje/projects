@@ -2337,6 +2337,39 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void sprawlingDungeonAssembles(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part A: the dungeon_complex jigsaw must sprawl past its start hub — i.e. the doorway connectors
+        // align so corridors/rooms actually attach (a misalignment would leave only the start, ~300 cobble). Assert the
+        // sprawl is bigger than the lone hub and carries dungeon content (a spawner and/or a loot chest). Loads .nbt.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, 7L);
+        int cobble = 0;
+        int spawners = 0;
+        int chests = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.COBBLESTONE) || st.is(Blocks.MOSSY_COBBLESTONE)) {
+                        cobble++;
+                    } else if (st.is(Blocks.SPAWNER)) {
+                        spawners++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(cobble > 400, "the dungeon should sprawl past its start hub (cobble " + cobble
+                + " — connectors likely misaligned if ~300)");
+        helper.assertTrue(spawners + chests >= 1, "the dungeon sprawl should reach a spawner room or a chest (spawners "
+                + spawners + ", chests " + chests + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a

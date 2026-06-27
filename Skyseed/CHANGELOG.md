@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.132.0] - 2026-06-27
+
+### Added
+- **The Sprawling Dungeon — a multi-room jigsaw dungeon (SKYDUNGEONPLAN Phase 1).** Replaces the old single-room
+  dungeon with a recursing `dungeon_complex/` jigsaw modeled on the vanilla monster dungeon (cobble/mossy, mob spawners,
+  `chests/simple_dungeon`) + stronghold connectivity: a hub, straight/corner/cross corridors, and varied terminal rooms
+  — zombie/skeleton/spider spawner rooms, iron-bar cell blocks, a flooded drowned room, a lava hazard, and a treasure
+  vault. Delivered two ways:
+  - **Huge Rocky rare @ 2.5%** (was the single-room dungeon @ 6%), sunk into the mountain.
+  - **NEW dedicated `dungeon_large` seed** — the sprawling dungeon as a whole island, crafted from a `dungeon` seed
+    ringed between an **ender pearl** and **blaze powder**, packed in cobblestone (`CCC/EDP/CCC`) — the end-game "huge
+    bits" gate. Full onboarding (recipe, painted icon, tag, guide, advancements).
+  - New `sprawlingDungeonAssembles` gametest (verifies the doorway connectors align so it actually sprawls past the hub);
+    111 pass. (The Abandoned Mineshaft — the 2nd Huge Rocky rare — is Phase 2.)
+
 ## [0.131.0] - 2026-06-27
 
 ### Fixed
