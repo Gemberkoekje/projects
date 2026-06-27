@@ -2402,27 +2402,40 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
-    public static void forestAndLushEndFormsGrowChorus(GameTestHelper helper) {
-        // Phase 4 bootstrap: a Forest/Lush seed thrown in the End grows chorus (chorus fruit) + the rare shulker
-        // (shells) — the only source of either in the otherwise-void End, where no outer islands or End Cities
-        // generate (final_density 0 + structures off). Guard that their the_end overrides keep that config.
+    public static void forestAndLushEndFormsSplitByBiome(GameTestHelper helper) {
+        // A Forest/Lush seed in the End splits by biome: the central the_end biome (the dragon-fight area) grows an
+        // EMPTY normal end-stone island (a building platform), while the outer End biomes grow a SMALL island with a
+        // little chorus (+ the rare shulker) — bootstrapping the End-City run but steering bulk chorus to the dedicated
+        // Chorus Forest seed. (Chorus is a deferred tree feature, so this checks the override config, not placed blocks.)
         final ServerLevel level = helper.getLevel();
         for (final String name : new String[]{"forest", "forest_large", "lush", "lush_large"}) {
             final IslandTheme t = theme(level, name);
             helper.assertTrue(t != null, "missing theme '" + name + "'");
-            final BiomeOverride end = t.biomeOverrides().stream()
-                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false))
+            final BiomeOverride central = t.biomeOverrides().stream()
+                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false)
+                            && o.biomes().contains("minecraft:the_end"))
                     .findFirst().orElse(null);
-            helper.assertTrue(end != null, "theme '" + name + "' has no the_end override");
-            final boolean chorus = end.variants().map(vs -> vs.stream().anyMatch(
-                    v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().getPath().equals("chorus_plant"))))
+            final BiomeOverride outer = t.biomeOverrides().stream()
+                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false) && o.biomes().isEmpty())
+                    .findFirst().orElse(null);
+            helper.assertTrue(central != null, "theme '" + name + "' has no central (the_end biome) End override");
+            helper.assertTrue(outer != null, "theme '" + name + "' has no outer (dimension the_end) End override");
+            helper.assertTrue(!endFormHasChorus(central), "the central End form of '" + name + "' must be EMPTY (no chorus)");
+            helper.assertTrue(endFormHasChorus(outer), "the outer End form of '" + name + "' must grow a little chorus");
+            final boolean shulker = outer.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().getPath().equals("shulker")))
                     .orElse(false);
-            helper.assertTrue(chorus, "the End form of '" + name + "' must grow chorus (the bootstrap)");
-            final boolean shulker = end.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().getPath().equals("shulker")))
-                    .orElse(false);
-            helper.assertTrue(shulker, "the End form of '" + name + "' must carry a shulker chance (shell bootstrap)");
+            helper.assertTrue(shulker, "the outer End form of '" + name + "' must carry a shulker chance (shell bootstrap)");
+            helper.assertTrue(central.shape().get().radius().min() > outer.shape().get().radius().min(),
+                    "the central End island of '" + name + "' must be larger than the small outer chorus island");
         }
         helper.succeed();
+    }
+
+    /** Whether a biome override's variants grow chorus plants (the End-form bootstrap decoration). */
+    private static boolean endFormHasChorus(BiomeOverride ov) {
+        return ov.variants().map(vs -> vs.stream().anyMatch(
+                v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().getPath().equals("chorus_plant"))))
+                .orElse(false);
     }
 
     @GameTest(template = REGION)

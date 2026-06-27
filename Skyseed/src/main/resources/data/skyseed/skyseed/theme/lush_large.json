@@ -48,9 +48,12 @@
       "underside": [ { "block": "minecraft:glow_lichen", "chance": 0.12 }, { "block": "minecraft:spore_blossom", "chance": 0.12 }, { "block": "minecraft:hanging_roots", "chance": 0.10 } ] } }
   ],
   "biome_overrides": [
-    { "_comment": "End form (SKYENDPLAN Phase 4 — the chorus bootstrap): a large end-stone island grown with chorus (chorus fruit) + the rare shulker (shells). Throw a Large Lush seed in the End to start the End-City progression.", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 13, "max": 17 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 3 } },
-      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 7, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
-      "mobs": [ { "entity": "minecraft:shulker", "chance": 0.2, "count": { "min": 1, "max": 2 } } ] },
+    { "_comment": "End — central island (the_end biome, the dragon-fight area): an EMPTY large end-stone island of normal size — a clean building platform by the fight. No chorus; craft a Chorus Forest seed for that.", "dimension": "minecraft:the_end", "biomes": [ "minecraft:the_end" ],
+      "shape": { "radius": { "min": 13, "max": 17 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 3 } } },
+    { "_comment": "End — outer islands (highlands/midlands/barrens/small islands): a SMALL end-stone island with a little chorus fruit + the rare shulker, to bootstrap the End-City run. For more chorus, craft the Chorus Forest seed.", "dimension": "minecraft:the_end",
+      "shape": { "radius": { "min": 4, "max": 5 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 2, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
+      "mobs": [ { "entity": "minecraft:shulker", "chance": 0.15, "count": { "min": 1, "max": 1 } } ] },
     { "_comment": "Large Nether adaptation — as the normal Lush vine grotto, ~1.5x bigger.",
       "dimension": "minecraft:the_nether",
       "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },

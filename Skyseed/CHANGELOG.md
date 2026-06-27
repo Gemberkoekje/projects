@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.130.0] - 2026-06-27
+
+### Changed
+- **Forest & Lush seeds in the End now split by biome — steering bulk chorus to the dedicated Chorus Forest seed.**
+  Thrown at the central `the_end` biome (the dragon-fight area), a Forest / Lush / large seed grows an **empty end-stone
+  island of normal size** — a clean building platform, no chorus. Thrown in any *other* End biome (highlands / midlands
+  / barrens / small islands), it grows a **small island with a little chorus fruit** (+ the rare shulker) — enough to
+  bootstrap the End-City run, but a clear nudge to craft the Chorus Forest seed if you want real chorus/purpur volume.
+  Previously every End Forest/Lush island was a full chorus island wherever it landed. Applies to `forest`,
+  `forest_large`, `lush`, `lush_large` (`forestAndLushEndFormsSplitByBiome` gametest; 109 pass).
+
 ## [0.129.0] - 2026-06-27
 
 ### Changed

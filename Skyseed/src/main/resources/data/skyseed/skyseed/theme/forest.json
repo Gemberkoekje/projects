@@ -25,8 +25,11 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } }
   ],
   "biome_overrides": [
-    { "_comment": "End form (SKYENDPLAN Phase 4 — the chorus bootstrap): an end-stone island grown with chorus (chorus fruit) + the rare shulker (shells). Throw a Forest seed in the End to start the End-City progression.", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.40, "underside": "teardrop" },
-      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 4, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
+    { "_comment": "End — central island (the_end biome, the dragon-fight area): an EMPTY end-stone island of normal size — a clean building platform by the fight. No chorus; craft a Chorus Forest seed for that.", "dimension": "minecraft:the_end", "biomes": [ "minecraft:the_end" ],
+      "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.40, "underside": "teardrop" } },
+    { "_comment": "End — outer islands (highlands/midlands/barrens/small islands): a SMALL end-stone island with a little chorus fruit + the rare shulker, to bootstrap the End-City run. For more chorus, craft the Chorus Forest seed.", "dimension": "minecraft:the_end",
+      "shape": { "radius": { "min": 4, "max": 5 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
+      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 2, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
       "mobs": [ { "entity": "minecraft:shulker", "chance": 0.15, "count": { "min": 1, "max": 1 } } ] },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 Warped fungal forest patch (the safe teal one; Endermen). Listed first so warped_forest wins; other Nether biomes fall to the crimson override below.",
       "dimension": "minecraft:the_nether", "biomes": [ "minecraft:warped_forest" ],
