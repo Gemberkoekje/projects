@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.149.0] - 2026-06-27
+
+### Changed
+- **Aquatic Large swampifies for the witch hut.** The witch-hut rare structure rolls on Aquatic Large in both
+  `swamp` and `mangrove_swamp`, but the theme only had a `swamp` biome override — over a mangrove swamp it fell back
+  to the base lake (grass, oak, blue orchid), so the hut sat on a clean lake. Added a `mangrove_swamp` override (mud
+  surface, `skyseed:mangrove` trees, lily pads, frogs) so that island comes up as a proper bog, and enriched the
+  existing `swamp` override with moss patches and brown mushrooms for more swamp character.
+
 ## [0.148.0] - 2026-06-27
 
 ### Changed

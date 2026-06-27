@@ -104,7 +104,23 @@
         "trees": [ { "feature": "minecraft:oak", "tries": 4, "spacing": 3 } ],
         "ground": [ { "block": "minecraft:short_grass", "chance": 0.25 }, { "block": "minecraft:blue_orchid", "chance": 0.04 } ] } } ] },
 
-    { "biomes": [ "minecraft:swamp" ], "surface": "minecraft:grass_block", "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.25 } ],
+    { "_comment": "Mangrove swamp: a muddy, mangrove-grown bog (this is one of the two biomes the witch-hut rare structure rolls in, so its hut lands on a proper swamp rather than the base lake).",
+      "biomes": [ "minecraft:mangrove_swamp" ], "surface": "minecraft:mud",
+      "surface_scatter": [ { "block": "minecraft:moss_block", "chance": 0.10 } ],
+      "pond": {
+        "block": "minecraft:water", "radius": 7, "depth": 5,
+        "plants": [ { "block": "minecraft:lily_pad", "chance": 0.14 }, { "block": "minecraft:seagrass", "chance": 0.12 } ],
+        "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.55 } ],
+        "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.45, "count": { "min": 1, "max": 3 } } ]
+      },
+      "mobs": [ { "entity": "minecraft:frog", "chance": 0.30, "count": { "min": 2, "max": 4 } } ],
+      "variants": [ { "weight": 1, "name": "mangrove", "decoration": {
+        "trees": [ { "feature": "skyseed:mangrove", "tries": 6, "spacing": 2 } ],
+        "ground": [ { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:short_grass", "chance": 0.10 } ] } } ] },
+
+    { "_comment": "Swamp: grass-and-mud bog with vine-hung swamp oaks (the witch hut's other home biome).",
+      "biomes": [ "minecraft:swamp" ], "surface": "minecraft:grass_block",
+      "surface_scatter": [ { "block": "minecraft:mud", "chance": 0.25 }, { "block": "minecraft:moss_block", "chance": 0.08 } ],
       "pond": {
         "block": "minecraft:water", "radius": 7, "depth": 5,
         "plants": [ { "block": "minecraft:lily_pad", "chance": 0.18 }, { "block": "minecraft:seagrass", "chance": 0.10 } ],
@@ -114,7 +130,7 @@
       "mobs": [ { "entity": "minecraft:frog", "chance": 0.25, "count": { "min": 2, "max": 4 } }, { "entity": "minecraft:cat", "chance": 0.12, "count": { "min": 1, "max": 1 } } ],
       "variants": [ { "weight": 1, "name": "swamp", "decoration": {
         "trees": [ { "feature": "minecraft:swamp_oak", "tries": 4, "spacing": 3 } ],
-        "ground": [ { "block": "minecraft:blue_orchid", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.15 } ] } } ] }
+        "ground": [ { "block": "minecraft:blue_orchid", "chance": 0.05 }, { "block": "minecraft:brown_mushroom", "chance": 0.04 }, { "block": "minecraft:short_grass", "chance": 0.15 } ] } } ] }
   ],
   "lava": {
     "lakes": [
