@@ -150,6 +150,15 @@ The kept End biome source is the lever. A seed thrown in the End takes its form 
 on biome), and does an "adapt me" End seed *re-skin* per biome (chorus in highlands, bare in barrens)? *Recommend yes to
 both* — it reuses proven machinery and makes the End feel mapped, not uniform.
 
+**Built (v0.115.0) — gating done; re-skin deferred.** The **End City** now gates to `end_highlands` / `end_midlands`
+via a top-level `fizzle` rule (biomes `the_end` + `end_barrens` + `small_end_islands`, with a hinted message): it grows
+in its native biomes and fizzles non-destructively elsewhere — reach the outer End through the dragon's gateway. Gated
+through the existing `FizzleRule` / `IslandGenerator.formValidFor` machinery (no theme restructure needed since
+`formValidFor` checks `fizzlesIn` before the base-dimension allow); guarded by `endCityGatesToHighlandsAndMidlands`.
+The per-biome **re-skin is deferred**: in the void End the player rarely visits the outer biomes (everything is grown
+near the `the_end` arrival), so re-skinning barrens/highlands is low-value and largely unseen — revisit if the End ever
+gets natural terrain. **Phase 5's substantive item (gating) is done.**
+
 ---
 
 ## Phase 6 — …is that a dragon?!

@@ -2237,6 +2237,27 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void endCityGatesToHighlandsAndMidlands(GameTestHelper helper) {
+        // Phase 5 — End-biome gating: the End City grows only in its native biomes (end_highlands / end_midlands, where
+        // vanilla End Cities live) and fizzles — with a hint — elsewhere in the End (central the_end, barrens, small islands).
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme city = theme(level, "end_city");
+        helper.assertTrue(city != null, "missing theme 'end_city'");
+        final var lookup = level.registryAccess().lookupOrThrow(Registries.BIOME);
+        final ResourceLocation end = Ids.mc("the_end");
+        for (final ResourceKey<net.minecraft.world.level.biome.Biome> k : java.util.List.of(Biomes.END_HIGHLANDS, Biomes.END_MIDLANDS)) {
+            helper.assertTrue(IslandGenerator.formValidFor(city, lookup.getOrThrow(k), 64, end),
+                    "End City should grow in " + k.location());
+        }
+        for (final ResourceKey<net.minecraft.world.level.biome.Biome> k : java.util.List.of(Biomes.THE_END, Biomes.END_BARRENS, Biomes.SMALL_END_ISLANDS)) {
+            final var b = lookup.getOrThrow(k);
+            helper.assertTrue(!IslandGenerator.formValidFor(city, b, 64, end), "End City should fizzle in " + k.location());
+            helper.assertTrue(city.fizzlesIn(b), "End City should show a fizzle hint in " + k.location());
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.

@@ -1,9 +1,10 @@
 {
-  "_comment": "End City (SKYENDPLAN Phase 3 flagship): a purpur tower + a cantilevered End ship on an end-stone island. Shulkers spawn for shells; the ship's chest (skyseed:chests/end_ship) holds a guaranteed elytra. End-only.",
+  "_comment": "End City (SKYENDPLAN Phase 3 flagship; Phase 5 biome-gated): a purpur tower + a cantilevered End ship on an end-stone island. Shulkers spawn for shells; the ship's chest (skyseed:chests/end_ship) holds a guaranteed elytra. Grows ONLY in its native End biomes — end_highlands / end_midlands (where vanilla End Cities live) — and fizzles with a hint in the central the_end (the dragon's), the barrens, and the small outer islands.",
   "dimensions": ["minecraft:the_end"],
   "shape": { "radius": { "min": 8, "max": 10 }, "rim_noise": 0.3, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 } },
   "palette": { "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone", "fill_depth": 4 },
   "ores": [],
   "mobs": [ { "entity": "minecraft:shulker", "chance": 0.5, "count": { "min": 2, "max": 3 } } ],
+  "fizzle": { "biomes": ["minecraft:the_end", "minecraft:end_barrens", "minecraft:small_end_islands"], "message": "skyseed.fizzle.end_city" },
   "jigsaw": { "pool": "skyseed:end_city/city", "target": "minecraft:bottom", "depth": 1, "pad": 6 }
 }

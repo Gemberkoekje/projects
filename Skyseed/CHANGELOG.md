@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.115.0] - 2026-06-27
+
+### Changed
+- **The End City is now biome-gated (Phase 5).** It grows only in its native End biomes — `end_highlands` /
+  `end_midlands`, where vanilla End Cities form — and fizzles non-destructively with a hint ("needs the End highlands
+  or midlands") in the central `the_end` (the dragon's), the `end_barrens`, and the `small_end_islands`. Reach the
+  outer End through the dragon's gateway. Done via a `fizzle` rule (the same machinery the Bastion uses for the basalt
+  deltas). Per-biome re-skinning of the adapt seeds is deferred — low-value in the void End, where the outer biomes
+  are rarely visited.
+
 ## [0.114.0] - 2026-06-27
 
 ### Changed
