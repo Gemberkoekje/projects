@@ -82,10 +82,16 @@ Loot-and-encounter islands pulled from the overworld's dungeons and ruins.
 - 🧙 **Witch Hut.** A swamp hut with a witch and a cat to deal with.
 - 🗼 **Pillager Outpost.** A wide cobblestone-and-dark-oak watchtower in a camp of tents, an archery target, a campfire and a banner. Get past the caged iron golem, fight your way up the ladder to the pillager room and its loot chest at the top, then free the golem and let it loose on the camp.
 - 🔱 **Ocean Monument.** A prismarine temple on a sand island, best thrown over a deep ocean. Guardians patrol its flooded halls and an elder guardian sits at the core, so come ready for the mining-fatigue glare. Mine it out for all the prismarine, clear a wet-sponge room, and dig up a buried Heart of the Sea for a conduit. The guardian shards are also what finally unlock the Aquarium.
-- 🗝️ **Trial Chamber.** The big one. A copper-and-tuff chamber sunk deep into a larger rocky island, reached by a single ladder shaft. Drop in and you find a lantern-lit complex with a **breeze** at its heart and spawner-and-vault rooms branching off, laid out differently every time. Clear the spawners for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the place ominous and get a shot at the **heavy core** for a **mace**.
+- 🗝️ **Trial Chamber.** The big one. A copper-and-tuff chamber sunk deep into a larger rocky island, reached by a single ladder shaft. Drop in and you find a lantern-lit complex with a **breeze** at its heart and spawner-and-vault rooms branching off through corridors, laid out differently every time. Clear the spawners for trial keys and spend them on the vaults. Bring an **ominous bottle** to turn the place ominous and get a shot at the **heavy core** for a **mace**.
 - 🏰 **Woodland Mansion.** A two-storey dark-oak manor on a big grassy island, with a red-carpet hall, loot rooms, a library, a gabled roof, and a run of side wings (a storeroom, another library, a hidden checkerboard room) that change each time. An **evoker** and a pack of **vindicators** hold it. Kill the evoker for a **Totem of Undying**, then grow another whenever you want more. It's a dependable totem source and the centrepiece of the overworld so far.
 
 And not everything announces itself with a seed of its own. Throw enough islands and you'll start turning up things you never crafted: a Frozen island sealed up inside an igloo, a Hamlet gone cobwebbed and abandoned, a ruin buried just under the surface that you only find by digging onto it. There are a fair few more hidden away in the ordinary islands, and the rest you'll have to come across yourself.
+
+---
+
+## Go huge
+
+Once you're farming the late game, the **Huge** seeds grow islands well beyond the Large ones — a single enormous landmass or a small cluster of them, threaded with **cave systems** to mine out and often hiding a **rare structure** deep inside: a sprawling multi-room dungeon, an abandoned mineshaft with rails and minecart chests, an ancient city, or a grand ocean monument. There's a dedicated **big-dungeon** seed too, if you just want the sprawl. They take an ender pearl and blaze powder to craft, so a Huge island is a proper late-game sink.
 
 ---
 
@@ -106,8 +112,18 @@ Build a portal, step through, and the Nether is the same idea — an empty sky o
 - **Your overworld seeds still work.** Throw a Rocky seed in the Nether and it adapts: a little netherrack mining island instead of stone. Desert becomes a soul-sand valley, Aquatic a lava lagoon, Forest a crimson or warped fungal patch, and so on. These are small on purpose — a foothold, not a base. Seeds with no Nether form (Meadow, Frozen) politely fizzle out.
 - **Nether seeds are the real payoff.** Craft a dedicated Nether seed from your overworld one plus a signature Nether block, and you get the full-size island: a deep-mining netherrack mountain rich in ancient debris, a broad lava lagoon with a strider pack, a towering fungal forest, a soul-sand valley riddled with fossils, or a hazardous basalt deltas of jagged columns. Each has a Large version too. Throw one *topside* as a joke and you'll get a tiny overworld island of the matching kind — except the Nether Lava seed, which grows a proper lava island up there, the only one there is.
 - **Lava is the new depth.** With no bedrock to dig toward, height is replaced by lava proximity: throw a mining island low, near the lava sea, for the best ancient debris and gold.
-- **Fortresses and surprises.** A Nether Fortress seed grows an arched nether-brick bridge running out of a keep, with a caged blaze spawner inside — a renewable source of blaze rods, no fortress to hunt for. And the Large Nether islands sometimes turn up with a blaze spawner room tucked on them.
+- **Structures of its own.** A **Nether Fortress** seed grows an arched nether-brick bridge running out of a keep, with a caged blaze spawner inside — renewable blaze rods, no fortress to hunt for. A **Bastion Remnant** is a ruined blackstone hold (one of three layouts, with courtyards sprawling off it) prowled by piglins and a brute. A **Piglin Trading Post** is the Nether's answer to a village — a gold-economy hall of bartering piglins. And a **Wither Arena** is a blast-proof obsidian venue to summon and fight the Wither safely, for the Nether Star and your first Beacon. The Large Nether islands sometimes turn up a blaze spawner room of their own, too.
 - **Ruined portals link up.** Throw a Ruined Portal and a matching one appears in the *other* dimension at the linked coordinate. Repair and light both frames and they connect into a real working pair — no setup, just vanilla doing its thing.
+
+---
+
+## Into the End
+
+Farm up enough blaze rods and ender pearls for Eyes of Ender and you can grow your way into the End as well — and like the Nether, it's an empty void you build out one seed at a time.
+
+- **Getting there.** There's no stronghold to stumble on. Instead you craft your way to a working **End portal**: collect portal-frame shards and a set of structure relics from across your islands, assemble the frame, fill it with Eyes of Ender, and step through. A **Return Portal** seed is your ride home.
+- **End-native seeds.** A **Chorus Forest** grows a chorus-and-purpur island roamed by endermen — a renewable source of chorus fruit, purpur and pearls. The flagship **End City** grows the real thing: a stepped, overhanging purpur tower that sprouts spire towers and flings end-stone-brick bridges out to floating wing sections, with a flying **End ship** docked at its tower carrying a guaranteed **elytra**.
+- **The dragon, and after.** The Ender Dragon fight is restored at the centre of a new world, and once it's down a **Dragon Trophy** seed grows a monument to mark the kill. Your overworld seeds work out here too — thrown into the End they come up as bare end-stone platforms to build on.
 
 ---
 
@@ -121,11 +137,11 @@ With **Patchouli** installed you get the full illustrated version. Without it, t
 
 ## What's next
 
-Skyseed is still in active development, with a fair bit of sky left to fill:
+All three chapters — overworld, Nether and End — are built out now, so what's left is mostly extras and polish:
 
-- **Richer structures.** The villages already come out as varied little street villages; different mansion shapes and Nether fortresses that sprawl out over the void are next.
-- **The End.** Already pre-voided and waiting in the background, so it'll grow out the same way — End islands, the city, the dragon — without anyone needing a fresh save.
-- **More creatures, island types and surprises** as it goes.
+- **A few more structures** to round things out — a Stronghold, shipwrecks, that sort of thing.
+- **More creatures, island variants and hidden surprises** as it goes.
+- Ongoing balance tuning from playtesting.
 
 ---
 
