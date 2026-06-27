@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.125.0] - 2026-06-27
+
+### Fixed
+- **Huge Aquatic's ocean no longer spills off a sheer cliff edge.** The deep pond carved right up to the thin island
+  rim, where the body ran out and water sheeted through the bottom. Ponds gained a `slope` option (default off): the
+  floor is now a **basin** — full depth across a flat centre, shallowing to the shore — so the edge water is shallow,
+  rests on the rim's body (no spill), and the shore eases in gently instead of dropping straight to deep water. The pond
+  bed and water plants follow the per-column floor. Enabled on all Huge Aquatic ponds; other ponds are unchanged.
+
 ## [0.124.0] - 2026-06-27
 
 ### Added

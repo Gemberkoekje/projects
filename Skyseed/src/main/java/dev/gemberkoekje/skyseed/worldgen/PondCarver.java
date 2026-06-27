@@ -53,6 +53,16 @@ final class PondCarver {
         return (((long) dx) << 32) | (dz & 0xffffffffL);
     }
 
+    /** The lowest carved-water Y in a column (its floor), scanned down from the surface — so the bed and plants follow
+     *  a sloped basin's per-column depth, not a single uniform bottom. {@code deepest} bounds the scan. */
+    private static int pondFloorY(Map<BlockPos, BlockState> blockMap, int wx, int wz, int waterY, int deepest) {
+        int f = waterY;
+        while (f - 1 >= deepest && isWater(blockMap, new BlockPos(wx, f - 1, wz))) {
+            f--;
+        }
+        return f;
+    }
+
     /**
      * Carve a contained water feature. A {@code pond} is an irregular blob in the centre; a
      * {@code river} is a meandering channel across the island. Each candidate column is only carved
@@ -70,18 +80,33 @@ final class PondCarver {
                 ? riverColumns(pond, baseRadius, random)
                 : pondColumns(pond, baseRadius, random);
 
+        // For a sloped basin, the floor rises toward the rim: full depth across a flat centre, then shallowing to 1 at
+        // the edge — matching the island body's teardrop taper, so the shore is shallow (rests on the rim) not sheer.
+        double maxDist = 1.0;
+        if (pond.slope()) {
+            for (int[] c : candidates) maxDist = Math.max(maxDist, Math.sqrt((double) c[0] * c[0] + (double) c[1] * c[1]));
+        }
+        final double flatTo = maxDist * 0.55; // the central this-fraction stays full depth
+
         for (int[] c : candidates) {
             final int wx = center.getX() + c[0];
             final int wz = center.getZ() + c[1];
-            // Containment: only carve where the island body sits below the floor, so water always rests
+            int colBottomY = bottomY;
+            if (pond.slope()) {
+                final double dist = Math.sqrt((double) c[0] * c[0] + (double) c[1] * c[1]);
+                final int depth = dist <= flatTo ? pond.depth()
+                        : Math.max(1, (int) Math.round(pond.depth() * (maxDist - dist) / Math.max(1.0, maxDist - flatTo)));
+                colBottomY = waterY - Math.max(0, depth - 1);
+            }
+            // Containment: only carve where the island body sits below this column's floor, so water always rests
             // on solid ground (no carving past the rim, no floating slabs).
-            if (!blockMap.containsKey(new BlockPos(wx, bottomY - 1, wz))) {
+            if (!blockMap.containsKey(new BlockPos(wx, colBottomY - 1, wz))) {
                 continue;
             }
             for (int y = waterY + 1; y <= ceil; y++) {
                 blockMap.remove(new BlockPos(wx, y, wz));
             }
-            for (int y = bottomY; y <= waterY; y++) {
+            for (int y = colBottomY; y <= waterY; y++) {
                 blockMap.put(new BlockPos(wx, y, wz), water);
             }
             carved.add(colKey(c[0], c[1]));
@@ -98,9 +123,10 @@ final class PondCarver {
      */
     static void containPond(Map<BlockPos, BlockState> blockMap, List<BlockPos> surfaceList, BlockPos center,
                             int waterY, int bottomY, BlockState surface, BlockState fill, Set<Long> carved, RandomSource random) {
-        // 1) Pond bed: the block the water rests on, seen through the surface.
+        // 1) Pond bed: the block the water rests on, seen through the surface (per-column floor for a sloped basin).
         for (long k : carved) {
-            final BlockPos floor = new BlockPos(center.getX() + (int) (k >> 32), bottomY - 1, center.getZ() + (int) k);
+            final int bx = center.getX() + (int) (k >> 32), bz = center.getZ() + (int) k;
+            final BlockPos floor = new BlockPos(bx, pondFloorY(blockMap, bx, bz, waterY, bottomY) - 1, bz);
             if (blockMap.containsKey(floor)) {
                 final BlockState bed = pondBed(random);
                 if (bed != null) {
@@ -306,12 +332,13 @@ final class PondCarver {
         for (long k : carved) {
             final int wx = center.getX() + (int) (k >> 32);
             final int wz = center.getZ() + (int) k;
+            final int floorY = pondFloorY(blockMap, wx, wz, waterY, bottomY); // per-column floor for a sloped basin
             float roll = random.nextFloat();
             for (GroundEntry g : pond.plants()) {
                 roll -= g.chance();
                 if (roll < 0) {
                     if (Lookup.hasBlock(g.block())) {
-                        plantInPond(blockMap, wx, wz, waterY, bottomY, g.block());
+                        plantInPond(blockMap, wx, wz, waterY, floorY, g.block());
                     }
                     break;
                 }

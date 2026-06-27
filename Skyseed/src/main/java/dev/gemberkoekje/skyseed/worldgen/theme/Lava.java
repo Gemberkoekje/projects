@@ -43,7 +43,7 @@ public record Lava(float veinChance, IntRange veinSize, List<Lake> lakes) {
         /** This band as a {@link Pond} of lava (no plants/banks/mobs) for the shared pond-carving code. */
         public Pond toPond() {
             return new Pond(Ids.mc("lava"), radius, depth,
-                    List.of(), List.of(), List.of(), "pond", 0.5f);
+                    List.of(), List.of(), List.of(), "pond", 0.5f, false);
         }
     }
 }

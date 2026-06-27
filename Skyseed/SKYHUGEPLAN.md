@@ -27,7 +27,7 @@ Two shapes, chosen per seed (both already supported by `Shape`):
 
 | Huge seed | Shape | Why |
 |---|---|---|
-| `huge_aquatic` | **single (big ocean)** | a single big island that's *mostly* a central lake/ocean (`Pond.extent` **0.80** fills it, thin shore). The cluster route read as boring separate islands — and ponds are centre-only + half-radius-capped, so a cluster can't hold a real lake. Cluster stays viable for *non-water* seeds (mushroom). *(v0.123.0: the biome-form ponds had a radius below the extent cap → a tiny pond on a vast sand bank; fixed so radius > cap and extent does the limiting.)* |
+| `huge_aquatic` | **single (big ocean)** | a single big island that's *mostly* a central lake/ocean (`Pond.extent` **0.80** fills it, thin shore). The cluster route read as boring separate islands — and ponds are centre-only + half-radius-capped, so a cluster can't hold a real lake. Cluster stays viable for *non-water* seeds (mushroom). *(v0.123.0: the biome-form ponds had a radius below the extent cap → a tiny pond on a vast sand bank; fixed so radius > cap and extent does the limiting. v0.125.0: + a `slope`d basin floor — full depth in a flat centre, shallowing to the shore — so the edge rests on the rim's body and eases in, instead of a sheer deep edge that spilled through the bottom.)* |
 | `huge_mushroom` | **cluster** (3 isles) | a scatter of mycelium isles + giant mushrooms reads better than one slab |
 | `huge_forest` | single | a sprawling forest landmass |
 | `huge_rocky` | single (tall `top_dome`) | a true mountain — caves shine here |
