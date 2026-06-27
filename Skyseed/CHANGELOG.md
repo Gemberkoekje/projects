@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.151.0] - 2026-06-27
+
+### Fixed
+- **No bald disc on buried huge-rocky islands.** The Huge Rocky island's rare Sprawling Dungeon and Abandoned
+  Mineshaft variants levelled a wide flat foundation pad on the mountaintop (`pad` 12 / 10) for structures that are
+  in fact fully buried (`sink` 10, only a few blocks tall). Set their `pad` to 0, so the summit keeps its natural
+  decorated dome and the structure stays encased underground where you mine down to it.
+
 ## [0.150.0] - 2026-06-27
 
 ### Fixed

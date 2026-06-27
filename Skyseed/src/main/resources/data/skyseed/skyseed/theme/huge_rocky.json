@@ -456,7 +456,8 @@
         "pool": "skyseed:dungeon_complex/start",
         "target": "minecraft:bottom",
         "depth": 4,
-        "pad": 12,
+        "_comment_pad": "pad 0: this complex is fully buried (sink 10, < 5 tall), so it needs no levelled surface foundation — a pad would only flatten a bald disc on the mountaintop for a building that isn't there.",
+        "pad": 0,
         "sink": 10
       },
       "mobs": []
@@ -468,7 +469,8 @@
         "pool": "skyseed:mineshaft/start",
         "target": "minecraft:bottom",
         "depth": 4,
-        "pad": 10,
+        "_comment_pad": "pad 0: fully buried (sink 10, ~3 tall) — no surface foundation needed, so no bald disc on the mountaintop.",
+        "pad": 0,
         "sink": 10,
         "reach": 24,
         "trestles": true
