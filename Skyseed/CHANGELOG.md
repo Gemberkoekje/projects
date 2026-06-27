@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.139.0] - 2026-06-27
+
+### Fixed
+- **The grand Ocean Monument spawns its guardians again.** Sinking the monument (0.131.0) dropped its water to island
+  level, but the aquatic-mob spawn still aimed a block above the pad — where a raised pond's water used to be, now air
+  above the flush basin — so every guardian was skipped (the spawn refuses to beach a mob on dry land). The in-water
+  spawn now walks down to the actual water column and spawns the mob submerged, which also covers any future sunk tank.
+  +1 regression test (119 pass).
+
 ## [0.138.0] - 2026-06-27
 
 ### Changed

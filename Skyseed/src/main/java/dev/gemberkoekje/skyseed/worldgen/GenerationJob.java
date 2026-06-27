@@ -156,15 +156,16 @@ public final class GenerationJob {
     private void spawnEnclosureAnimals() {
         for (IslandPlan.AnimalSpawn as : plan.animals()) {
             if (as.inWater()) {
-                if (level.getFluidState(as.pos()).isEmpty()) {
-                    continue; // the tank water at this spot is missing — skip rather than beach the animal
+                final BlockPos wet = submergedSpot(level, as.pos());
+                if (wet == null) {
+                    continue; // no tank water near this spot — skip rather than beach the animal
                 }
                 final Entity e = as.type().create(level);
                 if (e instanceof Mob mob) {
-                    mob.moveTo(as.pos().getX() + 0.5, as.pos().getY() + 0.5, as.pos().getZ() + 0.5,
+                    mob.moveTo(wet.getX() + 0.5, wet.getY() + 0.5, wet.getZ() + 0.5,
                             plan.random().nextFloat() * 360.0F, 0.0F);
                     applyTraits(mob, as.baby());
-                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(as.pos()), MobSpawnType.SPAWNER, null);
+                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wet), MobSpawnType.SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
                 continue;
@@ -174,6 +175,24 @@ public final class GenerationJob {
                 applyTraits(e, as.baby());
             }
         }
+    }
+
+    /**
+     * Finds a submerged spot at or below {@code from} for an aquatic mob. The rolled position assumes the tank water
+     * sits a block above the pad (a raised surface pond), but a <em>sunk</em> tank — e.g. the flush Ocean Monument,
+     * whose water now sits at island level rather than in a raised pool — puts the water lower, so the nominal spot is
+     * air and the mob would beach. We walk down to the first water block and one block into it (so the mob spawns
+     * inside the water, not bobbing at the surface). Returns {@code null} if there's no water within reach.
+     */
+    public static BlockPos submergedSpot(ServerLevel level, BlockPos from) {
+        for (int dy = 0; dy <= 14; dy++) {
+            final BlockPos p = from.below(dy);
+            if (!level.getFluidState(p).isEmpty()) {
+                final BlockPos deeper = p.below();
+                return level.getFluidState(deeper).isEmpty() ? p : deeper;
+            }
+        }
+        return null;
     }
 
     /**

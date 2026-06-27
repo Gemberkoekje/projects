@@ -2254,6 +2254,29 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void sunkTankAnimalsSpawnSubmerged(GameTestHelper helper) {
+        // Regression: the flush (sunk) Ocean Monument's water sits a block BELOW the rolled spawn spot (which assumes a
+        // raised surface pond), so every guardian used to be skipped — beached as dry air above the basin. submergedSpot
+        // must walk down to the real water column and return a spot inside it.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos surf = helper.absolutePos(new BlockPos(4, 9, 4));     // the flush water surface
+        for (int dy = 0; dy <= 4; dy++) {
+            level.setBlock(surf.below(dy), Blocks.WATER.defaultBlockState(), 3);   // a 5-deep basin
+        }
+        level.setBlock(surf.below(5), Blocks.PRISMARINE.defaultBlockState(), 3);   // basin floor
+        final BlockPos rolled = surf.above();                               // the buggy rolled spot: air above the surface
+        helper.assertTrue(level.getFluidState(rolled).isEmpty(), "setup: the rolled spot must be dry air");
+        final BlockPos wet = GenerationJob.submergedSpot(level, rolled);
+        helper.assertTrue(wet != null, "submergedSpot must find the sunk basin water below the dry rolled spot");
+        helper.assertTrue(!level.getFluidState(wet).isEmpty(), "the chosen spawn spot must be water");
+        helper.assertTrue(wet.getY() < surf.getY(), "the spawn spot must be submerged below the water surface");
+        // Over dry land (no tank water within reach) it must return null, so we skip rather than beach the mob on sand.
+        final BlockPos dry = helper.absolutePos(new BlockPos(10, 9, 10));
+        helper.assertTrue(GenerationJob.submergedSpot(level, dry) == null, "dry land must yield no spawn spot");
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void ancientCityPlaces(GameTestHelper helper) {
         // SKYHUGEPLAN §3: the Ancient City — the rare 6% bonus on the Huge Ancient seed. Verify it assembles: a
