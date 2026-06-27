@@ -1,5 +1,5 @@
 {
-  "_comment": "Huge Aquatic (SKYHUGEPLAN Phase 1 — reworked from the cluster, which read as boring separate islands): a single big island that is mostly a large central LAKE/ocean — a high pond extent (0.72) fills most of the island, leaving a ring of grassy land. radius ~28-32. RARE (5%): a bigger Ocean Monument grows in the centre (lake suppressed). Clay + gravel. Overworld. (Rivers radiating off the lake to the rim are a planned follow-up carve.)",
+  "_comment": "Huge Aquatic (SKYHUGEPLAN Phase 1 — reworked from the cluster, which read as boring separate islands): a single big island that is mostly a large central LAKE/ocean — a high pond extent (0.80) fills most of the island, leaving only a thin shore. radius ~28-32. RARE (5%): a bigger Ocean Monument grows in the centre (lake suppressed). Clay + gravel. Overworld. (Rivers radiating off the lake to the rim are a planned follow-up carve.)",
   "dimensions": [
     "minecraft:overworld"
   ],
@@ -8,7 +8,7 @@
       "min": 28,
       "max": 32
     },
-    "rim_noise": 0.25,
+    "rim_noise": 0.2,
     "underside": "teardrop",
     "top_dome": {
       "min": 1,
@@ -81,9 +81,9 @@
   ],
   "pond": {
     "block": "minecraft:water",
-    "radius": 24,
-    "extent": 0.72,
-    "depth": 5,
+    "radius": 26,
+    "extent": 0.8,
+    "depth": 6,
     "plants": [
       {
         "block": "minecraft:lily_pad",
@@ -254,8 +254,8 @@
       "fill": "minecraft:sand",
       "pond": {
         "block": "minecraft:water",
-        "radius": 10,
-        "depth": 3,
+        "radius": 26,
+        "depth": 6,
         "plants": [
           {
             "block": "minecraft:tube_coral_block",
@@ -340,7 +340,7 @@
             }
           }
         ],
-        "extent": 0.72
+        "extent": 0.8
       },
       "mobs": [
         {
@@ -366,8 +366,8 @@
       ],
       "pond": {
         "block": "minecraft:water",
-        "radius": 5,
-        "depth": 3,
+        "radius": 26,
+        "depth": 6,
         "style": "river",
         "plants": [
           {
@@ -395,7 +395,7 @@
             }
           }
         ],
-        "extent": 0.72
+        "extent": 0.8
       },
       "variants": [
         {
@@ -423,8 +423,8 @@
       "surface": "minecraft:mud",
       "pond": {
         "block": "minecraft:water",
-        "radius": 10,
-        "depth": 3,
+        "radius": 26,
+        "depth": 6,
         "plants": [
           {
             "block": "minecraft:seagrass",
@@ -441,7 +441,7 @@
             "chance": 0.6
           }
         ],
-        "extent": 0.72
+        "extent": 0.8
       },
       "mobs": [
         {
@@ -488,8 +488,8 @@
       ],
       "pond": {
         "block": "minecraft:water",
-        "radius": 10,
-        "depth": 3,
+        "radius": 26,
+        "depth": 6,
         "plants": [
           {
             "block": "minecraft:lily_pad",
@@ -506,7 +506,7 @@
             "chance": 0.65
           }
         ],
-        "extent": 0.72
+        "extent": 0.8
       },
       "mobs": [
         {

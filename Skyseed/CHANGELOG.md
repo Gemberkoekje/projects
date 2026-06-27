@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.123.0] - 2026-06-27
+
+### Fixed
+- **Huge Aquatic is now actually mostly ocean, not a sand bank with a tiny pond.** Its biome-form ponds (ocean reef,
+  swamp, mangrove) had a scaled radius *smaller* than the `extent` cap, so the radius — not `extent` — limited them to a
+  small central pond on a vast island. All Huge Aquatic ponds now use a radius past the cap (so `extent` does the
+  limiting), `extent` is raised to 0.80, the rim is smoothed, and the water is a little deeper — a broad central ocean
+  with only a thin shore. Guarded by a new `hugeAquaticIsMostlyWater` gametest.
+
 ## [0.122.0] - 2026-06-27
 
 ### Added

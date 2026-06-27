@@ -2415,6 +2415,21 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void hugeAquaticIsMostlyWater(GameTestHelper helper) {
+        // Huge Aquatic should be mostly its central lake/ocean (Pond.extent 0.80), not a sand bank with a tiny pond.
+        // Plan it and assert a large body of water — guards the "silly tiny ocean" regression (pond radius < extent cap).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_aquatic"), level.getBiome(c), RandomSource.create(1L));
+        int water = 0;
+        for (final var bp : p.blocks()) {
+            if (bp.state().is(Blocks.WATER)) water++;
+        }
+        helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.
