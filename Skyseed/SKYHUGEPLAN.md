@@ -38,9 +38,12 @@ Two shapes, chosen per seed (both already supported by `Shape`):
 | `huge_lush` | single | a lush-cave island (caves are the whole point) |
 | `huge_desert` | single (or cluster) | a vast dune sea; cluster it for a dune chain if preferred |
 
-Recipe/onboarding (standard "add a seed" checklist): a **huge_* seed per chosen theme**, crafted as
-`<theme>_large_skyseed` (centre) **+ 8 bulk theme blocks** — i.e. huge gates behind large and a real material sink
-(end-game). Unique icon (the large icon, bigger/with a cave mouth), lang, `skyseeds` tag, guide entry, advancements.
+Recipe/onboarding (standard "add a seed" checklist): a **huge_* seed per chosen theme**. **Recipe — the middle row is
+`ender pearl / <theme>_large_skyseed / blaze powder`** (`[ "TTT", "ELP", "TTT" ]`, where `T` is the theme's bulk
+block): the `*_large` seed gated between an **End** farm drop (ender pearl) and a **Nether** farm drop (blaze powder),
+so a huge island demands you've farmed *both* late chapters — *you want the huge island, you farm for it* — wrapped in
+six of the theme's bulk block (the body). Same uniform middle for every huge seed; only the six `T` blocks change per
+theme. Unique icon (the large icon, bigger / with a cave mouth), lang, `skyseeds` tag, guide entry, advancements.
 
 ---
 
@@ -115,10 +118,10 @@ Because a rare structure is *rare*, most huge islands are just big terrain + cav
 - **Cave reachability** — enclosed + a sinkhole (recommended) vs always an obvious entrance.
 - **Cave decoration source** — reuse `decoration.underside` (recommended, free theming) vs a dedicated
   `decoration.caves` list (more control, more JSON).
-- **Recipe cost / gate** — `large_skyseed` + 8 bulk (recommended, gates behind large) vs a flat 3×3 of huge-tier mats.
-  The README's earlier note wanted huge **gated behind a rare Nether ingredient** (so huge is post-Nether end-game) —
-  worth folding one in (e.g. a netherite scrap / ancient-debris-adjacent item, or a Wither-drop) to make it a true
-  capstone resource sink.
+- **Recipe cost / gate — DECIDED.** Middle row `ender pearl / <theme>_large_skyseed / blaze powder`, surrounded by six
+  of the theme's bulk block. The large seed gates behind large; the **ender pearl + blaze powder** make huge a
+  post-Nether *and* post-End farm gate (supersedes the README's older "rare Nether ingredient" idea). Both flank items
+  are renewable farm drops, so it's a sink, not a one-shot.
 - **Which seeds get huge** — all 10 overworld biomes (recommended) vs a curated subset first.
 
 ## Notes & standing rules
