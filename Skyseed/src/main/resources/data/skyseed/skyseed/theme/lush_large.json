@@ -49,7 +49,7 @@
   ],
   "biome_overrides": [
     { "_comment": "End form (SKYENDPLAN Phase 4 — the chorus bootstrap): a large end-stone island grown with chorus (chorus fruit) + the rare shulker (shells). Throw a Large Lush seed in the End to start the End-City progression.", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 13, "max": 17 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 3 } },
-      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 7, "spacing": 2 } ] } } ],
+      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 7, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
       "mobs": [ { "entity": "minecraft:shulker", "chance": 0.2, "count": { "min": 1, "max": 2 } } ] },
     { "_comment": "Large Nether adaptation — as the normal Lush vine grotto, ~1.5x bigger.",
       "dimension": "minecraft:the_nether",

@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.117.0] - 2026-06-27
+
+### Changed
+- **Flavor pass: the End's chorus islands are now lush, lit gardens.** The **Chorus Forest** gained denser chorus, a
+  second "purpur clearing" variant, **end-rod sprouts** (glowing + they light the island), and purpur boulders on top
+  of the existing purpur veins; the **Forest/Lush End-forms** (the chorus bootstrap islands) got the same end-rod +
+  purpur touch. The End's grown nature reads as the End now, not chorus on flat end stone. (The deliberately-bare
+  end-stone footholds — the other eight biome seeds' End forms — are left as-is.)
+
 ## [0.116.0] - 2026-06-27
 
 ### Added

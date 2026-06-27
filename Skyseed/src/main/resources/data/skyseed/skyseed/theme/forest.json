@@ -26,7 +26,7 @@
   ],
   "biome_overrides": [
     { "_comment": "End form (SKYENDPLAN Phase 4 — the chorus bootstrap): an end-stone island grown with chorus (chorus fruit) + the rare shulker (shells). Throw a Forest seed in the End to start the End-City progression.", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.40, "underside": "teardrop" },
-      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 4, "spacing": 2 } ] } } ],
+      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 4, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
       "mobs": [ { "entity": "minecraft:shulker", "chance": 0.15, "count": { "min": 1, "max": 1 } } ] },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 Warped fungal forest patch (the safe teal one; Endermen). Listed first so warped_forest wins; other Nether biomes fall to the crimson override below.",
       "dimension": "minecraft:the_nether", "biomes": [ "minecraft:warped_forest" ],

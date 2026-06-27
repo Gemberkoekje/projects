@@ -40,7 +40,7 @@
   ],
   "biome_overrides": [
     { "_comment": "End form (SKYENDPLAN Phase 4 — the chorus bootstrap): an end-stone island grown with chorus (chorus fruit) + the rare shulker (shells). Throw a Lush seed in the End to start the End-City progression.", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
-      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 4, "spacing": 2 } ] } } ],
+      "variants": [ { "weight": 1, "name": "chorus", "decoration": { "trees": [ { "feature": "minecraft:chorus_plant", "tries": 4, "spacing": 2 } ], "ground": [ { "block": "minecraft:end_rod", "chance": 0.02 }, { "block": "minecraft:purpur_block", "chance": 0.03 } ] } } ],
       "mobs": [ { "entity": "minecraft:shulker", "chance": 0.15, "count": { "min": 1, "max": 1 } } ] },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 vine grotto: warped nylium lit by shroomlights, weeping vines hanging beneath, warped roots + nether sprouts underfoot. Calm + pretty; Endermen. No pond (the base water pond is dropped by the dimension-override neutral default).",
       "dimension": "minecraft:the_nether",

@@ -157,7 +157,10 @@ through the existing `FizzleRule` / `IslandGenerator.formValidFor` machinery (no
 `formValidFor` checks `fizzlesIn` before the base-dimension allow); guarded by `endCityGatesToHighlandsAndMidlands`.
 The per-biome **re-skin is deferred**: in the void End the player rarely visits the outer biomes (everything is grown
 near the `the_end` arrival), so re-skinning barrens/highlands is low-value and largely unseen — revisit if the End ever
-gets natural terrain. **Phase 5's substantive item (gating) is done.**
+gets natural terrain. **Phase 5's substantive item (gating) is done.** *(A v0.117.0 flavor pass separately turned the
+chorus islands — Chorus Forest + the Forest/Lush End-forms — into lush, lit gardens: denser chorus, a purpur-clearing
+variant, end-rod sprouts, purpur boulders/veins. That's island enrichment, not the per-biome variation, which stays
+deferred.)*
 
 ---
 
