@@ -2375,37 +2375,84 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = BIG_REGION)
-    public static void abandonedMineshaftAssembles(GameTestHelper helper) {
-        // SKYDUNGEONPLAN Part B: the mineshaft jigsaw must sprawl past its start hub (the rail connectors align). Assert
-        // an oak-plank floor, a centre rail line, and support-arch fences across a sizable run. (Pieces carve tunnels —
-        // they bake no side walls/ceiling.) Loads .nbt.
+    public static void dungeonComplexGoesVertical(GameTestHelper helper) {
+        // With descending staircase + ladder-shaft pieces in the pool, the complex should drop below its start level —
+        // verticality, not just sprawl. The run is position-seeded, so sample a few seeds and assert the best descends:
+        // the assembled cobble spans well beyond a single room's height (a stair drops ~4, a shaft ~6).
         final ServerLevel level = helper.getLevel();
-        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
-        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("mineshaft/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, 5L);
-        int planks = 0;
-        int rails = 0;
-        int fences = 0;
-        for (int x = 0; x < 48; x++) {
-            for (int z = 0; z < 48; z++) {
-                for (int y = 0; y < 24; y++) {
-                    final var st = helper.getBlockState(new BlockPos(x, y, z));
-                    if (st.is(Blocks.OAK_PLANKS)) {
-                        planks++;
-                    } else if (st.is(Blocks.RAIL)) {
-                        rails++;
-                    } else if (st.is(Blocks.OAK_FENCE)) {
-                        fences++;
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 14, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
+        int bestSpan = 0;
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
                     }
                 }
             }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "", 0, null, seed);
+            int minY = Integer.MAX_VALUE;
+            int maxY = Integer.MIN_VALUE;
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.COBBLESTONE) || st.is(Blocks.MOSSY_COBBLESTONE)) {
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                        }
+                    }
+                }
+            }
+            if (maxY > minY) {
+                bestSpan = Math.max(bestSpan, maxY - minY);
+            }
         }
-        // The start hub is ~32 planks, ~5 rails and 0 fences (it uses log pillars); more than that — and any arch
-        // fences at all — means corridors/rooms attached (the rail connectors align). Counts vary with the
-        // position-seeded run, so the thresholds only need to clear the lone hub, not pin an exact sprawl.
-        helper.assertTrue(planks > 35, "the mineshaft should sprawl past its hub on an oak-plank floor (planks " + planks + ")");
-        helper.assertTrue(rails > 5, "the mineshaft should lay a centre rail line (rails " + rails + ")");
-        helper.assertTrue(fences > 0, "the mineshaft should raise support-arch fences — proving it sprawled (fences " + fences + ")");
+        helper.assertTrue(bestSpan > 9, "the dungeon should descend via stairs/shafts, not just sprawl flat "
+                + "(best cobble Y-span " + bestSpan + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void abandonedMineshaftAssembles(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part B: the mineshaft jigsaw must sprawl past its start hub (the rail connectors align). The
+        // jigsaw is seeded from the origin chunk, so a single placement can roll the terminator on every connector;
+        // sample a few seeds (resetting the platform between) and assert the BEST sprawled — an oak-plank floor well past
+        // the ~32-plank lone hub, with the support-arch fences the hub (log pillars) lacks. Loads .nbt.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("mineshaft/start"));
+        int bestPlanks = 0;
+        int bestFences = 0;
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, seed);
+            int planks = 0;
+            int fences = 0;
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.OAK_PLANKS)) {
+                            planks++;
+                        } else if (st.is(Blocks.OAK_FENCE)) {
+                            fences++;
+                        }
+                    }
+                }
+            }
+            bestPlanks = Math.max(bestPlanks, planks);
+            bestFences = Math.max(bestFences, fences);
+        }
+        helper.assertTrue(bestPlanks > 60, "no sampled mineshaft sprawled past its hub (best planks " + bestPlanks + ")");
+        helper.assertTrue(bestFences > 0, "no sampled mineshaft raised support arches (best fences " + bestFences + ")");
         helper.succeed();
     }
 

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.134.0] - 2026-06-27
+
+### Added
+- **The Sprawling Dungeon now goes *down*, not just out.** Two descending pieces join the `dungeon_complex/` tileset: a
+  stepped **staircase** (`stairs_down`, drops 4 levels) and a **ladder shaft** ("ladder room", `shaft`, drops 6). Their
+  two doorway connectors sit at different heights, so whatever attaches below lands lower — the complex gains
+  verticality. Both flow into the Huge Rocky rare and the `dungeon_large` seed. New `dungeonComplexGoesVertical`
+  gametest; the dungeon + mineshaft sprawl tests now sample several seeds and assert the best result (the jigsaw is
+  seeded from the origin chunk, so a single placement is not representative). 115 pass.
+
 ## [0.133.0] - 2026-06-27
 
 ### Added

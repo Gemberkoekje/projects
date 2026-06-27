@@ -48,6 +48,8 @@ public final class DungeonComplexTemplates {
         writeIfAbsent(dir.resolve("lava_room.nbt"), lavaRoom());
         writeIfAbsent(dir.resolve("treasure_vault.nbt"), treasureVault());
         writeIfAbsent(dir.resolve("dead_end.nbt"), deadEnd());
+        writeIfAbsent(dir.resolve("stairs_down.nbt"), stairsDown());
+        writeIfAbsent(dir.resolve("shaft.nbt"), shaft());
         for (final String mob : new String[]{"zombie", "skeleton", "spider"}) {
             writeIfAbsent(dir.resolve("spawner_" + mob + ".nbt"), spawnerRoom("minecraft:" + mob));
         }
@@ -69,11 +71,28 @@ public final class DungeonComplexTemplates {
         }
     }
 
-    /** A 1-wide, 2-tall doorway connector at {@code (x,1,z)} facing {@code dir}, self-linking into the parts pool. */
+    /** A 1-wide, 2-tall doorway connector at floor level {@code (x,1,z)} facing {@code dir}, self-linking into the parts pool. */
     private static void door(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int z, FrontAndTop dir) {
-        m.put(new BlockPos(x, 1, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
-        bes.put(new BlockPos(x, 1, z), jig("skyseed:dungeon", "skyseed:dungeon", POOL, "minecraft:air"));
-        m.put(new BlockPos(x, 2, z), AIR);
+        doorAt(m, bes, x, 1, z, dir);
+    }
+
+    /** As {@link #door}, but at an arbitrary height {@code y} — so a piece's two doors can sit at different levels (the
+     *  descending staircase / shaft), which makes the next piece attach lower and the complex go down, not just out. */
+    private static void doorAt(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        m.put(new BlockPos(x, y, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
+        bes.put(new BlockPos(x, y, z), jig("skyseed:dungeon", "skyseed:dungeon", POOL, "minecraft:air"));
+        m.put(new BlockPos(x, y + 1, z), AIR);
+    }
+
+    /** A solid cobble fill (with the same mossy speckle as {@link #box}) — carved afterwards for descending pieces. */
+    private static void fill(Map<BlockPos, BlockState> m, int x0, int x1, int z0, int z1, int y0, int y1) {
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                for (int y = y0; y <= y1; y++) {
+                    m.put(new BlockPos(x, y, z), (x + y + z) % 7 == 0 ? MOSSY : COBBLE);
+                }
+            }
+        }
     }
 
     private static void chest(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, BlockPos p, Direction facing) {
@@ -242,6 +261,38 @@ public final class DungeonComplexTemplates {
         box(m, 0, 2, 0, 2, 0, 3);
         door(m, bes, 1, 0, FrontAndTop.NORTH_UP);
         m.put(new BlockPos(1, 1, 1), Blocks.COBWEB.defaultBlockState());
+        return new Built(m, bes);
+    }
+
+    /** A descending stepped staircase: a 1-wide cobble stair cut into a solid block, its top door (nbt y5) four blocks
+     *  above its bottom door (nbt y1) — so whatever attaches below lands four levels down. The complex goes down, not
+     *  just out. */
+    private static Built stairsDown() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        fill(m, 0, 2, 0, 4, 0, 7);
+        for (int z = 0; z <= 4; z++) {
+            final int tread = 4 - z;               // descends one per step
+            m.put(new BlockPos(1, tread + 1, z), AIR); // headroom over each tread
+            m.put(new BlockPos(1, tread + 2, z), AIR);
+        }
+        doorAt(m, bes, 1, 5, 0, FrontAndTop.NORTH_UP); // top
+        doorAt(m, bes, 1, 1, 4, FrontAndTop.SOUTH_UP); // bottom, 4 lower
+        return new Built(m, bes);
+    }
+
+    /** A ladder shaft (a "ladder room"): a solid 3×3 tower with a 1-wide ladder well down its core, its top door (nbt
+     *  y7) six blocks above its bottom door (nbt y1) — a steeper plunge than the staircase. */
+    private static Built shaft() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        fill(m, 0, 2, 0, 2, 0, 8);
+        for (int y = 1; y <= 7; y++) {
+            m.put(new BlockPos(1, y, 1), Blocks.LADDER.defaultBlockState()
+                    .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // backed by the east wall
+        }
+        doorAt(m, bes, 1, 7, 0, FrontAndTop.NORTH_UP); // top
+        doorAt(m, bes, 1, 1, 2, FrontAndTop.SOUTH_UP); // bottom, 6 lower
         return new Built(m, bes);
     }
 }

@@ -130,8 +130,10 @@ surface tell.
    `hamlet_weathering`). Solid boxes with doorway connectors (jigsaw blocks → air), self-linking on `skyseed:dungeon`.
    Wired as the huge_rocky rare @ 2.5% (replacing `dungeon/lair`) AND as the dedicated `dungeon_large` seed
    (`CCC/EDP/CCC` recipe + full onboarding). `sprawlingDungeonAssembles` gametest proves the connectors align (cobble
-   > 400 = sprawled past the hub). Depth 4, sink 6, pad 12. *(Follow-up ideas: corridor_stairs for level changes; a
-   `centerpiece` to guarantee one treasure_vault.)*
+   > 400 = sprawled past the hub). Depth 4, sink 6, pad 12. **v0.134.0: added verticality** — a descending **stairs_down**
+   (drops 4) and a **shaft** ladder room (drops 6); their two connectors sit at different nbt-Y, so the next piece
+   attaches lower and the complex goes down, not just out (`dungeonComplexGoesVertical` gametest; assembly tests sample
+   multiple seeds since the jigsaw is position-seeded). *(Remaining idea: a `centerpiece` to guarantee one treasure_vault.)*
 2. **Mineshaft (oak) — DONE (v0.133.0).** `MineshaftTemplates` (start hub w/ stair, corridor, corridor_loot [chest
    minecart], corridor_spawner [cave-spider nest], cross, room, dead_end) + the self-linking `mineshaft/parts` pool.
    Pieces **carve tunnels** (bake floor + arches + rails + air, NOT walls/ceiling), self-linking on `skyseed:mineshaft`
