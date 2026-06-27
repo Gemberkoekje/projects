@@ -2246,6 +2246,27 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void endCityTiersAreDetailed(GameTestHelper helper) {
+        // Phase 5 detailing: every tier gets an end-stone-brick foundation course AND a corbel — a ring of upside-down
+        // purpur stairs under the lip (at y0, the lip floor) bevelling the overhang's underside, the iconic End City
+        // look. Checked on the templates (floor_a carried no brick at all before this pass).
+        final ServerLevel level = helper.getLevel();
+        for (final String id : new String[]{"end_city/floor_a", "end_city/floor_b"}) {
+            final StructureTemplate t = level.getStructureManager().get(skyseed(id)).orElseThrow();
+            final boolean brick = !t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.END_STONE_BRICKS).isEmpty();
+            int corbel = 0;
+            for (final var s : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.PURPUR_STAIRS)) {
+                if (s.pos().getY() == 0) {   // the corbel ring sits at the lip floor (y0); the parapet rail is at y1
+                    corbel++;
+                }
+            }
+            helper.assertTrue(brick, id + " should carry an end-stone-brick accent course");
+            helper.assertTrue(corbel >= 8, id + " should bevel its lip with a corbel ring (got " + corbel + " y0 stairs)");
+        }
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void dragonTrophyMonumentHasEmptyEggPedestal(GameTestHelper helper) {
         // Phase 6 capstone: the Dragon Trophy grows a monument — a purpur-capped pedestal + four dragon heads — but

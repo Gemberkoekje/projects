@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Half;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -71,6 +72,11 @@ public final class EndCityTemplates {
 
     private static BlockState stair(Direction face) {
         return Blocks.PURPUR_STAIRS.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, face);
+    }
+
+    /** An upside-down (top-half) purpur stair — used as a corbel to bevel the underside of an overhang. */
+    private static BlockState upStair(Direction face) {
+        return stair(face).setValue(BlockStateProperties.HALF, Half.TOP);
     }
 
     /** Place a jigsaw connector. A <em>vertical</em> seam uses the {@code aligned} joint (the parent UP and child DOWN
@@ -150,6 +156,18 @@ public final class EndCityTemplates {
         for (int x = 0; x <= 10; x++) {
             m.put(new BlockPos(x, y, 0), stair(Direction.SOUTH));
             m.put(new BlockPos(x, y, 10), stair(Direction.NORTH));
+        }
+    }
+
+    /** A corbel ring under the 11×11 lip's outer edge (the lip floor itself, y0): upside-down purpur stairs facing
+     *  inward, so the overhang's underside bevels back to the wall — the iconic End City lip. The top half stays solid,
+     *  so the lip is still a walkable balcony. */
+    private static void corbel(Map<BlockPos, BlockState> m) {
+        for (int i = 0; i <= 10; i++) {
+            m.put(new BlockPos(0, 0, i), upStair(Direction.EAST));
+            m.put(new BlockPos(10, 0, i), upStair(Direction.WEST));
+            m.put(new BlockPos(i, 0, 0), upStair(Direction.SOUTH));
+            m.put(new BlockPos(i, 0, 10), upStair(Direction.NORTH));
         }
     }
 
@@ -238,13 +256,16 @@ public final class EndCityTemplates {
         final int ceil = wallTop + 1;
 
         for (int x = 0; x <= 10; x++) for (int z = 0; z <= 10; z++) m.put(new BlockPos(x, 0, z), PURPUR);  // 11×11 lip floor
+        corbel(m);                                                                                         // bevel the overhang underside
         for (int x = 1; x <= 9; x++) {                                                                     // 9×9 walls (overhang 1)
             for (int z = 1; z <= 9; z++) {
                 m.put(new BlockPos(x, ceil, z), PURPUR);                                                   // ceiling
                 final boolean perim = x == 1 || x == 9 || z == 1 || z == 9;
                 final boolean corner = (x == 1 || x == 9) && (z == 1 || z == 9);
                 for (int y = 1; y <= wallTop; y++) {
-                    final BlockState w = corner ? PILLAR : (accents && (y == 2 || y == wallTop) ? END_BRICK : PURPUR);
+                    // An end-stone-brick foundation course (y1) on every tier; floor_b bands more courses (accents).
+                    final BlockState w = corner ? PILLAR
+                            : (y == 1 || (accents && (y == 2 || y == wallTop)) ? END_BRICK : PURPUR);
                     if (perim) m.put(new BlockPos(x, y, z), w);
                     else m.put(new BlockPos(x, y, z), AIR);
                 }
@@ -268,6 +289,7 @@ public final class EndCityTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
 
         for (int x = 0; x <= 10; x++) for (int z = 0; z <= 10; z++) m.put(new BlockPos(x, 0, z), PURPUR);  // lip floor
+        corbel(m);                                                                                         // bevel the overhang underside
         parapet(m, 1);
         for (final int[] c : new int[][]{{0, 1, 0}, {10, 1, 0}, {0, 1, 10}, {10, 1, 10}}) m.put(new BlockPos(c[0], c[1], c[2]), ROD);
         // Stepped ziggurat: each ring inset 1 and a block higher.

@@ -56,8 +56,17 @@ stack; the `roof` has no up connector, so it caps. (Mirrors the `dungeon_complex
       anything tall attached *near* the base collides with the stacking tier lip (bounding-box), so the fat tower is
       reached by a *low* arm and offset east clear of the lip. Guarded by the elevated-dragon-head check in
       `endCityHasPurpurTowerAndShipChest`.
-- [ ] **Phase 5 — Detailing pass.** magenta-glass windows, end-stone-brick accent courses, purpur-stair corbels under
-      every overhang, roof terracing + lighting polish — to match the vanilla read.
+- [x] **Phase 5 — Detailing pass.** ✅ Corbel rings (upside-down purpur stairs at the lip floor, y0) bevel every tier's
+      + the roof's overhang underside; an end-stone-brick foundation course on every tier (floor_a had none before,
+      floor_b bands extra). Windows + parapets + lip-corner rods were already in from Phase 1. Guarded by
+      `endCityTiersAreDetailed`.
+
+## ✅ Plan complete (v0.144.0)
+
+All five phases are in. The End City is a full vanilla-style jigsaw: a base + stacking overhanging corbelled tiers + a
+terraced roof, sprouting thin spire towers and end-stone-brick bridges to floating wing sections, with a guaranteed
+elevated fat-tower ship bearing the elytra. Possible future polish (not planned): per-spawn ship-loot variety, interior
+tier access/loot, a second ship variant.
 
 Tests: assembly (multi-seed, position-seeded jigsaw → robust thresholds), vertical span, the elytra-chest piece, and
 over-void bridge support. The `.nbt` 2-build dance applies to every new/changed piece.

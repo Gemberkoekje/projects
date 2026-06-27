@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.144.0] - 2026-06-27
+
+### Changed
+- **End City jigsaw — Phase 5: detailing pass; the conversion is complete (SKYENDCITYPLAN).** Every overhanging tier
+  and the roof now bevel their lip underside with a **corbel** ring of upside-down purpur stairs (the iconic End City
+  overhang look), and the tiers gain an **end-stone-brick foundation course** (floor_a had no brick before; floor_b
+  bands extra). +1 test; 122 pass. The End City is now a full vanilla-style jigsaw end to end (Phases 1–5): a base +
+  stacking corbelled tiers + a terraced roof, sprouting spire towers and bridges to floating wings, with a guaranteed
+  elevated fat-tower ship bearing the elytra.
+
 ## [0.143.0] - 2026-06-27
 
 ### Changed
