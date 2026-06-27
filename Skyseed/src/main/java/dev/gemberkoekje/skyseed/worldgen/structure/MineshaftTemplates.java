@@ -182,8 +182,8 @@ public final class MineshaftTemplates {
         return new Built(m, bes);
     }
 
-    /** The entrance hub: a carved 5×5 chamber with tunnel doors N/W/E and an open stepped stair climbing +Z to the
-     *  surface (seated by {@code sink:6}). */
+    /** A buried 5×5 crossing hub: four tunnel branches, no surface entrance — the sink seats the mineshaft deep in the
+     *  island (you stumble on it by digging in). */
     private static Built start(Variant v) {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
@@ -198,19 +198,11 @@ public final class MineshaftTemplates {
                 m.put(new BlockPos(c[0], y, c[1]), v.log());
             }
         }
+        // Four tunnel branches; no surface stair — the mineshaft is fully buried (the sink puts it deep in the island).
         link(m, bes, 2, 0, FrontAndTop.NORTH_UP, v);
+        link(m, bes, 2, 4, FrontAndTop.SOUTH_UP, v);
         link(m, bes, 0, 2, FrontAndTop.WEST_UP, v);
         link(m, bes, 4, 2, FrontAndTop.EAST_UP, v);
-
-        // Entrance: an open stepped stair climbing +Z out of the hub up to the surface (nbt y6 = sink 6).
-        for (int i = 0; i <= 6; i++) {
-            final int z = 5 + i;
-            final int treadY = Math.min(6, i);
-            m.put(new BlockPos(2, treadY, z), v.planks());
-            for (int y = treadY + 1; y <= 6; y++) {
-                m.put(new BlockPos(2, y, z), AIR);
-            }
-        }
         anchor(m, bes, new BlockPos(2, 0, 2), "minecraft:" + (v.gold() ? "dark_oak" : "oak") + "_planks");
         return new Built(m, bes);
     }

@@ -161,7 +161,7 @@
         "target": "minecraft:bottom",
         "depth": 4,
         "pad": 10,
-        "sink": 6,
+        "sink": 10,
         "reach": 24,
         "trestles": true
       },

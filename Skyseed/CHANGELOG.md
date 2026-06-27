@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.138.0] - 2026-06-27
+
+### Changed
+- **The Sprawling Dungeon + Abandoned Mineshaft sit deeper and fully buried.** Their start hubs lost the surface
+  stairwell (each is now a 4-branch hub) and sink deeper (`sink` 6 → 10), so there's no visible entrance — you stumble
+  on them by digging in (a fun surprise). The dedicated `dungeon_large` island deepened (`max_under_depth` 16 → 22) so
+  the descents still fit.
+
+### Fixed
+- **The dungeon ladder shaft is climbable now** — a cobblestone block sat directly above the top rung, so you couldn't
+  mount or dismount; added a head-clearance block above it.
+- **The dungeon staircase is walkable now** — the 45° descent had only 2-tall headroom, so your head clipped the next
+  step's ceiling as you walked down; widened to 3-tall headroom. 118 pass (the three start hubs + the staircase + the
+  shaft `.nbt` regenerated).
+
 ## [0.137.0] - 2026-06-27
 
 ### Fixed

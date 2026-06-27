@@ -114,29 +114,18 @@ public final class DungeonComplexTemplates {
 
     // ---- pieces ------------------------------------------------------------------------------------------------
 
-    /** The entrance hub: a 9×9 chamber with corridor doors N/W/E and an open stepped stairwell climbing +Z to the
-     *  surface (seated by {@code sink:6}). A lantern lights the hub. */
+    /** A buried 9×9 hub: four corridor branches and a lantern, with no surface entrance — the sink seats the whole
+     *  complex deep in the island, so you only find it by digging in (a fun surprise). */
     private static Built start() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         box(m, 0, 8, 0, 8, 0, 5);
+        // Four corridor branches; no surface stair — the complex is fully buried (the sink puts it deep in the island).
         door(m, bes, 4, 0, FrontAndTop.NORTH_UP);
+        door(m, bes, 4, 8, FrontAndTop.SOUTH_UP);
         door(m, bes, 0, 4, FrontAndTop.WEST_UP);
         door(m, bes, 8, 4, FrontAndTop.EAST_UP);
         m.put(new BlockPos(4, 4, 4), Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true));
-
-        // Entrance: a doorway in the +Z wall and a stepped stair climbing out and up to the surface (nbt y6 = sink 6),
-        // open to the sky — the side walls are the island's own rock. Mirrors the old dungeon lair entrance.
-        m.put(new BlockPos(4, 1, 8), AIR);
-        m.put(new BlockPos(4, 2, 8), AIR);
-        for (int i = 0; i <= 6; i++) {
-            final int z = 9 + i;
-            final int treadY = Math.min(6, i);
-            m.put(new BlockPos(4, treadY, z), COBBLE);
-            for (int y = treadY + 1; y <= 6; y++) {
-                m.put(new BlockPos(4, y, z), AIR);
-            }
-        }
         anchor(m, bes, new BlockPos(4, 0, 4), "minecraft:cobblestone");
         return new Built(m, bes);
     }
@@ -282,11 +271,12 @@ public final class DungeonComplexTemplates {
     private static Built stairsDown() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        fill(m, 0, 2, 0, 4, 0, 7);
+        fill(m, 0, 2, 0, 4, 0, 8);
         for (int z = 0; z <= 4; z++) {
             final int tread = 4 - z;               // descends one per step
-            m.put(new BlockPos(1, tread + 1, z), AIR); // headroom over each tread
-            m.put(new BlockPos(1, tread + 2, z), AIR);
+            m.put(new BlockPos(1, tread + 1, z), AIR); // 3-tall headroom over each tread, so the 45° descent isn't
+            m.put(new BlockPos(1, tread + 2, z), AIR); // head-blocked by the next step's ceiling as you walk down
+            m.put(new BlockPos(1, tread + 3, z), AIR);
         }
         doorAt(m, bes, 1, 5, 0, FrontAndTop.NORTH_UP);     // top — the entry (a parent connects here)
         doorAtDown(m, bes, 1, 1, 4, FrontAndTop.SOUTH_UP); // bottom — one-way descending exit (4 lower)
@@ -298,12 +288,15 @@ public final class DungeonComplexTemplates {
     private static Built shaft() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
-        fill(m, 0, 2, 0, 2, 0, 8);
+        fill(m, 0, 2, 0, 2, 0, 9);             // 1 block taller, so the top rung has a clear block above it
+        for (int y = 1; y <= 8; y++) {
+            m.put(new BlockPos(1, y, 1), AIR); // carve the ladder well AND a head-clearance block (y8) above the top rung
+        }
         for (int y = 1; y <= 7; y++) {
             m.put(new BlockPos(1, y, 1), Blocks.LADDER.defaultBlockState()
-                    .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // backed by the east wall
+                    .setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST)); // rungs y1-7, backed by the east wall
         }
-        doorAt(m, bes, 1, 7, 0, FrontAndTop.NORTH_UP);     // top — the entry
+        doorAt(m, bes, 1, 7, 0, FrontAndTop.NORTH_UP);     // top — the entry, level with the top rung (clear above to dismount)
         doorAtDown(m, bes, 1, 1, 2, FrontAndTop.SOUTH_UP); // bottom — one-way descending exit (6 lower)
         return new Built(m, bes);
     }

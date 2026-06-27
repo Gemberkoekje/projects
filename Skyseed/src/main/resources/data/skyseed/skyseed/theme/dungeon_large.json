@@ -1,7 +1,7 @@
 {
   "_comment": "Dedicated Large Dungeon island (SKYDUNGEONPLAN Part D): a big cobblestone island whose MAIN structure is the sprawling dungeon_complex jigsaw, sunk in, the entrance stair its only surface tell. Crafted from the dungeon seed + the huge bits (ender pearl + blaze powder) + cobblestone.",
   "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 16, "max": 20 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 }, "max_under_depth": 16 },
+  "shape": { "radius": { "min": 16, "max": 20 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 }, "max_under_depth": 22 },
   "palette": { "surface": "minecraft:cobblestone", "fill": "minecraft:cobblestone", "core": "minecraft:stone", "fill_depth": 4,
     "surface_scatter": [
       { "block": "minecraft:mossy_cobblestone", "chance": 0.28 },
@@ -10,7 +10,7 @@
       { "block": "minecraft:mossy_stone_bricks", "chance": 0.07 }
     ] },
   "ores": [],
-  "jigsaw": { "pool": "skyseed:dungeon_complex/start", "target": "minecraft:bottom", "depth": 4, "pad": 12, "sink": 6 },
+  "jigsaw": { "pool": "skyseed:dungeon_complex/start", "target": "minecraft:bottom", "depth": 4, "pad": 12, "sink": 10 },
   "variants": [
     { "weight": 1, "name": "ruin", "decoration": {
       "ground": [
