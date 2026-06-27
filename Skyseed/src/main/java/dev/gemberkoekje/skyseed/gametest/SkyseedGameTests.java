@@ -2125,6 +2125,24 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void chorusForestSeedCraftsFromChorusAndEndStone(GameTestHelper helper) {
+        // Phase 3 (End-native content): the Chorus Forest seed crafts from chorus fruit (bootstrapped off the End's
+        // outer islands) ringing end stone — both End-obtainable, so you grow a renewable chorus/purpur farm.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack c = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.CHORUS_FRUIT);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(c, e, c, e, c, e, c, e, c));
+        final var recipe = level.getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Chorus Forest Seed from chorus fruit + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
+                        .is(ModItems.SEEDS.get("chorus_forest").get()),
+                "the chorus fruit + end stone ring did not produce the Chorus Forest Seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void overworldBiomeThemesHaveEndForm(GameTestHelper helper) {
         // The 10 overworld biome themes (+ their large variants) grow in the End as same-size, pure end-stone islands
         // via a the_end biome override (end stone is the End's neutral default block; ores/decoration default off).

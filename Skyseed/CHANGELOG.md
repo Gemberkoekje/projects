@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.112.0] - 2026-06-27
+
+### Added
+- **Chorus Forest seed — the first End-native content (Phase 3 begins).** A new End-only seed: plant it for an
+  end-stone island studded with **chorus plants** (the vanilla chorus-plant feature) and veined with **purpur**, roamed
+  by an **enderman** pack — the End-highlands look, and a renewable chorus / purpur / ender-pearl economy. Crafted from
+  **chorus fruit** (bootstrapped off the End's outer islands) ringing **end stone**. Full onboarding: shaped recipe, a
+  unique icon, the `skyseeds` tag, a gated guide entry, and reveal/gathered/craft advancements.
+- **A "The End" guide category.** The End chapter now has its own Patchouli category; the End Portal, Return Portal, and
+  Chorus Forest entries live there.
+
+### Changed
+- **The End Portal guide warns there's no respawn in the End** — no beds or anchors work, so dying drops you back at
+  your overworld spawn; stage from home. (Closes the last Phase-2 item.)
+
 ## [0.111.0] - 2026-06-27
 
 ### Added

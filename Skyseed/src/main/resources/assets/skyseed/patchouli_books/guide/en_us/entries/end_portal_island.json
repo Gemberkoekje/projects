@@ -1,6 +1,6 @@
 {
   "name": "End Portal Seed",
-  "category": "skyseed:ruins",
+  "category": "skyseed:end",
   "advancement": "skyseed:reveal_end_portal",
   "icon": "minecraft:end_portal_frame",
   "sortnum": 9,
@@ -22,7 +22,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)Lighting it$()$(br)Fill all twelve frames with $(item)Eyes of Ender$() — Blaze Rods from a $(item)Nether Fortress$() island, crushed with $(item)Ender Pearls$(). The portal opens in the centre. Step through and you are in the End.$(br2)Throw a few spare seeds in your pack first — the End grows empty.",
+      "text": "$(bold)Lighting it$()$(br)Fill all twelve frames with $(item)Eyes of Ender$() — Blaze Rods from a $(item)Nether Fortress$() island, crushed with $(item)Ender Pearls$(). The portal opens in the centre. Step through and you are in the End.$(br2)Pack spare seeds — the End grows empty — and know there is $(bold)no respawn$() there: no beds, no anchors, so dying drops you back at your overworld spawn. Stage from home.",
       "advancement": "skyseed:craft_end_portal"
     },
     {

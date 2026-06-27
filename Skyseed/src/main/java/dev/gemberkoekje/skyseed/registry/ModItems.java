@@ -37,7 +37,7 @@ public final class ModItems {
             "hamlet", "trade_post", "village_center",
             "pasture", "poultry", "wool_farm", "stable", "aquarium",
             "dungeon", "ruined_portal", "desert_temple", "jungle_temple", "witch_hut", "outpost", "trial_chamber",
-            "woodland_mansion", "ocean_monument", "end_portal", "return_portal");
+            "woodland_mansion", "ocean_monument", "end_portal", "return_portal", "chorus_forest");
 
     /**
      * Hidden debug seeds — one per rare structure that otherwise <em>only</em> appears by chance (igloo,

@@ -1,6 +1,6 @@
 {
   "name": "Return Portal Seed",
-  "category": "skyseed:ruins",
+  "category": "skyseed:end",
   "advancement": "skyseed:reveal_return_portal",
   "icon": "minecraft:ender_pearl",
   "sortnum": 10,

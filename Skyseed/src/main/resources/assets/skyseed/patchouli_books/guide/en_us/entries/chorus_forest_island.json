@@ -1,0 +1,24 @@
+{
+  "name": "Chorus Forest Seed",
+  "category": "skyseed:end",
+  "advancement": "skyseed:reveal_chorus_forest",
+  "icon": "minecraft:chorus_flower",
+  "sortnum": 11,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Chorus Forest Skyseed$() — your own corner of the End highlands. Plant it for an end-stone island studded with $(item)chorus plants$() and veined with $(item)purpur$(), an $(item)enderman$() pack roaming it.$(br2)$(bold)Where to look$()$(br)Bootstrap from the End's outer islands: harvest a wild $(item)chorus plant$() for $(item)chorus fruit$(), then ring it with $(item)end stone$(). After that it's renewable — your own chorus never runs out."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:chorus_forest_skyseed",
+      "text": "Chorus fruit ringing end stone.",
+      "advancement": "skyseed:gathered_chorus_forest"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The economy$()$(br)Chorus plants regrow, so the island is a renewable farm. $(item)Chorus fruit$() is teleport-food; smelt it to $(item)popped chorus fruit$() → $(item)purpur$() blocks, pillars, stairs and slabs. And the resident $(item)endermen$() are a steady source of $(item)ender pearls$() — for Eyes of Ender and the Return Portal Seed.",
+      "advancement": "skyseed:craft_chorus_forest"
+    }
+  ]
+}

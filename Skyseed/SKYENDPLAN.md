@@ -77,9 +77,9 @@ checklist → assemble → plant"); and gametests for each loot drop, the recipe
 - **No ore model.** The End has no ores — so unlike the Nether's lava-proximity gradient, End seeds yield *blocks +
   access*, not tiered ore. Value here is **chorus, purpur, shulkers, elytra, and the dragon drops**, gated by structure
   and biome, not depth.
-- **Respawn.** No beds, no respawn anchors in the End. Every island sits over void; dying sends you to the overworld
-  spawn. The guide must make "the End has no respawn — stage from the overworld" a prominent warning (mirrors the
-  Nether's anchor warning).
+- **Respawn — warned (v0.112.0).** No beds, no respawn anchors in the End; dying sends you to the overworld spawn. The
+  End Portal guide entry now carries this prominently ("no respawn there… stage from home"), mirroring the Nether's
+  anchor warning. **Phase 2 is complete** (void End + central island + arrival + no-ore design + this warning).
 - **Five biomes** (verify against 1.21.1, as the Nether list was): `the_end` (central, the dragon), `end_highlands`,
   `end_midlands`, `end_barrens`, `small_end_islands`. The kept biome source means a seed thrown in the End lands in
   whichever biome that spot is — Phase 5 leans on this.
@@ -90,9 +90,13 @@ checklist → assemble → plant"); and gametests for each loot drop, the recipe
 
 Genuinely new seeds with no overworld parallel, the way the Nether got Bastion / Trading Post / Wither Arena:
 
-- **End Stone island** — the base End seed: an end-stone foothold (the Tier-N "adapt me" body other End seeds build on).
-- **Chorus Forest** — chorus plants + flowers, purpur, an enderman mob pack; the "End Highlands" look. Chorus fruit →
-  the random-teleport food + (cooked) popped chorus → purpur, a small renewable economy.
+- **End Stone island — dropped (superseded by v0.111.0).** The 10 overworld biome seeds already grow same-size, pure
+  end-stone islands in the End, so a dedicated end-stone base seed adds nothing; skipped.
+- **Chorus Forest — built (v0.112.0).** The `chorus_forest` seed: an end-stone island with chorus plants (the vanilla
+  `chorus_plant` feature), purpur surface-scatter, and an enderman pack — the End-highlands look + a renewable
+  chorus / purpur / ender-pearl economy. Crafted from chorus fruit (bootstrapped off the outer islands) ringing end
+  stone; full onboarding. Also added a dedicated **"The End" guide category** (End Portal / Return Portal / Chorus
+  Forest moved into it). **Next:** End City (below) is the remaining Phase-3 piece.
 - **End City** — the chapter's flagship structure seed, on the jigsaw machinery: purpur towers + a ship, **shulkers**
   (shulker shells → shulker boxes) and the **elytra** reward on the ship. The natural parallel to the Mansion / Bastion
   as the "grand loot dungeon." Likely **End-biome-gated** (highlands/midlands only — see Phase 5).

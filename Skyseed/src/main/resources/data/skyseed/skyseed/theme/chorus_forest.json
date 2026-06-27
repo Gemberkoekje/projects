@@ -1,0 +1,13 @@
+{
+  "_comment": "Chorus Forest (SKYENDPLAN Phase 3): an end-stone End island grown with chorus plants and purpur, roamed by an enderman pack — the End-Highlands look, and a renewable chorus/purpur economy. End-only (dimensions the_end).",
+  "dimensions": ["minecraft:the_end"],
+  "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.35, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } },
+  "palette": { "surface": "minecraft:end_stone", "fill": "minecraft:end_stone", "core": "minecraft:end_stone", "fill_depth": 4,
+    "surface_scatter": [ { "block": "minecraft:purpur_block", "chance": 0.10 } ] },
+  "ores": [],
+  "mobs": [ { "entity": "minecraft:enderman", "chance": 0.40, "count": { "min": 2, "max": 4 } } ],
+  "variants": [
+    { "weight": 1, "name": "chorus", "decoration": {
+      "trees": [ { "feature": "minecraft:chorus_plant", "tries": 6, "spacing": 2 } ] } }
+  ]
+}

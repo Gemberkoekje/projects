@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [
+        { "items": "minecraft:chorus_fruit" }, { "items": "minecraft:end_stone" }
+      ] }
+    }
+  }
+}
