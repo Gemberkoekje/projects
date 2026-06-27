@@ -3,6 +3,13 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.148.0] - 2026-06-27
+
+### Changed
+- **Ocean ruin sits flush.** The Aquatic island's rare ocean ruin now seats two blocks lower (`sink: 2` on its
+  jigsaw config), so the flooded basin's water surface lines up with the island instead of perching a course or two
+  above it. The broken top wall course and the snapped pillars still poke out, as intended.
+
 ## [0.147.0] - 2026-06-27
 
 ### Added

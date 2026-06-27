@@ -8,7 +8,7 @@
   ],
   "rare_structures": [
     { "chance": 0.08, "suppress_pond": true,
-      "jigsaw": { "pool": "skyseed:ocean_ruin/ruin", "target": "minecraft:bottom", "depth": 1, "pad": 5 } }
+      "jigsaw": { "pool": "skyseed:ocean_ruin/ruin", "target": "minecraft:bottom", "depth": 1, "pad": 5, "sink": 2 } }
   ],
   "pond": {
     "block": "minecraft:water", "radius": 4, "depth": 3,
