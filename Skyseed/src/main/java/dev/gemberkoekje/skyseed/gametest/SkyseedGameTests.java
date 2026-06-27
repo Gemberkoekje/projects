@@ -1118,7 +1118,8 @@ public final class SkyseedGameTests {
     @GameTest(template = BIG_REGION)
     public static void hamletReusesTradePostShops(GameTestHelper helper) {
         // The hamlet starts from a small green whose lot connectors pull the trade post's lots pool, so it places the
-        // same diverse profession shops, capped to 1–2. Five hamlets should land at least one shop (a RED_BED).
+        // same diverse profession shops, capped to 1–2. The placement is position-seeded and the gametest origin
+        // varies per run, so pass each iteration as an explicit seed → five DIFFERENT hamlets; at least one lands a shop.
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/start"));
@@ -1132,7 +1133,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "shop_", 2, fillers);
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "shop_", 2, fillers, iter);
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -1159,34 +1160,38 @@ public final class SkyseedGameTests {
     }
 
     private static void checkWood(GameTestHelper helper, ServerLevel level, BlockPos origin, String pool, Block wood) {
-        for (int x = 4; x <= 44; x++) {
-            for (int z = 4; z <= 44; z++) {
-                for (int y = 1; y <= 14; y++) {
-                    helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
-                }
-            }
-        }
         final var startPool = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/fillers"));
-        Jigsaw.placeCapped(level, startPool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers);
         int beds = 0;
         int rightWood = 0;
         int oak = 0;
-        for (int x = 4; x <= 44; x++) {
-            for (int z = 4; z <= 44; z++) {
-                for (int y = 1; y <= 14; y++) {
-                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
-                    if (s.is(Blocks.RED_BED)) {
-                        beds++;
-                    } else if (s.is(wood)) {
-                        rightWood++;
-                    } else if (s.is(Blocks.OAK_PLANKS)) {
-                        oak++;
+        // The village is position-seeded AND the gametest origin varies per run, so a single placement sometimes rolls
+        // zero shops; sample several explicit seeds and assert across them (a shop lands in at least one, oak never).
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, startPool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                        if (s.is(Blocks.RED_BED)) {
+                            beds++;
+                        } else if (s.is(wood)) {
+                            rightWood++;
+                        } else if (s.is(Blocks.OAK_PLANKS)) {
+                            oak++;
+                        }
                     }
                 }
             }
         }
-        helper.assertTrue(beds > 0, pool + " placed no shops (red_bed=" + beds + ")");
+        helper.assertTrue(beds > 0, pool + " placed no shops across 4 seeds (red_bed=" + beds + ")");
         helper.assertTrue(rightWood > 0, pool + " has no " + wood + " walls (count=" + rightWood + ")");
         helper.assertTrue(oak == 0, pool + " still has oak plank walls (oak=" + oak + ")");
     }
@@ -1255,32 +1260,36 @@ public final class SkyseedGameTests {
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/start"));
         final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/fillers"));
-        for (int x = 4; x <= 44; x++) {
-            for (int z = 4; z <= 44; z++) {
-                for (int y = 1; y <= 14; y++) {
-                    helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
-                }
-            }
-        }
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers);
         int beds = 0;
         int sandstone = 0;
         int oakWall = 0;
-        for (int x = 4; x <= 44; x++) {
-            for (int z = 4; z <= 44; z++) {
-                for (int y = 1; y <= 14; y++) {
-                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
-                    if (s.is(Blocks.RED_BED)) {
-                        beds++;
-                    } else if (s.is(Blocks.SMOOTH_SANDSTONE)) {
-                        sandstone++;
-                    } else if (s.is(Blocks.OAK_PLANKS)) {
-                        oakWall++;
+        // Position-seeded AND the gametest origin varies per run, so a single placement sometimes rolls zero shops;
+        // sample several explicit seeds and assert across them (a shop in at least one, oak in none).
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                        if (s.is(Blocks.RED_BED)) {
+                            beds++;
+                        } else if (s.is(Blocks.SMOOTH_SANDSTONE)) {
+                            sandstone++;
+                        } else if (s.is(Blocks.OAK_PLANKS)) {
+                            oakWall++;
+                        }
                     }
                 }
             }
         }
-        helper.assertTrue(beds > 0, "desert village placed no shops (red_bed=" + beds + ")");
+        helper.assertTrue(beds > 0, "desert village placed no shops across 4 seeds (red_bed=" + beds + ")");
         helper.assertTrue(sandstone > 0, "desert village has no sandstone walls (smooth_sandstone=" + sandstone + ")");
         helper.assertTrue(oakWall == 0, "desert village still has oak plank walls (oak_planks=" + oakWall + ")");
         helper.succeed();
