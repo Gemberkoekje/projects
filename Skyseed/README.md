@@ -2,7 +2,7 @@
 
 A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**. The only open work has its own docs — the deeper-jigsaw structure follow-ons in `SKYJIGSAWPLAN.md` and the multi-version refactor in `REFACTORPLAN.md`. (Per-chapter and per-feature build plans were retired into the CHANGELOG once shipped.)
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**. The only open build plan is the multi-version refactor (`REFACTORPLAN.md`); every per-chapter and per-feature plan was retired into the CHANGELOG once shipped.
 
 ---
 
@@ -57,7 +57,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); block-overlap fit + horizontal nudge-off (islands sit flush), player-aware, fizzle-and-drop |
 
-**All three chapters (overworld, Nether, End) and the Huge island tier are feature-complete.** The deep-jigsaw structural-diversity work also shipped for the villages, the Woodland Mansion (footprint variety) and the Nether Fortress (sprawl over the void). What remains is optional follow-on reuse of that approach (`SKYJIGSAWPLAN.md` Phase 5) and the multi-version build-out (`REFACTORPLAN.md` Stage 2); see **Roadmap** below.
+**All three chapters (overworld, Nether, End) and the Huge island tier are feature-complete.** The deep-jigsaw structural-diversity work is done too: the villages (street villages), the Woodland Mansion (footprint variety), the Nether Fortress (sprawl over the void), and connective galleries/courtyards for the Trial Chamber and Bastion (the Ocean Monument is kept as its single iconic water basin — its `grand` variant is its size variety). The only build-out left is multi-version (`REFACTORPLAN.md` Stage 2); see **Roadmap** below.
 
 ---
 
@@ -65,7 +65,6 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 All three chapters and the Huge island tier are built; what's left is mostly optional follow-on:
 
-- **Deeper-jigsaw structure reuse** (`SKYJIGSAWPLAN.md` Phase 5) — the villages (street villages), the Woodland Mansion (footprint variety) and the Nether Fortress (sprawl over the void) all shipped (v0.68–0.97). The remaining same-approach follow-on: reuse the street/connective + free-over-void-bridge pools for the **Trial Chamber / Ocean Monument / Bastion** corridor layouts.
 - **A few more structures** that would sit well as island variants: a **Stronghold** (the lit End portal already exists as its own seed), and **Buried Treasure / Shipwreck** as Aquatic features. (The Mineshaft and Ancient City already shipped as Huge-tier rares.)
 - **Remaining vanilla blocks** — down to essentially the **copper bulb** (a small Trial Chamber template edit); the Nether- and End-gated block sets landed with their chapters.
 - **Multi-version support** (`REFACTORPLAN.md`) — building against multiple Minecraft / NeoForge versions from one codebase: the **Stonecutter skeleton + the `compat` facade are done** (Stages 0–1); adding the second version is deferred until 1.21.1 is feature-complete (NeoForge-only; no new runtime dependency; Fabric is a separate future concern).
