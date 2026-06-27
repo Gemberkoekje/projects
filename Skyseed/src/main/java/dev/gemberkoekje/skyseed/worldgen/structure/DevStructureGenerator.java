@@ -57,6 +57,7 @@ public final class DevStructureGenerator {
             TrialChamberTemplates.generateInto(base.resolve("trial_chamber"));
             WoodlandMansionTemplates.generateInto(base.resolve("woodland_mansion"));
             OceanMonumentTemplates.generateInto(base.resolve("ocean_monument"));
+            AncientCityTemplates.generateInto(base.resolve("ancient_city")); // SKYHUGEPLAN §3 — huge Ancient's deep-dark ruin
             PortalChamberTemplates.generateInto(base.resolve("end_portal")); // SKYENDPLAN Phase 1
             ReturnPortalTemplates.generateInto(base.resolve("return_portal")); // SKYENDPLAN — the way home
             EndCityTemplates.generateInto(base.resolve("end_city")); // SKYENDPLAN Phase 3 — the flagship

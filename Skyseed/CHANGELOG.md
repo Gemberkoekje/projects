@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.126.0] - 2026-06-27
+
+### Added
+- **Rare structures on the huge islands — SKYHUGEPLAN Phase 3 (the huge tier is now feature-complete).** Every
+  structural huge biome carries a rare bonus build at its centre that replaces the normal jigsaw + wildlife when it rolls:
+  - **Huge Ancient → the Ancient City** (NEW): a 15×15 deepslate plaza with soul-lantern pillars and brick gateposts, a
+    dark-oak reliquary gazebo over blue soul fire with a sculk catalyst, **can-summon sculk shriekers flush in the
+    floor** (walk it carelessly and you wake the Warden), and three `minecraft:chests/ancient_city` chests (echo shards,
+    Swift Sneak, disc fragments). 6%.
+  - Existing structures wired as rare bonuses: **Huge Forest → Woodland Mansion** (5%, with its illagers), **Huge
+    Desert → Desert Pyramid** (6%), **Huge Frozen → Igloo** (6%), **Huge Meadow → Pillager Outpost** (6%), **Huge
+    Rocky → spawner Dungeon** (6%), **Huge Badlands → Trial Chamber** (5%).
+  - (Huge Aquatic's grand Ocean Monument shipped in 0.119.0; Mushroom + Lush keep their cave systems as the draw.)
+    Chances are first-pass — tune in playtest. New `ancientCityPlaces` gametest; 106 pass.
+
 ## [0.125.0] - 2026-06-27
 
 ### Fixed

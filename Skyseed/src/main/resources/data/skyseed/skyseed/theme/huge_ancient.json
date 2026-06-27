@@ -187,14 +187,16 @@
   ],
   "rare_structures": [
     {
-      "chance": 0.05,
+      "_comment": "6% — an Ancient City ruin: deepslate plaza, soul fire, can-summon shriekers (wake the Warden), ancient_city loot.",
+      "chance": 0.06,
       "jigsaw": {
-        "pool": "skyseed:vault_cell/cell",
+        "pool": "skyseed:ancient_city/plaza",
         "target": "minecraft:bottom",
         "depth": 1,
-        "pad": 5,
-        "sink": 5
-      }
+        "pad": 9,
+        "sink": 0
+      },
+      "mobs": []
     }
   ],
   "variants": [

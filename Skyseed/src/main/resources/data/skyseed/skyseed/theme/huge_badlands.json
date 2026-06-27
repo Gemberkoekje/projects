@@ -139,5 +139,19 @@
       "max": 5
     }
   },
-  "_comment": "Huge Badlands (SKYHUGEPLAN Phase 4): a huge badlands island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 26-32, dome 5-12. Overworld."
+  "_comment": "Huge Badlands (SKYHUGEPLAN Phase 4): a huge badlands island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 26-32, dome 5-12. Overworld.",
+  "rare_structures": [
+    {
+      "_comment": "5% — a Trial Chamber buried in the mesa (trial spawners + vaults).",
+      "chance": 0.05,
+      "jigsaw": {
+        "pool": "skyseed:trial_chamber/start",
+        "target": "minecraft:bottom",
+        "depth": 2,
+        "pad": 10,
+        "sink": 7
+      },
+      "mobs": []
+    }
+  ]
 }

@@ -1097,5 +1097,36 @@
       "min": 3,
       "max": 5
     }
-  }
+  },
+  "rare_structures": [
+    {
+      "_comment": "5% — a Woodland Mansion stands on the huge forest; its illagers replace the wildlife.",
+      "chance": 0.05,
+      "jigsaw": {
+        "pool": "skyseed:woodland_mansion/start",
+        "target": "minecraft:bottom",
+        "depth": 2,
+        "pad": 12,
+        "sink": 0,
+        "reach": 24
+      },
+      "mobs": [
+        {
+          "weight": 1,
+          "entries": [
+            {
+              "entity": "minecraft:evoker",
+              "adults": 1,
+              "babies": 0
+            },
+            {
+              "entity": "minecraft:vindicator",
+              "adults": 4,
+              "babies": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

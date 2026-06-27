@@ -2203,6 +2203,45 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void ancientCityPlaces(GameTestHelper helper) {
+        // SKYHUGEPLAN §3: the Ancient City — the rare 6% bonus on the Huge Ancient seed. Verify it assembles: a
+        // deepslate plaza, three ancient_city loot chests, a can-summon sculk shrieker (the Warden danger), the blue
+        // soul fire, and a sculk catalyst. (Loads the .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ancient_city/plaza"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int deepslate = 0, chests = 0;
+        boolean canSummon = false, soulFire = false, catalyst = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.DEEPSLATE_TILES) || st.is(Blocks.DEEPSLATE_BRICKS)
+                            || st.is(Blocks.CRACKED_DEEPSLATE_TILES) || st.is(Blocks.CRACKED_DEEPSLATE_BRICKS)) {
+                        deepslate++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.SCULK_SHRIEKER)
+                            && st.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.CAN_SUMMON)) {
+                        canSummon = true;
+                    } else if (st.is(Blocks.SOUL_FIRE)) {
+                        soulFire = true;
+                    } else if (st.is(Blocks.SCULK_CATALYST)) {
+                        catalyst = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(deepslate > 150, "the ancient city should be a big deepslate plaza (got " + deepslate + ")");
+        helper.assertTrue(chests == 3, "the ancient city should have three loot chests (got " + chests + ")");
+        helper.assertTrue(canSummon, "the ancient city should have a can-summon sculk shrieker (the Warden danger)");
+        helper.assertTrue(soulFire, "the ancient city should keep its blue soul fire");
+        helper.assertTrue(catalyst, "the ancient city should have a sculk catalyst");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a

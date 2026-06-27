@@ -248,5 +248,30 @@
       "max": 5
     }
   },
-  "_comment": "Huge Meadow (SKYHUGEPLAN Phase 4): a huge meadow island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 24-30, dome 1-2. Overworld."
+  "_comment": "Huge Meadow (SKYHUGEPLAN Phase 4): a huge meadow island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 24-30, dome 1-2. Overworld.",
+  "rare_structures": [
+    {
+      "_comment": "6% — a Pillager Outpost towers over the meadow; a pillager band garrisons it.",
+      "chance": 0.06,
+      "jigsaw": {
+        "pool": "skyseed:outpost/tower",
+        "target": "minecraft:bottom",
+        "depth": 1,
+        "pad": 9,
+        "iron_golems": 1
+      },
+      "mobs": [
+        {
+          "weight": 1,
+          "entries": [
+            {
+              "entity": "minecraft:pillager",
+              "adults": 4,
+              "babies": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }

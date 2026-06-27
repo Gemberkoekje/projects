@@ -439,5 +439,19 @@
       "max": 6
     }
   },
-  "_comment": "Huge Rocky (SKYHUGEPLAN Phase 4): a huge rocky island scaled from the base theme — biome adaptation (4 forms) + internal caves. radius 24-30, dome 12-20. Overworld."
+  "_comment": "Huge Rocky (SKYHUGEPLAN Phase 4): a huge rocky island scaled from the base theme — biome adaptation (4 forms) + internal caves. radius 24-30, dome 12-20. Overworld.",
+  "rare_structures": [
+    {
+      "_comment": "6% — a spawner Dungeon sunk into the mountain (mossy cobble, twin loot chests).",
+      "chance": 0.06,
+      "jigsaw": {
+        "pool": "skyseed:dungeon/lair",
+        "target": "minecraft:bottom",
+        "depth": 1,
+        "pad": 7,
+        "sink": 5
+      },
+      "mobs": []
+    }
+  ]
 }

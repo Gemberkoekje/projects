@@ -104,12 +104,14 @@
   ],
   "rare_structures": [
     {
-      "chance": 0.05,
+      "_comment": "6% — a snow Igloo with its basement lab; the captive zombie villager below.",
+      "chance": 0.06,
       "jigsaw": {
         "pool": "skyseed:igloo/igloo",
         "target": "minecraft:bottom",
         "depth": 1,
-        "pad": 4
+        "pad": 4,
+        "sink": 0
       },
       "mobs": [
         {
@@ -117,7 +119,8 @@
           "entries": [
             {
               "entity": "minecraft:zombie_villager",
-              "adults": 1
+              "adults": 1,
+              "babies": 0
             }
           ]
         }
