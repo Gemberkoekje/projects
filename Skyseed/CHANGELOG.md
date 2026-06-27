@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.142.0] - 2026-06-27
+
+### Changed
+- **End City jigsaw — Phase 3: bridges to a second section (SKYENDCITYPLAN).** A tier's side branch now throws an
+  end-stone-brick **bridge** (railed, with a stepped `bridge_stairs` variant for verticality) out over the void to a
+  **`wing`** — a second 7×7 section with its own treasure that stacks its own tiers and may sprout more spires/spans.
+  The branch yields a tower, a bridge, or nothing; new pools `end_city/branch` (replaces `tower`) + `end_city/bridge`.
+  Spans and wings float over the void by design (the End City look). Spires made a touch taller. +1 test (and the tower
+  test hardened to assemble the spire pieces in isolation, dodging the origin-varies flakiness). 121 pass.
+
 ## [0.141.0] - 2026-06-27
 
 ### Changed

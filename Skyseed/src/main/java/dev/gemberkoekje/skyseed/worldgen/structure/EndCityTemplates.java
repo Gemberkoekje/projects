@@ -31,10 +31,13 @@ public final class EndCityTemplates {
 
     /** Tiers + the roof self-stack through this pool: an UP connector (target {@code ec_tier}) mates a DOWN one (name {@code ec_tier}). */
     private static final String FLOOR_POOL = "skyseed:end_city/floor";
-    /** A tier's outward side branch draws a {@code tower_base} from here (or empty). */
-    private static final String TOWER_POOL = "skyseed:end_city/tower";
+    /** A tier's outward side branch draws from here: a {@code tower_base} (a spire), a {@code bridge_end} (a span to a
+     *  new section), or empty. */
+    private static final String BRANCH_POOL = "skyseed:end_city/branch";
     /** A tower then rises through here: {@code tower_piece} (stacks) / {@code tower_top} (caps) / empty. */
     private static final String TOWER_PIECE_POOL = "skyseed:end_city/tower_piece";
+    /** A bridge spans across here: {@code bridge_piece} / {@code bridge_stairs} (continue) / {@code wing} (a new section) / empty. */
+    private static final String BRIDGE_POOL = "skyseed:end_city/bridge";
 
     private static final BlockState PURPUR = Blocks.PURPUR_BLOCK.defaultBlockState();
     private static final BlockState PILLAR = Blocks.PURPUR_PILLAR.defaultBlockState();
@@ -52,6 +55,10 @@ public final class EndCityTemplates {
         writeIfAbsent(dir.resolve("tower_base.nbt"), towerBase());
         writeIfAbsent(dir.resolve("tower_piece.nbt"), towerPiece());
         writeIfAbsent(dir.resolve("tower_top.nbt"), towerTop());
+        writeIfAbsent(dir.resolve("bridge_end.nbt"), bridgeEnd());
+        writeIfAbsent(dir.resolve("bridge_piece.nbt"), bridgePiece());
+        writeIfAbsent(dir.resolve("bridge_stairs.nbt"), bridgeStairs());
+        writeIfAbsent(dir.resolve("wing.nbt"), wing());
     }
 
     // ---- shared helpers ----------------------------------------------------------------------------------------
@@ -83,14 +90,24 @@ public final class EndCityTemplates {
         jigAt(m, bes, x, y, z, FrontAndTop.DOWN_NORTH, "skyseed:ec_tier", "skyseed:ec_cap", FLOOR_POOL, "minecraft:purpur_block", true);
     }
 
-    /** A tier's outward side branch (horizontal) that may sprout a thin tower; unused → air (no floating wart). */
+    /** A tier's outward side branch (horizontal) that may sprout a tower or a bridge; unused → air (no floating wart). */
     private static void sideJig(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
-        jigAt(m, bes, x, y, z, dir, "skyseed:ec_wall", "skyseed:ec_tower", TOWER_POOL, "minecraft:air", false);
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_wall", "skyseed:ec_branch", BRANCH_POOL, "minecraft:air", false);
     }
 
-    /** The tower_base's stem (horizontal) that mates a tier's {@link #sideJig}. */
-    private static void towerStem(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
-        jigAt(m, bes, x, y, z, dir, "skyseed:ec_tower", "skyseed:ec_dead", TOWER_PIECE_POOL, "minecraft:air", false);
+    /** The stem (horizontal) on a tower_base / bridge_end that mates a tier's {@link #sideJig}. */
+    private static void branchStem(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_branch", "skyseed:ec_dead", BRANCH_POOL, "minecraft:air", false);
+    }
+
+    /** A bridge segment's outward connector (horizontal) that draws the next span/wing from the bridge pool. */
+    private static void bridgeOut(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_seam", "skyseed:ec_bridge", BRIDGE_POOL, "minecraft:air", false);
+    }
+
+    /** A bridge segment's / wing's incoming connector (horizontal), matching a parent's {@link #bridgeOut}. */
+    private static void bridgeIn(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_bridge", "skyseed:ec_dead", BRIDGE_POOL, "minecraft:air", false);
     }
 
     /** A tower segment's UP seat (vertical) — stacks the next tower piece/top. */
@@ -250,7 +267,7 @@ public final class EndCityTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         for (int x = 0; x <= 2; x++) for (int z = 0; z <= 2; z++) m.put(new BlockPos(x, 0, z), PURPUR);  // floor
         for (int y = 1; y <= 4; y++) tube(m, y);                                                          // shaft walls
-        towerStem(m, bes, 2, 2, 1, FrontAndTop.EAST_UP);    // stems toward the tier (the jigsaw spins it to any side)
+        branchStem(m, bes, 2, 2, 1, FrontAndTop.EAST_UP);   // stems toward the tier (the jigsaw spins it to any side)
         towerUp(m, bes, 1, 4, 1);                            // rises into tower_piece / tower_top
         return new Built(m, bes);
     }
@@ -275,6 +292,68 @@ public final class EndCityTemplates {
         for (int x = 0; x <= 2; x++) for (int z = 0; z <= 2; z++) m.put(new BlockPos(x, 3, z), PURPUR);  // cap
         for (final int[] c : new int[][]{{0, 4, 0}, {2, 4, 0}, {0, 4, 2}, {2, 4, 2}, {1, 4, 1}}) m.put(new BlockPos(c[0], c[1], c[2]), ROD);
         towerDown(m, bes, 1, 0, 1);             // no UP — caps the spire
+        return new Built(m, bes);
+    }
+
+    // ---- bridges + a second section (Phase 3) ----------------------------------------------------------------------
+
+    /** A 3-wide walkway from {@code x0..x1} at height {@code y}: an end-stone-brick path flanked by purpur kerbs + rails. */
+    private static void deck(Map<BlockPos, BlockState> m, int x0, int x1, int y) {
+        for (int x = x0; x <= x1; x++) {
+            m.put(new BlockPos(x, y, 1), END_BRICK);
+            m.put(new BlockPos(x, y, 0), PURPUR);
+            m.put(new BlockPos(x, y, 2), PURPUR);
+            m.put(new BlockPos(x, y + 1, 0), PURPUR);
+            m.put(new BlockPos(x, y + 1, 2), PURPUR);
+        }
+    }
+
+    /** {@code bridge_end} (vanilla {@code bridge_end}): the span that leaves a tier and heads out over the void. */
+    private static Built bridgeEnd() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        deck(m, 0, 3, 0);
+        branchStem(m, bes, 3, 1, 1, FrontAndTop.EAST_UP);   // mates a tier's side branch
+        bridgeOut(m, bes, 0, 1, 1, FrontAndTop.WEST_UP);    // continues the span outward
+        return new Built(m, bes);
+    }
+
+    /** {@code bridge_piece} (vanilla {@code bridge_piece}): a straight span segment. */
+    private static Built bridgePiece() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        deck(m, 0, 3, 0);
+        bridgeIn(m, bes, 3, 1, 1, FrontAndTop.EAST_UP);
+        bridgeOut(m, bes, 0, 1, 1, FrontAndTop.WEST_UP);
+        return new Built(m, bes);
+    }
+
+    /** {@code bridge_stairs} (vanilla {@code bridge_gentle/steep_stairs}): a span that steps down two blocks. */
+    private static Built bridgeStairs() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        deck(m, 3, 3, 2);   // east step (enters high)
+        deck(m, 2, 2, 1);   // middle step
+        deck(m, 0, 1, 0);   // west (leaves low)
+        bridgeIn(m, bes, 3, 3, 1, FrontAndTop.EAST_UP);
+        bridgeOut(m, bes, 0, 1, 1, FrontAndTop.WEST_UP);
+        return new Built(m, bes);
+    }
+
+    /** {@code wing} (a bridge-reached {@code base_floor}): a second 7×7 section out over the void — its own treasure
+     *  and an UP seat, so it stacks its own tiers (and may sprout more spires/spans). */
+    private static Built wing() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        shell(m, 0, 6, 0, 6, 0, 7);
+        for (final int[] g : new int[][]{{2, 4, 0}, {4, 4, 0}, {0, 4, 2}, {0, 4, 4}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
+        m.remove(new BlockPos(6, 2, 3));        // headroom over the east-wall opening where the bridge lands (the
+                                                // bridgeIn below is its lower half) — a 2-tall doorway
+        m.put(new BlockPos(2, 2, 3), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));
+        bes.put(new BlockPos(2, 2, 3), lootChest("minecraft:chests/end_city_treasure"));
+        m.put(new BlockPos(3, 2, 5), ROD);
+        bridgeIn(m, bes, 6, 1, 3, FrontAndTop.EAST_UP);     // the bridge lands on the east wall
+        upJig(m, bes, 3, 7, 3);                             // stacks its own tiers
         return new Built(m, bes);
     }
 }

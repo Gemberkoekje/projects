@@ -43,8 +43,12 @@ stack; the `roof` has no up connector, so it caps. (Mirrors the `dungeon_complex
       sprout from the tiers' lip-edge side connectors and cantilever over the void; pools `end_city/tower` +
       `end_city/tower_piece`, ~43% per branch, depth 6. Side branches put their destination cell clear of the lip so the
       tower doesn't collide with the tier (the seam-collision lesson from Phase 1). Guarded by `endCitySproutsTowers`.
-- [ ] **Phase 3 — Bridges + sprawl.** `bridge`/`bridge_stairs`/`bridge_end` (`end_city/bridge`) → a second `start`
-      section, so the city sprawls across the island (with over-void support where a bridge leaves the island).
+- [x] **Phase 3 — Bridges + sprawl.** ✅ A tier's side branch yields a tower, a `bridge_end`, or nothing; a bridge
+      (`bridge_piece` + a stepped `bridge_stairs`) spans end-stone-brick rails out over the void to a `wing` — a second
+      7×7 section (own treasure) that stacks its own tiers + may sprout more spires/spans. Pools `end_city/branch`
+      (replaces `tower`) + `end_city/bridge`. **No over-void support by design** — the spans/wings float, the End City
+      aesthetic (no `trestles`). Guarded by `endCityBridgesAcrossVoid`; the tower test hardened to place the spire
+      pieces in isolation (the full assembly is position-seeded AND the gametest origin varies per run → flaky).
 - [ ] **Phase 4 — Fat tower + dedicated ship.** `fat_tower` + a proper `ship` piece (`end_city/ship`); move the elytra
       reward to the ship and drop the interim start-ship.
 - [ ] **Phase 5 — Detailing pass.** magenta-glass windows, end-stone-brick accent courses, purpur-stair corbels under
