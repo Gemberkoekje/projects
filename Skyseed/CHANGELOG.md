@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.152.0] - 2026-06-27
+
+### Fixed
+- **End City fat tower ladder no longer blocks the door or traps you.** The fat tower's climbing ladder ran up the
+  west wall at z=2 — which is the doorway you enter through, so it sat in the entrance — and its deck exit faced the
+  main stack, where a side spire can grow a block off it and seal you on the ladder. Moved the ladder to the east
+  wall by the ship: you step in clear through the west doorway, and the exit pops up beside the ship, clear of the
+  stack's spires.
+
 ## [0.151.0] - 2026-06-27
 
 ### Fixed

@@ -214,12 +214,16 @@ public final class EndCityTemplates {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         shell(m, 0, 4, 0, 4, 0, 8);                 // floor y0, walls y1-7, deck (ceiling) y8
-        m.remove(new BlockPos(1, 8, 2));            // ladder hole through the deck
+        m.remove(new BlockPos(3, 8, 2));            // ladder hole through the deck (east side, by the ship gangway)
         m.remove(new BlockPos(0, 2, 2));            // headroom over the west doorway (the arm side)
-        final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
-        for (int y = 1; y <= 8; y++) m.put(new BlockPos(1, y, 2), ladder);   // backed by the west wall, climbs to the deck
+        // The ladder climbs the EAST wall (by the ship), not the west wall: it used to run up z=2 of the west wall,
+        // which is the doorway you enter through (so it blocked entry), and its deck exit faced the main stack — where
+        // a side spire can grow a block off it and trap you on the ladder. On the east face you step in clear, and the
+        // exit pops up beside the ship, away from the stack's spires.
+        final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST);
+        for (int y = 1; y <= 8; y++) m.put(new BlockPos(3, y, 2), ladder);   // backed by the east wall, climbs to the deck
         for (final int[] g : new int[][]{{2, 4, 0}, {2, 4, 4}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
-        m.put(new BlockPos(3, 9, 2), ROD);          // deck light by the gangway
+        m.put(new BlockPos(1, 9, 2), ROD);          // deck light, clear of the exit and the ship gangway
         jigAt(m, bes, 0, 1, 2, FrontAndTop.WEST_UP, "skyseed:ec_fattower", "skyseed:ec_dead", SHIP_POOL, "minecraft:air", false);  // the arm docks here
         jigAt(m, bes, 4, 9, 2, FrontAndTop.EAST_UP, "skyseed:ec_shipwall", "skyseed:ec_ship", SHIP_POOL, "minecraft:air", false);  // the ship docks here
         return new Built(m, bes);
