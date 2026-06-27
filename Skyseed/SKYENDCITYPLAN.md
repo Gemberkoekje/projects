@@ -49,8 +49,13 @@ stack; the `roof` has no up connector, so it caps. (Mirrors the `dungeon_complex
       (replaces `tower`) + `end_city/bridge`. **No over-void support by design** — the spans/wings float, the End City
       aesthetic (no `trestles`). Guarded by `endCityBridgesAcrossVoid`; the tower test hardened to place the spire
       pieces in isolation (the full assembly is position-seeded AND the gametest origin varies per run → flaky).
-- [ ] **Phase 4 — Fat tower + dedicated ship.** `fat_tower` + a proper `ship` piece (`end_city/ship`); move the elytra
-      reward to the ship and drop the interim start-ship.
+- [x] **Phase 4 — Fat tower + dedicated ship.** ✅ The interim base-ship is gone; the `start` sends a low east arm (kept
+      at y0-1, below the tiers) to a **guaranteed** `fat_tower` (wide 5×5 climbable shaft, internal ladder) pushed clear
+      east of the tier lip, and a dedicated `ship` (guaranteed elytra, dragon-head bow, mast, brewing) docks level with
+      its deck. Guaranteed single-element pools `end_city/fat_tower` + `end_city/ship`. **Collision lesson, deepened:**
+      anything tall attached *near* the base collides with the stacking tier lip (bounding-box), so the fat tower is
+      reached by a *low* arm and offset east clear of the lip. Guarded by the elevated-dragon-head check in
+      `endCityHasPurpurTowerAndShipChest`.
 - [ ] **Phase 5 — Detailing pass.** magenta-glass windows, end-stone-brick accent courses, purpur-stair corbels under
       every overhang, roof terracing + lighting polish — to match the vanilla read.
 

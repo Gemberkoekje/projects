@@ -2130,16 +2130,16 @@ public final class SkyseedGameTests {
 
     @GameTest(template = BIG_REGION)
     public static void endCityHasPurpurTowerAndShipChest(GameTestHelper helper) {
-        // Phase 3 flagship, now a full jigsaw (SKYENDCITYPLAN Phase 1): a base section + stacking overhanging tiers + a
-        // terraced roof, plus the interim End ship. Verify it assembles AND stacks vertically (not one box) — purpur
-        // built, magenta-glass windows, two loot chests (tower treasure + ship reward) and the bow's dragon head, with
-        // purpur rising in tiers well above the base. Placed low so the tower fits the scanned region. (Loads .nbt.)
+        // Full jigsaw (SKYENDCITYPLAN Phases 1+4): a base section + stacking overhanging tiers + a terraced roof, and a
+        // guaranteed fat tower off the base's east arm carrying the End ship. Verify it assembles AND stacks vertically
+        // (not one box) — purpur built, magenta-glass windows, two loot chests (tower treasure + ship reward), and the
+        // ship's dragon-head bow riding ELEVATED on the fat tower (not down at the base). Placed low to fit the scan.
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
         Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 3, origin, false, "", 0, null, 1L);
-        int purpur = 0, chests = 0, maxPurpurY = Integer.MIN_VALUE;
-        boolean dragon = false, glass = false;
+        int purpur = 0, chests = 0, maxPurpurY = Integer.MIN_VALUE, dragonY = Integer.MIN_VALUE;
+        boolean glass = false;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
                 for (int y = 0; y < 24; y++) {
@@ -2150,7 +2150,7 @@ public final class SkyseedGameTests {
                     } else if (st.is(Blocks.CHEST)) {
                         chests++;
                     } else if (st.is(Blocks.DRAGON_HEAD)) {
-                        dragon = true;
+                        dragonY = Math.max(dragonY, y);
                     } else if (st.is(Blocks.MAGENTA_STAINED_GLASS)) {
                         glass = true;
                     }
@@ -2159,11 +2159,13 @@ public final class SkyseedGameTests {
         }
         helper.assertTrue(purpur > 80, "the End City should be built of purpur (got " + purpur + ")");
         helper.assertTrue(chests >= 2, "the End City needs a tower chest and a ship chest (got " + chests + ")");
-        helper.assertTrue(dragon, "the End ship needs a dragon head at the bow");
         helper.assertTrue(glass, "the tiers should carry magenta-glass windows");
         // The base shell's ceiling sits ~8 above its floor (region y2); a stacked tier/roof puts purpur well above that.
         helper.assertTrue(maxPurpurY > 13, "the End City should stack tiers above its base, not be one box "
                 + "(top purpur Y " + maxPurpurY + ")");
+        // The ship now rides the fat tower's deck, well above the base floor (region y2) — not cantilevered at ground level.
+        helper.assertTrue(dragonY > 8, "the End ship (dragon-head bow) should ride the elevated fat tower, not the base "
+                + "(dragon head Y " + dragonY + ")");
         helper.succeed();
     }
 

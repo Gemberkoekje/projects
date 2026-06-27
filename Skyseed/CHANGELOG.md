@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.143.0] - 2026-06-27
+
+### Changed
+- **End City jigsaw — Phase 4: a fat tower bears the ship (SKYENDCITYPLAN).** The interim base-level ship is gone. The
+  base now sends a low east arm out to a **guaranteed fat tower** — a wide 5×5 climbable shaft with an internal ladder,
+  pushed clear east of the stacking tier lip — and the **End ship** (the guaranteed-elytra chest, dragon-head bow, mast
+  + brewing stand) docks level with the fat tower's deck. So the elytra now rides an elevated flying ship you reach by
+  climbing the tower, not a hull sitting at ground level. New guaranteed pools `end_city/fat_tower` + `end_city/ship`;
+  the main End City test now checks the dragon-head bow rides elevated. 121 pass.
+
 ## [0.142.0] - 2026-06-27
 
 ### Changed

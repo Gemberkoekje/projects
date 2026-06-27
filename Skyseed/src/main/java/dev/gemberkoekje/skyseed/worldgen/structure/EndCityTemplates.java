@@ -38,6 +38,10 @@ public final class EndCityTemplates {
     private static final String TOWER_PIECE_POOL = "skyseed:end_city/tower_piece";
     /** A bridge spans across here: {@code bridge_piece} / {@code bridge_stairs} (continue) / {@code wing} (a new section) / empty. */
     private static final String BRIDGE_POOL = "skyseed:end_city/bridge";
+    /** The start's guaranteed east arm leads here (one element, no empty) → the fat tower that bears the ship. */
+    private static final String FAT_TOWER_POOL = "skyseed:end_city/fat_tower";
+    /** The fat tower's deck leads here (one element) → the End ship with the guaranteed elytra. */
+    private static final String SHIP_POOL = "skyseed:end_city/ship";
 
     private static final BlockState PURPUR = Blocks.PURPUR_BLOCK.defaultBlockState();
     private static final BlockState PILLAR = Blocks.PURPUR_PILLAR.defaultBlockState();
@@ -59,6 +63,8 @@ public final class EndCityTemplates {
         writeIfAbsent(dir.resolve("bridge_piece.nbt"), bridgePiece());
         writeIfAbsent(dir.resolve("bridge_stairs.nbt"), bridgeStairs());
         writeIfAbsent(dir.resolve("wing.nbt"), wing());
+        writeIfAbsent(dir.resolve("fat_tower.nbt"), fatTower());
+        writeIfAbsent(dir.resolve("ship.nbt"), ship());
     }
 
     // ---- shared helpers ----------------------------------------------------------------------------------------
@@ -149,8 +155,8 @@ public final class EndCityTemplates {
 
     // ---- pieces ------------------------------------------------------------------------------------------------
 
-    /** The base section (vanilla {@code base_floor}): a 9×9 hollow shell on the island, treasure inside, the interim
-     *  ship off the east wall, and an UP connector that roots the stacking tower. */
+    /** The base section (vanilla {@code base_floor}): a 9×9 hollow shell on the island, treasure inside, a low east arm
+     *  out to the fat-tower ship, and an UP connector that roots the stacking tower. */
     private static Built start() {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
@@ -167,31 +173,60 @@ public final class EndCityTemplates {
         // No rods above the ceiling here: the base is capped by the tier that stacks on it, and a block at y9 would
         // push the base's bounding box up into that tier's floor (y9) and make the jigsaw reject it as a collision.
 
-        // East-wall boarding opening → the ship.
-        for (int y = 1; y <= 3; y++) m.remove(new BlockPos(8, y, 4));
-        ship(m, bes);
+        // A low east arm (kept at y0-1, below the stacking tiers, so the base's bounding box never reaches them) leads
+        // out to a guaranteed fat tower bearing the ship — pushed clear east so the tower can't collide with the tier lip.
+        m.remove(new BlockPos(8, 1, 4));               // east doorway out of the shell
+        m.remove(new BlockPos(8, 2, 4));
+        for (int x = 9; x <= 10; x++) {
+            m.put(new BlockPos(x, 0, 4), PURPUR);      // walkway
+            m.put(new BlockPos(x, 1, 3), PURPUR);      // rails
+            m.put(new BlockPos(x, 1, 5), PURPUR);
+        }
+        jigAt(m, bes, 10, 1, 4, FrontAndTop.EAST_UP, "skyseed:ec_fatwall", "skyseed:ec_fattower", FAT_TOWER_POOL, "minecraft:air", false);
 
         anchor(m, bes, new BlockPos(4, 0, 4), "minecraft:end_stone");   // seats on the island (target minecraft:bottom)
         upJig(m, bes, 4, 8, 4);                                          // stacks the first tier directly above
         return new Built(m, bes);
     }
 
-    /** Interim End ship (Phase 4 re-homes it onto a fat tower): a small purpur hull cantilevered off the base's east
-     *  wall at ground level, a mast, a dragon-head bowsprit, and the guaranteed-elytra chest at the stern. */
-    private static void ship(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes) {
-        for (int x = 9; x <= 13; x++) for (int z = 3; z <= 5; z++) m.put(new BlockPos(x, 1, z), PURPUR);  // hull body
-        m.put(new BlockPos(14, 1, 4), PURPUR);                                                            // taper
-        m.put(new BlockPos(15, 1, 4), PURPUR);                                                            // bow tip
-        for (int x = 9; x <= 13; x++) { m.put(new BlockPos(x, 2, 3), PURPUR); m.put(new BlockPos(x, 2, 5), PURPUR); }  // gunwales
-        m.put(new BlockPos(14, 2, 4), PURPUR);
-        m.put(new BlockPos(15, 2, 4), PURPUR);
-        for (int y = 2; y <= 6; y++) m.put(new BlockPos(11, y, 4), PILLAR);   // mast
-        m.put(new BlockPos(11, 7, 4), ROD);                                  // masthead light
-        m.put(new BlockPos(13, 2, 4), ROD);                                 // deck light
-        m.put(new BlockPos(15, 3, 4), Blocks.DRAGON_HEAD.defaultBlockState().setValue(BlockStateProperties.ROTATION_16, 12));  // bowsprit
-        m.put(new BlockPos(9, 2, 4), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST));
-        bes.put(new BlockPos(9, 2, 4), lootChest("skyseed:chests/end_ship"));
-        m.put(new BlockPos(10, 2, 4), Blocks.BREWING_STAND.defaultBlockState());
+    /** {@code fat_tower} (vanilla {@code fat_tower_base/middle/top}): a wide 5×5 climbable shaft reached by the start's
+     *  east arm and pushed clear east of the tier lip (so it can't collide). An internal ladder climbs to its deck,
+     *  where the End ship docks. */
+    private static Built fatTower() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        shell(m, 0, 4, 0, 4, 0, 8);                 // floor y0, walls y1-7, deck (ceiling) y8
+        m.remove(new BlockPos(1, 8, 2));            // ladder hole through the deck
+        m.remove(new BlockPos(0, 2, 2));            // headroom over the west doorway (the arm side)
+        final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
+        for (int y = 1; y <= 8; y++) m.put(new BlockPos(1, y, 2), ladder);   // backed by the west wall, climbs to the deck
+        for (final int[] g : new int[][]{{2, 4, 0}, {2, 4, 4}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
+        m.put(new BlockPos(3, 9, 2), ROD);          // deck light by the gangway
+        jigAt(m, bes, 0, 1, 2, FrontAndTop.WEST_UP, "skyseed:ec_fattower", "skyseed:ec_dead", SHIP_POOL, "minecraft:air", false);  // the arm docks here
+        jigAt(m, bes, 4, 9, 2, FrontAndTop.EAST_UP, "skyseed:ec_shipwall", "skyseed:ec_ship", SHIP_POOL, "minecraft:air", false);  // the ship docks here
+        return new Built(m, bes);
+    }
+
+    /** {@code ship} (vanilla {@code ship}): the End ship docked level with the fat tower's deck — a tapering purpur
+     *  hull, a mast, a dragon-head bowsprit, a brewing stand, and the reward chest with a guaranteed <b>elytra</b>. */
+    private static Built ship() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int x = 0; x <= 4; x++) for (int z = 1; z <= 3; z++) m.put(new BlockPos(x, 0, z), PURPUR);  // hull body
+        m.put(new BlockPos(5, 0, 2), PURPUR);                                                            // taper
+        m.put(new BlockPos(6, 0, 2), PURPUR);                                                            // bow tip
+        for (int x = 0; x <= 4; x++) { m.put(new BlockPos(x, 1, 1), PURPUR); m.put(new BlockPos(x, 1, 3), PURPUR); }  // gunwales
+        m.put(new BlockPos(5, 1, 2), PURPUR);
+        m.put(new BlockPos(6, 1, 2), PURPUR);
+        for (int y = 1; y <= 5; y++) m.put(new BlockPos(2, y, 2), PILLAR);   // mast
+        m.put(new BlockPos(2, 6, 2), ROD);                                  // masthead light
+        m.put(new BlockPos(4, 1, 2), ROD);                                 // deck light
+        m.put(new BlockPos(6, 2, 2), Blocks.DRAGON_HEAD.defaultBlockState().setValue(BlockStateProperties.ROTATION_16, 12));  // bowsprit
+        m.put(new BlockPos(1, 1, 2), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST));
+        bes.put(new BlockPos(1, 1, 2), lootChest("skyseed:chests/end_ship"));
+        m.put(new BlockPos(3, 1, 2), Blocks.BREWING_STAND.defaultBlockState());
+        jigAt(m, bes, 0, 1, 2, FrontAndTop.WEST_UP, "skyseed:ec_ship", "skyseed:ec_dead", SHIP_POOL, "minecraft:air", false);  // docks at the fat tower deck
+        return new Built(m, bes);
     }
 
     /** A stacking tier (vanilla {@code second_/third_floor}): an 11×11 lip floor overhanging 9×9 walls (the stepped
