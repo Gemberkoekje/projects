@@ -141,17 +141,23 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)   // was ha
 
 ### 2.3 The worldgen delta 1.21.1 → 26.1.2 (jar diff) → Skyseed's response
 
-**1 new biome · 0 new structures · vanilla noise-settings stable in name · 109 new blocks**, bucketed:
+> **For Skyseed, mobs ARE worldgen.** Islands get no ambient spawns — the generator *places* every creature (theme
+> `mobs` packs, animal pens, structure mob packs). So new mob **types** and new mob **variants** are part of this
+> delta exactly like a block or a biome: Skyseed has to decide where each one goes.
 
-| Delta (from the jar diff) | Worldgen-generating? | Skyseed response |
+**1 new biome · 0 new structures · vanilla noise-settings stable in name · 109 new blocks · 8 new placeable mobs + a biome-temperature variant system**, bucketed:
+
+| Delta (from the jar diff) | In Skyseed's worldgen? | Skyseed response |
 |---|---|---|
 | **Biome `pale_garden`** | yes | A `pale_garden` `biome_override` on the Forest line (a Forest seed over a pale garden → a pale variant), and/or a dedicated **Pale Garden island theme**. Version-inert on 1.21.1 (see §2.4). |
-| **Pale Garden blocks** — pale-oak wood set, pale moss / carpet / hanging moss, open/closed eyeblossom, creaking heart, resin block / bricks (+ slab/stairs/wall/chiseled) / clump (~40) | yes (generate in the pale garden) | Theme content: pale-oak trees, pale-moss surface + scatter, hanging-moss underside, eyeblossom/resin decoration; **Creaking** as a rare mob. Block-completeness: all obtainable. |
-| **1.21.5 vegetation** — bush, wildflowers, firefly bush, leaf litter, short/tall dry grass, cactus flower, golden dandelion (~8) | yes (generate in existing biomes) | Decoration entries on existing themes: forest/meadow → bush/wildflowers/firefly bush/leaf litter; desert/badlands → dry grass + cactus flower. |
-| **Copper expansion** — copper golem statue, copper bars/chains/chests/lanterns/torches + every oxidation + waxed state, **oxidizing lightning rods**, iron chain (~55) | no (crafted) | **Block-completeness only** — all craftable from copper, already obtainable. Copper Golem = a built mob. No worldgen work. |
-| **Wooden shelves** ×12, **dried ghast**, test blocks ×2 | no | Block-completeness (shelves/dried-ghast craftable); test blocks = parity exclusion (uncollectible). |
+| **Pale Garden blocks** — pale-oak wood set, pale moss / carpet / hanging moss, open/closed eyeblossom, creaking heart, resin block / bricks (+ slab/stairs/wall/chiseled) / clump (~40) | yes | Theme content: pale-oak trees, pale-moss surface + scatter, hanging-moss underside, eyeblossom/resin decoration + creaking hearts. Block-completeness: all obtainable. |
+| **1.21.5 vegetation** — bush, wildflowers, firefly bush, leaf litter, short/tall dry grass, cactus flower, golden dandelion (~8) | yes | Decoration entries on existing themes: forest/meadow → bush/wildflowers/firefly bush/leaf litter; desert/badlands → dry grass + cactus flower. |
+| **New mobs** — `creaking` (+ transient), `nautilus` + `zombie_nautilus`, `happy_ghast`, `copper_golem`, `parched`, `camel_husk`, `mannequin` | **yes — placement needed** | Slot into theme `mobs` packs / structures: **creaking** → the Pale Garden theme (with its creaking hearts); **nautilus / zombie_nautilus** → the Aquatic island (deep lake / ocean / aquarium); **happy_ghast** → the dried-ghast mechanic (a Nether soul-sand placement and/or a sky-mount reward); **copper_golem** → a copper-themed build/structure (player-built, but Skyseed can place one); **parched / camel_husk** → desert/badlands packs (verify their natural spawn rules first); **mannequin** = a display entity → likely no placement. |
+| **Mob variants** — `cow_variant` / `pig_variant` / `chicken_variant` = cold/temperate/warm (plus wolf/cat/frog as data registries) | **yes — auto, but verify** | These resolve from the **biome temperature** at the spawn position, so Skyseed's existing pasture / farm / animal placements pick up the right variant per island biome for free (a Frozen pasture → cold cows). Verify the placement API still lets the variant default by biome; force one only if a theme wants a specific variant. |
+| **Copper expansion** (blocks) — bars/chains/chests/lanterns/torches + oxidation + waxed, oxidizing lightning rods, iron chain (~55) | no (crafted) | Block-completeness only — all craftable from copper, already obtainable. |
+| **Wooden shelves** ×12, **dried ghast** (block), test blocks ×2 | no | Block-completeness (shelves/dried-ghast craftable); test blocks = parity exclusion. |
 
-So the actual **generation** work is exactly two things: a **Pale Garden theme** and the **1.21.5 vegetation** sprinkled into existing themes. Everything else is a **re-run of the block-completeness audit on 26.1.2** (the copper/shelf/ghast blocks are craftable, so they should already pass).
+So the **generation** work is: a **Pale Garden theme** (blocks + the creaking), the **1.21.5 vegetation** in existing themes, **placing the new aquatic / desert / sky mobs** into the themes that fit, and **confirming the cow/pig/chicken variant defaults** by biome — plus a **re-run of the block-completeness audit** for the craftable remainder.
 
 ### 2.4 The single-codebase data strategy (the key lever)
 
@@ -169,7 +175,8 @@ codec moved — still take a guarded data variant or a `//?` directive; handle t
   directives (§2.2) until 26.1.2 compiles. 1.21.1 stays green throughout.
 - **2b — tolerant codecs** (§2.4) — the unknown-id skip; a gametest proving a forward-referencing theme loads inert.
 - **2c — re-audit blocks on 26.1.2** — the 109 new ids through the completeness rule (expect all craftable → pass).
-- **2d — worldgen content** — the Pale Garden theme + the 1.21.5 vegetation decoration, version-inert on 1.21.1.
+- **2d — worldgen content** — the Pale Garden theme + the 1.21.5 vegetation decoration + **the new-mob placements**
+  (creaking → Pale Garden, nautilus → Aquatic, etc.) and the cow/pig/chicken variant check, all version-inert on 1.21.1.
 - **2e — per-version golden master + gametests**; write the "add a version" recipe. Route the gametest's remaining
   direct API calls through `compat` (the Stage-1 to-do).
 
