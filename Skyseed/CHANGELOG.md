@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.124.0] - 2026-06-27
+
+### Added
+- **The Huge island tier is complete — all 10 overworld biomes (SKYHUGEPLAN Phase 4).** Promoted the Rocky / Desert /
+  Ancient drafts to real seeds and added **Mushroom, Frozen, Meadow, Badlands, Lush** — each a huge biome island scaled
+  from its base theme (a towering Rocky mountain, a Badlands mesa, a deepslate Ancient cave-host, a Frozen glacier, …),
+  carrying the regular seeds' biome adaptation where they have it and an internal cave system. Full onboarding for all
+  eight (recipe via the `ender pearl / *_large seed / blaze powder` gate, a unique icon, the `skyseeds` tag, a guide
+  entry, reveal/gathered/craft advancements) plus creative debug seeds for free testing. (Rare structures are Phase 3.)
+
 ## [0.123.0] - 2026-06-27
 
 ### Fixed

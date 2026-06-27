@@ -1,0 +1,24 @@
+{
+  "name": "Huge Badlands Seed",
+  "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_huge_badlands",
+  "icon": "skyseed:huge_badlands_skyseed",
+  "sortnum": 57,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Huge Badlands Skyseed$() — a vast banded mesa, far bigger than its Large form, its deep body honeycombed with $(item)caves$().$(br2)$(bold)The cost$()$(br)End-game, like all huge seeds: a $(item)Large Badlands Skyseed$() ringed between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in terracotta."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:huge_badlands_skyseed",
+      "text": "The large seed between an ender pearl and blaze powder.",
+      "advancement": "skyseed:gathered_huge_badlands"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)What you get$()$(br)A huge banded mesa to build on and an ore-rich body to mine, with an internal $(item)cave system$() — sometimes sealed (mine in), sometimes opened by a $(o)sinkhole$() or a daylit $(o)gash$().",
+      "advancement": "skyseed:craft_huge_badlands"
+    }
+  ]
+}

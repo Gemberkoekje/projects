@@ -1,0 +1,202 @@
+{
+  "dimensions": [
+    "minecraft:overworld"
+  ],
+  "shape": {
+    "radius": {
+      "min": 24,
+      "max": 30
+    },
+    "rim_noise": 0.4,
+    "underside": "teardrop",
+    "top_dome": {
+      "min": 2,
+      "max": 4
+    },
+    "max_under_depth": 16
+  },
+  "palette": {
+    "surface": "minecraft:snow_block",
+    "fill": "minecraft:snow_block",
+    "core": "minecraft:stone",
+    "fill_depth": 3
+  },
+  "biome_overrides": [],
+  "ores": [
+    {
+      "block": "minecraft:packed_ice",
+      "chance": 0.95,
+      "count": {
+        "min": 8,
+        "max": 16
+      },
+      "vein_size": {
+        "min": 4,
+        "max": 8
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:ice",
+      "chance": 0.7,
+      "count": {
+        "min": 8,
+        "max": 12
+      },
+      "vein_size": {
+        "min": 3,
+        "max": 6
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:powder_snow",
+      "chance": 0.4,
+      "count": {
+        "min": 4,
+        "max": 8
+      },
+      "vein_size": {
+        "min": 2,
+        "max": 4
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:blue_ice",
+      "chance": 0.15,
+      "count": {
+        "min": 4,
+        "max": 8
+      },
+      "vein_size": {
+        "min": 1,
+        "max": 2
+      },
+      "depth": "deep_core"
+    },
+    {
+      "block": "minecraft:iron_ore",
+      "chance": 0.6,
+      "count": {
+        "min": 8,
+        "max": 16
+      },
+      "vein_size": {
+        "min": 2,
+        "max": 4
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:coal_ore",
+      "chance": 0.4,
+      "count": {
+        "min": 8,
+        "max": 12
+      },
+      "vein_size": {
+        "min": 2,
+        "max": 4
+      },
+      "depth": "core"
+    }
+  ],
+  "rare_structures": [
+    {
+      "chance": 0.05,
+      "jigsaw": {
+        "pool": "skyseed:igloo/igloo",
+        "target": "minecraft:bottom",
+        "depth": 1,
+        "pad": 4
+      },
+      "mobs": [
+        {
+          "weight": 1,
+          "entries": [
+            {
+              "entity": "minecraft:zombie_villager",
+              "adults": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "mobs": [
+    {
+      "entity": "minecraft:rabbit",
+      "chance": 0.15,
+      "count": {
+        "min": 1,
+        "max": 2
+      }
+    },
+    {
+      "entity": "minecraft:polar_bear",
+      "chance": 0.2,
+      "count": {
+        "min": 1,
+        "max": 1
+      }
+    }
+  ],
+  "variants": [
+    {
+      "weight": 3,
+      "name": "snowy",
+      "snow": 0.85,
+      "decoration": {
+        "trees": [
+          {
+            "feature": "minecraft:spruce",
+            "tries": 32,
+            "spacing": 2
+          }
+        ]
+      }
+    },
+    {
+      "weight": 2,
+      "name": "glacier",
+      "surface_override": "minecraft:packed_ice",
+      "snow": 0.3,
+      "decoration": {
+        "trees": [
+          {
+            "feature": "skyseed:ice_spike",
+            "tries": 16,
+            "spacing": 3
+          }
+        ]
+      }
+    },
+    {
+      "weight": 1,
+      "name": "deep_freeze",
+      "surface_override": "minecraft:blue_ice",
+      "snow": 0.2,
+      "decoration": {
+        "trees": [
+          {
+            "feature": "skyseed:ice_spike",
+            "tries": 24,
+            "spacing": 3
+          }
+        ]
+      }
+    }
+  ],
+  "caves": {
+    "rooms": {
+      "min": 3,
+      "max": 6
+    },
+    "size": {
+      "min": 3,
+      "max": 5
+    }
+  },
+  "_comment": "Huge Frozen (SKYHUGEPLAN Phase 4): a huge frozen island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 24-30, dome 2-4. Overworld."
+}

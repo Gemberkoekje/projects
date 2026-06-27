@@ -1,0 +1,10 @@
+{
+  "criteria": {
+    "has_0": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [
+        { "items": "skyseed:mushroom_large_skyseed" }, { "items": "minecraft:ender_pearl" }, { "items": "minecraft:blaze_powder" }
+      ] }
+    }
+  }
+}

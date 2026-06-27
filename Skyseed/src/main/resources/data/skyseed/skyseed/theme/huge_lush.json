@@ -1,0 +1,174 @@
+{
+  "dimensions": [
+    "minecraft:overworld"
+  ],
+  "shape": {
+    "radius": {
+      "min": 24,
+      "max": 30
+    },
+    "rim_noise": 0.4,
+    "underside": "teardrop",
+    "top_dome": {
+      "min": 2,
+      "max": 4
+    },
+    "max_under_depth": 20
+  },
+  "palette": {
+    "surface": "minecraft:moss_block",
+    "fill": "minecraft:rooted_dirt",
+    "core": "minecraft:stone",
+    "fill_depth": 3
+  },
+  "ores": [],
+  "pond": {
+    "block": "minecraft:water",
+    "radius": 10,
+    "depth": 3,
+    "water_mobs": [
+      {
+        "entity": "minecraft:axolotl",
+        "chance": 0.5,
+        "count": {
+          "min": 1,
+          "max": 2
+        }
+      }
+    ]
+  },
+  "variants": [
+    {
+      "weight": 3,
+      "name": "garden",
+      "decoration": {
+        "trees": [
+          {
+            "feature": "skyseed:azalea",
+            "tries": 32,
+            "spacing": 3
+          }
+        ],
+        "ground": [
+          {
+            "block": "minecraft:moss_carpet",
+            "chance": 0.45
+          },
+          {
+            "block": "minecraft:big_dripleaf",
+            "chance": 0.05
+          },
+          {
+            "block": "minecraft:small_dripleaf",
+            "chance": 0.07
+          },
+          {
+            "block": "minecraft:torchflower",
+            "chance": 0.02
+          },
+          {
+            "block": "minecraft:pitcher_plant",
+            "chance": 0.015
+          }
+        ],
+        "underside": [
+          {
+            "block": "minecraft:glow_lichen",
+            "chance": 0.12
+          },
+          {
+            "block": "minecraft:hanging_roots",
+            "chance": 0.15
+          },
+          {
+            "block": "minecraft:cave_vines",
+            "chance": 0.1
+          },
+          {
+            "block": "minecraft:spore_blossom",
+            "chance": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "weight": 2,
+      "name": "glow",
+      "decoration": {
+        "trees": [
+          {
+            "feature": "skyseed:azalea",
+            "tries": 16,
+            "spacing": 3
+          }
+        ],
+        "ground": [
+          {
+            "block": "minecraft:moss_carpet",
+            "chance": 0.4
+          },
+          {
+            "block": "minecraft:small_dripleaf",
+            "chance": 0.05
+          }
+        ],
+        "underside": [
+          {
+            "block": "minecraft:glow_lichen",
+            "chance": 0.22
+          },
+          {
+            "block": "minecraft:cave_vines",
+            "chance": 0.3
+          },
+          {
+            "block": "minecraft:hanging_roots",
+            "chance": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "weight": 1,
+      "name": "ancient_garden",
+      "decoration": {
+        "ground": [
+          {
+            "block": "minecraft:moss_carpet",
+            "chance": 0.5
+          },
+          {
+            "block": "minecraft:small_dripleaf",
+            "chance": 0.04
+          }
+        ],
+        "underside": [
+          {
+            "block": "minecraft:glow_lichen",
+            "chance": 0.12
+          },
+          {
+            "block": "minecraft:spore_blossom",
+            "chance": 0.12
+          },
+          {
+            "block": "minecraft:hanging_roots",
+            "chance": 0.1
+          }
+        ]
+      }
+    }
+  ],
+  "biome_overrides": [],
+  "caves": {
+    "rooms": {
+      "min": 5,
+      "max": 9
+    },
+    "size": {
+      "min": 4,
+      "max": 6
+    }
+  },
+  "_comment": "Huge Lush (SKYHUGEPLAN Phase 4): a huge lush island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 24-30, dome 2-4. Overworld."
+}

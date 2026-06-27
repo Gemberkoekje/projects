@@ -1,5 +1,4 @@
 {
-  "_comment": "Huge Ancient (SKYHUGEPLAN — debug-only for now; Phase-4 rollout promotes it): a vast moss/tuff/deepslate slab, radius ~24-30 with max_under_depth 22 (a deep body — the premier Phase-2 cave host). Scaled deepslate ores incl. diamond/emerald; dripstone/glow-lichen underside. Overworld.",
   "dimensions": [
     "minecraft:overworld"
   ],
@@ -8,7 +7,7 @@
       "min": 24,
       "max": 30
     },
-    "rim_noise": 0.35,
+    "rim_noise": 0.4,
     "underside": "teardrop",
     "top_dome": {
       "min": 2,
@@ -31,10 +30,10 @@
   "ores": [
     {
       "block": "minecraft:deepslate_iron_ore",
-      "chance": 1,
+      "chance": 0.8,
       "count": {
-        "min": 8,
-        "max": 14
+        "min": 12,
+        "max": 20
       },
       "vein_size": {
         "min": 4,
@@ -44,10 +43,10 @@
     },
     {
       "block": "minecraft:deepslate_coal_ore",
-      "chance": 1,
+      "chance": 0.5,
       "count": {
-        "min": 6,
-        "max": 12
+        "min": 8,
+        "max": 16
       },
       "vein_size": {
         "min": 4,
@@ -57,10 +56,10 @@
     },
     {
       "block": "minecraft:deepslate_copper_ore",
-      "chance": 1,
+      "chance": 0.8,
       "count": {
-        "min": 6,
-        "max": 12
+        "min": 8,
+        "max": 20
       },
       "vein_size": {
         "min": 4,
@@ -70,10 +69,10 @@
     },
     {
       "block": "minecraft:deepslate_redstone_ore",
-      "chance": 0.9,
+      "chance": 0.55,
       "count": {
-        "min": 4,
-        "max": 8
+        "min": 8,
+        "max": 16
       },
       "vein_size": {
         "min": 2,
@@ -83,10 +82,10 @@
     },
     {
       "block": "minecraft:deepslate_gold_ore",
-      "chance": 0.7,
+      "chance": 0.3,
       "count": {
-        "min": 3,
-        "max": 6
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 1,
@@ -96,10 +95,10 @@
     },
     {
       "block": "minecraft:deepslate_lapis_ore",
-      "chance": 0.7,
+      "chance": 0.35,
       "count": {
-        "min": 3,
-        "max": 6
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 1,
@@ -109,10 +108,10 @@
     },
     {
       "block": "minecraft:deepslate_diamond_ore",
-      "chance": 0.5,
+      "chance": 0.14,
       "count": {
-        "min": 2,
-        "max": 4
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 1,
@@ -122,10 +121,10 @@
     },
     {
       "block": "minecraft:deepslate_emerald_ore",
-      "chance": 0.25,
+      "chance": 0.06,
       "count": {
-        "min": 1,
-        "max": 2
+        "min": 4,
+        "max": 4
       },
       "vein_size": {
         "min": 1,
@@ -135,7 +134,20 @@
     },
     {
       "block": "minecraft:dripstone_block",
-      "chance": 0.8,
+      "chance": 0.5,
+      "count": {
+        "min": 8,
+        "max": 12
+      },
+      "vein_size": {
+        "min": 3,
+        "max": 6
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:calcite",
+      "chance": 0.4,
       "count": {
         "min": 4,
         "max": 8
@@ -148,27 +160,52 @@
     },
     {
       "block": "minecraft:amethyst_block",
-      "chance": 0.6,
+      "chance": 0.3,
       "count": {
-        "min": 2,
-        "max": 5
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 2,
         "max": 5
       },
       "depth": "core"
+    },
+    {
+      "block": "minecraft:budding_amethyst",
+      "chance": 0.15,
+      "count": {
+        "min": 4,
+        "max": 8
+      },
+      "vein_size": {
+        "min": 1,
+        "max": 3
+      },
+      "depth": "core"
+    }
+  ],
+  "rare_structures": [
+    {
+      "chance": 0.05,
+      "jigsaw": {
+        "pool": "skyseed:vault_cell/cell",
+        "target": "minecraft:bottom",
+        "depth": 1,
+        "pad": 5,
+        "sink": 5
+      }
     }
   ],
   "variants": [
     {
-      "weight": 1,
-      "name": "deep",
+      "weight": 3,
+      "name": "deep_cave",
       "decoration": {
         "ground": [
           {
             "block": "minecraft:moss_carpet",
-            "chance": 0.1
+            "chance": 0.4
           }
         ],
         "underside": [
@@ -183,11 +220,335 @@
           {
             "block": "minecraft:cave_vines",
             "chance": 0.05
+          },
+          {
+            "block": "minecraft:hanging_roots",
+            "chance": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "weight": 2,
+      "name": "geode",
+      "surface_override": "minecraft:calcite",
+      "decoration": {
+        "underside": [
+          {
+            "block": "minecraft:pointed_dripstone",
+            "chance": 0.08
+          }
+        ]
+      }
+    },
+    {
+      "weight": 1,
+      "name": "deep_dark",
+      "surface_override": "minecraft:sculk",
+      "decoration": {
+        "ground": [
+          {
+            "block": "minecraft:sculk_catalyst",
+            "chance": 0.04
+          },
+          {
+            "block": "minecraft:sculk_sensor",
+            "chance": 0.03
+          },
+          {
+            "block": "minecraft:sculk_shrieker",
+            "chance": 0.01
           }
         ]
       }
     }
   ],
+  "biome_overrides": [
+    {
+      "max_y": 20,
+      "ores": [
+        {
+          "block": "minecraft:deepslate_diamond_ore",
+          "chance": 0.3,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:deepslate_emerald_ore",
+          "chance": 0.12,
+          "count": {
+            "min": 1,
+            "max": 1
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 1
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:deepslate_redstone_ore",
+          "chance": 0.8,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 4
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_lapis_ore",
+          "chance": 0.55,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_gold_ore",
+          "chance": 0.45,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:deepslate_iron_ore",
+          "chance": 0.55,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_coal_ore",
+          "chance": 0.25,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 4
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:dripstone_block",
+          "chance": 0.5,
+          "count": {
+            "min": 2,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:calcite",
+          "chance": 0.4,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:amethyst_block",
+          "chance": 0.35,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 5
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:budding_amethyst",
+          "chance": 0.2,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "core"
+        }
+      ]
+    },
+    {
+      "min_y": 96,
+      "ores": [
+        {
+          "block": "minecraft:deepslate_coal_ore",
+          "chance": 0.85,
+          "count": {
+            "min": 3,
+            "max": 6
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_iron_ore",
+          "chance": 0.8,
+          "count": {
+            "min": 3,
+            "max": 5
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_copper_ore",
+          "chance": 0.5,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_gold_ore",
+          "chance": 0.15,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 2
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_diamond_ore",
+          "chance": 0.06,
+          "count": {
+            "min": 1,
+            "max": 1
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 1
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:dripstone_block",
+          "chance": 0.5,
+          "count": {
+            "min": 2,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:calcite",
+          "chance": 0.4,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:amethyst_block",
+          "chance": 0.25,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 5
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:budding_amethyst",
+          "chance": 0.1,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "core"
+        }
+      ]
+    }
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": {
+      "min": 4,
+      "max": 8
+    },
+    "lakes": [
+      {
+        "chance": 0.2,
+        "radius": 5,
+        "depth": 2
+      }
+    ]
+  },
   "caves": {
     "rooms": {
       "min": 5,
@@ -197,5 +558,6 @@
       "min": 4,
       "max": 6
     }
-  }
+  },
+  "_comment": "Huge Ancient (SKYHUGEPLAN Phase 4): a huge ancient island scaled from the base theme — biome adaptation (2 forms) + internal caves. radius 24-30, dome 2-4. Overworld."
 }

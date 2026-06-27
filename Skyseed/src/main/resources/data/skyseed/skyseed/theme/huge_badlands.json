@@ -1,0 +1,143 @@
+{
+  "dimensions": [
+    "minecraft:overworld"
+  ],
+  "shape": {
+    "radius": {
+      "min": 26,
+      "max": 32
+    },
+    "rim_noise": 0.42,
+    "underside": "teardrop",
+    "top_dome": {
+      "min": 5,
+      "max": 12
+    },
+    "max_under_depth": 18
+  },
+  "palette": {
+    "surface": "minecraft:red_sand",
+    "fill": "minecraft:orange_terracotta",
+    "core": "minecraft:terracotta",
+    "fill_depth": 3,
+    "fill_bands": [
+      "minecraft:orange_terracotta",
+      "minecraft:terracotta",
+      "minecraft:yellow_terracotta",
+      "minecraft:white_terracotta",
+      "minecraft:light_gray_terracotta",
+      "minecraft:red_terracotta",
+      "minecraft:brown_terracotta"
+    ],
+    "band_thickness": 1
+  },
+  "ores": [
+    {
+      "block": "minecraft:gold_ore",
+      "chance": 0.9,
+      "count": {
+        "min": 12,
+        "max": 20
+      },
+      "vein_size": {
+        "min": 2,
+        "max": 4
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:redstone_ore",
+      "chance": 0.25,
+      "count": {
+        "min": 4,
+        "max": 12
+      },
+      "vein_size": {
+        "min": 2,
+        "max": 4
+      },
+      "depth": "core"
+    }
+  ],
+  "mobs": [
+    {
+      "entity": "minecraft:armadillo",
+      "chance": 0.12,
+      "count": {
+        "min": 1,
+        "max": 2
+      }
+    }
+  ],
+  "variants": [
+    {
+      "weight": 3,
+      "name": "mesa",
+      "decoration": {
+        "ground": [
+          {
+            "block": "minecraft:dead_bush",
+            "chance": 0.08
+          },
+          {
+            "block": "minecraft:cactus",
+            "chance": 0.02
+          }
+        ]
+      }
+    },
+    {
+      "weight": 2,
+      "name": "eroded",
+      "surface_override": "minecraft:terracotta",
+      "decoration": {
+        "ground": [
+          {
+            "block": "minecraft:dead_bush",
+            "chance": 0.1
+          },
+          {
+            "block": "minecraft:cactus",
+            "chance": 0.03
+          }
+        ]
+      }
+    },
+    {
+      "weight": 1,
+      "name": "wooded",
+      "surface_override": "minecraft:grass_block",
+      "decoration": {
+        "trees": [
+          {
+            "feature": "minecraft:dark_oak",
+            "tries": 32,
+            "spacing": 3
+          }
+        ],
+        "ground": [
+          {
+            "block": "minecraft:short_grass",
+            "chance": 0.12
+          },
+          {
+            "block": "minecraft:dead_bush",
+            "chance": 0.04
+          }
+        ]
+      }
+    }
+  ],
+  "biome_overrides": [],
+  "caves": {
+    "rooms": {
+      "min": 4,
+      "max": 7
+    },
+    "size": {
+      "min": 3,
+      "max": 5
+    }
+  },
+  "_comment": "Huge Badlands (SKYHUGEPLAN Phase 4): a huge badlands island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 26-32, dome 5-12. Overworld."
+}

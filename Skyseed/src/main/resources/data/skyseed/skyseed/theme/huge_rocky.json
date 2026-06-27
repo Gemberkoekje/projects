@@ -1,5 +1,4 @@
 {
-  "_comment": "Huge Rocky (SKYHUGEPLAN — debug-only for now; promote to a real seed in the Phase-4 rollout): a towering stone mountain (big top_dome), radius ~24-30, max_under_depth capping the underside. Scaled rocky ores; goats. Overworld.",
   "dimensions": [
     "minecraft:overworld"
   ],
@@ -25,10 +24,10 @@
   "ores": [
     {
       "block": "minecraft:iron_ore",
-      "chance": 1,
+      "chance": 0.9,
       "count": {
         "min": 8,
-        "max": 14
+        "max": 12
       },
       "vein_size": {
         "min": 4,
@@ -38,10 +37,10 @@
     },
     {
       "block": "minecraft:copper_ore",
-      "chance": 1,
+      "chance": 0.9,
       "count": {
         "min": 8,
-        "max": 14
+        "max": 12
       },
       "vein_size": {
         "min": 4,
@@ -51,9 +50,9 @@
     },
     {
       "block": "minecraft:coal_ore",
-      "chance": 1,
+      "chance": 0.7,
       "count": {
-        "min": 6,
+        "min": 8,
         "max": 12
       },
       "vein_size": {
@@ -64,10 +63,10 @@
     },
     {
       "block": "minecraft:gold_ore",
-      "chance": 0.8,
+      "chance": 0.3,
       "count": {
-        "min": 3,
-        "max": 6
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 2,
@@ -77,10 +76,10 @@
     },
     {
       "block": "minecraft:lapis_ore",
-      "chance": 0.8,
+      "chance": 0.35,
       "count": {
-        "min": 3,
-        "max": 6
+        "min": 4,
+        "max": 12
       },
       "vein_size": {
         "min": 2,
@@ -90,42 +89,346 @@
     },
     {
       "block": "minecraft:redstone_ore",
-      "chance": 0.8,
+      "chance": 0.2,
       "count": {
-        "min": 3,
-        "max": 6
+        "min": 4,
+        "max": 8
       },
       "vein_size": {
         "min": 2,
         "max": 4
       },
       "depth": "deep_core"
-    },
-    {
-      "block": "minecraft:emerald_ore",
-      "chance": 0.4,
-      "count": {
-        "min": 1,
-        "max": 3
-      },
-      "vein_size": {
-        "min": 1,
-        "max": 1
-      },
-      "depth": "deep_core"
-    }
-  ],
-  "mobs": [
-    {
-      "entity": "minecraft:goat",
-      "chance": 0.3,
-      "count": {
-        "min": 1,
-        "max": 3
-      }
     }
   ],
   "variants": [],
+  "biome_overrides": [
+    {
+      "biomes": [
+        "minecraft:snowy_plains",
+        "minecraft:snowy_taiga",
+        "minecraft:ice_spikes",
+        "minecraft:snowy_slopes",
+        "minecraft:frozen_peaks",
+        "minecraft:jagged_peaks",
+        "minecraft:grove",
+        "minecraft:snowy_beach",
+        "minecraft:frozen_river",
+        "minecraft:frozen_ocean",
+        "minecraft:deep_frozen_ocean"
+      ],
+      "shape": {
+        "radius": {
+          "min": 15,
+          "max": 24
+        },
+        "rim_noise": 0.3,
+        "top_dome": {
+          "min": 4,
+          "max": 7
+        }
+      },
+      "surface": "minecraft:snow_block",
+      "fill": "minecraft:stone",
+      "core": "minecraft:stone",
+      "surface_scatter": [
+        {
+          "block": "minecraft:stone",
+          "chance": 0.25
+        }
+      ],
+      "variants": [],
+      "ores": [
+        {
+          "block": "minecraft:coal_ore",
+          "chance": 0.9,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:iron_ore",
+          "chance": 0.7,
+          "count": {
+            "min": 2,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:emerald_ore",
+          "chance": 0.1,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 1
+          },
+          "depth": "core"
+        }
+      ]
+    },
+    {
+      "min_y": 130,
+      "shape": {
+        "radius": {
+          "min": 15,
+          "max": 24
+        },
+        "rim_noise": 0.3,
+        "top_dome": {
+          "min": 4,
+          "max": 7
+        }
+      },
+      "surface": "minecraft:snow_block",
+      "fill": "minecraft:stone",
+      "core": "minecraft:stone",
+      "surface_scatter": [
+        {
+          "block": "minecraft:stone",
+          "chance": 0.25
+        }
+      ],
+      "variants": [],
+      "ores": [
+        {
+          "block": "minecraft:coal_ore",
+          "chance": 0.9,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:iron_ore",
+          "chance": 0.7,
+          "count": {
+            "min": 2,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:emerald_ore",
+          "chance": 0.1,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 1
+          },
+          "depth": "core"
+        }
+      ]
+    },
+    {
+      "max_y": 8,
+      "surface": "minecraft:deepslate",
+      "fill": "minecraft:cobbled_deepslate",
+      "core": "minecraft:deepslate",
+      "ores": [
+        {
+          "block": "minecraft:deepslate_diamond_ore",
+          "chance": 0.7,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 3
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:deepslate_redstone_ore",
+          "chance": 0.9,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 5
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_lapis_ore",
+          "chance": 0.6,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 4
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_gold_ore",
+          "chance": 0.55,
+          "count": {
+            "min": 1,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 2,
+            "max": 4
+          },
+          "depth": "deep_core"
+        },
+        {
+          "block": "minecraft:deepslate_iron_ore",
+          "chance": 0.75,
+          "count": {
+            "min": 2,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_coal_ore",
+          "chance": 0.25,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 5
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:deepslate_copper_ore",
+          "chance": 0.3,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 5
+          },
+          "depth": "core"
+        }
+      ]
+    },
+    {
+      "min_y": 70,
+      "ores": [
+        {
+          "block": "minecraft:coal_ore",
+          "chance": 0.95,
+          "count": {
+            "min": 3,
+            "max": 4
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:iron_ore",
+          "chance": 0.8,
+          "count": {
+            "min": 2,
+            "max": 3
+          },
+          "vein_size": {
+            "min": 4,
+            "max": 8
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:copper_ore",
+          "chance": 0.4,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 3,
+            "max": 6
+          },
+          "depth": "core"
+        },
+        {
+          "block": "minecraft:emerald_ore",
+          "chance": 0.08,
+          "count": {
+            "min": 1,
+            "max": 2
+          },
+          "vein_size": {
+            "min": 1,
+            "max": 1
+          },
+          "depth": "core"
+        }
+      ]
+    }
+  ],
+  "lava": {
+    "vein_chance": 0.05,
+    "vein_size": {
+      "min": 4,
+      "max": 8
+    },
+    "lakes": [
+      {
+        "max_y": -1,
+        "chance": 0.2,
+        "radius": 5,
+        "depth": 2
+      },
+      {
+        "max_y": 40,
+        "chance": 0.05,
+        "radius": 4,
+        "depth": 2
+      },
+      {
+        "max_y": 69,
+        "chance": 0.01,
+        "radius": 4,
+        "depth": 2
+      }
+    ]
+  },
   "caves": {
     "rooms": {
       "min": 5,
@@ -135,5 +438,6 @@
       "min": 4,
       "max": 6
     }
-  }
+  },
+  "_comment": "Huge Rocky (SKYHUGEPLAN Phase 4): a huge rocky island scaled from the base theme — biome adaptation (4 forms) + internal caves. radius 24-30, dome 12-20. Overworld."
 }

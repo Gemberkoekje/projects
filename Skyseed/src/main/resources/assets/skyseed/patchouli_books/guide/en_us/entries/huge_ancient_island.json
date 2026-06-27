@@ -1,0 +1,24 @@
+{
+  "name": "Huge Ancient Seed",
+  "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_huge_ancient",
+  "icon": "skyseed:huge_ancient_skyseed",
+  "sortnum": 58,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Huge Ancient Skyseed$() — a vast deepslate slab, far bigger than its Large form, its deep body honeycombed with $(item)caves$().$(br2)$(bold)The cost$()$(br)End-game, like all huge seeds: a $(item)Large Ancient Skyseed$() ringed between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in deepslate."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:huge_ancient_skyseed",
+      "text": "The large seed between an ender pearl and blaze powder.",
+      "advancement": "skyseed:gathered_huge_ancient"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)What you get$()$(br)A huge deepslate slab to build on and an ore-rich body to mine, with an internal $(item)cave system$() — sometimes sealed (mine in), sometimes opened by a $(o)sinkhole$() or a daylit $(o)gash$().",
+      "advancement": "skyseed:craft_huge_ancient"
+    }
+  ]
+}

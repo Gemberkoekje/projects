@@ -30,7 +30,8 @@ public final class ModItems {
             "mushroom", "mushroom_large", "frozen", "frozen_large", "meadow", "meadow_large",
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
             "aquatic", "aquatic_large",
-            "huge_forest", "huge_aquatic",
+            "huge_forest", "huge_aquatic", "huge_rocky", "huge_desert", "huge_mushroom", "huge_frozen",
+            "huge_meadow", "huge_badlands", "huge_ancient", "huge_lush",
             "ladder_small", "ladder_large",
             "nether_rocky", "nether_rocky_large", "nether_lava", "nether_lava_large", "nether_forest", "nether_forest_large",
             "nether_soul", "nether_soul_large", "nether_basalt", "nether_basalt_large", "nether_fortress", "bastion",
@@ -95,7 +96,12 @@ public final class ModItems {
             new BiomeDebugSeed("debug_huge_aquatic_swamp", "huge_aquatic", "minecraft:swamp"),
             new BiomeDebugSeed("debug_huge_rocky", "huge_rocky", "minecraft:windswept_hills"),
             new BiomeDebugSeed("debug_huge_desert", "huge_desert", "minecraft:desert"),
-            new BiomeDebugSeed("debug_huge_ancient", "huge_ancient", "minecraft:plains"));
+            new BiomeDebugSeed("debug_huge_ancient", "huge_ancient", "minecraft:plains"),
+            new BiomeDebugSeed("debug_huge_mushroom", "huge_mushroom", "minecraft:mushroom_fields"),
+            new BiomeDebugSeed("debug_huge_frozen", "huge_frozen", "minecraft:snowy_plains"),
+            new BiomeDebugSeed("debug_huge_meadow", "huge_meadow", "minecraft:meadow"),
+            new BiomeDebugSeed("debug_huge_badlands", "huge_badlands", "minecraft:badlands"),
+            new BiomeDebugSeed("debug_huge_lush", "huge_lush", "minecraft:jungle"));
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();
