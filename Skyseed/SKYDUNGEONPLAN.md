@@ -8,6 +8,11 @@ are rolled as rare structures at **2.5 %** each (so huge_rocky has a 5 % chance 
 | **Sprawling Dungeon** (`dungeon_complex/`) | 2.5 % | a multi-room cobble/mossy dungeon complex sunk into the mountain |
 | **Abandoned Mineshaft** (`mineshaft/`) | 2.5 % | a sprawling oak (or dark-oak mesa) mineshaft, with over-void wooden supports |
 
+**Plus a dedicated, craftable Large Dungeon seed** (`dungeon_large`, Part D) — the sprawling dungeon as a *whole island*
+in its own right, reusing the `dungeon_complex/` tileset as the island's main jigsaw. There is deliberately **no
+dedicated mineshaft seed**: a dedicated big dungeon is the more interesting payoff; the mineshaft stays a huge_rocky
+surprise only.
+
 ## ★ Reference the vanilla jigsaw pieces (do this for EVERY piece)
 
 **Before authoring any piece, look at how the vanilla equivalent actually looks and is built, and mirror its block
@@ -36,6 +41,8 @@ Where useful, inspect the real block names against the bundled client jar
    2.5 %**. (Each auto-gets a debug seed from `ThemeScanner`, so no manual debug wiring.)
 3. **Authenticity** — yes to all: **chest-minecart entities** + **rails**, and the **dark-oak mesa variant** of the
    mineshaft. More variety is better.
+4. **Dedicated Large Dungeon seed** (`dungeon_large`, Part D) — yes; a dedicated big dungeon is more interesting than a
+   dedicated big mineshaft, so the dungeon gets a craftable island seed and the mineshaft does not.
 
 ## Infrastructure we reuse (already in the codebase)
 - **Jigsaw sprawl**: a `jigsaw` config carries `pool`, `depth`, `pad`, `sink`, `reach`, `cap_count`/`cap_min`,
@@ -99,9 +106,28 @@ Corridors that sprawl off the island edge hang over the void. Add a **wood varia
   `placeStructures`, `trestles ? supportTrestles : supportFloatingFloors`. Connective rail/bridge gaps can also reuse
   the existing `resolve()` self-railing bridge.
 
+## Part D — Dedicated Large Dungeon seed (`dungeon_large`)
+A **craftable** seed that germinates the sprawling dungeon as a *whole island* — the `dungeon_complex/` tileset (Part A)
+reused as the island's **main** jigsaw (not a rare). A bigger rocky island (stone/cobble palette, cobble/mossy surface
+scatter, radius ≈ 14–18 like the Trial Chamber island) with the dungeon complex sunk into it; the entrance stair is the
+surface tell.
+
+- **Recipe** = *the normal dungeon seed + the "huge bits" + construction materials*: `CCC / EDP / CCC` — 6× **cobblestone**
+  (C, the construction material) around the centre **`dungeon_skyseed`** (D), ringed between an **`ender_pearl`** (E) and
+  **`blaze_powder`** (P). The ender pearl + blaze powder gate it to end-game exactly like the huge seeds.
+- **Theme** `dungeon_large.json`: a rocky island whose `jigsaw` is `{ pool: skyseed:dungeon_complex/start, target:
+  minecraft:bottom, depth ~5, pad ~10, sink ~8, cap_count ~10, cap_min ~6, centerpiece: …treasure_vault }` — the same
+  complex as the huge_rocky rare, just as the island's own structure.
+- **Full seed onboarding** (the 12-touch-point craftable-seed checklist): `SEED_THEMES += "dungeon_large"`, the recipe,
+  the `#skyseeds` tag entry, a `craft_dungeon_large` advancement, lang, an item model + a PowerShell icon (a cobble/mossy
+  dungeon mouth), a Patchouli island entry + a `recipes.json` crafting page. It's craftable, so it needs no debug seed
+  (test it from the creative tab).
+
 ## Phases (each its own commit)
-1. **Sprawling Dungeon** — `DungeonComplexTemplates` + `dungeon_complex/` pool, wire as huge_rocky rare @ 2.5%
-   (replacing `dungeon/lair`); gametest (assembles, has spawners/chests/varied rooms). 2-build dance.
+1. **Sprawling Dungeon (rare + dedicated seed)** — `DungeonComplexTemplates` + `dungeon_complex/` pool; wire as the
+   huge_rocky rare @ 2.5% (replacing `dungeon/lair`) **and** as the dedicated **`dungeon_large`** seed (new theme +
+   `CCC/EDP/CCC` recipe + full onboarding, Part D). Gametests (assembles with spawners/chests/varied rooms; the seed
+   crafts from the dungeon seed + ender pearl + blaze powder). 2-build dance.
 2. **Mineshaft (oak)** — `MineshaftTemplates` + `mineshaft/` pool (corridor/cross/stairs/room/start/dead_end, with the
    arches/rails/cobwebs/spawner/chest), wire as huge_rocky 2nd rare @ 2.5%. **+ extend `StructureWriter` for entities**
    (chest minecarts). Gametest.
