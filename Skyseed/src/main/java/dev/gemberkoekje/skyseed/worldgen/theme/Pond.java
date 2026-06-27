@@ -17,10 +17,12 @@ import java.util.List;
  * {@code style} is {@code "pond"} (an irregular blob carved into the centre, default) or
  * {@code "river"} (a meandering channel cut across the island); for a river, {@code radius} is the
  * channel's half-width. Either way the carve is clipped to where the island body can hold it, so it
- * never leaves a floating slab of water at the rim.
+ * never leaves a floating slab of water at the rim. {@code extent} caps the pond's radius as a fraction
+ * of the island radius (default 0.5 — well inside the rim); a higher value (e.g. 0.72) makes a near
+ * island-filling lake/ocean with only a thin land rim, for huge water islands.
  */
 public record Pond(ResourceLocation block, int radius, int depth, List<GroundEntry> plants,
-                   List<GroundEntry> bank, List<MobEntry> waterMobs, String style) {
+                   List<GroundEntry> bank, List<MobEntry> waterMobs, String style, float extent) {
     public static final Codec<Pond> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.optionalFieldOf("block", Ids.mc("water")).forGetter(Pond::block),
             Codec.INT.optionalFieldOf("radius", 3).forGetter(Pond::radius),
@@ -28,7 +30,8 @@ public record Pond(ResourceLocation block, int radius, int depth, List<GroundEnt
             GroundEntry.CODEC.listOf().optionalFieldOf("plants", List.of()).forGetter(Pond::plants),
             GroundEntry.CODEC.listOf().optionalFieldOf("bank", List.of()).forGetter(Pond::bank),
             MobEntry.CODEC.listOf().optionalFieldOf("water_mobs", List.of()).forGetter(Pond::waterMobs),
-            Codec.STRING.optionalFieldOf("style", "pond").forGetter(Pond::style)
+            Codec.STRING.optionalFieldOf("style", "pond").forGetter(Pond::style),
+            Codec.FLOAT.optionalFieldOf("extent", 0.5f).forGetter(Pond::extent)
     ).apply(i, Pond::new));
 
     public boolean isRiver() {

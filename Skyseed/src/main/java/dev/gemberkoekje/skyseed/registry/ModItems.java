@@ -79,7 +79,14 @@ public final class ModItems {
             new BiomeDebugSeed("debug_aquatic_ocean", "aquatic", "minecraft:ocean"),
             new BiomeDebugSeed("debug_aquatic_swamp", "aquatic", "minecraft:mangrove_swamp"),
             new BiomeDebugSeed("debug_frozen_ice_spikes", "frozen_large", "minecraft:ice_spikes"),
-            new BiomeDebugSeed("debug_ladder_desert", "ladder_small", "minecraft:desert"));
+            new BiomeDebugSeed("debug_ladder_desert", "ladder_small", "minecraft:desert"),
+            // Huge tier (SKYHUGEPLAN) — spawn the huge islands free for testing, across biomes. huge_rocky/desert/ancient
+            // are debug-only themes (no real seed yet; the Phase-4 rollout promotes them).
+            new BiomeDebugSeed("debug_huge_forest", "huge_forest", "minecraft:plains"),
+            new BiomeDebugSeed("debug_huge_aquatic", "huge_aquatic", "minecraft:plains"),
+            new BiomeDebugSeed("debug_huge_rocky", "huge_rocky", "minecraft:windswept_hills"),
+            new BiomeDebugSeed("debug_huge_desert", "huge_desert", "minecraft:desert"),
+            new BiomeDebugSeed("debug_huge_ancient", "huge_ancient", "minecraft:plains"));
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();

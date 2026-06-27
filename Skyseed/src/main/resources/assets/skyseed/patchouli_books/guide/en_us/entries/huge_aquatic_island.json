@@ -7,7 +7,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "The $(item)Huge Aquatic Skyseed$() — not one island but a whole $(o)archipelago$(): five isles ringed around a central $(item)lagoon$(), clay- and gravel-rich.$(br2)$(bold)The cost$()$(br)End-game, like all huge seeds — a $(item)Large Aquatic Skyseed$() ringed between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in sand."
+      "text": "The $(item)Huge Aquatic Skyseed$() — a great island that is mostly a $(o)lake$(): a broad central body of water rimmed with grassy shore, clay- and gravel-rich.$(br2)$(bold)The cost$()$(br)End-game, like all huge seeds — a $(item)Large Aquatic Skyseed$() ringed between an $(item)Ender Pearl$() and $(item)Blaze Powder$(), packed in sand."
     },
     {
       "type": "patchouli:crafting",
@@ -17,7 +17,7 @@
     },
     {
       "type": "patchouli:text",
-      "text": "$(bold)What you get$()$(br)A cluster of islands to bridge between, the centre one a $(item)lagoon$() with kelp and squid. Pack spare seeds and plenty of blocks for the crossings. $(br2)Water on every isle, cave systems and rare wrecks come in a later update.",
+      "text": "$(bold)What you get$()$(br)A wide lake with kelp, fish and squid, ringed by shore you can build on — and, about one throw in twenty, a grand $(item)Ocean Monument$() rises from it (guardians, gold, sponge). $(br2)Rivers running off the lake, cave systems and more come in a later update.",
       "advancement": "skyseed:craft_huge_aquatic"
     }
   ]

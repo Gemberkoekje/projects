@@ -1,30 +1,41 @@
 {
-  "_comment": "Huge Aquatic (SKYHUGEPLAN Phase 1 — cluster): an archipelago of five green isles via cluster_offsets (the Village-Center mechanism). The centre isle ([0,0,0], where the centre-based pond carves) is a lagoon; the four outer isles are dry for now — per-isle ponds are a Phase-2 carving item. Clay + gravel. RARE (5%): a bigger Ocean Monument grows on the centre isle (suppressing the lagoon). Overworld.",
+  "_comment": "Huge Aquatic (SKYHUGEPLAN Phase 1 — reworked from the cluster, which read as boring separate islands): a single big island that is mostly a large central LAKE/ocean — a high pond extent (0.72) fills most of the island, leaving a ring of grassy land. radius ~28-32. RARE (5%): a bigger Ocean Monument grows in the centre (lake suppressed). Clay + gravel. Overworld. (Rivers radiating off the lake to the rim are a planned follow-up carve.)",
   "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 15, "max": 17 }, "rim_noise": 0.30, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 }, "max_under_depth": 14,
-    "cluster_offsets": [ [0, 0, 0], [40, 0, 24], [-40, 0, 24], [40, 0, -24], [-40, 0, -24] ] },
+  "shape": { "radius": { "min": 28, "max": 32 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 }, "max_under_depth": 16 },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [
-    { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 16, "max": 24 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
-    { "block": "minecraft:gravel", "chance": 1.0, "count": { "min": 6, "max": 12 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
+    { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 24, "max": 36 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
+    { "block": "minecraft:gravel", "chance": 1.0, "count": { "min": 10, "max": 18 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" }
   ],
   "rare_structures": [
-    { "_comment": "5% — a bigger (19x19) Ocean Monument on the centre isle, lagoon suppressed; an elder guardian + pack.",
+    { "_comment": "5% — a bigger (19x19) Ocean Monument in the centre, lake suppressed; an elder guardian + pack.",
       "chance": 0.05, "suppress_pond": true,
       "jigsaw": { "pool": "skyseed:ocean_monument/grand", "target": "minecraft:bottom", "depth": 1, "pad": 10, "sink": 0 },
       "mobs": [ { "weight": 1, "entries": [ { "entity": "minecraft:elder_guardian", "adults": 1 }, { "entity": "minecraft:guardian", "adults": 6 } ] } ] }
   ],
-  "pond": { "block": "minecraft:water", "radius": 8, "depth": 4,
-    "plants": [ { "block": "minecraft:lily_pad", "chance": 0.12 }, { "block": "minecraft:kelp", "chance": 0.15 }, { "block": "minecraft:seagrass", "chance": 0.18 }, { "block": "minecraft:tall_seagrass", "chance": 0.06 } ],
-    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.6 } ],
-    "water_mobs": [ { "entity": "minecraft:squid", "chance": 0.4, "count": { "min": 2, "max": 4 } } ] },
+  "pond": {
+    "block": "minecraft:water", "radius": 24, "extent": 0.72, "depth": 5,
+    "plants": [
+      { "block": "minecraft:lily_pad", "chance": 0.08 },
+      { "block": "minecraft:kelp", "chance": 0.16 },
+      { "block": "minecraft:seagrass", "chance": 0.18 },
+      { "block": "minecraft:tall_seagrass", "chance": 0.06 }
+    ],
+    "bank": [ { "block": "minecraft:sugar_cane", "chance": 0.5 } ],
+    "water_mobs": [
+      { "entity": "minecraft:squid", "chance": 0.5, "count": { "min": 2, "max": 4 } },
+      { "entity": "minecraft:cod", "chance": 0.4, "count": { "min": 2, "max": 4 } },
+      { "entity": "minecraft:salmon", "chance": 0.3, "count": { "min": 1, "max": 3 } }
+    ]
+  },
   "mobs": [
     { "entity": "minecraft:cow", "chance": 0.3, "count": { "min": 1, "max": 2 } },
+    { "entity": "minecraft:sheep", "chance": 0.3, "count": { "min": 1, "max": 2 } },
     { "entity": "minecraft:chicken", "chance": 0.3, "count": { "min": 1, "max": 2 } }
   ],
   "variants": [
     { "weight": 1, "name": "freshwater", "decoration": {
-      "trees": [ { "feature": "minecraft:oak", "tries": 6, "spacing": 4 } ],
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.20 }, { "block": "minecraft:dandelion", "chance": 0.03 } ] } }
+      "trees": [ { "feature": "minecraft:oak", "tries": 8, "spacing": 4 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.22 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:poppy", "chance": 0.03 } ] } }
   ]
 }

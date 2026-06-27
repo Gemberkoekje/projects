@@ -27,7 +27,7 @@ Two shapes, chosen per seed (both already supported by `Shape`):
 
 | Huge seed | Shape | Why |
 |---|---|---|
-| `huge_aquatic` | **cluster** (4–5 isles) | an ocean archipelago — the natural cluster case, ponds/reefs per isle |
+| `huge_aquatic` | **single (big lake)** | a single big island that's *mostly* a central lake/ocean (`Pond.extent` 0.72 fills it). The cluster route read as boring separate islands — and ponds are centre-only + half-radius-capped, so a cluster can't hold a real lake. Cluster stays viable for *non-water* seeds (mushroom) |
 | `huge_mushroom` | **cluster** (3 isles) | a scatter of mycelium isles + giant mushrooms reads better than one slab |
 | `huge_forest` | single | a sprawling forest landmass |
 | `huge_rocky` | single (tall `top_dome`) | a true mountain — caves shine here |
@@ -127,14 +127,18 @@ the cave work, newest/most-thematic first.
 
 ## 4. Phases (build order)
 
-1. **Huge tier (sizing) — DONE (v0.118.0).** `huge_forest` (single: radius 24–30, `max_under_depth` 18, gentle dome,
-   central lake, scaled ores) and `huge_aquatic` (cluster: five isles via `cluster_offsets`, central lagoon) shipped
-   with full onboarding and the `ender pearl / *_large seed / blaze powder` gate. Gametests confirm both plan without
-   error and dwarf their `*_large` counterparts (>1.5×), in normal build time. **Findings:** (a) the centre-based pond
-   only carves the cluster's centre isle — **per-isle ponds for the outer isles are a Phase-2 carving item** (the outer
-   aquatic isles are dry green isles for now); (b) plan-time performance is fine — *in-world grow-in/streaming of a
-   ~tens-of-thousands-of-blocks island is still worth an in-game playtest* (placement can't be gametested: a huge
-   island/cluster exceeds the test region).
+1. **Huge tier (sizing) — DONE (v0.118.0, aquatic reworked v0.120.0).** `huge_forest` (single: radius 24–30,
+   `max_under_depth` 18, gentle dome, central lake, scaled ores) and `huge_aquatic` shipped with full onboarding and the
+   `ender pearl / *_large seed / blaze powder` gate. **`huge_aquatic` was first a five-isle `cluster_offsets`
+   archipelago — playtest verdict: boring separate islands + a tiny lagoon.** Root cause: ponds are centre-only and
+   capped at half the island radius, so a cluster can't hold a real lake. **Reworked (v0.120.0)** to a *single big
+   island that's mostly a broad central lake/ocean*, via a new **`Pond.extent`** knob (default 0.5; aquatic uses 0.72 to
+   fill most of the island, leaving a grassy rim). The Ocean Monument rare still rises from it. **Still owed:** *rivers
+   radiating off the lake to the rim* (a Phase-2 carve). Plan-time perf is fine; in-world grow-in of a
+   tens-of-thousands-of-blocks island is still worth an in-game playtest (placement exceeds the test region).
+   **Debug seeds (v0.120.0):** creative-only `debug_huge_*` for Forest / Aquatic (free spawn) + the not-yet-shipped
+   **Rocky** (mountain), **Desert** (dune sea), **Ancient** (deepslate slab) — easy cross-biome testing; the Phase-4
+   rollout promotes those three (and the rest) to real gated seeds.
 2. **Cave systems.** `CaveCarver` + cave decoration (reuse underside palette), gated by a `caves` config. Make
    **`huge_lush`** / **`huge_ancient`** the showcases.
 3. **Rare large structures.** Author the jigsaw dungeon + large mansion; wire them as `rare_structures` on the huge

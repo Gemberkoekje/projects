@@ -33,8 +33,6 @@ final class PondCarver {
             {1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
     };
 
-    /** Pond extent as a fraction of the island radius — keeps the pool well inside the rim so it can be contained. */
-    private static final double POND_EXTENT_FRACTION = 0.5;
     /** Strength of the pond's harmonic edge wobble (up to ~28%). */
     private static final double POND_RIM_WOBBLE = 0.28;
 
@@ -257,9 +255,10 @@ final class PondCarver {
     /** Candidate columns for an irregular radial pond — a few angular harmonics give it a blobby, non-round edge. */
     private static List<int[]> pondColumns(Pond pond, int baseRadius, RandomSource random) {
         final List<int[]> out = new ArrayList<>();
-        // Keep the pool well inside the island (extent ≈ 0.62·baseRadius after wobble) so its rim always has
-        // solid ground for the containment ring to wall against — overshooting the rim is what made it overflow.
-        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * POND_EXTENT_FRACTION)));
+        // Keep the pool inside the island (extent·baseRadius, default 0.5) so its rim always has solid ground for the
+        // containment ring to wall against — overshooting the rim is what made it overflow. A theme can raise extent
+        // for a near island-filling lake (huge water islands), trading rim width for a bigger pool.
+        final int r = Math.max(1, Math.min(pond.radius(), (int) Math.round(baseRadius * pond.extent())));
         final RimNoise edge = RimNoise.sample(random, POND_RIM_WOBBLE);
         final int maxR = (int) Math.ceil(r * 1.25) + 1;
         for (int dx = -maxR; dx <= maxR; dx++) {

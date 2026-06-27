@@ -3,6 +3,21 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.120.0] - 2026-06-27
+
+### Changed
+- **Huge Aquatic reworked into a single big lake island.** The five-isle cluster read as boring separate islands with
+  a tiny lagoon — ponds are capped at half the island radius and carve only at the centre, so a cluster can't hold a
+  real lake. It's now a single large island that is **mostly a broad central lake/ocean** rimmed with grassy shore
+  (kelp, fish, squid; the rare Ocean Monument still rises from it). New **`Pond.extent`** knob (default 0.5) lets a
+  theme fill most of the island with water — Huge Aquatic uses 0.72. (Rivers radiating off the lake to the rim are a
+  planned follow-up carve.)
+
+### Added
+- **Huge debug seeds for easy cross-biome testing** (creative-only, no recipe): **Debug Huge Forest / Aquatic** (the
+  shipped seeds, free) plus debug-only **Huge Rocky** (a stone mountain), **Huge Desert** (a dune sea), and **Huge
+  Ancient** (a deepslate slab) — the Phase-4 rollout biomes, previewed early.
+
 ## [0.119.0] - 2026-06-27
 
 ### Added
