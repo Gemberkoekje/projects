@@ -5,8 +5,8 @@
 > village / mansion / fortress is nearly identical because each structure has one shallow pool that always
 > lands the same way. This plan turns that into varied, organic, over-the-void layouts.
 
-Status: **the villages are shipped; mansion / fortress / structure-corridor diversity remain.** Companion to
-`SKYNETHERPLAN.md`; the README is the living index. Per-release detail in [CHANGELOG.md](CHANGELOG.md).
+Status: **villages, mansion footprints, and fortress sprawl are all shipped (Phases 0–4); only the structure-corridor
+reuse (Phase 5) remains.** The README is the living index. Per-release detail in [CHANGELOG.md](CHANGELOG.md).
 
 ## Shipped (one line each)
 
@@ -295,12 +295,12 @@ Keep these optional with backward-compatible defaults so every existing theme is
 
 ## 8. Phasing
 
-- **Phases 0–2 — ✅ shipped (the spike, the scan-bounds/`reach` fix, the Trade Post street village, and the Village
-  Center).** See *Shipped* up top for versions.
-- **Phase 3 — Woodland Mansion footprint variety.** Multiple cores + room graph (+ optional 2nd storey).
-- **Phase 4 — Nether Fortress sprawl.** Span/crossing/tower/stair-down pool over the void + loot/spawner cap.
-- **Phase 5 — Reuse & polish.** Hamlet lane, Trial Chamber / Ocean Monument / Bastion corridor pools,
-  under-support polish on over-void pieces.
+- **Phases 0–4 — ✅ shipped.** The spike + the scan-bounds/`reach` fix, the Trade Post street village + the Village
+  Center (Phases 0–2, v0.68–0.93), the Woodland Mansion footprint variety (Phase 3, v0.96–0.97, §4c), and the Nether
+  Fortress sprawl over the void (Phase 4, v0.94–0.95.1, §4d). See *Shipped* up top for the full version list.
+- **Phase 5 — Reuse & polish (the only open work).** Reuse the street/connective + free-over-void-bridge pools for the
+  Trial Chamber / Ocean Monument / Bastion corridor layouts; under-support polish on over-void pieces. (The Hamlet lane
+  already shipped, v0.74.0.)
 
 Each phase ships independently and is committed on its own (one feature per commit, per project convention).
 

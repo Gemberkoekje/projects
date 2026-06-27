@@ -54,17 +54,13 @@ changes between versions the Stonecutter directives live in a handful of named f
 
 ## Migration stages (each ends green: `runGameTestServer` passes on the active version)
 
-0. **Stonecutter skeleton + build proof.** ✅ **DONE** (branch `refactor/stonecutter-spike`) — Stonecutter 0.9.6 wraps
-   the existing ModDevGradle build cleanly on Gradle 9.2.1 with the configuration cache on. Tasks now run under the node
-   (`./gradlew :1.21.1:runGameTestServer` / `:1.21.1:build`; bare `runGameTestServer` is gone; `chiseledBuild` builds
-   every node); `versions/` + `.stonecutter/` are gitignored. The build script needed only minor adaptations
-   (`rootProject.file(...)` paths, `duplicatesStrategy = EXCLUDE`).
-1. **Concentrate the volatile surface into `compat`.** ✅ **DONE** — `Ids` (every `ResourceLocation`), `Lookup`
-   (registry access) and `Jigsaw` (the one `generateJigsaw` site) now front the version-volatile calls across ~18 files;
-   the algorithm / codecs / templates call the facade and never touch the volatile APIs. Behaviour-preserving — the
-   `islandOutputIsStable` golden master stays byte-identical. The NeoForge registration / network / config glue already
-   lives in its own classes (those *are* the facade for that concern), and the gametest keeps direct calls as the
-   golden-master oracle (route it when Stage 2 lands).
+0. **Stonecutter skeleton + build proof — ✅ DONE** (branch `refactor/stonecutter-spike`). Stonecutter 0.9.6 wraps
+   ModDevGradle on Gradle 9.2.1 (config cache on); tasks run under the node (`./gradlew :1.21.1:…`; `chiseledBuild`
+   builds every node); `versions/` + `.stonecutter/` gitignored.
+1. **Concentrate the volatile surface into `compat` — ✅ DONE.** `Ids` (every `ResourceLocation`), `Lookup` (registry
+   access) and `Jigsaw` (the one `generateJigsaw` site) front the version-volatile calls across ~18 files;
+   behaviour-preserving (the `islandOutputIsStable` golden master stays byte-identical). The gametest keeps direct calls
+   as the golden-master oracle — route it when Stage 2 lands.
 2. **Add the second MC/NeoForge version** (target **TBD — you pick**: latest 1.21.x, 1.22, …). Add the Stonecutter
    node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get **both** versions
    building and each one's gametests passing.
