@@ -2466,6 +2466,31 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void mineshaftTrestlesSupportOverVoid(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part C: a mineshaft floor left over the void grows oak-fence trestle legs (the wood variant of
+        // the village's dirt foundation, selected by the jigsaw's trestles flag). Lay a floating oak-plank deck over air
+        // and run supportTrestles; legs should hang below it.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(24, 12, 24)); // a deck floating high over air
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                level.setBlock(base.offset(dx, 0, dz), Blocks.OAK_PLANKS.defaultBlockState(), 2);
+            }
+        }
+        dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer.supportTrestles(level, base.above(), 4); // deck = origin.y-1
+        boolean leg = false;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (level.getBlockState(base.offset(dx, -1, dz)).is(Blocks.OAK_FENCE)) {
+                    leg = true;
+                }
+            }
+        }
+        helper.assertTrue(leg, "an over-void mineshaft floor should hang oak-fence trestle legs");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a

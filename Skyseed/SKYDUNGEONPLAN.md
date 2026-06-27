@@ -143,8 +143,11 @@ surface tell.
    proves the sprawl. (Over-void corridors still float — Phase 3 stilts them.) Note: the assembly gametests assert only
    robust "sprawled past the hub" thresholds, since the jigsaw is position-seeded; room/loot content is checked by
    direct piece placement (`dungeonComplexRoomsCarryContent`, `mineshaftMinecartEntitySpawns`).
-3. **Over-void trestles** — `supportTrestles()` + the `trestles` jigsaw flag, wired in `placeStructures`; gametest
-   (a corridor forced over the void grows fence legs).
+3. **Over-void trestles — DONE (v0.135.0).** `PathSurfacer.supportTrestles` (wood variant of `supportFloatingFloors`:
+   oak-fence legs on a sparse even/even grid under any over-void floor, to ground within `SUPPORT_SEARCH` or a
+   `TRESTLE_STUB` stub over pure void) + a `trestles` flag on `JigsawConfig`/`JigsawSite`, branched in
+   `GenerationJob.placeStructures` (`trestles ? supportTrestles : supportFloatingFloors`). The mineshaft rare sets
+   `reach: 24, trestles: true`; the village keeps its dirt foundation. `mineshaftTrestlesSupportOverVoid` gametest.
 4. **Mesa dark-oak variant** — `mineshaft_mesa/` pool (+ a biome gate, or a parallel rare), gold/ore flavour.
 
 ## Verification

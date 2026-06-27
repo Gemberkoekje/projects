@@ -63,5 +63,6 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      */
     public record JigsawSite(ResourceLocation pool, ResourceLocation target,
                              int depth, int pad, int ironGolems, BlockPos origin, int reach,
-                             String capPrefix, int capCount, String capFiller, Optional<ResourceLocation> centerpiece) {}
+                             String capPrefix, int capCount, String capFiller, Optional<ResourceLocation> centerpiece,
+                             boolean trestles) {}
 }

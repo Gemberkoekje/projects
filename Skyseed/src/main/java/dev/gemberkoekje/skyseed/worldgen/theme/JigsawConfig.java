@@ -35,7 +35,7 @@ import java.util.Optional;
  */
 public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int depth, int pad, int ironGolems,
                            int sink, int reach, String capPrefix, int capCount, int capMin, String capFiller,
-                           Optional<ResourceLocation> centerpiece) {
+                           Optional<ResourceLocation> centerpiece, boolean trestles) {
     public static final Codec<JigsawConfig> CODEC = RecordCodecBuilder.create(i -> i.group(
             ResourceLocation.CODEC.fieldOf("pool").forGetter(JigsawConfig::pool),
             ResourceLocation.CODEC.optionalFieldOf("target", Ids.mc("bottom")).forGetter(JigsawConfig::target),
@@ -48,12 +48,15 @@ public record JigsawConfig(ResourceLocation pool, ResourceLocation target, int d
             Codec.INT.optionalFieldOf("cap_count", 0).forGetter(JigsawConfig::capCount),
             Codec.INT.optionalFieldOf("cap_min", 0).forGetter(JigsawConfig::capMin),
             Codec.STRING.optionalFieldOf("cap_filler", "").forGetter(JigsawConfig::capFiller),
-            ResourceLocation.CODEC.optionalFieldOf("centerpiece").forGetter(JigsawConfig::centerpiece)
+            ResourceLocation.CODEC.optionalFieldOf("centerpiece").forGetter(JigsawConfig::centerpiece),
+            // When set, a {@code reach}-bounded floor left over the void gets WOODEN trestle legs (a mineshaft running
+            // off the island edge) instead of the village's dirt foundation. See PathSurfacer.supportTrestles.
+            Codec.BOOL.optionalFieldOf("trestles", false).forGetter(JigsawConfig::trestles)
     ).apply(i, JigsawConfig::new));
 
     /** A copy with a different {@code pool}, every other field preserved — for swapping in a dimension's pool variant. */
     public JigsawConfig withPool(ResourceLocation newPool) {
         return new JigsawConfig(newPool, target, depth, pad, ironGolems, sink, reach,
-                capPrefix, capCount, capMin, capFiller, centerpiece);
+                capPrefix, capCount, capMin, capFiller, centerpiece, trestles);
     }
 }

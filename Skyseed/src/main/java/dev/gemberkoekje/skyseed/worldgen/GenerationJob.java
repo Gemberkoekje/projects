@@ -244,7 +244,11 @@ public final class GenerationJob {
             // with empty decks, so they're skipped), THEN resolve the lane markers into terrain-aware paths and
             // over-void bridges — the lanes stay floating bridges, only buildings/fields/gardens get a foundation (§3a).
             if (js.reach() > 0) {
-                PathSurfacer.supportFloatingFloors(level, js.origin(), js.reach());
+                if (js.trestles()) {
+                    PathSurfacer.supportTrestles(level, js.origin(), js.reach()); // mineshaft: wooden legs over the void
+                } else {
+                    PathSurfacer.supportFloatingFloors(level, js.origin(), js.reach());
+                }
                 PathSurfacer.resolve(level, js.origin(), js.reach());
             }
             // Link up any fences / panes / walls (incl. the bridge railings just placed) in their default state.

@@ -327,7 +327,7 @@ public final class IslandGenerator {
                     : jc.capCount();
             jigsaws.add(new IslandPlan.JigsawSite(jc.pool(), jc.target(), jc.depth(), jc.pad(), jc.ironGolems(),
                     new BlockPos(center.getX(), gy + 1 - jc.sink(), center.getZ()), jc.reach(),
-                    jc.capPrefix(), cap, jc.capFiller(), jc.centerpiece()));
+                    jc.capPrefix(), cap, jc.capFiller(), jc.centerpiece(), jc.trestles()));
             // An Animal Island (or a rare structure's mobs): roll one weighted pack onto the pad, a block above its floor.
             if (!animalPacks.isEmpty()) {
                 MobPlanner.rollAnimals(animalPacks, new BlockPos(center.getX(), gy, center.getZ()), animals, random);

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.135.0] - 2026-06-27
+
+### Added
+- **Over-void mineshaft corridors now grow wooden trestle legs (SKYDUNGEONPLAN Phase 3).** A mineshaft that sprawls off
+  the island edge used to leave its tunnels floating in the void. A new `PathSurfacer.supportTrestles` — the wood
+  variant of the village's `supportFloatingFloors` — hangs **oak-fence legs** (a sparse grid, down to the ground or a
+  short stub over pure void) under any over-void mineshaft floor, like a vanilla mine support. Gated by a new
+  `trestles` flag on the jigsaw config (threaded through `JigsawSite`), so the village keeps its dirt foundation; the
+  mineshaft rare now sets `reach: 24, trestles: true`. New `mineshaftTrestlesSupportOverVoid` gametest; 116 pass.
+
 ## [0.134.0] - 2026-06-27
 
 ### Added

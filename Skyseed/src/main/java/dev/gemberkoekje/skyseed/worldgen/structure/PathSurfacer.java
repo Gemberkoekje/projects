@@ -42,6 +42,7 @@ public final class PathSurfacer {
     private static final int FLAGS = Block.UPDATE_CLIENTS; // no physics — fences are linked separately afterwards
     private static final int SUPPORT_SEARCH = 8; // how far below a floating floor to look for ground to anchor onto
     private static final int SUPPORT_STUB = 2;   // over pure void (no ground found within the search): a short stub only
+    private static final int TRESTLE_STUB = 4;   // a mineshaft trestle leg hangs a little longer over pure void
 
     /** Resolve every path marker within {@code reach} (horizontal half-extent) of {@code origin}. */
     public static void resolve(ServerLevel level, BlockPos origin, int reach) {
@@ -123,6 +124,42 @@ public final class PathSurfacer {
                 }
                 for (int d = 1; d <= gap; d++) {
                     level.setBlock(new BlockPos(p.getX(), deckY - d, p.getZ()), Blocks.DIRT.defaultBlockState(), FLAGS);
+                }
+            }
+        }
+    }
+
+    /**
+     * The wooden-trestle variant of {@link #supportFloatingFloors}, for a mineshaft that ran off the island edge: under
+     * a sparse (every-other-column) grid of the over-void floor tiles, hang an oak-fence leg down to the ground (within
+     * {@link #SUPPORT_SEARCH}) or — over pure void — a short {@link #TRESTLE_STUB} stub, like a vanilla mine support
+     * trestle. Sparse so it reads as legs rather than a curtain; the {@code linkConnections} pass run afterwards joins
+     * adjacent legs into a lattice. Selected over the dirt version by the jigsaw's {@code trestles} flag.
+     */
+    public static void supportTrestles(ServerLevel level, BlockPos origin, int reach) {
+        final int deckY = origin.getY() - 1; // the structure floor sits one below the jigsaw origin
+        final BlockState fence = Blocks.OAK_FENCE.defaultBlockState();
+        final BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                final int wx = origin.getX() + dx;
+                final int wz = origin.getZ() + dz;
+                if ((wx & 1) != 0 || (wz & 1) != 0) {
+                    continue; // a leg only on the even/even grid — a trestle, not a wall of fences
+                }
+                p.set(wx, deckY, wz);
+                if (!level.isLoaded(p) || level.getBlockState(p).isAir() || !level.getBlockState(p.below()).isAir()) {
+                    continue; // not a floor tile, or already grounded
+                }
+                int gap = TRESTLE_STUB;
+                for (int d = 2; d <= SUPPORT_SEARCH; d++) {
+                    if (!level.getBlockState(new BlockPos(wx, deckY - d, wz)).isAir()) {
+                        gap = d - 1;
+                        break;
+                    }
+                }
+                for (int d = 1; d <= gap; d++) {
+                    level.setBlock(new BlockPos(wx, deckY - d, wz), fence, FLAGS);
                 }
             }
         }
