@@ -180,6 +180,10 @@ public final class EndCityTemplates {
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
 
         shell(m, 0, 8, 0, 8, 0, 8);                    // floor y0, walls y1..7, ceiling y8
+        // Pilasters at the wall quarter points, matching the tiers above; the window slits sit framed within them.
+        for (final int[] p : new int[][]{{2, 0}, {6, 0}, {2, 8}, {6, 8}, {0, 2}, {0, 6}, {8, 2}, {8, 6}}) {
+            for (int y = 1; y <= 7; y++) m.put(new BlockPos(p[0], y, p[1]), PILLAR);
+        }
         m.remove(new BlockPos(4, 1, 0));               // south doorway
         m.remove(new BlockPos(4, 2, 0));
         for (final int[] w : new int[][]{{2, 4, 0}, {6, 4, 0}, {0, 4, 2}, {0, 4, 6}, {8, 4, 2}, {8, 4, 6}}) {
@@ -266,16 +270,22 @@ public final class EndCityTemplates {
                 m.put(new BlockPos(x, ceil, z), PURPUR);                                                   // ceiling
                 final boolean perim = x == 1 || x == 9 || z == 1 || z == 9;
                 final boolean corner = (x == 1 || x == 9) && (z == 1 || z == 9);
+                // Purpur-pillar pilasters at each wall's quarter points split the flat 9-wide face into vertical bays.
+                final boolean pilaster = perim && !corner && (x == 3 || x == 7 || z == 3 || z == 7);
                 for (int y = 1; y <= wallTop; y++) {
                     // An end-stone-brick foundation course (y1) on every tier; floor_b bands more courses (accents).
-                    final BlockState w = corner ? PILLAR
+                    final BlockState w = corner || pilaster ? PILLAR
                             : (y == 1 || (accents && (y == 2 || y == wallTop)) ? END_BRICK : PURPUR);
                     if (perim) m.put(new BlockPos(x, y, z), w);
                     else m.put(new BlockPos(x, y, z), AIR);
                 }
             }
         }
-        for (final int[] g : new int[][]{{5, 3, 1}, {5, 3, 9}, {1, 3, 5}, {9, 3, 5}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
+        // Tall magenta windows centred in each wall bay (2 high) break up the vertical face.
+        for (final int[] g : new int[][]{{5, 1}, {5, 9}, {1, 5}, {9, 5}}) {
+            m.put(new BlockPos(g[0], 3, g[1]), GLASS);
+            m.put(new BlockPos(g[0], 4, g[1]), GLASS);
+        }
         parapet(m, 1);
         for (final int[] c : new int[][]{{0, 1, 0}, {10, 1, 0}, {0, 1, 10}, {10, 1, 10}}) m.put(new BlockPos(c[0], c[1], c[2]), ROD);
 
@@ -315,7 +325,9 @@ public final class EndCityTemplates {
         for (int x = 0; x <= 2; x++) {
             for (int z = 0; z <= 2; z++) {
                 if (x != 1 || z != 1) {
-                    m.put(new BlockPos(x, y, z), PURPUR);
+                    // Pillar grain on the four corners gives the slender spires a vertical line instead of a flat shaft.
+                    final boolean corner = (x == 0 || x == 2) && (z == 0 || z == 2);
+                    m.put(new BlockPos(x, y, z), corner ? PILLAR : PURPUR);
                 }
             }
         }

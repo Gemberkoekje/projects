@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.153.0] - 2026-06-27
+
+### Changed
+- **End City detailing pass (part 1) — less blocky.** Broke up the flat purpur faces of the main mass: the stacked
+  tiers and the base section now carry purpur-pillar pilasters at each wall's quarter points (splitting the 9-wide
+  face into vertical bays), with taller 2-high magenta windows centred in the bays; the slender side spires get
+  pillar grain on their corners. Cosmetic only — same footprints, connectors and overhang geometry, so the jigsaw is
+  unchanged. (The fat tower, ship, bridges and wings are left for a follow-up pass.) 126 gametests pass.
+
 ## [0.152.0] - 2026-06-27
 
 ### Fixed
