@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.121.0] - 2026-06-27
+
+### Changed
+- **Huge Forest and Huge Aquatic now adapt to their biome**, like the regular and Large seeds — they were plain (one
+  look everywhere). A Huge Forest grows spruce in a taiga, dark oak in a dark forest, cherry in a cherry grove, plus
+  jungle / swamp / snowy / savanna / birch / flower forms; Huge Aquatic takes its ocean-reef / swamp / mangrove forms.
+  (Built by scaling the regular seeds' full biome-override sets up to huge size.)
+
+### Added
+- **Biome debug seeds for the huge tier** (creative-only): Debug Huge Forest in taiga / dark forest / cherry grove /
+  jungle / swamp / snowy, and Debug Huge Aquatic in ocean / swamp, for testing the adaptation across biomes. The earlier
+  Huge Rocky / Desert / Ancient debug themes stay as Phase-4 drafts.
+
 ## [0.120.0] - 2026-06-27
 
 ### Changed

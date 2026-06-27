@@ -80,10 +80,19 @@ public final class ModItems {
             new BiomeDebugSeed("debug_aquatic_swamp", "aquatic", "minecraft:mangrove_swamp"),
             new BiomeDebugSeed("debug_frozen_ice_spikes", "frozen_large", "minecraft:ice_spikes"),
             new BiomeDebugSeed("debug_ladder_desert", "ladder_small", "minecraft:desert"),
-            // Huge tier (SKYHUGEPLAN) — spawn the huge islands free for testing, across biomes. huge_rocky/desert/ancient
-            // are debug-only themes (no real seed yet; the Phase-4 rollout promotes them).
+            // Huge tier (SKYHUGEPLAN) — spawn the huge islands free for testing, in the biomes they adapt to (huge
+            // Forest/Aquatic carry the regular seeds' biome forms). huge_rocky/desert/ancient are debug-only draft
+            // themes (no real seed yet; the Phase-4 rollout promotes them).
             new BiomeDebugSeed("debug_huge_forest", "huge_forest", "minecraft:plains"),
+            new BiomeDebugSeed("debug_huge_forest_taiga", "huge_forest", "minecraft:taiga"),
+            new BiomeDebugSeed("debug_huge_forest_dark", "huge_forest", "minecraft:dark_forest"),
+            new BiomeDebugSeed("debug_huge_forest_cherry", "huge_forest", "minecraft:cherry_grove"),
+            new BiomeDebugSeed("debug_huge_forest_jungle", "huge_forest", "minecraft:jungle"),
+            new BiomeDebugSeed("debug_huge_forest_swamp", "huge_forest", "minecraft:swamp"),
+            new BiomeDebugSeed("debug_huge_forest_snowy", "huge_forest", "minecraft:snowy_plains"),
             new BiomeDebugSeed("debug_huge_aquatic", "huge_aquatic", "minecraft:plains"),
+            new BiomeDebugSeed("debug_huge_aquatic_ocean", "huge_aquatic", "minecraft:ocean"),
+            new BiomeDebugSeed("debug_huge_aquatic_swamp", "huge_aquatic", "minecraft:swamp"),
             new BiomeDebugSeed("debug_huge_rocky", "huge_rocky", "minecraft:windswept_hills"),
             new BiomeDebugSeed("debug_huge_desert", "huge_desert", "minecraft:desert"),
             new BiomeDebugSeed("debug_huge_ancient", "huge_ancient", "minecraft:plains"));

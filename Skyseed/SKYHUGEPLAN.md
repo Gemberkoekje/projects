@@ -136,9 +136,13 @@ the cave work, newest/most-thematic first.
    fill most of the island, leaving a grassy rim). The Ocean Monument rare still rises from it. **Still owed:** *rivers
    radiating off the lake to the rim* (a Phase-2 carve). Plan-time perf is fine; in-world grow-in of a
    tens-of-thousands-of-blocks island is still worth an in-game playtest (placement exceeds the test region).
-   **Debug seeds (v0.120.0):** creative-only `debug_huge_*` for Forest / Aquatic (free spawn) + the not-yet-shipped
-   **Rocky** (mountain), **Desert** (dune sea), **Ancient** (deepslate slab) — easy cross-biome testing; the Phase-4
-   rollout promotes those three (and the rest) to real gated seeds.
+   **Biome adaptation (v0.121.0):** huge Forest/Aquatic now carry the **regular seeds' full biome-form set, scaled**
+   (Forest → spruce/dark-oak/cherry/jungle/swamp/snowy/savanna/…; Aquatic → ocean-reef/swamp/mangrove) — copied from
+   `forest.json`/`aquatic.json`, dropping the End/Nether forms (huge is overworld-only) and scaling shape radius (×3) +
+   tree counts (×8). So a Huge Forest in a taiga is a huge spruce forest, etc. **Debug seeds (v0.120–0.121):**
+   creative-only `debug_huge_*` for Forest (plains/taiga/dark/cherry/jungle/swamp/snowy) and Aquatic (plains/ocean/swamp)
+   to test the adaptation, plus three **draft** debug-only themes — **Rocky** (mountain), **Desert** (dune sea),
+   **Ancient** (deepslate slab) — kept as a Phase-4 head start (the rollout promotes those + the rest to real gated seeds).
 2. **Cave systems.** `CaveCarver` + cave decoration (reuse underside palette), gated by a `caves` config. Make
    **`huge_lush`** / **`huge_ancient`** the showcases.
 3. **Rare large structures.** Author the jigsaw dungeon + large mansion; wire them as `rare_structures` on the huge
