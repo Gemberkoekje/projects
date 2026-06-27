@@ -82,14 +82,7 @@ public final class StructureParts {
      */
     public static void anchor(Map<BlockPos, BlockState> blocks, Map<BlockPos, CompoundTag> bes, BlockPos p, String finalState) {
         blocks.put(p, Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_SOUTH));
-        final CompoundTag t = new CompoundTag();
-        t.putString("id", "minecraft:jigsaw");
-        t.putString("name", "minecraft:bottom");
-        t.putString("target", "minecraft:empty");
-        t.putString("pool", "minecraft:empty");
-        t.putString("final_state", finalState);
-        t.putString("joint", "rollable");
-        bes.put(p, t);
+        bes.put(p, jig("minecraft:bottom", "minecraft:empty", "minecraft:empty", finalState));
     }
 
     /** A chest block-entity bound to a vanilla loot table id (filled on first open). */
