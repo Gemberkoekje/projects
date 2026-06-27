@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.136.0] - 2026-06-27
+
+### Added
+- **The dark-oak Mesa Mineshaft — Huge Badlands' rare (SKYDUNGEONPLAN Phase 4; the dungeon plan is complete).** The
+  mineshaft tileset is now generated in two palette variants from one geometry: the oak set (`mineshaft/`) and a
+  **dark-oak mesa** set (`mineshaft_mesa/`, dark-oak wood + sprinkled gold blocks, à la the vanilla badlands mineshaft).
+  The mesa variant is a rare on **Huge Badlands @ 2.5%** (alongside the Trial Chamber, dropped to 2.5% to share), with
+  the same over-void wooden trestles + chest minecarts. (A processor couldn't be reused for the swap — the connector
+  pool is baked into the `.nbt` — so the geometry is parameterized over a palette `Variant` instead.) New
+  `mesaMineshaftIsDarkOakWithGold` gametest; 117 pass.
+
 ## [0.135.0] - 2026-06-27
 
 ### Added

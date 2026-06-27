@@ -44,7 +44,7 @@ public final class DevStructureGenerator {
             AnimalTemplates.generateInto(base.resolve("animal"));
             DungeonTemplates.generateInto(base.resolve("dungeon"));
             DungeonComplexTemplates.generateInto(base.resolve("dungeon_complex")); // SKYDUNGEONPLAN Part A — sprawling dungeon
-            MineshaftTemplates.generateInto(base.resolve("mineshaft")); // SKYDUNGEONPLAN Part B — abandoned mineshaft
+            MineshaftTemplates.generateInto(base); // SKYDUNGEONPLAN Part B/Phase 4 — abandoned mineshaft (oak + dark-oak mesa)
             RuinedPortalTemplates.generateInto(base.resolve("ruined_portal"));
             NetherFortressTemplates.generateInto(base.resolve("nether_fortress"));
             BastionTemplates.generateInto(base.resolve("bastion"));

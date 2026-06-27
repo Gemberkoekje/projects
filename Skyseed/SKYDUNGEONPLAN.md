@@ -148,7 +148,12 @@ surface tell.
    `TRESTLE_STUB` stub over pure void) + a `trestles` flag on `JigsawConfig`/`JigsawSite`, branched in
    `GenerationJob.placeStructures` (`trestles ? supportTrestles : supportFloatingFloors`). The mineshaft rare sets
    `reach: 24, trestles: true`; the village keeps its dirt foundation. `mineshaftTrestlesSupportOverVoid` gametest.
-4. **Mesa dark-oak variant** — `mineshaft_mesa/` pool (+ a biome gate, or a parallel rare), gold/ore flavour.
+4. **Mesa dark-oak variant — DONE (v0.136.0). The plan is complete.** `MineshaftTemplates` is parameterized over a
+   palette `Variant` (oak / dark-oak-mesa) and emits BOTH sets from one geometry: `mineshaft/` (oak) + `mineshaft_mesa/`
+   (dark-oak + sprinkled gold blocks). The mesa set self-links through its own `mineshaft_mesa/parts` pool (a processor
+   couldn't be used — the connector pool is baked into the .nbt). Wired as a rare on **Huge Badlands** @ 2.5% (the Trial
+   Chamber dropped to 2.5% to share), with the same over-void trestles + chest minecarts. `mesaMineshaftIsDarkOakWithGold`
+   gametest.
 
 ## Verification
 - Gametests: each structure assembles via `Jigsaw.placeCapped` (like `ancientCityPlaces`/`grandOceanMonumentPlaces`),

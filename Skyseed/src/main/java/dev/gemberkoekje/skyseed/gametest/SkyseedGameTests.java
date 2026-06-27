@@ -2491,6 +2491,17 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void mesaMineshaftIsDarkOakWithGold(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Phase 4: the mesa variant reuses the mineshaft geometry in dark-oak with sprinkled gold (the
+        // vanilla badlands mineshaft). Place a mesa room and assert dark-oak + gold, and NO oak.
+        final BlockPos o = place(helper, "skyseed:mineshaft_mesa/room");
+        helper.assertTrue(contains(helper, o, 6, 4, 6, Blocks.DARK_OAK_PLANKS), "the mesa mineshaft should be dark-oak");
+        helper.assertTrue(contains(helper, o, 6, 4, 6, Blocks.GOLD_BLOCK), "the mesa mineshaft should sprinkle gold");
+        helper.assertTrue(!contains(helper, o, 6, 4, 6, Blocks.OAK_PLANKS), "the mesa mineshaft should have no oak");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a

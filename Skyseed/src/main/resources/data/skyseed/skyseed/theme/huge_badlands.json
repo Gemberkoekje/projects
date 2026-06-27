@@ -142,14 +142,28 @@
   "_comment": "Huge Badlands (SKYHUGEPLAN Phase 4): a huge badlands island scaled from the base theme — biome adaptation (0 forms) + internal caves. radius 26-32, dome 5-12. Overworld.",
   "rare_structures": [
     {
-      "_comment": "5% — a Trial Chamber buried in the mesa (trial spawners + vaults).",
-      "chance": 0.05,
+      "_comment": "2.5% — a Trial Chamber buried in the mesa (trial spawners + vaults).",
+      "chance": 0.025,
       "jigsaw": {
         "pool": "skyseed:trial_chamber/start",
         "target": "minecraft:bottom",
         "depth": 2,
         "pad": 10,
         "sink": 7
+      },
+      "mobs": []
+    },
+    {
+      "_comment": "2.5% — a dark-oak Mesa Abandoned Mineshaft (mineshaft_mesa/, dark-oak + sprinkled gold), carved through the badlands; over-void runs get wooden trestles. (SKYDUNGEONPLAN Part B/Phase 4.)",
+      "chance": 0.025,
+      "jigsaw": {
+        "pool": "skyseed:mineshaft_mesa/start",
+        "target": "minecraft:bottom",
+        "depth": 4,
+        "pad": 10,
+        "sink": 6,
+        "reach": 24,
+        "trestles": true
       },
       "mobs": []
     }
