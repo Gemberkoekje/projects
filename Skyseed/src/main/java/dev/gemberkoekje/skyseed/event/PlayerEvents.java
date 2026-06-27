@@ -63,23 +63,34 @@ public final class PlayerEvents {
             player.setRespawnPosition(overworld.dimension(), spawn, 0.0F, true, false);
         }
 
-        // A world made before the Nether/End were voided still has them as vanilla terrain; a world voided before
-        // v0.109.0 has a void End with no central island (no dragon arena / exit fountain). Point the player at the
-        // matching one-time in-place fix — each safely wipes/regenerates only what it must on the next reload.
-        boolean netherFix = SkyseedCommands.netherNeedsFix(server);
-        boolean endFix = SkyseedCommands.endNeedsFix(server);
-        if (netherFix || endFix) {
-            StringBuilder sb = new StringBuilder("[Skyseed] One-time world fix available (needs cheats/op):");
-            if (netherFix) {
+        // A world made before the Nether/End were voided still has them as vanilla terrain — offer the matching
+        // in-place conversion (safely wipes/regenerates only that dimension on the next reload). Per-dimension so the
+        // player sees only the fix they actually need.
+        boolean netherConvert = SkyseedCommands.netherNeedsConvert(server);
+        boolean endConvert = SkyseedCommands.endNeedsConvert(server);
+        if (netherConvert || endConvert) {
+            StringBuilder sb = new StringBuilder("[Skyseed] One-time conversion available (needs cheats/op):");
+            if (netherConvert) {
                 sb.append(" your Nether is still the vanilla dimension — run /emptynether to make it the empty Skyseed Nether.");
             }
-            if (endFix) {
-                sb.append(" your End is missing its Skyseed centre (the dragon's island + exit portal) — run /emptyend to grow it back.");
+            if (endConvert) {
+                sb.append(" your End is still the vanilla dimension — run /emptyend to make it the empty Skyseed End.");
             }
-            sb.append(" Each regenerates only what it must on the next reload (your overworld is untouched). NOTE: these fix "
-                    + "commands will be REMOVED in Skyseed 1.0 — run them before updating, or an un-updated old world can't be "
-                    + "repaired this way afterward.");
+            sb.append(" Each regenerates only that dimension on the next reload (your overworld is untouched). NOTE: these "
+                    + "conversion commands will be REMOVED in Skyseed 1.0 — run them before updating, or an un-updated old "
+                    + "world can't be converted this way afterward.");
             player.sendSystemMessage(Component.literal(sb.toString()).withStyle(ChatFormatting.GOLD));
+        }
+
+        // A void End generated before v0.109.0 has no central island, so the dragon's exit fountain never forms and the
+        // four-crystal respawn has nothing to attach to: that dragon can only be fought once. New worlds are fine.
+        if (SkyseedCommands.endIsOneShotDragon(server)) {
+            player.sendSystemMessage(Component.literal(
+                    "[Skyseed] Heads up: this world's End was generated before its central island existed, so its Ender "
+                  + "Dragon can be fought only ONCE — the respawn needs the central fountain, which this End is missing. "
+                  + "If you'd like to repeat the dragon fight, start a new world (new Ends grow the island and a "
+                  + "refightable dragon).")
+                  .withStyle(ChatFormatting.GOLD));
         }
     }
 }

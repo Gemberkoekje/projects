@@ -28,7 +28,6 @@ import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -70,14 +69,9 @@ public final class SkyseedCommands {
     private static final Target NETHER = new Target(Level.NETHER, "minecraft:the_nether", "DIM-1", "void_nether", "Nether");
     private static final Target END = new Target(Level.END, "minecraft:the_end", "DIM1", "void_end", "End");
 
-    /** The central End columns to regenerate: the island (r≤42) + the obsidian spikes (r≈43), in chunks. */
-    private static final int END_REGEN_CHUNK_RADIUS = 4;
-
     // Armed by the command, applied (and cleared) at shutdown. Paths are captured while the server is live.
     private static volatile boolean armedNether = false;
     private static volatile boolean armedEnd = false;
-    // The End is already the void dimension but lacks the central island (a save voided before v0.109.0): regrow it.
-    private static volatile boolean armedEndRegen = false;
     @Nullable
     private static volatile Path levelDatPath = null;
     @Nullable
@@ -99,18 +93,6 @@ public final class SkyseedCommands {
     private static int warn(CommandSourceStack source, String name, Target target) {
         MinecraftServer server = source.getServer();
         if (alreadyVoid(server, target)) {
-            // The End can be the void dimension yet still lack the central island (a save voided before v0.109.0):
-            // offer to regrow just the centre rather than reporting nothing to do.
-            if (target == END && !hasCentralIsland(server)) {
-                source.sendSuccess(() -> Component.literal(
-                        "⚠ Your End is the empty Skyseed End but has no central island — the dragon's arena and the exit "
-                      + "portal's footing never generated (this save was voided before v0.109.0). This regenerates the "
-                      + "chunks around 0,0 (you lose only what is built right at the centre) and resets the dragon fight "
-                      + "so it can be fought again. If you are sure, run:").withStyle(ChatFormatting.RED), false);
-                source.sendSuccess(() -> Component.literal("/" + name + " force").withStyle(ChatFormatting.YELLOW), false);
-                sendSunsetNote(source);
-                return 1;
-            }
             source.sendSuccess(() -> Component.literal("[Skyseed] Your " + target.label
                     + " is already the empty Skyseed dimension — nothing to do.").withStyle(ChatFormatting.GREEN), false);
             return 0;
@@ -120,32 +102,12 @@ public final class SkyseedCommands {
               + "Skyseed " + target.label + ". Everything you have built or stored there will be lost. If you are sure, run:")
                 .withStyle(ChatFormatting.RED), false);
         source.sendSuccess(() -> Component.literal("/" + name + " force").withStyle(ChatFormatting.YELLOW), false);
-        sendSunsetNote(source);
         return 1;
-    }
-
-    private static void sendSunsetNote(CommandSourceStack source) {
-        source.sendSuccess(() -> Component.literal(
-                "(These one-time fix commands will be removed in Skyseed 1.0 — run them before updating; an un-updated "
-              + "old world can't be repaired this way after 1.0.)").withStyle(ChatFormatting.GRAY), false);
     }
 
     private static int arm(CommandSourceStack source, String name, Target target) {
         MinecraftServer server = source.getServer();
         if (alreadyVoid(server, target)) {
-            if (target == END && !hasCentralIsland(server)) {
-                worldRootPath = server.getWorldPath(LevelResource.ROOT);
-                levelDatPath = server.getWorldPath(LevelResource.LEVEL_DATA_FILE);
-                armedEndRegen = true;
-                int movedOut = evacuate(server, END.dim());
-                source.sendSuccess(() -> Component.literal(
-                        "[Skyseed] End central regen armed — the chunks around 0,0 will be regrown with the island and "
-                      + "the dragon fight reset the next time this world loads. Exit to the title screen (or restart) "
-                      + "now to apply." + (movedOut > 0 ? " Moved " + movedOut + " player(s) out of the End." : ""))
-                        .withStyle(ChatFormatting.GOLD), false);
-                Skyseed.LOGGER.info("[skyseed] End central regen armed via /{} force", name);
-                return 1;
-            }
             source.sendSuccess(() -> Component.literal("[Skyseed] Your " + target.label
                     + " is already the empty Skyseed dimension — nothing to do.").withStyle(ChatFormatting.GREEN), false);
             return 0;
@@ -194,6 +156,31 @@ public final class SkyseedCommands {
                 && gen.generatorSettings().is(target.voidSettingsKey());
     }
 
+    /** True if the End already has its central Skyseed island (end stone on the island surface, off the bedrock spike). */
+    private static boolean hasCentralIsland(MinecraftServer server) {
+        ServerLevel end = server.getLevel(END.dim());
+        return end != null && end.getBlockState(new BlockPos(20, 63, 0)).is(Blocks.END_STONE);
+    }
+
+    /** Join-warning check: the Nether is still the vanilla dimension and can be voided with {@code /emptynether}. */
+    public static boolean netherNeedsConvert(MinecraftServer server) {
+        return !alreadyVoid(server, NETHER);
+    }
+
+    /** Join-warning check: the End is still the vanilla dimension and can be voided with {@code /emptyend}. */
+    public static boolean endNeedsConvert(MinecraftServer server) {
+        return !alreadyVoid(server, END);
+    }
+
+    /**
+     * Join-warning check: the End is the void dimension but was generated before v0.109.0, so it has no central island —
+     * the dragon's exit fountain can't form, so the dragon can only be fought once. (No command repairs this; a new
+     * world is needed for repeatable fights.)
+     */
+    public static boolean endIsOneShotDragon(MinecraftServer server) {
+        return alreadyVoid(server, END) && !hasCentralIsland(server);
+    }
+
     @SubscribeEvent
     static void onServerStopped(ServerStoppedEvent event) {
         Path levelDat = levelDatPath;
@@ -205,13 +192,9 @@ public final class SkyseedCommands {
             if (armedEnd) {
                 applyReset(levelDat, worldRoot, END);
             }
-            if (armedEndRegen) {
-                applyRegenEnd(levelDat, worldRoot);
-            }
         }
         armedNether = false;
         armedEnd = false;
-        armedEndRegen = false;
         levelDatPath = null;
         worldRootPath = null;
     }
@@ -226,11 +209,6 @@ public final class SkyseedCommands {
                 Skyseed.LOGGER.warn("[skyseed] {} reset skipped: level.dat had no vanilla {} generator to switch",
                         target.label, target.dimKey());
                 return;
-            }
-            // A converted End should host a fresh dragon (its central island regenerates with the new generator), not
-            // stay "already killed" from the old vanilla fight.
-            if (target == END) {
-                clearDragonFight(root);
             }
             // 2. Keep the original level.dat as a recovery point.
             Path backup = levelDat.resolveSibling("level.dat_skyseed_backup");
@@ -287,90 +265,6 @@ public final class SkyseedCommands {
         if (generator.getString("settings").equals(newSettingsId)) return false;
         generator.putString("settings", newSettingsId);
         return true;
-    }
-
-    /** True if the End already has its central Skyseed island (end stone on the island surface, off the bedrock spike). */
-    private static boolean hasCentralIsland(MinecraftServer server) {
-        ServerLevel end = server.getLevel(END.dim());
-        return end != null && end.getBlockState(new BlockPos(20, 63, 0)).is(Blocks.END_STONE);
-    }
-
-    /** Join-warning check: the Nether is still a non-void (vanilla) dimension and should be voided with /emptynether. */
-    public static boolean netherNeedsFix(MinecraftServer server) {
-        return !alreadyVoid(server, NETHER);
-    }
-
-    /** Join-warning check: the End is still vanilla, or is the void End but missing its central island — /emptyend fixes both. */
-    public static boolean endNeedsFix(MinecraftServer server) {
-        return !alreadyVoid(server, END) || !hasCentralIsland(server);
-    }
-
-    /**
-     * Remove the saved dragon-fight state ({@code Data.DragonFight}) from a loaded level.dat root, so the End starts a
-     * fresh fight — a new dragon spawns and the exit fountain re-forms on the regrown island — instead of staying
-     * "already killed". Returns true if it was present. Package-visible and pure so it can be unit-tested.
-     */
-    public static boolean clearDragonFight(CompoundTag root) {
-        if (!root.contains("Data", Tag.TAG_COMPOUND)) {
-            return false;
-        }
-        CompoundTag data = root.getCompound("Data");
-        if (!data.contains("DragonFight", Tag.TAG_COMPOUND)) {
-            return false;
-        }
-        data.remove("DragonFight");
-        return true;
-    }
-
-    /** Regrow the central End: reset the dragon fight in level.dat, then drop the central chunks so they regenerate. */
-    private static void applyRegenEnd(Path levelDat, Path worldRoot) {
-        try {
-            CompoundTag root = NbtIo.readCompressed(levelDat, NbtAccounter.unlimitedHeap());
-            boolean clearedFight = clearDragonFight(root);
-            if (clearedFight) {
-                Files.copy(levelDat, levelDat.resolveSibling("level.dat_skyseed_backup"), StandardCopyOption.REPLACE_EXISTING);
-                writeLevelDatAtomically(root, levelDat);
-            }
-            deleteCentralEndChunks(worldRoot);
-            Skyseed.LOGGER.info("[skyseed] End central regen applied: dragon fight reset={}, central chunks dropped (±{})",
-                    clearedFight, END_REGEN_CHUNK_RADIUS);
-        } catch (IOException e) {
-            Skyseed.LOGGER.error("[skyseed] End central regen did not finish; it is safe to re-run the command", e);
-        }
-    }
-
-    /**
-     * Drop the central End chunks (within {@link #END_REGEN_CHUNK_RADIUS} of 0,0) so Minecraft regenerates them with
-     * the central island. Rather than delete whole 512×512 region files, zero just those chunks' 4-byte entries in the
-     * region header — the surrounding void End (and anything grown out from the centre) is left untouched.
-     */
-    private static void deleteCentralEndChunks(Path worldRoot) {
-        Path dim = worldRoot.resolve(END.folder());
-        for (String sub : new String[]{"region", "entities", "poi"}) {
-            Path dir = dim.resolve(sub);
-            for (int cx = -END_REGEN_CHUNK_RADIUS; cx <= END_REGEN_CHUNK_RADIUS; cx++) {
-                for (int cz = -END_REGEN_CHUNK_RADIUS; cz <= END_REGEN_CHUNK_RADIUS; cz++) {
-                    zeroChunkEntry(dir, cx, cz);
-                }
-            }
-        }
-    }
-
-    /** Zero chunk ({@code cx,cz})'s 4-byte location entry in its {@code .mca} (Anvil) file → absent → regenerated. */
-    private static void zeroChunkEntry(Path regionDir, int cx, int cz) {
-        Path file = regionDir.resolve("r." + (cx >> 5) + "." + (cz >> 5) + ".mca");
-        if (!Files.exists(file)) {
-            return;
-        }
-        final long offset = ((cx & 31) + (cz & 31) * 32) * 4L;
-        try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "rw")) {
-            if (raf.length() >= offset + 4) {
-                raf.seek(offset);
-                raf.writeInt(0);
-            }
-        } catch (IOException e) {
-            Skyseed.LOGGER.warn("[skyseed] could not drop End chunk ({},{}) in {}", cx, cz, file.getFileName(), e);
-        }
     }
 
     private static void deleteRecursively(Path dir) throws IOException {

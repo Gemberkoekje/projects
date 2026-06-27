@@ -1798,21 +1798,6 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = REGION)
-    public static void endRegenClearsDragonFightTag(GameTestHelper helper) {
-        // /emptyend's End-regen resets the saved dragon fight (Data.DragonFight) so a fresh dragon spawns on the regrown
-        // island. Guard the NBT navigation: clears it when present, no-ops otherwise, refuses a foreign tag.
-        CompoundTag data = new CompoundTag();
-        data.put("DragonFight", new CompoundTag());
-        CompoundTag root = new CompoundTag();
-        root.put("Data", data);
-        helper.assertTrue(SkyseedCommands.clearDragonFight(root), "should report a change when DragonFight is present");
-        helper.assertTrue(!root.getCompound("Data").contains("DragonFight"), "DragonFight should be removed");
-        helper.assertTrue(!SkyseedCommands.clearDragonFight(root), "should report no change once already cleared");
-        helper.assertTrue(!SkyseedCommands.clearDragonFight(new CompoundTag()), "should refuse an empty/foreign level.dat");
-        helper.succeed();
-    }
-
     /** A minimal {@code level.dat} root holding one dimension's generator, mirroring the real nesting. */
     private static CompoundTag legacyLevelDat(String dimKey, String settingsId) {
         CompoundTag generator = new CompoundTag();
