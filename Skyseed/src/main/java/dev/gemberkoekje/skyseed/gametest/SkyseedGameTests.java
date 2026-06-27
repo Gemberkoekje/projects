@@ -2250,14 +2250,15 @@ public final class SkyseedGameTests {
     public static void endCitySproutsTowers(GameTestHelper helper) {
         // Phase 2: the spire pieces (tower_piece -> ... -> tower_top) assemble into a tall, end-rod-lit purpur tower.
         // Place the tower_piece pool directly — its down 'ec_spire' seat roots it — so the ship/tiers/bridges of a full
-        // assembly don't confound the measurement. Position-seeded (and the gametest origin varies per run), so sample
-        // several seeds and assert the best rises well past a single segment, lit by end rods.
+        // assembly don't confound the measurement. The assembly RNG is featureSeed ^ origin and the gametest engine
+        // relocates this test per run, so any one seed's spire height varies run to run; sample plenty of seeds and
+        // assert the BEST rises well past a single segment, lit by end rods (the wide sample is what keeps it robust).
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/tower_piece"));
         int bestSpan = 0;
         boolean rods = false;
-        for (long seed = 1; seed <= 8; seed++) {
+        for (long seed = 1; seed <= 24; seed++) {
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
                     for (int y = 0; y < 24; y++) {

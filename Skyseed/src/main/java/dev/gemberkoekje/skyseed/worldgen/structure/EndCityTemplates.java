@@ -218,6 +218,10 @@ public final class EndCityTemplates {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         shell(m, 0, 4, 0, 4, 0, 8);                 // floor y0, walls y1-7, deck (ceiling) y8
+        // Pilasters at the wall quarter points, matching the main tower, so the fat tower reads as the same building.
+        for (final int[] p : new int[][]{{1, 0}, {3, 0}, {1, 4}, {3, 4}, {0, 1}, {0, 3}, {4, 1}, {4, 3}}) {
+            for (int y = 1; y <= 7; y++) m.put(new BlockPos(p[0], y, p[1]), PILLAR);
+        }
         m.remove(new BlockPos(3, 8, 2));            // ladder hole through the deck (east side, by the ship gangway)
         m.remove(new BlockPos(0, 2, 2));            // headroom over the west doorway (the arm side)
         // The ladder climbs the EAST wall (by the ship), not the west wall: it used to run up z=2 of the west wall,
@@ -226,7 +230,10 @@ public final class EndCityTemplates {
         // exit pops up beside the ship, away from the stack's spires.
         final BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.WEST);
         for (int y = 1; y <= 8; y++) m.put(new BlockPos(3, y, 2), ladder);   // backed by the east wall, climbs to the deck
-        for (final int[] g : new int[][]{{2, 4, 0}, {2, 4, 4}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
+        for (final int[] g : new int[][]{{2, 0}, {2, 4}}) {                  // tall magenta windows on the side walls
+            m.put(new BlockPos(g[0], 3, g[1]), GLASS);
+            m.put(new BlockPos(g[0], 4, g[1]), GLASS);
+        }
         m.put(new BlockPos(1, 9, 2), ROD);          // deck light, clear of the exit and the ship gangway
         jigAt(m, bes, 0, 1, 2, FrontAndTop.WEST_UP, "skyseed:ec_fattower", "skyseed:ec_dead", SHIP_POOL, "minecraft:air", false);  // the arm docks here
         jigAt(m, bes, 4, 9, 2, FrontAndTop.EAST_UP, "skyseed:ec_shipwall", "skyseed:ec_ship", SHIP_POOL, "minecraft:air", false);  // the ship docks here
@@ -379,6 +386,8 @@ public final class EndCityTemplates {
             m.put(new BlockPos(x, y + 1, 0), PURPUR);
             m.put(new BlockPos(x, y + 1, 2), PURPUR);
         }
+        m.put(new BlockPos(x0, y + 2, 0), ROD);     // an end-rod lamp on each rail at the span's near end
+        m.put(new BlockPos(x0, y + 2, 2), ROD);
     }
 
     /** {@code bridge_end} (vanilla {@code bridge_end}): the span that leaves a tier and heads out over the void. */
@@ -419,7 +428,14 @@ public final class EndCityTemplates {
         final Map<BlockPos, BlockState> m = new HashMap<>();
         final Map<BlockPos, CompoundTag> bes = new HashMap<>();
         shell(m, 0, 6, 0, 6, 0, 7);
-        for (final int[] g : new int[][]{{2, 4, 0}, {4, 4, 0}, {0, 4, 2}, {0, 4, 4}}) m.put(new BlockPos(g[0], g[1], g[2]), GLASS);
+        // Pilasters at the wall quarter points (matching the tiers it stacks), framing the windows and the bridge door.
+        for (final int[] p : new int[][]{{2, 0}, {4, 0}, {2, 6}, {4, 6}, {0, 2}, {0, 4}, {6, 2}, {6, 4}}) {
+            for (int y = 1; y <= 6; y++) m.put(new BlockPos(p[0], y, p[1]), PILLAR);
+        }
+        for (final int[] g : new int[][]{{2, 0}, {4, 0}, {0, 2}, {0, 4}}) {    // tall magenta windows in the bays
+            m.put(new BlockPos(g[0], 3, g[1]), GLASS);
+            m.put(new BlockPos(g[0], 4, g[1]), GLASS);
+        }
         m.remove(new BlockPos(6, 2, 3));        // headroom over the east-wall opening where the bridge lands (the
                                                 // bridgeIn below is its lower half) — a 2-tall doorway
         m.put(new BlockPos(2, 2, 3), Blocks.CHEST.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST));

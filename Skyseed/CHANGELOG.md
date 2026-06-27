@@ -3,6 +3,15 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.154.0] - 2026-06-27
+
+### Changed
+- **End City detailing pass (part 2) — the rest of the structure.** Carried the same vanilla End-City language onto
+  the secondary masses: the fat tower and the bridge-reached wings now wear the purpur-pillar pilaster bays and tall
+  2-high magenta windows of the main tower, and the bridges get end-rod lamps along their rails. Cosmetic only (same
+  footprints and connectors). The End ship was already vanilla-styled (mast, dragon-head bowsprit, brewing stand), so
+  it's left as is. 126 gametests pass.
+
 ## [0.153.0] - 2026-06-27
 
 ### Changed
