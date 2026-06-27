@@ -34,6 +34,7 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.12 }, { "block": "minecraft:dead_bush", "chance": 0.04 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.42, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } } },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 Basalt Deltas fragment: blackstone + basalt with glowing magma hazards and a little gilded blackstone. fill_bands [] drops the overworld terracotta strata.",
       "dimension": "minecraft:the_nether",
       "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },

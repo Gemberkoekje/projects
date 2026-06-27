@@ -105,11 +105,12 @@ Genuinely new seeds with no overworld parallel, the way the Nether got Bastion /
 
 - **The ladder shaft already works in the End** (`ladder_small`/`ladder_large` have an `end` override → an end-stone
   foothold + the drop). Free transit, already shipped — just confirm it reads well over the End void.
-- **Adaptation.** An adapted overworld/utility seed thrown in the End should take **End form** via `biome_overrides`
-  (like the Nether adaptations): end-stone body, no grass/water. Decide the *output* — most overworld seeds have nothing
-  to give in the End (no ore, no crops); they may just become barren end-stone footholds, or be **disallowed** in the
-  End entirely (cleaner). *Recommend: a small allowlist of seeds that make sense in the End; the rest refuse to plant
-  there* — and that refusal is itself a teaching moment.
+- **Adaptation — built (v0.111.0).** The 10 overworld biome seeds and their large variants take **End form** via a
+  `the_end` `biome_override` (like the Nether adaptations): a **same-size, pure end-stone island**, no ore / crops /
+  trees / decoration — a barren foothold, not a content seed. The silhouette still varies per theme (each override
+  carries its own shape, so a forest dome still reads differently from a rocky crag), and Aquatic's pond becomes an
+  empty carved basin — an "empty lake" — for a touch of character. (End stone is the End's neutral default block, so the
+  override only needs to carry the shape.) Other utility/structure seeds still refuse the End (the cleaner default).
 - **End materials feeding overworld seeds.** Chorus fruit / purpur / shulker boxes are the new craft inputs; check
   whether any existing recipe wants them, and whether a "chorus farm" belongs as an overworld-grown seed fed by End
   chorus (probably End-only — keep it there).

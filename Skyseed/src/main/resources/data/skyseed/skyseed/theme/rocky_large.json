@@ -34,6 +34,7 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.32, "underside": "teardrop", "top_dome": { "min": 8, "max": 12 } } },
     { "_comment": "Large Nether adaptation — as the normal Rocky Nether island, ~1.5x bigger. Abyss/low band: debris.",
       "dimension": "minecraft:the_nether", "max_y": 50,
       "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },

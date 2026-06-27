@@ -49,6 +49,7 @@
       ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 1, "max": 2 } } },
     { "_comment": "Large Nether adaptation — as the normal Ancient haunted deep, ~1.5x bigger.",
       "dimension": "minecraft:the_nether",
       "shape": { "radius": { "min": 3, "max": 4 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 2 } },

@@ -2125,6 +2125,26 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void overworldBiomeThemesHaveEndForm(GameTestHelper helper) {
+        // The 10 overworld biome themes (+ their large variants) grow in the End as same-size, pure end-stone islands
+        // via a the_end biome override (end stone is the End's neutral default block; ores/decoration default off).
+        // Guard that every one carries that override, so a newly-added biome theme can't silently fail to grow there.
+        final ServerLevel level = helper.getLevel();
+        final String[] bases = {"forest", "rocky", "desert", "mushroom", "frozen",
+                                "meadow", "badlands", "ancient", "lush", "aquatic"};
+        for (final String base : bases) {
+            for (final String name : new String[]{base, base + "_large"}) {
+                final IslandTheme t = theme(level, name);
+                helper.assertTrue(t != null, "missing theme '" + name + "'");
+                final boolean hasEnd = t.biomeOverrides().stream()
+                        .anyMatch(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false));
+                helper.assertTrue(hasEnd, "theme '" + name + "' has no the_end biome override — it won't grow in the End");
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void everyThemePlansWithoutError(GameTestHelper helper) {
         // The broadest guard: plan every registered theme and require non-empty output. If the IslandGenerator
         // refactor breaks any theme (a codec field, a pond, a structure), this fails loudly.

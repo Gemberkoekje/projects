@@ -25,6 +25,7 @@
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 7, "max": 10 }, "rim_noise": 0.40, "underside": "teardrop" } },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 Warped fungal forest patch (the safe teal one; Endermen). Listed first so warped_forest wins; other Nether biomes fall to the crimson override below.",
       "dimension": "minecraft:the_nether", "biomes": [ "minecraft:warped_forest" ],
       "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },

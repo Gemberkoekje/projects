@@ -12,6 +12,7 @@
   ],
   "variants": [],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop" } },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 island on purpose (reused overworld seed; the incentive is to craft Nether-specific seeds). Abyss/low band near the lava sea: Ancient Debris emerges. Listed first so it wins in the Nether.",
       "dimension": "minecraft:the_nether", "max_y": 50,
       "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },

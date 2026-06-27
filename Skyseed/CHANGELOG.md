@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.111.0] - 2026-06-27
+
+### Added
+- **All 10 overworld biome seeds (and their large variants) now grow in the End** — as **same-size, pure end-stone
+  islands**. Each theme gained a `the_end` biome override carrying its own shape, so the silhouettes still vary by theme
+  (a forest dome reads differently from a rocky crag), just rendered in end stone with no ores, trees, or ground cover.
+  The **Aquatic** seed's pond becomes an empty carved basin — an "empty lake" — for a touch of its character. (Same
+  dimension-override mechanism the Nether adaptations use; end stone is the End's neutral default block, so each
+  override only has to carry the shape.) Throw a forest / rocky / desert / … seed in the End to grow one.
+
 ## [0.110.0] - 2026-06-27
 
 ### Changed

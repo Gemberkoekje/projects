@@ -18,6 +18,7 @@
       "ground": [ { "block": "minecraft:red_mushroom", "chance": 0.08 }, { "block": "minecraft:brown_mushroom", "chance": 0.08 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" } },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 mushroom island: a calm mycelium pocket with mooshrooms (the Nether's scarce food + leather) and small mushrooms. Listed first so it wins in the Nether.",
       "dimension": "minecraft:the_nether",
       "shape": { "radius": { "min": 2, "max": 3 }, "rim_noise": 0.2, "top_dome": { "min": 1, "max": 1 } },

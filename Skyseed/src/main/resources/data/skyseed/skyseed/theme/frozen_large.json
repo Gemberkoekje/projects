@@ -28,6 +28,7 @@
       "trees": [ { "feature": "skyseed:ice_spike", "tries": 4, "spacing": 3 } ] } }
   ],
   "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 3, "max": 6 } } },
     { "biomes": [ "minecraft:frozen_peaks", "minecraft:jagged_peaks", "minecraft:ice_spikes", "minecraft:snowy_slopes", "minecraft:frozen_ocean", "minecraft:deep_frozen_ocean", "minecraft:frozen_river" ],
       "pond": { "block": "minecraft:ice", "radius": 5, "depth": 2 },
       "variants": [

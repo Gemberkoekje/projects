@@ -2,6 +2,9 @@
   "dimensions": ["minecraft:overworld"],
   "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" },
   "palette": { "surface": "minecraft:snow_block", "fill": "minecraft:snow_block", "core": "minecraft:stone", "fill_depth": 3 },
+  "biome_overrides": [
+    { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" } }
+  ],
   "ores": [
     { "block": "minecraft:packed_ice", "chance": 0.95, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
     { "block": "minecraft:ice", "chance": 0.70, "count": { "min": 2, "max": 3 }, "vein_size": { "min": 3, "max": 6 }, "depth": "core" },
