@@ -100,6 +100,29 @@ jigsaw, so a rolled rare structure is the whole event. Add a `rare_structures` l
 
 Because a rare structure is *rare*, most huge islands are just big terrain + caves; the structure is the jackpot.
 
+**Built so far:** **Ocean Monument** on `huge_aquatic` — a bigger 19×19 prismarine monument (12 towers, a big pool, an
+8-gold cache + 2 buried-treasure chests, a sponge niche, an elder guardian + a 6-guardian pack), **5%**, on the
+cluster's centre isle with the lagoon suppressed (**v0.119.0**).
+
+**A per-seed menu of rare bonuses (suggestions).** Pick the thematic vanilla structure each huge biome would hide. A
+**general jigsaw dungeon** can ride *any* huge seed (in the cave layer); these are the flavour picks on top:
+
+| Huge seed | Rare bonus | Why / source |
+|---|---|---|
+| `huge_aquatic` | **Ocean Monument** (bigger) ✅ | guardians → prismarine shards, gold, sponge, conduit mats |
+| `huge_forest` | **Woodland Mansion** (large) | dark-forest manor; illagers, totems, the allay/woodland loot |
+| `huge_ancient` | **Ancient City** | deepslate → the deep dark: sculk, a warden, the swift-sneak/echo loot — the premier cave host |
+| `huge_rocky` | **Mineshaft** | abandoned shafts: rails, cobweb, minecart chests; folds into the cave system naturally |
+| `huge_badlands` | **Mineshaft (badlands, exposed + gold)** OR a **Stronghold** wing | badlands shafts are iconic; or a stronghold ruin for a mesa |
+| `huge_desert` | **Desert Pyramid** (large) or **Trail Ruins** | a buried temple with the TNT trap + chests |
+| `huge_frozen` | **Igloo** (with the basement lab) | a snowy dome + the hidden brewing/zombie-villager cellar |
+| `huge_meadow` | **Pillager Outpost** or a small **Village** | meadows host both in vanilla; an outpost = a raid/loot beat |
+| `huge_mushroom` | *(no vanilla structure)* — a **giant fungal cavern** set-piece, or none | mushroom is structure-poor; lean on caves |
+| `huge_lush` | *(the lush caves are the draw)* — a small overgrown ruin, or none | the carved lush cave *is* the bonus |
+
+Open per-seed calls (chances, exact "large" footprints, biome-gating) are tuning; build them out in Phase 3 alongside
+the cave work, newest/most-thematic first.
+
 ---
 
 ## 4. Phases (build order)

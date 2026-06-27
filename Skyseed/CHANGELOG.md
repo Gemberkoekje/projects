@@ -3,6 +3,19 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.119.0] - 2026-06-27
+
+### Added
+- **A bigger Ocean Monument as a rare bonus on the Huge Aquatic seed (5%).** A new **19×19** prismarine monument (vs the
+  13×13 of the Ocean Monument seed) — twelve lantern-capped dark-prismarine towers, a big water pool, an eight-block
+  gold cache plus two buried-treasure chests in a treasure wing, a sponge niche, and an **elder guardian + a
+  six-guardian pack** — grows on the cluster's centre isle (lagoon suppressed) about one throw in twenty, via the
+  existing `RareStructure` roll. (SKYHUGEPLAN also gained a per-seed menu of rare-bonus suggestions for the other huge
+  islands.)
+
+### Changed
+- **Huge Aquatic's cluster isles enlarged** (radius 15–17, smoother rim) so the rare monument's pad fits the centre isle.
+
 ## [0.118.0] - 2026-06-27
 
 ### Added

@@ -2170,6 +2170,39 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void grandOceanMonumentPlaces(GameTestHelper helper) {
+        // SKYHUGEPLAN: the bigger (19x19) Ocean Monument — the rare 5% bonus on the Huge Aquatic seed. Verify it
+        // assembles: a big prismarine basin, the eight-block gold cache, two buried-treasure chests, a sponge. (Loads .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ocean_monument/grand"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int prismarine = 0, gold = 0, chests = 0;
+        boolean sponge = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.PRISMARINE) || st.is(Blocks.PRISMARINE_BRICKS) || st.is(Blocks.DARK_PRISMARINE)) {
+                        prismarine++;
+                    } else if (st.is(Blocks.GOLD_BLOCK)) {
+                        gold++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.WET_SPONGE)) {
+                        sponge = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(prismarine > 250, "the grand monument should be a big prismarine basin (got " + prismarine + ")");
+        helper.assertTrue(gold == 8, "the grand monument should have an eight-block gold cache (got " + gold + ")");
+        helper.assertTrue(chests == 2, "the grand monument should have two buried-treasure chests (got " + chests + ")");
+        helper.assertTrue(sponge, "the grand monument should have a sponge niche");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a

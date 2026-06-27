@@ -36,6 +36,7 @@ public final class OceanMonumentTemplates {
 
     public static void generateInto(Path dir) throws IOException {
         writeIfAbsent(dir.resolve("monument.nbt"), monument());
+        writeIfAbsent(dir.resolve("grand.nbt"), grand());
     }
 
     /** A deterministic prismarine masonry mix — mostly bricks, with dark-prismarine and plain-prismarine accents. */
@@ -97,6 +98,64 @@ public final class OceanMonumentTemplates {
         bes.put(new BlockPos(9, 1, 8), lootChest("minecraft:chests/buried_treasure"));
 
         // Anchor at the centre base; the guardians spawn in the open water just above it.
+        anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:prismarine");
+        return new Built(m, bes);
+    }
+
+    /**
+     * A larger 19×19 monument — the rare bonus on the Huge Aquatic seed (SKYHUGEPLAN, 5% chance). Same prismarine
+     * palette as {@link #monument()}, scaled up: a deeper basin, twelve lantern-capped dark-prismarine towers
+     * (corners + mid-edges + four inner), a fuller eight-block gold cache + two buried-treasure chests in a treasure
+     * wing, and a bigger sponge niche. The bigger elder-guardian pack comes from the rare structure's {@code mobs}.
+     */
+    private static Built grand() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final int max = 18, mid = 9;   // 19×19 footprint
+        final int wallTop = 6;
+
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), (x % 4 == 0 && z % 4 == 0) ? LAMP : mix(x, z));
+                final boolean perim = x == 0 || x == max || z == 0 || z == max;
+                for (int y = 1; y <= wallTop; y++) {
+                    if (perim) {
+                        m.put(new BlockPos(x, y, z), (y == 3 && (x % 4 == 2 || z % 4 == 2)) ? LAMP : mix(x, y + z));
+                    } else {
+                        m.put(new BlockPos(x, y, z), WATER);
+                    }
+                }
+            }
+        }
+
+        // Twelve dark-prismarine towers — corners, cardinal mid-edges, and four inner — taller, each lantern-capped.
+        for (final int[] c : new int[][]{
+                {1, 1}, {max - 1, 1}, {1, max - 1}, {max - 1, max - 1},
+                {mid, 1}, {mid, max - 1}, {1, mid}, {max - 1, mid},
+                {5, 5}, {max - 5, 5}, {5, max - 5}, {max - 5, max - 5}}) {
+            for (int y = 1; y <= 9; y++) {
+                m.put(new BlockPos(c[0], y, c[1]), DARK);
+            }
+            m.put(new BlockPos(c[0], 10, c[1]), LAMP);
+        }
+
+        // A taller 3×3 sponge niche set into the west wall.
+        for (int z = mid - 1; z <= mid + 1; z++) {
+            m.put(new BlockPos(1, 2, z), SPONGE);
+            m.put(new BlockPos(1, 3, z), SPONGE);
+        }
+
+        // Treasure wing (SE corner): an eight-block gold cache around a sea lantern, plus two buried-treasure chests.
+        for (final int[] g : new int[][]{{14, 14}, {15, 14}, {16, 14}, {14, 15}, {16, 15}, {14, 16}, {15, 16}, {16, 16}}) {
+            m.put(new BlockPos(g[0], 1, g[1]), Blocks.GOLD_BLOCK.defaultBlockState());
+        }
+        m.put(new BlockPos(15, 0, 15), LAMP);
+        m.put(new BlockPos(15, 1, 15), LAMP);
+        m.put(new BlockPos(13, 1, 15), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.WEST));
+        bes.put(new BlockPos(13, 1, 15), lootChest("minecraft:chests/buried_treasure"));
+        m.put(new BlockPos(15, 1, 13), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
+        bes.put(new BlockPos(15, 1, 13), lootChest("minecraft:chests/buried_treasure"));
+
         anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:prismarine");
         return new Built(m, bes);
     }
