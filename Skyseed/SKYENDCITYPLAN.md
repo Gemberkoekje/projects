@@ -39,8 +39,10 @@ stack; the `roof` has no up connector, so it caps. (Mirrors the `dungeon_complex
       pad 7. The interim ship + treasure ride the `start`. Gotcha solved: a vertical-jigsaw child is rejected if a
       parent block sits in the child's destination cell — the base's old top-corner rods (y9) collided with the tier
       floor (y9), so no tier stacked; removing them fixed it (the joint/orientation were fine all along).
-- [ ] **Phase 2 — Thin towers.** `tower_base/piece/top` off the tiers' side connectors (`end_city/tower`) — the iconic
-      end-rod-lit spires.
+- [x] **Phase 2 — Thin towers.** ✅ `tower_base`/`tower_piece`/`tower_top` (slender 3×3 spires, windowed + end-rod-lit)
+      sprout from the tiers' lip-edge side connectors and cantilever over the void; pools `end_city/tower` +
+      `end_city/tower_piece`, ~43% per branch, depth 6. Side branches put their destination cell clear of the lip so the
+      tower doesn't collide with the tier (the seam-collision lesson from Phase 1). Guarded by `endCitySproutsTowers`.
 - [ ] **Phase 3 — Bridges + sprawl.** `bridge`/`bridge_stairs`/`bridge_end` (`end_city/bridge`) → a second `start`
       section, so the city sprawls across the island (with over-void support where a bridge leaves the island).
 - [ ] **Phase 4 — Fat tower + dedicated ship.** `fat_tower` + a proper `ship` piece (`end_city/ship`); move the elytra

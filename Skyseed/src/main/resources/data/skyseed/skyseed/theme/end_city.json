@@ -6,5 +6,5 @@
   "ores": [],
   "mobs": [ { "entity": "minecraft:shulker", "chance": 0.5, "count": { "min": 2, "max": 3 } } ],
   "fizzle": { "biomes": ["minecraft:the_end", "minecraft:end_barrens", "minecraft:small_end_islands"], "message": "skyseed.fizzle.end_city" },
-  "jigsaw": { "pool": "skyseed:end_city/start", "target": "minecraft:bottom", "depth": 5, "pad": 7 }
+  "jigsaw": { "pool": "skyseed:end_city/start", "target": "minecraft:bottom", "depth": 6, "pad": 7 }
 }

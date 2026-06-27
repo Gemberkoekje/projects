@@ -2168,6 +2168,46 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = BIG_REGION)
+    public static void endCitySproutsTowers(GameTestHelper helper) {
+        // Phase 2: thin towers branch off the tiers' side connectors and rise as spires. Position-seeded, so sample
+        // seeds and assert the best sprouts a WEST tower that rises. The tiers' lip reaches region x19 and the start
+        // sits at x20+; the ship is to the EAST — so any purpur WEST of x18 is a side tower, and its vertical span
+        // proves it rose (not just a stub). Placed low so the spires fit the scanned region.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
+        int bestWestSpan = 0;
+        for (long seed = 1; seed <= 5; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 6, origin, false, "", 0, null, seed);
+            int wMinY = Integer.MAX_VALUE, wMaxY = Integer.MIN_VALUE;
+            for (int x = 0; x < 18; x++) {      // west of the tiers' lip (x19) and start (x20) → tower territory
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.PURPUR_BLOCK) || st.is(Blocks.PURPUR_PILLAR)) {
+                            wMinY = Math.min(wMinY, y);
+                            wMaxY = Math.max(wMaxY, y);
+                        }
+                    }
+                }
+            }
+            if (wMaxY > wMinY) {
+                bestWestSpan = Math.max(bestWestSpan, wMaxY - wMinY);
+            }
+        }
+        helper.assertTrue(bestWestSpan > 6, "the End City should sprout side towers that rise as spires, not stubs "
+                + "(best west-tower purpur Y-span " + bestWestSpan + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
     public static void dragonTrophyMonumentHasEmptyEggPedestal(GameTestHelper helper) {
         // Phase 6 capstone: the Dragon Trophy grows a monument — a purpur-capped pedestal + four dragon heads — but
         // NO dragon egg (the egg is unique; the player sets their own). Verify it assembles and carries no egg. (Loads .nbt.)

@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.141.0] - 2026-06-27
+
+### Changed
+- **End City jigsaw — Phase 2: thin side towers (SKYENDCITYPLAN).** The tiers now branch outward from their lip edges
+  into slender 3×3 purpur **spire towers** that cantilever over the void and rise — `tower_base` → `tower_piece`
+  (windowed + lit) → `tower_top` (end-rod-crowned cap) — via the new `end_city/tower` + `end_city/tower_piece` pools
+  (~43% per side branch, so a city sprouts a few flanking spires). Theme jigsaw depth 5 → 6. +1 test; 120 pass.
+
 ## [0.140.0] - 2026-06-27
 
 ### Changed

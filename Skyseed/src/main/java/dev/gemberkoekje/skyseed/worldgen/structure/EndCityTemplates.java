@@ -31,6 +31,10 @@ public final class EndCityTemplates {
 
     /** Tiers + the roof self-stack through this pool: an UP connector (target {@code ec_tier}) mates a DOWN one (name {@code ec_tier}). */
     private static final String FLOOR_POOL = "skyseed:end_city/floor";
+    /** A tier's outward side branch draws a {@code tower_base} from here (or empty). */
+    private static final String TOWER_POOL = "skyseed:end_city/tower";
+    /** A tower then rises through here: {@code tower_piece} (stacks) / {@code tower_top} (caps) / empty. */
+    private static final String TOWER_PIECE_POOL = "skyseed:end_city/tower_piece";
 
     private static final BlockState PURPUR = Blocks.PURPUR_BLOCK.defaultBlockState();
     private static final BlockState PILLAR = Blocks.PURPUR_PILLAR.defaultBlockState();
@@ -45,6 +49,9 @@ public final class EndCityTemplates {
         writeIfAbsent(dir.resolve("floor_a.nbt"), floorTier(5, false));
         writeIfAbsent(dir.resolve("floor_b.nbt"), floorTier(6, true));
         writeIfAbsent(dir.resolve("roof.nbt"), roof());
+        writeIfAbsent(dir.resolve("tower_base.nbt"), towerBase());
+        writeIfAbsent(dir.resolve("tower_piece.nbt"), towerPiece());
+        writeIfAbsent(dir.resolve("tower_top.nbt"), towerTop());
     }
 
     // ---- shared helpers ----------------------------------------------------------------------------------------
@@ -53,25 +60,47 @@ public final class EndCityTemplates {
         return Blocks.PURPUR_STAIRS.defaultBlockState().setValue(BlockStateProperties.HORIZONTAL_FACING, face);
     }
 
-    /** A vertical jigsaw uses the {@code aligned} joint (not {@code rollable}, which is for rolling around a horizontal
-     *  axis): the parent's UP and the child's DOWN connector share the {@code north} top vector, so they mate with no
-     *  spin. {@link StructureParts#jig} bakes {@code rollable}; override it here. */
-    private static CompoundTag jigAligned(String name, String target) {
-        final CompoundTag t = jig(name, target, FLOOR_POOL, "minecraft:purpur_block");
-        t.putString("joint", "aligned");
-        return t;
+    /** Place a jigsaw connector. A <em>vertical</em> seam uses the {@code aligned} joint (the parent UP and child DOWN
+     *  connectors share the {@code north} top vector, so they mate with no spin); a <em>horizontal</em> seam stays
+     *  {@code rollable} (free to spin), as {@link StructureParts#jig} bakes. */
+    private static void jigAt(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z,
+                              FrontAndTop orient, String name, String target, String pool, String finalState, boolean aligned) {
+        m.put(new BlockPos(x, y, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, orient));
+        final CompoundTag t = jig(name, target, pool, finalState);
+        if (aligned) {
+            t.putString("joint", "aligned");
+        }
+        bes.put(new BlockPos(x, y, z), t);
     }
 
-    /** An up-facing jigsaw at {@code (x,y,z)} that stacks the next tier/roof on top (becomes purpur if nothing rolls). */
+    /** A tier/roof's UP seat that stacks the next tier/roof on top (becomes purpur if nothing rolls). */
     private static void upJig(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z) {
-        m.put(new BlockPos(x, y, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.UP_NORTH));
-        bes.put(new BlockPos(x, y, z), jigAligned("skyseed:ec_up", "skyseed:ec_tier"));
+        jigAt(m, bes, x, y, z, FrontAndTop.UP_NORTH, "skyseed:ec_up", "skyseed:ec_tier", FLOOR_POOL, "minecraft:purpur_block", true);
     }
 
-    /** A down-facing jigsaw at {@code (x,y,z)} — a tier/roof's underside seat, matching a parent's {@link #upJig}. */
+    /** A tier/roof's DOWN underside seat, matching a parent's {@link #upJig}. */
     private static void downJig(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z) {
-        m.put(new BlockPos(x, y, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.DOWN_NORTH));
-        bes.put(new BlockPos(x, y, z), jigAligned("skyseed:ec_tier", "skyseed:ec_cap"));
+        jigAt(m, bes, x, y, z, FrontAndTop.DOWN_NORTH, "skyseed:ec_tier", "skyseed:ec_cap", FLOOR_POOL, "minecraft:purpur_block", true);
+    }
+
+    /** A tier's outward side branch (horizontal) that may sprout a thin tower; unused → air (no floating wart). */
+    private static void sideJig(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_wall", "skyseed:ec_tower", TOWER_POOL, "minecraft:air", false);
+    }
+
+    /** The tower_base's stem (horizontal) that mates a tier's {@link #sideJig}. */
+    private static void towerStem(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z, FrontAndTop dir) {
+        jigAt(m, bes, x, y, z, dir, "skyseed:ec_tower", "skyseed:ec_dead", TOWER_PIECE_POOL, "minecraft:air", false);
+    }
+
+    /** A tower segment's UP seat (vertical) — stacks the next tower piece/top. */
+    private static void towerUp(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z) {
+        jigAt(m, bes, x, y, z, FrontAndTop.UP_NORTH, "skyseed:ec_up", "skyseed:ec_spire", TOWER_PIECE_POOL, "minecraft:air", true);
+    }
+
+    /** A tower segment's DOWN underside seat, matching a parent's {@link #towerUp}. */
+    private static void towerDown(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int y, int z) {
+        jigAt(m, bes, x, y, z, FrontAndTop.DOWN_NORTH, "skyseed:ec_spire", "skyseed:ec_dead", TOWER_PIECE_POOL, "minecraft:air", true);
     }
 
     /** A hollow purpur shell over {@code [x0..x1] × [z0..z1]}, floor {@code y0}, ceiling {@code y1}, corner pillars. */
@@ -173,6 +202,9 @@ public final class EndCityTemplates {
         parapet(m, 1);
         for (final int[] c : new int[][]{{0, 1, 0}, {10, 1, 0}, {0, 1, 10}, {10, 1, 10}}) m.put(new BlockPos(c[0], c[1], c[2]), ROD);
 
+        // Outward branches at the lip edges (their destination cells are clear of the lip, so a tower won't collide).
+        sideJig(m, bes, 0, 3, 5, FrontAndTop.WEST_UP);
+        sideJig(m, bes, 10, 3, 5, FrontAndTop.EAST_UP);
         downJig(m, bes, 5, 0, 5);        // underside seat — mates the tier below
         upJig(m, bes, 5, ceil, 5);       // stacks the next tier/roof
         return new Built(m, bes);
@@ -195,6 +227,54 @@ public final class EndCityTemplates {
         m.put(new BlockPos(5, 7, 5), ROD);                                  // crowning light
 
         downJig(m, bes, 5, 0, 5);        // underside seat only — no UP connector, so the roof caps the stack
+        return new Built(m, bes);
+    }
+
+    // ---- thin side towers (Phase 2) --------------------------------------------------------------------------------
+
+    /** A purpur perimeter ring of the 3×3 footprint at height {@code y} (the 1×1 core stays a hollow shaft). */
+    private static void tube(Map<BlockPos, BlockState> m, int y) {
+        for (int x = 0; x <= 2; x++) {
+            for (int z = 0; z <= 2; z++) {
+                if (x != 1 || z != 1) {
+                    m.put(new BlockPos(x, y, z), PURPUR);
+                }
+            }
+        }
+    }
+
+    /** {@code tower_base} (vanilla {@code tower_base}): a slender 3×3 shaft that stems off a tier's side and rises into
+     *  a spire. The stem is rotated to whatever side it attaches; the body cantilevers over the void like vanilla. */
+    private static Built towerBase() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int x = 0; x <= 2; x++) for (int z = 0; z <= 2; z++) m.put(new BlockPos(x, 0, z), PURPUR);  // floor
+        for (int y = 1; y <= 4; y++) tube(m, y);                                                          // shaft walls
+        towerStem(m, bes, 2, 2, 1, FrontAndTop.EAST_UP);    // stems toward the tier (the jigsaw spins it to any side)
+        towerUp(m, bes, 1, 4, 1);                            // rises into tower_piece / tower_top
+        return new Built(m, bes);
+    }
+
+    /** {@code tower_piece} (vanilla {@code tower_piece}): a stacking 3×3 shaft segment with a window and an inner rod. */
+    private static Built towerPiece() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int y = 0; y <= 3; y++) tube(m, y);
+        m.put(new BlockPos(0, 2, 1), GLASS);    // a magenta window
+        m.put(new BlockPos(1, 1, 1), ROD);      // inner light
+        towerDown(m, bes, 1, 0, 1);
+        towerUp(m, bes, 1, 3, 1);
+        return new Built(m, bes);
+    }
+
+    /** {@code tower_top} (vanilla {@code tower_top}): caps the spire with a roof and crowning end rods. */
+    private static Built towerTop() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        for (int y = 0; y <= 2; y++) tube(m, y);
+        for (int x = 0; x <= 2; x++) for (int z = 0; z <= 2; z++) m.put(new BlockPos(x, 3, z), PURPUR);  // cap
+        for (final int[] c : new int[][]{{0, 4, 0}, {2, 4, 0}, {0, 4, 2}, {2, 4, 2}, {1, 4, 1}}) m.put(new BlockPos(c[0], c[1], c[2]), ROD);
+        towerDown(m, bes, 1, 0, 1);             // no UP — caps the spire
         return new Built(m, bes);
     }
 }
