@@ -3,6 +3,20 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.127.0] - 2026-06-27
+
+### Changed
+- **Debug seeds are auto-generated from the themes now — no more hand-maintained lists or per-seed files.** A
+  construction-time scan (`ThemeScanner`) reads every theme's `biome_overrides` and `rare_structures` and registers a
+  debug seed for each: one that forces the island to a representative biome, and one that forces an otherwise
+  chance-gated rare structure (a new `forcedRare` carried by the seed item → entity → generator, bypassing the dice
+  roll). Names are composed at runtime ("Debug: forest [taiga]", "Debug: huge_ancient (ancient_city)") and the icons
+  reuse the base theme's seed texture via a client model hook, so there are **no per-seed model, lang, or registration
+  files** to maintain. Add a biome override or a rare structure to any theme and its debug seed appears next launch
+  (143 today, up from a hand-listed ~35). Replaces the manual `BIOME_DEBUG_SEEDS` list and its ~36 model/lang files;
+  the dedicated debug *themes* (`debug_igloo`, …) are unchanged. New `autoDebugSeedsCoverOverridesAndRares` +
+  `debugForcedRareGerminatesItsStructure` gametests; 108 pass.
+
 ## [0.126.0] - 2026-06-27
 
 ### Added

@@ -55,53 +55,18 @@ public final class ModItems {
             "debug_bastion_remnant", "debug_streets", "debug_small_waterfall", "debug_large_waterfall");
 
     /**
-     * Hidden debug seeds that germinate an <em>existing</em> theme but force the island to read as a specific biome,
-     * regardless of where they're thrown — so a biome-adaptive island (the trade post's desert style, and any theme
-     * with biome overrides) can be inspected on demand without flying to that biome. Same creative-only treatment as
-     * {@link #DEBUG_SEED_THEMES}: registered into {@link #DEBUG_SEEDS}, shown in the debug tab, but no recipe/tag/guide.
+     * Auto-generated debug seeds, derived at construction by {@link ThemeScanner} from the shipped theme JSON: one per
+     * theme {@code biome_overrides} entry (germinate that theme forced to a representative biome) and one per
+     * {@code rare_structures} entry (germinate that theme forcing the otherwise chance-gated structure). Replaces the
+     * old hand-maintained list — add an override or rare structure to any theme and its debug seed appears automatically,
+     * with no model/lang/list edits. Same creative-only treatment as {@link #DEBUG_SEED_THEMES}: registered into
+     * {@link #DEBUG_SEEDS}, shown in the debug tab, names composed at runtime, icons reused from the base theme
+     * ({@link dev.gemberkoekje.skyseed.client.SkyseedClientEvents} model hook); no recipe/tag/guide.
      */
-    public record BiomeDebugSeed(String name, String theme, String biome) {}
+    public static final List<ThemeScanner.DebugSeedSpec> AUTO_DEBUG_SEEDS = ThemeScanner.scan();
 
-    public static final List<BiomeDebugSeed> BIOME_DEBUG_SEEDS = List.of(
-            new BiomeDebugSeed("debug_trade_post_plains", "trade_post", "minecraft:plains"),
-            new BiomeDebugSeed("debug_trade_post_desert", "trade_post", "minecraft:desert"),
-            new BiomeDebugSeed("debug_trade_post_savanna", "trade_post", "minecraft:savanna"),
-            new BiomeDebugSeed("debug_trade_post_taiga", "trade_post", "minecraft:taiga"),
-            new BiomeDebugSeed("debug_trade_post_snowy", "trade_post", "minecraft:snowy_plains"),
-            new BiomeDebugSeed("debug_village_center", "village_center", "minecraft:plains"),
-            new BiomeDebugSeed("debug_village_center_desert", "village_center", "minecraft:desert"),
-            new BiomeDebugSeed("debug_village_center_savanna", "village_center", "minecraft:savanna"),
-            new BiomeDebugSeed("debug_village_center_snowy", "village_center", "minecraft:snowy_plains"),
-            new BiomeDebugSeed("debug_village_center_taiga", "village_center", "minecraft:taiga"),
-            new BiomeDebugSeed("debug_forest_taiga", "forest", "minecraft:taiga"),
-            new BiomeDebugSeed("debug_forest_dark", "forest", "minecraft:dark_forest"),
-            new BiomeDebugSeed("debug_desert_badlands", "desert", "minecraft:badlands"),
-            new BiomeDebugSeed("debug_rocky_snowy", "rocky", "minecraft:snowy_plains"),
-            new BiomeDebugSeed("debug_aquatic_ocean", "aquatic", "minecraft:ocean"),
-            new BiomeDebugSeed("debug_aquatic_swamp", "aquatic", "minecraft:mangrove_swamp"),
-            new BiomeDebugSeed("debug_frozen_ice_spikes", "frozen_large", "minecraft:ice_spikes"),
-            new BiomeDebugSeed("debug_ladder_desert", "ladder_small", "minecraft:desert"),
-            // Huge tier (SKYHUGEPLAN) — spawn the huge islands free for testing, in the biomes they adapt to (huge
-            // Forest/Aquatic carry the regular seeds' biome forms). huge_rocky/desert/ancient are debug-only draft
-            // themes (no real seed yet; the Phase-4 rollout promotes them).
-            new BiomeDebugSeed("debug_huge_forest", "huge_forest", "minecraft:plains"),
-            new BiomeDebugSeed("debug_huge_forest_taiga", "huge_forest", "minecraft:taiga"),
-            new BiomeDebugSeed("debug_huge_forest_dark", "huge_forest", "minecraft:dark_forest"),
-            new BiomeDebugSeed("debug_huge_forest_cherry", "huge_forest", "minecraft:cherry_grove"),
-            new BiomeDebugSeed("debug_huge_forest_jungle", "huge_forest", "minecraft:jungle"),
-            new BiomeDebugSeed("debug_huge_forest_swamp", "huge_forest", "minecraft:swamp"),
-            new BiomeDebugSeed("debug_huge_forest_snowy", "huge_forest", "minecraft:snowy_plains"),
-            new BiomeDebugSeed("debug_huge_aquatic", "huge_aquatic", "minecraft:plains"),
-            new BiomeDebugSeed("debug_huge_aquatic_ocean", "huge_aquatic", "minecraft:ocean"),
-            new BiomeDebugSeed("debug_huge_aquatic_swamp", "huge_aquatic", "minecraft:swamp"),
-            new BiomeDebugSeed("debug_huge_rocky", "huge_rocky", "minecraft:windswept_hills"),
-            new BiomeDebugSeed("debug_huge_desert", "huge_desert", "minecraft:desert"),
-            new BiomeDebugSeed("debug_huge_ancient", "huge_ancient", "minecraft:plains"),
-            new BiomeDebugSeed("debug_huge_mushroom", "huge_mushroom", "minecraft:mushroom_fields"),
-            new BiomeDebugSeed("debug_huge_frozen", "huge_frozen", "minecraft:snowy_plains"),
-            new BiomeDebugSeed("debug_huge_meadow", "huge_meadow", "minecraft:meadow"),
-            new BiomeDebugSeed("debug_huge_badlands", "huge_badlands", "minecraft:badlands"),
-            new BiomeDebugSeed("debug_huge_lush", "huge_lush", "minecraft:jungle"));
+    /** Auto debug seed's registered item name ({@code <id>_skyseed}) → its base theme, for the client model hook. */
+    public static final Map<String, String> AUTO_DEBUG_BASE = new LinkedHashMap<>();
 
     /** theme id → its seed item, in {@link #SEED_THEMES} order. */
     public static final Map<String, DeferredItem<IslandSeedItem>> SEEDS = new LinkedHashMap<>();
@@ -129,11 +94,12 @@ public final class ModItems {
         for (final String part : END_PORTAL_PARTS) {
             PARTS.put(part, ITEMS.registerItem(part, Item::new, new Item.Properties()));
         }
-        for (BiomeDebugSeed s : BIOME_DEBUG_SEEDS) {
-            final ResourceLocation themeId = Ids.mod(s.theme());
-            final ResourceLocation biomeId = Ids.parse(s.biome());
-            DEBUG_SEEDS.put(s.name(), ITEMS.registerItem(s.name() + "_skyseed",
-                    props -> new IslandSeedItem(props, themeId, biomeId), new Item.Properties().stacksTo(16)));
+        for (ThemeScanner.DebugSeedSpec s : AUTO_DEBUG_SEEDS) {
+            final ResourceLocation themeId = Ids.mod(s.baseTheme());
+            DEBUG_SEEDS.put(s.id(), ITEMS.registerItem(s.id() + "_skyseed",
+                    props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.label()),
+                    new Item.Properties().stacksTo(16)));
+            AUTO_DEBUG_BASE.put(s.id() + "_skyseed", s.baseTheme());
         }
     }
 

@@ -2243,6 +2243,36 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void autoDebugSeedsCoverOverridesAndRares(GameTestHelper helper) {
+        // The debug seeds are derived at construction by ThemeScanner from the theme JSON — one per biome override and
+        // per rare structure. Confirm the scan actually produced both kinds (not a silent empty result).
+        int biomeForced = 0, rareForced = 0;
+        for (var holder : ModItems.DEBUG_SEEDS.values()) {
+            final var item = holder.get();
+            if (item.forcedRareIndex() >= 0) {
+                rareForced++;
+            } else if (item.forcedBiome() != null) {
+                biomeForced++;
+            }
+        }
+        helper.assertTrue(biomeForced > 10, "auto scan should make many biome-override debug seeds (got " + biomeForced + ")");
+        helper.assertTrue(rareForced > 0, "auto scan should make rare-structure debug seeds (got " + rareForced + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void debugForcedRareGerminatesItsStructure(GameTestHelper helper) {
+        // forcedRare bypasses the chance roll: huge_ancient's rare structure #0 (the Ancient City) must land in the plan.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_ancient"), level.getBiome(c),
+                RandomSource.create(1L), 0);
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().startsWith("ancient_city")),
+                "forcedRare=0 on huge_ancient should germinate the ancient_city structure");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a
         // stranded player can build their way home without a trip back to the Nether.

@@ -4,7 +4,9 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.SkyseedClientConfig;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
+import dev.gemberkoekje.skyseed.registry.ModItems;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
@@ -18,6 +20,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 
@@ -33,6 +36,18 @@ public final class SkyseedClientEvents {
     private static WeakReference<Screen> defaulted = new WeakReference<>(null);
 
     private SkyseedClientEvents() {}
+
+    @SubscribeEvent
+    static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
+        // Auto debug seeds ship no model file; point each at its base theme's seed model so the icon reuses that texture.
+        final var models = event.getModels();
+        ModItems.AUTO_DEBUG_BASE.forEach((itemId, baseTheme) -> {
+            final var baked = models.get(ModelResourceLocation.inventory(Ids.mod(baseTheme + "_skyseed")));
+            if (baked != null) {
+                models.put(ModelResourceLocation.inventory(Ids.mod(itemId)), baked);
+            }
+        });
+    }
 
     @SubscribeEvent
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {

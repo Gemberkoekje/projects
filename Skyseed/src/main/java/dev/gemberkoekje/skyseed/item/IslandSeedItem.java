@@ -33,15 +33,29 @@ public class IslandSeedItem extends Item {
 
     private final ResourceLocation theme;
     private final ResourceLocation forcedBiome;
+    private final int forcedRareIndex;
+    private final String debugLabel;
 
     public IslandSeedItem(Properties properties, ResourceLocation theme) {
         this(properties, theme, null);
     }
 
     public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome) {
+        this(properties, theme, forcedBiome, -1, null);
+    }
+
+    /**
+     * Full constructor for an auto-generated debug seed: {@code forcedRareIndex} (an index into the theme's
+     * {@code rare_structures}, or -1) forces a chance-gated structure, and {@code debugLabel} (non-null) gives it a
+     * composed, lang-free display name. See {@link dev.gemberkoekje.skyseed.registry.ThemeScanner}.
+     */
+    public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome,
+                          int forcedRareIndex, String debugLabel) {
         super(properties);
         this.theme = theme;
         this.forcedBiome = forcedBiome;
+        this.forcedRareIndex = forcedRareIndex;
+        this.debugLabel = debugLabel;
     }
 
     /** The island theme this seed germinates into (a {@code skyseed:theme} datapack-registry id). */
@@ -52,6 +66,18 @@ public class IslandSeedItem extends Item {
     /** A biome this (debug) seed forces its island to germinate as, ignoring where it's thrown; null = normal. */
     public ResourceLocation forcedBiome() {
         return forcedBiome;
+    }
+
+    /** A rare-structure index this (debug) seed forces its island to germinate, bypassing the chance roll; -1 = none. */
+    public int forcedRareIndex() {
+        return forcedRareIndex;
+    }
+
+    @Override
+    public net.minecraft.network.chat.Component getName(ItemStack stack) {
+        return debugLabel != null
+                ? net.minecraft.network.chat.Component.literal("Debug: " + debugLabel)
+                : super.getName(stack);
     }
 
     @Override

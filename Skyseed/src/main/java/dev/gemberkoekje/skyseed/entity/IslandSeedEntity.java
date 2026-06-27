@@ -60,6 +60,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     private static final EntityDataAccessor<String> DATA_FORCED_BIOME =
             SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.STRING);
 
+    private static final EntityDataAccessor<Integer> DATA_FORCED_RARE =
+            SynchedEntityData.defineId(IslandSeedEntity.class, EntityDataSerializers.INT);
+
     /** Ticks from spawn to germination (~2 s at 20 tps). */
     public static final int ARM_DURATION = 40;
 
@@ -100,6 +103,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         super.defineSynchedData(builder); // defines the projectile's item-stack data; required
         builder.define(DATA_THEME, "");
         builder.define(DATA_FORCED_BIOME, "");
+        builder.define(DATA_FORCED_RARE, -1);
     }
 
     public void setTheme(ResourceLocation theme) {
@@ -121,6 +125,16 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     public ResourceLocation getForcedBiome() {
         String s = this.entityData.get(DATA_FORCED_BIOME);
         return s.isEmpty() ? null : Ids.parse(s);
+    }
+
+    /** Force the rare structure at this index into the theme's {@code rare_structures} (debug seeds); -1 = normal roll. */
+    public void setForcedRare(int index) {
+        this.entityData.set(DATA_FORCED_RARE, index);
+    }
+
+    /** @return the forced rare-structure index, or -1 for the normal chance roll. */
+    public int getForcedRare() {
+        return this.entityData.get(DATA_FORCED_RARE);
     }
 
     /** A debug seed's forced biome resolved to a holder, or {@code null} for the normal planting-biome behaviour. */
@@ -264,7 +278,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
                                      List<Vec3> players, IslandPlacement.Occupancy occupied) {
         BlockPos cursor = base;
         for (int attempt = 0; attempt < MAX_H_ATTEMPTS; attempt++) {
-            final IslandPlan candidate = planAt(level, theme, cursor, forcedBiomeHolder(level));
+            final IslandPlan candidate = planAt(level, theme, cursor, forcedBiomeHolder(level), getForcedRare());
             final IslandPlacement.Fit fit = IslandPlacement.check(candidate, players, occupied);
             if (fit.ok()) {
                 this.setPos(cursor.getX() + 0.5, cursor.getY() + 0.5, cursor.getZ() + 0.5);
@@ -285,7 +299,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         }
         for (int lift : V_FALLBACK) {
             final BlockPos c = base.above(lift);
-            final IslandPlan candidate = planAt(level, theme, c, forcedBiomeHolder(level));
+            final IslandPlan candidate = planAt(level, theme, c, forcedBiomeHolder(level), getForcedRare());
             if (IslandPlacement.check(candidate, players, occupied).ok()) {
                 this.setPos(c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5);
                 return candidate;
@@ -296,9 +310,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
 
     /** Plan the island at {@code c} as {@code forced} (a debug seed's biome) or, when null, the planting biome at
      *  {@code c}; RNG is decorrelated per island via {@code worldSeed ^ centre}. */
-    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c, Holder<Biome> forced) {
+    private static IslandPlan planAt(ServerLevel level, IslandTheme theme, BlockPos c, Holder<Biome> forced, int forcedRare) {
         final RandomSource random = RandomSource.create(level.getSeed() ^ c.asLong());
-        return IslandGenerator.planIsland(level, c, theme, forced != null ? forced : level.getBiome(c), random);
+        return IslandGenerator.planIsland(level, c, theme, forced != null ? forced : level.getBiome(c), random, forcedRare);
     }
 
     /**
@@ -369,6 +383,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (forced != null) {
             tag.putString("ForcedBiome", forced.toString());
         }
+        if (getForcedRare() >= 0) {
+            tag.putInt("ForcedRare", getForcedRare());
+        }
         tag.putBoolean("Precise", this.precise);
         if (this.precise) {
             tag.putDouble("TX", this.targetX);
@@ -386,6 +403,9 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         }
         if (tag.contains("ForcedBiome")) {
             setForcedBiome(Ids.parse(tag.getString("ForcedBiome")));
+        }
+        if (tag.contains("ForcedRare")) {
+            setForcedRare(tag.getInt("ForcedRare"));
         }
         this.precise = tag.getBoolean("Precise");
         if (this.precise) {

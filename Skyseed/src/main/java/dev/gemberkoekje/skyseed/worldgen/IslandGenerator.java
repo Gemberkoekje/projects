@@ -63,6 +63,15 @@ public final class IslandGenerator {
 
     public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
                                         Holder<Biome> biome, RandomSource random) {
+        return planIsland(level, center, theme, biome, random, -1);
+    }
+
+    /**
+     * As above, but {@code forcedRare} (an index into the theme's {@code rare_structures}, or -1 for the normal chance
+     * roll) lets a debug seed force a specific otherwise chance-gated structure to germinate. See {@link #rollRare}.
+     */
+    public static IslandPlan planIsland(ServerLevel level, BlockPos center, IslandTheme theme,
+                                        Holder<Biome> biome, RandomSource random, int forcedRare) {
         // Pass 0: resolve the per-island config (palette/shape/variant/snow…) from the theme + matching biome override.
         final Resolved cfg = resolveConfig(level, center, theme, biome, random);
         final boolean useBase = cfg.useBase(); // false off the theme's home dimension — gates the home-only lava pass
@@ -90,7 +99,7 @@ public final class IslandGenerator {
 
         // Rare structures: at most one germinates in place of the usual island. Rolled here, before the pond, so a
         // flooded ruin can suppress the pond it stands in for.
-        final RareStructure rare = rollRare(theme, biome, cfg, random);
+        final RareStructure rare = rollRare(theme, biome, cfg, random, forcedRare);
 
         // Water: a Y-banded lava lake (rolled first; a hit suppresses the pond) or the theme/override pond/river.
         final Water water = planWater(buffers, cfg, theme, center, sh, lava, rare, random);
@@ -196,7 +205,12 @@ public final class IslandGenerator {
      * Roll for a rare structure (the first whose chance hits) that germinates in place of the usual island. Gated to the
      * theme's home dimension unless the structure names its own. Consumes one RNG roll per candidate up to the hit.
      */
-    private static RareStructure rollRare(IslandTheme theme, Holder<Biome> biome, Resolved cfg, RandomSource random) {
+    private static RareStructure rollRare(IslandTheme theme, Holder<Biome> biome, Resolved cfg, RandomSource random,
+                                          int forcedRare) {
+        // A debug seed can force a specific rare structure (bypassing the chance + dimension/biome gates entirely).
+        if (forcedRare >= 0 && forcedRare < theme.rareStructures().size()) {
+            return theme.rareStructures().get(forcedRare);
+        }
         for (final RareStructure rs : theme.rareStructures()) {
             if (rs.rollsIn(cfg.dim(), cfg.useBase()) && rs.matchesBiome(biome) && random.nextFloat() < rs.chance()) {
                 return rs;
