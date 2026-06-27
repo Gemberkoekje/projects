@@ -10,7 +10,14 @@
     { "block": "minecraft:lapis_ore", "chance": 0.35, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" },
     { "block": "minecraft:redstone_ore", "chance": 0.20, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "deep_core" }
   ],
-  "variants": [],
+  "_comment_variants": "Stone-type look: normal stone stays the common case; the rest re-skin the whole body to a vanilla stone alternative. Ores keep their stone-form blocks (as in vanilla, where ore in diorite still reads as stone-framed ore). The deepslate/snowy bands set their own variants so a stone-type roll can't override them.",
+  "variants": [
+    { "weight": 12, "name": "stone" },
+    { "weight": 2, "name": "diorite", "surface_override": "minecraft:diorite", "fill_override": "minecraft:diorite", "core_override": "minecraft:diorite" },
+    { "weight": 2, "name": "granite", "surface_override": "minecraft:granite", "fill_override": "minecraft:granite", "core_override": "minecraft:granite" },
+    { "weight": 2, "name": "andesite", "surface_override": "minecraft:andesite", "fill_override": "minecraft:andesite", "core_override": "minecraft:andesite" },
+    { "weight": 1, "name": "tuff", "surface_override": "minecraft:tuff", "fill_override": "minecraft:tuff", "core_override": "minecraft:tuff" }
+  ],
   "biome_overrides": [
     { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.35, "underside": "teardrop" } },
     { "_comment": "Nether adaptation (Tier 1) — a TINY ~7x7x4 island on purpose (reused overworld seed; the incentive is to craft Nether-specific seeds). Abyss/low band near the lava sea: Ancient Debris emerges. Listed first so it wins in the Nether.",
@@ -67,6 +74,7 @@
 
     { "max_y": 8,
       "surface": "minecraft:deepslate", "fill": "minecraft:cobbled_deepslate", "core": "minecraft:deepslate",
+      "variants": [],
       "ores": [
         { "block": "minecraft:deepslate_diamond_ore", "chance": 0.70, "count": { "min": 1, "max": 3 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
         { "block": "minecraft:deepslate_redstone_ore", "chance": 0.90, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 5 }, "depth": "core" },

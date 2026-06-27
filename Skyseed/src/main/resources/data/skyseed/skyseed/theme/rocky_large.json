@@ -31,7 +31,19 @@
     { "weight": 2, "name": "snowcapped", "surface_override": "minecraft:snow_block", "snow": 0.70, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ] } },
     { "weight": 1, "name": "scree", "surface_override": "minecraft:gravel", "decoration": {
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } }
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.04 } ] } },
+    { "weight": 1, "name": "diorite", "surface_override": "minecraft:diorite", "fill_override": "minecraft:diorite", "core_override": "minecraft:diorite", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } },
+    { "weight": 1, "name": "granite", "surface_override": "minecraft:granite", "fill_override": "minecraft:granite", "core_override": "minecraft:granite", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } },
+    { "weight": 1, "name": "andesite", "surface_override": "minecraft:andesite", "fill_override": "minecraft:andesite", "core_override": "minecraft:andesite", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } },
+    { "weight": 1, "name": "tuff", "surface_override": "minecraft:tuff", "fill_override": "minecraft:tuff", "core_override": "minecraft:tuff", "decoration": {
+      "trees": [ { "feature": "minecraft:spruce", "tries": 3, "spacing": 3 } ],
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.06 } ] } }
   ],
   "biome_overrides": [
     { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 11, "max": 15 }, "rim_noise": 0.32, "underside": "teardrop", "top_dome": { "min": 8, "max": 12 } } },
@@ -91,6 +103,7 @@
 
     { "max_y": 8,
       "surface": "minecraft:deepslate", "fill": "minecraft:cobbled_deepslate", "core": "minecraft:deepslate",
+      "variants": [],
       "ores": [
         { "block": "minecraft:deepslate_diamond_ore", "chance": 0.80, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 1, "max": 3 }, "depth": "deep_core" },
         { "block": "minecraft:deepslate_redstone_ore", "chance": 0.90, "count": { "min": 2, "max": 5 }, "vein_size": { "min": 3, "max": 5 }, "depth": "core" },

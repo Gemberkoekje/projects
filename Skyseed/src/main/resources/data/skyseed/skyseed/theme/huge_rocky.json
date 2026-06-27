@@ -101,7 +101,14 @@
       "depth": "deep_core"
     }
   ],
-  "variants": [],
+  "_comment_variants": "Stone-type look: normal stone stays the common case; the rest re-skin the whole body to a vanilla stone alternative. Deepslate/snowy bands set their own variants so a stone-type roll can't override them.",
+  "variants": [
+    { "weight": 12, "name": "stone" },
+    { "weight": 2, "name": "diorite", "surface_override": "minecraft:diorite", "fill_override": "minecraft:diorite", "core_override": "minecraft:diorite" },
+    { "weight": 2, "name": "granite", "surface_override": "minecraft:granite", "fill_override": "minecraft:granite", "core_override": "minecraft:granite" },
+    { "weight": 2, "name": "andesite", "surface_override": "minecraft:andesite", "fill_override": "minecraft:andesite", "core_override": "minecraft:andesite" },
+    { "weight": 1, "name": "tuff", "surface_override": "minecraft:tuff", "fill_override": "minecraft:tuff", "core_override": "minecraft:tuff" }
+  ],
   "biome_overrides": [
     {
       "biomes": [
@@ -250,6 +257,7 @@
       "surface": "minecraft:deepslate",
       "fill": "minecraft:cobbled_deepslate",
       "core": "minecraft:deepslate",
+      "variants": [],
       "ores": [
         {
           "block": "minecraft:deepslate_diamond_ore",

@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.147.0] - 2026-06-27
+
+### Added
+- **Stone-type Rocky islands.** The Rocky line (small / Large / Huge) now rolls a weighted stone-type look: normal
+  stone stays the common case, with diorite, granite, andesite, and tuff variants that re-skin the *whole* body — so
+  mining one actually yields that block, not a stone island wearing a diorite skin. The theme `Variant` codec gains
+  `fill_override` / `core_override` (alongside the existing `surface_override`) to swap the whole body; the deepslate
+  and snowy bands set their own `variants` so a stone-type roll can't override their palette/ores. These stone
+  alternatives didn't generate anywhere in Skyseed before (they were only craftable, via Nether quartz). +1 test; 125 pass.
+
 ## [0.146.0] - 2026-06-27
 
 ### Changed

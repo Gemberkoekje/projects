@@ -159,15 +159,18 @@ public final class IslandGenerator {
         final Shape shape = eff(ov, BiomeOverride::shape, useBase, theme::shape, NEUTRAL_SHAPE);
         final List<OreEntry> ores = eff(ov, BiomeOverride::ores, useBase, theme::ores, List.<OreEntry>of());
         final List<Variant> variants = eff(ov, BiomeOverride::variants, useBase, theme::variants, List.<Variant>of());
-        final ResourceLocation fillId = eff(ov, BiomeOverride::fill, useBase, pal::fill, neutralBlock);
-        final ResourceLocation coreId = eff(ov, BiomeOverride::core, useBase, pal::core, neutralBlock);
+        ResourceLocation fillId = eff(ov, BiomeOverride::fill, useBase, pal::fill, neutralBlock);
+        ResourceLocation coreId = eff(ov, BiomeOverride::core, useBase, pal::core, neutralBlock);
         final int baseFill = eff(ov, BiomeOverride::fillDepth, useBase, pal::fillDepth, 2);
         final List<GroundEntry> scatterCfg = eff(ov, BiomeOverride::surfaceScatter, useBase, pal::surfaceScatter, List.<GroundEntry>of());
 
         final Variant variant = pickVariant(variants, random);
         ResourceLocation surfaceId = eff(ov, BiomeOverride::surface, useBase, pal::surface, neutralBlock);
-        if (variant != null && variant.surfaceOverride().isPresent()) {
-            surfaceId = variant.surfaceOverride().get();
+        if (variant != null) {
+            // A variant can re-skin the whole body, not just the surface (e.g. a stony island rolling diorite/granite).
+            if (variant.surfaceOverride().isPresent()) surfaceId = variant.surfaceOverride().get();
+            if (variant.fillOverride().isPresent()) fillId = variant.fillOverride().get();
+            if (variant.coreOverride().isPresent()) coreId = variant.coreOverride().get();
         }
         final BlockState surface = resolveBlock(surfaceId, Blocks.GRASS_BLOCK).defaultBlockState();
         final BlockState fill = resolveBlock(fillId, Blocks.DIRT).defaultBlockState();

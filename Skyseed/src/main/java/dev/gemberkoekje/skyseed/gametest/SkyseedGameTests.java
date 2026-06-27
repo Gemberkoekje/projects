@@ -126,6 +126,43 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void rockyRollsWholeBodyStoneTypeVariants(GameTestHelper helper) {
+        // The Rocky line carries stone-type variants (stone/diorite/granite/andesite/tuff). A non-stone roll must
+        // re-skin the WHOLE body through fill_override/core_override — not just the surface — so mining it actually
+        // yields that block. Plan plains islands at a mid-altitude Y (clear of the deepslate/snow bands, which set
+        // their own variants) across a deterministic seed range: plain stone stays the common case, and at least one
+        // alternative appears with a fully converted body (no leftover cobblestone fill or stone core).
+        final ServerLevel level = helper.getLevel();
+        final var plains = level.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.PLAINS);
+        int stoneIslands = 0, altIslands = 0;
+        boolean sawFullyConvertedAlt = false;
+        for (long seed = 1; seed <= 40; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 64, 40),
+                    theme(level, "rocky"), plains, RandomSource.create(seed));
+            boolean cobble = false, stone = false, alt = false;
+            for (IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(Blocks.COBBLESTONE)) cobble = true;
+                else if (bp.state().is(Blocks.STONE)) stone = true;
+                else if (bp.state().is(Blocks.DIORITE) || bp.state().is(Blocks.GRANITE)
+                        || bp.state().is(Blocks.ANDESITE) || bp.state().is(Blocks.TUFF)) alt = true;
+            }
+            if (alt) {
+                altIslands++;
+                if (!cobble && !stone) sawFullyConvertedAlt = true;  // fill+core were overridden, not just the surface
+            } else if (stone && cobble) {
+                stoneIslands++;
+            }
+        }
+        helper.assertTrue(stoneIslands > 0, "expected plain-stone Rocky islands (stone + cobblestone) across the range");
+        helper.assertTrue(altIslands > 0, "expected stone-type-alternative Rocky islands (diorite/granite/andesite/tuff)");
+        helper.assertTrue(sawFullyConvertedAlt,
+                "an alternative Rocky island must convert its whole body (no leftover cobblestone fill / stone core)");
+        helper.assertTrue(stoneIslands > altIslands,
+                "plain stone must stay more common than the alternatives, got stone=" + stoneIslands + " alt=" + altIslands);
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void desertAdaptsInTheNether(GameTestHelper helper) {
         // Thrown in the Nether, Desert adapts (SKYNETHERPLAN): a Soul Sand Valley — soul sand over soul soil and a
         // basalt core — not the overworld sand island.

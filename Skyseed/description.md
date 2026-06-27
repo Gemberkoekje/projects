@@ -35,7 +35,7 @@ Press **V** to switch. It remembers which you picked.
 Every Skyseed grows its own kind of island. Most have a few different looks and the odd hidden surprise, and each has a larger, pricier **Large** version with its own twist.
 
 - **Forest.** Your starter. Grass, flowers, and trees that suit wherever it lands. The Large one is a sprawling old-growth wood, biggest of the green islands.
-- **Rocky.** The mining island, and the one where height counts for the most. Low gives you deepslate, diamond and redstone; the middle, iron and copper; high, coal and iron, with snow on the very top. Dig around and you might hit lava — likelier the lower you throw, a long shot up high and about one in five below Y 0. Large Rocky is a tall mountain with emeralds in it.
+- **Rocky.** The mining island, and the one where height counts for the most. Low gives you deepslate, diamond and redstone; the middle, iron and copper; high, coal and iron, with snow on the very top. Dig around and you might hit lava — likelier the lower you throw, a long shot up high and about one in five below Y 0. Most come up as ordinary stone, but every so often the whole island is diorite, granite, andesite or tuff instead. Large Rocky is a tall mountain with emeralds in it.
 - **Desert.** Sand and sandstone, cacti and dead bushes, clay and fossils underneath. Drop it over a badlands and you get red dunes. Large: an oasis.
 - **Mushroom.** Mycelium under giant red and brown mushrooms. Nothing hostile spawns on it, so it's a safe place to build. The Large isle comes with mooshrooms grazing.
 - **Frozen.** Snow and ice, packed ice, the occasional blue ice, and a few powder-snow pockets to mind your step around. Large: a frozen lake.
