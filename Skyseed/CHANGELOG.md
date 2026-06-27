@@ -3,6 +3,17 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.122.0] - 2026-06-27
+
+### Added
+- **Cave systems for huge islands (SKYHUGEPLAN Phase 2).** Huge land islands (Forest + the Rocky / Desert / Ancient
+  drafts) now carve an **internal cave system** — a ring of chambers linked by tunnels, hollowed out of the body while
+  keeping a solid skin below the surface and above the underside, so the island never opens to the void. Caves are
+  dressed from the variant's underside palette (stalactites, cave vines, glow lichen) with a dripstone + glow-lichen
+  default, plus floor stalagmites; the theme's ores are exposed for mining. Each island rolls a **reachability** —
+  **hidden** (mine in), a **sinkhole** shaft, or a **gash** ravine. New `caves` theme config + `CaveCarver` engine
+  (existing islands are untouched — caves are opt-in).
+
 ## [0.121.0] - 2026-06-27
 
 ### Changed

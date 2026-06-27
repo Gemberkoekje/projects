@@ -2389,7 +2389,28 @@ public final class SkyseedGameTests {
         final int hugeF = IslandGenerator.planIsland(level, c, theme(level, "huge_forest"), b, RandomSource.create(1L)).blocks().size();
         final int hugeA = IslandGenerator.planIsland(level, c, theme(level, "huge_aquatic"), b, RandomSource.create(1L)).blocks().size();
         helper.assertTrue(hugeF > largeF * 3 / 2, "huge_forest (" + hugeF + ") should dwarf forest_large (" + largeF + ")");
-        helper.assertTrue(hugeA > largeA * 3 / 2, "huge_aquatic cluster (" + hugeA + ") should dwarf aquatic_large (" + largeA + ")");
+        helper.assertTrue(hugeA > largeA * 3 / 2, "huge_aquatic (" + hugeA + ") should dwarf aquatic_large (" + largeA + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void hugeIslandsCarveDecoratedCaves(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 2: huge land islands carve an internal cave system, dressed from the underside palette (or
+        // a default of dripstone + glow lichen). huge_forest has no other dripstone/glow-lichen source, so any in its
+        // plan came from the caves — assert some appear (the carver ran, the caves were decorated).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var biome = level.getBiome(c);
+        int caveDeco = 0;
+        for (long seed = 1; seed <= 6; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_forest"), biome, RandomSource.create(seed));
+            for (final var bp : p.blocks()) {
+                if (bp.state().is(Blocks.POINTED_DRIPSTONE) || bp.state().is(Blocks.GLOW_LICHEN)) {
+                    caveDeco++;
+                }
+            }
+        }
+        helper.assertTrue(caveDeco > 0, "huge_forest should carve decorated caves (dripstone/glow lichen) — got " + caveDeco);
         helper.succeed();
     }
 

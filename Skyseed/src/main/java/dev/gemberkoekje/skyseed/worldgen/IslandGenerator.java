@@ -95,6 +95,12 @@ public final class IslandGenerator {
         // Water: a Y-banded lava lake (rolled first; a hit suppresses the pond) or the theme/override pond/river.
         final Water water = planWater(buffers, cfg, theme, center, sh, lava, rare, random);
 
+        // Caves (huge islands): hollow the interior, keeping a solid skin below the surface + above the underside, and
+        // roll a reachability (hidden / sinkhole / gash). Before the structure/decoration so a breach drops those columns.
+        final List<GroundEntry> caveDeco = cfg.variant() != null ? cfg.variant().decoration().underside() : List.of();
+        theme.caves().ifPresent(caves -> CaveCarver.carve(blockMap, buffers.surfaceList(), buffers.bottomList(),
+                center, baseRadius, caves, caveDeco, random));
+
         // Curated structure: a jigsaw building/cluster on a levelled pad (assembled later by GenerationJob), or a rare
         // structure's jigsaw + animal packs in its place.
         final StructurePlan structure = planStructure(level, buffers, cfg, theme, rare, center, topDome, random);

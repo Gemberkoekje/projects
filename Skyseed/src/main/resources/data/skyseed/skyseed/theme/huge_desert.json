@@ -1,16 +1,104 @@
 {
   "_comment": "Huge Desert (SKYHUGEPLAN — debug-only for now; Phase-4 rollout promotes it): a vast dune sea of sand/sandstone, radius ~26-32. Scaled clay/gold/bone-fossil ores; cactus + dead bush; rabbits. Overworld.",
-  "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 26, "max": 32 }, "rim_noise": 0.40, "underside": "teardrop", "top_dome": { "min": 2, "max": 5 }, "max_under_depth": 16 },
-  "palette": { "surface": "minecraft:sand", "fill": "minecraft:sandstone", "core": "minecraft:smooth_sandstone", "fill_depth": 3 },
-  "ores": [
-    { "block": "minecraft:clay", "chance": 1.0, "count": { "min": 8, "max": 14 }, "vein_size": { "min": 4, "max": 8 }, "depth": "core" },
-    { "block": "minecraft:gold_ore", "chance": 0.7, "count": { "min": 3, "max": 6 }, "vein_size": { "min": 1, "max": 2 }, "depth": "deep_core" },
-    { "block": "minecraft:bone_block", "chance": 0.5, "count": { "min": 2, "max": 4 }, "vein_size": { "min": 3, "max": 7 }, "depth": "deep_core" }
+  "dimensions": [
+    "minecraft:overworld"
   ],
-  "mobs": [ { "entity": "minecraft:rabbit", "chance": 0.3, "count": { "min": 1, "max": 3 } } ],
+  "shape": {
+    "radius": {
+      "min": 26,
+      "max": 32
+    },
+    "rim_noise": 0.4,
+    "underside": "teardrop",
+    "top_dome": {
+      "min": 2,
+      "max": 5
+    },
+    "max_under_depth": 16
+  },
+  "palette": {
+    "surface": "minecraft:sand",
+    "fill": "minecraft:sandstone",
+    "core": "minecraft:smooth_sandstone",
+    "fill_depth": 3
+  },
+  "ores": [
+    {
+      "block": "minecraft:clay",
+      "chance": 1,
+      "count": {
+        "min": 8,
+        "max": 14
+      },
+      "vein_size": {
+        "min": 4,
+        "max": 8
+      },
+      "depth": "core"
+    },
+    {
+      "block": "minecraft:gold_ore",
+      "chance": 0.7,
+      "count": {
+        "min": 3,
+        "max": 6
+      },
+      "vein_size": {
+        "min": 1,
+        "max": 2
+      },
+      "depth": "deep_core"
+    },
+    {
+      "block": "minecraft:bone_block",
+      "chance": 0.5,
+      "count": {
+        "min": 2,
+        "max": 4
+      },
+      "vein_size": {
+        "min": 3,
+        "max": 7
+      },
+      "depth": "deep_core"
+    }
+  ],
+  "mobs": [
+    {
+      "entity": "minecraft:rabbit",
+      "chance": 0.3,
+      "count": {
+        "min": 1,
+        "max": 3
+      }
+    }
+  ],
   "variants": [
-    { "weight": 1, "name": "standard", "decoration": {
-      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.10 }, { "block": "minecraft:cactus", "chance": 0.05 } ] } }
-  ]
+    {
+      "weight": 1,
+      "name": "standard",
+      "decoration": {
+        "ground": [
+          {
+            "block": "minecraft:dead_bush",
+            "chance": 0.1
+          },
+          {
+            "block": "minecraft:cactus",
+            "chance": 0.05
+          }
+        ]
+      }
+    }
+  ],
+  "caves": {
+    "rooms": {
+      "min": 3,
+      "max": 6
+    },
+    "size": {
+      "min": 3,
+      "max": 5
+    }
+  }
 }

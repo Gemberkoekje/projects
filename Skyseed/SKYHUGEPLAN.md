@@ -143,8 +143,16 @@ the cave work, newest/most-thematic first.
    creative-only `debug_huge_*` for Forest (plains/taiga/dark/cherry/jungle/swamp/snowy) and Aquatic (plains/ocean/swamp)
    to test the adaptation, plus three **draft** debug-only themes — **Rocky** (mountain), **Desert** (dune sea),
    **Ancient** (deepslate slab) — kept as a Phase-4 head start (the rollout promotes those + the rest to real gated seeds).
-2. **Cave systems.** `CaveCarver` + cave decoration (reuse underside palette), gated by a `caves` config. Make
-   **`huge_lush`** / **`huge_ancient`** the showcases.
+2. **Cave systems — DONE (v0.122.0).** `CaveCarver` hollows a ring of ellipsoid chambers + tunnels out of the
+   interior, clipped so a solid skin always remains below the surface (`SURFACE_MARGIN`) and above the underside
+   (`UNDER_MARGIN`) — never opens to the void; carved in the outer ring (clear of the centre's ponds/structures).
+   Dressed from the variant's `decoration.underside` palette (stalactites via `DecorationPlanner.hangUnder`, cave vines,
+   glow lichen) with a dripstone+lichen default, plus floor stalagmites; the theme's ores are exposed for mining.
+   Reachability rolled per island: **hidden** (40%, mine in) / **sinkhole** shaft (35%) / **gash** ravine (25%).
+   Opt-in via a `caves` theme config (`rooms`, `size`); applied to **huge_forest** + the **rocky / desert / ancient**
+   drafts (not huge_aquatic — it's mostly lake). Guarded by `hugeIslandsCarveDecoratedCaves`. *(huge_lush/huge_ancient
+   are still the richest, via their underside palettes — huge_lush ships in the Phase-4 rollout.)* In-world look needs a
+   playtest (the plan can't render a cave cross-section).
 3. **Rare large structures.** Author the jigsaw dungeon + large mansion; wire them as `rare_structures` on the huge
    themes. 2-build dance + gametests.
 4. **Roll out** huge variants for the remaining overworld biomes; tune sizes, cave density, chances, recipes.

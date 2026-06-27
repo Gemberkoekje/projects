@@ -150,8 +150,8 @@ final class DecorationPlanner {
         }
     }
 
-    /** Build a single hanging feature under {@code bottom} (a column's lowest block). */
-    private static void hangUnder(Map<BlockPos, BlockState> blockMap, BlockPos bottom, ResourceLocation id, RandomSource random) {
+    /** Build a single hanging feature under {@code bottom} (a column's lowest block, or a cave ceiling for the CaveCarver). */
+    static void hangUnder(Map<BlockPos, BlockState> blockMap, BlockPos bottom, ResourceLocation id, RandomSource random) {
         final BlockPos first = bottom.below();
         if (blockMap.containsKey(first)) {
             return;
