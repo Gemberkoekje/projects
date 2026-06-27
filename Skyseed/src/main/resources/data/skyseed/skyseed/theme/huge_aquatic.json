@@ -60,7 +60,7 @@
         "target": "minecraft:bottom",
         "depth": 1,
         "pad": 10,
-        "sink": 0
+        "sink": 6
       },
       "mobs": [
         {

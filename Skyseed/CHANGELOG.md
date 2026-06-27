@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.131.0] - 2026-06-27
+
+### Fixed
+- **The Ocean Monument now sinks into the island, its pool flush with the surface — no more raised "weird pool."** The
+  monument's basin was placed on top of the island (`sink: 0`), so its walled water column rose above the surface.
+  Sinking it by its own water height (`sink: 5` for the 13×13 monument, `6` for the grand) drops the pool so its surface
+  lands flush with the island top, with only the dark-prismarine towers breaking the surface — a half-submerged
+  monument. Applied to the dedicated Ocean Monument seed, the Aquatic Large rare roll, and the Huge Aquatic grand
+  monument. New `oceanMonumentWaterSitsFlush` gametest (also guards against an off-by-one sink); 110 pass.
+
 ## [0.130.0] - 2026-06-27
 
 ### Changed

@@ -2224,6 +2224,36 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = REGION)
+    public static void oceanMonumentWaterSitsFlush(GameTestHelper helper) {
+        // The monument is sunk (sink = its 5-deep water height) so the pool surface lands flush with the island top, not
+        // as a raised basin. The jigsaw assembles during placement (not in the plan), so check its recorded site: the
+        // anchor lands at origin.y - 1 (the basin floor), the pool is 5 deep, so its surface (floor + 5) must be flush
+        // with the island's surface Y — never above it (the old "weird pool"). Also catches an off-by-one in the sink.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme t = theme(level, "aquatic_large");
+        final int idx = rareIndex(t, "ocean_monument/start");
+        helper.assertTrue(idx >= 0, "aquatic_large should host the ocean monument rare structure");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(level, c, t, level.getBiome(c),
+                RandomSource.create(3L), DebugForce.rare(idx));
+        final IslandPlan.JigsawSite site = p.jigsaws().stream()
+                .filter(j -> j.pool().getPath().equals("ocean_monument/start")).findFirst().orElse(null);
+        helper.assertTrue(site != null, "the forced monument should record a jigsaw site");
+        int maxLandY = Integer.MIN_VALUE; // the island's own surface (the monument isn't in the plan, only its site)
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (!bp.state().isAir() && !bp.state().is(Blocks.WATER)) {
+                maxLandY = Math.max(maxLandY, bp.pos().getY());
+            }
+        }
+        final int poolTop = (site.origin().getY() - 1) + 5;
+        helper.assertTrue(poolTop <= maxLandY, "the monument pool must sit flush, not above the island surface "
+                + "(pool top " + poolTop + " vs land top " + maxLandY + ")");
+        helper.assertTrue(poolTop >= maxLandY - 1, "the monument pool should reach the island surface "
+                + "(pool top " + poolTop + " vs land top " + maxLandY + ")");
+        helper.succeed();
+    }
+
     @GameTest(template = BIG_REGION)
     public static void ancientCityPlaces(GameTestHelper helper) {
         // SKYHUGEPLAN §3: the Ancient City — the rare 6% bonus on the Huge Ancient seed. Verify it assembles: a
