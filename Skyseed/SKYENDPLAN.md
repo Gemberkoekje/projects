@@ -96,12 +96,17 @@ Genuinely new seeds with no overworld parallel, the way the Nether got Bastion /
   `chorus_plant` feature), purpur surface-scatter, and an enderman pack — the End-highlands look + a renewable
   chorus / purpur / ender-pearl economy. Crafted from chorus fruit (bootstrapped off the outer islands) ringing end
   stone; full onboarding. Also added a dedicated **"The End" guide category** (End Portal / Return Portal / Chorus
-  Forest moved into it). **Next:** End City (below) is the remaining Phase-3 piece.
-- **End City** — the chapter's flagship structure seed, on the jigsaw machinery: purpur towers + a ship, **shulkers**
-  (shulker shells → shulker boxes) and the **elytra** reward on the ship. The natural parallel to the Mansion / Bastion
-  as the "grand loot dungeon." Likely **End-biome-gated** (highlands/midlands only — see Phase 5).
-- **Open question:** an **Ender Pearl / enderman farm** seed (a dark end-stone platform mob-packed with endermen) — handy
-  but maybe redundant with Chorus Forest's pack. Decide whether endermen are a dedicated seed or just a pack rider.
+  Forest moved into it).
+- **End City — built (v0.113.0).** The `end_city` seed: a 7×7 purpur tower (corner pillars, doorway, windows, an
+  internal ladder, end-rod lighting, a ground-floor `end_city_treasure` chest) with a cantilevered **End ship** off the
+  top — a tapering hull, a masted deck, a bow dragon head, and the reward chest (`skyseed:chests/end_ship`) holding a
+  **guaranteed elytra**. **Shulkers** spawn on the island (theme mobs) for shells → shulker boxes. Crafted from purpur
+  framing shulker shells around end stone (bootstrapped off the outer islands' vanilla End Cities); full onboarding +
+  a structure-assembly gametest. The chapter's "grand loot dungeon," the Mansion / Bastion parallel.
+- **Enderman farm — resolved: a pack rider, not its own seed.** The Chorus Forest already carries an enderman pack
+  (ender pearls) and the End City a shulker pack, so a dedicated enderman/pearl-farm seed is redundant; dropped.
+- **Deferred to Phase 5:** End-biome gating (e.g. End City only in highlands/midlands). Today every End seed grows
+  wherever it's thrown; biome interactions are the Phase-5 job. **With these, the Phase-3 seed roster is complete.**
 
 ---
 

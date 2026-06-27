@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.113.0] - 2026-06-27
+
+### Added
+- **End City seed — the End chapter's flagship structure (Phase 3 roster complete).** Plant it for a purpur **tower**
+  (corner pillars, doorway, windows, an internal ladder, end-rod lighting and a ground-floor `end_city_treasure`
+  chest) with a cantilevered **End ship** off the top — a tapering hull, a masted deck with a bow **dragon head**, and
+  the reward chest holding a **guaranteed elytra** (the new `skyseed:chests/end_ship` loot table). **Shulkers** spawn on
+  the island for shells → shulker boxes. Crafted from purpur framing shulker shells around end stone (bootstrapped off
+  the outer islands' vanilla End Cities). Full onboarding plus a structure-assembly gametest.
+
 ## [0.112.0] - 2026-06-27
 
 ### Added

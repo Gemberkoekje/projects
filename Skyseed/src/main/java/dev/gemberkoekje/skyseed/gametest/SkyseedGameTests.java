@@ -2106,6 +2106,36 @@ public final class SkyseedGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = BIG_REGION)
+    public static void endCityHasPurpurTowerAndShipChest(GameTestHelper helper) {
+        // Phase 3 flagship: the End City Seed grows a purpur tower + a cantilevered End ship. Verify the structure
+        // assembles — purpur built, two loot chests (tower treasure + ship reward) and the bow's dragon head. (Loads .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/city"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        int purpur = 0, chests = 0;
+        boolean dragon = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.PURPUR_BLOCK) || st.is(Blocks.PURPUR_PILLAR)) {
+                        purpur++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.DRAGON_HEAD)) {
+                        dragon = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(purpur > 40, "the End City should be built of purpur (got " + purpur + ")");
+        helper.assertTrue(chests >= 2, "the End City needs a tower chest and a ship chest (got " + chests + ")");
+        helper.assertTrue(dragon, "the End ship needs a dragon head at the bow");
+        helper.succeed();
+    }
+
     @GameTest(template = REGION)
     public static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
         // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a
@@ -2139,6 +2169,25 @@ public final class SkyseedGameTests {
         helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
                         .is(ModItems.SEEDS.get("chorus_forest").get()),
                 "the chorus fruit + end stone ring did not produce the Chorus Forest Seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void endCitySeedCraftsFromShulkerShellAndPurpur(GameTestHelper helper) {
+        // Phase 3 flagship: the End City Seed crafts from purpur framing shulker shells around end stone — all
+        // End-obtainable (bootstrapped from the outer islands' vanilla End Cities), so your own city is renewable.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.PURPUR_BLOCK);
+        final net.minecraft.world.item.ItemStack s = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SHULKER_SHELL);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(p, s, p, p, e, p, p, s, p));
+        final var recipe = level.getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the End City Seed from purpur + shulker shells + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input, level.registryAccess())
+                        .is(ModItems.SEEDS.get("end_city").get()),
+                "the purpur + shulker shell + end stone frame did not produce the End City Seed");
         helper.succeed();
     }
 

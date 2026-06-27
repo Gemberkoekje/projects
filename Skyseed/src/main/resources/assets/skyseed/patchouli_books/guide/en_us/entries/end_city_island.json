@@ -1,0 +1,29 @@
+{
+  "name": "End City Seed",
+  "category": "skyseed:end",
+  "advancement": "skyseed:reveal_end_city",
+  "icon": "skyseed:end_city_skyseed",
+  "sortnum": 12,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)End City Skyseed$() — the End's grand prize, the way the Mansion and Bastion crown their chapters. Plant it for a $(o)purpur tower$() with a cantilevered $(o)End ship$() on an end-stone island, $(item)shulkers$() drifting around it.$(br2)$(bold)Where to look$()$(br)Bootstrap from the End's outer islands: their vanilla $(item)End Cities$() are where you first find $(item)shulkers$() (for $(item)shells$()) and $(item)purpur$(). Bring those home to seed your own."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:end_city_skyseed",
+      "text": "Shulker shells and end stone, framed in purpur.",
+      "advancement": "skyseed:gathered_end_city"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)The spoils$()$(br)The tower's chest rolls $(item)End City treasure$() — diamonds, enchanted gear, emeralds. Climb the ladder to the deck: the ship's chest holds the chapter's reward, a guaranteed $(item)elytra$(). And the resident $(item)shulkers$() are a renewable source of $(item)shells$() → $(item)shulker boxes$().",
+      "advancement": "skyseed:craft_end_city"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "$(bold)Mind the shulkers$()$(br)They levitate you — over the void, that is a long way down. Pick them off from cover, or bring a bucket of water to break your fall. A $(item)Return Portal Seed$() in your pack is cheap insurance.",
+      "advancement": "skyseed:craft_end_city"
+    }
+  ]
+}
