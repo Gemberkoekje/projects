@@ -6,7 +6,7 @@
   "ores": [
     { "block": "minecraft:nether_gold_ore", "chance": 0.50, "count": { "min": 1, "max": 2 }, "vein_size": { "min": 2, "max": 4 }, "depth": "core" }
   ],
-  "jigsaw": { "pool": "skyseed:bastion/bastion", "target": "minecraft:bottom", "depth": 1, "pad": 6 },
+  "jigsaw": { "pool": "skyseed:bastion/bastion", "target": "minecraft:bottom", "depth": 2, "pad": 6 },
   "mobs": [
     { "entity": "minecraft:piglin", "chance": 0.60, "count": { "min": 1, "max": 2 } },
     { "entity": "minecraft:piglin_brute", "chance": 0.40, "count": { "min": 1, "max": 1 } },

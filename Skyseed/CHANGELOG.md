@@ -3,6 +3,14 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.146.0] - 2026-06-27
+
+### Changed
+- **Bastion layout variety (SKYJIGSAWPLAN Phase 5).** The three walled bastion variants (treasure / housing / remnant)
+  now carry an outward wall connector that may sprawl a chain of small ruined `courtyard` yards out over the void via
+  the new `bastion/courtyard` pool (or roll empty), so a bastion varies its footprint instead of landing as one fixed
+  unit. Jigsaw depth 1 → 2 (the dedicated bastion seed + the three bastion-biome Large-Nether rares). +1 test; 124 pass.
+
 ## [0.145.0] - 2026-06-27
 
 ### Changed

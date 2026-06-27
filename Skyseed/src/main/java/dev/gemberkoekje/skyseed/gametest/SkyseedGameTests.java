@@ -3077,6 +3077,30 @@ public final class SkyseedGameTests {
     }
 
     @GameTest(template = REGION)
+    public static void bastionCourtyardChainsThePool(GameTestHelper helper) {
+        // Phase 5: the courtyard mates a bastion wall (a court_door connector) AND re-draws the courtyard pool from its
+        // far end, so bastions sprawl into chained yards instead of landing as one fixed unit. Checked on the template.
+        final ServerLevel level = helper.getLevel();
+        final StructureTemplate t = level.getStructureManager().get(skyseed("bastion/courtyard")).orElseThrow();
+        int door = 0, out = 0;
+        for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+            if (j.nbt() == null) {
+                continue;
+            }
+            if (j.nbt().getString("name").equals("skyseed:court_door")) {
+                door++;   // mates a wall's bastion_edge connector
+            }
+            if (j.nbt().getString("target").equals("skyseed:court_door")
+                    && j.nbt().getString("pool").equals("skyseed:bastion/courtyard")) {
+                out++;    // its far end re-draws the courtyard pool → chained yards
+            }
+        }
+        helper.assertTrue(door == 1, "the courtyard should mate a wall via a court_door connector (got " + door + ")");
+        helper.assertTrue(out == 1, "the courtyard should re-draw the courtyard pool from its far end (got " + out + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
     public static void oceanMonumentHasPrismarineAndTreasure(GameTestHelper helper) {
         final BlockPos o = place(helper, "skyseed:ocean_monument/monument");
         helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.PRISMARINE_BRICKS), "monument lost its prismarine");

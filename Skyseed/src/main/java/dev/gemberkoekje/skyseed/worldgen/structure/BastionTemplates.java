@@ -2,9 +2,11 @@ package dev.gemberkoekje.skyseed.worldgen.structure;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.FrontAndTop;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ChestBlock;
+import net.minecraft.world.level.block.JigsawBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.io.IOException;
@@ -36,6 +38,50 @@ public final class BastionTemplates {
         StructureParts.writeIfAbsent(dir.resolve("bridge.nbt"), bridge());
         StructureParts.writeIfAbsent(dir.resolve("housing.nbt"), housing());
         StructureParts.writeIfAbsent(dir.resolve("remnant.nbt"), remnant());
+        StructureParts.writeIfAbsent(dir.resolve("courtyard.nbt"), courtyard());
+    }
+
+    /** A floor-level outward connector (Phase 5 sprawl) on a bastion wall, drawing the courtyard pool; the doorway
+     *  above it is carved open (a ruined breach when nothing attaches, a passage when a courtyard does). */
+    private static void courtConnector(Map<BlockPos, BlockState> m, Map<BlockPos, CompoundTag> bes, int x, int z, FrontAndTop dir, String floor) {
+        m.put(new BlockPos(x, 0, z), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, dir));
+        bes.put(new BlockPos(x, 0, z), StructureParts.jig("skyseed:bastion_edge", "skyseed:court_door", "skyseed:bastion/courtyard", floor));
+        m.remove(new BlockPos(x, 1, z));
+        m.remove(new BlockPos(x, 2, z));
+    }
+
+    /** A connective courtyard (Phase 5): a small ruined blackstone yard cantilevering off a bastion over the void — a
+     *  door connector that mates a wall's {@link #courtConnector}, and a far connector that re-draws the courtyard pool
+     *  so bastions sprawl into chained yards rather than landing as one fixed unit. */
+    private static Built courtyard() {
+        final Map<BlockPos, BlockState> m = new HashMap<>();
+        final Map<BlockPos, CompoundTag> bes = new HashMap<>();
+        final BlockState bs = Blocks.BLACKSTONE.defaultBlockState();
+        final BlockState brick = Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
+        final int max = 6, mid = 3;
+        for (int x = 0; x <= max; x++) {
+            for (int z = 0; z <= max; z++) {
+                m.put(new BlockPos(x, 0, z), bs);
+                if (x == 0 || x == max || z == 0 || z == max) {
+                    final int h = (x == 0 || z == 0) ? 2 : 1;   // ruined: lower on the far/+ sides
+                    for (int y = 1; y <= h; y++) {
+                        m.put(new BlockPos(x, y, z), brick);
+                    }
+                }
+            }
+        }
+        m.put(new BlockPos(2, 1, 2), Blocks.GILDED_BLACKSTONE.defaultBlockState());      // a gilded post
+        m.put(new BlockPos(4, 1, 4), Blocks.CRIMSON_NYLIUM.defaultBlockState());
+        m.put(new BlockPos(4, 2, 4), Blocks.CRIMSON_ROOTS.defaultBlockState());
+        // Door connector (−X, mates a wall) + far connector (+X, re-draws the courtyard pool); doorways carved open.
+        m.put(new BlockPos(0, 0, mid), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.WEST_UP));
+        bes.put(new BlockPos(0, 0, mid), StructureParts.jig("skyseed:court_door", "skyseed:bastion_edge", "minecraft:empty", "minecraft:blackstone"));
+        m.remove(new BlockPos(0, 1, mid));
+        m.remove(new BlockPos(0, 2, mid));
+        m.put(new BlockPos(max, 0, mid), Blocks.JIGSAW.defaultBlockState().setValue(JigsawBlock.ORIENTATION, FrontAndTop.EAST_UP));
+        bes.put(new BlockPos(max, 0, mid), StructureParts.jig("skyseed:bastion_edge", "skyseed:court_door", "skyseed:bastion/courtyard", "minecraft:blackstone"));
+        m.remove(new BlockPos(max, 1, mid));
+        return new Built(m, bes);
     }
 
     /** A 9×9 ruin with a lodestone treasure plinth, a caged magma-cube spawner and the best loot. */
@@ -89,6 +135,7 @@ public final class BastionTemplates {
         m.put(new BlockPos(1, 2, 0), gild);
         m.put(new BlockPos(7, 2, 0), gild);
 
+        courtConnector(m, bes, 0, mid, FrontAndTop.WEST_UP, "minecraft:blackstone");   // a yard may sprawl off the west wall
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:blackstone");
         return new Built(m, bes);
     }
@@ -204,6 +251,7 @@ public final class BastionTemplates {
         m.put(new BlockPos(2, 0, 6), gild);
         m.put(new BlockPos(6, 0, 2), gild);
 
+        courtConnector(m, bes, max, mid, FrontAndTop.EAST_UP, "minecraft:blackstone");   // a yard may sprawl off the east doorway
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:blackstone");
         return new Built(m, bes);
     }
@@ -265,6 +313,7 @@ public final class BastionTemplates {
         m.put(new BlockPos(6, 1, 2), gild);
         m.put(new BlockPos(2, 1, 6), crying);
 
+        courtConnector(m, bes, max, mid, FrontAndTop.EAST_UP, "minecraft:polished_blackstone");   // a yard may sprawl off the collapsed east span
         StructureParts.anchor(m, bes, new BlockPos(mid, 0, mid), "minecraft:polished_blackstone");
         return new Built(m, bes);
     }
