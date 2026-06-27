@@ -3,6 +3,16 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.140.0] - 2026-06-27
+
+### Changed
+- **The End City is now a full jigsaw, not one box (SKYENDCITYPLAN Phase 1).** Replaced the single purpur box with a
+  vanilla-style `end_city` tileset: a base section + stacking **overhanging tiers** (`floor_a`/`floor_b` — an 11×11 lip
+  cantilevered over 9×9 walls, the stepped End City silhouette) + a terraced **roof**, chained by vertical up/down
+  jigsaw connectors, with magenta-glass windows, purpur-stair parapets and end-rod lighting. The `end_city_treasure`
+  chest and the (interim) cantilevered elytra ship ride the base. Theme jigsaw depth 1 → 5. Phases 2–5 (thin towers,
+  bridges, a fat-tower ship, detailing) extend the same pools. 119 pass.
+
 ## [0.139.0] - 2026-06-27
 
 ### Fixed

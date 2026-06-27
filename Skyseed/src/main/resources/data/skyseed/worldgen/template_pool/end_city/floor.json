@@ -1,0 +1,8 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:end_city/floor_a", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:end_city/floor_b", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:end_city/roof", "processors": "minecraft:empty", "projection": "rigid" } }
+  ]
+}
