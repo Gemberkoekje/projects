@@ -452,6 +452,18 @@
         "sink": 6
       },
       "mobs": []
+    },
+    {
+      "_comment": "2.5% — an Abandoned Mineshaft (mineshaft/) carved through the mountain: oak-plank tunnels with support arches, rails, cobwebs, cave-spider nests + chest minecarts. (SKYDUNGEONPLAN Part B.)",
+      "chance": 0.025,
+      "jigsaw": {
+        "pool": "skyseed:mineshaft/start",
+        "target": "minecraft:bottom",
+        "depth": 4,
+        "pad": 10,
+        "sink": 6
+      },
+      "mobs": []
     }
   ]
 }

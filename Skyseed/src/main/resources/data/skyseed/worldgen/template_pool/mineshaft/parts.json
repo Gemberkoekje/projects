@@ -1,0 +1,12 @@
+{
+  "fallback": "minecraft:empty",
+  "elements": [
+    { "weight": 6, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/corridor", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/corridor_loot", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/corridor_spawner", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/cross", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/room", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 2, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:mineshaft/dead_end", "processors": "minecraft:empty", "projection": "rigid" } },
+    { "weight": 3, "element": { "element_type": "minecraft:empty_pool_element" } }
+  ]
+}

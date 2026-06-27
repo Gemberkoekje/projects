@@ -132,9 +132,15 @@ surface tell.
    (`CCC/EDP/CCC` recipe + full onboarding). `sprawlingDungeonAssembles` gametest proves the connectors align (cobble
    > 400 = sprawled past the hub). Depth 4, sink 6, pad 12. *(Follow-up ideas: corridor_stairs for level changes; a
    `centerpiece` to guarantee one treasure_vault.)*
-2. **Mineshaft (oak)** — `MineshaftTemplates` + `mineshaft/` pool (corridor/cross/stairs/room/start/dead_end, with the
-   arches/rails/cobwebs/spawner/chest), wire as huge_rocky 2nd rare @ 2.5%. **+ extend `StructureWriter` for entities**
-   (chest minecarts). Gametest.
+2. **Mineshaft (oak) — DONE (v0.133.0).** `MineshaftTemplates` (start hub w/ stair, corridor, corridor_loot [chest
+   minecart], corridor_spawner [cave-spider nest], cross, room, dead_end) + the self-linking `mineshaft/parts` pool.
+   Pieces **carve tunnels** (bake floor + arches + rails + air, NOT walls/ceiling), self-linking on `skyseed:mineshaft`
+   with the connector final-state = rail (so the track carries through). Wired as huge_rocky's 2nd rare @ 2.5%.
+   **`StructureWriter` extended to bake an entities list** (+ `Built.entities()` + `StructureParts.chestMinecart`), so
+   the jigsaw placement spawns the chest minecarts — proven by `mineshaftMinecartEntitySpawns`. `abandonedMineshaftAssembles`
+   proves the sprawl. (Over-void corridors still float — Phase 3 stilts them.) Note: the assembly gametests assert only
+   robust "sprawled past the hub" thresholds, since the jigsaw is position-seeded; room/loot content is checked by
+   direct piece placement (`dungeonComplexRoomsCarryContent`, `mineshaftMinecartEntitySpawns`).
 3. **Over-void trestles** — `supportTrestles()` + the `trestles` jigsaw flag, wired in `placeStructures`; gametest
    (a corridor forced over the void grows fence legs).
 4. **Mesa dark-oak variant** — `mineshaft_mesa/` pool (+ a biome gate, or a parallel rare), gold/ore flavour.

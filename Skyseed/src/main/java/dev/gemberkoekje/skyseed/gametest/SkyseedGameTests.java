@@ -2347,26 +2347,75 @@ public final class SkyseedGameTests {
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
         Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, 7L);
         int cobble = 0;
-        int spawners = 0;
-        int chests = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
                 for (int y = 0; y < 24; y++) {
                     final var st = helper.getBlockState(new BlockPos(x, y, z));
                     if (st.is(Blocks.COBBLESTONE) || st.is(Blocks.MOSSY_COBBLESTONE)) {
                         cobble++;
-                    } else if (st.is(Blocks.SPAWNER)) {
-                        spawners++;
-                    } else if (st.is(Blocks.CHEST)) {
-                        chests++;
                     }
                 }
             }
         }
+        // The lone hub is ~300 cobble; more than that means corridors/rooms attached (the doorway connectors align).
+        // Which rooms land is position-seeded, so room content is verified by direct placement, not by scanning a run.
         helper.assertTrue(cobble > 400, "the dungeon should sprawl past its start hub (cobble " + cobble
                 + " — connectors likely misaligned if ~300)");
-        helper.assertTrue(spawners + chests >= 1, "the dungeon sprawl should reach a spawner room or a chest (spawners "
-                + spawners + ", chests " + chests + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = REGION)
+    public static void dungeonComplexRoomsCarryContent(GameTestHelper helper) {
+        // The pieces bake their content by construction; verify directly (the assembled run's room mix is position-
+        // seeded, so it isn't deterministic across the test set). A spawner room = a spawner + loot chests.
+        final BlockPos sp = place(helper, "skyseed:dungeon_complex/spawner_zombie");
+        helper.assertTrue(contains(helper, sp, 6, 4, 6, Blocks.SPAWNER), "spawner_zombie should bake a mob spawner");
+        helper.assertTrue(contains(helper, sp, 6, 4, 6, Blocks.CHEST), "spawner_zombie should bake loot chests");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void abandonedMineshaftAssembles(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part B: the mineshaft jigsaw must sprawl past its start hub (the rail connectors align). Assert
+        // an oak-plank floor, a centre rail line, and support-arch fences across a sizable run. (Pieces carve tunnels —
+        // they bake no side walls/ceiling.) Loads .nbt.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("mineshaft/start"));
+        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, 5L);
+        int planks = 0;
+        int rails = 0;
+        int fences = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.OAK_PLANKS)) {
+                        planks++;
+                    } else if (st.is(Blocks.RAIL)) {
+                        rails++;
+                    } else if (st.is(Blocks.OAK_FENCE)) {
+                        fences++;
+                    }
+                }
+            }
+        }
+        // The start hub is ~32 planks, ~5 rails and 0 fences (it uses log pillars); more than that — and any arch
+        // fences at all — means corridors/rooms attached (the rail connectors align). Counts vary with the
+        // position-seeded run, so the thresholds only need to clear the lone hub, not pin an exact sprawl.
+        helper.assertTrue(planks > 35, "the mineshaft should sprawl past its hub on an oak-plank floor (planks " + planks + ")");
+        helper.assertTrue(rails > 5, "the mineshaft should lay a centre rail line (rails " + rails + ")");
+        helper.assertTrue(fences > 0, "the mineshaft should raise support-arch fences — proving it sprawled (fences " + fences + ")");
+        helper.succeed();
+    }
+
+    @GameTest(template = BIG_REGION)
+    public static void mineshaftMinecartEntitySpawns(GameTestHelper helper) {
+        // The corridor_loot piece bakes a chest-minecart ENTITY (via the extended StructureWriter / Built.entities).
+        // Placing the piece must spawn the minecart — proving the entities list round-trips through the .nbt.
+        final BlockPos origin = place(helper, "skyseed:mineshaft/corridor_loot");
+        helper.assertTrue(near(helper.getLevel(), origin, net.minecraft.world.entity.vehicle.MinecartChest.class),
+                "the corridor_loot piece should spawn a chest minecart from its baked entity");
         helper.succeed();
     }
 

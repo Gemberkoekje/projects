@@ -3,6 +3,22 @@
 All notable changes to Skyseed are recorded here. The format is loosely based on
 [Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
 
+## [0.133.0] - 2026-06-27
+
+### Added
+- **The Abandoned Mineshaft — Huge Rocky's 2nd rare jigsaw (SKYDUNGEONPLAN Phase 2).** A recursing `mineshaft/` jigsaw
+  modeled on the vanilla mineshaft: 3-wide **carved tunnels** (oak-plank floor, a centre rail line, **fence-post + plank
+  support arches**, scattered cobwebs) with a **cave-spider spawner nest** variant and a **chest-minecart** variant, a
+  crossing, a big open room with log pillars, a start hub with a surface stair, and dead-ends. Pieces carve (they bake no
+  side walls/ceiling), so a sunk run reads as a tunnel through the rock. Wired as huge_rocky's **2nd rare @ 2.5%**
+  (alongside the Sprawling Dungeon) — so a Huge Rocky island rolls one or the other.
+- **`StructureWriter` now bakes an entities list** (+ `Built.entities()`, `StructureParts.chestMinecart`), so a piece can
+  ship live entities in its `.nbt` — used for the mineshaft's chest minecarts (loot table `chests/abandoned_mineshaft`).
+  Verified end-to-end by `mineshaftMinecartEntitySpawns` (places the piece, asserts the minecart spawns).
+- New `abandonedMineshaftAssembles` + `dungeonComplexRoomsCarryContent` gametests; the dungeon/mineshaft sprawl tests
+  now assert only robust "sprawled past the hub" thresholds (the jigsaw is position-seeded), checking room/loot content
+  by direct piece placement instead. 114 pass. (Over-void corridors still float — Phase 3 adds the wooden trestles.)
+
 ## [0.132.0] - 2026-06-27
 
 ### Added

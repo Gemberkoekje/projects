@@ -114,7 +114,7 @@ public final class StructureParts {
     /** Write {@code b} to {@code file} as a structure {@code .nbt}, unless the file already exists (dev-time gen). */
     public static void writeIfAbsent(Path file, Built b) throws IOException {
         if (!Files.exists(file)) {
-            StructureWriter.write(b.blocks(), b.blockEntities(), file);
+            StructureWriter.write(b.blocks(), b.blockEntities(), b.entities(), file);
             Skyseed.LOGGER.info("[skyseed] generated structure template {}", file.getFileName());
         }
     }
@@ -178,5 +178,14 @@ public final class StructureParts {
         be.put("SpawnData", spawnData);
         be.put("SpawnPotentials", potentials);
         return be;
+    }
+
+    /** A chest-minecart <em>entity</em> NBT (for {@link Built#entities()}) bound to a loot table — fills on first open,
+     *  like a vanilla mineshaft's. Pair with a rail under it so it sits. */
+    public static CompoundTag chestMinecart(String lootTable) {
+        final CompoundTag e = new CompoundTag();
+        e.putString("id", "minecraft:chest_minecart");
+        e.putString("LootTable", lootTable);
+        return e;
     }
 }
