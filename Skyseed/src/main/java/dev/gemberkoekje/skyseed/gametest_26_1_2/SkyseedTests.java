@@ -9,6 +9,7 @@ import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
+import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
@@ -23,6 +24,8 @@ import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
@@ -32,6 +35,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -119,6 +123,18 @@ public final class SkyseedTests {
         reg(event, "structure_connections_link_after_placement", REGION, SkyseedTests::structureConnectionsLinkAfterPlacement);
         reg(event, "dimension_gate_grows_or_fizzles_by_implementation", REGION, SkyseedTests::dimensionGateGrowsOrFizzlesByImplementation);
         reg(event, "dimension_override_never_inherits_overworld", REGION, SkyseedTests::dimensionOverrideNeverInheritsOverworld);
+        reg(event, "biome_override_replaces_body_fields", REGION, SkyseedTests::biomeOverrideReplacesBodyFields);
+        reg(event, "shape_builder_caps_surface_and_buries_core", REGION, SkyseedTests::shapeBuilderCapsSurfaceAndBuriesCore);
+        reg(event, "island_is_deterministic", REGION, SkyseedTests::islandIsDeterministic);
+        reg(event, "island_blocks_sorted_bottom_up", REGION, SkyseedTests::islandBlocksSortedBottomUp);
+        reg(event, "rocky_has_ore", REGION, SkyseedTests::rockyHasOre);
+        reg(event, "placement_rejects_overlap_and_players", REGION, SkyseedTests::placementRejectsOverlapAndPlayers);
+        reg(event, "bank_sugar_cane_stands_in_water", REGION, SkyseedTests::bankSugarCaneStandsInWater);
+        // DEFERRED to a later phase (not ported here):
+        //  - everySeedRecipeAndBookEntryMatchesSeedKind + everyCraftableSeedHasUniqueIcon: need the book/icon resource
+        //    helpers (Phase 4); the recipe half also can't pass until SKYRECIPEGENPLAN lands the per-version recipes.
+        //  - legacyDimensionResetRewritesGeneratorSettings: exercises the level.dat /emptynether reset, which is a no-op
+        //    on 26.1.2 (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal.
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -1628,5 +1644,172 @@ public final class SkyseedTests {
         helper.assertTrue(!coal, "a nether override must NOT inherit the base's overworld coal ore");
         helper.assertTrue(!grass, "a nether override must NOT inherit the base's overworld grass");
         helper.succeed();
+    }
+
+    static void biomeOverrideReplacesBodyFields(GameTestHelper helper) {
+        // planIsland's per-field resolution, OVERRIDE-WINS branch (the merge that Finding 2 collapses into a helper):
+        // a matching biome override replaces the base palette's surface/fill/core and the snow chance, while a
+        // non-matching biome keeps the base. (The no-leak NEUTRAL branch is covered by dimensionOverrideNeverInherits-
+        // Overworld; the BASE branch by everyThemePlansWithoutError and the plains tests.)
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme t = theme(level, "gametest/override_wins");
+        final Holder<Biome> desert = biome(level, "minecraft:desert");
+        final Holder<Biome> plains = biome(level, "minecraft:plains");
+
+        // Desert matches the override: sand surface, sandstone fill, red_sandstone core, snow 1.0 — and no base blocks.
+        final IslandPlan d = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), t, desert, RandomSource.create(3L));
+        boolean sand = false, sandstone = false, redSandstone = false, baseLeakInDesert = false;
+        for (IslandPlan.BlockPlacement bp : d.blocks()) {
+            if (bp.state().is(Blocks.SAND)) sand = true;
+            else if (bp.state().is(Blocks.SANDSTONE)) sandstone = true;
+            else if (bp.state().is(Blocks.RED_SANDSTONE)) redSandstone = true;
+            else if (bp.state().is(Blocks.GRASS_BLOCK) || bp.state().is(Blocks.DIRT) || bp.state().is(Blocks.STONE)) baseLeakInDesert = true;
+        }
+        helper.assertTrue(sand && sandstone && redSandstone,
+                "desert override must replace surface/fill/core (sand=" + sand + " sandstone=" + sandstone + " red_sandstone=" + redSandstone + ")");
+        helper.assertTrue(!baseLeakInDesert, "desert override must replace the base palette entirely (found grass/dirt/stone)");
+        helper.assertTrue(d.snow() == 1.0f, "desert override must set snow=1.0 (got " + d.snow() + ")");
+
+        // Plains does NOT match: the base palette stands, no desert blocks, snow stays off.
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), t, plains, RandomSource.create(3L));
+        boolean grass = false, dirt = false, stone = false, desertLeakInPlains = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) grass = true;
+            else if (bp.state().is(Blocks.DIRT)) dirt = true;
+            else if (bp.state().is(Blocks.STONE)) stone = true;
+            else if (bp.state().is(Blocks.SAND) || bp.state().is(Blocks.SANDSTONE) || bp.state().is(Blocks.RED_SANDSTONE)) desertLeakInPlains = true;
+        }
+        helper.assertTrue(grass && dirt && stone, "plains (no override) must keep the base grass/dirt/stone palette");
+        helper.assertTrue(!desertLeakInPlains, "plains must not pick up the desert override's blocks");
+        helper.assertTrue(p.snow() == 0.0f, "plains must keep the base snow=0 (got " + p.snow() + ")");
+        helper.succeed();
+    }
+
+    static void shapeBuilderCapsSurfaceAndBuriesCore(GameTestHelper helper) {
+        // Backs ShapeBuilder.build's terrain + column-list outputs (the buffers a parameter-object refactor bundles and
+        // must keep distinct): the SURFACE block caps each column (never buried), and ORE — placed by OrePlanner from
+        // the CORE column list — is always buried inside the body, never surfaced. A core/surface list mix-up would
+        // expose the ore (or bury the grass), so this guards the refactor without reaching into the package-private
+        // builder. (dim_leak in the overworld = grass/dirt/stone body, coal in the core, no decoration to muddy it.)
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme t = theme(level, "gametest/dim_leak");
+        final Holder<Biome> plains = biome(level, "minecraft:plains");
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), t, plains, RandomSource.create(5L));
+        final java.util.Set<BlockPos> solid = new java.util.HashSet<>();
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            solid.add(bp.pos());
+        }
+        int grass = 0, coal = 0;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) {
+                grass++;
+                helper.assertTrue(!solid.contains(bp.pos().above()),
+                        "a surface (grass) block must cap its column — found one buried under solid");
+            } else if (bp.state().is(Blocks.COAL_ORE)) {
+                coal++;
+                helper.assertTrue(solid.contains(bp.pos().above()),
+                        "a core ore block must be buried (solid above it), never surfaced");
+            }
+        }
+        helper.assertTrue(grass > 0 && coal > 0,
+                "expected a grass-capped body with buried coal (grass=" + grass + " coal=" + coal + ")");
+        helper.succeed();
+    }
+
+    static void islandIsDeterministic(GameTestHelper helper) {
+        final IslandPlan a = plan(helper, "rocky", 42L);
+        final IslandPlan b = plan(helper, "rocky", 42L);
+        helper.assertTrue(a.blocks().size() == b.blocks().size(),
+                "same seed gave different block counts (" + a.blocks().size() + " vs " + b.blocks().size() + ")");
+        helper.assertTrue(a.blocks().get(0).pos().equals(b.blocks().get(0).pos()),
+                "same seed gave a different first block position");
+        helper.succeed();
+    }
+
+    static void islandBlocksSortedBottomUp(GameTestHelper helper) {
+        final IslandPlan p = plan(helper, "rocky", 7L);
+        int prevY = Integer.MIN_VALUE;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            helper.assertTrue(bp.pos().getY() >= prevY, "block list is not sorted bottom-up (grow-in animation relies on it)");
+            prevY = bp.pos().getY();
+        }
+        helper.succeed();
+    }
+
+    static void rockyHasOre(GameTestHelper helper) {
+        // Rocky carries ores; the exact set varies with germination Y (deepslate variants when deep), so match
+        // any "*_ore" block rather than a fixed list. Over several seeds at least one vein should land.
+        boolean anyOre = false;
+        for (long seed = 0; seed < 6 && !anyOre; seed++) {
+            for (IslandPlan.BlockPlacement bp : plan(helper, "rocky", seed).blocks()) {
+                if (Lookup.blockId(bp.state().getBlock()).endsWith("_ore")) {
+                    anyOre = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(anyOre, "rocky islands produced no ore across 6 seeds");
+        helper.succeed();
+    }
+
+    static void placementRejectsOverlapAndPlayers(GameTestHelper helper) {
+        // The fit check must allow open sky (so islands can sit adjacent), reject real overlap (engulfment), and
+        // reject burying a player.
+        final IslandPlan island = plan(helper, "rocky", 1L);
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        final java.util.List<Vec3> noPlayers = java.util.List.of();
+
+        helper.assertTrue(IslandPlacement.check(island, noPlayers, (x, y, z) -> false).ok(),
+                "an island in open sky was wrongly rejected");
+
+        // A solid column through the centre = real overlap (e.g. another island). Even though it's small relative to
+        // the island, it must be rejected — the old 5%-of-size tolerance let big islands swallow small ones — and the
+        // blocked centroid must point back at the column so the caller can push off it.
+        final IslandPlacement.Occupancy column = (x, y, z) ->
+                Math.abs(x - center.getX()) <= 3 && Math.abs(z - center.getZ()) <= 3;
+        final IslandPlacement.Fit blocked = IslandPlacement.check(island, noPlayers, column);
+        helper.assertTrue(!blocked.ok(), "an island overlapping solid was not rejected (engulfment)");
+        helper.assertTrue(Math.abs(blocked.blockedX() - center.getX()) <= 3 && Math.abs(blocked.blockedZ() - center.getZ()) <= 3,
+                "the blocked centroid did not point at the obstruction");
+
+        // A player whose body is where the island would place blocks -> buried, must not fit.
+        helper.assertTrue(!IslandPlacement.check(island, java.util.List.of(Vec3.atCenterOf(center)), (x, y, z) -> false).ok(),
+                "germinating with a block on the player was not rejected");
+        helper.succeed();
+    }
+
+    static void bankSugarCaneStandsInWater(GameTestHelper helper) {
+        // Every sugar cane the carver places must be able to survive — stacked on cane, or on dirt/sand with water
+        // horizontally beside its *supporting* block. (The bug placed it on steep banks 3 up from the water, where
+        // it instantly pops.)
+        int totalCane = 0;
+        for (long seed = 1; seed <= 8; seed++) {
+            final java.util.Map<BlockPos, BlockState> map = new java.util.HashMap<>();
+            for (IslandPlan.BlockPlacement bp : plan(helper, "gametest/water", seed).blocks()) {
+                map.put(bp.pos(), bp.state());
+            }
+            for (var e : map.entrySet()) {
+                if (!e.getValue().is(Blocks.SUGAR_CANE)) {
+                    continue;
+                }
+                totalCane++;
+                final BlockPos below = e.getKey().below();
+                final BlockState ground = map.get(below);
+                final boolean onCane = ground != null && ground.is(Blocks.SUGAR_CANE);
+                final boolean onWetSoil = ground != null
+                        && (ground.is(BlockTags.DIRT) || ground.is(Blocks.SAND) || ground.is(Blocks.RED_SAND))
+                        && (isWaterAt(map, below.east()) || isWaterAt(map, below.west())
+                            || isWaterAt(map, below.north()) || isWaterAt(map, below.south()));
+                helper.assertTrue(onCane || onWetSoil,
+                        "sugar cane at " + e.getKey() + " would pop — no cane below and no water beside its support");
+            }
+        }
+        helper.assertTrue(totalCane > 0, "no sugar cane grew across 8 water-island seeds to verify");
+        helper.succeed();
+    }
+
+    private static boolean isWaterAt(java.util.Map<BlockPos, BlockState> map, BlockPos p) {
+        final BlockState s = map.get(p);
+        return s != null && s.getFluidState().is(FluidTags.WATER);
     }
 }
