@@ -1,0 +1,24 @@
+{
+  "name": "Pale Garden Island",
+  "category": "skyseed:overworld",
+  "advancement": "skyseed:reveal_pale_garden",
+  "icon": "minecraft:pale_oak_log",
+  "sortnum": 21,
+  "pages": [
+    {
+      "type": "patchouli:text",
+      "text": "The $(item)Pale Garden Skyseed$() — pale-oak logs and a pale moss block, both off a $(bold)Forest island thrown over a pale garden$(). The eerie cousin of the Forest seed."
+    },
+    {
+      "type": "patchouli:crafting",
+      "recipe": "skyseed:pale_garden_skyseed",
+      "text": "Everything's in hand — here's how it goes together.",
+      "advancement": "skyseed:gathered_pale_garden"
+    },
+    {
+      "type": "patchouli:text",
+      "text": "A hush of pale oak and creeping moss, lit only by eyeblossoms that open after dark. $(bold)Creaking hearts$() in the trees wake a Creaking at night — keep watching it. Hanging moss drips from the underside; coal and iron sit in the core.",
+      "advancement": "skyseed:craft_pale_garden"
+    }
+  ]
+}

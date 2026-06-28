@@ -221,6 +221,7 @@ public final class SkyseedTests {
         reg(event, "huge_aquatic_is_mostly_water", REGION, SkyseedTests::hugeAquaticIsMostlyWater);
         reg(event, "every_theme_plans_without_error", REGION, SkyseedTests::everyThemePlansWithoutError);
         reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
+        reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
         reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
@@ -3319,6 +3320,36 @@ public final class SkyseedTests {
             if (bp.state().is(Blocks.WATER)) water++;
         }
         helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void paleGardenSeedGrowsCreakingPaleForest(GameTestHelper helper) {
+        // REFACTORPLAN 2d-1: the dedicated Pale Garden seed's theme (a 26.1.2-only seed) grows pale oak WITH creaking
+        // hearts — the pale_oak_creaking feature embeds a creaking heart that wakes a Creaking at night — plus pale
+        // moss. Also independently confirms pale_garden is a registered, resolvable theme on 26.1.2.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var cfReg = Lookup.registry(level.registryAccess(), Registries.CONFIGURED_FEATURE);
+        boolean creakingOak = false, paleMoss = false;
+        for (long seed = 1; seed <= 8 && !(creakingOak && paleMoss); seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "pale_garden"),
+                    level.getBiome(c), RandomSource.create(seed));
+            for (final var t : p.trees()) {
+                final var fid = cfReg.getKey(t.feature());
+                if (fid != null && fid.toString().equals("minecraft:pale_oak_creaking")) {
+                    creakingOak = true;
+                    break;
+                }
+            }
+            for (final var bp : p.blocks()) {
+                if (bp.state().is(Blocks.PALE_MOSS_BLOCK) || bp.state().is(Blocks.PALE_MOSS_CARPET)) {
+                    paleMoss = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(paleMoss, "the pale_garden theme placed no pale moss");
+        helper.assertTrue(creakingOak, "the pale_garden theme scheduled no pale_oak_creaking tree (no Creaking source)");
         helper.succeed();
     }
 

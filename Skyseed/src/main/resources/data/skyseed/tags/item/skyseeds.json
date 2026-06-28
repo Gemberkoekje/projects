@@ -20,6 +20,7 @@
     "skyseed:lush_large_skyseed",
     "skyseed:aquatic_skyseed",
     "skyseed:aquatic_large_skyseed",
+    { "id": "skyseed:pale_garden_skyseed", "required": false },
     "skyseed:huge_forest_skyseed",
     "skyseed:huge_aquatic_skyseed",
     "skyseed:huge_rocky_skyseed",

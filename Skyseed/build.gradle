@@ -97,7 +97,12 @@ def generateRecipes = tasks.register('generateRecipes') {
         if (!goldenRecipesDir.exists()) return
         goldenRecipesDir.eachFileRecurse { f ->
             if (f.isDirectory() || !f.name.endsWith('.json')) return
-            def rel = goldenRecipesDir.toPath().relativize(f.toPath()).toString()
+            def rel = goldenRecipesDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            // recipes/_modern_only/... are version-gated (they reference ids absent on 1.21.1, e.g. pale_oak_log):
+            // skip them on the legacy node, and on a modern node strip the marker dir so they land at the normal path.
+            def modernOnly = rel.startsWith('_modern_only/')
+            if (modernOnly && legacy) return
+            if (modernOnly) rel = rel.substring('_modern_only/'.length())
             def outFile = new File(outRoot, rel)
             outFile.parentFile.mkdirs()
             if (legacy) {
@@ -161,9 +166,14 @@ def generateGuide = tasks.register('generateGuide') {
             write(new File(outBook, "categories/${f.name}"), out)
         }
 
+        // Entries whose crafting page references a version-gated (26.1.2-only) recipe — skip them in the generated
+        // Modonomicon book on the legacy node, so that book never points at a recipe this node doesn't ship.
+        def modernOnlyEntries = ['pale_garden_island']
         def byCat = [:].withDefault { [] }
         new File(patchouliGuideRoot, 'en_us/entries').eachFile { f ->
-            if (f.name.endsWith('.json')) byCat[slurper.parse(f).category] << f
+            if (!f.name.endsWith('.json')) return
+            if (mcv == '1.21.1' && modernOnlyEntries.contains(f.name - '.json')) return
+            byCat[slurper.parse(f).category] << f
         }
         byCat.each { cat, files ->
             files.sort { slurper.parse(it).sortnum ?: 0 }.eachWithIndex { f, i ->
