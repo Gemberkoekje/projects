@@ -118,6 +118,73 @@ def generateRecipes = tasks.register('generateRecipes') {
 sourceSets.main.resources.srcDir(generatedRecipesDir)
 tasks.withType(ProcessResources).configureEach { dependsOn(generateRecipes) }
 
+// --- Guide generation: the golden Patchouli book -> the Modonomicon book. See MODONOMICONPLAN.md. ---
+// The Patchouli guide (assets/.../patchouli_books/guide, hand-authored = golden) stays as-is and ships for the
+// Patchouli backend; this task DERIVES the Modonomicon edition from it into build/generated/guide (a resource srcDir,
+// ships on every node since Modonomicon is the primary backend). Mapping: patchouli:text -> modonomicon:text,
+// patchouli:crafting -> modonomicon:crafting_recipe (recipe_id_1); the entry reveal `advancement` -> a
+// modonomicon:advancement condition; categories pass name/icon/sort_number; INDEX display_mode auto-lays-out entries
+// (no manual x/y); and Patchouli $(...) text macros are expanded to vanilla section codes (Modonomicon renders via the
+// MC font). Page-level advancement gates are dropped (pages show once the entry unlocks) — acceptable approximation.
+def patchouliGuideRoot = rootProject.file('src/main/resources/assets/skyseed/patchouli_books/guide')
+def generatedGuideDir = layout.buildDirectory.dir('generated/guide')
+
+def expandGuideMacros = { String s ->
+    s.replace('$(br2)', '\n\n').replace('$(br)', '\n').replace('$(li)', '\n  • ')
+     .replace('$(item)', '§3').replace('$(bold)', '§l').replace('$(italic)', '§o')
+     .replace('$(o)', '§o').replace('$(2)', '§2').replace('$()', '§r')
+}
+
+def generateGuide = tasks.register('generateGuide') {
+    inputs.dir(patchouliGuideRoot).optional()
+    outputs.dir(generatedGuideDir)
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def write = { File f, Object o -> f.parentFile.mkdirs(); f.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(o)) }
+        def outBook = new File(generatedGuideDir.get().asFile, 'data/skyseed/modonomicon/books/guide')
+        outBook.deleteDir()
+        if (!patchouliGuideRoot.exists()) return
+
+        write(new File(outBook, 'book.json'), [name: "Skyfarer's Almanac",
+                tooltip: "The full illustrated guide to Skyseed.", display_mode: "index"])
+
+        new File(patchouliGuideRoot, 'en_us/categories').eachFile { f ->
+            if (!f.name.endsWith('.json')) return
+            def c = slurper.parse(f)
+            def out = [name: c.name, display_mode: "index", sort_number: (c.sortnum ?: 0)]
+            if (c.icon) out.icon = c.icon
+            if (c.description) out.description = expandGuideMacros(c.description as String)
+            write(new File(outBook, "categories/${f.name}"), out)
+        }
+
+        def byCat = [:].withDefault { [] }
+        new File(patchouliGuideRoot, 'en_us/entries').eachFile { f ->
+            if (f.name.endsWith('.json')) byCat[slurper.parse(f).category] << f
+        }
+        byCat.each { cat, files ->
+            files.sort { slurper.parse(it).sortnum ?: 0 }.eachWithIndex { f, i ->
+                def e = slurper.parse(f)
+                def pages = e.pages.collect { p ->
+                    if (p.type == 'patchouli:crafting') {
+                        def pg = [type: 'modonomicon:crafting_recipe', recipe_id_1: p.recipe]
+                        if (p.text) pg.text = expandGuideMacros(p.text as String)
+                        pg
+                    } else {
+                        [type: 'modonomicon:text', text: expandGuideMacros((p.text ?: '') as String)]
+                    }
+                }
+                def out = [category: e.category, name: e.name, icon: e.icon,
+                        x: (i % 6) * 2, y: i.intdiv(6) * 2, sort_number: (e.sortnum ?: 0), pages: pages]
+                if (e.advancement) out.condition = [type: 'modonomicon:advancement', advancement_id: e.advancement]
+                write(new File(outBook, "entries/${f.name}"), out)
+            }
+        }
+        println "generated Modonomicon guide: ${new File(outBook, 'entries').listFiles()?.size() ?: 0} entries"
+    }
+}
+sourceSets.main.resources.srcDir(generatedGuideDir)
+tasks.withType(ProcessResources).configureEach { dependsOn(generateGuide) }
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)

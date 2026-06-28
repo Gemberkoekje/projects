@@ -6,6 +6,8 @@ import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.compat.ModonomiconCompat;
+import dev.gemberkoekje.skyseed.item.SkyseedGuide;
+import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
@@ -124,7 +126,7 @@ public final class SkyseedTests {
         reg(event, "structure_connections_link_after_placement", REGION, SkyseedTests::structureConnectionsLinkAfterPlacement);
         reg(event, "dimension_gate_grows_or_fizzles_by_implementation", REGION, SkyseedTests::dimensionGateGrowsOrFizzlesByImplementation);
         reg(event, "dimension_override_never_inherits_overworld", REGION, SkyseedTests::dimensionOverrideNeverInheritsOverworld);
-        reg(event, "modonomicon_backend_resolves_and_degrades", REGION, SkyseedTests::modonomiconBackendResolvesAndDegrades);
+        reg(event, "modonomicon_guide_book_is_complete_and_degrades", REGION, SkyseedTests::modonomiconGuideBookIsCompleteAndDegrades);
         reg(event, "biome_override_replaces_body_fields", REGION, SkyseedTests::biomeOverrideReplacesBodyFields);
         reg(event, "shape_builder_caps_surface_and_buries_core", REGION, SkyseedTests::shapeBuilderCapsSurfaceAndBuriesCore);
         reg(event, "island_is_deterministic", REGION, SkyseedTests::islandIsDeterministic);
@@ -1648,15 +1650,22 @@ public final class SkyseedTests {
         helper.succeed();
     }
 
-    static void modonomiconBackendResolvesAndDegrades(GameTestHelper helper) {
-        // SKYMODONOMICONPLAN Phase 1 proof: with Modonomicon present, a LOADED book id resolves to a non-empty book
-        // stack, and an ABSENT book id resolves to EMPTY — the fall-through guarantee that keeps SkyseedGuide graceful
-        // (so a backend with no Skyseed book lets the next backend / written book win). Uses a throwaway test_guide
-        // book so the real skyseed:guide / SkyseedGuide.book() precedence is untouched until the Phase 2 content lands.
-        helper.assertTrue(!ModonomiconCompat.bookStack(Id.of("skyseed:test_guide")).isEmpty(),
-                "Modonomicon should resolve the loaded skyseed:test_guide book to a non-empty stack");
+    static void modonomiconGuideBookIsCompleteAndDegrades(GameTestHelper helper) {
+        // SKYMODONOMICONPLAN Phase 2: the real generated skyseed:guide Modonomicon book loads, is COMPLETE (one entry
+        // per seed/part, matching the Patchouli edition so both backends stay first-class), and an absent id resolves
+        // to EMPTY (the fall-through guarantee). The book is derived from the golden Patchouli content by generateGuide.
+        helper.assertTrue(!ModonomiconCompat.bookStack(SkyseedGuide.BOOK_ID).isEmpty(),
+                "the generated Modonomicon skyseed:guide book should load to a non-empty stack");
         helper.assertTrue(ModonomiconCompat.bookStack(Id.of("skyseed:no_such_book")).isEmpty(),
                 "Modonomicon should resolve an absent book id to EMPTY (so SkyseedGuide falls through)");
+        // Completeness: the generated Modonomicon book must ship at least one entry per craftable seed, so the
+        // preferred backend is never thinner than the legacy Patchouli one. Count the shipped entry resources (the
+        // book is parsed without errors but Modonomicon links entries later than gametest tick 0, so the runtime
+        // getEntries() is unreliable here — the resource count is the robust completeness signal).
+        final int entries = helper.getLevel().getServer().getResourceManager()
+                .listResources("modonomicon/books/guide/entries", p -> true).size();
+        helper.assertTrue(entries >= ModItems.SEEDS.size(),
+                "the Modonomicon guide must ship at least one entry per seed (entries=" + entries + ", seeds=" + ModItems.SEEDS.size() + ")");
         helper.succeed();
     }
 
