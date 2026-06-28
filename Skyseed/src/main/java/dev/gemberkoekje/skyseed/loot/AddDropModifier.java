@@ -28,11 +28,21 @@ public class AddDropModifier extends LootModifier {
     private final Item item;
     private final float chance;
 
+    // 26.1.2 added a priority to LootModifier (the ctor + codecStart now carry an int); the CODEC's apply(::new)
+    // resolves to whichever ctor arity matches the active version, so only the constructor needs the directive.
+    //? if >=26.1.2 {
+    /*public AddDropModifier(LootItemCondition[] conditions, int priority, Item item, float chance) {
+        super(conditions, priority);
+        this.item = item;
+        this.chance = chance;
+    }*/
+    //?} else {
     public AddDropModifier(LootItemCondition[] conditions, Item item, float chance) {
         super(conditions);
         this.item = item;
         this.chance = chance;
     }
+    //?}
 
     @Override
     protected ObjectArrayList<ItemStack> doApply(ObjectArrayList<ItemStack> generatedLoot, LootContext context) {
