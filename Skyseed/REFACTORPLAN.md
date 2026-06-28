@@ -321,9 +321,13 @@ inert on 1.21.1. Gametest `forest_over_pale_garden_grows_pale_variant` (resolve-
 (configured features), pale_oak_log, pale_moss_block/carpet, pale_hanging_moss, open/closed_eyeblossom, creaking_heart,
 resin_*; entities creaking/nautilus/happy_ghast/copper_golem.
 
-**2d-1 Pale Garden — dedicated seed → NEXT (atomic unit).** Design (researched): a dedicated seed is only meaningful
-where pale content exists, so it's a **26.1.2-only feature**, and the `everySeedRecipeAndBookEntry` coverage test makes
-it all-or-nothing (theme + recipe + gathered + reveal advancements + book entry, or 26.1.2 goes red). Plan:
+**2d-1 Pale Garden — dedicated seed ✅ DONE** (`c85e5d0`): a craftable 26.1.2-only Pale Garden Skyseed (pale_oak_creaking
+→ Creaking, pale moss, eyeblossom, hanging-moss underside; crafted from pale_oak_log + pale_moss_block). The full
+cross-version-gating pattern landed and is the **template for all future modern-only content** — both nodes green
+(1.21.1 126 clean, 26.1.2 All 129; recipe present on 26.1.2, absent on 1.21.1). It went exactly per the plan below,
+plus one find: the `#skyseeds` item tag needed the new entry as `{id, required:false}` (else the absent item breaks the
+1.21.1 tag load). Gametest `pale_garden_seed_grows_creaking_pale_forest` locks the content + confirms the theme resolves.
+The original (verified-correct) plan was:
 - **theme** `pale_garden.json` — the full eerie island (use `minecraft:pale_oak_creaking` so the trees carry creaking
   hearts → Creakings; pale-moss surface, resin decoration). Ships to both, inert on 1.21.1.
 - **registration** — add `"pale_garden"` to `ModItems.SEED_THEMES` via a `//? if >=26.1.2` directive (26.1.2-only → no
