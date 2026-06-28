@@ -89,13 +89,24 @@ public final class ModItems {
         registerSeeds(SEED_THEMES, SEEDS);
         registerSeeds(DEBUG_SEED_THEMES, DEBUG_SEEDS);
         for (final String part : END_PORTAL_PARTS) {
+            // 26.1.2 registerItem takes a Supplier/UnaryOperator<Item.Properties> (or none) rather than an instance.
+            //? if >=26.1.2 {
+            /*PARTS.put(part, ITEMS.registerItem(part, Item::new));*/
+            //?} else {
             PARTS.put(part, ITEMS.registerItem(part, Item::new, new Item.Properties()));
+            //?}
         }
         for (ThemeScanner.DebugSeedSpec s : AUTO_DEBUG_SEEDS) {
             final Id themeId = Id.of(Ids.mod(s.baseTheme()).toString());
+            //? if >=26.1.2 {
+            /*DEBUG_SEEDS.put(s.id(), ITEMS.registerItem(s.id() + "_skyseed",
+                    props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.forcedWaterfall(), s.label()),
+                    () -> new Item.Properties().stacksTo(16)));*/
+            //?} else {
             DEBUG_SEEDS.put(s.id(), ITEMS.registerItem(s.id() + "_skyseed",
                     props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.forcedWaterfall(), s.label()),
                     new Item.Properties().stacksTo(16)));
+            //?}
             AUTO_DEBUG_BASE.put(s.id() + "_skyseed", s.baseTheme());
         }
     }
@@ -103,8 +114,13 @@ public final class ModItems {
     private static void registerSeeds(List<String> themes, Map<String, DeferredItem<IslandSeedItem>> into) {
         for (String theme : themes) {
             final Id themeId = Id.of(Ids.mod(theme).toString());
+            //? if >=26.1.2 {
+            /*into.put(theme, ITEMS.registerItem(theme + "_skyseed",
+                    props -> new IslandSeedItem(props, themeId), () -> new Item.Properties().stacksTo(16)));*/
+            //?} else {
             into.put(theme, ITEMS.registerItem(theme + "_skyseed",
                     props -> new IslandSeedItem(props, themeId), new Item.Properties().stacksTo(16)));
+            //?}
         }
     }
 

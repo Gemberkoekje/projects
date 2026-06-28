@@ -127,6 +127,23 @@ public class IslandSeedItem extends Item {
     }
     //?}
 
+    // 26.1.2: releaseUsing returns boolean (was consumed), and serverbound payloads go through
+    // ClientPacketDistributor instead of PacketDistributor.
+    //? if >=26.1.2 {
+    /*@Override
+    public boolean releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
+        if (!(entity instanceof Player player) || !level.isClientSide()) {
+            return false; // the server spawns the seed from the packet the client sends below
+        }
+        final int heldTicks = getUseDuration(stack, entity) - timeLeft;
+        final boolean precise = SkyseedClientConfig.PRECISE_THROW.get();
+        final InteractionHand hand = player.getMainHandItem() == stack ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
+        final Vec3 target = precise ? preciseTarget(player, heldTicks) : Vec3.ZERO;
+        net.neoforged.neoforge.network.ClientPacketDistributor.sendToServer(new ThrowSeedPayload(
+                precise, heldTicks, target.x, target.y, target.z, hand == InteractionHand.OFF_HAND ? 1 : 0));
+        return true;
+    }*/
+    //?} else {
     @Override
     public void releaseUsing(ItemStack stack, Level level, LivingEntity entity, int timeLeft) {
         if (!(entity instanceof Player player) || !level.isClientSide()) {
@@ -139,6 +156,7 @@ public class IslandSeedItem extends Item {
         PacketDistributor.sendToServer(new ThrowSeedPayload(
                 precise, heldTicks, target.x, target.y, target.z, hand == InteractionHand.OFF_HAND ? 1 : 0));
     }
+    //?}
 
     /** Precise mode: the germination point along the player's look, at a charge-scaled distance. */
     public static Vec3 preciseTarget(Player player, int heldTicks) {
