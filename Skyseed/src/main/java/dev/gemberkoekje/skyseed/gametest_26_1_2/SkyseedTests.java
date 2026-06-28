@@ -223,6 +223,7 @@ public final class SkyseedTests {
         reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
         reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
+        reg(event, "forest_places_fallen_logs", REGION, SkyseedTests::forestPlacesFallenLogs);
         reg(event, "new_mobs_resolve_on_themes", REGION, SkyseedTests::newMobsResolveOnThemes);
         reg(event, "farm_animals_default_to_biome_variant", REGION, SkyseedTests::farmAnimalsDefaultToBiomeVariant);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
@@ -3390,6 +3391,28 @@ public final class SkyseedTests {
                         && Lookup.hasEntityType(Id.of("minecraft:zombie_nautilus"))
                         && Lookup.hasEntityType(Id.of("minecraft:happy_ghast")),
                 "a 1.21.5 placed-mob id is unknown on 26.1.2");
+        helper.succeed();
+    }
+
+    static void forestPlacesFallenLogs(GameTestHelper helper) {
+        // The 1.21.5 fallen-log decoration (fallen_oak_tree, a new configured feature absent from 1.21.1) was missed in
+        // the first vegetation pass — added after a jar diff. Plan forest over a forest biome and confirm the fallen-oak
+        // feature is scheduled in p.trees(). Resolves on 26.1.2; skipped inert on 1.21.1 (unknown feature id there).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var cfReg = Lookup.registry(level.registryAccess(), Registries.CONFIGURED_FEATURE);
+        final var forest = biome(level, "minecraft:forest");
+        boolean fallen = false;
+        for (long seed = 1; seed <= 16 && !fallen; seed++) {
+            for (final var t : IslandGenerator.planIsland(level, c, theme(level, "forest"), forest, RandomSource.create(seed)).trees()) {
+                final var fid = cfReg.getKey(t.feature());
+                if (fid != null && fid.toString().equals("minecraft:fallen_oak_tree")) {
+                    fallen = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(fallen, "forest scheduled no fallen_oak_tree (the 1.21.5 fallen-log feature did not resolve)");
         helper.succeed();
     }
 
