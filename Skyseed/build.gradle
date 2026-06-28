@@ -282,6 +282,38 @@ def generateDebugSeedModels = tasks.register('generateDebugSeedModels') {
 sourceSets.main.resources.srcDir(generatedDebugModelsDir)
 tasks.withType(ProcessResources).configureEach { dependsOn(generateDebugSeedModels) }
 
+// --- Item-model DEFINITIONS for modern (1.21.5+) nodes. On 1.21.5+ every item needs an assets/<ns>/items/<id>.json
+// definition or the client logs "Missing item model" and renders the missing-texture checkerboard; the older
+// models/item/<id>.json file is no longer enough by itself, and the runtime bake hook can't help because there's no
+// baked base model to copy. Skyseed ships none (1.21.1 uses the old system). Generate one per existing
+// models/item/<id>.json — the committed seed/relic/edge/guide models AND the generated debug-seed models — each
+// pointing minecraft:model at skyseed:item/<id>. Modern-node-only (1.21.1 ignores assets/<ns>/items/ entirely). ---
+def generatedItemDefsDir = layout.buildDirectory.dir('generated/item_definitions')
+def generateItemModelDefinitions = tasks.register('generateItemModelDefinitions') {
+    dependsOn(generateDebugSeedModels)
+    inputs.dir(seedModelDir).optional()
+    inputs.dir(generatedDebugModelsDir).optional()
+    outputs.dir(generatedItemDefsDir)
+    doLast {
+        def outDir = new File(generatedItemDefsDir.get().asFile, 'assets/skyseed/items')
+        outDir.deleteDir(); outDir.mkdirs()
+        def ids = new TreeSet()
+        [seedModelDir, new File(generatedDebugModelsDir.get().asFile, 'assets/skyseed/models/item')].each { dir ->
+            if (dir != null && dir.exists()) {
+                dir.eachFile { f -> if (f.name.endsWith('.json')) ids << f.name.substring(0, f.name.length() - '.json'.length()) }
+            }
+        }
+        ids.each { id ->
+            new File(outDir, "${id}.json").text = groovy.json.JsonOutput.toJson([model: [type: 'minecraft:model', model: "skyseed:item/${id}"]])
+        }
+        println "generated item-model definitions: ${ids.size()}"
+    }
+}
+if (mcv != "1.21.1") {
+    sourceSets.main.resources.srcDir(generatedItemDefsDir)
+    tasks.withType(ProcessResources).configureEach { dependsOn(generateItemModelDefinitions) }
+}
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)

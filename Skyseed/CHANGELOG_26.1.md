@@ -9,6 +9,16 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.156.0] - 2026-06-28
+
+The first real `:26.1.2:runClient` session surfaced runtime issues the headless gametests can't (no client model load, no integrated-server→client handshake). All fixed.
+
+### Fixed — 26.1.2 runClient
+- **`runClient` no longer hangs on "Loading terrain".** `test_instance` is a network-synced registry, so the client handshake (`RegistrySynchronization.packRegistry`) serializes every gametest — and the code-registered tests' codec threw. Registered a real `skyseed:gametest` codec in `TEST_INSTANCE_TYPE` and backed `SkyseedTest.codec()` with it (encode is all the handshake needs; decode → no-op). New gametest `every_test_instance_serializes_for_client_sync` guards it. Verified: the client reaches "joined the game".
+- **All item icons render.** On 1.21.5+ every item needs an `assets/<ns>/items/<id>.json` definition or it renders as the missing-texture checkerboard; Skyseed shipped none (1.21.1 uses the old `models/item/` system + a bake hook, which has no base model to copy here). A new `generateItemModelDefinitions` task emits one per item — the committed seed/relic/edge/guide models **and** the generated debug-seed models (237 total). Missing-item-model warnings: ~230 → 0.
+- **The Modonomicon guide book shows the Skyfarer's Almanac icon** (its `items/guide.json` definition + the book's `model: skyseed:guide` field), instead of the default brown book.
+- **Dropped the obsolete global-loot-modifier index** (`data/neoforge/loot_modifiers/global_loot_modifiers.json`): on 1.21.5+ NeoForge loads each `loot_modifiers/` file as a codec GLM, so the legacy `{replace,entries}` index logged `ERROR: No key type`. The per-relic GLMs load directly and still drop.
+
 ## [0.155.0] - 2026-06-28
 
 The whole 26.1.2 port landed under this version (1.21.1 stays byte-for-byte identical — the shared data additions below
