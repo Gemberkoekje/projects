@@ -3,10 +3,14 @@ package dev.gemberkoekje.skyseed.gametest_26_1_2;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
+import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
+import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -80,6 +84,16 @@ public final class SkyseedTests {
         reg(event, "nether_forest_is_crimson_warped_with_tiny_overworld", REGION, SkyseedTests::netherForestIsCrimsonWarpedWithTinyOverworld);
         reg(event, "nether_soul_is_full_size_with_tiny_desert_overworld", REGION, SkyseedTests::netherSoulIsFullSizeWithTinyDesertOverworld);
         reg(event, "nether_basalt_is_full_size_with_tiny_badlands_overworld", REGION, SkyseedTests::netherBasaltIsFullSizeWithTinyBadlandsOverworld);
+        reg(event, "ruined_portal_has_nether_variant_and_twins", REGION, SkyseedTests::ruinedPortalHasNetherVariantAndTwins);
+        reg(event, "large_nether_seeds_are_full_size_nether_native", REGION, SkyseedTests::largeNetherSeedsAreFullSizeNetherNative);
+        reg(event, "blaze_room_rolls_on_large_nether_seeds", REGION, SkyseedTests::blazeRoomRollsOnLargeNetherSeeds);
+        reg(event, "bastion_remnant_rolls_on_bastion_biome_large_seeds", REGION, SkyseedTests::bastionRemnantRollsOnBastionBiomeLargeSeeds);
+        reg(event, "debug_streets_seed_is_a_deep_jigsaw_spike", REGION, SkyseedTests::debugStreetsSeedIsADeepJigsawSpike);
+        reg(event, "path_surfacer_resolves_markers_into_paths_and_bridges", REGION, SkyseedTests::pathSurfacerResolvesMarkersIntoPathsAndBridges);
+        reg(event, "path_surfacer_supports_floating_floors", REGION, SkyseedTests::pathSurfacerSupportsFloatingFloors);
+        reg(event, "snow_cover_caps_highest_block", REGION, SkyseedTests::snowCoverCapsHighestBlock);
+        reg(event, "trade_post_blacksmith_places", REGION, SkyseedTests::tradePostBlacksmithPlaces);
+        reg(event, "trade_post_over_void_uses_piers", BIG_REGION, SkyseedTests::tradePostOverVoidUsesPiers);
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -675,5 +689,337 @@ public final class SkyseedTests {
         helper.assertTrue(oRedSand, "the overworld easter-egg island should be a badlands (red sand)");
         helper.assertTrue(!oBasalt, "the overworld easter-egg island should not be basalt");
         helper.succeed();
+    }
+
+    static void ruinedPortalHasNetherVariantAndTwins(GameTestHelper helper) {
+        // SKYNETHERPLAN (Ruined Portal twins): the ruined portal now grows in BOTH dimensions. Overworld = the
+        // treasure frame (goodies pool); Nether = a small netherrack island with the no-goodies _nether frame. It is
+        // flagged a twin theme, and the 8:1 linked-coordinate maths is the vanilla portal map.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme rp = theme(overworld, "ruined_portal");
+        helper.assertTrue(rp.twin().isPresent(), "ruined_portal should be flagged as a cross-dimension twin theme");
+        helper.assertTrue(rp.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), "ruined_portal should grow in the overworld");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        final Holder<Biome> plains = biome(overworld, Biomes.PLAINS);
+        helper.assertTrue(IslandGenerator.formValidFor(rp, wastes, 64, Lookup.dimensionId(Level.NETHER)),
+                "ruined_portal should now also grow in the Nether");
+
+        // Overworld form: the jigsaw uses the goodies pool.
+        final IslandPlan ow = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), rp, plains,
+                RandomSource.create(91L));
+        helper.assertTrue(ow.jigsaws().stream().anyMatch(j -> j.pool().path().equals("ruined_portal/portal")),
+                "the overworld ruined portal should use the goodies pool ruined_portal/portal");
+        helper.assertTrue(ow.twinTheme().isPresent(), "the overworld ruined portal plan should carry a twin theme");
+
+        // A ruined portal that rolls on a big island via rare_structures pairs too: the rare structure carries the
+        // same twin theme, so planIsland routes it into the plan exactly like the dedicated seed does.
+        final IslandTheme rockyLarge = theme(overworld, "rocky_large");
+        helper.assertTrue(rockyLarge.rareStructures().stream().anyMatch(
+                        rs -> rs.jigsaw().pool().path().equals("ruined_portal/portal") && rs.twin().isPresent()),
+                "rocky_large's ruined-portal rare structure should carry the twin theme");
+
+        // Nether form: a netherrack island whose jigsaw swaps to the no-goodies _nether pool.
+        final IslandPlan nv = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), rp, wastes,
+                RandomSource.create(92L));
+        boolean netherrack = false;
+        for (IslandPlan.BlockPlacement bp : nv.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+        }
+        helper.assertTrue(netherrack, "the Nether ruined portal should be a netherrack island");
+        helper.assertTrue(nv.jigsaws().stream().anyMatch(j -> j.pool().path().equals("ruined_portal/portal_nether")),
+                "the Nether ruined portal should swap to the no-goodies pool ruined_portal/portal_nether");
+
+        // Linked-coordinate maths: overworld/8 and nether*8 (vanilla's portal map).
+        final BlockPos toNether = TwinPlacer.linkedPortalPos(new BlockPos(800, 80, 80), Level.NETHER, nether);
+        helper.assertTrue(toNether.getX() == 100 && toNether.getZ() == 10,
+                "overworld->nether twin should divide X/Z by 8, was " + toNether);
+        final BlockPos toOverworld = TwinPlacer.linkedPortalPos(new BlockPos(100, 70, 10), Level.OVERWORLD, overworld);
+        helper.assertTrue(toOverworld.getX() == 800 && toOverworld.getZ() == 80,
+                "nether->overworld twin should multiply X/Z by 8, was " + toOverworld);
+        helper.succeed();
+    }
+
+    static void largeNetherSeedsAreFullSizeNetherNative(GameTestHelper helper) {
+        // The Large variants of the 5 Tier-2 Nether-native seeds (SKYNETHERPLAN): same biome content, much bigger
+        // (radius 11-17). Each is the_nether-only and grows a LARGE island carrying its surface block.
+        final ServerLevel overworld = helper.getLevel();
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        record L(String theme, Block surface) {}
+        final L[] cases = {
+            new L("nether_rocky_large", Blocks.NETHERRACK),
+            new L("nether_lava_large", Blocks.BASALT),
+            new L("nether_forest_large", Blocks.CRIMSON_NYLIUM),
+            new L("nether_soul_large", Blocks.SOUL_SAND),
+            new L("nether_basalt_large", Blocks.BASALT),
+        };
+        long seed = 200L;
+        for (L c : cases) {
+            final IslandTheme t = theme(nether, c.theme());
+            helper.assertTrue(t.baseValidIn(Lookup.dimensionId(Level.NETHER)), c.theme() + " must implement the_nether");
+            helper.assertTrue(!t.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), c.theme() + " must be the_nether-only");
+            final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), t, wastes,
+                    RandomSource.create(seed++));
+            helper.assertTrue(p.blocks().size() > 1500,
+                    c.theme() + " should be a LARGE island (>1500 blocks), was " + p.blocks().size());
+            boolean surface = false;
+            for (IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(c.surface())) surface = true;
+            }
+            helper.assertTrue(surface, c.theme() + " should carry its surface block " + c.surface());
+        }
+        helper.succeed();
+    }
+
+    /** The index of the first rare structure in {@code theme} whose jigsaw pool path equals {@code poolPath}, or -1. */
+    private static int rareIndex(IslandTheme theme, String poolPath) {
+        final var list = theme.rareStructures();
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).jigsaw().pool().path().equals(poolPath)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static void blazeRoomRollsOnLargeNetherSeeds(GameTestHelper helper) {
+        // The surprise blaze spawner room (SKYNETHERPLAN): a 5% rare_structures roll on each of the 5 Large Nether
+        // seeds. (Its on-demand debug seed is auto-generated from these hosts now, not a hand-made theme.)
+        final ServerLevel overworld = helper.getLevel();
+        for (String t : new String[] { "nether_rocky_large", "nether_lava_large", "nether_forest_large",
+                "nether_soul_large", "nether_basalt_large" }) {
+            final IslandTheme nt = theme(overworld, t);
+            helper.assertTrue(nt.rareStructures().stream().anyMatch(
+                            rs -> rs.jigsaw().pool().path().equals("nether_fortress/blaze_room")),
+                    t + " should carry the 5% blaze spawner room rare structure");
+        }
+        // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        final IslandTheme host = theme(nether, "nether_rocky_large");
+        final int idx = rareIndex(host, "nether_fortress/blaze_room");
+        helper.assertTrue(idx >= 0, "nether_rocky_large should host the blaze room rare structure");
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
+                RandomSource.create(140L), DebugForce.rare(idx));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("nether_fortress/blaze_room")),
+                "forcing the blaze-room rare structure should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    static void bastionRemnantRollsOnBastionBiomeLargeSeeds(GameTestHelper helper) {
+        // A ruined bastion remnant (crying obsidian + cracked polished blackstone) is a 5% rare_structures roll on the
+        // three bastion-biome Large Nether seeds — the Nether-wastes Rocky, the crimson/warped Forest and the soul-sand
+        // Soul — but NOT the basalt deltas or the lava sea (the vanilla rule). Its on-demand debug seed is auto-generated.
+        final ServerLevel overworld = helper.getLevel();
+        for (String t : new String[] { "nether_rocky_large", "nether_forest_large", "nether_soul_large" }) {
+            helper.assertTrue(theme(overworld, t).rareStructures().stream().anyMatch(
+                            rs -> rs.jigsaw().pool().path().equals("bastion/remnant")),
+                    t + " should carry the 5% bastion remnant rare structure");
+        }
+        for (String t : new String[] { "nether_basalt_large", "nether_lava_large" }) {
+            helper.assertTrue(theme(overworld, t).rareStructures().stream().noneMatch(
+                            rs -> rs.jigsaw().pool().path().equals("bastion/remnant")),
+                    t + " must not carry the bastion remnant (no bastions in the basalt deltas or the lava sea)");
+        }
+        // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        final IslandTheme host = theme(nether, "nether_rocky_large");
+        final int idx = rareIndex(host, "bastion/remnant");
+        helper.assertTrue(idx >= 0, "nether_rocky_large should host the bastion remnant rare structure");
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
+                RandomSource.create(77L), DebugForce.rare(idx));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("bastion/remnant")),
+                "forcing the bastion-remnant rare structure should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    static void debugStreetsSeedIsADeepJigsawSpike(GameTestHelper helper) {
+        // SKYJIGSAWPLAN Phase 0 spike: a throwaway creative seed whose jigsaw recurses (depth 6) through a
+        // self-connecting street pool, so the network branches, twists and — on a real island — runs out over the
+        // void. The over-void sprawl and its reach are an in-world smoke test (throw the seed); here we just guard
+        // the wiring — a deep jigsaw into the start pool, carried as a jigsaw site on the plan.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme streets = theme(overworld, "debug_streets");
+        helper.assertTrue(streets.jigsaw().isPresent(), "debug_streets must have a jigsaw config");
+        helper.assertTrue(streets.jigsaw().get().pool().path().equals("debug_streets/start"),
+                "debug_streets must start from its start pool");
+        helper.assertTrue(streets.jigsaw().get().depth() >= 5,
+                "debug_streets must recurse deep enough to sprawl (got depth " + streets.jigsaw().get().depth() + ")");
+        helper.assertTrue(streets.jigsaw().get().reach() > 0,
+                "debug_streets must set reach > 0 so the path/bridge surfacing pass runs");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, streets, overworld.getBiome(c),
+                RandomSource.create(42L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("debug_streets/start")),
+                "the debug streets seed should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    static void pathSurfacerResolvesMarkersIntoPathsAndBridges(GameTestHelper helper) {
+        // SKYJIGSAWPLAN §3a: a connective piece leaves a PURPLE_WOOL marker one block above each path tile;
+        // PathSurfacer turns a marker over ground into a dirt path and a marker over void into a self-railing
+        // wooden bridge, then clears the markers. Hand-build a strip: ground for x=5..7, open void for x=8..9.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0));
+        final int y = 5, z = 7;
+        for (int x = 5; x <= 7; x++) { // ground: dirt fill under a grass deck tile
+            level.setBlock(base.offset(x, y - 1, z), Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS);
+            level.setBlock(base.offset(x, y, z), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+        for (int x = 5; x <= 9; x++) { // a marker one block above every path tile (ground x5..7, void x8..9)
+            level.setBlock(base.offset(x, y + 1, z), PathSurfacer.MARKER.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+
+        PathSurfacer.resolve(level, base.offset(7, y, z), 6);
+
+        for (int x = 5; x <= 7; x++) { // ground tiles -> a worn dirt path
+            helper.assertTrue(level.getBlockState(base.offset(x, y, z)).is(Blocks.DIRT_PATH),
+                    "ground deck x=" + x + " should be a dirt path");
+        }
+        helper.assertTrue(level.getBlockState(base.offset(8, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
+        helper.assertTrue(level.getBlockState(base.offset(9, y, z)).is(Blocks.OAK_SLAB), "void deck should be a slab");
+        // The exposed (over-void) side of a bridge tile gets an edge beam + a fence railing.
+        helper.assertTrue(level.getBlockState(base.offset(8, y, z + 1)).is(Blocks.OAK_PLANKS), "bridge edge beam");
+        helper.assertTrue(level.getBlockState(base.offset(8, y + 1, z + 1)).is(Blocks.OAK_FENCE), "bridge railing");
+        // Markers are all gone.
+        for (int x = 5; x <= 9; x++) {
+            helper.assertTrue(!level.getBlockState(base.offset(x, y + 1, z)).is(PathSurfacer.MARKER),
+                    "marker at x=" + x + " should be cleared");
+        }
+        helper.succeed();
+    }
+
+    static void pathSurfacerSupportsFloatingFloors(GameTestHelper helper) {
+        // A solid lot floor over the void gets a dirt foundation (any material — here sandstone, proving it is not
+        // oak-specific). Over PURE void it's a short stub (no long pillar into nothing); over ground within reach it
+        // connects down to that ground. A floor already on solid ground is left alone, and an empty (air) lane deck
+        // gets NO foundation, so the bridges stay floating.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0));
+        final int deckY = 11; // supportFloatingFloors reads origin.Y - 1 as the floor level
+        level.setBlock(base.offset(18, deckY, 20), Blocks.SANDSTONE.defaultBlockState(), Block.UPDATE_CLIENTS); // pure void below
+        level.setBlock(base.offset(14, deckY, 20), Blocks.SPRUCE_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // over ground
+        level.setBlock(base.offset(14, deckY - 5, 20), Blocks.STONE.defaultBlockState(), Block.UPDATE_CLIENTS);  // the ground below it
+        level.setBlock(base.offset(22, deckY - 1, 20), Blocks.DIRT.defaultBlockState(), Block.UPDATE_CLIENTS);  // ground
+        level.setBlock(base.offset(22, deckY, 20), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // on ground
+        level.setBlock(base.offset(16, deckY, 20), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS); // a lane deck (air) over void
+
+        PathSurfacer.supportFloatingFloors(level, base.offset(20, deckY + 1, 20), 6);
+
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 2, 20)).is(Blocks.DIRT),
+                "the pure-void floor should get a short stub foundation");
+        helper.assertTrue(level.getBlockState(base.offset(18, deckY - 3, 20)).isAir(),
+                "the pure-void stub should stop short, not pillar into nothing");
+        helper.assertTrue(level.getBlockState(base.offset(14, deckY - 4, 20)).is(Blocks.DIRT),
+                "a floor over ground should connect its foundation down to that ground");
+        helper.assertTrue(level.getBlockState(base.offset(22, deckY - 2, 20)).isAir(),
+                "a floor already on solid ground should not be stilted");
+        helper.assertTrue(level.getBlockState(base.offset(16, deckY - 1, 20)).isAir(),
+                "an empty lane deck over the void should NOT be stilted (it stays a floating bridge)");
+        helper.succeed();
+    }
+
+    static void snowCoverCapsHighestBlock(GameTestHelper helper) {
+        // The snow post-pass lays a layer on the HIGHEST block of every column — so it lands on a building roof and a
+        // tree canopy, not just the open ground beneath them. Full blocks / stairs / slabs / leaves receive it; a fence
+        // (thin) does not, and an open-void column gets nothing.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(0, 0, 0)); // region is 16x24x16 — keep everything inside
+        final int y = 6;
+        level.setBlock(base.offset(4, y, 4), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS); // open ground
+        level.setBlock(base.offset(6, y + 4, 4), Blocks.OAK_PLANKS.defaultBlockState(), Block.UPDATE_CLIENTS); // a roof, higher up
+        level.setBlock(base.offset(8, y + 3, 4), Blocks.OAK_LEAVES.defaultBlockState(), Block.UPDATE_CLIENTS); // a tree canopy
+        level.setBlock(base.offset(10, y, 4), Blocks.OAK_FENCE.defaultBlockState(), Block.UPDATE_CLIENTS); // thin — no snow
+
+        PathSurfacer.snowCover(level, base.offset(2, y - 2, 2), base.offset(13, y + 12, 6), 1.0f, level.getRandom());
+
+        helper.assertTrue(level.getBlockState(base.offset(4, y + 1, 4)).is(Blocks.SNOW),
+                "snow should cap the open ground");
+        helper.assertTrue(level.getBlockState(base.offset(6, y + 5, 4)).is(Blocks.SNOW),
+                "snow should land on the roof (the column's highest block), not the ground below it");
+        helper.assertTrue(level.getBlockState(base.offset(8, y + 4, 4)).is(Blocks.SNOW),
+                "snow should land on a tree canopy (leaves)");
+        helper.assertTrue(level.getBlockState(base.offset(10, y + 1, 4)).isAir(),
+                "a thin fence should not hold a snow layer");
+        helper.succeed();
+    }
+
+    static void tradePostBlacksmithPlaces(GameTestHelper helper) {
+        // The two large-section landmarks — the L-shaped forge and the great hall — are the FAVOURED pieces on the
+        // village's large lots (weight 3 each, above the weight-1 shops), so a large lot reliably builds one of them.
+        // We assert this on the pool WEIGHTS, deterministically: counting anvils/bells across an assembled village is
+        // far too noisy to test reliably (the gametest origin varies per run, so the jigsaw — which seeds its assembly
+        // RNG from the origin's chunk — builds a different village each run, and the rare landmark can miss all of a
+        // small sample). getShuffledTemplates expands each element by its weight, so a piece's count is its weight.
+        final var reg = helper.getLevel().registryAccess();
+        final RandomSource rng = RandomSource.create(0L);
+        final var lots = Lookup.templatePool(reg, Ids.mod("trade_post/large_lots")).value().getShuffledTemplates(rng);
+        final long forge = lots.stream().filter(e -> e.toString().contains("trade_post/forge")).count();
+        final long hall = lots.stream().filter(e -> e.toString().contains("trade_post/great_hall")).count();
+        helper.assertTrue(forge > 0 && hall > 0,
+                "the forge and great hall must both be large-lot pieces (forge=" + forge + ", hall=" + hall + ")");
+        helper.assertTrue(forge > 1 && hall > 1,
+                "the forge and great hall must outweigh a single (weight-1) shop on the large lots, so a large lot "
+                        + "favours the bigger footprints (forge=" + forge + ", hall=" + hall + ")");
+        helper.succeed();
+    }
+
+    static void tradePostOverVoidUsesPiers(GameTestHelper helper) {
+        // A surplus lot that lands over the void gets a plank pier (its signature: a mooring chain) from the _void
+        // filler pool, instead of a floating farm; the same lot on solid ground gets the normal fields (no chain).
+        // Sample several seeds (a small village may place no surplus at all) — over the void at least one should pier,
+        // and on the island none ever should.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int voidChains = 0;
+        int islandChains = 0;
+        for (int iter = 0; iter < 8; iter++) {
+            // (1) over the void — clear the whole region to air (incl. y0, so nothing solid sits below a lot)
+            fillRegion(helper, true);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            voidChains += countChains(helper);
+            // (2) on solid ground — surplus lots should be fields, never piers
+            fillRegion(helper, false);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            islandChains += countChains(helper);
+        }
+        helper.assertTrue(voidChains > 0, "over the void, surplus lots should be piers (chain count=" + voidChains + ")");
+        helper.assertTrue(islandChains == 0, "on the island, surplus lots should be fields, not piers (chain=" + islandChains + ")");
+        helper.succeed();
+    }
+
+    /** Reset the big region: {@code void} clears every block to air; otherwise a solid dirt floor (y≤2) under air. */
+    private static void fillRegion(GameTestHelper helper, boolean toVoid) {
+        for (int x = 0; x <= 47; x++) {
+            for (int z = 0; z <= 47; z++) {
+                for (int y = 0; y <= 14; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), toVoid ? Blocks.AIR : (y <= 2 ? Blocks.DIRT : Blocks.AIR));
+                }
+            }
+        }
+    }
+
+    private static int countChains(GameTestHelper helper) {
+        int chains = 0;
+        for (int x = 0; x <= 47; x++) {
+            for (int z = 0; z <= 47; z++) {
+                for (int y = 1; y <= 14; y++) {
+                    // 26.1.2: the chain block was renamed minecraft:chain -> minecraft:iron_chain (copper update).
+                    if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.IRON_CHAIN)) {
+                        chains++;
+                    }
+                }
+            }
+        }
+        return chains;
     }
 }
