@@ -2,6 +2,7 @@ package dev.gemberkoekje.skyseed.event;
 
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.command.SkyseedCommands;
+import dev.gemberkoekje.skyseed.compat.Players;
 import dev.gemberkoekje.skyseed.item.SkyseedGuide;
 import dev.gemberkoekje.skyseed.worldgen.SkyseedWorldData;
 import net.minecraft.ChatFormatting;
@@ -25,7 +26,7 @@ public final class PlayerEvents {
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             return;
         }
-        MinecraftServer server = player.getServer();
+        MinecraftServer server = player.level().getServer(); // Entity.getServer() was removed in 26.1.2
         if (server == null) {
             return;
         }
@@ -54,7 +55,7 @@ public final class PlayerEvents {
         // On first join, drop the player squarely on the island's grass centre, bypassing vanilla's
         // spawn-fudge (which can land them on top of the tree).
         if (!world.hasSpawned(player.getUUID())) {
-            player.teleportTo(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
+            Players.teleport(player, overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
                     player.getYRot(), player.getXRot());
             world.markSpawned(player.getUUID());
         }
@@ -63,9 +64,16 @@ public final class PlayerEvents {
         // yet). Without this, respawning runs vanilla's area-search around the world spawn, which can
         // drop the player onto a different, nearby island they've built. Sleeping in a bed (or an
         // anchor) sets its own respawn and overrides this.
+        //? if >=26.1.2 {
+        /*if (player.getRespawnConfig() == null) {
+            player.setRespawnPosition(new net.minecraft.server.level.ServerPlayer.RespawnConfig(
+                    net.minecraft.world.level.storage.LevelData.RespawnData.of(overworld.dimension(), spawn, 0.0F, 0.0F), true), false);
+        }*/
+        //?} else {
         if (player.getRespawnPosition() == null) {
             player.setRespawnPosition(overworld.dimension(), spawn, 0.0F, true, false);
         }
+        //?}
 
         // A world made before the Nether/End were voided still has them as vanilla terrain — offer the matching
         // in-place conversion (safely wipes/regenerates only that dimension on the next reload). Per-dimension so the

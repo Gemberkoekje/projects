@@ -52,7 +52,11 @@ public final class StructureWriter {
         }
 
         final CompoundTag root = new CompoundTag();
+        //? if >=26.1.2 {
+        /*root.putInt("DataVersion", SharedConstants.getCurrentVersion().dataVersion().version());*/
+        //?} else {
         root.putInt("DataVersion", SharedConstants.getCurrentVersion().getDataVersion().getVersion());
+        //?}
 
         final ListTag size = new ListTag();
         size.add(IntTag.valueOf(sx + 1));

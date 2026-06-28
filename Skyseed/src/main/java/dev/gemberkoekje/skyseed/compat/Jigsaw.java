@@ -75,9 +75,15 @@ public final class Jigsaw {
         final RandomSource random = RandomSource.create(featureSeed ^ origin.asLong());
         final Structure.GenerationContext context = new Structure.GenerationContext(
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
-                templates, featureSeed, new ChunkPos(origin), level, biome -> true);
+                templates, featureSeed, new ChunkPos(origin.getX() >> 4, origin.getZ() >> 4), level, biome -> true);
+        // 26.1.2 wraps the jigsaw max-distance-from-centre in a JigsawStructure.MaxDistance (was a bare int).
+        //? if >=26.1.2 {
+        /*final JigsawStructure.MaxDistance maxDist = new JigsawStructure.MaxDistance(128);*/
+        //?} else {
+        final int maxDist = 128;
+        //?}
         final Optional<Structure.GenerationStub> stub = JigsawPlacement.addPieces(
-                context, pool, Optional.of(Ids.parse(target.value())), depth, origin, false, Optional.empty(), 128,
+                context, pool, Optional.of(Ids.parse(target.value())), depth, origin, false, Optional.empty(), maxDist,
                 PoolAliasLookup.EMPTY, JigsawStructure.DEFAULT_DIMENSION_PADDING, JigsawStructure.DEFAULT_LIQUID_SETTINGS);
         if (stub.isEmpty()) {
             return;
