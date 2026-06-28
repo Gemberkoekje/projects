@@ -1,8 +1,0 @@
-{
-  "fallback": "minecraft:empty",
-  "elements": [
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/wing_storeroom", "processors": "minecraft:empty", "projection": "rigid" } },
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/wing_library",   "processors": "minecraft:empty", "projection": "rigid" } },
-    { "weight": 1, "element": { "element_type": "minecraft:single_pool_element", "location": "skyseed:woodland_mansion/wing_prison",   "processors": "minecraft:empty", "projection": "rigid" } }
-  ]
-}

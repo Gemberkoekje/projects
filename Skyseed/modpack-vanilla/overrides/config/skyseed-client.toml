@@ -1,3 +1,0 @@
-#Skyseed throw mode. true = Precise (direct placement along your look vector, the
-#default); false = Classic (charged physics arc). Toggle in-game with the throw-mode key.
-preciseThrowMode = false

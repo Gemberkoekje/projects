@@ -1,5 +1,0 @@
-{
-  "dimensions": ["minecraft:overworld"],
-  "shape": { "radius": { "min": 3, "max": 3 } },
-  "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone" }
-}
