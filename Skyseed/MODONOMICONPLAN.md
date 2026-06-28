@@ -1,9 +1,11 @@
 # Skyseed — Modonomicon (optional guide book) Plan (SKYMODONOMICONPLAN)
 
-**Goal.** Add **Modonomicon** as an optional rich-guide-book backend alongside the existing **Patchouli** one, and
-make it the **26.1.2 backend** (Patchouli has no released 26.1.2 build yet — `patchouli_26.1.2` is intentionally
-omitted in `gradle.properties`). Keep everything **optional** (soft dependency), and **degrade gracefully if both book
-mods are installed at once** (which shouldn't normally happen, but must not break).
+**Goal.** Add **Modonomicon** as an optional rich-guide-book backend and make it the **primary guide backend on every
+version** — preferred over Patchouli when both are present, because Modonomicon is the more actively developed mod.
+Patchouli is demoted to a **legacy/secondary fallback** (still optional, still supported). On **26.1.2** Modonomicon
+is the *only* rich backend (Patchouli has no released 26.1.2 build — `patchouli_26.1.2` is intentionally omitted in
+`gradle.properties`). Keep everything **optional** (soft dependency), and **degrade gracefully if both book mods are
+installed at once** (which shouldn't normally happen, but must not break).
 
 **Non-goal / already true:** 26.1.2 is *already functional today* — with no book mod, `SkyseedGuide.book()` returns
 the vanilla written-book fallback. Modonomicon just restores the *rich illustrated* edition on 26.1.2. So this is an
@@ -38,64 +40,77 @@ enhancement layered on a working fallback, not a blocker.
   only behind `ModList.isLoaded("modonomicon")`.
 - **`SkyseedGuide.book()`** becomes a small **ordered walk** over backends instead of a single Patchouli check:
   ```java
-  // version-primary first; first present + non-empty wins; else the written book.
-  for (Backend b : BACKENDS) {                 // BACKENDS order is //?-swapped per node (see §3)
+  // Modonomicon first (preferred everywhere), then Patchouli; first present + non-empty wins; else the written book.
+  static final Backend[] BACKENDS = { MODONOMICON, PATCHOULI };   // ONE fixed global order — no per-version swap
+  for (Backend b : BACKENDS) {
       if (ModList.get().isLoaded(b.modid)) {
-          ItemStack s = b.book(BOOK_ID);        // PatchouliCompat / ModonomiconCompat
-          if (!s.isEmpty()) return s;
+          ItemStack s = b.book(BOOK_ID);        // ModonomiconCompat / PatchouliCompat
+          if (!s.isEmpty()) return s;            // empty (no content yet on this node) → fall through
       }
   }
   return writtenBook();
   ```
-  (A `Backend` is just `{ String modid; ItemStack book(Id); }` — two static entries, no heavy interface needed.)
+  (A `Backend` is just `{ String modid; ItemStack book(Id); }` — two static entries, no heavy interface needed.) The
+  order is the **same on every node**, so there's no `//?` on the precedence; only each compat class's *API import*
+  stays `//?`-gated to the nodes where that mod's build exists.
 
 ### 2. Per-version backend wiring (mirror the Patchouli pattern exactly)
-- `gradle.properties`: add `modonomicon_26.1.2=<version>` (and `modonomicon_1.21.1=…` only if/when we also want it on
-  1.21.1). build.gradle: `if (project.hasProperty("modonomicon_${mcv}")) { compileOnly … ; localRuntime … }` +
-  the Modonomicon maven repo. **Confirm coordinates/repo in Phase 0** (likely `com.klikli-dev:modonomicon:<mc>-<ver>`
-  on the klikli-dev / Modrinth maven).
-- So: 1.21.1 compiles+runs with Patchouli (Modonomicon optional/absent), 26.1.2 compiles+runs with Modonomicon
-  (Patchouli absent). Each compat class's API import is `//?`-gated to the nodes where that API exists.
+- `gradle.properties`: add `modonomicon_${mcv}` on **both** nodes (`modonomicon_1.21.1=…` *and* `modonomicon_26.1.2=…`)
+  — Modonomicon is now the primary backend everywhere, so it's wired on every node that has a Modonomicon build.
+  build.gradle: `if (project.hasProperty("modonomicon_${mcv}")) { compileOnly … ; localRuntime … }` + the Modonomicon
+  maven repo. **Confirm coordinates/repo in Phase 0** (likely `com.klikli-dev:modonomicon:<mc>-<ver>` on the
+  klikli-dev / Modrinth maven; Modonomicon ships builds for both 1.21.1 and 26.1.2).
+- So: **1.21.1** has *both* backends available (Modonomicon preferred, Patchouli the fallback); **26.1.2** has only
+  Modonomicon (Patchouli has no build → its API import compiles out via `//?`, its `localRuntime` is skipped). Each
+  compat class's API import is `//?`-gated to the nodes where that mod's API exists (`PatchouliCompat`'s import stays
+  `//? if <26.1.2`; `ModonomiconCompat`'s is present on both nodes).
 
 ### 3. Both-installed handling (the explicit ask) — deterministic precedence, no conflict
 - **They don't actually conflict at the data layer:** Patchouli reads only `…/patchouli_books/…`, Modonomicon reads
   only `…/modonomicon/books/…` — disjoint trees. With both mods present, *each* loads its own copy of the Skyseed
   book into its own index. That's benign redundancy, not a clash.
 - **Skyseed only ever hands out ONE book:** `book()` returns the **first present backend in `BACKENDS` order**, so the
-  granted book == the crafted book == one item. Order = **version-primary first**: 1.21.1 → `[patchouli, modonomicon]`,
-  26.1.2 → `[modonomicon, patchouli]` (the list is `//?`-swapped per node, so "both installed" deterministically uses
-  the *version-appropriate* book). If the primary's stack comes back empty (content failed to load), it falls through
-  to the secondary, then the written book — never a crash.
+  granted book == the crafted book == one item. Order = **Modonomicon first, then Patchouli — the same on every
+  version** (Modonomicon is the more actively developed mod, so it's preferred everywhere). If both are installed,
+  Modonomicon wins; if Modonomicon's stack comes back empty (its content hasn't been built on this node yet — see §4),
+  it falls through to Patchouli, then to the written book — never a crash.
 - **Debuggability:** log one INFO at startup if more than one backend is loaded, naming which Skyseed will use.
-- Net: both-installed = the player gets exactly one Skyseed book (the version-primary one); the other mod still shows
-  its redundant copy in *its own* book list, which is harmless. Documented so it's understood, not surprising.
+- Net: both-installed = the player gets exactly one Skyseed book (Modonomicon's); Patchouli still shows its redundant
+  copy in *its own* book list, which is harmless. Documented so it's understood, not surprising.
 
 ### 4. Content — the real work (same divergent-data theme as SKYRECIPEGENPLAN)
 The 72 entries + 6 categories + book.json are **Patchouli-format**; Modonomicon's book schema differs (its own
 `book/category/entry/page` JSON, page types like `modonomicon:text` / `modonomicon:crafting_recipe`, its own
 text/condition model). So the content must exist in **both** formats. Options, recommended order:
 - **(A, recommended) Golden = the existing Patchouli JSON; transform → Modonomicon** at build time (a `generateGuide`
-  Gradle task, sibling to SKYRECIPEGENPLAN's `generateRecipes`). 1.21.1 uses golden verbatim; 26.1.2 emits the
-  Modonomicon book. **The hard part is the page-type + macro mapping**: `patchouli:text`→`modonomicon:text`,
-  `patchouli:crafting`→`modonomicon:crafting_recipe`, and the `$(item)`/`$(bold)`/`$(br)`/`$()` macros →
-  Modonomicon/MC formatting; plus the reveal-`advancement` gate → a Modonomicon condition. Worth a focused mapping
-  pass; not all macros may have a 1:1 target (fall back to plain styled text).
+  Gradle task, sibling to SKYRECIPEGENPLAN's `generateRecipes`). Because Modonomicon is now preferred on **every**
+  version, the transform runs on **both** nodes: each node ships the generated Modonomicon book (the primary), and
+  1.21.1 *also* ships the Patchouli golden verbatim (the fallback). So the transform is now load-bearing for the
+  primary book everywhere — its fidelity matters more than in the version-split design. **The hard part is the
+  page-type + macro mapping**: `patchouli:text`→`modonomicon:text`, `patchouli:crafting`→`modonomicon:crafting_recipe`,
+  and the `$(item)`/`$(bold)`/`$(br)`/`$()` macros → Modonomicon/MC formatting; plus the reveal-`advancement` gate →
+  a Modonomicon condition. Worth a focused mapping pass; not all macros may have a 1:1 target (fall back to plain
+  styled text).
 - **(B, pragmatic interim) Hand-author a Modonomicon book** (or a thin subset) for 26.1.2, maintained separately.
   Higher drift risk across 72 entries, but unblocks a rich 26.1.2 book without the transformer. Could start as a
   smaller book and grow.
 - **(C) A neutral guide schema → both** — cleanest long-term but the most upfront work; only worth it if Patchouli is
   eventually dropped or a third backend appears.
-- **Until content lands, 26.1.2 shows the written-book fallback** (already working), so the integration is shippable
-  before the book content is.
+- **The precedence fall-through covers the interim gracefully:** until the Modonomicon content (the transform) lands,
+  Modonomicon's book stack is empty, so `book()` falls through — **1.21.1 keeps showing the Patchouli book**, and
+  **26.1.2 shows the written-book fallback** (both already working). So the integration + precedence are shippable
+  before any Modonomicon content exists, with **no regression** to the current 1.21.1 Patchouli experience.
 
 ---
 
 ## Validation
-- **No book mod:** `book()` → written book (unchanged). **Patchouli only (1.21.1):** rich Patchouli book (unchanged).
-  **Modonomicon only (26.1.2):** rich Modonomicon book.
-- **Both installed:** exactly one Skyseed book item (the version-primary); no crash; the INFO log fires. Add a tiny
-  unit-style gametest or manual check that `book()` is non-empty and stable under each combination (simulated via the
-  precedence list, since you can't easily load both in one gametest run).
+- **No book mod:** `book()` → written book. **Patchouli only:** Patchouli book (the fallback path). **Modonomicon
+  only:** Modonomicon book. **Both installed (either version):** the **Modonomicon** book (preferred), no crash, the
+  INFO log fires.
+- **1.21.1 behaviour change to verify:** with the Modonomicon content present, a 1.21.1 user who has *both* mods now
+  gets the **Modonomicon** book where they previously got Patchouli — intended, but call it out in the changelog.
+- Add a tiny unit-style gametest or manual check that `book()` is non-empty and stable under each combination
+  (simulated via the precedence list, since you can't easily load both mods in one gametest run).
 - **Content coverage:** extend `everySeedRecipeAndBookEntryMatchesSeedKind` (currently Patchouli-path) so on 26.1.2 it
   checks the **Modonomicon** entries instead — closing the loop with SKYGAMETESTPLAN Phase 4 (this is one of the two
   deferred generation tests). Each seed must still have an entry that carries its recipe and reveal gate.
@@ -120,11 +135,10 @@ text/condition model). So the content must exist in **both** formats. Options, r
   per-book item); the book data path (`data/<modid>/modonomicon/books/<book>/…`); availability of a 26.1.2 build.
 - **Macro/page mapping fidelity (Option A):** some Patchouli macros may lack a clean Modonomicon equivalent — decide a
   documented fallback (plain `§`-styled text) rather than failing the transform.
-- **Open decision — precedence when both present:** version-primary-first (recommended) vs a fixed global order vs a
-  config option. Default: version-primary-first, `//?`-swapped.
-- **Open decision — Modonomicon on 1.21.1 too?** The facade is backend-agnostic, so enabling Modonomicon as an
-  *also-optional* 1.21.1 backend is just adding `modonomicon_1.21.1` — but Patchouli stays the 1.21.1 primary. Defer
-  unless wanted.
+- **DECIDED — precedence when both present:** a single fixed global order, **Modonomicon → Patchouli → written book**,
+  the same on every version (Modonomicon is the more actively developed mod). No `//?`-swap on the order.
+- **DECIDED — Modonomicon on 1.21.1 too:** yes. Modonomicon is wired (`modonomicon_1.21.1`) and *preferred* on 1.21.1
+  as well; Patchouli is demoted to the legacy fallback there. (Confirm Modonomicon publishes a 1.21.1 build in Phase 0.)
 - **Open decision — content source of truth:** golden=Patchouli+transform (A) vs hand-authored Modonomicon (B). Lean
   A for single-source consistency with SKYRECIPEGENPLAN; B is the lower-effort interim.
 
