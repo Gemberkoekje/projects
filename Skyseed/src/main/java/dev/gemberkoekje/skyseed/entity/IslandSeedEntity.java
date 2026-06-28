@@ -35,7 +35,11 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+//? if >=26.1.2 {
+/*import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile;*/
+//?} else {
 import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
+//?}
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
