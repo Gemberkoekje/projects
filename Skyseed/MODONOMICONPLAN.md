@@ -130,9 +130,9 @@ text/condition model). So the content must exist in **both** formats. Options, r
 ---
 
 ## Risks / open decisions
-- **Modonomicon API specifics to confirm (Phase 0):** Maven coordinates + repo; the API call for a book `ItemStack`
-  by id (and whether the book item is a generic registered item with NBT/data-component pointing at the book id, vs a
-  per-book item); the book data path (`data/<modid>/modonomicon/books/<book>/…`); availability of a 26.1.2 build.
+- **RESOLVED (Phase 0) — Modonomicon API specifics:** Maven coords/repo, the book-stack approach (generic
+  `modonomicon:book` item + `BOOK_ID` data component, existence via `BookDataManager`), the data path
+  (`modonomicon/books`), and the 26.1.2 build (`1.134.2`) are all confirmed — see the Status log.
 - **Macro/page mapping fidelity (Option A):** some Patchouli macros may lack a clean Modonomicon equivalent — decide a
   documented fallback (plain `§`-styled text) rather than failing the transform.
 - **DECIDED — precedence when both present:** a single fixed global order, **Modonomicon → Patchouli → written book**,
@@ -143,4 +143,26 @@ text/condition model). So the content must exist in **both** formats. Options, r
   A for single-source consistency with SKYRECIPEGENPLAN; B is the lower-effort interim.
 
 ## Status log
-- _(Not started — this document is the plan. 26.1.2 currently uses the written-book fallback; Patchouli powers 1.21.1.)_
+- **★ Phase 0 DONE (commit `a12b353`, 2026-06-28) — Modonomicon wired as an optional backend on both nodes,
+  precedence + graceful fall-through verified.** Confirmed facts (save re-deriving):
+  - **Maven:** `com.klikli_dev:modonomicon-<mc>-neoforge:<ver>` on repo `https://dl.cloudsmith.io/public/klikli-dev/
+    mods/maven/`. Wired `compileOnly + localRuntime`, **`transitive = false`** (clean at dev runtime — 0 load
+    failures both nodes). Versions: **`modonomicon_1.21.1=1.114.5`, `modonomicon_26.1.2=1.134.2`** (Modonomicon ships
+    a build for *both* MCs). Per-node guard `if (project.hasProperty("modonomicon_${mcv}"))`, mirroring Patchouli.
+  - **API (javap-confirmed, STABLE across 1.114.5 ↔ 1.134.2 — so no `//?` in `ModonomiconCompat`):** the book item
+    is the generic `ItemRegistry.MODONOMICON.get()` (a `modonomicon:book`) carrying the book id in the
+    `DataComponentRegistry.BOOK_ID.get()` data component (`DataComponentType<id>`); existence is
+    `BookDataManager.get().getBook(id)` (returns null if absent → we return `ItemStack.EMPTY` so `SkyseedGuide` falls
+    through). The only version-volatile thing is the MC id type, kept behind `var id = Ids.parse(book.value())` (never
+    named). `RegistryObject<T> extends Supplier<T>` so `.get()` yields the value. Data path is
+    `data/<modid>/modonomicon/books/<book>/…` (`ModonomiconConstants.Data.MODONOMICON_DATA_PATH = "modonomicon/books"`).
+  - **`SkyseedGuide.book()`** walks Modonomicon → Patchouli → written book; logs once if both are installed. Verified:
+    1.21.1 with BOTH mods at dev runtime → 126 green + the INFO log + falls through to Patchouli (no Modonomicon
+    content yet); 26.1.2 with Modonomicon → 58 green + falls through to the written book. **No regression** (both nodes
+    behave exactly as before content lands).
+  - **Datagen API present for Phase 2:** the jar ships `…api.datagen.BookProvider`/`NeoBookProvider`/`EntryProvider`/
+    `CategoryProvider` + `book.BookModel`/`BookEntryModel`/`BookCategoryModel` + condition models — i.e. Modonomicon
+    supports *code* book authoring, relevant when wiring the golden→Modonomicon content (Option A).
+- _Next: Phase 1 — a minimal Modonomicon `book.json` + a category + ~2 entries so 26.1.2 returns a real Modonomicon
+  book (proving the data path + the stack). Then Phase 2 content + flipping the book-coverage gametest to validate
+  BOTH backends (Patchouli AND Modonomicon stay first-class — per the standing rule)._
