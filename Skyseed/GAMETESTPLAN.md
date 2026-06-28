@@ -149,4 +149,39 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
 ---
 
 ## Status log
-- _(Phase 0 not started — this document is the plan.)_
+- **★ Phase 0 DONE (commit `df20812`, 2026-06-28) — the harness is validated end-to-end on 26.1.2.**
+  `:26.1.2:runGameTestServer` BUILD SUCCESSFUL (the ported `island_generates_blocks` runs + passes); `:1.21.1:`
+  stays 126 green. Confirmed facts (save re-deriving):
+  - **`GameTestInstance` has THREE abstract methods, not two:** `run(GameTestHelper)`, `codec()`, **and
+    `protected MutableComponent typeDescription()`** (display label — return any `Component.literal(...)`). The first
+    spike compile failed only on the missing `typeDescription`.
+  - **The `codec()` dummy is fine** — `MapCodec.<SkyseedTest>unit(() -> { throw … })` satisfies the contract and is
+    never invoked for `RegistrationInfo.BUILT_IN` tests (the run never serializes them). No `TEST_INSTANCE_TYPE`
+    registration needed. (Fallback path documented above is unnecessary.)
+  - **`@EventBusSubscriber(modid = Skyseed.MODID)` auto-routes `RegisterGameTestsEvent` to the mod bus** (no `bus=`).
+  - **The 26.1.2 GameTestServer run needs `JAVA_HOME = jdk-26.0.1`** (the node toolchain is `java_26.1.2=25`; JDK 26
+    satisfies it). The 1.21.1 run uses JDK 21.
+  - **A NeoForge/vanilla built-in test runs alongside ours** — the run reported "All **2** required tests passed"
+    with one test registered. Harmless; just don't read the raw count as the Skyseed test count. (Watch when Phase 1
+    lands the bulk — the delta from the registered count should stay +1, not ×2.)
+  - **Two runtime data issues the compile/build milestone couldn't catch** (they need a live server — `:build` never
+    loads registries):
+    1. **FIXED — void noise_settings.** `void`/`void_nether`/`void_end` failed registry load: the 26.1.2
+       `noise_router` codec added a **required** `preliminary_surface_level` density function. Added `0.0` (a void
+       has no surface) as the first `noise_router` field in all three. 1.21.1's lenient codec ignores the extra key
+       → **one shared JSON loads on both** (verified). This is the [[skyseed-refactor]] "void noise-settings standing
+       rule" / "re-verify void_* load" risk, now closed.
+    2. **NOT fixed (separate production-data scope, non-fatal):** the seed crafting recipes log ~45 parse errors on
+       26.1.2 — the **1.21.5 ingredient format change** (`{"item":"x"}`/`{"tag":"x"}` → plain `"x"`/`"#x"`). Unlike
+       noise_settings, the formats are **mutually exclusive** between versions, so they can't share one JSON — needs
+       per-version recipe resources or datagen. Doesn't block tests (recipes aren't exercised by the gen suite).
+  - **JaCoCo 0.8.12 can't instrument Java 25 (class major 69)** → the `gameTestServer` agent is now guarded to the
+    1.21.1 node. **26.1.2 coverage tooling is the open Phase-1 question** (a Java-25-capable JaCoCo if/when one ships,
+    or an alternative). Until then, 26.1.2 coverage can't be numerically measured — port by category/inspection and
+    revisit the tool.
+- _Next: Phase 1 — port the generation-invariant tests (the 60-test bulk) into `gametest_26_1_2`._
+
+## Resolved decisions
+- **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
+  underscores; per-version packages let more nodes get isolated suites later).
+- **Environment = one empty `AllOf()`** (`Ids.mod("default")`) — sufficient; no per-batch setup needed.
