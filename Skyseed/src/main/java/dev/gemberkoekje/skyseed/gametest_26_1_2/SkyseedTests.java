@@ -203,6 +203,13 @@ public final class SkyseedTests {
         reg(event, "mesa_mineshaft_is_dark_oak_with_gold", REGION, SkyseedTests::mesaMineshaftIsDarkOakWithGold);
         reg(event, "overworld_biome_themes_have_end_form", REGION, SkyseedTests::overworldBiomeThemesHaveEndForm);
         reg(event, "forest_and_lush_end_forms_split_by_biome", REGION, SkyseedTests::forestAndLushEndFormsSplitByBiome);
+        // batch d — recipe resolution (the End-chapter crafting chain; recipes now load via SKYRECIPEGENPLAN):
+        reg(event, "end_portal_edges_craft_from_shard_and_relics", REGION, SkyseedTests::endPortalEdgesCraftFromShardAndRelics);
+        reg(event, "end_portal_seed_crafts_from_four_edges", REGION, SkyseedTests::endPortalSeedCraftsFromFourEdges);
+        reg(event, "return_portal_seed_crafts_from_end_stone_and_pearls", REGION, SkyseedTests::returnPortalSeedCraftsFromEndStoneAndPearls);
+        reg(event, "chorus_forest_seed_crafts_from_chorus_and_end_stone", REGION, SkyseedTests::chorusForestSeedCraftsFromChorusAndEndStone);
+        reg(event, "end_city_seed_crafts_from_shulker_shell_and_purpur", REGION, SkyseedTests::endCitySeedCraftsFromShulkerShellAndPurpur);
+        reg(event, "dragon_trophy_seed_crafts_from_dragon_breath", REGION, SkyseedTests::dragonTrophySeedCraftsFromDragonBreath);
         // DEFERRED — still not ported (each needs a 26.1.2 API the suite hasn't crossed yet):
         //  - the recipe-resolution cluster (endPortalEdges/endPortalSeed/returnPortalSeed/chorusForest/endCity/
         //    dragonTrophy seed crafts) + everySeedRecipeAndBookEntryMatchesSeedKind: need the reworked recipe API
@@ -3042,5 +3049,119 @@ public final class SkyseedTests {
         return ov.variants().map(vs -> vs.stream().anyMatch(
                 v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().path().equals("chorus_plant"))))
                 .orElse(false);
+    }
+
+    // ===== recipe-resolution tests (26.1.2: level.recipeAccess().getRecipeFor(...); assemble(input) lost the Provider arg) =====
+
+    static void endPortalEdgesCraftFromShardAndRelics(GameTestHelper helper) {
+        // Phase-1 (End chapter) collect-a-thon: each of the four portal edges is a shapeless craft of one Portal Frame
+        // Shard + two structure relics. Resolving the recipe also proves every ingredient id is a registered item.
+        final ServerLevel level = helper.getLevel();
+        final String[][] edges = {
+                {"grand_edge", "mansion_relic", "monument_relic"}, {"temple_edge", "desert_relic", "jungle_relic"},
+                {"camp_edge", "trial_relic", "outpost_relic"}, {"nether_edge", "fortress_relic", "bastion_relic"}};
+        for (final String[] e : edges) {
+            final net.minecraft.world.item.crafting.CraftingInput input =
+                    net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get("portal_frame_shard").get()),
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(e[1]).get()),
+                            new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(e[2]).get())));
+            final var recipe = level.recipeAccess().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+            helper.assertTrue(recipe.isPresent(), "no crafting recipe for " + e[0] + " (shard + " + e[1] + " + " + e[2] + ")");
+            helper.assertTrue(recipe.get().value().assemble(input).is(ModItems.PARTS.get(e[0]).get()),
+                    e[0] + " recipe did not produce the edge");
+        }
+        helper.succeed();
+    }
+
+    static void endPortalSeedCraftsFromFourEdges(GameTestHelper helper) {
+        // Phase-1 payoff: the four portal edges set in a cross forge the End Portal Seed (which grows the portal chamber).
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack none = net.minecraft.world.item.ItemStack.EMPTY;
+        final java.util.function.Function<String, net.minecraft.world.item.ItemStack> part =
+                id -> new net.minecraft.world.item.ItemStack(ModItems.PARTS.get(id).get());
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                        none, part.apply("grand_edge"), none,
+                        part.apply("camp_edge"), none, part.apply("temple_edge"),
+                        none, part.apply("nether_edge"), none));
+        final var recipe = level.recipeAccess().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the End Portal Seed from the four edges");
+        helper.assertTrue(recipe.get().value().assemble(input)
+                        .is(ModItems.SEEDS.get("end_portal").get()),
+                "the edge cross did not produce the End Portal Seed");
+        helper.succeed();
+    }
+
+    static void returnPortalSeedCraftsFromEndStoneAndPearls(GameTestHelper helper) {
+        // The End-only Return Portal Seed crafts from end stone + ender pearls — both obtainable in the End, so a
+        // stranded player can build their way home without a trip back to the Nether.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack s = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(s, p, s, p, s, p, s, p, s));
+        final var recipe = level.recipeAccess().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Return Portal Seed from end stone + ender pearls");
+        helper.assertTrue(recipe.get().value().assemble(input)
+                        .is(ModItems.SEEDS.get("return_portal").get()),
+                "the end stone + ender pearl ring did not produce the Return Portal Seed");
+        helper.succeed();
+    }
+
+    static void chorusForestSeedCraftsFromChorusAndEndStone(GameTestHelper helper) {
+        // Phase 3 (End-native content): the Chorus Forest seed crafts from chorus fruit ringing end stone — both
+        // End-obtainable, so you grow a renewable chorus/purpur farm.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack c = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.CHORUS_FRUIT);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(c, e, c, e, c, e, c, e, c));
+        final var recipe = level.recipeAccess().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Chorus Forest Seed from chorus fruit + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input)
+                        .is(ModItems.SEEDS.get("chorus_forest").get()),
+                "the chorus fruit + end stone ring did not produce the Chorus Forest Seed");
+        helper.succeed();
+    }
+
+    static void endCitySeedCraftsFromShulkerShellAndPurpur(GameTestHelper helper) {
+        // Phase 3 flagship: the End City Seed crafts from purpur framing shulker shells around end stone — all
+        // End-obtainable, so your own city is renewable.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.PURPUR_BLOCK);
+        final net.minecraft.world.item.ItemStack s = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SHULKER_SHELL);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(p, s, p, p, e, p, p, s, p));
+        final var recipe = level.recipeAccess().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the End City Seed from purpur + shulker shells + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input)
+                        .is(ModItems.SEEDS.get("end_city").get()),
+                "the purpur + shulker shell + end stone frame did not produce the End City Seed");
+        helper.succeed();
+    }
+
+    static void dragonTrophySeedCraftsFromDragonBreath(GameTestHelper helper) {
+        // Phase 6 capstone: the Dragon Trophy seed crafts from dragon's breath ringed in obsidian and end stone —
+        // post-dragon by construction, so the trophy is earned, not handed out.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.END_STONE);
+        final net.minecraft.world.item.ItemStack o = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.OBSIDIAN);
+        final net.minecraft.world.item.ItemStack d = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DRAGON_BREATH);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(e, o, e, o, d, o, e, o, e));
+        final var recipe = level.recipeAccess().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Dragon Trophy Seed from dragon's breath + obsidian + end stone");
+        helper.assertTrue(recipe.get().value().assemble(input)
+                        .is(ModItems.SEEDS.get("dragon_trophy").get()),
+                "the dragon's breath + obsidian + end stone ring did not produce the Dragon Trophy Seed");
+        helper.succeed();
     }
 }
