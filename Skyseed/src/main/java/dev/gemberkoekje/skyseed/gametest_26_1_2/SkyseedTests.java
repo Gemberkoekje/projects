@@ -220,6 +220,7 @@ public final class SkyseedTests {
         reg(event, "huge_islands_carve_decorated_caves", REGION, SkyseedTests::hugeIslandsCarveDecoratedCaves);
         reg(event, "huge_aquatic_is_mostly_water", REGION, SkyseedTests::hugeAquaticIsMostlyWater);
         reg(event, "every_theme_plans_without_error", REGION, SkyseedTests::everyThemePlansWithoutError);
+        reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
         reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
@@ -3318,6 +3319,39 @@ public final class SkyseedTests {
             if (bp.state().is(Blocks.WATER)) water++;
         }
         helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void forestOverPaleGardenGrowsPaleVariant(GameTestHelper helper) {
+        // REFACTORPLAN 2d-1: a Forest seed over a pale_garden biome grows the pale variant (pale oak + pale moss). This
+        // is also the resolve-side proof of the §2.4 cross-version data strategy — these ids exist on 26.1.2 so they
+        // build, whereas on 1.21.1 they're unknown and the tolerant resolvers skip them (the SAME forest.json loads
+        // inert there, already covered by unknownThemeIdsFallBack).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var pale = biome(level, "minecraft:pale_garden");
+        // Vanilla tree features land in p.trees() (deferred ConfiguredFeature placements), not p.blocks(); the pale
+        // moss (surface_scatter + ground) IS in p.blocks() and is unique to this override.
+        final var cfReg = Lookup.registry(level.registryAccess(), Registries.CONFIGURED_FEATURE);
+        boolean paleOak = false, paleMoss = false;
+        for (long seed = 1; seed <= 8 && !(paleOak && paleMoss); seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "forest"), pale, RandomSource.create(seed));
+            for (final var t : p.trees()) {
+                final var fid = cfReg.getKey(t.feature());
+                if (fid != null && fid.toString().equals("minecraft:pale_oak")) {
+                    paleOak = true;
+                    break;
+                }
+            }
+            for (final var bp : p.blocks()) {
+                if (bp.state().is(Blocks.PALE_MOSS_BLOCK) || bp.state().is(Blocks.PALE_MOSS_CARPET)) {
+                    paleMoss = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(paleMoss, "the Forest pale_garden override placed no pale moss (the override did not match / decoration did not resolve)");
+        helper.assertTrue(paleOak, "the Forest pale_garden override scheduled no pale_oak tree (the configured feature did not resolve)");
         helper.succeed();
     }
 
