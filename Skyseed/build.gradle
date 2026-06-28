@@ -66,6 +66,58 @@ if (project != rootProject) {
     tasks.withType(ProcessResources).configureEach { dependsOn(syncDevStructures) }
 }
 
+// --- Per-version recipe generation (golden source -> version-correct JSON). See RECIPEGENPLAN.md. ---
+// Recipes are authored ONCE in the modern (26.1.2) string-ingredient form under the repo-root `recipes/` tree; this
+// task emits the node's data JSON into build/generated/recipes. Modern nodes copy verbatim; the legacy 1.21.1 node
+// downgrades each ingredient ("x"/"#tag" -> {"item":"x"}/{"tag":"x"}), since the 1.21.5+ ingredient formats are
+// mutually exclusive and can't share one JSON. Golden lives OUTSIDE src/main (so it never ships raw); the generated
+// dir is a resource srcDir. processResources depends on it.
+def goldenRecipesDir = rootProject.file('recipes')
+def generatedRecipesDir = layout.buildDirectory.dir('generated/recipes')
+
+// Downgrade a modern ingredient node (string / "#tag" / list-of-choices / typed object) to the 1.21.1 object form.
+def downgradeIngredient
+downgradeIngredient = { node ->
+    if (node instanceof String) {
+        node.startsWith('#') ? [tag: node.substring(1)] : [item: node]
+    } else if (node instanceof List) {
+        node.collect { downgradeIngredient(it) }
+    } else {
+        node // a typed/custom ingredient object -> leave as-is
+    }
+}
+
+def generateRecipes = tasks.register('generateRecipes') {
+    inputs.dir(goldenRecipesDir).optional()
+    outputs.dir(generatedRecipesDir)
+    def legacy = (mcv == "1.21.1")
+    doLast {
+        def outRoot = generatedRecipesDir.get().asFile
+        outRoot.deleteDir()
+        if (!goldenRecipesDir.exists()) return
+        goldenRecipesDir.eachFileRecurse { f ->
+            if (f.isDirectory() || !f.name.endsWith('.json')) return
+            def rel = goldenRecipesDir.toPath().relativize(f.toPath()).toString()
+            def outFile = new File(outRoot, rel)
+            outFile.parentFile.mkdirs()
+            if (legacy) {
+                def recipe = new groovy.json.JsonSlurper().parse(f)
+                if (recipe.key instanceof Map) {
+                    recipe.key = recipe.key.collectEntries { k, v -> [(k): downgradeIngredient(v)] }
+                }
+                if (recipe.ingredients instanceof List) {
+                    recipe.ingredients = recipe.ingredients.collect { downgradeIngredient(it) }
+                }
+                outFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(recipe))
+            } else {
+                outFile.text = f.text // modern node: golden is already the correct form
+            }
+        }
+    }
+}
+sourceSets.main.resources.srcDir(generatedRecipesDir)
+tasks.withType(ProcessResources).configureEach { dependsOn(generateRecipes) }
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)

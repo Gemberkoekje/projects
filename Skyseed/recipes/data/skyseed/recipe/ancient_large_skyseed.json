@@ -7,15 +7,9 @@
     "DCD"
   ],
   "key": {
-    "D": {
-      "item": "minecraft:deepslate"
-    },
-    "C": {
-      "item": "minecraft:cobbled_deepslate"
-    },
-    "G": {
-      "item": "skyseed:ancient_skyseed"
-    }
+    "D": "minecraft:deepslate",
+    "C": "minecraft:cobbled_deepslate",
+    "G": "skyseed:ancient_skyseed"
   },
   "result": {
     "id": "skyseed:ancient_large_skyseed"
