@@ -224,6 +224,7 @@ public final class SkyseedTests {
         reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
         reg(event, "new_mobs_resolve_on_themes", REGION, SkyseedTests::newMobsResolveOnThemes);
+        reg(event, "farm_animals_default_to_biome_variant", REGION, SkyseedTests::farmAnimalsDefaultToBiomeVariant);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
         reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
@@ -3322,6 +3323,32 @@ public final class SkyseedTests {
             if (bp.state().is(Blocks.WATER)) water++;
         }
         helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void farmAnimalsDefaultToBiomeVariant(GameTestHelper helper) {
+        // REFACTORPLAN 2d-4: the 1.21.5 cow/pig/chicken biome-temperature variant defaults through Skyseed's spawn path
+        // for free — GenerationJob spawns via Entities.create + EventHooks.finalizeMobSpawn, and Cow.finalizeSpawn picks
+        // the variant from the spawn biome (VariantUtils.selectVariantToSpawn(SpawnContext)). Lock it robustly: set a cow
+        // to the WRONG variant first, then run that same finalize, and confirm it's reset to the biome-selected one — so
+        // a future spawn-path change that drops finalizeMobSpawn is caught regardless of the test region's biome.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos pos = helper.absolutePos(new BlockPos(8, 2, 8));
+        final var cow = dev.gemberkoekje.skyseed.compat.Entities.create(net.minecraft.world.entity.EntityType.COW, level);
+        helper.assertTrue(cow != null, "could not create a cow");
+        dev.gemberkoekje.skyseed.compat.Entities.place(cow, pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 0.0F, 0.0F);
+        final var selected = net.minecraft.world.entity.variant.VariantUtils.selectVariantToSpawn(
+                net.minecraft.world.entity.variant.SpawnContext.create(level, cow.blockPosition()),
+                Registries.COW_VARIANT).orElseThrow();
+        // deliberately assign a DIFFERENT variant, so a working finalize must overwrite it back to the biome choice
+        final var wrong = Lookup.registry(level.registryAccess(), Registries.COW_VARIANT)
+                .listElements().filter(h -> !h.equals(selected)).findFirst().orElseThrow();
+        cow.setVariant(wrong);
+        net.neoforged.neoforge.event.EventHooks.finalizeMobSpawn(cow, level, level.getCurrentDifficultyAt(pos),
+                net.minecraft.world.entity.EntitySpawnReason.SPAWNER, null);
+        helper.assertTrue(cow.getVariant().equals(selected),
+                "the spawn path did not default the cow's variant by biome (finalizeMobSpawn missing or not assigning the variant)");
+        cow.discard();
         helper.succeed();
     }
 
