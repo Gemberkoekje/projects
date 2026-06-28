@@ -2,7 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.resources.ResourceLocation;
+import dev.gemberkoekje.skyseed.compat.Id;
 
 import java.util.List;
 
@@ -17,9 +17,9 @@ public record AnimalPack(int weight, List<Entry> entries) {
             Entry.CODEC.listOf().fieldOf("entries").forGetter(AnimalPack::entries)
     ).apply(i, AnimalPack::new));
 
-    public record Entry(ResourceLocation entity, int adults, int babies) {
+    public record Entry(Id entity, int adults, int babies) {
         public static final Codec<Entry> CODEC = RecordCodecBuilder.create(i -> i.group(
-                ResourceLocation.CODEC.fieldOf("entity").forGetter(Entry::entity),
+                Id.CODEC.fieldOf("entity").forGetter(Entry::entity),
                 Codec.INT.optionalFieldOf("adults", 1).forGetter(Entry::adults),
                 Codec.INT.optionalFieldOf("babies", 0).forGetter(Entry::babies)
         ).apply(i, Entry::new));

@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.TreeSite;
 import dev.gemberkoekje.skyseed.worldgen.theme.Decoration;
@@ -151,12 +152,12 @@ final class DecorationPlanner {
     }
 
     /** Build a single hanging feature under {@code bottom} (a column's lowest block, or a cave ceiling for the CaveCarver). */
-    static void hangUnder(Map<BlockPos, BlockState> blockMap, BlockPos bottom, ResourceLocation id, RandomSource random) {
+    static void hangUnder(Map<BlockPos, BlockState> blockMap, BlockPos bottom, Id id, RandomSource random) {
         final BlockPos first = bottom.below();
         if (blockMap.containsKey(first)) {
             return;
         }
-        switch (id.getPath()) {
+        switch (id.path()) {
             case "pointed_dripstone" -> {
                 final int len = 1 + random.nextInt(3); // 1-3 tall stalactite
                 for (int i = 0; i < len; i++) {

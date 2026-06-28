@@ -1,6 +1,6 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
-import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.Caves;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
@@ -36,8 +36,8 @@ final class CaveCarver {
 
     /** Default cave dressing for themes whose variant has no underside palette: a little dripstone + glow lichen. */
     private static final List<GroundEntry> DEFAULT_DECO = List.of(
-            new GroundEntry(Ids.mc("pointed_dripstone"), 0.12f),
-            new GroundEntry(Ids.mc("glow_lichen"), 0.07f));
+            new GroundEntry(Id.of("minecraft:pointed_dripstone"), 0.12f),
+            new GroundEntry(Id.of("minecraft:glow_lichen"), 0.07f));
 
     private static long key(int dx, int dz) {
         return (((long) dx) << 32) | (dz & 0xffffffffL);

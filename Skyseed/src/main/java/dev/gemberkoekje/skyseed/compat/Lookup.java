@@ -81,6 +81,17 @@ public final class Lookup {
         return BuiltInRegistries.ENTITY_TYPE.get(id);
     }
 
+    /** Whether an entity type is registered under {@code id} (a {@code null}/unparseable id → false). */
+    public static boolean hasEntityType(Id id) {
+        final ResourceLocation rl = id == null ? null : Ids.parse(id.value());
+        return rl != null && hasEntityType(rl);
+    }
+
+    /** The entity type under {@code id} (callers gate with {@link #hasEntityType(Id)}). */
+    public static EntityType<?> entityType(Id id) {
+        return entityType(Ids.parse(id.value()));
+    }
+
     // --- Dynamic registries (via RegistryAccess) ----------------------------------------------------------------
 
     /** A registry — vanilla or one of this mod's datapack registries (e.g. the theme registry) — by its key. */

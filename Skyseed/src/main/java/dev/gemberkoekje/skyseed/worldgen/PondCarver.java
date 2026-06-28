@@ -1,10 +1,10 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.GroundEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
@@ -347,9 +347,9 @@ final class PondCarver {
     }
 
     /** Place one water plant in a pond column; type decides placement (surface lily vs floor-rooted vs coral). */
-    private static void plantInPond(Map<BlockPos, BlockState> blockMap, int wx, int wz, int waterY, int bottomY, ResourceLocation id) {
+    private static void plantInPond(Map<BlockPos, BlockState> blockMap, int wx, int wz, int waterY, int bottomY, Id id) {
         final BlockPos floor = new BlockPos(wx, bottomY, wz); // lowest water block, resting on the island body
-        switch (id.getPath()) {
+        switch (id.path()) {
             case "lily_pad" -> blockMap.put(new BlockPos(wx, waterY + 1, wz), Blocks.LILY_PAD.defaultBlockState());
             case "kelp", "kelp_plant" -> {
                 for (int y = bottomY; y <= waterY; y++) {
@@ -406,9 +406,9 @@ final class PondCarver {
     }
 
     /** Place a bank plant; sugar cane stacks 1-3 tall, everything else is a single block. */
-    private static void bankPlant(Map<BlockPos, BlockState> blockMap, BlockPos above, ResourceLocation id, RandomSource random) {
+    private static void bankPlant(Map<BlockPos, BlockState> blockMap, BlockPos above, Id id, RandomSource random) {
         final BlockState state = Lookup.blockState(id);
-        if (id.getPath().equals("sugar_cane")) {
+        if (id.path().equals("sugar_cane")) {
             final int h = 1 + random.nextInt(3); // 1-3 tall (rolled regardless of placement, to keep generation deterministic)
             if (!caneCanStand(blockMap, above.below())) {
                 return; // would pop on the first tick — only grow cane where water sits beside its supporting block

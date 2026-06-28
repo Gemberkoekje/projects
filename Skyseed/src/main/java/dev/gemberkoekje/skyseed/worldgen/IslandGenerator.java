@@ -461,7 +461,7 @@ public final class IslandGenerator {
     /** The ore list with a one-off lava vein appended (rolled last, so it doesn't shift the real ores' RNG). */
     private static List<OreEntry> withLavaVein(List<OreEntry> ores, Lava lava) {
         final List<OreEntry> out = new ArrayList<>(ores);
-        out.add(new OreEntry(Ids.mc("lava"), lava.veinChance(),
+        out.add(new OreEntry(Id.of("minecraft:lava"), lava.veinChance(),
                 new IntRange(1, 1), lava.veinSize(), OreDepth.CORE));
         return out;
     }

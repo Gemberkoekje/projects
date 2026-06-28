@@ -19,6 +19,18 @@ public record Id(String value) {
         return new Id(value);
     }
 
+    /** The namespace part (before the {@code :}); {@code minecraft} when none is written. Pure string — no registry. */
+    public String namespace() {
+        final int c = value.indexOf(':');
+        return c < 0 ? "minecraft" : value.substring(0, c);
+    }
+
+    /** The path part (after the {@code :}); the whole string when there's no namespace. For code that branches on kind. */
+    public String path() {
+        final int c = value.indexOf(':');
+        return c < 0 ? value : value.substring(c + 1);
+    }
+
     @Override
     public String toString() {
         return value;

@@ -1,12 +1,12 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.AnimalPack;
 import dev.gemberkoekje.skyseed.worldgen.theme.MobEntry;
 import dev.gemberkoekje.skyseed.worldgen.theme.Pond;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 
@@ -112,7 +112,7 @@ final class MobPlanner {
     }
 
     /** @return the entity type for {@code id}, or {@code null} (logged) if it isn't a registered entity. */
-    private static EntityType<?> resolveEntity(ResourceLocation id) {
+    private static EntityType<?> resolveEntity(Id id) {
         if (Lookup.hasEntityType(id)) {
             return Lookup.entityType(id);
         }

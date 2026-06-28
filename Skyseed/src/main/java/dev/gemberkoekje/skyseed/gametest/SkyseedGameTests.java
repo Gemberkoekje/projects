@@ -2859,7 +2859,7 @@ public final class SkyseedGameTests {
             helper.assertTrue(outer != null, "theme '" + name + "' has no outer (dimension the_end) End override");
             helper.assertTrue(!endFormHasChorus(central), "the central End form of '" + name + "' must be EMPTY (no chorus)");
             helper.assertTrue(endFormHasChorus(outer), "the outer End form of '" + name + "' must grow a little chorus");
-            final boolean shulker = outer.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().getPath().equals("shulker")))
+            final boolean shulker = outer.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().path().equals("shulker")))
                     .orElse(false);
             helper.assertTrue(shulker, "the outer End form of '" + name + "' must carry a shulker chance (shell bootstrap)");
             helper.assertTrue(central.shape().get().radius().min() > outer.shape().get().radius().min(),
