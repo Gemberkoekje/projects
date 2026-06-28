@@ -5,6 +5,7 @@ import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
+import dev.gemberkoekje.skyseed.compat.ModonomiconCompat;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.DebugForce;
 import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
@@ -123,6 +124,7 @@ public final class SkyseedTests {
         reg(event, "structure_connections_link_after_placement", REGION, SkyseedTests::structureConnectionsLinkAfterPlacement);
         reg(event, "dimension_gate_grows_or_fizzles_by_implementation", REGION, SkyseedTests::dimensionGateGrowsOrFizzlesByImplementation);
         reg(event, "dimension_override_never_inherits_overworld", REGION, SkyseedTests::dimensionOverrideNeverInheritsOverworld);
+        reg(event, "modonomicon_backend_resolves_and_degrades", REGION, SkyseedTests::modonomiconBackendResolvesAndDegrades);
         reg(event, "biome_override_replaces_body_fields", REGION, SkyseedTests::biomeOverrideReplacesBodyFields);
         reg(event, "shape_builder_caps_surface_and_buries_core", REGION, SkyseedTests::shapeBuilderCapsSurfaceAndBuriesCore);
         reg(event, "island_is_deterministic", REGION, SkyseedTests::islandIsDeterministic);
@@ -1643,6 +1645,18 @@ public final class SkyseedTests {
         helper.assertTrue(netherrack, "a bare nether override should give a neutral netherrack body");
         helper.assertTrue(!coal, "a nether override must NOT inherit the base's overworld coal ore");
         helper.assertTrue(!grass, "a nether override must NOT inherit the base's overworld grass");
+        helper.succeed();
+    }
+
+    static void modonomiconBackendResolvesAndDegrades(GameTestHelper helper) {
+        // SKYMODONOMICONPLAN Phase 1 proof: with Modonomicon present, a LOADED book id resolves to a non-empty book
+        // stack, and an ABSENT book id resolves to EMPTY — the fall-through guarantee that keeps SkyseedGuide graceful
+        // (so a backend with no Skyseed book lets the next backend / written book win). Uses a throwaway test_guide
+        // book so the real skyseed:guide / SkyseedGuide.book() precedence is untouched until the Phase 2 content lands.
+        helper.assertTrue(!ModonomiconCompat.bookStack(Id.of("skyseed:test_guide")).isEmpty(),
+                "Modonomicon should resolve the loaded skyseed:test_guide book to a non-empty stack");
+        helper.assertTrue(ModonomiconCompat.bookStack(Id.of("skyseed:no_such_book")).isEmpty(),
+                "Modonomicon should resolve an absent book id to EMPTY (so SkyseedGuide falls through)");
         helper.succeed();
     }
 

@@ -1,0 +1,13 @@
+{
+  "category": "skyseed:overview",
+  "name": "Welcome, Skyfarer",
+  "icon": "skyseed:forest_skyseed",
+  "x": 0,
+  "y": 0,
+  "pages": [
+    {
+      "type": "modonomicon:text",
+      "text": "Craft a Skyseed, hold right-click to wind up, and release to throw it. Where it lands, an island grows from nothing."
+    }
+  ]
+}
