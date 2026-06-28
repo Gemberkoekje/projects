@@ -2822,9 +2822,16 @@ public final class SkyseedTests {
         final IslandSeedEntity b = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         b.readAdditionalSaveData(net.minecraft.world.level.storage.TagValueInput.create(
                 net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess(), tag));
+        // Re-serialise b and assert on THAT, not the source tag: this actually exercises the READ side (ValueInput).
+        // Asserting the precise target on the original `tag` would pass even if readAdditionalSaveData silently dropped
+        // it — b only re-emits Precise/TY if its read restored them (it writes TY only when precise is true).
+        final var out2 = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+                net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess());
+        b.addAdditionalSaveData(out2);
+        final var tag2 = out2.buildResult();
         helper.assertTrue(theme.equals(b.getTheme()), "theme did not round-trip through NBT");
-        helper.assertTrue(tag.getBooleanOr("Precise", false) && tag.getDoubleOr("TY", 0.0) == 2.5,
-                "precise target did not round-trip");
+        helper.assertTrue(tag2.getBooleanOr("Precise", false) && tag2.getDoubleOr("TY", 0.0) == 2.5,
+                "precise target did not round-trip through read");
         helper.succeed();
     }
 
