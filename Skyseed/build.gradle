@@ -30,6 +30,16 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache") // datagen cache files
 }
 
+// The gametest harness (src/main/.../gametest) uses the pre-1.21.5 @GameTest / @GameTestHolder registration API, which
+// the 26.1.2 gametest rewrite removed (it's now instance/datapack-based). The gametests are dev-only — the 1.21.1
+// golden-master witness — so until they're ported they compile only on the old-API node; newer nodes build the
+// shipped mod without them. See REFACTORPLAN.md §2.6.
+if (mcv != "1.21.1") {
+    sourceSets.main.java {
+        exclude("dev/gemberkoekje/skyseed/gametest/**")
+    }
+}
+
 // Stonecutter copies src/main into the per-version node, so processResources can see a resource from both the node
 // copy and the repo-root source — byte-identical for a single version. Drop the duplicates. (When per-version
 // directives exist (Stage 2), revisit so the processed copy wins — see REFACTORPLAN.md / Stonecutter resource processing.)
