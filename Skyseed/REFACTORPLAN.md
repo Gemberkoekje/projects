@@ -260,6 +260,22 @@ THREE meaty rewrites — (a) **`SavedData`** became Codec-based (`SavedDataType(
 `WorldVersion.getDataVersion`→`dataVersion()`, `IModFile.findResource`, `FMLEnvironment.production`. These want a
 focused pass (the NeoForge sources jar is located, per below).
 
+**★★★ DONE — 120 → 0. `:26.1.2:build` BUILD SUCCESSFUL (last commit `c2ad486`, 2026-06-28); the full 26.1.2 jar
+`skyseed-26.1.2_0.155.0.jar` assembles, 1.21.1 green 126 tests every step.** All three meaty rewrites landed clean
+on 26.1.2 first try (SavedData→Codec+SavedDataType; recipe MapCodec/StreamCodec+RecipeSerializer record;
+LootModifier priority ctor). The scattered renames resolved as: GameRules→registry (`set(rule,v,server)`,
+`RULE_DISABLE_RAIDS=true`→`RAIDS=false` **inverted**, `SPAWN_PATROLS`); spawn→`setRespawnData`/`getRespawnData().pos()`
++`LevelData.RespawnData`, player→`ServerPlayer.RespawnConfig`/`getRespawnConfig`; `Commands.hasPermission(LEVEL_GAMEMASTERS)`;
+client action bar `mc.gui.setOverlayMessage` (cross-version); `releaseUsing`→boolean+`ClientPacketDistributor`;
+`KeyMapping.Category` record; `registerItem` Supplier; `ChunkPos(x>>4,z>>4)`+`JigsawStructure.MaxDistance`;
+`dataVersion().version()`; `Entity.getServer()`→`level().getServer()`. **Pragmatic 26.1.2 stubs (TODO-commented,
+re-wire later):** `worldGenOptions()` gone→bonusChest=false; `ModelResourceLocation` removed + `ModifyBakingResult`
+reworked→auto-debug-seed icon hook no-op; `IModFile.findResource` moved→`ThemeScanner` yields none;
+`FMLEnvironment.production` moved→`DevStructureGenerator` dev-gen disabled. **NEXT: port the gametest sourceset** (the
+`@GameTest`/`@GameTestHolder` annotations were removed in 26.1.2 → the new `GameTestInstance`/datapack-registered
+harness; currently `exclude`d on `mcv != "1.21.1"`). "Nothing regressed" = 1.21.1's 126 tests + golden master, green
+after every slice.
+
 (earlier this session: 120 → 81.) DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob);
 `registryOrThrow`→`lookupOrThrow` (NOT a clean swap — `//?` in `Lookup.registry()`, all callers route through it);
 `Registry.get`→`getValue` (`//?` in `Lookup.byId()`, block/entity route through it); the item/entity superclass
