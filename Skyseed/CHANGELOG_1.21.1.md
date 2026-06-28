@@ -5,6 +5,15 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.160.0] - 2026-06-28
+
+### Fixed
+- **1.21.1 client no longer crashes at startup** with `IllegalArgumentException: Side-loaded models must use the
+  'standalone' variant`. The 0.157.0 guide-icon fix registered the model via `ModelEvent.RegisterAdditional` with the
+  `inventory` variant, which that event rejects (a hard startup crash). It now registers the `standalone` variant
+  (`skyseed:item/guide`) and bridges it to the `inventory` key Modonomicon's book renderer looks up, in
+  `onModifyBakingResult`. The guide book still shows the Skyfarer's Almanac.
+
 ## [0.159.0] - 2026-06-28
 
 26.1.2-only fix (see [CHANGELOG_26.1.md](CHANGELOG_26.1.md)): the seed throw wind-up animation. **No 1.21.1 change** —

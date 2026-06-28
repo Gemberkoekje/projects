@@ -9,6 +9,12 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.160.0] - 2026-06-28
+
+1.21.1-only fix (see [CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)): the 0.157.0 guide-icon fix crashed the 1.21.1 client
+at startup (`RegisterAdditional` rejected the `inventory` variant). **No 26.1.2 change** — its guide icon was never
+affected (it uses the generated `items/guide.json` definition).
+
 ## [0.159.0] - 2026-06-28
 
 ### Fixed

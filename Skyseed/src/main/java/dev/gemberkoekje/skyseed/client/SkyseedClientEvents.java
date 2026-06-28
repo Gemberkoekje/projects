@@ -55,6 +55,12 @@ public final class SkyseedClientEvents {
         });*/
         //?} else {
         final var models = event.getModels();
+        // Bridge the side-loaded guide model (registered 'standalone' in onRegisterAdditionalModels) to the inventory
+        // key Modonomicon's 1.21.1 book renderer looks up, so the guide book shows the Almanac instead of a missing model.
+        final var guide = models.get(new ModelResourceLocation(Ids.mod("item/guide"), "standalone"));
+        if (guide != null) {
+            models.put(ModelResourceLocation.inventory(Ids.mod("guide")), guide);
+        }
         ModItems.AUTO_DEBUG_BASE.forEach((itemId, baseTheme) -> {
             final var baked = models.get(ModelResourceLocation.inventory(Ids.mod(baseTheme + "_skyseed")));
             if (baked != null) {
@@ -67,12 +73,12 @@ public final class SkyseedClientEvents {
     //? if <26.1.2 {
     @SubscribeEvent
     static void onRegisterAdditionalModels(ModelEvent.RegisterAdditional event) {
-        // skyseed:guide is not a registered item, so MRL(skyseed:guide,"inventory") isn't baked by default. Modonomicon's
-        // 1.21.1 book renderer resolves the book's `model` field via exactly that MRL (getModel(new
-        // ModelResourceLocation(book.getModel(),"inventory"))), so register it here to force the model loaded + baked —
-        // the guide book then shows the Skyfarer's Almanac instead of a missing model. (On 26.1.2 the generated
-        // items/guide.json definition covers this; that client loads every items/ definition, registered or not.)
-        event.register(ModelResourceLocation.inventory(Ids.mod("guide")));
+        // skyseed:guide is not a registered item, so its model isn't baked by default. Modonomicon's 1.21.1 book
+        // renderer resolves the book's `model` via getModel(new ModelResourceLocation(book.getModel(),"inventory")),
+        // so force the guide model loaded + baked here, then bridge it to that inventory key in onModifyBakingResult.
+        // RegisterAdditional only accepts the 'standalone' variant — register skyseed:item/guide (= models/item/guide.json).
+        // (On 26.1.2 the generated items/guide.json definition covers this; that client loads every items/ definition.)
+        event.register(new ModelResourceLocation(Ids.mod("item/guide"), "standalone"));
     }
     //?}
 
