@@ -1,0 +1,132 @@
+# Skyseed — Modonomicon (optional guide book) Plan (SKYMODONOMICONPLAN)
+
+**Goal.** Add **Modonomicon** as an optional rich-guide-book backend alongside the existing **Patchouli** one, and
+make it the **26.1.2 backend** (Patchouli has no released 26.1.2 build yet — `patchouli_26.1.2` is intentionally
+omitted in `gradle.properties`). Keep everything **optional** (soft dependency), and **degrade gracefully if both book
+mods are installed at once** (which shouldn't normally happen, but must not break).
+
+**Non-goal / already true:** 26.1.2 is *already functional today* — with no book mod, `SkyseedGuide.book()` returns
+the vanilla written-book fallback. Modonomicon just restores the *rich illustrated* edition on 26.1.2. So this is an
+enhancement layered on a working fallback, not a blocker.
+
+---
+
+## Current state (what we're extending)
+- **`SkyseedGuide.book()`** is the single entry point. It already does graceful degradation: if `patchouli` is loaded
+  *and* yields a non-empty stack → the Patchouli book; otherwise → `writtenBook()` (a vanilla written book). Both the
+  first-join grant and the `skyseed:guide` craft (`GuideRecipe`) call it, so they always agree.
+- **`compat/PatchouliCompat`** is the Patchouli-specific bridge: `bookStack(Id)`, the `vazkii.patchouli` import under
+  `//? if <26.1.2 {` (absent on 26.1.2), the body `//?`-split (1.21.1 = `PatchouliAPI.getBookStack`, 26.1.2 =
+  `ItemStack.EMPTY`). Referenced only behind `ModList.isLoaded("patchouli")`, so the API classes load only when the
+  mod is present.
+- **Dependency wiring (the pattern to mirror):** `compileOnly "vazkii.patchouli:Patchouli:${patchouli_${mcv}}"` +
+  `localRuntime …`, guarded by `if (project.hasProperty("patchouli_${mcv}"))`. The version is a **per-node property**
+  `patchouli_1.21.1=…` in the root `gradle.properties` (26.1.2 deliberately has none). Repo: `maven.blamejared.com`.
+- **Content:** 79 Patchouli JSON files — `book.json`, **6 categories**, **72 entries** — under
+  `assets/skyseed/patchouli_books/guide/en_us/{categories,entries}` (+ `data/skyseed/patchouli_books/guide/`). Entries
+  carry `name`/`category`/`icon`/`sortnum`, a reveal `advancement` gate, and `pages[]` of `patchouli:text` /
+  `patchouli:crafting`, with Patchouli text macros (`$(item)`, `$(bold)`, `$(br)`, `$()`) and per-page advancement
+  gates. The gametest `everySeedRecipeAndBookEntryMatchesSeedKind` reads these entries to verify coverage.
+
+---
+
+## Design
+
+### 1. Backend-agnostic facade (small, mirrors PatchouliCompat)
+- Add **`compat/ModonomiconCompat`** — same shape as `PatchouliCompat`: a `bookStack(Id)` whose Modonomicon API import
+  is under `//? if >=26.1.2 {` (and a `//?` body returning `ItemStack.EMPTY` on nodes without the API). Referenced
+  only behind `ModList.isLoaded("modonomicon")`.
+- **`SkyseedGuide.book()`** becomes a small **ordered walk** over backends instead of a single Patchouli check:
+  ```java
+  // version-primary first; first present + non-empty wins; else the written book.
+  for (Backend b : BACKENDS) {                 // BACKENDS order is //?-swapped per node (see §3)
+      if (ModList.get().isLoaded(b.modid)) {
+          ItemStack s = b.book(BOOK_ID);        // PatchouliCompat / ModonomiconCompat
+          if (!s.isEmpty()) return s;
+      }
+  }
+  return writtenBook();
+  ```
+  (A `Backend` is just `{ String modid; ItemStack book(Id); }` — two static entries, no heavy interface needed.)
+
+### 2. Per-version backend wiring (mirror the Patchouli pattern exactly)
+- `gradle.properties`: add `modonomicon_26.1.2=<version>` (and `modonomicon_1.21.1=…` only if/when we also want it on
+  1.21.1). build.gradle: `if (project.hasProperty("modonomicon_${mcv}")) { compileOnly … ; localRuntime … }` +
+  the Modonomicon maven repo. **Confirm coordinates/repo in Phase 0** (likely `com.klikli-dev:modonomicon:<mc>-<ver>`
+  on the klikli-dev / Modrinth maven).
+- So: 1.21.1 compiles+runs with Patchouli (Modonomicon optional/absent), 26.1.2 compiles+runs with Modonomicon
+  (Patchouli absent). Each compat class's API import is `//?`-gated to the nodes where that API exists.
+
+### 3. Both-installed handling (the explicit ask) — deterministic precedence, no conflict
+- **They don't actually conflict at the data layer:** Patchouli reads only `…/patchouli_books/…`, Modonomicon reads
+  only `…/modonomicon/books/…` — disjoint trees. With both mods present, *each* loads its own copy of the Skyseed
+  book into its own index. That's benign redundancy, not a clash.
+- **Skyseed only ever hands out ONE book:** `book()` returns the **first present backend in `BACKENDS` order**, so the
+  granted book == the crafted book == one item. Order = **version-primary first**: 1.21.1 → `[patchouli, modonomicon]`,
+  26.1.2 → `[modonomicon, patchouli]` (the list is `//?`-swapped per node, so "both installed" deterministically uses
+  the *version-appropriate* book). If the primary's stack comes back empty (content failed to load), it falls through
+  to the secondary, then the written book — never a crash.
+- **Debuggability:** log one INFO at startup if more than one backend is loaded, naming which Skyseed will use.
+- Net: both-installed = the player gets exactly one Skyseed book (the version-primary one); the other mod still shows
+  its redundant copy in *its own* book list, which is harmless. Documented so it's understood, not surprising.
+
+### 4. Content — the real work (same divergent-data theme as SKYRECIPEGENPLAN)
+The 72 entries + 6 categories + book.json are **Patchouli-format**; Modonomicon's book schema differs (its own
+`book/category/entry/page` JSON, page types like `modonomicon:text` / `modonomicon:crafting_recipe`, its own
+text/condition model). So the content must exist in **both** formats. Options, recommended order:
+- **(A, recommended) Golden = the existing Patchouli JSON; transform → Modonomicon** at build time (a `generateGuide`
+  Gradle task, sibling to SKYRECIPEGENPLAN's `generateRecipes`). 1.21.1 uses golden verbatim; 26.1.2 emits the
+  Modonomicon book. **The hard part is the page-type + macro mapping**: `patchouli:text`→`modonomicon:text`,
+  `patchouli:crafting`→`modonomicon:crafting_recipe`, and the `$(item)`/`$(bold)`/`$(br)`/`$()` macros →
+  Modonomicon/MC formatting; plus the reveal-`advancement` gate → a Modonomicon condition. Worth a focused mapping
+  pass; not all macros may have a 1:1 target (fall back to plain styled text).
+- **(B, pragmatic interim) Hand-author a Modonomicon book** (or a thin subset) for 26.1.2, maintained separately.
+  Higher drift risk across 72 entries, but unblocks a rich 26.1.2 book without the transformer. Could start as a
+  smaller book and grow.
+- **(C) A neutral guide schema → both** — cleanest long-term but the most upfront work; only worth it if Patchouli is
+  eventually dropped or a third backend appears.
+- **Until content lands, 26.1.2 shows the written-book fallback** (already working), so the integration is shippable
+  before the book content is.
+
+---
+
+## Validation
+- **No book mod:** `book()` → written book (unchanged). **Patchouli only (1.21.1):** rich Patchouli book (unchanged).
+  **Modonomicon only (26.1.2):** rich Modonomicon book.
+- **Both installed:** exactly one Skyseed book item (the version-primary); no crash; the INFO log fires. Add a tiny
+  unit-style gametest or manual check that `book()` is non-empty and stable under each combination (simulated via the
+  precedence list, since you can't easily load both in one gametest run).
+- **Content coverage:** extend `everySeedRecipeAndBookEntryMatchesSeedKind` (currently Patchouli-path) so on 26.1.2 it
+  checks the **Modonomicon** entries instead — closing the loop with SKYGAMETESTPLAN Phase 4 (this is one of the two
+  deferred generation tests). Each seed must still have an entry that carries its recipe and reveal gate.
+
+---
+
+## Phases
+- **Phase 0 — integration only (no content).** Confirm Modonomicon coords/API/data-path; add `ModonomiconCompat` +
+  the `modonomicon_${mcv}` build wiring + the precedence walk in `SkyseedGuide.book()` + the both-loaded INFO log.
+  Verify: 1.21.1 still Patchouli, 26.1.2 still written-book fallback (Modonomicon present but no book yet → empty →
+  fallback), both nodes green. **Shippable.**
+- **Phase 1 — a minimal Modonomicon book.** A `book.json` + one category + ~2 entries so 26.1.2 returns a *real*
+  Modonomicon book; proves the data path, the book item id, and `ModonomiconCompat.bookStack`.
+- **Phase 2 — full content.** Land Option A (the `generateGuide` transform) or Option B (hand-authored), porting all
+  72 entries + 6 categories; flip the coverage gametest to the Modonomicon path on 26.1.2.
+
+---
+
+## Risks / open decisions
+- **Modonomicon API specifics to confirm (Phase 0):** Maven coordinates + repo; the API call for a book `ItemStack`
+  by id (and whether the book item is a generic registered item with NBT/data-component pointing at the book id, vs a
+  per-book item); the book data path (`data/<modid>/modonomicon/books/<book>/…`); availability of a 26.1.2 build.
+- **Macro/page mapping fidelity (Option A):** some Patchouli macros may lack a clean Modonomicon equivalent — decide a
+  documented fallback (plain `§`-styled text) rather than failing the transform.
+- **Open decision — precedence when both present:** version-primary-first (recommended) vs a fixed global order vs a
+  config option. Default: version-primary-first, `//?`-swapped.
+- **Open decision — Modonomicon on 1.21.1 too?** The facade is backend-agnostic, so enabling Modonomicon as an
+  *also-optional* 1.21.1 backend is just adding `modonomicon_1.21.1` — but Patchouli stays the 1.21.1 primary. Defer
+  unless wanted.
+- **Open decision — content source of truth:** golden=Patchouli+transform (A) vs hand-authored Modonomicon (B). Lean
+  A for single-source consistency with SKYRECIPEGENPLAN; B is the lower-effort interim.
+
+## Status log
+- _(Not started — this document is the plan. 26.1.2 currently uses the written-book fallback; Patchouli powers 1.21.1.)_
