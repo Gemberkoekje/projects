@@ -2,7 +2,6 @@ package dev.gemberkoekje.skyseed.compat;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -36,46 +35,34 @@ public final class Jigsaw {
     private Jigsaw() {
     }
 
-    /** Assemble the jigsaw {@code pool} starting from {@code target}, depth-limited, at {@code origin}. */
-    public static void place(ServerLevel level, Holder<StructureTemplatePool> pool, ResourceLocation target,
-                             int depth, BlockPos origin, boolean keepJigsaws) {
-        placeCapped(level, pool, target, depth, origin, keepJigsaws, "", 0, null);
-    }
-
     /**
-     * As {@link #place}, but forces a family of elements to an exact count. Vanilla's jigsaw has no per-element
-     * limit, and even with the pool stacked toward one element the assembly only places <em>as many as randomly
-     * roll and fit</em> — so a "cap" alone cannot raise a sparse village up to a target, only trim a dense one down.
-     * This instead guarantees the planned count: a lot pool made entirely of the capped element places as many lots
-     * as fit, then the assembled list is normalised — the {@code capCount} pieces nearest {@code origin} are kept,
-     * and every surplus one is <em>replaced</em> (at its own position + rotation, before anything is stamped) by a
-     * random element drawn from {@code fillerPool}. So a trade post lands its rolled 2–4 shops whenever that many
-     * lots placed at all, and the rest of the lots become the fields/gardens from the filler pool.
+     * Assemble the jigsaw {@code pool} from the start jigsaw {@code target} at {@code origin}, depth-limited, forcing a
+     * family of elements to an exact count. Vanilla's jigsaw has no per-element limit, and even with the pool stacked
+     * toward one element the assembly only places <em>as many as randomly roll and fit</em> — so a "cap" alone cannot
+     * raise a sparse village up to a target, only trim a dense one down. This instead guarantees the planned count: a
+     * lot pool made entirely of the capped element places as many lots as fit, then the assembled list is normalised —
+     * the {@code capCount} pieces nearest {@code origin} are kept, and every surplus one is <em>replaced</em> (at its
+     * own position + rotation, before anything is stamped) by a random element drawn from {@code fillerPool}. So a
+     * trade post lands its rolled 2–4 shops whenever that many lots placed at all, the rest becoming fields/gardens.
      *
-     * <p>A {@code capCount <= 0} (or empty prefix) disables it and behaves exactly like {@link #place}. A null
-     * {@code fillerPool} drops the surplus instead of replacing it (leaving the lot empty).
+     * <p>A {@code capCount <= 0} (or empty prefix) disables the cap. A null {@code fillerPool} drops the surplus
+     * instead of replacing it (leaving the lot empty). {@code target} is the version-agnostic {@link Id} of the start
+     * jigsaw (usually {@code minecraft:bottom}); the assembly RNG is seeded from the world seed (see the
+     * {@code featureSeed} overload for an explicit seed).
      */
-    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, ResourceLocation target,
+    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, Id target,
                                    int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
                                    Holder<StructureTemplatePool> fillerPool) {
         placeCapped(level, pool, target, depth, origin, keepJigsaws, capPrefix, capCount, fillerPool, level.getSeed());
     }
 
-    /** As {@link #placeCapped(ServerLevel, Holder, ResourceLocation, int, BlockPos, boolean, String, int, Holder)},
-     *  taking the start jigsaw {@code target} as a version-agnostic {@link Id} (the generator's JigsawSite path). */
-    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, Id target,
-                                   int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
-                                   Holder<StructureTemplatePool> fillerPool) {
-        placeCapped(level, pool, Ids.parse(target.value()), depth, origin, keepJigsaws, capPrefix, capCount, fillerPool);
-    }
-
     /**
-     * As {@link #placeCapped(ServerLevel, Holder, ResourceLocation, int, BlockPos, boolean, String, int, Holder)} but
-     * with an explicit {@code featureSeed} driving the jigsaw assembly RNG (vanilla seeds it from the world seed and
-     * the origin's chunk, so a fixed origin always assembles the same village). Production passes the world seed; a
-     * test can pass a varying seed to sample many different villages deterministically.
+     * As {@link #placeCapped(ServerLevel, Holder, Id, int, BlockPos, boolean, String, int, Holder)} but with an
+     * explicit {@code featureSeed} driving the jigsaw assembly RNG (vanilla seeds it from the world seed and the
+     * origin's chunk, so a fixed origin always assembles the same village). Production passes the world seed; a test
+     * can pass a varying seed to sample many different villages deterministically.
      */
-    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, ResourceLocation target,
+    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, Id target,
                                    int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
                                    Holder<StructureTemplatePool> fillerPool, long featureSeed) {
         final ChunkGenerator generator = level.getChunkSource().getGenerator();
@@ -90,7 +77,7 @@ public final class Jigsaw {
                 level.registryAccess(), generator, generator.getBiomeSource(), level.getChunkSource().randomState(),
                 templates, featureSeed, new ChunkPos(origin), level, biome -> true);
         final Optional<Structure.GenerationStub> stub = JigsawPlacement.addPieces(
-                context, pool, Optional.of(target), depth, origin, false, Optional.empty(), 128,
+                context, pool, Optional.of(Ids.parse(target.value())), depth, origin, false, Optional.empty(), 128,
                 PoolAliasLookup.EMPTY, JigsawStructure.DEFAULT_DIMENSION_PADDING, JigsawStructure.DEFAULT_LIQUID_SETTINGS);
         if (stub.isEmpty()) {
             return;
@@ -102,7 +89,7 @@ public final class Jigsaw {
             // at this point, so we can tell island from void below each lot. Falls back to the normal pool if absent.
             Holder<StructureTemplatePool> voidFillerPool = fillerPool;
             if (fillerPool != null && fillerPool.unwrapKey().isPresent()) {
-                final ResourceLocation voidId = fillerPool.unwrapKey().get().location().withSuffix("_void");
+                final String voidId = fillerPool.unwrapKey().get().location().withSuffix("_void").toString();
                 if (Lookup.hasTemplatePool(level.registryAccess(), voidId)) {
                     voidFillerPool = Lookup.templatePool(level.registryAccess(), voidId);
                 }

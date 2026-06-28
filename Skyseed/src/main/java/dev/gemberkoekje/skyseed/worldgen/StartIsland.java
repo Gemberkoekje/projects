@@ -1,9 +1,9 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -89,7 +89,7 @@ public final class StartIsland {
         level.setBlock(treePos, Blocks.AIR.defaultBlockState(), FLAGS); // clear the spot for the feature
         // A real Minecraft oak feature places natural, distance-tracked leaves (persistent=false), so a fast-leaf-decay
         // mod treats it like any other tree — unlike the old hand-placed PERSISTENT leaves, which never decayed.
-        final var oak = Lookup.configuredFeature(level.registryAccess(), ResourceLocation.parse("minecraft:oak"));
+        final var oak = Lookup.configuredFeature(level.registryAccess(), Id.of("minecraft:oak"));
         if (oak.isPresent()
                 && oak.get().place(level, level.getChunkSource().getGenerator(), level.getRandom(), treePos)) {
             return;

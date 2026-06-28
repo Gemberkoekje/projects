@@ -1000,11 +1000,11 @@ public final class SkyseedGameTests {
         for (int iter = 0; iter < 8; iter++) {
             // (1) over the void — clear the whole region to air (incl. y0, so nothing solid sits below a lot)
             fillRegion(helper, true);
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 4, fillers, iter);
             voidChains += countChains(helper);
             // (2) on solid ground — surplus lots should be fields, never piers
             fillRegion(helper, false);
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 4, fillers, iter);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 4, fillers, iter);
             islandChains += countChains(helper);
         }
         helper.assertTrue(voidChains > 0, "over the void, surplus lots should be piers (chain count=" + voidChains + ")");
@@ -1106,7 +1106,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         helper.assertTrue(helper.getBlockState(new BlockPos(24, 3, 24)).is(Blocks.LANTERN),
                 "the start square's centre tile must land at origin (where the centerpiece capstone is stamped)");
         helper.succeed();
@@ -1202,7 +1202,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "shop_", 2, fillers, iter);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 2, origin, false, "shop_", 2, fillers, iter);
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -1244,7 +1244,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, startPool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            Jigsaw.placeCapped(level, startPool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 3, fillers, seed);
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -1289,7 +1289,7 @@ public final class SkyseedGameTests {
                         }
                     }
                 }
-                Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 6, origin, false, "shop_", cap, fillers, seed);
+                Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 6, origin, false, "shop_", cap, fillers, seed);
                 int villageShops = 0;
                 for (int x = 0; x < 48; x++) {
                     for (int z = 0; z < 48; z++) {
@@ -1342,7 +1342,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 3, fillers, seed);
             for (int x = 4; x <= 44; x++) {
                 for (int z = 4; z <= 44; z++) {
                     for (int y = 1; y <= 14; y++) {
@@ -1404,7 +1404,7 @@ public final class SkyseedGameTests {
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/start"));
         final var ends = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/ends"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "span_", 8, ends, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "span_", 8, ends, 1L);
         int spawners = 0, netherBrick = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -1999,7 +1999,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("woodland_mansion/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 2, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 2, origin, false, "", 0, null, 1L);
         int birch = 0, darkOak = 0, glass = 0, wingBlocks = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -2044,7 +2044,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/cottages"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         boolean strippedPost = false, pane = false, cobble = false;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -2143,7 +2143,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_portal/chamber"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         final java.util.List<BlockPos> frames = new java.util.ArrayList<>();
         final java.util.List<net.minecraft.core.Direction> facings = new java.util.ArrayList<>();
         int eyed = 0;
@@ -2191,7 +2191,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("return_portal/shrine"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         int portal = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -2215,7 +2215,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 3, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 3, origin, false, "", 0, null, 1L);
         int purpur = 0, chests = 0, maxPurpurY = Integer.MIN_VALUE, dragonY = Integer.MIN_VALUE;
         boolean glass = false;
         for (int x = 0; x < 48; x++) {
@@ -2267,7 +2267,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mod("ec_spire"), 6, origin, false, "", 0, null, seed);
+            Jigsaw.placeCapped(level, pool, Id.of("skyseed:ec_spire"), 6, origin, false, "", 0, null, seed);
             int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
@@ -2311,7 +2311,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 6, origin, false, "", 0, null, seed);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 6, origin, false, "", 0, null, seed);
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
                     for (int y = 0; y < 24; y++) {
@@ -2355,7 +2355,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dragon_trophy/monument"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         int heads = 0;
         boolean purpur = false, egg = false, brick = false;
         for (int x = 0; x < 48; x++) {
@@ -2388,7 +2388,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ocean_monument/grand"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         int prismarine = 0, gold = 0, chests = 0;
         boolean sponge = false;
         for (int x = 0; x < 48; x++) {
@@ -2475,7 +2475,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ancient_city/plaza"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 1, origin, false, "", 0, null, 1L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
         int deepslate = 0, chests = 0;
         boolean canSummon = false, soulFire = false, catalyst = false;
         for (int x = 0; x < 48; x++) {
@@ -2558,7 +2558,7 @@ public final class SkyseedGameTests {
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
-        Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, 7L);
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 4, origin, false, "", 0, null, 7L);
         int cobble = 0;
         for (int x = 0; x < 48; x++) {
             for (int z = 0; z < 48; z++) {
@@ -2604,7 +2604,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 5, origin, false, "", 0, null, seed);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "", 0, null, seed);
             int minY = Integer.MAX_VALUE;
             int maxY = Integer.MIN_VALUE;
             for (int x = 0; x < 48; x++) {
@@ -2676,7 +2676,7 @@ public final class SkyseedGameTests {
                     }
                 }
             }
-            Jigsaw.placeCapped(level, pool, Ids.mc("bottom"), 4, origin, false, "", 0, null, seed);
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 4, origin, false, "", 0, null, seed);
             int planks = 0;
             int fences = 0;
             for (int x = 0; x < 48; x++) {
