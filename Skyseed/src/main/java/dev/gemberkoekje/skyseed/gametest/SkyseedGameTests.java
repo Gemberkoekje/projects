@@ -406,8 +406,8 @@ public final class SkyseedGameTests {
         // grows a FULL-SIZE mining island in the Nether (radius 6-9, like an overworld normal seed). Its BASE config
         // is the_nether only (the overworld form is just an easter-egg override — see netherRockySeedMakesTinyOverworldIsland).
         final IslandTheme nr = theme(helper.getLevel(), "nether_rocky");
-        helper.assertTrue(nr.baseValidIn(Level.NETHER.location()), "nether_rocky must implement the_nether");
-        helper.assertTrue(!nr.baseValidIn(Level.OVERWORLD.location()), "nether_rocky's BASE must not be an overworld implementation");
+        helper.assertTrue(nr.baseValidIn(Level.NETHER.location().toString()), "nether_rocky must implement the_nether");
+        helper.assertTrue(!nr.baseValidIn(Level.OVERWORLD.location().toString()), "nether_rocky's BASE must not be an overworld implementation");
 
         final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
@@ -415,7 +415,7 @@ public final class SkyseedGameTests {
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
 
         // Germination gate: valid (full base form) in the Nether.
-        helper.assertTrue(IslandGenerator.formValidFor(nr, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nr, wastes, 64, Level.NETHER.location().toString()),
                 "nether_rocky should grow in the Nether");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
@@ -446,7 +446,7 @@ public final class SkyseedGameTests {
                 .getHolderOrThrow(Biomes.PLAINS);
 
         // It grows (does not fizzle) in the overworld via the easter-egg override.
-        helper.assertTrue(IslandGenerator.formValidFor(nr, plains, 80, Level.OVERWORLD.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nr, plains, 80, Level.OVERWORLD.location().toString()),
                 "nether_rocky should grow a tiny island in the overworld (easter egg), not fizzle");
 
         // High up: a tiny stone island, never netherrack.
@@ -480,8 +480,8 @@ public final class SkyseedGameTests {
         // nether_rocky makes). Base is the_nether-only; the overworld form is a full dimension override.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme nl = theme(overworld, "nether_lava");
-        helper.assertTrue(nl.baseValidIn(Level.NETHER.location()), "nether_lava base must implement the_nether");
-        helper.assertTrue(!nl.baseValidIn(Level.OVERWORLD.location()),
+        helper.assertTrue(nl.baseValidIn(Level.NETHER.location().toString()), "nether_lava base must implement the_nether");
+        helper.assertTrue(!nl.baseValidIn(Level.OVERWORLD.location().toString()),
                 "nether_lava base must be the_nether-only (the overworld form is an override)");
 
         final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
@@ -491,9 +491,9 @@ public final class SkyseedGameTests {
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
 
-        helper.assertTrue(IslandGenerator.formValidFor(nl, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nl, wastes, 64, Level.NETHER.location().toString()),
                 "nether_lava should grow in the Nether");
-        helper.assertTrue(IslandGenerator.formValidFor(nl, plains, 80, Level.OVERWORLD.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nl, plains, 80, Level.OVERWORLD.location().toString()),
                 "nether_lava should ALSO grow (full-size) in the overworld");
 
         // Nether: full-size lava lagoon over a netherrack body.
@@ -538,8 +538,8 @@ public final class SkyseedGameTests {
         // warped_forest biome (a same-dimension biome override). Thrown topside it shrugs into a TINY grass island.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme nf = theme(overworld, "nether_forest");
-        helper.assertTrue(nf.baseValidIn(Level.NETHER.location()), "nether_forest base must implement the_nether");
-        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location()), "nether_forest base must be the_nether-only");
+        helper.assertTrue(nf.baseValidIn(Level.NETHER.location().toString()), "nether_forest base must implement the_nether");
+        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location().toString()), "nether_forest base must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
@@ -595,8 +595,8 @@ public final class SkyseedGameTests {
         // topside it makes a TINY desert island instead. Nether-native base; the overworld form is a dimension override.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme ns = theme(overworld, "nether_soul");
-        helper.assertTrue(ns.baseValidIn(Level.NETHER.location()), "nether_soul base must implement the_nether");
-        helper.assertTrue(!ns.baseValidIn(Level.OVERWORLD.location()), "nether_soul base must be the_nether-only");
+        helper.assertTrue(ns.baseValidIn(Level.NETHER.location().toString()), "nether_soul base must implement the_nether");
+        helper.assertTrue(!ns.baseValidIn(Level.OVERWORLD.location().toString()), "nether_soul base must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
@@ -605,9 +605,9 @@ public final class SkyseedGameTests {
         final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.PLAINS);
 
-        helper.assertTrue(IslandGenerator.formValidFor(ns, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(ns, wastes, 64, Level.NETHER.location().toString()),
                 "nether_soul should grow in the Nether");
-        helper.assertTrue(IslandGenerator.formValidFor(ns, plains, 80, Level.OVERWORLD.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(ns, plains, 80, Level.OVERWORLD.location().toString()),
                 "nether_soul should grow a tiny desert in the overworld");
 
         // Nether: full-size soul sand valley with bone fossils.
@@ -647,8 +647,8 @@ public final class SkyseedGameTests {
         // core. Thrown topside it makes a TINY badlands island. Nether-native base; the overworld form is an override.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme nb = theme(overworld, "nether_basalt");
-        helper.assertTrue(nb.baseValidIn(Level.NETHER.location()), "nether_basalt base must implement the_nether");
-        helper.assertTrue(!nb.baseValidIn(Level.OVERWORLD.location()), "nether_basalt base must be the_nether-only");
+        helper.assertTrue(nb.baseValidIn(Level.NETHER.location().toString()), "nether_basalt base must implement the_nether");
+        helper.assertTrue(!nb.baseValidIn(Level.OVERWORLD.location().toString()), "nether_basalt base must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
@@ -657,9 +657,9 @@ public final class SkyseedGameTests {
         final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.PLAINS);
 
-        helper.assertTrue(IslandGenerator.formValidFor(nb, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nb, wastes, 64, Level.NETHER.location().toString()),
                 "nether_basalt should grow in the Nether");
-        helper.assertTrue(IslandGenerator.formValidFor(nb, plains, 80, Level.OVERWORLD.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nb, plains, 80, Level.OVERWORLD.location().toString()),
                 "nether_basalt should grow a tiny badlands in the overworld");
 
         // Nether: full-size basalt deltas with gilded blackstone.
@@ -701,7 +701,7 @@ public final class SkyseedGameTests {
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme rp = theme(overworld, "ruined_portal");
         helper.assertTrue(rp.twin().isPresent(), "ruined_portal should be flagged as a cross-dimension twin theme");
-        helper.assertTrue(rp.baseValidIn(Level.OVERWORLD.location()), "ruined_portal should grow in the overworld");
+        helper.assertTrue(rp.baseValidIn(Level.OVERWORLD.location().toString()), "ruined_portal should grow in the overworld");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
@@ -709,7 +709,7 @@ public final class SkyseedGameTests {
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
         final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.PLAINS);
-        helper.assertTrue(IslandGenerator.formValidFor(rp, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(rp, wastes, 64, Level.NETHER.location().toString()),
                 "ruined_portal should now also grow in the Nether");
 
         // Overworld form: the jigsaw uses the goodies pool.
@@ -767,8 +767,8 @@ public final class SkyseedGameTests {
         long seed = 200L;
         for (L c : cases) {
             final IslandTheme t = theme(nether, c.theme());
-            helper.assertTrue(t.baseValidIn(Level.NETHER.location()), c.theme() + " must implement the_nether");
-            helper.assertTrue(!t.baseValidIn(Level.OVERWORLD.location()), c.theme() + " must be the_nether-only");
+            helper.assertTrue(t.baseValidIn(Level.NETHER.location().toString()), c.theme() + " must implement the_nether");
+            helper.assertTrue(!t.baseValidIn(Level.OVERWORLD.location().toString()), c.theme() + " must be the_nether-only");
             final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), t, wastes,
                     RandomSource.create(seed++));
             helper.assertTrue(p.blocks().size() > 1500,
@@ -1371,14 +1371,14 @@ public final class SkyseedGameTests {
         // structure itself is placed later by the generation job, so the plan carries it as a jigsaw site.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme nf = theme(overworld, "nether_fortress");
-        helper.assertTrue(nf.baseValidIn(Level.NETHER.location()), "nether_fortress must implement the_nether");
-        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location()), "nether_fortress must be the_nether-only");
+        helper.assertTrue(nf.baseValidIn(Level.NETHER.location().toString()), "nether_fortress must implement the_nether");
+        helper.assertTrue(!nf.baseValidIn(Level.OVERWORLD.location().toString()), "nether_fortress must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
-        helper.assertTrue(IslandGenerator.formValidFor(nf, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(nf, wastes, 64, Level.NETHER.location().toString()),
                 "nether_fortress should grow in the Nether");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nf, wastes,
@@ -1428,18 +1428,18 @@ public final class SkyseedGameTests {
         // generation job, so the plan carries it as a jigsaw site.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme bastion = theme(overworld, "bastion");
-        helper.assertTrue(bastion.baseValidIn(Level.NETHER.location()), "bastion must implement the_nether");
-        helper.assertTrue(!bastion.baseValidIn(Level.OVERWORLD.location()), "bastion must be the_nether-only");
+        helper.assertTrue(bastion.baseValidIn(Level.NETHER.location().toString()), "bastion must implement the_nether");
+        helper.assertTrue(!bastion.baseValidIn(Level.OVERWORLD.location().toString()), "bastion must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
-        helper.assertTrue(IslandGenerator.formValidFor(bastion, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(bastion, wastes, 64, Level.NETHER.location().toString()),
                 "bastion should grow in the Nether");
         final var deltas = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.BASALT_DELTAS);
-        helper.assertTrue(!IslandGenerator.formValidFor(bastion, deltas, 64, Level.NETHER.location()),
+        helper.assertTrue(!IslandGenerator.formValidFor(bastion, deltas, 64, Level.NETHER.location().toString()),
                 "the bastion should fizzle in the basalt deltas (the vanilla rule)");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), bastion, wastes,
@@ -1462,18 +1462,18 @@ public final class SkyseedGameTests {
         // grows anywhere in the Nether — including the basalt deltas, since (unlike the bastion) it has no fizzle rule.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme post = theme(overworld, "piglin_trading_post");
-        helper.assertTrue(post.baseValidIn(Level.NETHER.location()), "trading post must implement the_nether");
-        helper.assertTrue(!post.baseValidIn(Level.OVERWORLD.location()), "trading post must be the_nether-only");
+        helper.assertTrue(post.baseValidIn(Level.NETHER.location().toString()), "trading post must implement the_nether");
+        helper.assertTrue(!post.baseValidIn(Level.OVERWORLD.location().toString()), "trading post must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
-        helper.assertTrue(IslandGenerator.formValidFor(post, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(post, wastes, 64, Level.NETHER.location().toString()),
                 "trading post should grow in the Nether");
         final var deltas = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.BASALT_DELTAS);
-        helper.assertTrue(IslandGenerator.formValidFor(post, deltas, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(post, deltas, 64, Level.NETHER.location().toString()),
                 "the trading post has no fizzle rule — it should grow in the basalt deltas too");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), post, wastes,
@@ -1500,7 +1500,7 @@ public final class SkyseedGameTests {
         final IslandTheme post = theme(overworld, "piglin_trading_post");
         final var plains = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.PLAINS);
-        helper.assertTrue(IslandGenerator.formValidFor(post, plains, 80, Level.OVERWORLD.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(post, plains, 80, Level.OVERWORLD.location().toString()),
                 "the trading post should grow (not fizzle) in the overworld");
 
         final IslandPlan p = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), post, plains,
@@ -1526,14 +1526,14 @@ public final class SkyseedGameTests {
         // arena jigsaw, and (like the other nether structures) grows only in the Nether.
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme arena = theme(overworld, "wither_arena");
-        helper.assertTrue(arena.baseValidIn(Level.NETHER.location()), "wither arena must implement the_nether");
-        helper.assertTrue(!arena.baseValidIn(Level.OVERWORLD.location()), "wither arena must be the_nether-only");
+        helper.assertTrue(arena.baseValidIn(Level.NETHER.location().toString()), "wither arena must implement the_nether");
+        helper.assertTrue(!arena.baseValidIn(Level.OVERWORLD.location().toString()), "wither arena must be the_nether-only");
 
         final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
         helper.assertTrue(nether != null, "no the_nether level on the server");
         final var wastes = nether.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(Biomes.NETHER_WASTES);
-        helper.assertTrue(IslandGenerator.formValidFor(arena, wastes, 64, Level.NETHER.location()),
+        helper.assertTrue(IslandGenerator.formValidFor(arena, wastes, 64, Level.NETHER.location().toString()),
                 "wither arena should grow in the Nether");
 
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), arena, wastes,
@@ -1600,9 +1600,9 @@ public final class SkyseedGameTests {
         // `dimensions` or a dimension-keyed override — and fizzles elsewhere rather than growing the foreign base.
         final ServerLevel level = helper.getLevel();
         final var biome = level.registryAccess().registryOrThrow(Registries.BIOME).getHolderOrThrow(Biomes.PLAINS);
-        final ResourceLocation ow = Level.OVERWORLD.location();
-        final ResourceLocation nether = Level.NETHER.location();
-        final ResourceLocation end = Level.END.location();
+        final String ow = Level.OVERWORLD.location().toString();
+        final String nether = Level.NETHER.location().toString();
+        final String end = Level.END.location().toString();
 
         record Case(String theme, boolean ow, boolean nether, boolean end) {}
         final Case[] cases = {
@@ -2884,7 +2884,7 @@ public final class SkyseedGameTests {
         final IslandTheme city = theme(level, "end_city");
         helper.assertTrue(city != null, "missing theme 'end_city'");
         final var lookup = level.registryAccess().lookupOrThrow(Registries.BIOME);
-        final ResourceLocation end = Ids.mc("the_end");
+        final String end = Ids.mc("the_end").toString();
         for (final ResourceKey<net.minecraft.world.level.biome.Biome> k : java.util.List.of(Biomes.END_HIGHLANDS, Biomes.END_MIDLANDS)) {
             helper.assertTrue(IslandGenerator.formValidFor(city, lookup.getOrThrow(k), 64, end),
                     "End City should grow in " + k.location());

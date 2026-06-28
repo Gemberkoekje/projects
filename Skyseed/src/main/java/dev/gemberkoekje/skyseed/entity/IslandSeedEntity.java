@@ -238,7 +238,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // override). Thrown into a dimension it doesn't implement — an overworld seed in the Nether, say — it fizzles
         // rather than growing the wrong, foreign base island here. A `fizzle` biome rule also excludes specific biomes
         // (the Bastion never forms in the basalt deltas), showing the thrower its own action-bar message.
-        if (!IslandGenerator.formValidFor(theme, biome, base.getY(), level.dimension().location())) {
+        if (!IslandGenerator.formValidFor(theme, biome, base.getY(), level.dimension().location().toString())) {
             if (theme.fizzlesIn(biome) && this.getOwner() instanceof Player thrower) {
                 theme.fizzle().flatMap(FizzleRule::message)
                         .ifPresent(key -> thrower.displayClientMessage(Component.translatable(key), true));

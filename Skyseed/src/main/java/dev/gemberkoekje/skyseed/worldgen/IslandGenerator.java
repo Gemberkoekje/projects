@@ -24,7 +24,6 @@ import dev.gemberkoekje.skyseed.worldgen.theme.Underside;
 import dev.gemberkoekje.skyseed.worldgen.theme.Variant;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.util.RandomSource;
@@ -144,7 +143,7 @@ public final class IslandGenerator {
     }
 
     /** The per-island config resolved from the theme + the matching biome override (see {@link #resolveConfig}). */
-    private record Resolved(BiomeOverride ov, boolean useBase, ResourceLocation dim, Shape shape, List<OreEntry> ores,
+    private record Resolved(BiomeOverride ov, boolean useBase, String dim, Shape shape, List<OreEntry> ores,
                             Variant variant, BlockState surface, BlockState fill, BlockState core, float snow,
                             List<Scatter> scatter, List<BlockState> bands, int bandThickness, int baseFill) {}
 
@@ -155,10 +154,10 @@ public final class IslandGenerator {
      */
     private static Resolved resolveConfig(ServerLevel level, BlockPos center, IslandTheme theme, Holder<Biome> biome,
                                           RandomSource random) {
-        final ResourceLocation dim = level.dimension().location();
+        final String dim = level.dimension().location().toString();
         final boolean useBase = theme.baseValidIn(dim);
         final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, useBase);
-        final Id neutralBlock = Id.of(dim.getPath().equals("the_end") ? "minecraft:end_stone" : "minecraft:netherrack");
+        final Id neutralBlock = Id.of(Id.of(dim).path().equals("the_end") ? "minecraft:end_stone" : "minecraft:netherrack");
         final Palette pal = theme.palette();
         final Shape shape = eff(ov, BiomeOverride::shape, useBase, theme::shape, NEUTRAL_SHAPE);
         final List<OreEntry> ores = eff(ov, BiomeOverride::ores, useBase, theme::ores, List.<OreEntry>of());
@@ -467,7 +466,7 @@ public final class IslandGenerator {
     }
 
     private static BiomeOverride matchOverride(List<BiomeOverride> overrides, Holder<Biome> biome, int y,
-                                               ResourceLocation dim, boolean baseValidHere) {
+                                               String dim, boolean baseValidHere) {
         for (BiomeOverride o : overrides) {
             // A non-dimensioned override belongs to the base config's home dimension(s); it must not leak into a
             // foreign dimension (e.g. an overworld biome tweak applying to a seed thrown in the Nether). Only
@@ -488,7 +487,7 @@ public final class IslandGenerator {
      * seed must <em>fizzle</em> — it has no implementation for this dimension and must not fall back to the foreign
      * base form (e.g. an overworld seed thrown in the Nether). See SKYNETHERPLAN and {@code IslandSeedEntity}.
      */
-    public static boolean formValidFor(IslandTheme theme, Holder<Biome> biome, int y, ResourceLocation dim) {
+    public static boolean formValidFor(IslandTheme theme, Holder<Biome> biome, int y, String dim) {
         if (theme.fizzlesIn(biome)) {
             return false; // a hard biome exclusion (e.g. bastions never form in the basalt deltas)
         }

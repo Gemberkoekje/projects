@@ -6,7 +6,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
@@ -75,8 +74,8 @@ public record BiomeOverride(
                     shape, ores, variants, pond, waterfalls, mobs, dimension, fillBands, jigsaw)));
 
     /** True if {@code dim} (when dimension is set), {@code biome} (when biomes is set) and {@code y} (when a range is set) all match. */
-    public boolean matches(Holder<Biome> biome, int y, ResourceLocation dim) {
-        if (dimension.isPresent() && (dim == null || !dimension.get().equals(dim.toString()))) {
+    public boolean matches(Holder<Biome> biome, int y, String dim) {
+        if (dimension.isPresent() && (dim == null || !dimension.get().equals(dim))) {
             return false;
         }
         if (!biomes.isEmpty() && !matchesBiome(biome)) {

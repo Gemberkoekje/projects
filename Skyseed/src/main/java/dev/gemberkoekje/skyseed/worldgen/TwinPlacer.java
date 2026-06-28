@@ -41,7 +41,7 @@ public final class TwinPlacer {
             return;
         }
         final BlockPos linked = linkedPortalPos(center, to, other);
-        if (!IslandGenerator.formValidFor(theme, other.getBiome(linked), linked.getY(), other.dimension().location())) {
+        if (!IslandGenerator.formValidFor(theme, other.getBiome(linked), linked.getY(), other.dimension().location().toString())) {
             return; // the theme doesn't implement the other dimension — no twin
         }
         final IslandPlan twin = placeTwinNear(other, theme, linked);

@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.gemberkoekje.skyseed.compat.Id;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
@@ -31,8 +30,8 @@ public record IslandTheme(Shape shape, Palette palette, List<OreEntry> ores, Lis
                           Optional<LadderShaft> ladderShaft, Optional<FizzleRule> fizzle, Optional<Caves> caves) {
 
     /** True if this theme's base config is an implementation for {@code dim} (its declared {@code dimensions}). */
-    public boolean baseValidIn(ResourceLocation dim) {
-        return dimensions.contains(dim.toString());
+    public boolean baseValidIn(String dim) {
+        return dimensions.contains(dim);
     }
 
     /** True if a {@code fizzle} rule excludes {@code biome} — the seed should fizzle there regardless of dimension. */

@@ -5,7 +5,6 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
@@ -41,8 +40,8 @@ public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> 
 
     /** Whether this rare structure may roll in {@code dim}: only its own {@code dimension} when set, else the theme's
      * home dimension ({@code baseValidHere}). */
-    public boolean rollsIn(ResourceLocation dim, boolean baseValidHere) {
-        return dimension.isPresent() ? dimension.get().equals(dim.toString()) : baseValidHere;
+    public boolean rollsIn(String dim, boolean baseValidHere) {
+        return dimension.isPresent() ? dimension.get().equals(dim) : baseValidHere;
     }
 
     /** True if this rare structure may roll in {@code biome} (no {@code biomes} filter set = any biome). */
