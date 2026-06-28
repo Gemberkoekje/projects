@@ -180,13 +180,47 @@ codec moved — still take a guarded data variant or a `//?` directive; handle t
 - **2e — per-version golden master + gametests**; write the "add a version" recipe. Route the gametest's remaining
   direct API calls through `compat` (the Stage-1 to-do).
 
+### 2.6 The 26.1.2 compile — decompile proven + the live API delta (2026-06-28)
+
+On branch `refactor/26.1.2-compat`. **`:26.1.2:compileJava` runs the full NeoForm pipeline cleanly** — download →
+decompile (46 s) → patch → recompile (6882 files) — on the box's JDK 26 (no JDK-25 download needed). **This retires
+the #1 risk below** (Stonecutter ↔ ModDevGradle on NeoForge). The decompile is cached, so subsequent compiles are fast.
+
+Skyseed's own source then produced **101 errors** (javac's first-100 cap — more will surface once the big one is
+fixed). The root causes, confirmed against the decompiled Mojmap sources jar:
+
+| Old (1.21.1) | New (26.1.2) | Where |
+|---|---|---|
+| **`net.minecraft.resources.ResourceLocation`** | **`net.minecraft.resources.Identifier`** (a pure rename) | **everywhere — 171 occurrences across 31 files**; the dominant task |
+| `net.minecraft.world.InteractionResultHolder<T>` | `net.minecraft.world.InteractionResult` (holder merged in; `.success(item)` shape changed) | `IslandSeedItem` |
+| `net.minecraft.world.item.UseAnim` | `net.minecraft.world.item.ItemUseAnimation` | `IslandSeedItem` |
+| `…projectile.ThrowableItemProjectile` | `…projectile.throwableitemprojectile.ThrowableItemProjectile` (subpackage) | `IslandSeedEntity` |
+| `…client.resources.model.ModelResourceLocation` | moved/renamed (verify) | `SkyseedClientEvents` |
+| NeoForge `…gametest.GameTestHolder` / `PrefixGameTestTemplate` | moved/removed — the gametest-registration API changed | `SkyseedGameTests` |
+| `vazkii.patchouli.api.*` | none for this node (Patchouli build pending) | `PatchouliCompat` → needs a `//?` stub |
+| `…entity.animal.Cow` / `…npc.Villager` / `…animal.IronGolem` | animal/npc package reorg (verify) | mob placement |
+
+**Strategy for the `ResourceLocation` → `Identifier` rename (the crux).** Java has no import alias, so a renamed type
+used 171× can't be hidden behind a single import directive. Two levers, used together:
+1. **Confine the type to the facade** — switch the codec records (`Variant`/`Palette`/`OreEntry`/`BiomeOverride`/
+   `Pond`/`MobEntry`/`JigsawConfig`/`AnimalPack`/`RareStructure`/`IslandTheme`/`FizzleRule`) to store the **raw id
+   `String`** (`Codec.STRING`) instead of `ResourceLocation`, resolving to the MC id type via `Ids`/`Lookup` at
+   use-time. This deletes most of the 171, is behaviour-preserving for valid ids (the golden master guards it), **and
+   directly enables §2.4** (an unknown id is just a String that resolves to nothing → skip). 
+2. **Per-file `//?` import + usage swaps** for the residual — the facade (`Ids`/`Lookup`/`Jigsaw`) and the few entity /
+   client / gametest files where the id type genuinely lives.
+
+Then the other rows are small per-file directives (mostly one import + one call-site each). **Order:** the
+`String`-records refactor first (verified green on 1.21.1, no 26.1.2 needed), then the facade/file directives, then
+recompile to surface the post-100 remainder, repeat to green.
+
 ---
 
 ## Risks & things to verify
 
-- **Stonecutter ↔ ModDevGradle integration — the main unknown.** Stonecutter is most battle-tested with Loom; verify
-  it drives a NeoForge/ModDevGradle build cleanly (or whether the NeoForge build needs adjusting). If it can't, that
-  changes the approach — which is exactly why **Stage 0 is a throwaway spike** before any investment.
+- **Stonecutter ↔ ModDevGradle integration — ✅ RETIRED.** Proven twice: Stage 0 on 1.21.1, and now §2.6 — Stonecutter
+  drives the full ModDevGradle/NeoForm pipeline for a *second*, 18-months-newer node (`26.1.2`) cleanly (decompile +
+  recompile), with the 1.21.1 node staying green. The integration is not a risk.
 - **NeoForge API churn is the real work.** The network/payload + registration APIs moved meaningfully between recent
   NeoForge versions — expect most directives there. Concentrating it in `compat` (Stage 1) pays off before adding a
   version.
