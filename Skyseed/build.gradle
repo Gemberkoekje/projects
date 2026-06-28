@@ -130,7 +130,11 @@ def patchouliGuideRoot = rootProject.file('src/main/resources/assets/skyseed/pat
 def generatedGuideDir = layout.buildDirectory.dir('generated/guide')
 
 def expandGuideMacros = { String s ->
-    s.replace('$(br2)', '\n\n').replace('$(br)', '\n').replace('$(li)', '\n  • ')
+    // Modonomicon's book renderer is configured renderSoftLineBreaks=false + replaceSoftLineBreaksWithSpace=true, so a
+    // bare "\n" collapses to a space. Use a Markdown HARD break ("  \n", two trailing spaces) for a single line break so
+    // it actually breaks; "\n\n" stays a paragraph break (structural, always honoured). The § colour/bold codes survive
+    // because a text node renders through Component.translatable's literal fallback, which the MC Font then interprets.
+    s.replace('$(br2)', '\n\n').replace('$(br)', '  \n').replace('$(li)', '  \n  • ')
      .replace('$(item)', '§3').replace('$(bold)', '§l').replace('$(italic)', '§o')
      .replace('$(o)', '§o').replace('$(2)', '§2').replace('$()', '§r')
 }
