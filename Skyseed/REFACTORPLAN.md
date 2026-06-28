@@ -305,6 +305,44 @@ Serializer`/`LootModifier` shape (GuideRecipe, ModRecipes, AddDropModifier); **`
 (`CHAIN`), etc. **Realistic scope: a multi-session grind** — the crux (RL) + the facade are done; this is volume, with
 the NBT rewrite the one genuinely careful piece.
 
+### 2.8 Stage 2d content progress (2026-06-28)
+
+**2b (tolerant codecs) — ✅ VERIFIED COMPLETE.** Every resolve path skips unknown ids: blocks (`Lookup.hasBlock`
+gate), mobs (`MobPlanner.resolveEntity`/`hasEntityType`), features (`DecorationPlanner` skip-with-log), template pools
+(`hasTemplatePool`), biomes (`Lookup.biomeMatches` → false for an unknown id/tag). All codecs store raw `String`
+(`Id`=`Codec.STRING`, `BiomeOverride.biomes`=`Codec.STRING.listOf`) → parse-tolerant. The 1.21.1 inert-load is already
+gametested by `unknownThemeIdsFallBack` (a forward id is indistinguishable from an unknown id there) — so the suite
+stays frozen; the resolve-side proof is on the 26.1.2 node.
+
+**2d-1 Pale Garden — biome override ✅ DONE** (`dd2860b`): a `pale_garden` override on the Forest line (pale oak +
+moss + carpet + eyeblossom + hanging-moss underside). Same `forest.json` ships to both nodes — resolves on 26.1.2,
+inert on 1.21.1. Gametest `forest_over_pale_garden_grows_pale_variant` (resolve-side: pale moss in `p.blocks()` + the
+`pale_oak` CF in `p.trees()`). Both green: 1.21.1 126, 26.1.2 128. Verified 26.1.2 ids: `pale_oak`/`pale_oak_creaking`
+(configured features), pale_oak_log, pale_moss_block/carpet, pale_hanging_moss, open/closed_eyeblossom, creaking_heart,
+resin_*; entities creaking/nautilus/happy_ghast/copper_golem.
+
+**2d-1 Pale Garden — dedicated seed → NEXT (atomic unit).** Design (researched): a dedicated seed is only meaningful
+where pale content exists, so it's a **26.1.2-only feature**, and the `everySeedRecipeAndBookEntry` coverage test makes
+it all-or-nothing (theme + recipe + gathered + reveal advancements + book entry, or 26.1.2 goes red). Plan:
+- **theme** `pale_garden.json` — the full eerie island (use `minecraft:pale_oak_creaking` so the trees carry creaking
+  hearts → Creakings; pale-moss surface, resin decoration). Ships to both, inert on 1.21.1.
+- **registration** — add `"pale_garden"` to `ModItems.SEED_THEMES` via a `//? if >=26.1.2` directive (26.1.2-only → no
+  dormant item on 1.21.1). NB this is what makes the coverage test demand the rest, on 26.1.2 only.
+- **recipe** — golden recipe with pale ingredients (e.g. pale_oak_planks); filter it to 26.1.2 in `generateRecipes`
+  (a `recipes/_26_1_2_only/…` subtree or a marker the task skips when `mcv=="1.21.1"`) so the 1.21.1 vanilla recipe
+  loader never sees the pale ids.
+- **advancements** — `craft_pale_garden` is safe as-is (references `recipe_id` as a STRING). `gathered_pale_garden`
+  references items: use a **tag** (`#minecraft:pale_oak_logs` — unknown tag resolves to empty, tolerant) NOT a direct
+  `minecraft:pale_oak_*` id (a direct unknown item id breaks the 1.21.1 advancement load). `reveal_pale_garden` per the
+  existing reveal pattern. ⚠ VERIFY the tag-tolerance assumption with a 1.21.1 datapack-load run.
+- **book** — a Patchouli source entry; filter it to 26.1.2 in `generateGuide` (the Modonomicon book) and confirm the
+  Patchouli book load on 1.21.1 (its crafting page references the 26.1.2-only recipe → likely also needs the 26.1.2
+  gate, or a tolerant page).
+- **lang + icon** — a `pale_garden_skyseed` lang name + a PowerShell-painted 16×16 pale seed texture/model.
+Then re-run both nodes (1.21.1 must stay 126 + load clean; 26.1.2 coverage test green with the new seed).
+
+**2d-2 vegetation / 2d-3 mobs / 2d-4 variant-check** — still pending (mostly tolerant theme data, lower risk).
+
 ---
 
 ## Risks & things to verify
