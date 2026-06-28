@@ -200,10 +200,19 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
   + `placeInWorld`; jigsaw-NBT `filterBlocks` via `CompoundTag.getStringOr` (getString → `Optional` on 26.1.2); the
   golem via the `Entities` compat helper; biome overrides via `biome()`. Also added a Modonomicon coverage test
   (`modonomicon_guide_book_is_complete_and_degrades`) when SKYMODONOMICONPLAN Phase 2 landed.
-- _Next: Phase 4 — book/icon (48 tests, the big one) + the 3 deferred tests
-  (`everySeedRecipeAndBookEntryMatchesSeedKind`, `everyCraftableSeedHasUniqueIcon`, `seedStateRoundTripsThroughNbt`).
-  It needs the book/icon resource helpers (1.21.1 source lines ~1918–3097) and pairs with SKYRECIPEGENPLAN (recipes
-  now load) + SKYMODONOMICONPLAN (validate BOTH guide backends stay complete)._
+- **★ Phase 4 IN PROGRESS — 29 ported across 3 batches (104 ported total; "All 105 passed")** (commits `9540dd1`
+  batch a +6, `ca93fc9` batch b +11, `7ed1fc1` batch c +12, 2026-06-28). The "book/icon" section (1.21.1 lines
+  ~1918–3097) is really a grab-bag — the resource-coverage helpers (plain classpath `getResource`, version-agnostic)
+  + `everyCraftableSeedHasUniqueIcon` (icon models still ship at `assets/skyseed/models/item`), the mansion/village
+  structure guards, the End-chapter / monument / ancient-city / dungeon / mineshaft jigsaw-assembly tests, and the
+  End-form theme-config guards. `MinecartChest` → `vehicle.minecart`; one borderline-flaky vertical-dungeon test
+  samples 8 seeds (the 26.1.2 gametest origin randomization landed it on the boundary).
+- _Phase 4 remaining: (1) the **recipe-resolution cluster** (~7 End-chapter seed crafts + `everySeedRecipeAndBook-
+  EntryMatchesSeedKind`) — needs the reworked recipe API (`Level.recipeAccess()`/`getRecipeFor`/`assemble(input)`;
+  `Recipe` lost `getResultItem`); (2) `endPortalDropsSeedIntoStructureLoot` (loot-table API); (3) the theme-config
+  tail (1.21.1 lines ~2885–3097, mostly cross-version, unread); (4) the standing deferrals — `auto_debug_seeds`
+  (ThemeScanner stub), `seedStateRoundTripsThroughNbt` (ValueOutput/Input), `legacyDimensionReset` (level.dat,
+  pre-1.0 removal). The recipe cluster pairs with SKYRECIPEGENPLAN (recipes now load)._
 
 ## Resolved decisions
 - **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
