@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.gametest_26_1_2;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Entities;
 import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
@@ -16,6 +17,7 @@ import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlacement;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
+import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
@@ -25,6 +27,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.entity.npc.villager.Villager;
@@ -43,8 +46,11 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -149,6 +155,19 @@ public final class SkyseedTests {
         reg(event, "large_ladder_island_punches_deeper", REGION, SkyseedTests::largeLadderIslandPunchesDeeper);
         reg(event, "ladder_shaft_rotation_varies", REGION, SkyseedTests::ladderShaftRotationVaries);
         reg(event, "precise_seed_germinates_at_target", REGION, 200, SkyseedTests::preciseSeedGerminatesAtTarget);
+
+        // --- structure templates (guard the template de-duplication) ---
+        reg(event, "outpost_has_spawner_and_cage", REGION, SkyseedTests::outpostHasSpawnerAndCage);
+        reg(event, "outpost_golem_fits_in_cage", REGION, SkyseedTests::outpostGolemFitsInCage);
+        reg(event, "trial_hub_has_boss_and_ominous_vault", REGION, SkyseedTests::trialHubHasBossAndOminousVault);
+        reg(event, "trial_gallery_chains_the_rooms_pool", REGION, SkyseedTests::trialGalleryChainsTheRoomsPool);
+        reg(event, "bastion_courtyard_chains_the_pool", REGION, SkyseedTests::bastionCourtyardChainsThePool);
+        reg(event, "ocean_monument_has_prismarine_and_treasure", REGION, SkyseedTests::oceanMonumentHasPrismarineAndTreasure);
+        reg(event, "ocean_monument_plans_submerged_guardian", REGION, SkyseedTests::oceanMonumentPlansSubmergedGuardian);
+        reg(event, "starter_island_bonus_chest", REGION, SkyseedTests::starterIslandBonusChest);
+        reg(event, "forest_in_bamboo_biome_grows_bamboo", REGION, SkyseedTests::forestInBambooBiomeGrowsBamboo);
+        reg(event, "lush_hangs_glow_lichen", REGION, SkyseedTests::lushHangsGlowLichen);
+        reg(event, "aquatic_reef_has_coral", REGION, SkyseedTests::aquaticReefHasCoral);
         // DEFERRED to a later phase (not ported here):
         //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag)/readAdditionalSaveData(CompoundTag)
         //    directly, but 26.1.2 reworked those to ValueOutput/ValueInput — needs a rewrite against the new NBT API.
@@ -2047,5 +2066,191 @@ public final class SkyseedTests {
             }
         }
         return false;
+    }
+
+    private static Identifier skyseed(String path) {
+        return Ids.mod(path);
+    }
+
+    /** True if {@code p} plans {@code block} anywhere. */
+    private static boolean planHas(IslandPlan p, Block block) {
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(block)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Place a single structure template (no rotation) at region-relative (1,1,1); returns its world origin. */
+    private static BlockPos place(GameTestHelper helper, String id) {
+        final ServerLevel level = helper.getLevel();
+        final StructureTemplate tmpl = level.getServer().getStructureManager().get(skyseed(id.substring(id.indexOf(':') + 1)))
+                .orElseThrow(() -> new IllegalStateException("structure '" + id + "' not found"));
+        final BlockPos origin = helper.absolutePos(new BlockPos(1, 1, 1));
+        tmpl.placeInWorld(level, origin, origin, new StructurePlaceSettings(), level.getRandom(), Block.UPDATE_CLIENTS);
+        return origin;
+    }
+
+    // ===== structure-template tests =====
+
+    static void outpostHasSpawnerAndCage(GameTestHelper helper) {
+        final BlockPos o = place(helper, "skyseed:outpost/tower");
+        helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.SPAWNER), "outpost lost its pillager spawner");
+        helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.DARK_OAK_FENCE), "outpost lost its golem cage");
+        helper.assertTrue(contains(helper, o, 14, 18, 14, Blocks.CHEST), "outpost lost its loot chest");
+        // The cage (and railing) fences must link up — a cage-edge fence connects to its neighbour posts.
+        final BlockState cageFence = helper.getLevel().getBlockState(o.offset(6, 1, 5));
+        helper.assertTrue(cageFence.is(Blocks.DARK_OAK_FENCE)
+                        && (cageFence.getValue(BlockStateProperties.EAST) || cageFence.getValue(BlockStateProperties.WEST)),
+                "the golem-cage fences are not linked");
+        helper.succeed();
+    }
+
+    static void outpostGolemFitsInCage(GameTestHelper helper) {
+        // Guards the golem-suffocation fix: seated on the cage floor (where GenerationJob now spawns it), the
+        // ~1.4-wide, ~2.7-tall golem must have no suffocating block in its eye-box — needs the all-fence pen
+        // (a corner log there would suffocate it) and the floor-level spawn (one up jams its head in the ceiling).
+        final BlockPos o = place(helper, "skyseed:outpost/tower");
+        final IronGolem golem = Entities.create(EntityType.IRON_GOLEM, helper.getLevel());
+        helper.assertTrue(golem != null, "could not create an iron golem");
+        Entities.place(golem, o.getX() + 6.5, o.getY() + 1, o.getZ() + 6.5, 0.0F, 0.0F);
+        helper.getLevel().addFreshEntity(golem);
+        helper.assertTrue(!golem.isInWall(), "the outpost golem is suffocating in its cage");
+        helper.succeed();
+    }
+
+    static void trialHubHasBossAndOminousVault(GameTestHelper helper) {
+        final BlockPos o = place(helper, "skyseed:trial_chamber/hub");
+        helper.assertTrue(contains(helper, o, 8, 8, 8, Blocks.TRIAL_SPAWNER), "trial hub lost its breeze boss spawner");
+        helper.assertTrue(contains(helper, o, 8, 8, 8, Blocks.VAULT), "trial hub lost its ominous vault");
+        helper.succeed();
+    }
+
+    static void trialGalleryChainsTheRoomsPool(GameTestHelper helper) {
+        // Phase 5 layout variety: the connective gallery mates the hub like a room (a room_door connector) AND re-draws
+        // the rooms pool from its far end, so the chamber chains rooms through corridors. Checked on the template.
+        final ServerLevel level = helper.getLevel();
+        final StructureTemplate t = level.getServer().getStructureManager().get(skyseed("trial_chamber/gallery")).orElseThrow();
+        int in = 0, out = 0;
+        for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+            if (j.nbt() == null) {
+                continue;
+            }
+            if (j.nbt().getStringOr("name", "").equals("skyseed:room_door")) {
+                in++;   // mates the hub/parent exactly like a room
+            }
+            if (j.nbt().getStringOr("target", "").equals("skyseed:room_door")
+                    && j.nbt().getStringOr("pool", "").equals("skyseed:trial_chamber/rooms")) {
+                out++;  // its far end re-draws the rooms pool → corridors, not just spokes
+            }
+        }
+        helper.assertTrue(in == 1, "the gallery should mate the hub like a room (1 room_door connector, got " + in + ")");
+        helper.assertTrue(out == 1, "the gallery should re-draw the rooms pool from its far end (got " + out + ")");
+        helper.succeed();
+    }
+
+    static void bastionCourtyardChainsThePool(GameTestHelper helper) {
+        // Phase 5: the courtyard mates a bastion wall (a court_door connector) AND re-draws the courtyard pool from its
+        // far end, so bastions sprawl into chained yards instead of landing as one fixed unit. Checked on the template.
+        final ServerLevel level = helper.getLevel();
+        final StructureTemplate t = level.getServer().getStructureManager().get(skyseed("bastion/courtyard")).orElseThrow();
+        int door = 0, out = 0;
+        for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+            if (j.nbt() == null) {
+                continue;
+            }
+            if (j.nbt().getStringOr("name", "").equals("skyseed:court_door")) {
+                door++;   // mates a wall's bastion_edge connector
+            }
+            if (j.nbt().getStringOr("target", "").equals("skyseed:court_door")
+                    && j.nbt().getStringOr("pool", "").equals("skyseed:bastion/courtyard")) {
+                out++;    // its far end re-draws the courtyard pool → chained yards
+            }
+        }
+        helper.assertTrue(door == 1, "the courtyard should mate a wall via a court_door connector (got " + door + ")");
+        helper.assertTrue(out == 1, "the courtyard should re-draw the courtyard pool from its far end (got " + out + ")");
+        helper.succeed();
+    }
+
+    static void oceanMonumentHasPrismarineAndTreasure(GameTestHelper helper) {
+        final BlockPos o = place(helper, "skyseed:ocean_monument/monument");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.PRISMARINE_BRICKS), "monument lost its prismarine");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.SEA_LANTERN), "monument lost its sea lanterns");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.WATER), "monument's pool is not filled");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.GOLD_BLOCK), "monument lost its gold treasure");
+        helper.assertTrue(contains(helper, o, 14, 10, 14, Blocks.CHEST), "monument lost its treasure chest");
+        helper.succeed();
+    }
+
+    static void oceanMonumentPlansSubmergedGuardian(GameTestHelper helper) {
+        // The monument's guardians must be flagged to spawn in water (the AQUATIC set), or they'd beach and die.
+        final IslandPlan p = plan(helper, "ocean_monument", 1L);
+        boolean guardian = false;
+        for (final IslandPlan.AnimalSpawn a : p.animals()) {
+            if (a.type() == EntityType.GUARDIAN || a.type() == EntityType.ELDER_GUARDIAN) {
+                helper.assertTrue(a.inWater(), "monument guardian is not flagged to spawn submerged");
+                guardian = true;
+            }
+        }
+        helper.assertTrue(guardian, "ocean monument planned no guardians");
+        helper.succeed();
+    }
+
+    static void starterIslandBonusChest(GameTestHelper helper) {
+        // The starter island places a stocked chest beside the spawn iff the "Generate Bonus Chest" option is on.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 5, 8));
+        final BlockPos chestPos = center.offset(-1, 1, 0);
+        StartIsland.build(level, center, false);
+        helper.assertTrue(!level.getBlockState(chestPos).is(Blocks.CHEST), "bonus chest placed when the option is off");
+        StartIsland.build(level, center, true);
+        helper.assertTrue(level.getBlockState(chestPos).is(Blocks.CHEST), "bonus chest missing when the option is on");
+        helper.assertTrue(level.getBlockEntity(chestPos) instanceof ChestBlockEntity c && !c.isEmpty(),
+                "the bonus chest is empty");
+        helper.succeed();
+    }
+
+    static void forestInBambooBiomeGrowsBamboo(GameTestHelper helper) {
+        // Thrown over a bamboo jungle, a Forest island comes up as a bamboo forest.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        final Holder<Biome> bamboo = biome(level, Biomes.BAMBOO_JUNGLE);
+        final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "forest"), bamboo, RandomSource.create(3L));
+        helper.assertTrue(planHas(p, Blocks.BAMBOO), "a Forest over a bamboo jungle grew no bamboo");
+        helper.succeed();
+    }
+
+    static void lushHangsGlowLichen(GameTestHelper helper) {
+        // The multiface glow lichen gets a valid UP face (not an empty state), and lush islands hang it underneath.
+        helper.assertTrue(Blocks.GLOW_LICHEN.defaultBlockState().setValue(BlockStateProperties.UP, true)
+                .getValue(BlockStateProperties.UP), "glow lichen has no UP face property");
+        boolean found = false;
+        for (long seed = 1; seed <= 8 && !found; seed++) {
+            found = planHas(plan(helper, "lush", seed), Blocks.GLOW_LICHEN);
+        }
+        helper.assertTrue(found, "no lush island hung glow lichen across 8 seeds");
+        helper.succeed();
+    }
+
+    static void aquaticReefHasCoral(GameTestHelper helper) {
+        // A warm-ocean Aquatic reef grows small coral plants (and fans). Use Y 64 so the sub-zero stone override
+        // doesn't win, and a warm-ocean biome so the reef override does.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(8, 8, 8));
+        final BlockPos center = new BlockPos(base.getX(), 64, base.getZ());
+        final Holder<Biome> warm = biome(level, Biomes.WARM_OCEAN);
+        boolean coral = false;
+        for (long seed = 1; seed <= 10 && !coral; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "aquatic_large"), warm, RandomSource.create(seed));
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().getBlock() instanceof net.minecraft.world.level.block.CoralPlantBlock) {
+                    coral = true;
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(coral, "warm-ocean Aquatic reef grew no small coral plants across 10 seeds");
+        helper.succeed();
     }
 }
