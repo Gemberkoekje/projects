@@ -367,8 +367,17 @@ resin, the 1.21.5 vegetation as decoration); the craftable remainder (copper exp
 the 12 wooden shelves, dried ghast) is obtainable from already-obtainable materials. All 109 new ids obtainable.
 
 **★★ Stage 2d (worldgen content) COMPLETE** — all of 2b/2c/2d-1..4 done. Both nodes green every step (1.21.1 frozen at
-126; 26.1.2 grew 126 → 132 as the content + its gametests landed). The Pale Garden seed established the reusable
+126; 26.1.2 grew 126 → 133 as the content + its gametests landed). The Pale Garden seed established the reusable
 modern-only-content gating pattern; everything else is tolerant theme data that ships to both nodes inert on 1.21.1.
+
+**Post-completion jar-diff audit (2026-06-28, `64371ca`).** Diffed the actual vanilla worldgen registries (1.21.1
+client-extra jar vs the 26.1.2 patched jar) to catch anything missed: **0 new structures, 0 new structure_sets, 1 new
+biome** (pale_garden — handled). Two new template_pools (`trial_chambers/decor/{bed,disposal}`) apply only to vanilla's
+Trial Chamber — Skyseed builds its own, so N/A. The ~46/29 "new" configured/placed_features were almost all **pale
+garden + 1.21.5 vegetation (handled) or pure renames** (1.21.1 `patch_cactus`/`patch_sugar_cane`/… lost the `patch_`
+prefix; Skyseed places those blocks directly anyway). The one genuine miss: **`minecraft:fallen_*_tree`** (new in
+1.21.5) — added fallen oak/birch/spruce/jungle logs to the forest line (gametest `forest_places_fallen_logs`). Nothing
+else outstanding.
 
 ---
 
