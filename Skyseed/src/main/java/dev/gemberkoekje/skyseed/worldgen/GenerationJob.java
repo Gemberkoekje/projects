@@ -1,5 +1,6 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Entities;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
@@ -171,9 +172,9 @@ public final class GenerationJob {
                 if (wet == null) {
                     continue; // no tank water near this spot — skip rather than beach the animal
                 }
-                final Entity e = as.type().create(level);
+                final Entity e = Entities.create(as.type(), level);
                 if (e instanceof Mob mob) {
-                    mob.moveTo(wet.getX() + 0.5, wet.getY() + 0.5, wet.getZ() + 0.5,
+                    Entities.place(mob, wet.getX() + 0.5, wet.getY() + 0.5, wet.getZ() + 0.5,
                             plan.random().nextFloat() * 360.0F, 0.0F);
                     applyTraits(mob, as.baby());
                     EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wet), SPAWNER, null);
@@ -296,11 +297,11 @@ public final class GenerationJob {
                     js.origin().offset(2, 0, 0), js.origin().offset(-2, 0, 0),
                     js.origin().offset(0, 0, 2), js.origin().offset(0, 0, -2)};
             for (int i = 0; i < js.ironGolems(); i++) {
-                final IronGolem golem = EntityType.IRON_GOLEM.create(level);
+                final IronGolem golem = Entities.create(EntityType.IRON_GOLEM, level);
                 if (golem != null) {
                     final BlockPos base = hasCenterpiece ? guardSpots[i % guardSpots.length] : js.origin();
                     final BlockPos spot = golemSpot(base);
-                    golem.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
+                    Entities.place(golem, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
                     golem.setPersistenceRequired();
                     level.addFreshEntity(golem);
                 }
@@ -419,10 +420,14 @@ public final class GenerationJob {
                     if (!state.is(Blocks.RED_BED) || state.getValue(BedBlock.PART) != BedPart.FOOT) {
                         continue;
                     }
-                    final Villager villager = EntityType.VILLAGER.create(level);
+                    final Villager villager = Entities.create(EntityType.VILLAGER, level);
                     if (villager != null) {
-                        villager.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, 0.0F, 0.0F);
+                        Entities.place(villager, p.getX() + 0.5, p.getY(), p.getZ() + 0.5, 0.0F, 0.0F);
+                        // VillagerType.byBiome was removed in 26.1.2 (VillagerType became a Holder/registry); there the
+                        // type is left to vanilla's finalizeMobSpawn, which sets it from the spawn biome.
+                        //? if <26.1.2 {
                         villager.setVillagerData(villager.getVillagerData().setType(VillagerType.byBiome(level.getBiome(p))));
+                        //?}
                         villager.setPersistenceRequired();
                         level.addFreshEntity(villager);
                     }
@@ -438,9 +443,9 @@ public final class GenerationJob {
                 continue;
             }
             for (int i = 0; i < 3; i++) {
-                Bee bee = EntityType.BEE.create(level);
+                Bee bee = Entities.create(EntityType.BEE, level);
                 if (bee != null) {
-                    bee.moveTo(hive.getX() + 0.5, hive.getY() + 0.5, hive.getZ() + 0.5, 0.0F, 0.0F);
+                    Entities.place(bee, hive.getX() + 0.5, hive.getY() + 0.5, hive.getZ() + 0.5, 0.0F, 0.0F);
                     beehive.addOccupant(bee);
                 }
             }
@@ -457,9 +462,9 @@ public final class GenerationJob {
                 }
                 // Place submerged, centred in the water block — EntityType#spawn aligns to the block top,
                 // which would leave a squid/axolotl out of the water and they'd promptly die.
-                final Entity e = ms.type().create(level);
+                final Entity e = Entities.create(ms.type(), level);
                 if (e instanceof Mob mob) {
-                    mob.moveTo(wp.getX() + 0.5, wp.getY() + 0.5, wp.getZ() + 0.5, plan.random().nextFloat() * 360.0F, 0.0F);
+                    Entities.place(mob, wp.getX() + 0.5, wp.getY() + 0.5, wp.getZ() + 0.5, plan.random().nextFloat() * 360.0F, 0.0F);
                     EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wp), SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
