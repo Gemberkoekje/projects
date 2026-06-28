@@ -91,6 +91,12 @@ public final class ThemeScanner {
     }
 
     private static void scanTheme(String theme, String json, List<DebugSeedSpec> out, Set<String> ids) {
+        // Skip the gametest/* scaffolding themes: they're test-only (used directly by the gametests), have no
+        // island_seed_<theme> icon texture, and shouldn't appear as creative-tab debug seeds — generating one only
+        // yields a model the client can't resolve. Keeps the auto debug seeds to real content.
+        if (theme.startsWith("gametest/")) {
+            return;
+        }
         try {
             final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             if (root.has("biome_overrides")) {

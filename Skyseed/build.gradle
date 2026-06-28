@@ -208,6 +208,68 @@ def generateGuide = tasks.register('generateGuide') {
 sourceSets.main.resources.srcDir(generatedGuideDir)
 tasks.withType(ProcessResources).configureEach { dependsOn(generateGuide) }
 
+// --- Auto debug-seed item models (so the client doesn't warn "Unable to load model" for the ~150 creative-tab debug
+// seeds). They ship no per-seed model file by design; instead each reuses its base theme's seed texture. This mirrors
+// ThemeScanner.scan() — KEEP THE TWO IN SYNC — and writes one model per derived debug seed pointing at
+// skyseed:item/island_seed_<baseTheme>. (The runtime ModelEvent hook fixes the rendered icon but not the load warning,
+// which fires earlier; these generated models satisfy the load so the warning never appears.) The everyAutoDebugSeed-
+// HasAModel gametest fails if the two ever diverge. gametest/* themes are skipped in both. ---
+def themeSrcDir = rootProject.file('src/main/resources/data/skyseed/skyseed/theme')
+def seedModelDir = rootProject.file('src/main/resources/assets/skyseed/models/item')
+def generatedDebugModelsDir = layout.buildDirectory.dir('generated/debug_seed_models')
+def generateDebugSeedModels = tasks.register('generateDebugSeedModels') {
+    inputs.dir(themeSrcDir).optional()
+    inputs.dir(seedModelDir).optional()
+    outputs.dir(generatedDebugModelsDir)
+    doLast {
+        def slurper = new groovy.json.JsonSlurper()
+        def outDir = new File(generatedDebugModelsDir.get().asFile, 'assets/skyseed/models/item')
+        outDir.deleteDir(); outDir.mkdirs()
+        if (!themeSrcDir.exists()) return
+        def themes = new TreeMap() // theme id -> parsed json, sorted (mirrors ThemeScanner's TreeMap walk order)
+        themeSrcDir.eachFileRecurse { f ->
+            if (f.name.endsWith('.json')) {
+                def rel = themeSrcDir.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+                themes[rel.substring(0, rel.length() - '.json'.length())] = slurper.parse(f)
+            }
+        }
+        def ids = new HashSet()
+        def unique = { base -> def safe = base.replaceAll('[^a-z0-9_]', '_'); def id = safe; def n = 2; while (!ids.add(id)) id = safe + '_' + (n++); id }
+        def firstConcreteBiome = { biomes ->            // -> the biome path (e.g. "plains"), or null
+            for (b in biomes) {
+                def s = b as String
+                if (s.startsWith('#')) {
+                    s = s.substring(1); def cc = s.indexOf(':')
+                    def ns = cc < 0 ? 'minecraft' : s.substring(0, cc); def path = cc < 0 ? s : s.substring(cc + 1)
+                    if (!path.startsWith('is_')) continue
+                    s = ns + ':' + path.substring('is_'.length())
+                }
+                def cc = s.indexOf(':'); return cc < 0 ? s : s.substring(cc + 1)
+            }
+            return null
+        }
+        def rareTag = { rare, i ->                       // jigsaw pool's first path segment, else rare<i>
+            if (rare.jigsaw?.pool) { def p = rare.jigsaw.pool as String; def cc = p.indexOf(':'); p = cc < 0 ? p : p.substring(cc + 1); def sl = p.indexOf('/'); return sl < 0 ? p : p.substring(0, sl) }
+            return 'rare' + i
+        }
+        def emit = { id, theme ->
+            // Inherit the base theme's seed model (parent), so the debug seed reuses whatever texture that seed uses
+            // (e.g. the *_large seeds share island_seed_large). Skip if the base seed model is missing (non-seed theme).
+            if (!new File(seedModelDir, "${theme}_skyseed.json").exists()) return
+            new File(outDir, "${id}_skyseed.json").text = groovy.json.JsonOutput.toJson([parent: "skyseed:item/${theme}_skyseed"])
+        }
+        themes.each { theme, root ->
+            if (theme.startsWith('gametest/')) return
+            root.biome_overrides?.each { ov -> if (ov.biomes) { def bp = firstConcreteBiome(ov.biomes); if (bp != null) emit(unique("debug_${theme}_${bp}"), theme) } }
+            root.rare_structures?.eachWithIndex { rare, i -> emit(unique("debug_${theme}_${rareTag(rare, i)}"), theme) }
+            if (root.ladder_shaft && (root.ladder_shaft.waterfall_chance == null || root.ladder_shaft.waterfall_chance > 0)) emit(unique("debug_${theme}_waterfall"), theme)
+        }
+        println "generated debug-seed models: ${outDir.listFiles()?.length ?: 0}"
+    }
+}
+sourceSets.main.resources.srcDir(generatedDebugModelsDir)
+tasks.withType(ProcessResources).configureEach { dependsOn(generateDebugSeedModels) }
+
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)

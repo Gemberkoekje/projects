@@ -194,6 +194,7 @@ public final class SkyseedTests {
         reg(event, "debug_forced_rare_germinates_its_structure", REGION, SkyseedTests::debugForcedRareGerminatesItsStructure);
         reg(event, "debug_forced_waterfall_germinates_water_column", REGION, SkyseedTests::debugForcedWaterfallGerminatesWaterColumn);
         reg(event, "auto_debug_seeds_cover_overrides_and_rares", REGION, SkyseedTests::autoDebugSeedsCoverOverridesAndRares);
+        reg(event, "every_auto_debug_seed_has_a_model", REGION, SkyseedTests::everyAutoDebugSeedHasAModel);
         reg(event, "seed_state_round_trips_through_nbt", REGION, SkyseedTests::seedStateRoundTripsThroughNbt);
         reg(event, "sprawling_dungeon_assembles", BIG_REGION, SkyseedTests::sprawlingDungeonAssembles);
         reg(event, "dungeon_complex_rooms_carry_content", REGION, SkyseedTests::dungeonComplexRoomsCarryContent);
@@ -2839,6 +2840,25 @@ public final class SkyseedTests {
         helper.assertTrue(theme.equals(b.getTheme()), "theme did not round-trip through NBT");
         helper.assertTrue(tag2.getBooleanOr("Precise", false) && tag2.getDoubleOr("TY", 0.0) == 2.5,
                 "precise target did not round-trip through read");
+        helper.succeed();
+    }
+
+    static void everyAutoDebugSeedHasAModel(GameTestHelper helper) {
+        // Every auto debug seed must ship a generated item model (generateDebugSeedModels, which mirrors ThemeScanner)
+        // so the client never logs "Unable to load model" for it. Fails if the Gradle generator drifts from the runtime
+        // scan. (The debug seeds are the same on both nodes, so this 26.1.2 check also covers the 1.21.1 build's models.)
+        int missing = 0;
+        String first = null;
+        for (final String id : ModItems.AUTO_DEBUG_BASE.keySet()) {
+            if (!resourceExists("/assets/skyseed/models/item/" + id + ".json")) {
+                missing++;
+                if (first == null) {
+                    first = id;
+                }
+            }
+        }
+        helper.assertTrue(missing == 0, missing + " auto debug seed(s) have no item model (first: " + first
+                + ") — generateDebugSeedModels has drifted from ThemeScanner");
         helper.succeed();
     }
 
