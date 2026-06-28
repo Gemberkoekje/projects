@@ -163,6 +163,22 @@ text/condition model). So the content must exist in **both** formats. Options, r
   - **Datagen API present for Phase 2:** the jar ships `…api.datagen.BookProvider`/`NeoBookProvider`/`EntryProvider`/
     `CategoryProvider` + `book.BookModel`/`BookEntryModel`/`BookCategoryModel` + condition models — i.e. Modonomicon
     supports *code* book authoring, relevant when wiring the golden→Modonomicon content (Option A).
-- _Next: Phase 1 — a minimal Modonomicon `book.json` + a category + ~2 entries so 26.1.2 returns a real Modonomicon
-  book (proving the data path + the stack). Then Phase 2 content + flipping the book-coverage gametest to validate
-  BOTH backends (Patchouli AND Modonomicon stay first-class — per the standing rule)._
+- **★ Phase 1 DONE (commit `5b97c27`, 2026-06-28) — the data-driven Modonomicon book pipeline is proven on both
+  nodes.** A minimal book at `data/skyseed/modonomicon/books/test_guide/` (book.json + an Overview category + a Welcome
+  entry) loads cleanly on **both** Modonomicon versions (1.114.5 + 1.134.2), and the new 26.1.2 gametest
+  `modonomicon_backend_resolves_and_degrades` asserts `ModonomiconCompat.bookStack` resolves a LOADED book to a
+  non-empty stack and an ABSENT id to EMPTY (the fall-through guarantee). 59 green on 26.1.2, 126 on 1.21.1.
+  **Confirmed JSON format (worked first try; field names from the datagen `*Model` builders, snake_case keys):**
+  - `book.json`: `{ "name": "...", "tooltip": "..." }` (textures/model/colors all default — optional).
+  - `categories/<id>.json`: `{ "name": "...", "icon": "minecraft:grass_block", "sort_number": 0 }` (icon accepts a
+    plain item-id string; the `"title"`/`"landing_text"` shape from web search was a *different* mod, Modopedia).
+  - `entries/<id>.json`: `{ "category": "<ns>:<category_id>", "name": "...", "icon": "<ns>:<item>", "x": 0, "y": 0,
+    "pages": [ { "type": "modonomicon:text", "text": "..." } ] }` — the entry id comes from the file path; entries
+    **reference** their category (the category does NOT list entries). Crafting page = `{ "type":
+    "modonomicon:crafting_recipe", "recipe": "<ns>:<recipe_id>" }` (to wire in Phase 2; recipes are golden-generated).
+  - A **throwaway `test_guide` id** was used so `SkyseedGuide.book()`'s real `skyseed:guide` precedence is untouched
+    (no 1.21.1 Patchouli regression). **Phase 2 replaces test_guide with the real `skyseed:guide` Modonomicon book at
+    full parity** (so both nodes switch to Modonomicon only once it's complete) and removes test_guide.
+- _Next: Phase 2 — the full `skyseed:guide` content (golden→Modonomicon transform; the page-type + `$(...)` macro
+  mapping is the meaty part), then flip the book-coverage gametest to validate BOTH backends (Patchouli AND
+  Modonomicon stay first-class + complete — per the standing rule)._
