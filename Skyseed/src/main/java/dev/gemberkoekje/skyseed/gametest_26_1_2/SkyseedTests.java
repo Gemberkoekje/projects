@@ -224,8 +224,8 @@ public final class SkyseedTests {
         reg(event, "aquatic_sub_zero_has_lava_lake", REGION, SkyseedTests::aquaticSubZeroHasLavaLake);
         reg(event, "island_output_is_stable", REGION, SkyseedTests::islandOutputIsStable);
         reg(event, "every_seed_recipe_and_book_entry_matches_seed_kind", REGION, SkyseedTests::everySeedRecipeAndBookEntryMatchesSeedKind);
-        // DEFERRED — still not ported (each needs a 26.1.2 API/feature the suite hasn't crossed yet):
-        //  - endPortalDropsSeedIntoStructureLoot: the loot-table API (reloadableRegistries/LootParams) reworked.
+        reg(event, "end_portal_drops_seed_into_structure_loot", REGION, SkyseedTests::endPortalDropsSeedIntoStructureLoot);
+        // DEFERRED — still not ported (each needs a 26.1.2 feature the suite hasn't crossed yet):
         //  - autoDebugSeedsCoverOverridesAndRares: ModItems.DEBUG_SEEDS is empty on 26.1.2 because ThemeScanner.scan()
         //    is stubbed (the IModFile.findResource follow-up from Stage 2b).
         //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag) directly — 26.1.2 reworked it to
@@ -3403,6 +3403,33 @@ public final class SkyseedTests {
             helper.assertTrue(!resourceExists(entryPath(theme)), "debug seed '" + theme + "' must not have a field-notes entry");
             helper.assertTrue(!resourceExists(gatheredPath(theme)), "debug seed '" + theme + "' must not have a gathered advancement");
             helper.assertTrue(!resourceExists(revealPath(theme)), "debug seed '" + theme + "' must not have a reveal advancement");
+        }
+        helper.succeed();
+    }
+
+    static void endPortalDropsSeedIntoStructureLoot(GameTestHelper helper) {
+        // Phase-1 collect-a-thon: a global loot modifier (AddDropModifier) seeds the Portal Frame Shard into dungeon
+        // loot and each relic into its structure's loot table. Roll the targeted tables across fixed seeds and confirm
+        // the modifier's item appears — proving the GLM is registered, loaded, and gated to the right table.
+        final ServerLevel level = helper.getLevel();
+        final String[][] cases = {
+                {"minecraft:chests/simple_dungeon", "portal_frame_shard"},
+                {"minecraft:chests/woodland_mansion", "mansion_relic"}};
+        for (final String[] c : cases) {
+            final var table = level.getServer().reloadableRegistries().getLootTable(
+                    net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.LOOT_TABLE,
+                            net.minecraft.resources.Identifier.parse(c[0])));
+            final var params = new net.minecraft.world.level.storage.loot.LootParams.Builder(level)
+                    .withParameter(net.minecraft.world.level.storage.loot.parameters.LootContextParams.ORIGIN,
+                            net.minecraft.world.phys.Vec3.ZERO)
+                    .create(net.minecraft.world.level.storage.loot.parameters.LootContextParamSets.CHEST);
+            boolean found = false;
+            for (long seed = 1; seed <= 80 && !found; seed++) {
+                for (final net.minecraft.world.item.ItemStack s : table.getRandomItems(params, seed)) {
+                    if (s.is(ModItems.PARTS.get(c[1]).get())) { found = true; break; }
+                }
+            }
+            helper.assertTrue(found, "the loot modifier never added " + c[1] + " to " + c[0] + " over 80 rolls");
         }
         helper.succeed();
     }
