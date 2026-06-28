@@ -29,6 +29,7 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -94,6 +95,17 @@ public final class SkyseedTests {
         reg(event, "snow_cover_caps_highest_block", REGION, SkyseedTests::snowCoverCapsHighestBlock);
         reg(event, "trade_post_blacksmith_places", REGION, SkyseedTests::tradePostBlacksmithPlaces);
         reg(event, "trade_post_over_void_uses_piers", BIG_REGION, SkyseedTests::tradePostOverVoidUsesPiers);
+        reg(event, "trade_post_is_a_street_village", REGION, SkyseedTests::tradePostIsAStreetVillage);
+        reg(event, "village_center_is_a_big_village", REGION, SkyseedTests::villageCenterIsABigVillage);
+        reg(event, "village_center_favours_big_buildings", REGION, SkyseedTests::villageCenterFavoursBigBuildings);
+        reg(event, "village_centerpiece_lands_on_square_centre", BIG_REGION, SkyseedTests::villageCenterpieceLandsOnSquareCentre);
+        reg(event, "jigsaw_config_with_pool_swaps_only_the_pool", REGION, SkyseedTests::jigsawConfigWithPoolSwapsOnlyThePool);
+        reg(event, "trade_post_desert_biome_selects_desert_pool", REGION, SkyseedTests::tradePostDesertBiomeSelectsDesertPool);
+        reg(event, "trade_post_biome_styles_select_their_pools", REGION, SkyseedTests::tradePostBiomeStylesSelectTheirPools);
+        reg(event, "hamlet_biome_styles_select_their_pools", REGION, SkyseedTests::hamletBiomeStylesSelectTheirPools);
+        reg(event, "hamlet_reuses_trade_post_shops", BIG_REGION, SkyseedTests::hamletReusesTradePostShops);
+        reg(event, "trade_post_biome_pieces_use_their_wood", BIG_REGION, SkyseedTests::tradePostBiomePiecesUseTheirWood);
+        reg(event, "trade_post_village_places_shops", BIG_REGION, SkyseedTests::tradePostVillagePlacesShops);
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -127,6 +139,11 @@ public final class SkyseedTests {
     /** The biome holder for a vanilla biome key on {@code level} (26.1.2: lookupOrThrow + getOrThrow). */
     private static Holder<Biome> biome(ServerLevel level, ResourceKey<Biome> key) {
         return level.registryAccess().lookupOrThrow(Registries.BIOME).getOrThrow(key);
+    }
+
+    /** The biome holder for a string biome id (e.g. {@code "minecraft:desert"}) — those outside the {@link Biomes} constants. */
+    private static Holder<Biome> biome(ServerLevel level, String id) {
+        return biome(level, ResourceKey.create(Registries.BIOME, Identifier.parse(id)));
     }
 
     // ===== tests =====
@@ -1021,5 +1038,273 @@ public final class SkyseedTests {
             }
         }
         return chains;
+    }
+
+    static void tradePostIsAStreetVillage(GameTestHelper helper) {
+        // SKYJIGSAWPLAN Phase 1: the Trade Post is now a street village — a square radiating a depth-4 street
+        // network with shops + fields hung off lot connectors, surfaced by PathSurfacer (dirt paths on the island,
+        // self-railing bridges over the void). Guard the wiring; the village's look is an in-world smoke test. The
+        // streets/lots pools are validated by the datapack load (a bad element reference fails the run).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        helper.assertTrue(tp.jigsaw().isPresent() && tp.jigsaw().get().pool().path().equals("trade_post/start"),
+                "trade_post must start from its start pool");
+        helper.assertTrue(tp.jigsaw().get().depth() >= 4, "trade_post must recurse into a street network");
+        helper.assertTrue(tp.jigsaw().get().reach() > 0, "trade_post must set reach for surfacing + the bed scan");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, overworld.getBiome(c), RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post/start")),
+                "trade_post should carry its start jigsaw site");
+        helper.succeed();
+    }
+
+    static void villageCenterIsABigVillage(GameTestHelper helper) {
+        // The village_center seed is "a bigger Trade Post" laid out as a CLUSTER: the SAME building pieces via a
+        // denser street skeleton (trade_post/start_dense, whose lanes weight the large/big-building section higher),
+        // a deeper street network and a guaranteed 4+ shops, spread over 3 small islands ringed around a void centre
+        // (cluster_offsets). Like the trade post it's biome-styled -- a desert one pulls the desert pieces.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme vc = theme(level, "village_center");
+        helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().path().equals("trade_post/start_dense"),
+                "village_center must reuse the trade post village pieces (via the denser start_dense skeleton)");
+        helper.assertTrue(vc.jigsaw().get().depth() > 4, "village_center must run a deeper street network than the trade post (depth 4)");
+        helper.assertTrue(vc.jigsaw().get().capMin() >= 4, "village_center must guarantee at least 4 shops");
+        helper.assertTrue(!vc.shape().clusterOffsets().isEmpty(),
+                "village_center must be a cluster of small islands (cluster_offsets), not one huge island");
+        helper.assertTrue(vc.jigsaw().get().centerpiece().map(cp -> cp.path().equals("anvil")).orElse(false),
+                "village_center must set an anvil centerpiece (the capstone at the cluster's centre)");
+        final Holder<Biome> desert = biome(level, "minecraft:desert");
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), vc, desert, RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post_desert/start_dense")),
+                "a desert village_center must use the desert village pieces (biome-styled like the trade post)");
+        helper.succeed();
+    }
+
+    static void villageCenterFavoursBigBuildings(GameTestHelper helper) {
+        // The village_center assembles from start_dense, whose streets pool weights the large (big-building) section
+        // higher than the trade post's — so it reads as having more forges / great halls. We assert this on the pool
+        // WEIGHTS, deterministically: a per-village big-building count is far too noisy to test reliably (the gametest
+        // origin varies per run; the ~1.7x bias needs a huge sample to clear the variance). getShuffledTemplates
+        // expands each element by its weight, so counting the large section in that list yields exactly its weight.
+        final var reg = helper.getLevel().registryAccess();
+        final RandomSource rng = RandomSource.create(0L);
+        final long dense = Lookup.templatePool(reg, Ids.mod("trade_post/streets_dense")).value()
+                .getShuffledTemplates(rng).stream().filter(e -> e.toString().contains("street_large")).count();
+        final long normal = Lookup.templatePool(reg, Ids.mod("trade_post/streets")).value()
+                .getShuffledTemplates(rng).stream().filter(e -> e.toString().contains("street_large")).count();
+        helper.assertTrue(dense > normal, "the village_center's dense streets must weight the large (big-building) "
+                + "section higher than the trade post's (dense=" + dense + " vs trade post=" + normal + ")");
+        helper.succeed();
+    }
+
+    static void villageCenterpieceLandsOnSquareCentre(GameTestHelper helper) {
+        // The anvil capstone (GenerationJob) is stamped at the jigsaw origin, which must be the start square's centre
+        // tile — its lantern. Assemble just the start square and confirm the lantern sits exactly at origin: the spot
+        // the capstone replaces. Guards against the jigsaw seating shifting and the capstone landing off-centre/floating.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        helper.assertTrue(helper.getBlockState(new BlockPos(24, 3, 24)).is(Blocks.LANTERN),
+                "the start square's centre tile must land at origin (where the centerpiece capstone is stamped)");
+        helper.succeed();
+    }
+
+    static void jigsawConfigWithPoolSwapsOnlyThePool(GameTestHelper helper) {
+        // Backs JigsawConfig.withPool (the wither dimensionVariant uses to swap in a _nether pool): it must change ONLY
+        // the pool. Round-trip — withPool(other).withPool(original) equalling the original — proves every other field
+        // (depth, cap, golems, centerpiece, …) survived the copy.
+        final var jc = theme(helper.getLevel(), "village_center").jigsaw().orElseThrow();
+        final Id other = Id.of("skyseed:trade_post_desert/start");
+        final var swapped = jc.withPool(other);
+        helper.assertTrue(swapped.pool().equals(other), "withPool must set the new pool");
+        helper.assertTrue(swapped.withPool(jc.pool()).equals(jc),
+                "withPool must change only the pool (round-trip to the original pool must equal the original)");
+        helper.succeed();
+    }
+
+    static void tradePostDesertBiomeSelectsDesertPool(GameTestHelper helper) {
+        // Biome-override wiring — what a forced-biome debug seed exercises. Planning the trade post in a desert biome
+        // must select the desert jigsaw pool (and a sand surface), not the default plains/oak start.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        final Holder<Biome> desert = biome(overworld, "minecraft:desert");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, desert, RandomSource.create(8L));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post_desert/start")),
+                "a trade post in a desert biome should use the desert jigsaw pool");
+        helper.succeed();
+    }
+
+    static void tradePostBiomeStylesSelectTheirPools(GameTestHelper helper) {
+        // The remaining village styles: savanna gets its acacia pool; taiga and snowy share the spruce pool.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme tp = theme(overworld, "trade_post");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final String[][] cases = {
+                {"minecraft:savanna", "trade_post_savanna/start"},
+                {"minecraft:taiga", "trade_post_spruce/start"},
+                {"minecraft:snowy_plains", "trade_post_spruce/start"}};
+        for (String[] cs : cases) {
+            final Holder<Biome> b = biome(overworld, cs[0]);
+            final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, b, RandomSource.create(8L));
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals(cs[1])),
+                    cs[0] + " trade post should use pool " + cs[1]);
+        }
+        helper.succeed();
+    }
+
+    static void hamletBiomeStylesSelectTheirPools(GameTestHelper helper) {
+        // The hamlet is biome-aware like the trade post: each biome selects its own hamlet hub pool (which in turn
+        // pulls that biome's trade-post shops).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme h = theme(overworld, "hamlet");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final String[][] cases = {
+                {"minecraft:plains", "hamlet/start"},
+                {"minecraft:desert", "hamlet_desert/start"},
+                {"minecraft:savanna", "hamlet_savanna/start"},
+                {"minecraft:taiga", "hamlet_spruce/start"},
+                {"minecraft:snowy_plains", "hamlet_spruce/start"}};
+        for (String[] cs : cases) {
+            final Holder<Biome> b = biome(overworld, cs[0]);
+            final IslandPlan p = IslandGenerator.planIsland(overworld, c, h, b, RandomSource.create(8L));
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals(cs[1])),
+                    cs[0] + " hamlet should use pool " + cs[1]);
+        }
+        helper.succeed();
+    }
+
+    static void hamletReusesTradePostShops(GameTestHelper helper) {
+        // The hamlet starts from a small green whose lot connectors pull the trade post's lots pool, so it places the
+        // same diverse profession shops, capped to 1–2. The placement is position-seeded and the gametest origin
+        // varies per run, so pass each iteration as an explicit seed → five DIFFERENT hamlets; at least one lands a shop.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int beds = 0;
+        for (int iter = 0; iter < 5; iter++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 2, origin, false, "shop_", 2, fillers, iter);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.RED_BED)) {
+                            beds++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, "5 hamlets placed no shops (red_bed=" + beds + ")");
+        helper.succeed();
+    }
+
+    static void tradePostBiomePiecesUseTheirWood(GameTestHelper helper) {
+        // The savanna set is acacia and the shared spruce set is spruce — confirm the palette produced the right wood
+        // (not oak) and the villages still place shops via the same cap/filler machinery.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        checkWood(helper, level, origin, "trade_post_savanna", Blocks.ACACIA_PLANKS);
+        checkWood(helper, level, origin, "trade_post_spruce", Blocks.SPRUCE_PLANKS);
+        helper.succeed();
+    }
+
+    private static void checkWood(GameTestHelper helper, ServerLevel level, BlockPos origin, String pool, Block wood) {
+        final var startPool = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod(pool + "/fillers"));
+        int beds = 0;
+        int rightWood = 0;
+        int oak = 0;
+        // The village is position-seeded AND the gametest origin varies per run, so a single placement sometimes rolls
+        // zero shops; sample several explicit seeds and assert across them (a shop lands in at least one, oak never).
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, startPool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                        if (s.is(Blocks.RED_BED)) {
+                            beds++;
+                        } else if (s.is(wood)) {
+                            rightWood++;
+                        } else if (s.is(Blocks.OAK_PLANKS)) {
+                            oak++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, pool + " placed no shops across 4 seeds (red_bed=" + beds + ")");
+        helper.assertTrue(rightWood > 0, pool + " has no " + wood + " walls (count=" + rightWood + ")");
+        helper.assertTrue(oak == 0, pool + " still has oak plank walls (oak=" + oak + ")");
+    }
+
+    static void tradePostVillagePlacesShops(GameTestHelper helper) {
+        // Regression for the shop cap. A shop carries a job-site block (composter/lectern/barrel/fletching); the cap
+        // keeps the `cap` shops nearest the centre and re-stamps the surplus lots as fields/gardens. Asserting an exact
+        // count off ONE assembled village is fragile — the jigsaw is seeded from the (grid-allocated) origin chunk, so
+        // which village lands, and where its shops fall relative to the scan, shifts whenever the gametest SET changes.
+        // Instead sample a few deterministic villages per cap, scan the WHOLE template, and assert the two robust halves
+        // of the guarantee: no village ever EXCEEDS the cap (the trim), and the cap IS reachable when enough lots place
+        // (the fill). (Loads dev-generated .nbt; syncDevStructures keeps the node copy current.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post/fillers"));
+        int crops = 0;
+        for (int cap = 2; cap <= 4; cap++) {
+            int best = 0;
+            for (long seed = 1; seed <= 3; seed++) {
+                for (int x = 0; x < 48; x++) {
+                    for (int z = 0; z < 48; z++) {
+                        for (int y = 1; y <= 14; y++) {
+                            helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR); // reset platform
+                        }
+                    }
+                }
+                Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 6, origin, false, "shop_", cap, fillers, seed);
+                int villageShops = 0;
+                for (int x = 0; x < 48; x++) {
+                    for (int z = 0; z < 48; z++) {
+                        for (int y = 1; y <= 14; y++) {
+                            final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                            // One job-site block per capped small shop (all eight professions). The forge (furnace /
+                            // smithing table / anvil), the great hall (bell) and the fillers use none of these, so the
+                            // count is exactly the kept shops. Decorations must not reuse a job site (the market stall
+                            // sells produce, not a barrel/composter), or they'd be miscounted as shops.
+                            if (s.is(Blocks.COMPOSTER) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)
+                                    || s.is(Blocks.FLETCHING_TABLE) || s.is(Blocks.SMOKER) || s.is(Blocks.LOOM)
+                                    || s.is(Blocks.STONECUTTER) || s.is(Blocks.CARTOGRAPHY_TABLE)) {
+                                villageShops++;
+                            } else if (s.is(Blocks.WHEAT) || s.is(Blocks.POTATOES) || s.is(Blocks.CARROTS)) {
+                                crops++; // a wheat / potato / carrot field tile
+                            }
+                        }
+                    }
+                }
+                helper.assertTrue(villageShops <= cap,
+                        "cap " + cap + " exceeded — kept more shops than the cap (shops=" + villageShops + ")");
+                best = Math.max(best, villageShops);
+            }
+            helper.assertTrue(best == cap,
+                    "no sampled village reached the capped " + cap + " shops (best=" + best + ") — the fill is unreachable");
+        }
+        helper.assertTrue(crops > 0, "villages placed no crop fields (crops=" + crops + ")");
+        helper.succeed();
     }
 }
