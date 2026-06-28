@@ -1,10 +1,10 @@
 package dev.gemberkoekje.skyseed.item;
 
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.PatchouliCompat;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.network.Filterable;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -23,7 +23,7 @@ public final class SkyseedGuide {
     private SkyseedGuide() {}
 
     /** The Patchouli book id (also the datapack book folder under {@code patchouli_books/guide}). */
-    public static final ResourceLocation BOOK_ID = Ids.mod("guide");
+    public static final Id BOOK_ID = Id.of(Ids.mod("guide").toString());
 
     /** The Patchouli book if that mod is present, otherwise the plain written-book fallback. */
     public static ItemStack book() {
