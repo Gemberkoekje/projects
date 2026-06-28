@@ -12,10 +12,11 @@ plugins {
     id 'dev.kikugie.stonecutter' version '0.9.6'
 }
 
-// Stonecutter version matrix. One version for now (the Stage-0 spike); add nodes here to target more.
+// Stonecutter version matrix (see REFACTORPLAN.md "Stage 2 in detail"). Each node's MC/NeoForge/Java/etc. are pulled
+// per-node in build.gradle from the version-keyed root gradle.properties (by project.name = the version string).
 stonecutter {
     create(rootProject) {
-        versions("1.21.1")
+        versions("1.21.1", "26.1.2")
         vcsVersion = "1.21.1"
     }
 }

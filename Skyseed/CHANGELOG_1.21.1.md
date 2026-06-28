@@ -1,7 +1,19 @@
-# Changelog
+# Changelog — Minecraft 1.21.1 build
 
-All notable changes to Skyseed are recorded here. The format is loosely based on
-[Keep a Changelog](https://keepachangelog.com/), and this project uses [SemVer](https://semver.org/).
+Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built for multiple Minecraft versions (see
+`REFACTORPLAN.md`); the **26.1.2** build has its own [CHANGELOG_26.1.md](CHANGELOG_26.1.md). Both builds share the
+version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
+change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
+
+## [0.155.0] - 2026-06-28
+
+### Changed
+- **Multi-version build scaffolding (Stage 2a).** The build is now per-node under Stonecutter: a second target node
+  (`26.1.2`) joined the matrix, and MC / NeoForge / Java / Parchment / Patchouli are selected per node from
+  version-keyed root `gradle.properties` (by `project.name`). **No gameplay change to the 1.21.1 build** —
+  behaviour-preserving, 126 gametests pass, and the 26.1.2 node configures lazily so the 1.21.1 workflow is untouched.
+  The changelog was split into this file + `CHANGELOG_26.1.md`. (The 26.1.2 compat-compile is in progress — see
+  `REFACTORPLAN.md` "Stage 2 in detail".)
 
 ## [0.154.0] - 2026-06-27
 

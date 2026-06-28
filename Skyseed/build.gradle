@@ -6,6 +6,15 @@ plugins {
     id 'jacoco'
 }
 
+// --- Per-node version selection (Stonecutter Stage 2 — see REFACTORPLAN.md) ---
+// This build script runs in the version NODE subproject, whose name is the MC version ("1.21.1" / "26.1.2"). Pull this
+// node's MC / NeoForge / Java versions (and optional Parchment / Patchouli) from the version-keyed root gradle.properties.
+def mcv = project.name
+ext.minecraft_version       = property("mc_${mcv}")
+ext.minecraft_version_range = property("mcrange_${mcv}")
+ext.neo_version             = property("neo_${mcv}")
+def javaVersion             = property("java_${mcv}") as int
+
 // Prefix the Minecraft version so jars and the in-game version are distinguishable across MC versions once we
 // target more than one (e.g. skyseed-1.21.1_0.60.0.jar). minecraft_version is per-node under Stonecutter.
 version = "${minecraft_version}_${mod_version}"
@@ -51,16 +60,19 @@ base {
     archivesName = mod_id
 }
 
-// Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+// Java target is per-node (1.21.1 → Java 21; 26.1.2 → Java 25). Mojang ships the matching JDK to end users.
+java.toolchain.languageVersion = JavaLanguageVersion.of(javaVersion)
 
 neoForge {
     // Specify the version of NeoForge to use.
     version = project.neo_version
 
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
+    // Parchment param-name mappings — only when published for this node's MC (omitted = Mojmap only, still compiles).
+    if (project.hasProperty("parchment_${mcv}")) {
+        parchment {
+            mappingsVersion = property("parchment_${mcv}")
+            minecraftVersion = property("parchment_mc_${mcv}")
+        }
     }
 
     // This line is optional. Access Transformers are automatically detected
@@ -138,9 +150,12 @@ configurations {
 dependencies {
     // Patchouli — OPTIONAL: it provides the rich illustrated guide book. We compile against it and load it in
     // dev for testing, but the published mod does not require it (without Patchouli the guide is a plain
-    // vanilla written book). compileOnly + localRuntime = present here, not forced on dependents.
-    compileOnly "vazkii.patchouli:Patchouli:1.21.1-93-NEOFORGE"
-    localRuntime "vazkii.patchouli:Patchouli:1.21.1-93-NEOFORGE"
+    // vanilla written book). compileOnly + localRuntime = present here, not forced on dependents. Per-node: skipped
+    // for a node with no published Patchouli build (then PatchouliCompat needs a //? directive — Stage 2 work).
+    if (project.hasProperty("patchouli_${mcv}")) {
+        compileOnly "vazkii.patchouli:Patchouli:${property("patchouli_${mcv}")}"
+        localRuntime "vazkii.patchouli:Patchouli:${property("patchouli_${mcv}")}"
+    }
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

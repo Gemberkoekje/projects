@@ -2,7 +2,7 @@
 
 A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG.md](CHANGELOG.md)**. The only open build plan is the multi-version refactor (`REFACTORPLAN.md`); every per-chapter and per-feature plan was retired into the CHANGELOG once shipped.
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)** (the in-progress 26.1.2 build has its own **[CHANGELOG_26.1.md](CHANGELOG_26.1.md)**). The only open build plan is the multi-version refactor (`REFACTORPLAN.md`); every per-chapter and per-feature plan was retired into the changelog once shipped.
 
 ---
 
@@ -24,7 +24,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 
 ## Status
 
-**Version 0.154.0** — see [CHANGELOG.md](CHANGELOG.md). **All three dimension chapters are built end to end.** The **overworld** (every island type + its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, the rare surprises); the **Nether** (overworld seeds adapt or fizzle across the portal, five full-size native seeds + Large variants, all four Nether structures — the Fortress + blaze room, the Bastion Remnant, the Piglin Trading Post, the Wither Arena — and ruined-portal twins); and the **End** (a void End reached by an Eye-of-Ender portal bootstrap, End-native seeds, biome gating, the dragon-trophy capstone, and a full vanilla-style **End City** jigsaw). On top of those: a **Huge island tier** (bigger landmasses / archipelagos with internal cave systems and rare interior structures) and villages that assemble as varied **street villages** through deep jigsaw use. What exists today:
+**Version 0.155.0** — see [CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md). **All three dimension chapters are built end to end.** The **overworld** (every island type + its Large variant, villages, animal farms, the loot/encounter structure islands, both grand structures, the rare surprises); the **Nether** (overworld seeds adapt or fizzle across the portal, five full-size native seeds + Large variants, all four Nether structures — the Fortress + blaze room, the Bastion Remnant, the Piglin Trading Post, the Wither Arena — and ruined-portal twins); and the **End** (a void End reached by an Eye-of-Ender portal bootstrap, End-native seeds, biome gating, the dragon-trophy capstone, and a full vanilla-style **End City** jigsaw). On top of those: a **Huge island tier** (bigger landmasses / archipelagos with internal cave systems and rare interior structures) and villages that assemble as varied **street villages** through deep jigsaw use. What exists today:
 
 | Area | Built |
 |---|---|
