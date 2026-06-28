@@ -345,7 +345,12 @@ The original (verified-correct) plan was:
 - **lang + icon** — a `pale_garden_skyseed` lang name + a PowerShell-painted 16×16 pale seed texture/model.
 Then re-run both nodes (1.21.1 must stay 126 + load clean; 26.1.2 coverage test green with the new seed).
 
-**2d-2 vegetation / 2d-3 mobs / 2d-4 variant-check** — still pending (mostly tolerant theme data, lower risk).
+**2d-2 vegetation ✅ DONE** (`f9d5bf1`): the 1.21.5 flora as decoration on existing themes — forest (leaf_litter,
+bush, firefly_bush, wildflowers), meadow (wildflowers, firefly_bush, bush, golden_dandelion), desert + badlands
+(short/tall_dry_grass, cactus_flower). Pure tolerant theme data, inert on 1.21.1. Gametest
+new_vegetation_resolves_on_themes. Both nodes green (1.21.1 126, 26.1.2 All 130).
+
+**2d-3 mobs / 2d-4 variant-check** — still pending (tolerant theme data + a verification).
 
 ---
 
