@@ -200,19 +200,21 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
   + `placeInWorld`; jigsaw-NBT `filterBlocks` via `CompoundTag.getStringOr` (getString → `Optional` on 26.1.2); the
   golem via the `Entities` compat helper; biome overrides via `biome()`. Also added a Modonomicon coverage test
   (`modonomicon_guide_book_is_complete_and_degrades`) when SKYMODONOMICONPLAN Phase 2 landed.
-- **★ Phase 4 IN PROGRESS — 29 ported across 3 batches (104 ported total; "All 105 passed")** (commits `9540dd1`
-  batch a +6, `ca93fc9` batch b +11, `7ed1fc1` batch c +12, 2026-06-28). The "book/icon" section (1.21.1 lines
-  ~1918–3097) is really a grab-bag — the resource-coverage helpers (plain classpath `getResource`, version-agnostic)
-  + `everyCraftableSeedHasUniqueIcon` (icon models still ship at `assets/skyseed/models/item`), the mansion/village
-  structure guards, the End-chapter / monument / ancient-city / dungeon / mineshaft jigsaw-assembly tests, and the
-  End-form theme-config guards. `MinecartChest` → `vehicle.minecart`; one borderline-flaky vertical-dungeon test
-  samples 8 seeds (the 26.1.2 gametest origin randomization landed it on the boundary).
-- _Phase 4 remaining: (1) the **recipe-resolution cluster** (~7 End-chapter seed crafts + `everySeedRecipeAndBook-
-  EntryMatchesSeedKind`) — needs the reworked recipe API (`Level.recipeAccess()`/`getRecipeFor`/`assemble(input)`;
-  `Recipe` lost `getResultItem`); (2) `endPortalDropsSeedIntoStructureLoot` (loot-table API); (3) the theme-config
-  tail (1.21.1 lines ~2885–3097, mostly cross-version, unread); (4) the standing deferrals — `auto_debug_seeds`
-  (ThemeScanner stub), `seedStateRoundTripsThroughNbt` (ValueOutput/Input), `legacyDimensionReset` (level.dat,
-  pre-1.0 removal). The recipe cluster pairs with SKYRECIPEGENPLAN (recipes now load)._
+- **★★ Phase 4 COMPLETE — the gametest suite is FULLY PORTED: 124 tests green on 26.1.2** ("All 125 passed" incl. the
+  built-in; batches `9540dd1`/`ca93fc9`/`7ed1fc1`/`a54d836`/`01ea1e2` + `17aced9` golden master + `aa988cf` coverage +
+  `3ede588` loot, 2026-06-28). The "book/icon" section (1.21.1 lines ~1918–3097) was a grab-bag — resource-coverage
+  helpers (plain classpath `getResource`), the mansion/village/End-chapter/monument/ancient-city/dungeon/mineshaft
+  jigsaw-assembly tests, the End-form theme-config guards, the End-chapter **recipe-resolution** crafts
+  (`level.recipeAccess().getRecipeFor` + `assemble(input)`), the loot-modifier test (loot API ports cleanly), and the
+  **golden master** (captured fresh for 26.1.2 — **4 of 5 fingerprints byte-identical to the 1.21.1 suite**, only
+  `gametest/water` differs by 10 blocks). Idioms: `MinecartChest`→`vehicle.minecart`, `ResourceKey.location()`→
+  `identifier()`, `getStringOr`, the `Entities` helper, `Lookup.registry`/`getValue`.
+- **3 tests deferred** (each genuinely blocked, not a port gap): `auto_debug_seeds` (`ModItems.DEBUG_SEEDS` empty —
+  `ThemeScanner.scan()` is stubbed pending the `IModFile.findResource` follow-up), `seedStateRoundTripsThroughNbt`
+  (the ValueOutput/ValueInput NBT rework), `legacyDimensionReset` (level.dat reset, slated for pre-1.0 removal).
+- _The 26.1.2 gametest harness is DONE — 124 tests across all 4 phases, the golden master locked, both guide backends
+  validated. Remaining open threads are elsewhere: the §-macro render check (SKYMODONOMICONPLAN), the ThemeScanner
+  `findResource` stub (unblocks the last debug-seed test), and the still-stubbed worldGenOptions/bonus-chest._
 
 ## Resolved decisions
 - **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
