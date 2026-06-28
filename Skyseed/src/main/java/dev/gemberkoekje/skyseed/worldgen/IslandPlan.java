@@ -2,7 +2,6 @@ package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.compat.Id;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -62,8 +61,8 @@ public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List
      * post-assembly connection-link and (when {@code > 0}) path/bridge surfacing passes scan (SKYJIGSAWPLAN §3a).
      * {@code centerpiece}, when present, is a block stamped at the centre (the origin) as a capstone.
      */
-    public record JigsawSite(ResourceLocation pool, ResourceLocation target,
+    public record JigsawSite(Id pool, Id target,
                              int depth, int pad, int ironGolems, BlockPos origin, int reach,
-                             String capPrefix, int capCount, String capFiller, Optional<ResourceLocation> centerpiece,
+                             String capPrefix, int capCount, String capFiller, Optional<Id> centerpiece,
                              boolean trestles) {}
 }

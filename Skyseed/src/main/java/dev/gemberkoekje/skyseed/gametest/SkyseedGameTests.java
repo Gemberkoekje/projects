@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.gametest;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
@@ -714,7 +715,7 @@ public final class SkyseedGameTests {
         // Overworld form: the jigsaw uses the goodies pool.
         final IslandPlan ow = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), rp, plains,
                 RandomSource.create(91L));
-        helper.assertTrue(ow.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("ruined_portal/portal")),
+        helper.assertTrue(ow.jigsaws().stream().anyMatch(j -> j.pool().path().equals("ruined_portal/portal")),
                 "the overworld ruined portal should use the goodies pool ruined_portal/portal");
         helper.assertTrue(ow.twinTheme().isPresent(), "the overworld ruined portal plan should carry a twin theme");
 
@@ -722,7 +723,7 @@ public final class SkyseedGameTests {
         // same twin theme, so planIsland routes it into the plan exactly like the dedicated seed does.
         final IslandTheme rockyLarge = theme(overworld, "rocky_large");
         helper.assertTrue(rockyLarge.rareStructures().stream().anyMatch(
-                        rs -> rs.jigsaw().pool().getPath().equals("ruined_portal/portal") && rs.twin().isPresent()),
+                        rs -> rs.jigsaw().pool().path().equals("ruined_portal/portal") && rs.twin().isPresent()),
                 "rocky_large's ruined-portal rare structure should carry the twin theme");
 
         // Nether form: a netherrack island whose jigsaw swaps to the no-goodies _nether pool.
@@ -733,7 +734,7 @@ public final class SkyseedGameTests {
             if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
         }
         helper.assertTrue(netherrack, "the Nether ruined portal should be a netherrack island");
-        helper.assertTrue(nv.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("ruined_portal/portal_nether")),
+        helper.assertTrue(nv.jigsaws().stream().anyMatch(j -> j.pool().path().equals("ruined_portal/portal_nether")),
                 "the Nether ruined portal should swap to the no-goodies pool ruined_portal/portal_nether");
 
         // Linked-coordinate maths: overworld/8 and nether*8 (vanilla's portal map).
@@ -785,7 +786,7 @@ public final class SkyseedGameTests {
     private static int rareIndex(IslandTheme theme, String poolPath) {
         final var list = theme.rareStructures();
         for (int i = 0; i < list.size(); i++) {
-            if (list.get(i).jigsaw().pool().getPath().equals(poolPath)) {
+            if (list.get(i).jigsaw().pool().path().equals(poolPath)) {
                 return i;
             }
         }
@@ -801,7 +802,7 @@ public final class SkyseedGameTests {
                 "nether_soul_large", "nether_basalt_large" }) {
             final IslandTheme nt = theme(overworld, t);
             helper.assertTrue(nt.rareStructures().stream().anyMatch(
-                            rs -> rs.jigsaw().pool().getPath().equals("nether_fortress/blaze_room")),
+                            rs -> rs.jigsaw().pool().path().equals("nether_fortress/blaze_room")),
                     t + " should carry the 5% blaze spawner room rare structure");
         }
         // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
@@ -813,7 +814,7 @@ public final class SkyseedGameTests {
         helper.assertTrue(idx >= 0, "nether_rocky_large should host the blaze room rare structure");
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
                 RandomSource.create(140L), DebugForce.rare(idx));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/blaze_room")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("nether_fortress/blaze_room")),
                 "forcing the blaze-room rare structure should assemble its jigsaw");
         helper.succeed();
     }
@@ -826,12 +827,12 @@ public final class SkyseedGameTests {
         final ServerLevel overworld = helper.getLevel();
         for (String t : new String[] { "nether_rocky_large", "nether_forest_large", "nether_soul_large" }) {
             helper.assertTrue(theme(overworld, t).rareStructures().stream().anyMatch(
-                            rs -> rs.jigsaw().pool().getPath().equals("bastion/remnant")),
+                            rs -> rs.jigsaw().pool().path().equals("bastion/remnant")),
                     t + " should carry the 5% bastion remnant rare structure");
         }
         for (String t : new String[] { "nether_basalt_large", "nether_lava_large" }) {
             helper.assertTrue(theme(overworld, t).rareStructures().stream().noneMatch(
-                            rs -> rs.jigsaw().pool().getPath().equals("bastion/remnant")),
+                            rs -> rs.jigsaw().pool().path().equals("bastion/remnant")),
                     t + " must not carry the bastion remnant (no bastions in the basalt deltas or the lava sea)");
         }
         // forcedRare germinates it on demand on a host theme — the same path the auto debug seed drives.
@@ -843,7 +844,7 @@ public final class SkyseedGameTests {
         helper.assertTrue(idx >= 0, "nether_rocky_large should host the bastion remnant rare structure");
         final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), host, wastes,
                 RandomSource.create(77L), DebugForce.rare(idx));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/remnant")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("bastion/remnant")),
                 "forcing the bastion-remnant rare structure should assemble its jigsaw");
         helper.succeed();
     }
@@ -857,7 +858,7 @@ public final class SkyseedGameTests {
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme streets = theme(overworld, "debug_streets");
         helper.assertTrue(streets.jigsaw().isPresent(), "debug_streets must have a jigsaw config");
-        helper.assertTrue(streets.jigsaw().get().pool().getPath().equals("debug_streets/start"),
+        helper.assertTrue(streets.jigsaw().get().pool().path().equals("debug_streets/start"),
                 "debug_streets must start from its start pool");
         helper.assertTrue(streets.jigsaw().get().depth() >= 5,
                 "debug_streets must recurse deep enough to sprawl (got depth " + streets.jigsaw().get().depth() + ")");
@@ -866,7 +867,7 @@ public final class SkyseedGameTests {
         final BlockPos c = new BlockPos(40, 80, 40);
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, streets, overworld.getBiome(c),
                 RandomSource.create(42L));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("debug_streets/start")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("debug_streets/start")),
                 "the debug streets seed should carry its start jigsaw site");
         helper.succeed();
     }
@@ -1044,13 +1045,13 @@ public final class SkyseedGameTests {
         // streets/lots pools are validated by the datapack load (a bad element reference fails the run).
         final ServerLevel overworld = helper.getLevel();
         final IslandTheme tp = theme(overworld, "trade_post");
-        helper.assertTrue(tp.jigsaw().isPresent() && tp.jigsaw().get().pool().getPath().equals("trade_post/start"),
+        helper.assertTrue(tp.jigsaw().isPresent() && tp.jigsaw().get().pool().path().equals("trade_post/start"),
                 "trade_post must start from its start pool");
         helper.assertTrue(tp.jigsaw().get().depth() >= 4, "trade_post must recurse into a street network");
         helper.assertTrue(tp.jigsaw().get().reach() > 0, "trade_post must set reach for surfacing + the bed scan");
         final BlockPos c = new BlockPos(40, 80, 40);
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, overworld.getBiome(c), RandomSource.create(8L));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post/start")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post/start")),
                 "trade_post should carry its start jigsaw site");
         helper.succeed();
     }
@@ -1063,18 +1064,18 @@ public final class SkyseedGameTests {
         // (cluster_offsets). Like the trade post it's biome-styled -- a desert one pulls the desert pieces.
         final ServerLevel level = helper.getLevel();
         final IslandTheme vc = theme(level, "village_center");
-        helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().getPath().equals("trade_post/start_dense"),
+        helper.assertTrue(vc.jigsaw().isPresent() && vc.jigsaw().get().pool().path().equals("trade_post/start_dense"),
                 "village_center must reuse the trade post village pieces (via the denser start_dense skeleton)");
         helper.assertTrue(vc.jigsaw().get().depth() > 4, "village_center must run a deeper street network than the trade post (depth 4)");
         helper.assertTrue(vc.jigsaw().get().capMin() >= 4, "village_center must guarantee at least 4 shops");
         helper.assertTrue(!vc.shape().clusterOffsets().isEmpty(),
                 "village_center must be a cluster of small islands (cluster_offsets), not one huge island");
-        helper.assertTrue(vc.jigsaw().get().centerpiece().map(cp -> cp.getPath().equals("anvil")).orElse(false),
+        helper.assertTrue(vc.jigsaw().get().centerpiece().map(cp -> cp.path().equals("anvil")).orElse(false),
                 "village_center must set an anvil centerpiece (the capstone at the cluster's centre)");
         final var desert = level.registryAccess().registryOrThrow(Registries.BIOME)
                 .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
         final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), vc, desert, RandomSource.create(8L));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start_dense")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post_desert/start_dense")),
                 "a desert village_center must use the desert village pieces (biome-styled like the trade post)");
         helper.succeed();
     }
@@ -1117,7 +1118,7 @@ public final class SkyseedGameTests {
         // the pool. Round-trip — withPool(other).withPool(original) equalling the original — proves every other field
         // (depth, cap, golems, centerpiece, …) survived the copy.
         final var jc = theme(helper.getLevel(), "village_center").jigsaw().orElseThrow();
-        final ResourceLocation other = ResourceLocation.parse("skyseed:trade_post_desert/start");
+        final Id other = Id.of("skyseed:trade_post_desert/start");
         final var swapped = jc.withPool(other);
         helper.assertTrue(swapped.pool().equals(other), "withPool must set the new pool");
         helper.assertTrue(swapped.withPool(jc.pool()).equals(jc),
@@ -1135,7 +1136,7 @@ public final class SkyseedGameTests {
                 .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse("minecraft:desert")));
         final BlockPos c = new BlockPos(40, 80, 40);
         final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, desert, RandomSource.create(8L));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("trade_post_desert/start")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("trade_post_desert/start")),
                 "a trade post in a desert biome should use the desert jigsaw pool");
         helper.succeed();
     }
@@ -1154,7 +1155,7 @@ public final class SkyseedGameTests {
             final var biome = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                     .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(cs[0])));
             final IslandPlan p = IslandGenerator.planIsland(overworld, c, tp, biome, RandomSource.create(8L));
-            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals(cs[1])),
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals(cs[1])),
                     cs[0] + " trade post should use pool " + cs[1]);
         }
         helper.succeed();
@@ -1177,7 +1178,7 @@ public final class SkyseedGameTests {
             final var biome = overworld.registryAccess().registryOrThrow(Registries.BIOME)
                     .getHolderOrThrow(ResourceKey.create(Registries.BIOME, ResourceLocation.parse(cs[0])));
             final IslandPlan p = IslandGenerator.planIsland(overworld, c, h, biome, RandomSource.create(8L));
-            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals(cs[1])),
+            helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals(cs[1])),
                     cs[0] + " hamlet should use pool " + cs[1]);
         }
         helper.succeed();
@@ -1387,7 +1388,7 @@ public final class SkyseedGameTests {
             if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
         }
         helper.assertTrue(netherrack, "the nether fortress island should be a netherrack island");
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("nether_fortress/start")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("nether_fortress/start")),
                 "the nether fortress island should assemble the fortress jigsaw (start pool = the keep)");
         helper.succeed();
     }
@@ -1450,7 +1451,7 @@ public final class SkyseedGameTests {
             }
         }
         helper.assertTrue(blackstone, "the bastion island should be a blackstone island");
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("bastion/bastion")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("bastion/bastion")),
                 "the bastion should assemble the bastion jigsaw");
         helper.succeed();
     }
@@ -1485,7 +1486,7 @@ public final class SkyseedGameTests {
         }
         helper.assertTrue(blackstone, "the trading post island should be a blackstone island");
         helper.assertTrue(p.jigsaws().stream()
-                        .anyMatch(j -> j.pool().getPath().equals("piglin_trading_post/trading_post")),
+                        .anyMatch(j -> j.pool().path().equals("piglin_trading_post/trading_post")),
                 "the trading post should assemble its jigsaw");
         helper.succeed();
     }
@@ -1511,10 +1512,10 @@ public final class SkyseedGameTests {
             }
         }
         helper.assertTrue(grass, "the overworld easter egg should be a grass island");
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("abandoned/cottage")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("abandoned/cottage")),
                 "the overworld easter egg should assemble the abandoned cottage");
         helper.assertTrue(p.jigsaws().stream()
-                        .noneMatch(j -> j.pool().getPath().equals("piglin_trading_post/trading_post")),
+                        .noneMatch(j -> j.pool().path().equals("piglin_trading_post/trading_post")),
                 "the trading-post hall must not appear in the overworld");
         helper.succeed();
     }
@@ -1544,7 +1545,7 @@ public final class SkyseedGameTests {
             }
         }
         helper.assertTrue(blackstone, "the wither arena island should be a blackstone island");
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().equals("wither_arena/wither_arena")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("wither_arena/wither_arena")),
                 "the wither arena should assemble its jigsaw");
         helper.succeed();
     }
@@ -2427,7 +2428,7 @@ public final class SkyseedGameTests {
         final IslandPlan p = IslandGenerator.planIsland(level, c, t, level.getBiome(c),
                 RandomSource.create(3L), DebugForce.rare(idx));
         final IslandPlan.JigsawSite site = p.jigsaws().stream()
-                .filter(j -> j.pool().getPath().equals("ocean_monument/start")).findFirst().orElse(null);
+                .filter(j -> j.pool().path().equals("ocean_monument/start")).findFirst().orElse(null);
         helper.assertTrue(site != null, "the forced monument should record a jigsaw site");
         int maxLandY = Integer.MIN_VALUE; // the island's own surface (the monument isn't in the plan, only its site)
         for (final IslandPlan.BlockPlacement bp : p.blocks()) {
@@ -2530,7 +2531,7 @@ public final class SkyseedGameTests {
         final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
         final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_ancient"), level.getBiome(c),
                 RandomSource.create(1L), DebugForce.rare(0));
-        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().getPath().startsWith("ancient_city")),
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().startsWith("ancient_city")),
                 "forcedRare=0 on huge_ancient should germinate the ancient_city structure");
         helper.succeed();
     }

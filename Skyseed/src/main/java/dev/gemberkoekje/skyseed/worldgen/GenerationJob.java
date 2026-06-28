@@ -6,7 +6,6 @@ import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.Traps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
@@ -254,7 +253,7 @@ public final class GenerationJob {
         for (IslandPlan.JigsawSite js : plan.jigsaws()) {
             final Holder<StructureTemplatePool> pool = Lookup.templatePool(level.registryAccess(), js.pool());
             final Holder<StructureTemplatePool> fillerPool = js.capFiller().isEmpty() ? null
-                    : Lookup.templatePool(level.registryAccess(), ResourceLocation.parse(js.capFiller()));
+                    : Lookup.templatePool(level.registryAccess(), js.capFiller());
             Jigsaw.placeCapped(level, pool, js.target(), js.depth(), js.origin(), false,
                     js.capPrefix(), js.capCount(), fillerPool);
             // Re-add any support-dependent trap blocks the jigsaw path would have popped (plate / tripwire).

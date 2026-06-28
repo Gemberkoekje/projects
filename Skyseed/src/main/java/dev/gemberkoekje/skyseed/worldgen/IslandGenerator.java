@@ -508,8 +508,7 @@ public final class IslandGenerator {
         if (level.dimension() != Level.NETHER) {
             return jc;
         }
-        final ResourceLocation netherPool = Ids.of(
-                jc.pool().getNamespace(), jc.pool().getPath() + "_nether");
+        final Id netherPool = Id.of(jc.pool().namespace() + ":" + jc.pool().path() + "_nether");
         if (Lookup.hasTemplatePool(level.registryAccess(), netherPool)) {
             return jc.withPool(netherPool);
         }

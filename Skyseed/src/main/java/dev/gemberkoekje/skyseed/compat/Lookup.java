@@ -134,6 +134,22 @@ public final class Lookup {
                 .getOrThrow(ResourceKey.create(Registries.TEMPLATE_POOL, id));
     }
 
+    /** Whether a jigsaw template pool is registered under {@code id} (a {@code null}/unparseable id → false). */
+    public static boolean hasTemplatePool(RegistryAccess access, Id id) {
+        final ResourceLocation rl = id == null ? null : Ids.parse(id.value());
+        return rl != null && hasTemplatePool(access, rl);
+    }
+
+    /** The template-pool holder for {@code id} (callers gate with {@link #hasTemplatePool(RegistryAccess, Id)}). */
+    public static Holder<StructureTemplatePool> templatePool(RegistryAccess access, Id id) {
+        return templatePool(access, Ids.parse(id.value()));
+    }
+
+    /** The template-pool holder for a raw {@code namespace:path} pool id (e.g. a cap-filler pool string). */
+    public static Holder<StructureTemplatePool> templatePool(RegistryAccess access, String id) {
+        return templatePool(access, Ids.parse(id));
+    }
+
     /** The configured feature registered under {@code id}, if present. */
     public static Optional<ConfiguredFeature<?, ?>> configuredFeature(RegistryAccess access, ResourceLocation id) {
         return access.registryOrThrow(Registries.CONFIGURED_FEATURE).getOptional(id);

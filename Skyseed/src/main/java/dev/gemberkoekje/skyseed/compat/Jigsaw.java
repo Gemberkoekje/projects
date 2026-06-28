@@ -61,6 +61,14 @@ public final class Jigsaw {
         placeCapped(level, pool, target, depth, origin, keepJigsaws, capPrefix, capCount, fillerPool, level.getSeed());
     }
 
+    /** As {@link #placeCapped(ServerLevel, Holder, ResourceLocation, int, BlockPos, boolean, String, int, Holder)},
+     *  taking the start jigsaw {@code target} as a version-agnostic {@link Id} (the generator's JigsawSite path). */
+    public static void placeCapped(ServerLevel level, Holder<StructureTemplatePool> pool, Id target,
+                                   int depth, BlockPos origin, boolean keepJigsaws, String capPrefix, int capCount,
+                                   Holder<StructureTemplatePool> fillerPool) {
+        placeCapped(level, pool, Ids.parse(target.value()), depth, origin, keepJigsaws, capPrefix, capCount, fillerPool);
+    }
+
     /**
      * As {@link #placeCapped(ServerLevel, Holder, ResourceLocation, int, BlockPos, boolean, String, int, Holder)} but
      * with an explicit {@code featureSeed} driving the jigsaw assembly RNG (vanilla seeds it from the world seed and
