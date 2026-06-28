@@ -1,10 +1,10 @@
 package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.item.IslandSeedItem;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
@@ -92,7 +92,7 @@ public final class ModItems {
             PARTS.put(part, ITEMS.registerItem(part, Item::new, new Item.Properties()));
         }
         for (ThemeScanner.DebugSeedSpec s : AUTO_DEBUG_SEEDS) {
-            final ResourceLocation themeId = Ids.mod(s.baseTheme());
+            final Id themeId = Id.of(Ids.mod(s.baseTheme()).toString());
             DEBUG_SEEDS.put(s.id(), ITEMS.registerItem(s.id() + "_skyseed",
                     props -> new IslandSeedItem(props, themeId, s.forcedBiome(), s.forcedRare(), s.forcedWaterfall(), s.label()),
                     new Item.Properties().stacksTo(16)));
@@ -102,7 +102,7 @@ public final class ModItems {
 
     private static void registerSeeds(List<String> themes, Map<String, DeferredItem<IslandSeedItem>> into) {
         for (String theme : themes) {
-            final ResourceLocation themeId = Ids.mod(theme);
+            final Id themeId = Id.of(Ids.mod(theme).toString());
             into.put(theme, ITEMS.registerItem(theme + "_skyseed",
                     props -> new IslandSeedItem(props, themeId), new Item.Properties().stacksTo(16)));
         }

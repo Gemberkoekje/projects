@@ -3277,7 +3277,7 @@ public final class SkyseedGameTests {
         final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
-        seed.setTheme(skyseed("gametest/island"));
+        seed.setTheme(Id.of("skyseed:gametest/island"));
         seed.setNoGravity(true); // rest in place and arm rather than fall through the region floor
         level.addFreshEntity(seed);
         helper.succeedWhen(() -> {
@@ -3432,7 +3432,7 @@ public final class SkyseedGameTests {
         final BlockPos target = helper.absolutePos(new BlockPos(10, 10, 10));
         final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         seed.setPos(spawn.getX() + 0.5, spawn.getY() + 0.5, spawn.getZ() + 0.5);
-        seed.setTheme(skyseed("gametest/island"));
+        seed.setTheme(Id.of("skyseed:gametest/island"));
         seed.setPreciseTarget(new Vec3(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5));
         seed.setNoGravity(true);
         level.addFreshEntity(seed);
@@ -3452,7 +3452,7 @@ public final class SkyseedGameTests {
     public static void seedStateRoundTripsThroughNbt(GameTestHelper helper) {
         // Save/load: theme + precise target must survive addAdditionalSaveData → readAdditionalSaveData.
         final ServerLevel level = helper.getLevel();
-        final ResourceLocation theme = skyseed("gametest/island");
+        final Id theme = Id.of("skyseed:gametest/island");
         final IslandSeedEntity a = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
         a.setTheme(theme);
         a.setPreciseTarget(new Vec3(1.5, 2.5, 3.5));

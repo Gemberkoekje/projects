@@ -5,7 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.gemberkoekje.skyseed.Skyseed;
-import net.minecraft.resources.ResourceLocation;
+import dev.gemberkoekje.skyseed.compat.Id;
+import dev.gemberkoekje.skyseed.compat.Ids;
 import net.neoforged.fml.ModList;
 
 import java.nio.file.Files;
@@ -33,7 +34,7 @@ public final class ThemeScanner {
      * {@code forcedRare} &ge; 0 (force the rare structure at that index into {@code rare_structures}), or
      * {@code forcedWaterfall} (force the ladder shaft's waterfall variant).
      */
-    public record DebugSeedSpec(String id, String baseTheme, String label, ResourceLocation forcedBiome,
+    public record DebugSeedSpec(String id, String baseTheme, String label, Id forcedBiome,
                                 int forcedRare, boolean forcedWaterfall) {}
 
     public static List<DebugSeedSpec> scan() {
@@ -66,12 +67,12 @@ public final class ThemeScanner {
                     if (!ov.has("biomes")) {
                         continue;
                     }
-                    final ResourceLocation biome = firstConcreteBiome(ov.getAsJsonArray("biomes"));
+                    final Id biome = firstConcreteBiome(ov.getAsJsonArray("biomes"));
                     if (biome == null) {
                         continue;
                     }
-                    final String id = unique("debug_" + theme + "_" + biome.getPath(), ids);
-                    out.add(new DebugSeedSpec(id, theme, theme + " [" + biome.getPath() + "]", biome, -1, false));
+                    final String id = unique("debug_" + theme + "_" + biome.path(), ids);
+                    out.add(new DebugSeedSpec(id, theme, theme + " [" + biome.path() + "]", biome, -1, false));
                 }
             }
             if (root.has("rare_structures")) {
@@ -107,7 +108,7 @@ public final class ThemeScanner {
      * or a {@code #ns:is_X} tag mapped to {@code ns:X} (every override tag follows that shape, and {@code X} is a real
      * biome). An odd tag we can't map to a single biome is skipped.
      */
-    private static ResourceLocation firstConcreteBiome(JsonArray biomes) {
+    private static Id firstConcreteBiome(JsonArray biomes) {
         for (JsonElement b : biomes) {
             String s = b.getAsString();
             if (s.startsWith("#")) {
@@ -120,9 +121,8 @@ public final class ThemeScanner {
                 }
                 s = ns + ":" + path.substring("is_".length());
             }
-            final ResourceLocation id = ResourceLocation.tryParse(s);
-            if (id != null) {
-                return id;
+            if (Ids.parse(s) != null) {
+                return Id.of(s);
             }
         }
         return null;
@@ -134,9 +134,9 @@ public final class ThemeScanner {
         if (rare.has("jigsaw")) {
             final JsonObject jig = rare.getAsJsonObject("jigsaw");
             if (jig.has("pool")) {
-                final ResourceLocation pool = ResourceLocation.tryParse(jig.get("pool").getAsString());
-                if (pool != null) {
-                    final String path = pool.getPath();
+                final String poolStr = jig.get("pool").getAsString();
+                if (Ids.parse(poolStr) != null) {
+                    final String path = Id.of(poolStr).path();
                     final int slash = path.indexOf('/');
                     return slash < 0 ? path : path.substring(0, slash);
                 }

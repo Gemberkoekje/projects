@@ -7,7 +7,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.resources.ResourceLocation;
+import dev.gemberkoekje.skyseed.compat.Id;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.UseAnim;
@@ -31,17 +31,17 @@ public class IslandSeedItem extends Item {
     public static final double MIN_DISTANCE = 5.0;  // Precise: a tap places the island this near
     public static final double MAX_DISTANCE = 40.0; // Precise: a full charge places it this far
 
-    private final ResourceLocation theme;
-    private final ResourceLocation forcedBiome;
+    private final Id theme;
+    private final Id forcedBiome;
     private final int forcedRareIndex;
     private final boolean forcedWaterfall;
     private final String debugLabel;
 
-    public IslandSeedItem(Properties properties, ResourceLocation theme) {
+    public IslandSeedItem(Properties properties, Id theme) {
         this(properties, theme, null);
     }
 
-    public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome) {
+    public IslandSeedItem(Properties properties, Id theme, Id forcedBiome) {
         this(properties, theme, forcedBiome, -1, false, null);
     }
 
@@ -51,7 +51,7 @@ public class IslandSeedItem extends Item {
      * shaft's waterfall variant, and {@code debugLabel} (non-null) gives it a composed, lang-free display name. See
      * {@link dev.gemberkoekje.skyseed.registry.ThemeScanner}.
      */
-    public IslandSeedItem(Properties properties, ResourceLocation theme, ResourceLocation forcedBiome,
+    public IslandSeedItem(Properties properties, Id theme, Id forcedBiome,
                           int forcedRareIndex, boolean forcedWaterfall, String debugLabel) {
         super(properties);
         this.theme = theme;
@@ -62,12 +62,12 @@ public class IslandSeedItem extends Item {
     }
 
     /** The island theme this seed germinates into (a {@code skyseed:theme} datapack-registry id). */
-    public ResourceLocation theme() {
+    public Id theme() {
         return theme;
     }
 
     /** A biome this (debug) seed forces its island to germinate as, ignoring where it's thrown; null = normal. */
-    public ResourceLocation forcedBiome() {
+    public Id forcedBiome() {
         return forcedBiome;
     }
 

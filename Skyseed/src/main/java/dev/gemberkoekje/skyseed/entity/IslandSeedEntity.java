@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.entity;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
@@ -26,7 +27,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -111,25 +111,25 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         builder.define(DATA_FORCED_WATERFALL, false);
     }
 
-    public void setTheme(ResourceLocation theme) {
-        this.entityData.set(DATA_THEME, theme == null ? "" : theme.toString());
+    public void setTheme(Id theme) {
+        this.entityData.set(DATA_THEME, theme == null ? "" : theme.value());
     }
 
     /** @return this seed's theme id, or {@code null} if none was set (a bare/legacy seed). */
-    public ResourceLocation getTheme() {
+    public Id getTheme() {
         String s = this.entityData.get(DATA_THEME);
-        return s.isEmpty() ? null : Ids.parse(s);
+        return s.isEmpty() ? null : Id.of(s);
     }
 
     /** Force the germinating island to read as this biome (debug seeds only); {@code null} = use the planting biome. */
-    public void setForcedBiome(ResourceLocation biome) {
-        this.entityData.set(DATA_FORCED_BIOME, biome == null ? "" : biome.toString());
+    public void setForcedBiome(Id biome) {
+        this.entityData.set(DATA_FORCED_BIOME, biome == null ? "" : biome.value());
     }
 
     /** @return the forced biome id, or {@code null} for the normal planting-biome behaviour. */
-    public ResourceLocation getForcedBiome() {
+    public Id getForcedBiome() {
         String s = this.entityData.get(DATA_FORCED_BIOME);
-        return s.isEmpty() ? null : Ids.parse(s);
+        return s.isEmpty() ? null : Id.of(s);
     }
 
     /** Force the rare structure at this index into the theme's {@code rare_structures} (debug seeds); -1 = normal roll. */
@@ -159,12 +159,12 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
 
     /** A debug seed's forced biome resolved to a holder, or {@code null} for the normal planting-biome behaviour. */
     private Holder<Biome> forcedBiomeHolder(ServerLevel level) {
-        ResourceLocation forced = getForcedBiome();
+        Id forced = getForcedBiome();
         if (forced == null) {
             return null;
         }
         return level.registryAccess().registryOrThrow(Registries.BIOME)
-                .getHolder(ResourceKey.create(Registries.BIOME, forced))
+                .getHolder(ResourceKey.create(Registries.BIOME, Ids.parse(forced.value())))
                 .<Holder<Biome>>map(ref -> ref)
                 .orElse(null);
     }
@@ -377,11 +377,11 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
      */
     private IslandTheme resolveTheme(ServerLevel level) {
         Registry<IslandTheme> themes = Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME);
-        ResourceLocation id = getTheme();
-        IslandTheme theme = (id != null) ? themes.get(id) : null;
+        Id id = getTheme();
+        IslandTheme theme = (id != null) ? Lookup.byId(themes, id) : null;
         if (theme == null) {
-            ResourceLocation forest = Ids.mod("forest");
-            theme = themes.get(forest);
+            Id forest = Id.of("skyseed:forest");
+            theme = Lookup.byId(themes, forest);
             if (theme != null && id != null) {
                 Skyseed.LOGGER.warn("[skyseed] unknown theme '{}' — falling back to {}", id, forest);
             } else if (theme == null && !themes.holders().findAny().isEmpty()) {
@@ -395,13 +395,13 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putInt("ArmTicks", this.armTicks);
-        ResourceLocation theme = getTheme();
+        Id theme = getTheme();
         if (theme != null) {
-            tag.putString("Theme", theme.toString());
+            tag.putString("Theme", theme.value());
         }
-        ResourceLocation forced = getForcedBiome();
+        Id forced = getForcedBiome();
         if (forced != null) {
-            tag.putString("ForcedBiome", forced.toString());
+            tag.putString("ForcedBiome", forced.value());
         }
         if (getForcedRare() >= 0) {
             tag.putInt("ForcedRare", getForcedRare());
@@ -422,10 +422,10 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         super.readAdditionalSaveData(tag);
         this.armTicks = tag.getInt("ArmTicks");
         if (tag.contains("Theme")) {
-            setTheme(Ids.parse(tag.getString("Theme")));
+            setTheme(Id.of(tag.getString("Theme")));
         }
         if (tag.contains("ForcedBiome")) {
-            setForcedBiome(Ids.parse(tag.getString("ForcedBiome")));
+            setForcedBiome(Id.of(tag.getString("ForcedBiome")));
         }
         if (tag.contains("ForcedRare")) {
             setForcedRare(tag.getInt("ForcedRare"));
