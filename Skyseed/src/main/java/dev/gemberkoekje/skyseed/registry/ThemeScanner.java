@@ -41,8 +41,14 @@ public final class ThemeScanner {
         final List<DebugSeedSpec> out = new ArrayList<>();
         final Set<String> ids = new HashSet<>();
         try {
+            //? if >=26.1.2 {
+            /*// TODO(26.1.2): IModFile.findResource moved/renamed; re-wire the theme-JSON scan so the auto debug-tab
+            // seeds regenerate. Until then the scan yields none (the shipped/main seeds are unaffected).
+            final Path dir = null;*/
+            //?} else {
             final Path dir = ModList.get().getModFileById(Skyseed.MODID).getFile()
                     .findResource("data", "skyseed", "skyseed", "theme");
+            //?}
             if (dir == null || !Files.isDirectory(dir)) {
                 return out;
             }

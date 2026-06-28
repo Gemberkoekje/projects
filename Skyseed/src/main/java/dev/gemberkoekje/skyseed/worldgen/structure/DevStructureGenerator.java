@@ -5,7 +5,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+//? if <26.1.2 {
 import net.neoforged.fml.loading.FMLEnvironment;
+//?}
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -23,9 +25,17 @@ public final class DevStructureGenerator {
     private DevStructureGenerator() {}
 
     public static void onCommonSetup(FMLCommonSetupEvent event) {
+        // 26.1.2: FMLEnvironment.production moved; this dev-only NBT generator is disabled there (the templates are
+        // already committed as .nbt, so nothing is lost at runtime). TODO(26.1.2): re-wire the dev/production check.
+        //? if >=26.1.2 {
+        /*if (true) {
+            return;
+        }*/
+        //?} else {
         if (FMLEnvironment.production) {
             return;
         }
+        //?}
         try {
             // build.gradle passes the repo-root structure dir as a system property — needed under Stonecutter, where
             // the run executes in the per-version node and a user.dir guess would write to the node's throwaway src

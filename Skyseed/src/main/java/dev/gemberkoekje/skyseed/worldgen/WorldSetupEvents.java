@@ -54,9 +54,17 @@ public final class WorldSetupEvents {
         if (overworld.getGameTime() == 0L) {
             BlockPos center = findLandCenter(overworld);
             // Honour the vanilla "Generate Bonus Chest" world-creation option with a starter chest on the island.
+            //? if >=26.1.2 {
+            /*boolean bonusChest = false; // WorldData.worldGenOptions() was removed in 26.1; bonus-chest wiring is a follow-up*/
+            //?} else {
             boolean bonusChest = server.getWorldData().worldGenOptions().generateBonusChest();
+            //?}
             BlockPos spawn = StartIsland.build(overworld, center, bonusChest);
+            //? if >=26.1.2 {
+            /*overworld.setRespawnData(net.minecraft.world.level.storage.LevelData.RespawnData.of(overworld.dimension(), spawn, 0.0F, 0.0F));*/
+            //?} else {
             overworld.setDefaultSpawnPos(spawn, 0.0F);
+            //?}
             data.markStartPlaced(spawn);
             data.setCreatedVersion(Skyseed.VERSION); // stamp the creation version for future-migration warnings
             disableRaids(server, overworld);
@@ -105,9 +113,17 @@ public final class WorldSetupEvents {
      * (SKYVILLAGESPLAN → Raids).
      */
     private static void disableRaids(MinecraftServer server, ServerLevel overworld) {
+        // 26.1.2 made game rules a registry: gameRules.set(rule, value, server), and the rule keys lost their RULE_
+        // prefix (RULE_DISABLE_RAIDS=true became RAIDS=false — the sense inverted; RULE_DO_PATROL_SPAWNING -> SPAWN_PATROLS).
+        //? if >=26.1.2 {
+        /*overworld.getGameRules().set(GameRules.RAIDS, false, server);
+        // Also stop random pillager patrols wandering onto islands — pillagers should be an Outpost encounter.
+        overworld.getGameRules().set(GameRules.SPAWN_PATROLS, false, server);*/
+        //?} else {
         overworld.getGameRules().getRule(GameRules.RULE_DISABLE_RAIDS).set(true, server);
         // Also stop random pillager patrols wandering onto islands — pillagers should be an Outpost encounter.
         overworld.getGameRules().getRule(GameRules.RULE_DO_PATROL_SPAWNING).set(false, server);
+        //?}
     }
 
     /**

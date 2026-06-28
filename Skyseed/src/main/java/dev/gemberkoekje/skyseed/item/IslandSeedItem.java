@@ -139,7 +139,7 @@ public class IslandSeedItem extends Item {
         final boolean precise = SkyseedClientConfig.PRECISE_THROW.get();
         final InteractionHand hand = player.getMainHandItem() == stack ? InteractionHand.MAIN_HAND : InteractionHand.OFF_HAND;
         final Vec3 target = precise ? preciseTarget(player, heldTicks) : Vec3.ZERO;
-        net.neoforged.neoforge.network.ClientPacketDistributor.sendToServer(new ThrowSeedPayload(
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new ThrowSeedPayload(
                 precise, heldTicks, target.x, target.y, target.z, hand == InteractionHand.OFF_HAND ? 1 : 0));
         return true;
     }*/

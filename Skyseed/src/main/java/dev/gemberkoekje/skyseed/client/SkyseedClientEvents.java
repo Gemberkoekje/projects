@@ -6,7 +6,9 @@ import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import net.minecraft.client.Minecraft;
+//? if <26.1.2 {
 import net.minecraft.client.resources.model.ModelResourceLocation;
+//?}
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
@@ -40,6 +42,11 @@ public final class SkyseedClientEvents {
     @SubscribeEvent
     static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
         // Auto debug seeds ship no model file; point each at its base theme's seed model so the icon reuses that texture.
+        //? if >=26.1.2 {
+        /*// TODO(26.1.2): the model-bake event was reworked (ModelResourceLocation removed; getModels() -> a
+        // ModelBakery.BakingResult). Re-wire the auto-debug-seed icon reuse against the new BakingResult API; until
+        // then those debug-tab seeds fall back to the missing-model icon (dev-only cosmetic, the main seeds are fine).*/
+        //?} else {
         final var models = event.getModels();
         ModItems.AUTO_DEBUG_BASE.forEach((itemId, baseTheme) -> {
             final var baked = models.get(ModelResourceLocation.inventory(Ids.mod(baseTheme + "_skyseed")));
@@ -47,6 +54,7 @@ public final class SkyseedClientEvents {
                 models.put(ModelResourceLocation.inventory(Ids.mod(itemId)), baked);
             }
         });
+        //?}
     }
 
     @SubscribeEvent
@@ -68,8 +76,9 @@ public final class SkyseedClientEvents {
             SkyseedClientConfig.PRECISE_THROW.set(precise); // persisted by the config system
             final Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
-                mc.player.displayClientMessage(
-                        Component.translatable(precise ? "skyseed.throw_mode.precise" : "skyseed.throw_mode.classic"), true);
+                // displayClientMessage was removed from Player in 26.1.2; the Gui overlay (action bar) works on both.
+                mc.gui.setOverlayMessage(
+                        Component.translatable(precise ? "skyseed.throw_mode.precise" : "skyseed.throw_mode.classic"), false);
             }
         }
     }

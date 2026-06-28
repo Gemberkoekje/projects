@@ -86,7 +86,13 @@ public final class SkyseedCommands {
 
     private static void register(CommandDispatcher<CommandSourceStack> dispatcher, String name, Target target) {
         dispatcher.register(Commands.literal(name)
+                // 26.1.2 replaced CommandSourceStack.hasPermission(int) with the declarative permission system;
+                // LEVEL_GAMEMASTERS is the op-level-2 equivalent.
+                //? if >=26.1.2 {
+                /*.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))*/
+                //?} else {
                 .requires(src -> src.hasPermission(2))
+                //?}
                 .executes(ctx -> warn(ctx.getSource(), name, target))
                 .then(Commands.literal("force").executes(ctx -> arm(ctx.getSource(), name, target))));
     }
@@ -138,7 +144,11 @@ public final class SkyseedCommands {
     /** Teleport every player currently in {@code dim} to the overworld spawn. Returns how many were moved. */
     private static int evacuate(MinecraftServer server, ResourceKey<Level> dim) {
         ServerLevel overworld = server.overworld();
+        //? if >=26.1.2 {
+        /*BlockPos spawn = overworld.getRespawnData().pos();*/
+        //?} else {
         BlockPos spawn = overworld.getSharedSpawnPos();
+        //?}
         int moved = 0;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.level().dimension().equals(dim)) {
