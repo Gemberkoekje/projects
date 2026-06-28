@@ -179,7 +179,17 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
     1.21.1 node. **26.1.2 coverage tooling is the open Phase-1 question** (a Java-25-capable JaCoCo if/when one ships,
     or an alternative). Until then, 26.1.2 coverage can't be numerically measured — port by category/inspection and
     revisit the tool.
-- _Next: Phase 1 — port the generation-invariant tests (the 60-test bulk) into `gametest_26_1_2`._
+- **Phase 1 IN PROGRESS — 39 of ~60 generation-invariant tests ported + green** (`:26.1.2:runGameTestServer` = "All
+  40 passed" incl. the +1 built-in; commits `144a915` batch 1 +18, `6ab0294` batch 2 +10, `881c6b7` batch 3 +11,
+  2026-06-28). The 1.21.1→26.1.2 port is purely mechanical — only three idioms differ, funnelled through helpers in
+  `SkyseedTests`: `biome(level, Biomes.X)` and `biome(level, "ns:path")` (was
+  `registryAccess().registryOrThrow(BIOME).getHolderOrThrow(...)`), and `Lookup.dimensionId(Level.X)` (was
+  `Level.X.location().toString()`). Plus one block rename to watch: `Blocks.CHAIN` → `Blocks.IRON_CHAIN` (copper
+  update; the committed 1.21.1-era structure `.nbt` is datafixer-upgraded on load, so the pier test passes). Done:
+  the Nether-adaptation + Tier-2-native cluster, twins/rare-structure/jigsaw-surfacing, and the
+  trade-post/village_center/hamlet street-village cluster. **Remaining ~21 generation tests** (1.21.1 source lines
+  ~1356–1917): the desert/sandstone village, the structure-diversity/gallery/courtyard pieces, and the rest of the
+  jigsaw/decoration guards — same mechanical port. Then Phases 2–4 (world-apply 7, structure 11, book/icon 48)._
 
 ## Resolved decisions
 - **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
