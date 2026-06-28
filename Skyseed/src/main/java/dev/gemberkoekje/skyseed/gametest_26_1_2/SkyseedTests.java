@@ -194,6 +194,7 @@ public final class SkyseedTests {
         reg(event, "debug_forced_rare_germinates_its_structure", REGION, SkyseedTests::debugForcedRareGerminatesItsStructure);
         reg(event, "debug_forced_waterfall_germinates_water_column", REGION, SkyseedTests::debugForcedWaterfallGerminatesWaterColumn);
         reg(event, "auto_debug_seeds_cover_overrides_and_rares", REGION, SkyseedTests::autoDebugSeedsCoverOverridesAndRares);
+        reg(event, "seed_state_round_trips_through_nbt", REGION, SkyseedTests::seedStateRoundTripsThroughNbt);
         reg(event, "sprawling_dungeon_assembles", BIG_REGION, SkyseedTests::sprawlingDungeonAssembles);
         reg(event, "dungeon_complex_rooms_carry_content", REGION, SkyseedTests::dungeonComplexRoomsCarryContent);
         reg(event, "dungeon_complex_goes_vertical", BIG_REGION, SkyseedTests::dungeonComplexGoesVertical);
@@ -2802,6 +2803,28 @@ public final class SkyseedTests {
         helper.assertTrue(canSummon, "the ancient city should have a can-summon sculk shrieker (the Warden danger)");
         helper.assertTrue(soulFire, "the ancient city should keep its blue soul fire");
         helper.assertTrue(catalyst, "the ancient city should have a sculk catalyst");
+        helper.succeed();
+    }
+
+    static void seedStateRoundTripsThroughNbt(GameTestHelper helper) {
+        // Save/load: theme + precise target must survive addAdditionalSaveData -> readAdditionalSaveData. 26.1.2 routes
+        // entity NBT through ValueOutput/ValueInput; drive them via a CompoundTag-backed TagValueOutput/TagValueInput.
+        final ServerLevel level = helper.getLevel();
+        final Id theme = Id.of("skyseed:gametest/island");
+        final IslandSeedEntity a = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        a.setTheme(theme);
+        a.setPreciseTarget(new Vec3(1.5, 2.5, 3.5));
+        final var out = net.minecraft.world.level.storage.TagValueOutput.createWithContext(
+                net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess());
+        a.addAdditionalSaveData(out);
+        final var tag = out.buildResult();
+
+        final IslandSeedEntity b = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        b.readAdditionalSaveData(net.minecraft.world.level.storage.TagValueInput.create(
+                net.minecraft.util.ProblemReporter.DISCARDING, level.registryAccess(), tag));
+        helper.assertTrue(theme.equals(b.getTheme()), "theme did not round-trip through NBT");
+        helper.assertTrue(tag.getBooleanOr("Precise", false) && tag.getDoubleOr("TY", 0.0) == 2.5,
+                "precise target did not round-trip");
         helper.succeed();
     }
 

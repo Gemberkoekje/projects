@@ -42,10 +42,17 @@ public final class SkyseedClientEvents {
     @SubscribeEvent
     static void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
         // Auto debug seeds ship no model file; point each at its base theme's seed model so the icon reuses that texture.
+        // 26.1.2 reworked the model bake: getModels() (a Map<ModelResourceLocation, BakedModel>) became
+        // getBakingResult().itemStackModels(), a mutable Map keyed by the item's plain Identifier — ModelResourceLocation
+        // is gone, and inventory item models are now looked up by item id directly.
         //? if >=26.1.2 {
-        /*// TODO(26.1.2): the model-bake event was reworked (ModelResourceLocation removed; getModels() -> a
-        // ModelBakery.BakingResult). Re-wire the auto-debug-seed icon reuse against the new BakingResult API; until
-        // then those debug-tab seeds fall back to the missing-model icon (dev-only cosmetic, the main seeds are fine).*/
+        /*final var itemModels = event.getBakingResult().itemStackModels();
+        ModItems.AUTO_DEBUG_BASE.forEach((itemId, baseTheme) -> {
+            final var baseModel = itemModels.get(Ids.mod(baseTheme + "_skyseed"));
+            if (baseModel != null) {
+                itemModels.put(Ids.mod(itemId), baseModel);
+            }
+        });*/
         //?} else {
         final var models = event.getModels();
         ModItems.AUTO_DEBUG_BASE.forEach((itemId, baseTheme) -> {
