@@ -5,9 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-//? if <26.1.2 {
 import net.neoforged.fml.loading.FMLEnvironment;
-//?}
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,10 +23,9 @@ public final class DevStructureGenerator {
     private DevStructureGenerator() {}
 
     public static void onCommonSetup(FMLCommonSetupEvent event) {
-        // 26.1.2: FMLEnvironment.production moved; this dev-only NBT generator is disabled there (the templates are
-        // already committed as .nbt, so nothing is lost at runtime). TODO(26.1.2): re-wire the dev/production check.
+        // 26.1.2 turned FMLEnvironment.production (a field) into FMLEnvironment.isProduction() (a method).
         //? if >=26.1.2 {
-        /*if (true) {
+        /*if (FMLEnvironment.isProduction()) {
             return;
         }*/
         //?} else {

@@ -40,22 +40,49 @@ public final class ThemeScanner {
     public static List<DebugSeedSpec> scan() {
         final List<DebugSeedSpec> out = new ArrayList<>();
         final Set<String> ids = new HashSet<>();
+        // theme id -> raw JSON, gathered from the mod's own file; a TreeMap so the derived debug-seed ids are stable
+        // (sorted) across runs regardless of the underlying walk order.
+        final java.util.Map<String, String> themes = new java.util.TreeMap<>();
+        final String prefix = "data/skyseed/skyseed/theme/";
         try {
             //? if >=26.1.2 {
-            /*// TODO(26.1.2): IModFile.findResource moved/renamed; re-wire the theme-JSON scan so the auto debug-tab
-            // seeds regenerate. Until then the scan yields none (the shipped/main seeds are unaffected).
-            final Path dir = null;*/
+            /*// IModFile.findResource was removed in 26.1; walk the mod file's JarContents instead — works for both a
+            // packaged jar and the exploded dev classpath.
+            ModList.get().getModFileById(Skyseed.MODID).getFile().getContents().visitContent(
+                    prefix.substring(0, prefix.length() - 1), (path, resource) -> {
+                        String name = path.replace('\\', '/');
+                        if (!name.endsWith(".json")) {
+                            return;
+                        }
+                        final int at = name.indexOf(prefix);
+                        if (at >= 0) {
+                            name = name.substring(at + prefix.length());
+                        } else if (name.startsWith("/")) {
+                            name = name.substring(1);
+                        }
+                        try {
+                            themes.put(name.substring(0, name.length() - ".json".length()),
+                                    new String(resource.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                        } catch (Exception e) {
+                            Skyseed.LOGGER.warn("[skyseed] debug-seed scan could not read {}: {}", path, e.toString());
+                        }
+                    });*/
             //?} else {
             final Path dir = ModList.get().getModFileById(Skyseed.MODID).getFile()
                     .findResource("data", "skyseed", "skyseed", "theme");
+            if (dir != null && Files.isDirectory(dir)) {
+                try (Stream<Path> files = Files.walk(dir)) {
+                    files.filter(p -> p.getFileName().toString().endsWith(".json")).forEach(p -> {
+                        try {
+                            themes.put(relName(dir, p), Files.readString(p));
+                        } catch (Exception e) {
+                            Skyseed.LOGGER.warn("[skyseed] debug-seed scan could not read {}: {}", p, e.toString());
+                        }
+                    });
+                }
+            }
             //?}
-            if (dir == null || !Files.isDirectory(dir)) {
-                return out;
-            }
-            try (Stream<Path> files = Files.walk(dir)) {
-                files.filter(p -> p.getFileName().toString().endsWith(".json")).sorted()
-                        .forEach(p -> scanTheme(dir, p, out, ids));
-            }
+            themes.forEach((theme, json) -> scanTheme(theme, json, out, ids));
         } catch (Exception e) {
             Skyseed.LOGGER.warn("[skyseed] debug-seed theme scan skipped: {}", e.toString());
         }
@@ -63,10 +90,9 @@ public final class ThemeScanner {
         return out;
     }
 
-    private static void scanTheme(Path dir, Path file, List<DebugSeedSpec> out, Set<String> ids) {
-        final String theme = relName(dir, file);
+    private static void scanTheme(String theme, String json, List<DebugSeedSpec> out, Set<String> ids) {
         try {
-            final JsonObject root = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            final JsonObject root = JsonParser.parseString(json).getAsJsonObject();
             if (root.has("biome_overrides")) {
                 for (JsonElement el : root.getAsJsonArray("biome_overrides")) {
                     final JsonObject ov = el.getAsJsonObject();

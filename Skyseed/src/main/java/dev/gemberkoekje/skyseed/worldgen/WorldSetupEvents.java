@@ -54,8 +54,9 @@ public final class WorldSetupEvents {
         if (overworld.getGameTime() == 0L) {
             BlockPos center = findLandCenter(overworld);
             // Honour the vanilla "Generate Bonus Chest" world-creation option with a starter chest on the island.
+            // 26.1.2 dropped WorldData.worldGenOptions(); the WorldOptions now hang off the server's WorldGenSettings.
             //? if >=26.1.2 {
-            /*boolean bonusChest = false; // WorldData.worldGenOptions() was removed in 26.1; bonus-chest wiring is a follow-up*/
+            /*boolean bonusChest = server.getWorldGenSettings().options().generateBonusChest();*/
             //?} else {
             boolean bonusChest = server.getWorldData().worldGenOptions().generateBonusChest();
             //?}
