@@ -51,6 +51,24 @@ public final class Lookup {
         return BuiltInRegistries.BLOCK.getKey(block);
     }
 
+    // --- Blocks, by version-agnostic Id (the data carries Id; the Id -> Minecraft id type parse happens here) -----
+
+    /** Whether a block is registered under {@code id} (a {@code null}/unparseable id → false). */
+    public static boolean hasBlock(Id id) {
+        final ResourceLocation rl = id == null ? null : Ids.parse(id.value());
+        return rl != null && hasBlock(rl);
+    }
+
+    /** The block under {@code id} (callers gate with {@link #hasBlock(Id)}; vanilla returns AIR for an unknown id). */
+    public static Block block(Id id) {
+        return block(Ids.parse(id.value()));
+    }
+
+    /** Convenience: the default {@link BlockState} of the block registered under {@code id}. */
+    public static BlockState blockState(Id id) {
+        return block(id).defaultBlockState();
+    }
+
     // --- Entity types (static registry) -------------------------------------------------------------------------
 
     /** Whether an entity type is registered under {@code id}. */

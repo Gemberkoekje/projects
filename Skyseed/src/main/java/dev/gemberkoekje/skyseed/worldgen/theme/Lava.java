@@ -2,7 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Id;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +42,7 @@ public record Lava(float veinChance, IntRange veinSize, List<Lake> lakes) {
 
         /** This band as a {@link Pond} of lava (no plants/banks/mobs) for the shared pond-carving code. */
         public Pond toPond() {
-            return new Pond(Ids.mc("lava"), radius, depth,
+            return new Pond(Id.of("minecraft:lava"), radius, depth,
                     List.of(), List.of(), List.of(), "pond", 0.5f, false);
         }
     }

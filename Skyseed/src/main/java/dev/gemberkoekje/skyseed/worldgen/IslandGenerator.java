@@ -1,6 +1,7 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan.BlockPlacement;
@@ -157,18 +158,18 @@ public final class IslandGenerator {
         final ResourceLocation dim = level.dimension().location();
         final boolean useBase = theme.baseValidIn(dim);
         final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, useBase);
-        final ResourceLocation neutralBlock = Ids.mc(dim.getPath().equals("the_end") ? "end_stone" : "netherrack");
+        final Id neutralBlock = Id.of(dim.getPath().equals("the_end") ? "minecraft:end_stone" : "minecraft:netherrack");
         final Palette pal = theme.palette();
         final Shape shape = eff(ov, BiomeOverride::shape, useBase, theme::shape, NEUTRAL_SHAPE);
         final List<OreEntry> ores = eff(ov, BiomeOverride::ores, useBase, theme::ores, List.<OreEntry>of());
         final List<Variant> variants = eff(ov, BiomeOverride::variants, useBase, theme::variants, List.<Variant>of());
-        ResourceLocation fillId = eff(ov, BiomeOverride::fill, useBase, pal::fill, neutralBlock);
-        ResourceLocation coreId = eff(ov, BiomeOverride::core, useBase, pal::core, neutralBlock);
+        Id fillId = eff(ov, BiomeOverride::fill, useBase, pal::fill, neutralBlock);
+        Id coreId = eff(ov, BiomeOverride::core, useBase, pal::core, neutralBlock);
         final int baseFill = eff(ov, BiomeOverride::fillDepth, useBase, pal::fillDepth, 2);
         final List<GroundEntry> scatterCfg = eff(ov, BiomeOverride::surfaceScatter, useBase, pal::surfaceScatter, List.<GroundEntry>of());
 
         final Variant variant = pickVariant(variants, random);
-        ResourceLocation surfaceId = eff(ov, BiomeOverride::surface, useBase, pal::surface, neutralBlock);
+        Id surfaceId = eff(ov, BiomeOverride::surface, useBase, pal::surface, neutralBlock);
         if (variant != null) {
             // A variant can re-skin the whole body, not just the surface (e.g. a stony island rolling diorite/granite).
             if (variant.surfaceOverride().isPresent()) surfaceId = variant.surfaceOverride().get();
@@ -182,7 +183,7 @@ public final class IslandGenerator {
                 : eff(ov, BiomeOverride::snow, useBase, pal::snow, 0f);
         final List<Scatter> scatter = resolveScatter(scatterCfg);
         final List<BlockState> bands = resolveBands(
-                eff(ov, BiomeOverride::fillBands, useBase, pal::fillBands, List.<ResourceLocation>of()));
+                eff(ov, BiomeOverride::fillBands, useBase, pal::fillBands, List.<Id>of()));
         final int bandThickness = Math.max(1, pal.bandThickness());
         return new Resolved(ov, useBase, dim, shape, ores, variant, surface, fill, core, snow, scatter, bands,
                 bandThickness, baseFill);
@@ -530,12 +531,12 @@ public final class IslandGenerator {
         return out;
     }
 
-    private static List<BlockState> resolveBands(List<ResourceLocation> ids) {
+    private static List<BlockState> resolveBands(List<Id> ids) {
         if (ids.isEmpty()) {
             return List.of();
         }
         List<BlockState> out = new ArrayList<>(ids.size());
-        for (ResourceLocation id : ids) {
+        for (Id id : ids) {
             if (Lookup.hasBlock(id)) {
                 out.add(Lookup.blockState(id));
             } else {
@@ -567,7 +568,7 @@ public final class IslandGenerator {
         return variants.get(variants.size() - 1);
     }
 
-    private static Block resolveBlock(ResourceLocation id, Block fallback) {
+    private static Block resolveBlock(Id id, Block fallback) {
         if (id != null && Lookup.hasBlock(id)) {
             return Lookup.block(id);
         }

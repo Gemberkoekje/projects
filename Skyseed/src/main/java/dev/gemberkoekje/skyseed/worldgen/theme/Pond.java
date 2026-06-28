@@ -2,8 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.gemberkoekje.skyseed.compat.Ids;
-import net.minecraft.resources.ResourceLocation;
+import dev.gemberkoekje.skyseed.compat.Id;
 
 import java.util.List;
 
@@ -23,10 +22,10 @@ import java.util.List;
  * shapes the floor as a basin — full {@code depth} in a flat centre, shallowing to the shore — so the edge
  * water is shallow (rests on the rim's body instead of spilling off a sheer deep edge) and the shore eases in.
  */
-public record Pond(ResourceLocation block, int radius, int depth, List<GroundEntry> plants,
+public record Pond(Id block, int radius, int depth, List<GroundEntry> plants,
                    List<GroundEntry> bank, List<MobEntry> waterMobs, String style, float extent, boolean slope) {
     public static final Codec<Pond> CODEC = RecordCodecBuilder.create(i -> i.group(
-            ResourceLocation.CODEC.optionalFieldOf("block", Ids.mc("water")).forGetter(Pond::block),
+            Id.CODEC.optionalFieldOf("block", Id.of("minecraft:water")).forGetter(Pond::block),
             Codec.INT.optionalFieldOf("radius", 3).forGetter(Pond::radius),
             Codec.INT.optionalFieldOf("depth", 2).forGetter(Pond::depth),
             GroundEntry.CODEC.listOf().optionalFieldOf("plants", List.of()).forGetter(Pond::plants),

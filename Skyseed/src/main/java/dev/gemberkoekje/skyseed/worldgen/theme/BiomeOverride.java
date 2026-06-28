@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -27,9 +28,9 @@ public record BiomeOverride(
         Optional<Integer> minY,
         Optional<Integer> maxY,
         Optional<Float> snow,
-        Optional<ResourceLocation> surface,
-        Optional<ResourceLocation> fill,
-        Optional<ResourceLocation> core,
+        Optional<Id> surface,
+        Optional<Id> fill,
+        Optional<Id> core,
         Optional<Integer> fillDepth,
         Optional<List<GroundEntry>> surfaceScatter,
         Optional<Shape> shape,
@@ -39,7 +40,7 @@ public record BiomeOverride(
         Optional<Integer> waterfalls,
         Optional<List<MobEntry>> mobs,
         Optional<String> dimension,
-        Optional<List<ResourceLocation>> fillBands,
+        Optional<List<Id>> fillBands,
         Optional<JigsawConfig> jigsaw) {
 
     /** {@code min_y}/{@code max_y}/{@code snow} folded into one codec slot (still separate top-level JSON keys) so the
@@ -56,9 +57,9 @@ public record BiomeOverride(
     public static final Codec<BiomeOverride> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(BiomeOverride::biomes),
             Scalars.CODEC.forGetter(o -> new Scalars(o.minY(), o.maxY(), o.snow())),
-            ResourceLocation.CODEC.optionalFieldOf("surface").forGetter(BiomeOverride::surface),
-            ResourceLocation.CODEC.optionalFieldOf("fill").forGetter(BiomeOverride::fill),
-            ResourceLocation.CODEC.optionalFieldOf("core").forGetter(BiomeOverride::core),
+            Id.CODEC.optionalFieldOf("surface").forGetter(BiomeOverride::surface),
+            Id.CODEC.optionalFieldOf("fill").forGetter(BiomeOverride::fill),
+            Id.CODEC.optionalFieldOf("core").forGetter(BiomeOverride::core),
             Codec.INT.optionalFieldOf("fill_depth").forGetter(BiomeOverride::fillDepth),
             GroundEntry.CODEC.listOf().optionalFieldOf("surface_scatter").forGetter(BiomeOverride::surfaceScatter),
             Shape.CODEC.optionalFieldOf("shape").forGetter(BiomeOverride::shape),
@@ -68,7 +69,7 @@ public record BiomeOverride(
             Codec.INT.optionalFieldOf("waterfalls").forGetter(BiomeOverride::waterfalls),
             MobEntry.CODEC.listOf().optionalFieldOf("mobs").forGetter(BiomeOverride::mobs),
             Codec.STRING.optionalFieldOf("dimension").forGetter(BiomeOverride::dimension),
-            ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands),
+            Id.CODEC.listOf().optionalFieldOf("fill_bands").forGetter(BiomeOverride::fillBands),
             JigsawConfig.CODEC.optionalFieldOf("jigsaw").forGetter(BiomeOverride::jigsaw)
     ).apply(i, (biomes, sc, surface, fill, core, fillDepth, surfaceScatter, shape, ores, variants, pond,
                 waterfalls, mobs, dimension, fillBands, jigsaw) ->

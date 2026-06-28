@@ -2,7 +2,7 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.resources.ResourceLocation;
+import dev.gemberkoekje.skyseed.compat.Id;
 
 import java.util.List;
 
@@ -15,16 +15,16 @@ import java.util.List;
  * — ground, building roofs and tree tops alike (a cold-biome island): {@code 1.0} caps every column, a lower value
  * leaves icy patches showing. {@code 0} (the default) is off. Block ids resolved at gen time.
  */
-public record Palette(ResourceLocation surface, ResourceLocation fill, ResourceLocation core, int fillDepth,
-                      List<GroundEntry> surfaceScatter, List<ResourceLocation> fillBands, int bandThickness,
+public record Palette(Id surface, Id fill, Id core, int fillDepth,
+                      List<GroundEntry> surfaceScatter, List<Id> fillBands, int bandThickness,
                       float snow) {
     public static final Codec<Palette> CODEC = RecordCodecBuilder.create(i -> i.group(
-            ResourceLocation.CODEC.fieldOf("surface").forGetter(Palette::surface),
-            ResourceLocation.CODEC.fieldOf("fill").forGetter(Palette::fill),
-            ResourceLocation.CODEC.fieldOf("core").forGetter(Palette::core),
+            Id.CODEC.fieldOf("surface").forGetter(Palette::surface),
+            Id.CODEC.fieldOf("fill").forGetter(Palette::fill),
+            Id.CODEC.fieldOf("core").forGetter(Palette::core),
             Codec.INT.optionalFieldOf("fill_depth", 3).forGetter(Palette::fillDepth),
             GroundEntry.CODEC.listOf().optionalFieldOf("surface_scatter", List.of()).forGetter(Palette::surfaceScatter),
-            ResourceLocation.CODEC.listOf().optionalFieldOf("fill_bands", List.of()).forGetter(Palette::fillBands),
+            Id.CODEC.listOf().optionalFieldOf("fill_bands", List.of()).forGetter(Palette::fillBands),
             Codec.INT.optionalFieldOf("band_thickness", 2).forGetter(Palette::bandThickness),
             Codec.FLOAT.optionalFieldOf("snow", 0.0f).forGetter(Palette::snow)
     ).apply(i, Palette::new));
