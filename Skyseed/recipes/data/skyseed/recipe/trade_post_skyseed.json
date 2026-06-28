@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DPD",
+    "HCH",
+    "DPD"
+  ],
+  "key": {
+    "D": "minecraft:dirt",
+    "P": "#minecraft:planks",
+    "H": "skyseed:hamlet_skyseed",
+    "C": "minecraft:cobblestone"
+  },
+  "result": {
+    "id": "skyseed:trade_post_skyseed"
+  }
+}

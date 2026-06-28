@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "AA",
+    "MM"
+  ],
+  "key": {
+    "A": [
+      "minecraft:azalea",
+      "minecraft:flowering_azalea"
+    ],
+    "M": "minecraft:moss_block"
+  },
+  "result": {
+    "id": "skyseed:lush_skyseed"
+  }
+}

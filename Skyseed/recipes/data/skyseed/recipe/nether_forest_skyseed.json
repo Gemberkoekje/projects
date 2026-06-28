@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CW",
+    "FS"
+  ],
+  "key": {
+    "C": "minecraft:crimson_stem",
+    "W": "minecraft:warped_stem",
+    "F": "skyseed:forest_skyseed",
+    "S": "minecraft:shroomlight"
+  },
+  "result": {
+    "id": "skyseed:nether_forest_skyseed"
+  }
+}

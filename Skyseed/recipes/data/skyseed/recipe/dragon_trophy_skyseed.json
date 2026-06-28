@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "EOE", "ODO", "EOE" ],
+  "key": {
+    "E": "minecraft:end_stone",
+    "O": "minecraft:obsidian",
+    "D": "minecraft:dragon_breath"
+  },
+  "result": { "id": "skyseed:dragon_trophy_skyseed" }
+}

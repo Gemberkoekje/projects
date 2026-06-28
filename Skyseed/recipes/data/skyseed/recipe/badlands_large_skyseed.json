@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "TRT",
+    "RGR",
+    "TRT"
+  ],
+  "key": {
+    "T": "minecraft:terracotta",
+    "R": "minecraft:red_sand",
+    "G": "skyseed:badlands_skyseed"
+  },
+  "result": {
+    "id": "skyseed:badlands_large_skyseed"
+  }
+}

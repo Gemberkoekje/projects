@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "WP", "DD" ],
+  "key": {
+    "W": "#minecraft:wool",
+    "P": "#minecraft:planks",
+    "D": "minecraft:dirt"
+  },
+  "result": { "id": "skyseed:pasture_skyseed" }
+}

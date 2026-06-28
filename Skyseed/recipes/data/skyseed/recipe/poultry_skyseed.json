@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "FE", "DD" ],
+  "key": {
+    "F": "minecraft:feather",
+    "E": "minecraft:egg",
+    "D": "minecraft:dirt"
+  },
+  "result": { "id": "skyseed:poultry_skyseed" }
+}

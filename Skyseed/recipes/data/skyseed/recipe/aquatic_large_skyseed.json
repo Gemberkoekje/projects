@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "KSK",
+    "SGS",
+    "KSK"
+  ],
+  "key": {
+    "K": "minecraft:clay",
+    "S": "minecraft:sand",
+    "G": "skyseed:aquatic_skyseed"
+  },
+  "result": {
+    "id": "skyseed:aquatic_large_skyseed"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BB",
+    "AL"
+  ],
+  "key": {
+    "B": "minecraft:basalt",
+    "A": "skyseed:aquatic_skyseed",
+    "L": "minecraft:lava_bucket"
+  },
+  "result": {
+    "id": "skyseed:nether_lava_skyseed"
+  }
+}

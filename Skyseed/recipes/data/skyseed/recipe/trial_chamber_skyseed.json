@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "TCT", "CDC", "TCT" ],
+  "key": {
+    "T": "minecraft:tuff_bricks",
+    "C": "minecraft:copper_block",
+    "D": "minecraft:diamond"
+  },
+  "result": { "id": "skyseed:trial_chamber_skyseed" }
+}

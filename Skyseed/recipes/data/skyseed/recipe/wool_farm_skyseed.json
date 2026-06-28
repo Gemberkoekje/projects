@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "WW", "ID" ],
+  "key": {
+    "W": "#minecraft:wool",
+    "I": "minecraft:iron_ingot",
+    "D": "minecraft:dirt"
+  },
+  "result": { "id": "skyseed:wool_farm_skyseed" }
+}

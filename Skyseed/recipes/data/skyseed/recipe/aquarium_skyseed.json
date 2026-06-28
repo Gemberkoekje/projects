@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "TR", "SS" ],
+  "key": {
+    "T": "minecraft:turtle_scute",
+    "R": "minecraft:prismarine_shard",
+    "S": "minecraft:sand"
+  },
+  "result": { "id": "skyseed:aquarium_skyseed" }
+}

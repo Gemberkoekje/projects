@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PSP",
+    "SGS",
+    "PSP"
+  ],
+  "key": {
+    "P": "#skyseed:ice",
+    "S": "minecraft:snow_block",
+    "G": "skyseed:frozen_skyseed"
+  },
+  "result": {
+    "id": "skyseed:frozen_large_skyseed"
+  }
+}

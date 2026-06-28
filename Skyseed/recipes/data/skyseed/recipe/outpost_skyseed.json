@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "PCP", "PIP", "PPP" ],
+  "key": {
+    "P": "minecraft:dark_oak_planks",
+    "C": "minecraft:crossbow",
+    "I": "minecraft:iron_ingot"
+  },
+  "result": { "id": "skyseed:outpost_skyseed" }
+}

@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "skyseed:portal_frame_shard",
+    "skyseed:trial_relic",
+    "skyseed:outpost_relic"
+  ],
+  "result": { "id": "skyseed:camp_edge" }
+}

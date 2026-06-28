@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PP",
+    "CE"
+  ],
+  "key": {
+    "P": "#minecraft:planks",
+    "C": "minecraft:cobblestone",
+    "E": "minecraft:emerald"
+  },
+  "result": {
+    "id": "skyseed:hamlet_skyseed"
+  }
+}

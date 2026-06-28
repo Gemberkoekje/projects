@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "MM", "JH" ],
+  "key": {
+    "M": "minecraft:mossy_cobblestone",
+    "J": "minecraft:jungle_planks",
+    "H": "minecraft:tripwire_hook"
+  },
+  "result": { "id": "skyseed:jungle_temple_skyseed" }
+}

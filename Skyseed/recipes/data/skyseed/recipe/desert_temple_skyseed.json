@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "ZT", "SS" ],
+  "key": {
+    "Z": "minecraft:sandstone",
+    "T": "minecraft:tnt",
+    "S": "minecraft:sand"
+  },
+  "result": { "id": "skyseed:desert_temple_skyseed" }
+}

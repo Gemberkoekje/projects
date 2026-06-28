@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BGB",
+    "BBB",
+    "NNN"
+  ],
+  "key": {
+    "B": "minecraft:blackstone",
+    "G": "minecraft:gold_ingot",
+    "N": "minecraft:netherrack"
+  },
+  "result": {
+    "id": "skyseed:piglin_trading_post_skyseed"
+  }
+}

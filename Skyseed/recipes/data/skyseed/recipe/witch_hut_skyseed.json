@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "CM", "PP" ],
+  "key": {
+    "C": "minecraft:cauldron",
+    "M": "minecraft:brown_mushroom",
+    "P": "minecraft:oak_planks"
+  },
+  "result": { "id": "skyseed:witch_hut_skyseed" }
+}

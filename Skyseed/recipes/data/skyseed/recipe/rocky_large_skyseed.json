@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SCS",
+    "CGC",
+    "SCS"
+  ],
+  "key": {
+    "S": "minecraft:stone",
+    "C": "minecraft:cobblestone",
+    "G": "skyseed:rocky_skyseed"
+  },
+  "result": {
+    "id": "skyseed:rocky_large_skyseed"
+  }
+}

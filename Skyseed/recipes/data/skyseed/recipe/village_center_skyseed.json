@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DPD",
+    "TAT",
+    "DPD"
+  ],
+  "key": {
+    "D": "minecraft:dirt",
+    "P": "#minecraft:planks",
+    "T": "skyseed:trade_post_skyseed",
+    "A": "minecraft:anvil"
+  },
+  "result": {
+    "id": "skyseed:village_center_skyseed"
+  }
+}

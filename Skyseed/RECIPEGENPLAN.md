@@ -115,4 +115,19 @@ matches the "golden JSON → per-version JSON" ask directly. **Revisit datagen i
   keep it per-type, don't over-abstract up front.
 
 ## Status log
-- _(Not started — this document is the plan. Recipes currently throw ~45 non-fatal parse errors on 26.1.2.)_
+- **★ Phases 0 + 1 DONE (commits `bfdd382` Phase 0, `<this>` Phase 1, 2026-06-28) — the ~45 recipe parse errors on
+  26.1.2 are GONE.** All 75 recipes now live as **golden** (modern string-ingredient form) under `recipes/data/skyseed/
+  recipe/`; the originals were removed from `src/main/resources`. The `generateRecipes` Gradle task emits the node's
+  data JSON into `build/generated/recipes` (a resource srcDir): **26.1.2 copies golden verbatim, 1.21.1 downgrades**
+  each ingredient (`"x"`/`"#tag"` → `{"item":"x"}`/`{"tag":"x"}`) via a `JsonSlurper` transform of `key`/`ingredients`
+  only. Verified: **26.1.2 = 0 recipe parse errors, 75 recipes ship + load, 58 gametests green**; **1.21.1 = 126
+  gametests green** (its `everySeedRecipeAndBookEntryMatchesSeedKind` test confirms every seed is still craftable —
+  functional identity of the downgrade). The one-off `upgradeRecipesToGolden` migration task (a narrow regex that
+  collapsed only the ingredient objects, preserving 2-space formatting + key order) was used once and removed.
+  Implementation notes (save re-deriving): golden lives **outside `src/main`** so Stonecutter never stages it raw and
+  it never ships ungenerated; the generated dir is per-node (`build/` under Stonecutter); deleting a recipe from
+  `src/main/resources` also needs the stale **Stonecutter-staged** `versions/<v>/src/...` copy removed (the documented
+  staging trap) — done. The `skyseed:guide` code recipe (`guide.json`, no ingredients) is golden too, copied verbatim.
+- _Phase 2 (the recipe-presence regression gametest) is now UNBLOCKED: the deferred `everySeedRecipeAndBookEntryMatches-
+  SeedKind` can be ported to the 26.1.2 suite (SKYGAMETESTPLAN Phase 4) now that recipes load — it doubles as this
+  plan's regression guard._

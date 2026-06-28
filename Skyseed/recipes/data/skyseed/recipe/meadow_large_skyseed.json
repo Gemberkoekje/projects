@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "FDF",
+    "DGD",
+    "FDF"
+  ],
+  "key": {
+    "F": "#minecraft:small_flowers",
+    "D": "minecraft:dirt",
+    "G": "skyseed:meadow_skyseed"
+  },
+  "result": {
+    "id": "skyseed:meadow_large_skyseed"
+  }
+}

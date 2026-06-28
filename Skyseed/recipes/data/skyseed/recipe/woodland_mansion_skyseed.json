@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "PDP", "DTD", "PDP" ],
+  "key": {
+    "P": "minecraft:dark_oak_planks",
+    "D": "minecraft:diamond",
+    "T": "minecraft:totem_of_undying"
+  },
+  "result": { "id": "skyseed:woodland_mansion_skyseed" }
+}

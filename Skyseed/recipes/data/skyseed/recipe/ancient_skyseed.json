@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DD",
+    "CC"
+  ],
+  "key": {
+    "D": "minecraft:deepslate",
+    "C": "minecraft:cobbled_deepslate"
+  },
+  "result": {
+    "id": "skyseed:ancient_skyseed"
+  }
+}

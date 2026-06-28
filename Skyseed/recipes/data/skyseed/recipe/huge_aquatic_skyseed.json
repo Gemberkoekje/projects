@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "TTT", "ELP", "TTT" ],
+  "key": {
+    "T": "minecraft:sand",
+    "E": "minecraft:ender_pearl",
+    "L": "skyseed:aquatic_large_skyseed",
+    "P": "minecraft:blaze_powder"
+  },
+  "result": { "id": "skyseed:huge_aquatic_skyseed" }
+}

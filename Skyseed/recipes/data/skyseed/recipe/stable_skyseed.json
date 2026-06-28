@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "LG", "PP" ],
+  "key": {
+    "L": "minecraft:leather",
+    "G": "minecraft:gold_ingot",
+    "P": "#minecraft:planks"
+  },
+  "result": { "id": "skyseed:stable_skyseed" }
+}

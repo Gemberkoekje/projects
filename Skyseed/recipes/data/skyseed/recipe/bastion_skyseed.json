@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BBB",
+    "GCG",
+    "BBB"
+  ],
+  "key": {
+    "B": "minecraft:blackstone",
+    "G": "minecraft:gold_ingot",
+    "C": "minecraft:crying_obsidian"
+  },
+  "result": {
+    "id": "skyseed:bastion_skyseed"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NSN",
+    "NRN",
+    "NSN"
+  ],
+  "key": {
+    "N": "minecraft:soul_sand",
+    "S": "minecraft:bone_block",
+    "R": "skyseed:nether_soul_skyseed"
+  },
+  "result": {
+    "id": "skyseed:nether_soul_large_skyseed"
+  }
+}

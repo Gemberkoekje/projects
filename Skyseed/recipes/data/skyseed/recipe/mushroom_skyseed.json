@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RB",
+    "DD"
+  ],
+  "key": {
+    "R": "minecraft:red_mushroom",
+    "B": "minecraft:brown_mushroom",
+    "D": "minecraft:dirt"
+  },
+  "result": {
+    "id": "skyseed:mushroom_skyseed"
+  }
+}

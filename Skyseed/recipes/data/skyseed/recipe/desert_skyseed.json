@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SS",
+    "ZZ"
+  ],
+  "key": {
+    "S": "minecraft:sand",
+    "Z": "minecraft:sandstone"
+  },
+  "result": {
+    "id": "skyseed:desert_skyseed"
+  }
+}

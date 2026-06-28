@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NSN",
+    "NRN",
+    "NSN"
+  ],
+  "key": {
+    "N": "minecraft:netherrack",
+    "S": "minecraft:quartz",
+    "R": "skyseed:nether_rocky_skyseed"
+  },
+  "result": {
+    "id": "skyseed:nether_rocky_large_skyseed"
+  }
+}

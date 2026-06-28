@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "BP", "DD" ],
+  "key": {
+    "B": "minecraft:beef",
+    "P": "#minecraft:planks",
+    "D": "minecraft:dirt"
+  },
+  "result": { "id": "skyseed:pasture_skyseed" }
+}

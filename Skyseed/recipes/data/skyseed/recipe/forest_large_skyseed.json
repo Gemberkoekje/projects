@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "LDL",
+    "DGD",
+    "LDL"
+  ],
+  "key": {
+    "L": "#minecraft:logs_that_burn",
+    "D": "minecraft:dirt",
+    "G": "skyseed:forest_skyseed"
+  },
+  "result": {
+    "id": "skyseed:forest_large_skyseed"
+  }
+}

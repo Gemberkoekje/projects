@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NSN",
+    "NRN",
+    "NSN"
+  ],
+  "key": {
+    "N": "minecraft:basalt",
+    "S": "minecraft:gilded_blackstone",
+    "R": "skyseed:nether_basalt_skyseed"
+  },
+  "result": {
+    "id": "skyseed:nether_basalt_large_skyseed"
+  }
+}

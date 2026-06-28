@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "ONO",
+    "NSN",
+    "ONO"
+  ],
+  "key": {
+    "O": "minecraft:obsidian",
+    "N": "minecraft:nether_bricks",
+    "S": "minecraft:soul_sand"
+  },
+  "result": {
+    "id": "skyseed:wither_arena_skyseed"
+  }
+}

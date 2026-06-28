@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BB",
+    "PG"
+  ],
+  "key": {
+    "B": "minecraft:basalt",
+    "P": "skyseed:badlands_skyseed",
+    "G": "minecraft:gilded_blackstone"
+  },
+  "result": {
+    "id": "skyseed:nether_basalt_skyseed"
+  }
+}

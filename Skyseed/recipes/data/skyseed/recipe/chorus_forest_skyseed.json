@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "CEC", "ECE", "CEC" ],
+  "key": {
+    "C": "minecraft:chorus_fruit",
+    "E": "minecraft:end_stone"
+  },
+  "result": { "id": "skyseed:chorus_forest_skyseed" }
+}

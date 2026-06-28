@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "PSP", "PEP", "PSP" ],
+  "key": {
+    "P": "minecraft:purpur_block",
+    "S": "minecraft:shulker_shell",
+    "E": "minecraft:end_stone"
+  },
+  "result": { "id": "skyseed:end_city_skyseed" }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "NN",
+    "II"
+  ],
+  "key": {
+    "N": "minecraft:snow_block",
+    "I": "#skyseed:ice"
+  },
+  "result": {
+    "id": "skyseed:frozen_skyseed"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DDD",
+    "CSC",
+    "CLC"
+  ],
+  "key": {
+    "D": "minecraft:dirt",
+    "C": "minecraft:cobblestone",
+    "S": "skyseed:ladder_small_skyseed",
+    "L": "minecraft:ladder"
+  },
+  "result": {
+    "id": "skyseed:ladder_large_skyseed"
+  }
+}
