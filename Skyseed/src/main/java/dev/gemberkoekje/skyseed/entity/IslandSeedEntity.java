@@ -4,6 +4,7 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.compat.Id;
 import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Lookup;
+import dev.gemberkoekje.skyseed.compat.Players;
 import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
@@ -23,6 +24,10 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+//? if >=26.1.2 {
+/*import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;*/
+//?}
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -98,7 +103,11 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
 
     /** Spawned from the item's use(). */
     public IslandSeedEntity(Level level, LivingEntity thrower) {
+        //? if >=26.1.2 {
+        /*super(ModEntities.ISLAND_SEED.get(), thrower, level, new ItemStack(ModItems.DEFAULT_SEED.get()));*/
+        //?} else {
         super(ModEntities.ISLAND_SEED.get(), thrower, level);
+        //?}
     }
 
     @Override
@@ -167,10 +176,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (forced == null) {
             return null;
         }
-        return Lookup.registry(level.registryAccess(), Registries.BIOME)
-                .getHolder(ResourceKey.create(Registries.BIOME, Ids.parse(forced.value())))
-                .<Holder<Biome>>map(ref -> ref)
-                .orElse(null);
+        return Lookup.biomeHolder(level.registryAccess(), forced);
     }
 
     /** The biome the island should generate as at {@code pos}: a debug seed's forced biome, else the planting biome. */
@@ -245,7 +251,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (!IslandGenerator.formValidFor(theme, biome, base.getY(), Lookup.dimensionId(level.dimension()))) {
             if (theme.fizzlesIn(biome) && this.getOwner() instanceof Player thrower) {
                 theme.fizzle().flatMap(FizzleRule::message)
-                        .ifPresent(key -> thrower.displayClientMessage(Component.translatable(key), true));
+                        .ifPresent(key -> Players.actionBar(thrower, Component.translatable(key)));
             }
             fizzle(level);
             this.discard();
@@ -388,13 +394,40 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             theme = Lookup.byId(themes, forest);
             if (theme != null && id != null) {
                 Skyseed.LOGGER.warn("[skyseed] unknown theme '{}' — falling back to {}", id, forest);
-            } else if (theme == null && !themes.holders().findAny().isEmpty()) {
-                theme = themes.holders().findFirst().map(h -> h.value()).orElse(null);
+            } else if (theme == null && Lookup.elements(themes).findAny().isPresent()) {
+                theme = Lookup.elements(themes).findFirst().map(h -> h.value()).orElse(null);
             }
         }
         return theme;
     }
 
+    //? if >=26.1.2 {
+    /*@Override
+    public void addAdditionalSaveData(ValueOutput output) {
+        super.addAdditionalSaveData(output);
+        output.putInt("ArmTicks", this.armTicks);
+        Id theme = getTheme();
+        if (theme != null) {
+            output.putString("Theme", theme.value());
+        }
+        Id forced = getForcedBiome();
+        if (forced != null) {
+            output.putString("ForcedBiome", forced.value());
+        }
+        if (getForcedRare() >= 0) {
+            output.putInt("ForcedRare", getForcedRare());
+        }
+        if (getForcedWaterfall()) {
+            output.putBoolean("ForcedWaterfall", true);
+        }
+        output.putBoolean("Precise", this.precise);
+        if (this.precise) {
+            output.putDouble("TX", this.targetX);
+            output.putDouble("TY", this.targetY);
+            output.putDouble("TZ", this.targetZ);
+        }
+    }*/
+    //?} else {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
@@ -420,7 +453,25 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             tag.putDouble("TZ", this.targetZ);
         }
     }
+    //?}
 
+    //? if >=26.1.2 {
+    /*@Override
+    public void readAdditionalSaveData(ValueInput input) {
+        super.readAdditionalSaveData(input);
+        this.armTicks = input.getIntOr("ArmTicks", 0);
+        input.getString("Theme").ifPresent(s -> setTheme(Id.of(s)));
+        input.getString("ForcedBiome").ifPresent(s -> setForcedBiome(Id.of(s)));
+        input.getInt("ForcedRare").ifPresent(this::setForcedRare);
+        setForcedWaterfall(input.getBooleanOr("ForcedWaterfall", false));
+        this.precise = input.getBooleanOr("Precise", false);
+        if (this.precise) {
+            this.targetX = input.getDoubleOr("TX", 0.0);
+            this.targetY = input.getDoubleOr("TY", 0.0);
+            this.targetZ = input.getDoubleOr("TZ", 0.0);
+        }
+    }*/
+    //?} else {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
@@ -444,4 +495,5 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
             this.targetZ = tag.getDouble("TZ");
         }
     }
+    //?}
 }

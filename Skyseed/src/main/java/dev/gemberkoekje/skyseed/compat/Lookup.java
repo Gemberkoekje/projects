@@ -21,6 +21,7 @@ import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
 import net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Version-volatile registry access, isolated behind stable signatures.
@@ -110,6 +111,30 @@ public final class Lookup {
         /*return dim.identifier().toString();*/
         //?} else {
         return dim.location().toString();
+        //?}
+    }
+
+    /** A registry's elements as a stream of holders ({@code Registry.holders()} was renamed {@code listElements()} in 26.1.2). */
+    public static <T> Stream<Holder.Reference<T>> elements(Registry<T> registry) {
+        //? if >=26.1.2 {
+        /*return registry.listElements();*/
+        //?} else {
+        return registry.holders();
+        //?}
+    }
+
+    /** The holder for a biome {@code id}, or {@code null} if absent/unparseable. {@code Registry.getHolder(ResourceKey)}
+     *  became {@code get(Identifier)} (returning an {@code Optional<Holder>}) in 26.1.2. */
+    public static Holder<Biome> biomeHolder(RegistryAccess access, Id id) {
+        final var rl = id == null ? null : Ids.parse(id.value());
+        if (rl == null) {
+            return null;
+        }
+        final Registry<Biome> reg = registry(access, Registries.BIOME);
+        //? if >=26.1.2 {
+        /*return reg.get(rl).<Holder<Biome>>map(ref -> ref).orElse(null);*/
+        //?} else {
+        return reg.getHolder(ResourceKey.create(Registries.BIOME, rl)).<Holder<Biome>>map(ref -> ref).orElse(null);
         //?}
     }
 
