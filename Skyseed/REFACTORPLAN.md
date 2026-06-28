@@ -214,6 +214,34 @@ Then the other rows are small per-file directives (mostly one import + one call-
 `String`-records refactor first (verified green on 1.21.1, no 26.1.2 needed), then the facade/file directives, then
 recompile to surface the post-100 remainder, repeat to green.
 
+### 2.7 The 26.1.2 shipped-code error map (120 errors) + per-category fix plan
+
+The crux (the `ResourceLocation`→`Identifier` rename) is **DONE and validated** — recompiling `:26.1.2:` shows zero
+`Identifier` errors. The gametest harness is **excluded** on non-1.21.1 nodes (it uses the removed pre-1.21.5
+`@GameTest` API; it stays the 1.21.1 golden-master witness and is ported separately). With those out, the shipped code
+has **120 errors** (true count, `-Xmaxerrs` lifted), which cluster into ~10 root deltas. Each fix is a `//?` block —
+**1.21.1 branch = current code (must stay green via `runGameTestServer`), 26.1.2 branch in `/*…*/`, Javadoc-free** —
+verified by recompiling `:26.1.2:` and watching per-file/per-symbol counts (the 100-cap hides the total until <100).
+
+The per-category plan, highest-leverage first (each links a category of the 120 to its concrete fix):
+
+| # | Category (errors) | 26.1.2 API (from the cached sources jar) | Fix |
+|---|---|---|---|
+| 1 | **Mob class reorg** (~10) — `Cow`/`Sheep`/`Bee`/`IronGolem`/`Villager`/`VillagerType` | moved into per-type subpackages: `animal.cow.Cow`, `animal.sheep.Sheep`, `animal.bee.Bee`, `animal.golem.IronGolem`, `npc.villager.Villager`/`VillagerType` (names + API unchanged) | `//?` import swaps (GenerationJob + any other user) |
+| 2 | **`MobSpawnType`→`EntitySpawnReason`** (~5) | `net.minecraft.world.entity.EntitySpawnReason`, `.SPAWNER` constant kept | `//?` a **static import** of `SPAWNER`; rewrite `MobSpawnType.SPAWNER`→`SPAWNER`. Then recheck `EntityType.spawn(...)` / NeoForge `EventHooks.finalizeMobSpawn(...)` arg type |
+| 3 | **`registryOrThrow`→`lookupOrThrow`** (~5, multi-file) | `RegistryAccess.lookupOrThrow(key)` returns `Registry<E>` on 26.1.2 (registryOrThrow removed) | funnel registry access through `Lookup.registry(...)` where possible, `//?` that one method; `//?` the residual direct callers (WorldData, …) |
+| 4 | **Entity API** (IslandSeedEntity, the ~19 left after the superclass import fix) | `ThrowableItemProjectile` **constructor** signature changed; `moveTo`/`getRespawnPosition`/`hasImpulse` etc. | per-method `//?`; read each new signature from the jar |
+| 5 | **Commands API** (~14) | `displayClientMessage`/`hasPermission`/`getSharedSpawnPos`/`setDefaultSpawnPos`/`getServer`/`worldGenOptions` shifted | per-call `//?`; several are Player/Server/ServerLevel method renames |
+| 6 | **WorldData / level API** (~8) | `getDataVersion`/`findResource`/`getMinBuildHeight`/`getMaxBuildHeight`/`worldGenOptions` | per-call `//?` |
+| 7 | **Recipe** (~7) | `SimpleCraftingRecipeSerializer` + its `Factory` changed | `//?` the serializer construction |
+| 8 | **Client / rendering** (~6) | `ModelResourceLocation` moved; `KeyMapping` ctor gained a param; `registerEntityRenderer`/`getModels` shifted | `//?` imports + ctor/call sites (client-only, no gametest coverage — compile-checked only) |
+| 9 | **`CHAIN`** (~4) — in structure templates (Bastion/Outpost) | a `Blocks`/property constant moved/renamed | identify the new constant, `//?` or direct swap |
+| 10 | **`GameRules`** (~2) + scattered 1-offs (`getAsString`, `production`, `Factory`) | misc renames | per-site `//?` |
+
+**Execution order:** 1→3 first (mob reorg + spawn-reason + registry — highest error count, mostly import/static-import
+swaps), then the file-local clusters (entity, commands, worlddata, recipe), then client + the 1-offs. Recompile after
+each cluster; the count only visibly drops below 100 once the bulk is cleared, so track the per-symbol histogram.
+
 ---
 
 ## Risks & things to verify
