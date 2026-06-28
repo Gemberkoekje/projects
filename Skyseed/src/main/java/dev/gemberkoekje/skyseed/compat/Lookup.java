@@ -47,7 +47,7 @@ public final class Lookup {
 
     /** The block under {@code id} (vanilla returns AIR for an unknown id; callers gate with {@link #hasBlock(Id)}). */
     public static Block block(Id id) {
-        return BuiltInRegistries.BLOCK.get(Ids.parse(id.value()));
+        return byId(BuiltInRegistries.BLOCK, id);
     }
 
     /** Convenience: the default {@link BlockState} of the block under {@code id}. */
@@ -70,7 +70,7 @@ public final class Lookup {
 
     /** The entity type under {@code id} (callers gate with {@link #hasEntityType(Id)}). */
     public static EntityType<?> entityType(Id id) {
-        return BuiltInRegistries.ENTITY_TYPE.get(Ids.parse(id.value()));
+        return byId(BuiltInRegistries.ENTITY_TYPE, id);
     }
 
     // --- Biomes -------------------------------------------------------------------------------------------------
@@ -102,10 +102,19 @@ public final class Lookup {
         //?}
     }
 
-    /** A value from {@code registry} under {@code id} — {@code null} if the id is absent or unparseable. */
+    /** A value from {@code registry} under {@code id} — {@code null} if the id is absent or unparseable. The direct
+     *  value accessor was renamed {@code get} → {@code getValue} in 26.1.2 (there {@code get} returns an
+     *  {@code Optional<Holder>} instead), so this is the one place block/entity/theme value lookups resolve. */
     public static <T> T byId(Registry<T> registry, Id id) {
         final var rl = id == null ? null : Ids.parse(id.value());
-        return rl == null ? null : registry.get(rl);
+        if (rl == null) {
+            return null;
+        }
+        //? if >=26.1.2 {
+        /*return registry.getValue(rl);*/
+        //?} else {
+        return registry.get(rl);
+        //?}
     }
 
     /** Whether a jigsaw template pool is registered under {@code id} (a {@code null}/unparseable id → false). */
