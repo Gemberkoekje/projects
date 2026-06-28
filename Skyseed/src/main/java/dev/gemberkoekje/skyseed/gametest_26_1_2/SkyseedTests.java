@@ -168,6 +168,14 @@ public final class SkyseedTests {
         reg(event, "forest_in_bamboo_biome_grows_bamboo", REGION, SkyseedTests::forestInBambooBiomeGrowsBamboo);
         reg(event, "lush_hangs_glow_lichen", REGION, SkyseedTests::lushHangsGlowLichen);
         reg(event, "aquatic_reef_has_coral", REGION, SkyseedTests::aquaticReefHasCoral);
+
+        // --- book/icon coverage + structure diversity (Phase 4, batch a) ---
+        reg(event, "every_craftable_seed_has_unique_icon", REGION, SkyseedTests::everyCraftableSeedHasUniqueIcon);
+        reg(event, "structure_theme_records_jigsaw", REGION, SkyseedTests::structureThemeRecordsJigsaw);
+        reg(event, "mansion_garrison_planned", REGION, SkyseedTests::mansionGarrisonPlanned);
+        reg(event, "mansion_assembles_with_flush_wings", BIG_REGION, SkyseedTests::mansionAssemblesWithFlushWings);
+        reg(event, "mansion_cores_have_distinct_footprints", REGION, SkyseedTests::mansionCoresHaveDistinctFootprints);
+        reg(event, "village_houses_use_vanilla_blocks", BIG_REGION, SkyseedTests::villageHousesUseVanillaBlocks);
         // DEFERRED to a later phase (not ported here):
         //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag)/readAdditionalSaveData(CompoundTag)
         //    directly, but 26.1.2 reworked those to ValueOutput/ValueInput — needs a rewrite against the new NBT API.
@@ -2251,6 +2259,162 @@ public final class SkyseedTests {
             }
         }
         helper.assertTrue(coral, "warm-ocean Aquatic reef grew no small coral plants across 10 seeds");
+        helper.succeed();
+    }
+
+    // ===== book/icon coverage helpers (plain classpath resource access — version-agnostic) =====
+
+    /** Patchouli field-notes entry path for a theme — note large variants flip to a {@code large_} prefix. */
+    private static String entryPath(String theme) {
+        final String name = theme.endsWith("_large")
+                ? "large_" + theme.substring(0, theme.length() - "_large".length()) + "_island"
+                : theme + "_island";
+        return "/assets/skyseed/patchouli_books/guide/en_us/entries/" + name + ".json";
+    }
+
+    /** Path to a seed's gathered-materials advancement — the Patchouli page gate that reveals its recipe. */
+    private static String gatheredPath(String theme) {
+        return "/data/skyseed/advancement/gathered_" + theme + ".json";
+    }
+
+    /** Path to a seed's reveal advancement — the gate that unhides its book entry (crafted prereq or held makings). */
+    private static String revealPath(String theme) {
+        return "/data/skyseed/advancement/reveal_" + theme + ".json";
+    }
+
+    /** The {@code layer0} texture id from a seed's item model, or {@code null}. */
+    private static String modelLayer0(String theme) {
+        final String json = readResource("/assets/skyseed/models/item/" + theme + "_skyseed.json");
+        if (json == null) {
+            return null;
+        }
+        final com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
+        if (!root.has("textures")) {
+            return null;
+        }
+        final com.google.gson.JsonObject tex = root.getAsJsonObject("textures");
+        return tex.has("layer0") ? tex.get("layer0").getAsString() : null;
+    }
+
+    /** Resource path of the PNG a {@code namespace:item/name} texture id refers to. */
+    private static String texturePath(String textureId) {
+        final int colon = textureId.indexOf(':');
+        return "/assets/" + textureId.substring(0, colon) + "/textures/" + textureId.substring(colon + 1) + ".png";
+    }
+
+    private static boolean resourceExists(String path) {
+        return SkyseedTests.class.getResource(path) != null;
+    }
+
+    private static String readResource(String path) {
+        try (java.io.InputStream in = SkyseedTests.class.getResourceAsStream(path)) {
+            return in == null ? null : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException ex) {
+            return null;
+        }
+    }
+
+    // ===== book/icon coverage + structure-diversity tests =====
+
+    static void everyCraftableSeedHasUniqueIcon(GameTestHelper helper) {
+        // Each regular seed's item model must point at its own texture (no two share one — that is how the Ocean
+        // Monument seed slipped through reusing the generic island_seed icon), and that texture must exist.
+        final java.util.Map<String, String> byTexture = new java.util.HashMap<>();
+        for (String theme : ModItems.SEEDS.keySet()) {
+            final String layer0 = modelLayer0(theme);
+            helper.assertTrue(layer0 != null, "seed '" + theme + "' item model has no layer0 texture");
+            helper.assertTrue(resourceExists(texturePath(layer0)), "seed '" + theme + "' icon texture is missing (" + layer0 + ")");
+            final String other = byTexture.put(layer0, theme);
+            helper.assertTrue(other == null, "seeds '" + theme + "' and '" + other + "' share the icon '" + layer0 + "'");
+        }
+        helper.succeed();
+    }
+
+    static void structureThemeRecordsJigsaw(GameTestHelper helper) {
+        // Hamlet is a jigsaw village; planning it must record a JigsawSite for GenerationJob to assemble.
+        final IslandPlan p = plan(helper, "hamlet", 3L);
+        helper.assertTrue(!p.jigsaws().isEmpty(), "hamlet plan recorded no jigsaw site");
+        helper.succeed();
+    }
+
+    static void mansionGarrisonPlanned(GameTestHelper helper) {
+        // The Woodland Mansion's evoker→totem garrison comes from the theme animals pack; it must be planned.
+        final IslandPlan p = plan(helper, "woodland_mansion", 5L);
+        boolean evoker = false;
+        for (IslandPlan.AnimalSpawn a : p.animals()) {
+            if (a.type() == EntityType.EVOKER) {
+                evoker = true;
+                break;
+            }
+        }
+        helper.assertTrue(evoker, "woodland mansion planned no evoker (the guaranteed totem source)");
+        helper.succeed();
+    }
+
+    static void mansionAssemblesWithFlushWings(GameTestHelper helper) {
+        // Assemble the mansion jigsaw and confirm the wings attach FLUSH (the overlap fix): the core lays a birch floor,
+        // dark-oak walls and glass-pane windows, and the wings actually connect — a wing-specific block (iron bars /
+        // lectern / barrel) landing beyond the core proves the connection resolved instead of being rejected.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("woodland_mansion/start"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 2, origin, false, "", 0, null, 1L);
+        int birch = 0, darkOak = 0, glass = 0, wingBlocks = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 18; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.BIRCH_PLANKS)) birch++;
+                    else if (s.is(Blocks.DARK_OAK_PLANKS)) darkOak++;
+                    else if (s.is(Blocks.GLASS_PANE)) glass++;
+                    else if (s.is(Blocks.IRON_BARS) || s.is(Blocks.LECTERN) || s.is(Blocks.BARREL)) wingBlocks++;
+                }
+            }
+        }
+        helper.assertTrue(birch > 80, "the mansion should lay a birch-plank floor (got " + birch + ")");
+        helper.assertTrue(darkOak > 80, "the mansion should have dark-oak walls (got " + darkOak + ")");
+        helper.assertTrue(glass > 0, "the mansion should have glass-pane windows (got " + glass + ")");
+        helper.assertTrue(wingBlocks > 0,
+                "at least one wing must attach flush — no wing block found means the wings were rejected for overlap");
+        helper.succeed();
+    }
+
+    static void mansionCoresHaveDistinctFootprints(GameTestHelper helper) {
+        // Real footprint variety: the start pool offers three core shapes, so the silhouette differs each throw.
+        final var mgr = helper.getLevel().getServer().getStructureManager();
+        final var footprints = new java.util.HashSet<String>();
+        for (final String name : new String[]{"core_square", "core_long", "core_wide"}) {
+            final var t = mgr.get(Ids.mod("woodland_mansion/" + name));
+            helper.assertTrue(t.isPresent(), "missing mansion core template: " + name);
+            final var sz = t.get().getSize();
+            footprints.add(sz.getX() + "x" + sz.getZ());
+        }
+        helper.assertTrue(footprints.size() == 3,
+                "the three mansion cores must have distinct footprints, saw " + footprints);
+        helper.succeed();
+    }
+
+    static void villageHousesUseVanillaBlocks(GameTestHelper helper) {
+        // The village houses follow the vanilla village frame: stripped-log corner posts, a cobblestone foundation,
+        // and glass-pane windows. Assemble a hamlet cottage and confirm all three landed.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("hamlet/cottages"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        boolean strippedPost = false, pane = false, cobble = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 12; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.STRIPPED_OAK_LOG) || s.is(Blocks.STRIPPED_SPRUCE_LOG) || s.is(Blocks.STRIPPED_BIRCH_LOG)) strippedPost = true;
+                    else if (s.is(Blocks.GLASS_PANE)) pane = true;
+                    else if (s.is(Blocks.COBBLESTONE)) cobble = true;
+                }
+            }
+        }
+        helper.assertTrue(strippedPost, "village house must use stripped-log corner posts (the vanilla frame)");
+        helper.assertTrue(pane, "village house windows must be glass panes");
+        helper.assertTrue(cobble, "village house must sit on a cobblestone foundation");
         helper.succeed();
     }
 }
