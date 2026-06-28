@@ -5,6 +5,12 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.163.0] - 2026-06-28
+
+### Fixed
+- **Guide entries are gated by their reveal advancement again** (both nodes) — only relevant/unlocked seeds show. 0.158.0
+  wrongly dropped the entry-level `modonomicon:advancement` condition; restored. See [CHANGELOG_26.1.md](CHANGELOG_26.1.md).
+
 ## [0.162.0] - 2026-06-28
 
 ### Changed

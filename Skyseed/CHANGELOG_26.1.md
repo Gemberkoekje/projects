@@ -9,6 +9,14 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.163.0] - 2026-06-28
+
+### Fixed
+- **Guide entries are gated by their reveal advancement again** — only relevant/unlocked seeds show, instead of every
+  entry appearing from the start. 0.158.0 wrongly dropped the entry-level `modonomicon:advancement` condition while
+  chasing the premature "found it!"; that turned out to be the page-level checklist (fixed separately in 0.161.0), so
+  the entry gating was correct all along. Restored it.
+
 ## [0.162.0] - 2026-06-28
 
 ### Changed
