@@ -4,7 +4,9 @@ import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.recipe.GuideRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.crafting.RecipeSerializer;
+//? if <26.1.2 {
 import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
+//?}
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -14,8 +16,13 @@ public final class ModRecipes {
     public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS =
             DeferredRegister.create(Registries.RECIPE_SERIALIZER, Skyseed.MODID);
 
+    //? if >=26.1.2 {
+    /*public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<GuideRecipe>> GUIDE =
+            RECIPE_SERIALIZERS.register("guide", () -> new RecipeSerializer<>(GuideRecipe.MAP_CODEC, GuideRecipe.STREAM_CODEC));*/
+    //?} else {
     public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<GuideRecipe>> GUIDE =
             RECIPE_SERIALIZERS.register("guide", () -> new SimpleCraftingRecipeSerializer<>(GuideRecipe::new));
+    //?}
 
     private ModRecipes() {}
 
