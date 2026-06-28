@@ -350,7 +350,14 @@ bush, firefly_bush, wildflowers), meadow (wildflowers, firefly_bush, bush, golde
 (short/tall_dry_grass, cactus_flower). Pure tolerant theme data, inert on 1.21.1. Gametest
 new_vegetation_resolves_on_themes. Both nodes green (1.21.1 126, 26.1.2 All 130).
 
-**2d-3 mobs / 2d-4 variant-check** — still pending (tolerant theme data + a verification).
+**2d-3 new-mob placements ✅ DONE** (`f59e418`): nautilus + zombie_nautilus -> aquatic (ocean reef + main pond
+water_mobs), parched + camel_husk -> desert, happy_ghast -> huge_meadow (sky-mount reward), copper_golem ->
+village_center (mechanical helper). creaking already placed in 2d-1; mannequin skipped (display entity). Tolerant
+theme mobs data, inert on 1.21.1. Gametest new_mobs_resolve_on_themes. Both nodes green (1.21.1 126, 26.1.2 All 131).
+
+**2d-4 cow/pig/chicken biome-variant check** — still pending (a verification: the new cow/pig/chicken variants should
+default by biome temperature at the spawn position, so existing pasture/farm placements pick the right variant per
+island biome; force one only if a theme wants a specific variant).
 
 ---
 
