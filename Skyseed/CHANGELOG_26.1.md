@@ -9,6 +9,13 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.162.0] - 2026-06-28
+
+### Changed
+- **Trimmed the superfluous found-it explanation from "The Rare Catch" intro** (the "A green [x] turns up under each
+  once you've gathered the makings" line) — players notice the checkmarks without being told. Removed from the shared
+  Patchouli source, so both guide backends drop it.
+
 ## [0.161.0] - 2026-06-28
 
 ### Fixed

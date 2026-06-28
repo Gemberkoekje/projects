@@ -6,7 +6,7 @@
   "pages": [
     {
       "type": "patchouli:text",
-      "text": "A few islands hide behind something rare — a far-off biome, a lucky drop, a 1-in-20 find. Their pages stay a locked $(bold)?$() until you have what they need, so here's exactly where to look. A green $(2)[x]$() turns up under each once you've gathered the makings."
+      "text": "A few islands hide behind something rare — a far-off biome, a lucky drop, a 1-in-20 find. Their pages stay a locked $(bold)?$() until you have what they need, so here's exactly where to look."
     },
     {
       "type": "patchouli:text",
