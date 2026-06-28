@@ -224,6 +224,7 @@ public final class SkyseedTests {
         reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
         reg(event, "forest_places_fallen_logs", REGION, SkyseedTests::forestPlacesFallenLogs);
+        reg(event, "void_worldgen_setup_loads_and_is_void", REGION, SkyseedTests::voidWorldgenSetupLoadsAndIsVoid);
         reg(event, "new_mobs_resolve_on_themes", REGION, SkyseedTests::newMobsResolveOnThemes);
         reg(event, "farm_animals_default_to_biome_variant", REGION, SkyseedTests::farmAnimalsDefaultToBiomeVariant);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
@@ -3391,6 +3392,27 @@ public final class SkyseedTests {
                         && Lookup.hasEntityType(Id.of("minecraft:zombie_nautilus"))
                         && Lookup.hasEntityType(Id.of("minecraft:happy_ghast")),
                 "a 1.21.5 placed-mob id is unknown on 26.1.2");
+        helper.succeed();
+    }
+
+    static void voidWorldgenSetupLoadsAndIsVoid(GameTestHelper helper) {
+        // REFACTORPLAN §2.2(b): re-verify the skyblock void worldgen still drives the baked dimension generator on
+        // 26.1.2. The void/void_nether/void_end noise_settings + the skyblock world_preset must still PARSE (their codec
+        // shapes survived beyond the preliminary_surface_level fix — a shifted field would fail the datapack load), and
+        // the void settings must be structurally VOID (default_block = air) so the skyblock overworld/nether/end
+        // generate void, not terrain. (Vanilla structures are suppressed separately by generateStructures=false at world
+        // creation — SkyseedClientEvents — which reads the same worldGenOptions chain as the bonus chest.)
+        final var ra = helper.getLevel().registryAccess();
+        final var noise = Lookup.registry(ra, Registries.NOISE_SETTINGS);
+        for (final String id : java.util.List.of("void", "void_nether", "void_end")) {
+            final var settings = noise.getOptional(Ids.mod(id)).orElse(null);
+            helper.assertTrue(settings != null, "noise_settings skyseed:" + id + " did not parse on 26.1.2");
+            helper.assertTrue(settings.defaultBlock().is(Blocks.AIR),
+                    "skyseed:" + id + " is not a void generator — its default_block is " + settings.defaultBlock());
+        }
+        final var presets = Lookup.registry(ra, Registries.WORLD_PRESET);
+        helper.assertTrue(presets.getOptional(Ids.mod("skyblock")).isPresent(),
+                "world_preset skyseed:skyblock did not parse on 26.1.2");
         helper.succeed();
     }
 
