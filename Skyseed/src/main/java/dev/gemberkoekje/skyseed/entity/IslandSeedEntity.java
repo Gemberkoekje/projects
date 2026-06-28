@@ -275,8 +275,8 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         // seed) or a rolled rare structure (a portal that surfaced on a big island). Spawned directly here, not via
         // another thrown seed, so it never spawns a twin of its own.
         if (plan.twinTheme().isPresent()) {
-            final IslandTheme twinTheme = Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME)
-                    .get(plan.twinTheme().get());
+            final IslandTheme twinTheme = Lookup.byId(
+                    Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME), plan.twinTheme().get());
             if (twinTheme != null) {
                 TwinPlacer.spawnTwin(level, this.blockPosition(), twinTheme);
             }

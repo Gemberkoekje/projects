@@ -2,11 +2,10 @@ package dev.gemberkoekje.skyseed.worldgen.theme;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Id;
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 
 import java.util.List;
@@ -24,7 +23,7 @@ import java.util.Optional;
  * {@code SKYSTRUCTURESPLAN.md}.
  */
 public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> mobs, boolean suppressPond,
-                            List<String> biomes, Optional<ResourceLocation> twin, Optional<String> dimension) {
+                            List<String> biomes, Optional<Id> twin, Optional<String> dimension) {
     public static final Codec<RareStructure> CODEC = RecordCodecBuilder.create(i -> i.group(
             Codec.FLOAT.fieldOf("chance").forGetter(RareStructure::chance),
             JigsawConfig.CODEC.fieldOf("jigsaw").forGetter(RareStructure::jigsaw),
@@ -33,7 +32,7 @@ public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> 
             Codec.STRING.listOf().optionalFieldOf("biomes", List.of()).forGetter(RareStructure::biomes),
             // If present, a roll of this rare structure also grows the named theme at the dimension-linked
             // coordinate in the other dimension — so a ruined portal rolled on a big island gets its twin too.
-            ResourceLocation.CODEC.optionalFieldOf("twin").forGetter(RareStructure::twin),
+            Id.CODEC.optionalFieldOf("twin").forGetter(RareStructure::twin),
             // A roll gate by dimension: when set, this rare structure rolls only in that dimension — so a Nether-native
             // seed can carry an overworld easter egg (the Trading Post growing the abandoned cottage thrown topside).
             // Unset, it follows the theme's home dimension. See rollsIn.
@@ -52,16 +51,8 @@ public record RareStructure(float chance, JigsawConfig jigsaw, List<AnimalPack> 
             return true;
         }
         for (final String entry : biomes) {
-            if (entry.startsWith("#")) {
-                final ResourceLocation tagId = Ids.parse(entry.substring(1));
-                if (tagId != null && biome.is(TagKey.create(Registries.BIOME, tagId))) {
-                    return true;
-                }
-            } else {
-                final ResourceLocation id = Ids.parse(entry);
-                if (id != null && biome.is(id)) {
-                    return true;
-                }
+            if (Lookup.biomeMatches(biome, entry)) {
+                return true;
             }
         }
         return false;

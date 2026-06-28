@@ -2871,7 +2871,7 @@ public final class SkyseedGameTests {
     /** Whether a biome override's variants grow chorus plants (the End-form bootstrap decoration). */
     private static boolean endFormHasChorus(BiomeOverride ov) {
         return ov.variants().map(vs -> vs.stream().anyMatch(
-                v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().getPath().equals("chorus_plant"))))
+                v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().path().equals("chorus_plant"))))
                 .orElse(false);
     }
 

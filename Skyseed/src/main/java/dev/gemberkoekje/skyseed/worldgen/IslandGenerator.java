@@ -137,7 +137,7 @@ public final class IslandGenerator {
         final List<BlockPos> hives = beeNests(blockMap);
 
         // Cross-dimension twin (Ruined Portal): a rolled rare structure's twin wins, else the theme's own.
-        final Optional<ResourceLocation> twinTheme =
+        final Optional<Id> twinTheme =
                 (rare != null && rare.twin().isPresent()) ? rare.twin() : theme.twin();
         return new IslandPlan(blocks, decor.trees(), mobs, hives, jigsaws, animals, random, twinTheme, fluidTicks,
                 decor.scatterPositions(), snow);

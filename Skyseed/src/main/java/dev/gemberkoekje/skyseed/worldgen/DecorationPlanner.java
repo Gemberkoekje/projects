@@ -46,10 +46,10 @@ final class DecorationPlanner {
         for (TreeEntry tree : deco.trees()) {
             // skyseed:* "features" are built-in hand-built trees (vanilla features that won't place
             // dry, like mangroves); anything else is a vanilla configured feature placed afterwards.
-            final boolean custom = tree.feature().getNamespace().equals(Skyseed.MODID);
+            final boolean custom = tree.feature().namespace().equals(Skyseed.MODID);
             ConfiguredFeature<?, ?> feature = null;
             if (custom) {
-                final String path = tree.feature().getPath();
+                final String path = tree.feature().path();
                 if (!path.equals("mangrove") && !path.equals("azalea") && !path.equals("ice_spike")) {
                     Skyseed.LOGGER.warn("[skyseed] unknown built-in tree '{}' — skipping", tree.feature());
                     continue;
@@ -79,7 +79,7 @@ final class DecorationPlanner {
                 treeBases.add(base);
                 if (custom) {
                     // hand-built into the streamed block list (vanilla features that won't place here)
-                    final String path = tree.feature().getPath();
+                    final String path = tree.feature().path();
                     if (path.equals("azalea")) {
                         CustomTrees.buildAzalea(blockMap, base, random);
                     } else if (path.equals("ice_spike")) {

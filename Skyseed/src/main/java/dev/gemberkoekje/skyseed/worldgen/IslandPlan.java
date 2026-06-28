@@ -1,5 +1,6 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Id;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
@@ -36,7 +37,7 @@ import java.util.Set;
  */
 public record IslandPlan(List<BlockPlacement> blocks, List<TreeSite> trees, List<MobSpawn> mobs,
                          List<BlockPos> hives, List<JigsawSite> jigsaws, List<AnimalSpawn> animals,
-                         RandomSource random, Optional<ResourceLocation> twinTheme, List<BlockPos> fluidTicks,
+                         RandomSource random, Optional<Id> twinTheme, List<BlockPos> fluidTicks,
                          Set<BlockPos> scatterPositions, float snow) {
     public record BlockPlacement(BlockPos pos, BlockState state) {}
 

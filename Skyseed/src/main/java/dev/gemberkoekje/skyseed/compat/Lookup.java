@@ -7,7 +7,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
@@ -92,11 +94,33 @@ public final class Lookup {
         return entityType(Ids.parse(id.value()));
     }
 
+    // --- Biomes -------------------------------------------------------------------------------------------------
+
+    /**
+     * Whether {@code biome} matches a single theme biome-filter {@code entry}: a {@code #namespace:path} entry tests a
+     * biome tag, a plain {@code namespace:path} entry tests the biome id. An unparseable entry matches nothing. This is
+     * the one place the biome-id type ({@code ResourceLocation}/{@code Identifier}) is named for biome matching.
+     */
+    public static boolean biomeMatches(Holder<Biome> biome, String entry) {
+        if (entry.startsWith("#")) {
+            final ResourceLocation tagId = Ids.parse(entry.substring(1));
+            return tagId != null && biome.is(TagKey.create(Registries.BIOME, tagId));
+        }
+        final ResourceLocation id = Ids.parse(entry);
+        return id != null && biome.is(id);
+    }
+
     // --- Dynamic registries (via RegistryAccess) ----------------------------------------------------------------
 
     /** A registry — vanilla or one of this mod's datapack registries (e.g. the theme registry) — by its key. */
     public static <T> Registry<T> registry(RegistryAccess access, ResourceKey<? extends Registry<? extends T>> key) {
         return access.registryOrThrow(key);
+    }
+
+    /** A value from {@code registry} under {@code id} — {@code null} if the id is absent or unparseable. */
+    public static <T> T byId(Registry<T> registry, Id id) {
+        final ResourceLocation rl = id == null ? null : Ids.parse(id.value());
+        return rl == null ? null : registry.get(rl);
     }
 
     /** Whether a jigsaw {@link StructureTemplatePool} is registered under {@code id}. */
@@ -113,5 +137,11 @@ public final class Lookup {
     /** The configured feature registered under {@code id}, if present. */
     public static Optional<ConfiguredFeature<?, ?>> configuredFeature(RegistryAccess access, ResourceLocation id) {
         return access.registryOrThrow(Registries.CONFIGURED_FEATURE).getOptional(id);
+    }
+
+    /** The configured feature under {@code id} (a {@code null}/unparseable id → empty). */
+    public static Optional<ConfiguredFeature<?, ?>> configuredFeature(RegistryAccess access, Id id) {
+        final ResourceLocation rl = id == null ? null : Ids.parse(id.value());
+        return rl == null ? Optional.empty() : configuredFeature(access, rl);
     }
 }
