@@ -5,6 +5,14 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.158.0] - 2026-06-28
+
+### Fixed
+- **The Modonomicon guide no longer shows "found it!" on entries nothing has been found for.** The generated
+  Modonomicon book (on both nodes) no longer translates Patchouli's per-entry `advancement` to a
+  `modonomicon:advancement` condition — Modonomicon rendered it as an always-met completion flag. Entries are now
+  always visible. (The Patchouli book keeps reveal-on-found.) See [CHANGELOG_26.1.md](CHANGELOG_26.1.md).
+
 ## [0.157.0] - 2026-06-28
 
 ### Fixed

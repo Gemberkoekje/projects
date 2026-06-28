@@ -9,6 +9,14 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.158.0] - 2026-06-28
+
+### Fixed
+- **The Modonomicon guide no longer shows "found it!" on entries nothing has been found for.** Patchouli's per-entry
+  `advancement` (reveal-when-found) was translated to a `modonomicon:advancement` condition, which Modonomicon renders
+  as an always-already-met "found it!" completion flag — worse than no gating. `generateGuide` no longer emits the
+  condition, so Modonomicon entries are simply always visible. (The Patchouli book keeps reveal-on-found.)
+
 ## [0.157.0] - 2026-06-28
 
 1.21.1-only fix (see [CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)): the Modonomicon guide-book icon. **No 26.1.2

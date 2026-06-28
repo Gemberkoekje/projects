@@ -210,7 +210,10 @@ def generateGuide = tasks.register('generateGuide') {
                 }
                 def out = [category: e.category, name: e.name, icon: e.icon,
                         x: (i % 6) * 2, y: i.intdiv(6) * 2, sort_number: (e.sortnum ?: 0), pages: pages]
-                if (e.advancement) out.condition = [type: 'modonomicon:advancement', advancement_id: e.advancement]
+                // NOTE: Patchouli's per-entry `advancement` (reveal-when-found) is intentionally NOT translated to a
+                // modonomicon:advancement condition. Modonomicon renders that condition as a per-entry "found it!"
+                // completion flag that reads as already-met when nothing has been found, which is worse than no gating —
+                // so Modonomicon entries are simply always visible. (The Patchouli book keeps the reveal-on-found behaviour.)
                 write(new File(outBook, "entries/${f.name}"), out)
             }
         }
