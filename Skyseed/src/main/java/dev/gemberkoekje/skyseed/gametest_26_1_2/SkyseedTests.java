@@ -1770,6 +1770,15 @@ public final class SkyseedTests {
                 .listResources("modonomicon/books/guide/entries", p -> true).size();
         helper.assertTrue(entries >= ModItems.SEEDS.size(),
                 "the Modonomicon guide must ship at least one entry per seed (entries=" + entries + ", seeds=" + ModItems.SEEDS.size() + ")");
+        // The book ITEM must render as the Skyseed Almanac (skyseed:guide), not Modonomicon's default book: the generated
+        // book.json sets model=skyseed:guide, and Modonomicon's client BookModel renders ModelManager.getItemModel(book
+        // .getModel()) per stack. On 26.1.2 that id resolves the assets/skyseed/items/guide.json definition — guide is no
+        // registered item (so no auto-generated one), hence we ship it explicitly; on 1.21.1 the id resolves models/item/guide.json.
+        final var guideBook = com.klikli_dev.modonomicon.data.BookDataManager.get().getBook(Ids.parse(SkyseedGuide.BOOK_ID.value()));
+        helper.assertTrue(guideBook != null && "skyseed:guide".equals(guideBook.getModel().toString()),
+                "the Modonomicon guide must set model=skyseed:guide (got " + (guideBook == null ? "null" : guideBook.getModel()) + ")");
+        helper.assertTrue(resourceExists("/assets/skyseed/items/guide.json"),
+                "ship assets/skyseed/items/guide.json so 26.1.2 getItemModel(skyseed:guide) renders the Almanac book icon");
         helper.succeed();
     }
 

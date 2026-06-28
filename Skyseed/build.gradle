@@ -163,8 +163,13 @@ def generateGuide = tasks.register('generateGuide') {
         outBook.deleteDir()
         if (!patchouliGuideRoot.exists()) return
 
+        // model: render the book ITEM as the Skyseed Almanac (the same skyseed:guide model the Patchouli book uses)
+        // instead of Modonomicon's default brown book. Modonomicon's client BookModel replaces the shared
+        // modonomicon:book item model and, per stack, renders ModelManager.getItemModel(book.getModel()) — so this id
+        // resolves models/item/guide.json on 1.21.1 and the assets/skyseed/items/guide.json definition on 26.1.2 (both shipped).
         write(new File(outBook, 'book.json'), [name: "Skyfarer's Almanac",
-                tooltip: "The full illustrated guide to Skyseed.", display_mode: "index"])
+                tooltip: "The full illustrated guide to Skyseed.", display_mode: "index",
+                model: "skyseed:guide"])
 
         new File(patchouliGuideRoot, 'en_us/categories').eachFile { f ->
             if (!f.name.endsWith('.json')) return
