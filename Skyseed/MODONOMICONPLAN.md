@@ -179,6 +179,28 @@ text/condition model). So the content must exist in **both** formats. Options, r
   - A **throwaway `test_guide` id** was used so `SkyseedGuide.book()`'s real `skyseed:guide` precedence is untouched
     (no 1.21.1 Patchouli regression). **Phase 2 replaces test_guide with the real `skyseed:guide` Modonomicon book at
     full parity** (so both nodes switch to Modonomicon only once it's complete) and removes test_guide.
-- _Next: Phase 2 — the full `skyseed:guide` content (golden→Modonomicon transform; the page-type + `$(...)` macro
-  mapping is the meaty part), then flip the book-coverage gametest to validate BOTH backends (Patchouli AND
-  Modonomicon stay first-class + complete — per the standing rule)._
+- **★ Phase 2 DONE (commit `9a73b23`, 2026-06-28) — the full Modonomicon guide is generated from the golden Patchouli
+  book; `book()` now returns the real `skyseed:guide` Modonomicon book on both nodes.** The `generateGuide` Gradle
+  task (sibling to `generateRecipes`) derives the Modonomicon edition into `build/generated/guide` (resource srcDir);
+  the Patchouli book stays as-is for its backend. **Confirmed transform facts (codec field names via `javap -v`):**
+  - book.json `{name, tooltip, display_mode: "index"}`; category `{name, icon, sort_number, display_mode: "index"}`;
+    entry `{category: "skyseed:<cat>", name, icon, x, y, sort_number, pages, condition}` (category id is `skyseed:<cat>`
+    — full namespace, no book scope — matching the Patchouli category names, so the entries link). **`BookDisplayMode.
+    INDEX`** auto-lays-out entries (no manual x/y tree needed).
+  - pages: `patchouli:text`→`modonomicon:text` (`text`), `patchouli:crafting`→`modonomicon:crafting_recipe`
+    (**`recipe_id_1`**, recipes are golden-generated so they exist); the entry reveal `advancement` → a
+    `{type: "modonomicon:advancement", advancement_id: …}` **condition**; per-page advancements dropped.
+  - **Macros** `$(...)` are self-expanded to vanilla **§-codes** (item→§3, bold→§l, o/italic→§o, br/br2→\n/\n\n,
+    li→bullet, 2→§2, ()→§r). ⚠ **Residual render-time risk:** Modonomicon renders text via **CommonMark/Markdown**
+    (it bundles `commonmark` jars + has `use_markdown_title`), so the §-codes may need visual checking / a switch to
+    markdown formatting — the only thing a gametest can't verify (text *content* is all present).
+  - **Gametest** `modonomicon_guide_book_is_complete_and_degrades`: the book loads (non-empty), an absent id → EMPTY,
+    and it ships ≥ one entry per seed (the completeness guarantee — preferred backend never thinner than the legacy
+    one). **Build-timing gotcha (diagnosed):** Modonomicon links entries into `Book.getEntries()` only after
+    `areBooksBuilt()` (false at gametest tick 0 — `cats=6` but `entries=0` then), so the test counts the shipped
+    entry *resources* instead of the runtime map. Categories load fine and the entry refs match, so it builds in-game.
+  - Verified: book loads with 0 parse errors on **both** Modonomicon builds (1.114.5 + 1.134.2); 59 green on 26.1.2,
+    126 on 1.21.1; Patchouli stays first-class (content unchanged, still shipped + valid).
+- _Follow-ups: (1) visually verify the §-macro rendering through Modonomicon's markdown (refine to markdown if needed);
+  (2) the 1.21.1 book-coverage test still checks only the Patchouli entries — extend it (or add a 26.1.2 analog) to
+  assert the Modonomicon book stays complete as seeds are added, so BOTH backends are kept up to date._
