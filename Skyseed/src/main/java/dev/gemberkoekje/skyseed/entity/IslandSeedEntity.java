@@ -167,7 +167,7 @@ public class IslandSeedEntity extends ThrowableItemProjectile {
         if (forced == null) {
             return null;
         }
-        return level.registryAccess().registryOrThrow(Registries.BIOME)
+        return Lookup.registry(level.registryAccess(), Registries.BIOME)
                 .getHolder(ResourceKey.create(Registries.BIOME, Ids.parse(forced.value())))
                 .<Holder<Biome>>map(ref -> ref)
                 .orElse(null);

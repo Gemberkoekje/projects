@@ -11,12 +11,24 @@ import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.MobSpawnType;
+//? if >=26.1.2 {
+/*import static net.minecraft.world.entity.EntitySpawnReason.SPAWNER;*/
+//?} else {
+import static net.minecraft.world.entity.MobSpawnType.SPAWNER;
+//?}
+//? if >=26.1.2 {
+/*import net.minecraft.world.entity.animal.bee.Bee;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.animal.sheep.Sheep;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerType;*/
+//?} else {
 import net.minecraft.world.entity.animal.Bee;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.animal.Sheep;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerType;
+//?}
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
@@ -164,12 +176,12 @@ public final class GenerationJob {
                     mob.moveTo(wet.getX() + 0.5, wet.getY() + 0.5, wet.getZ() + 0.5,
                             plan.random().nextFloat() * 360.0F, 0.0F);
                     applyTraits(mob, as.baby());
-                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wet), MobSpawnType.SPAWNER, null);
+                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wet), SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
                 continue;
             }
-            final Entity e = as.type().spawn(level, freeStandSpot(as.pos()), MobSpawnType.SPAWNER);
+            final Entity e = as.type().spawn(level, freeStandSpot(as.pos()), SPAWNER);
             if (e != null) {
                 applyTraits(e, as.baby());
             }
@@ -448,7 +460,7 @@ public final class GenerationJob {
                 final Entity e = ms.type().create(level);
                 if (e instanceof Mob mob) {
                     mob.moveTo(wp.getX() + 0.5, wp.getY() + 0.5, wp.getZ() + 0.5, plan.random().nextFloat() * 360.0F, 0.0F);
-                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wp), MobSpawnType.SPAWNER, null);
+                    EventHooks.finalizeMobSpawn(mob, level, level.getCurrentDifficultyAt(wp), SPAWNER, null);
                     level.addFreshEntity(mob);
                 }
                 continue;
@@ -460,7 +472,7 @@ public final class GenerationJob {
             if (level.getBlockState(surface).isAir() || blocked(spawnPos) || blocked(spawnPos.above())) {
                 continue;
             }
-            ms.type().spawn(level, spawnPos, MobSpawnType.SPAWNER);
+            ms.type().spawn(level, spawnPos, SPAWNER);
         }
     }
 

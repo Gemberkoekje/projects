@@ -90,9 +90,16 @@ public final class Lookup {
 
     // --- Dynamic registries (via RegistryAccess) ----------------------------------------------------------------
 
-    /** A registry — vanilla or one of this mod's datapack registries (e.g. the theme registry) — by its key. */
+    /** A registry — vanilla or one of this mod's datapack registries (e.g. the theme registry) — by its key. The
+     *  accessor was renamed {@code registryOrThrow} → {@code lookupOrThrow} (both return a {@code Registry}) in 26.1.2;
+     *  on 1.21.1 {@code lookupOrThrow} returns a holder-lookup instead, so the two are NOT interchangeable — hence the
+     *  directive. Route ALL registry access through here so the swap lives in one place. */
     public static <T> Registry<T> registry(RegistryAccess access, ResourceKey<? extends Registry<? extends T>> key) {
+        //? if >=26.1.2 {
+        /*return access.lookupOrThrow(key);*/
+        //?} else {
         return access.registryOrThrow(key);
+        //?}
     }
 
     /** A value from {@code registry} under {@code id} — {@code null} if the id is absent or unparseable. */
@@ -104,13 +111,13 @@ public final class Lookup {
     /** Whether a jigsaw template pool is registered under {@code id} (a {@code null}/unparseable id → false). */
     public static boolean hasTemplatePool(RegistryAccess access, Id id) {
         final var rl = id == null ? null : Ids.parse(id.value());
-        return rl != null && access.registryOrThrow(Registries.TEMPLATE_POOL).containsKey(rl);
+        return rl != null && registry(access, Registries.TEMPLATE_POOL).containsKey(rl);
     }
 
     /** Whether a jigsaw template pool is registered under a raw {@code namespace:path} pool id (e.g. a {@code _void} variant). */
     public static boolean hasTemplatePool(RegistryAccess access, String id) {
         final var rl = Ids.parse(id);
-        return rl != null && access.registryOrThrow(Registries.TEMPLATE_POOL).containsKey(rl);
+        return rl != null && registry(access, Registries.TEMPLATE_POOL).containsKey(rl);
     }
 
     /** The template-pool holder for {@code id} (callers gate with {@link #hasTemplatePool(RegistryAccess, Id)}). */
@@ -127,7 +134,7 @@ public final class Lookup {
     public static Optional<ConfiguredFeature<?, ?>> configuredFeature(RegistryAccess access, Id id) {
         final var rl = id == null ? null : Ids.parse(id.value());
         return rl == null ? Optional.empty()
-                : access.registryOrThrow(Registries.CONFIGURED_FEATURE).getOptional(rl);
+                : registry(access, Registries.CONFIGURED_FEATURE).getOptional(rl);
     }
 
     // --- The one method that names the Minecraft id type: the raw templatePool gametests reach via Ids.mod(...) ---
