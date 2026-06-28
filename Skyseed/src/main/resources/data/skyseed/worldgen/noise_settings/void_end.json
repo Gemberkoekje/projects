@@ -10,6 +10,7 @@
   "noise": { "min_y": 0, "height": 256, "size_horizontal": 1, "size_vertical": 2 },
   "surface_rule": { "type": "minecraft:sequence", "sequence": [] },
   "noise_router": {
+    "preliminary_surface_level": 0.0,
     "barrier": 0.0,
     "fluid_level_floodedness": 0.0,
     "fluid_level_spread": 0.0,

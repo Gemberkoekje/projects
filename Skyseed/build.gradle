@@ -30,13 +30,18 @@ sourceSets.main.resources {
     exclude("src/generated/**/.cache") // datagen cache files
 }
 
-// The gametest harness (src/main/.../gametest) uses the pre-1.21.5 @GameTest / @GameTestHolder registration API, which
-// the 26.1.2 gametest rewrite removed (it's now instance/datapack-based). The gametests are dev-only — the 1.21.1
-// golden-master witness — so until they're ported they compile only on the old-API node; newer nodes build the
-// shipped mod without them. See REFACTORPLAN.md §2.6.
-if (mcv != "1.21.1") {
+// Each MC version gets its OWN gametest suite, fully isolated by package + a per-version compile exclude. The 1.21.5+
+// rewrite removed the @GameTest / @GameTestHolder annotation API (it's now the GameTestInstance / RegisterGameTestsEvent
+// framework), so the suites can't share source. Keeping them separate also means the 1.21.1 suite stays an UNCHANGING
+// golden-master witness while newer nodes get a native suite. Add a node → add a `gametest_<v>` package + a branch here.
+// See GAMETESTPLAN.md.
+if (mcv == "1.21.1") {
     sourceSets.main.java {
-        exclude("dev/gemberkoekje/skyseed/gametest/**")
+        exclude("dev/gemberkoekje/skyseed/gametest_26_1_2/**") // 1.21.1 node: only the old-API suite
+    }
+} else {
+    sourceSets.main.java {
+        exclude("dev/gemberkoekje/skyseed/gametest/**")        // newer nodes: only their native suite
     }
 }
 
@@ -238,11 +243,16 @@ configurations {
 dependencies {
     jacocoAgentRuntime "org.jacoco:org.jacoco.agent:0.8.12:runtime"
 }
-neoForge.runs.named('gameTestServer').configure {
-    def execFile = layout.buildDirectory.file('jacoco/gameTest.exec').get().asFile
-    // includes= our packages only: avoids JaCoCo choking on Minecraft's huge Blocks/Items classes and keeps the
-    // run fast — we only care about coverage of the mod's own code anyway.
-    jvmArgument("-javaagent:${configurations.jacocoAgentRuntime.singleFile}=destfile=${execFile},append=false,includes=dev.gemberkoekje.skyseed.*")
+// JaCoCo 0.8.12 can't instrument Java 25 bytecode (class file major version 69), which the 26.1.2 node compiles to —
+// it throws on every mod class and pollutes the run. Attach the agent only on the 1.21.1 node for now; 26.1.2 coverage
+// tooling (a Java-25-capable JaCoCo or alternative) is tracked in GAMETESTPLAN.md.
+if (mcv == "1.21.1") {
+    neoForge.runs.named('gameTestServer').configure {
+        def execFile = layout.buildDirectory.file('jacoco/gameTest.exec').get().asFile
+        // includes= our packages only: avoids JaCoCo choking on Minecraft's huge Blocks/Items classes and keeps the
+        // run fast — we only care about coverage of the mod's own code anyway.
+        jvmArgument("-javaagent:${configurations.jacocoAgentRuntime.singleFile}=destfile=${execFile},append=false,includes=dev.gemberkoekje.skyseed.*")
+    }
 }
 
 tasks.register('gameTestCoverage', JacocoReport) {
