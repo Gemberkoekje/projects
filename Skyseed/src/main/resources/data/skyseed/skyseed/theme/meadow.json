@@ -24,10 +24,14 @@
         { "block": "minecraft:oxeye_daisy", "chance": 0.05 }, { "block": "minecraft:cornflower", "chance": 0.04 },
         { "block": "minecraft:lily_of_the_valley", "chance": 0.04 },
         { "block": "minecraft:lilac", "chance": 0.03 }, { "block": "minecraft:rose_bush", "chance": 0.02 }, { "block": "minecraft:peony", "chance": 0.02 },
-        { "block": "minecraft:bee_nest", "chance": 0.015 }
+        { "block": "minecraft:bee_nest", "chance": 0.015 },
+        { "_comment": "1.21.5 flora (26.1.2) — every id here is unknown on 1.21.1, so the tolerant resolvers skip them (REFACTORPLAN 2d-2)",
+          "block": "minecraft:wildflowers", "chance": 0.06 }, { "block": "minecraft:firefly_bush", "chance": 0.03 },
+        { "block": "minecraft:bush", "chance": 0.05 }, { "block": "minecraft:golden_dandelion", "chance": 0.04 }
       ] } },
     { "weight": 2, "name": "sunflower", "decoration": {
-      "ground": [ { "block": "minecraft:sunflower", "chance": 0.28 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:dandelion", "chance": 0.04 } ] } },
+      "ground": [ { "block": "minecraft:sunflower", "chance": 0.28 }, { "block": "minecraft:short_grass", "chance": 0.15 }, { "block": "minecraft:dandelion", "chance": 0.04 },
+        { "block": "minecraft:wildflowers", "chance": 0.05 }, { "block": "minecraft:bush", "chance": 0.04 } ] } },
     { "weight": 2, "name": "tulip", "decoration": {
       "ground": [
         { "block": "minecraft:red_tulip", "chance": 0.08 }, { "block": "minecraft:orange_tulip", "chance": 0.08 },

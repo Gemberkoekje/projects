@@ -22,7 +22,10 @@
   "variants": [
     { "weight": 1, "name": "oak", "decoration": {
       "trees": [ { "feature": "minecraft:oak", "tries": 4, "spacing": 3 } ],
-      "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } }
+      "ground": [ { "block": "minecraft:short_grass", "chance": 0.30 }, { "block": "minecraft:poppy", "chance": 0.03 }, { "block": "minecraft:dandelion", "chance": 0.03 }, { "block": "minecraft:azalea", "chance": 0.03 },
+        { "_comment": "1.21.5 forest-floor flora (26.1.2) — unknown on 1.21.1, skipped there (REFACTORPLAN 2d-2)",
+          "block": "minecraft:leaf_litter", "chance": 0.12 }, { "block": "minecraft:bush", "chance": 0.06 },
+        { "block": "minecraft:firefly_bush", "chance": 0.03 }, { "block": "minecraft:wildflowers", "chance": 0.04 } ] } }
   ],
   "biome_overrides": [
     { "_comment": "End — central island (the_end biome, the dragon-fight area): an EMPTY end-stone island of normal size — a clean building platform by the fight. No chorus; craft a Chorus Forest seed for that.", "dimension": "minecraft:the_end", "biomes": [ "minecraft:the_end" ],
@@ -150,10 +153,13 @@
     { "biomes": [ "#minecraft:is_forest" ], "variants": [
       { "weight": 3, "name": "oak", "decoration": {
         "trees": [ { "feature": "minecraft:oak", "tries": 7, "spacing": 2 } ],
-        "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 }, { "block": "minecraft:poppy", "chance": 0.04 }, { "block": "minecraft:dandelion", "chance": 0.04 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } },
+        "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 }, { "block": "minecraft:poppy", "chance": 0.04 }, { "block": "minecraft:dandelion", "chance": 0.04 }, { "block": "minecraft:azalea", "chance": 0.03 },
+          { "_comment": "1.21.5 forest-floor flora (26.1.2) — unknown on 1.21.1, skipped there",
+            "block": "minecraft:leaf_litter", "chance": 0.12 }, { "block": "minecraft:bush", "chance": 0.06 }, { "block": "minecraft:firefly_bush", "chance": 0.03 } ] } },
       { "weight": 2, "name": "birch", "decoration": {
         "trees": [ { "feature": "minecraft:birch", "tries": 7, "spacing": 2 } ],
-        "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 }, { "block": "minecraft:azalea", "chance": 0.03 } ] } }
+        "ground": [ { "block": "minecraft:short_grass", "chance": 0.35 }, { "block": "minecraft:azalea", "chance": 0.03 },
+          { "block": "minecraft:leaf_litter", "chance": 0.10 }, { "block": "minecraft:bush", "chance": 0.05 } ] } }
     ] }
   ]
 }

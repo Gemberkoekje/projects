@@ -26,9 +26,12 @@
   ],
   "variants": [
     { "weight": 3, "name": "mesa", "decoration": {
-      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.08 }, { "block": "minecraft:cactus", "chance": 0.02 } ] } },
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.08 }, { "block": "minecraft:cactus", "chance": 0.02 },
+        { "_comment": "1.21.5 arid flora (26.1.2) — unknown on 1.21.1, skipped there (REFACTORPLAN 2d-2)",
+          "block": "minecraft:short_dry_grass", "chance": 0.18 }, { "block": "minecraft:tall_dry_grass", "chance": 0.07 } ] } },
     { "weight": 2, "name": "eroded", "surface_override": "minecraft:terracotta", "decoration": {
-      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.10 }, { "block": "minecraft:cactus", "chance": 0.03 } ] } },
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.10 }, { "block": "minecraft:cactus", "chance": 0.03 },
+        { "block": "minecraft:short_dry_grass", "chance": 0.15 } ] } },
     { "weight": 1, "name": "wooded", "surface_override": "minecraft:grass_block", "decoration": {
       "trees": [ { "feature": "minecraft:dark_oak", "tries": 4, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.12 }, { "block": "minecraft:dead_bush", "chance": 0.04 } ] } }

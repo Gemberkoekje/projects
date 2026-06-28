@@ -222,6 +222,7 @@ public final class SkyseedTests {
         reg(event, "every_theme_plans_without_error", REGION, SkyseedTests::everyThemePlansWithoutError);
         reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
         reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
+        reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
         reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
@@ -3320,6 +3321,34 @@ public final class SkyseedTests {
             if (bp.state().is(Blocks.WATER)) water++;
         }
         helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void newVegetationResolvesOnThemes(GameTestHelper helper) {
+        // REFACTORPLAN 2d-2: the 1.21.5 flora resolves on 26.1.2 (skipped inert on 1.21.1 — they're unknown ids there).
+        // Plan each theme over a biome that selects the edited variant and confirm a signature new plant lands: desert
+        // (base 'standard' variant) -> short_dry_grass; a forest biome (#is_forest variant) -> leaf_litter; meadow
+        // (base 'wildflower' variant) -> wildflowers. Ground decoration is expanded into p.blocks().
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var desert = biome(level, "minecraft:desert");
+        final var forest = biome(level, "minecraft:forest");
+        final var meadow = biome(level, "minecraft:meadow");
+        boolean dryGrass = false, leafLitter = false, wildflowers = false;
+        for (long seed = 1; seed <= 12 && !(dryGrass && leafLitter && wildflowers); seed++) {
+            if (!dryGrass && planHas(IslandGenerator.planIsland(level, c, theme(level, "desert"), desert, RandomSource.create(seed)), Blocks.SHORT_DRY_GRASS)) {
+                dryGrass = true;
+            }
+            if (!leafLitter && planHas(IslandGenerator.planIsland(level, c, theme(level, "forest"), forest, RandomSource.create(seed)), Blocks.LEAF_LITTER)) {
+                leafLitter = true;
+            }
+            if (!wildflowers && planHas(IslandGenerator.planIsland(level, c, theme(level, "meadow"), meadow, RandomSource.create(seed)), Blocks.WILDFLOWERS)) {
+                wildflowers = true;
+            }
+        }
+        helper.assertTrue(dryGrass, "desert grew no short_dry_grass (1.21.5 arid flora did not resolve)");
+        helper.assertTrue(leafLitter, "forest grew no leaf_litter (1.21.5 forest-floor flora did not resolve)");
+        helper.assertTrue(wildflowers, "meadow grew no wildflowers (1.21.5 flora did not resolve)");
         helper.succeed();
     }
 

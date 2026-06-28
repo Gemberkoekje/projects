@@ -12,7 +12,10 @@
   ],
   "variants": [
     { "weight": 1, "name": "standard", "decoration": {
-      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 }, { "block": "minecraft:cactus", "chance": 0.06 } ] } }
+      "ground": [ { "block": "minecraft:dead_bush", "chance": 0.12 }, { "block": "minecraft:cactus", "chance": 0.06 },
+        { "_comment": "1.21.5 arid flora (26.1.2) — unknown on 1.21.1, skipped there (REFACTORPLAN 2d-2)",
+          "block": "minecraft:short_dry_grass", "chance": 0.22 }, { "block": "minecraft:tall_dry_grass", "chance": 0.08 },
+        { "block": "minecraft:cactus_flower", "chance": 0.04 } ] } }
   ],
   "biome_overrides": [
     { "_comment": "End form: a same-size, pure end-stone island (the overworld silhouette in end stone).", "dimension": "minecraft:the_end", "shape": { "radius": { "min": 6, "max": 9 }, "rim_noise": 0.40, "underside": "teardrop" } },
