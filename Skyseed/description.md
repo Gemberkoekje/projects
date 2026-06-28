@@ -131,7 +131,7 @@ Farm up enough blaze rods and ender pearls for Eyes of Ender and you can grow in
 
 Every world hands you the **Skyfarer's Almanac**. It has the recipe for each seed, and once you've crafted one it unlocks that island's field notes to read as you go. Lose the book and you can craft any Skyseed back into it at a table.
 
-With **Patchouli** installed you get the full illustrated version. Without it, the Almanac falls back to a plain written book that still covers the basics.
+With **Modonomicon** (or **Patchouli**) installed you get the full illustrated version. Without either, the Almanac falls back to a plain written book that still covers the basics.
 
 ---
 
@@ -155,9 +155,9 @@ The three chapters, overworld, Nether and End, are all built out, so what's left
 
 ## Requirements
 
-- **Minecraft 1.21.1**
+- **Minecraft 1.21.1** or **26.1.2**
 - **NeoForge**
-- **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** *(optional)*, for the illustrated guidebook. Runs fine without it.
+- **[Modonomicon](https://www.curseforge.com/minecraft/mc-mods/modonomicon)** or **[Patchouli](https://www.curseforge.com/minecraft/mc-mods/patchouli)** *(optional)*, for the illustrated guidebook. Runs fine without either.
 
 ---
 

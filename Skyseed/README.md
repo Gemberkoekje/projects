@@ -1,8 +1,8 @@
 # Skyseed
 
-A **terraforming skyblock** mod for **Minecraft 1.21.1 / NeoForge**. Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
+A **terraforming skyblock** mod for **Minecraft 1.21.1 and 26.1.2 / NeoForge** (one codebase, built for both via Stonecutter). Craft a *Skyseed*, throw it into open air, and ~2 seconds later a procedurally generated, themed sky island germinates where it comes to rest. Progression is driven by **exploration + crafting**, not block-condensing.
 
-> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)** (the in-progress 26.1.2 build has its own **[CHANGELOG_26.1.md](CHANGELOG_26.1.md)**). The only open build plan is the multi-version refactor (`REFACTORPLAN.md`); every per-chapter and per-feature plan was retired into the changelog once shipped.
+> This README is the consolidated project plan: architecture, data model, decisions, and current status. The full version history is in **[CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)**; the **26.1.2** build (which compiles, builds, and passes its own gametest suite) has its own **[CHANGELOG_26.1.md](CHANGELOG_26.1.md)**. The only open build plan is the multi-version refactor (`REFACTORPLAN.md`, now on Stage 3 — CI/generalize); every per-chapter and per-feature plan — including the 26.1.2 gametest harness, the recipe generator, and the Modonomicon guide — was retired into the changelogs once shipped.
 
 ---
 
@@ -57,7 +57,7 @@ Different recipes produce Skyseeds of different **themes** (forest, rocky, …) 
 | Guide | The Skyfarer's Almanac — **Patchouli optional**: the rich illustrated book when Patchouli is installed, a plain vanilla written book otherwise. Crafted from any one Skyseed (`#skyseed:skyseeds`); advancement-gated entries |
 | Safety | Tick-budget placement (no single-tick stalls); block-overlap fit + horizontal nudge-off (islands sit flush), player-aware, fizzle-and-drop |
 
-**All three chapters (overworld, Nether, End) and the Huge island tier are feature-complete.** The deep-jigsaw structural-diversity work is done too: the villages (street villages), the Woodland Mansion (footprint variety), the Nether Fortress (sprawl over the void), and connective galleries/courtyards for the Trial Chamber and Bastion (the Ocean Monument is kept as its single iconic water basin — its `grand` variant is its size variety). The only build-out left is multi-version (`REFACTORPLAN.md` Stage 2); see **Roadmap** below.
+**All three chapters (overworld, Nether, End) and the Huge island tier are feature-complete.** The deep-jigsaw structural-diversity work is done too: the villages (street villages), the Woodland Mansion (footprint variety), the Nether Fortress (sprawl over the void), and connective galleries/courtyards for the Trial Chamber and Bastion (the Ocean Monument is kept as its single iconic water basin — its `grand` variant is its size variety). Multi-version is built too: the **26.1.2** node compiles, builds, and passes its gametests (the 1.21.4/1.21.5 worldgen content — Pale Garden, the new vegetation/mobs — is in, gated so the same data is inert on 1.21.1). The only build-out left is `REFACTORPLAN.md` **Stage 3** (CI/generalize); see **Roadmap** below.
 
 ---
 
@@ -67,7 +67,7 @@ All three chapters and the Huge island tier are built; what's left is mostly opt
 
 - **A few more structures** that would sit well as island variants: a **Stronghold** (the lit End portal already exists as its own seed), and **Buried Treasure / Shipwreck** as Aquatic features. (The Mineshaft and Ancient City already shipped as Huge-tier rares.)
 - **Remaining vanilla blocks** — down to essentially the **copper bulb** (a small Trial Chamber template edit); the Nether- and End-gated block sets landed with their chapters.
-- **Multi-version support** (`REFACTORPLAN.md`) — building against multiple Minecraft / NeoForge versions from one codebase: the **Stonecutter skeleton + the `compat` facade are done** (Stages 0–1); adding the second version is deferred until 1.21.1 is feature-complete (NeoForge-only; no new runtime dependency; Fabric is a separate future concern).
+- **Multi-version support** (`REFACTORPLAN.md`) — building against multiple Minecraft / NeoForge versions from one codebase. The **Stonecutter skeleton + the `compat` facade** (Stages 0–1) and the **second version `26.1.2`** (Stage 2 — compiles, builds, native 134-test gametest suite, the full 1.21.4/1.21.5 worldgen content) are **done**; both nodes are green at every commit. Remaining: **Stage 3** (generalize + document) — `chiseledBuild`/`chiseledRunGameTestServer` fan a task across all nodes and a CI matrix builds each, both landed; adding further versions is the open generalization. NeoForge-only; no new runtime dependency; Fabric is a separate future concern.
 
 > **⚠ Before 1.0 (cleanup):** **remove the `/emptynether` and `/emptyend` rescue commands** (`SkyseedCommands.java`, offered by the legacy-world warning in `PlayerEvents`). They're a one-time stopgap for worlds created *before* the void dimensions landed (v0.35.x) — by 1.0 there should be no pre-void world left to rescue — and the in-place conversion leans on Minecraft's **experimental-features** path, which is acceptable as a rescue route now but should **not** ship in a 1.0 release.
 
@@ -228,24 +228,28 @@ Skyseed itself only optionally integrates with Patchouli; nothing else is refere
 
 ## Building & running
 
-Requires **JDK 21** (NeoForge 1.21.1's required Java). The build is pinned to a local JDK 21 via `org.gradle.java.home` in `gradle.properties` — adjust that path if your JDK lives elsewhere.
+One codebase, two version nodes via **Stonecutter** (`1.21.1` and `26.1.2`). Each node needs its own JDK toolchain — **JDK 21** for the 1.21.1 node, **JDK 25** for the 26.1.2 node (Java 25+ runs both). The active node is set in `stonecutter.gradle.kts`; address a specific node with `:<version>:<task>`.
 
 ```sh
-./gradlew build              # compile + package the mod jar
-./gradlew runClient          # launch a dev Minecraft client with the mod loaded
-./gradlew runServer          # launch a dev dedicated server
-./gradlew runGameTestServer  # run the GameTest suite (exits 0 on pass); also /test runall in dev
+./gradlew :1.21.1:build                 # build the 1.21.1 jar
+./gradlew :26.1.2:build                 # build the 26.1.2 jar
+./gradlew chiseledBuild                 # build EVERY version node in one go
+./gradlew :26.1.2:runGameTestServer     # run a node's GameTest suite (exits 0 on pass)
+./gradlew chiseledRunGameTestServer     # run the gametests on every node
+./gradlew runClient                     # dev client for the active node
 ```
 
-The first invocation downloads Gradle, NeoForge, and Minecraft, so it takes a while.
+CI (`.github/workflows/ci-skyseed.yml`) builds + gametests both nodes as a matrix. The first invocation downloads Gradle, NeoForge, and Minecraft (and the 26.1.2 node decompiles via NeoForm), so it takes a while.
 
 ### Tests
 
-`gametest/SkyseedGameTests.java` holds a NeoForge GameTest suite that asserts generation/structure
-invariants (every theme plans without error, generation is deterministic, structures keep their key
-blocks). Run it with `./gradlew runGameTestServer` — it's the safety net to run before and after the
-refactors in the codebase. For test **coverage**, run `./gradlew gameTestCoverage` (attaches the
-JaCoCo agent to the run) → `build/reports/jacoco/gameTestCoverage/html/index.html`.
+`gametest/SkyseedGameTests.java` holds the **1.21.1** GameTest suite (NeoForge `@GameTest`) that asserts
+generation/structure invariants (every theme plans without error, generation is deterministic, structures
+keep their key blocks). The **26.1.2** node has its own suite in `gametest_26_1_2/` on the newer
+`GameTestInstance` framework (134 tests, incl. a 26.1.2-captured golden master). Run a node's suite with
+`./gradlew :<version>:runGameTestServer`, or all nodes with `./gradlew chiseledRunGameTestServer` — the
+safety net to run before and after refactors. For test **coverage** (1.21.1), run `./gradlew gameTestCoverage`
+(JaCoCo) → `build/reports/jacoco/gameTestCoverage/html/index.html`.
 
 The build compiles with `-Xlint:all` (warnings stay visible in the log; the build is *not* `-Werror`).
 

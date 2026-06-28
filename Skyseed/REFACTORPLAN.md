@@ -65,8 +65,12 @@ changes between versions the Stonecutter directives live in a handful of named f
    Stonecutter node; resolve the per-version compile diffs with directives — almost all landing in `compat`. Get
    **both** versions building and each one's gametests passing. **Detailed, data-driven plan: see
    [Stage 2 in detail](#stage-2-in-detail--target-mc-2612--neoforge-261276) below.**
-3. **Generalize + document.** Add further versions as wanted; write the "how to add a version" recipe (a node + the
-   expected directive sites); optionally a CI matrix (`chiseledBuild`).
+3. **Generalize + document — IN PROGRESS.** ✅ The **CI matrix is wired**: `stonecutter.gradle.kts` registers
+   `chiseledBuild` + `chiseledRunGameTestServer` (fan a task across every node via `stonecutter.tasks.named(<task>)`, so
+   a new node needs no edit there), and `.github/workflows/ci-skyseed.yml` builds + gametests each node as a matrix
+   (1.21.1→JDK 21, 26.1.2→JDK 25). Remaining: the "how to add a version" recipe (a node + the expected directive
+   sites), and adding further versions as wanted. _NB: the 1.21.1 suite has one long-known flaky gametest that can make
+   CI red intermittently (passes on rerun); worth a retry/guard before CI is load-bearing._
 
 > **Priority (per the maintainer): 1.21.1 was the only target while the chapters were built; Stage 2 is now active.**
 > Stages 0–1 (the structural value) landed first; the **second version's driver is the worldgen content newer versions
