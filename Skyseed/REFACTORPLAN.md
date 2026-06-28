@@ -242,6 +242,28 @@ The per-category plan, highest-leverage first (each links a category of the 120 
 swaps), then the file-local clusters (entity, commands, worlddata, recipe), then client + the 1-offs. Recompile after
 each cluster; the count only visibly drops below 100 once the bulk is cleared, so track the per-symbol histogram.
 
+**Progress (2026-06-28): 120 → 102.** DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob),
+`registryOrThrow`→`lookupOrThrow` (NOT a clean swap — `//?` in `Lookup.registry()`, all callers route through it),
+`Registry.get`→`getValue` (`//?` in `Lookup.byId()`, block/entity route through it), and the item/entity superclass
+import. **The whole `compat` facade now compiles clean on 26.1.2.** The remaining 102, accurately mapped from the
+full compile (`-Xmaxerrs` lifted), is dominated by **ONE recurring rewrite not in the table above:**
+
+- **★ the 1.21.5 NBT/serialization rewrite — `CompoundTag` direct access → `ValueInput`/`ValueOutput` with
+  `Optional<T>` getters.** Hits `IslandSeedEntity` (`addAdditionalSaveData(ValueOutput)`/`readAdditionalSaveData(
+  ValueInput)`, ~13 errors), `SkyseedCommands` (`CompoundTag.contains`/`get` → Optional, ~11) and `SkyseedWorldData`
+  (~8) — **~30 of the 102, and the meatiest** (each save/load method is a real per-version rewrite, not a rename).
+  Do these carefully: write the 1.21.1 body (current) and the 26.1.2 `ValueInput`/`ValueOutput` body as a `//?` method
+  pair, reading the new accessor names from the jar.
+
+Other clusters (mechanical renames, per the histogram): **entity API** — `EntityType.create(Level)`→`create(Level,
+EntitySpawnReason)`, `Entity.moveTo`→(renamed), `teleportTo`/`setRespawnPosition` signatures (GenerationJob,
+PlayerEvents, IslandSeedEntity ctor needs an `ItemStack`); **recipe API** — `CustomRecipe`/`SimpleCraftingRecipe
+Serializer`/`LootModifier` shape (GuideRecipe, ModRecipes, AddDropModifier); **`DeferredRegister.registerItem`** sig
+(ModItems); **client** — `ModelResourceLocation`, `KeyMapping` ctor, `SkyseedClientEvents`, `WorldSetupEvents`;
+**1-offs** — `ChunkPos` ctor + `MaxDistance` (Jigsaw), `ModEntities` `ResourceKey`, `TwinPlacer`, structure templates
+(`CHAIN`), etc. **Realistic scope: a multi-session grind** — the crux (RL) + the facade are done; this is volume, with
+the NBT rewrite the one genuinely careful piece.
+
 ---
 
 ## Risks & things to verify
