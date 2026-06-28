@@ -209,12 +209,17 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
   **golden master** (captured fresh for 26.1.2 — **4 of 5 fingerprints byte-identical to the 1.21.1 suite**, only
   `gametest/water` differs by 10 blocks). Idioms: `MinecartChest`→`vehicle.minecart`, `ResourceKey.location()`→
   `identifier()`, `getStringOr`, the `Entities` helper, `Lookup.registry`/`getValue`.
-- **3 tests deferred** (each genuinely blocked, not a port gap): `auto_debug_seeds` (`ModItems.DEBUG_SEEDS` empty —
-  `ThemeScanner.scan()` is stubbed pending the `IModFile.findResource` follow-up), `seedStateRoundTripsThroughNbt`
-  (the ValueOutput/ValueInput NBT rework), `legacyDimensionReset` (level.dat reset, slated for pre-1.0 removal).
-- _The 26.1.2 gametest harness is DONE — 124 tests across all 4 phases, the golden master locked, both guide backends
-  validated. Remaining open threads are elsewhere: the §-macro render check (SKYMODONOMICONPLAN), the ThemeScanner
-  `findResource` stub (unblocks the last debug-seed test), and the still-stubbed worldGenOptions/bonus-chest._
+- **★★ Post-Phase-4 stub cleanup (2026-06-28) — every production no-op wired, +2 tests → 126 ported ("All 127").**
+  Wiring the remaining 26.1.2 production stubs unblocked the two API-gated tests:
+  - `auto_debug_seeds_cover_overrides_and_rares` — `ThemeScanner` now walks `IModFile.getContents().visitContent`
+    (findResource was removed), so `ModItems.DEBUG_SEEDS` is populated (152) and the coverage test passes (`f1c63ea`).
+  - `seedStateRoundTripsThroughNbt` — driven through a `CompoundTag`-backed `TagValueOutput.createWithContext` /
+    `TagValueInput.create` (`ProblemReporter.DISCARDING`), reading back via `getBooleanOr`/`getDoubleOr` (`bjv...`).
+- **Only `legacyDimensionReset` stays deferred** — the level.dat `/emptynether` reset is a genuine no-op on 26.1.2
+  (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal, so there is nothing to test.
+- _The 26.1.2 gametest harness is DONE — 126 tests across all 4 phases, the golden master locked, both guide backends
+  validated, and all production stubs are now real code (ThemeScanner, bonus-chest, FMLEnvironment.isProduction, the
+  model-bake icon hook, the Modonomicon hard-break fix). Nothing is left but the actual 1.21.1↔26.1.2 content._
 
 ## Resolved decisions
 - **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
