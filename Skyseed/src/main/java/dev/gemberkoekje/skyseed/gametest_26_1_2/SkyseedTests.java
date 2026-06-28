@@ -193,6 +193,7 @@ public final class SkyseedTests {
         // batch c — debug seeds / dungeon / mineshaft / End-form theme config:
         reg(event, "debug_forced_rare_germinates_its_structure", REGION, SkyseedTests::debugForcedRareGerminatesItsStructure);
         reg(event, "debug_forced_waterfall_germinates_water_column", REGION, SkyseedTests::debugForcedWaterfallGerminatesWaterColumn);
+        reg(event, "auto_debug_seeds_cover_overrides_and_rares", REGION, SkyseedTests::autoDebugSeedsCoverOverridesAndRares);
         reg(event, "sprawling_dungeon_assembles", BIG_REGION, SkyseedTests::sprawlingDungeonAssembles);
         reg(event, "dungeon_complex_rooms_carry_content", REGION, SkyseedTests::dungeonComplexRoomsCarryContent);
         reg(event, "dungeon_complex_goes_vertical", BIG_REGION, SkyseedTests::dungeonComplexGoesVertical);
@@ -225,13 +226,9 @@ public final class SkyseedTests {
         reg(event, "island_output_is_stable", REGION, SkyseedTests::islandOutputIsStable);
         reg(event, "every_seed_recipe_and_book_entry_matches_seed_kind", REGION, SkyseedTests::everySeedRecipeAndBookEntryMatchesSeedKind);
         reg(event, "end_portal_drops_seed_into_structure_loot", REGION, SkyseedTests::endPortalDropsSeedIntoStructureLoot);
-        // DEFERRED — still not ported (each needs a 26.1.2 feature the suite hasn't crossed yet):
-        //  - autoDebugSeedsCoverOverridesAndRares: ModItems.DEBUG_SEEDS is empty on 26.1.2 because ThemeScanner.scan()
-        //    is stubbed (the IModFile.findResource follow-up from Stage 2b).
-        //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag) directly — 26.1.2 reworked it to
-        //    ValueOutput/ValueInput.
+        // DEFERRED — not ported:
         //  - legacyDimensionResetRewritesGeneratorSettings: the level.dat /emptynether reset is a no-op on 26.1.2
-        //    (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal.
+        //    (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal — so there is nothing to test.
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -2805,6 +2802,23 @@ public final class SkyseedTests {
         helper.assertTrue(canSummon, "the ancient city should have a can-summon sculk shrieker (the Warden danger)");
         helper.assertTrue(soulFire, "the ancient city should keep its blue soul fire");
         helper.assertTrue(catalyst, "the ancient city should have a sculk catalyst");
+        helper.succeed();
+    }
+
+    static void autoDebugSeedsCoverOverridesAndRares(GameTestHelper helper) {
+        // The debug seeds are derived at construction by ThemeScanner from the theme JSON — one per biome override and
+        // per rare structure. Confirm the scan actually produced both kinds (not a silent empty result).
+        int biomeForced = 0, rareForced = 0;
+        for (var holder : ModItems.DEBUG_SEEDS.values()) {
+            final var item = holder.get();
+            if (item.forcedRareIndex() >= 0) {
+                rareForced++;
+            } else if (item.forcedBiome() != null) {
+                biomeForced++;
+            }
+        }
+        helper.assertTrue(biomeForced > 10, "auto scan should make many biome-override debug seeds (got " + biomeForced + ")");
+        helper.assertTrue(rareForced > 0, "auto scan should make rare-structure debug seeds (got " + rareForced + ")");
         helper.succeed();
     }
 
