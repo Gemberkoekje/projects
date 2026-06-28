@@ -89,7 +89,11 @@ public final class Jigsaw {
             // at this point, so we can tell island from void below each lot. Falls back to the normal pool if absent.
             Holder<StructureTemplatePool> voidFillerPool = fillerPool;
             if (fillerPool != null && fillerPool.unwrapKey().isPresent()) {
+                //? if >=26.1.2 {
+                /*final String voidId = fillerPool.unwrapKey().get().identifier().withSuffix("_void").toString();*/
+                //?} else {
                 final String voidId = fillerPool.unwrapKey().get().location().withSuffix("_void").toString();
+                //?}
                 if (Lookup.hasTemplatePool(level.registryAccess(), voidId)) {
                     voidFillerPool = Lookup.templatePool(level.registryAccess(), voidId);
                 }

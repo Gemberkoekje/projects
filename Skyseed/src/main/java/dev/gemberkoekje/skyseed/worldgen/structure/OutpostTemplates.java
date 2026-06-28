@@ -128,7 +128,11 @@ public final class OutpostTemplates {
         }
         // Lantern on a chain dropped from the roof ridge (the gable slab lands at y16) so it isn't floating.
         for (int y = 12; y <= 15; y++) {
+            //? if >=26.1.2 {
+            /*m.put(new BlockPos(mid, y, mid), Blocks.IRON_CHAIN.defaultBlockState());*/
+            //?} else {
             m.put(new BlockPos(mid, y, mid), Blocks.CHAIN.defaultBlockState());
+            //?}
         }
         m.put(new BlockPos(mid, 11, mid), Blocks.LANTERN.defaultBlockState().setValue(BlockStateProperties.HANGING, true));
 

@@ -13,6 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 //?}
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -99,6 +100,16 @@ public final class Lookup {
         /*return access.lookupOrThrow(key);*/
         //?} else {
         return access.registryOrThrow(key);
+        //?}
+    }
+
+    /** The id string of a dimension key, e.g. {@code "minecraft:the_nether"}. {@code ResourceKey.location()} was
+     *  renamed {@code identifier()} in 26.1.2, so the dim-id extraction lives here. */
+    public static String dimensionId(ResourceKey<Level> dim) {
+        //? if >=26.1.2 {
+        /*return dim.identifier().toString();*/
+        //?} else {
+        return dim.location().toString();
         //?}
     }
 

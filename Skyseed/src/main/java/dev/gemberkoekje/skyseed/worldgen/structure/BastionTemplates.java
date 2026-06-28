@@ -92,7 +92,11 @@ public final class BastionTemplates {
         final BlockState brick = Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState();
         final BlockState gild = Blocks.GILDED_BLACKSTONE.defaultBlockState();
         final BlockState gold = Blocks.GOLD_BLOCK.defaultBlockState();
+        //? if >=26.1.2 {
+        /*final BlockState chain = Blocks.IRON_CHAIN.defaultBlockState();*/
+        //?} else {
         final BlockState chain = Blocks.CHAIN.defaultBlockState();
+        //?}
         final int max = 8, mid = 4;
 
         for (int x = 0; x <= max; x++) {
@@ -306,7 +310,11 @@ public final class BastionTemplates {
         // A caged magma-cube spawner chained over one corner; a bastion chest in another.
         m.put(new BlockPos(2, 1, 2), Blocks.SPAWNER.defaultBlockState());
         bes.put(new BlockPos(2, 1, 2), StructureParts.mobSpawner("minecraft:magma_cube"));
+        //? if >=26.1.2 {
+        /*m.put(new BlockPos(2, 2, 2), Blocks.IRON_CHAIN.defaultBlockState());*/
+        //?} else {
         m.put(new BlockPos(2, 2, 2), Blocks.CHAIN.defaultBlockState());
+        //?}
         m.put(new BlockPos(6, 1, 6), Blocks.CHEST.defaultBlockState().setValue(ChestBlock.FACING, Direction.NORTH));
         bes.put(new BlockPos(6, 1, 6), StructureParts.lootChest("minecraft:chests/bastion_other"));
         // Fallen rubble: a gilded chunk and a crying-obsidian shard knocked loose into the yard.

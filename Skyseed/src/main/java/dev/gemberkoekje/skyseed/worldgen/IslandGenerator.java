@@ -154,7 +154,7 @@ public final class IslandGenerator {
      */
     private static Resolved resolveConfig(ServerLevel level, BlockPos center, IslandTheme theme, Holder<Biome> biome,
                                           RandomSource random) {
-        final String dim = level.dimension().location().toString();
+        final String dim = Lookup.dimensionId(level.dimension());
         final boolean useBase = theme.baseValidIn(dim);
         final BiomeOverride ov = matchOverride(theme.biomeOverrides(), biome, center.getY(), dim, useBase);
         final Id neutralBlock = Id.of(Id.of(dim).path().equals("the_end") ? "minecraft:end_stone" : "minecraft:netherrack");

@@ -668,7 +668,11 @@ public final class TradePostTemplates {
         m.put(new BlockPos(1, 2, 2), Blocks.LANTERN.defaultBlockState());
         m.put(new BlockPos(3, 1, 1), Blocks.BARREL.defaultBlockState()); // a little dockside storage
         m.put(new BlockPos(3, 1, 3), Blocks.BARREL.defaultBlockState());
+        //? if >=26.1.2 {
+        /*m.put(new BlockPos(3, 1, 2), Blocks.IRON_CHAIN.defaultBlockState()); // a mooring chain (the pier's signature)*/
+        //?} else {
         m.put(new BlockPos(3, 1, 2), Blocks.CHAIN.defaultBlockState()); // a mooring chain (the pier's signature)
+        //?}
         conn(m, bes, new BlockPos(mid, 0, 0), FrontAndTop.NORTH_UP, "skyseed:lot_door", "skyseed:lot",
                 "minecraft:empty", id(p.wall()));
         return new Built(m, bes);

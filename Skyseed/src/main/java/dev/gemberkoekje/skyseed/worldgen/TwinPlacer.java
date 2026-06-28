@@ -1,5 +1,6 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
+import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -41,7 +42,7 @@ public final class TwinPlacer {
             return;
         }
         final BlockPos linked = linkedPortalPos(center, to, other);
-        if (!IslandGenerator.formValidFor(theme, other.getBiome(linked), linked.getY(), other.dimension().location().toString())) {
+        if (!IslandGenerator.formValidFor(theme, other.getBiome(linked), linked.getY(), Lookup.dimensionId(other.dimension()))) {
             return; // the theme doesn't implement the other dimension — no twin
         }
         final IslandPlan twin = placeTwinNear(other, theme, linked);
@@ -65,7 +66,11 @@ public final class TwinPlacer {
         if (to == Level.NETHER) {
             y = Mth.clamp(y, 16, 110); // above the lava sea, below the ceiling
         } else {
+            //? if >=26.1.2 {
+            /*y = Mth.clamp(y, toLevel.getMinY() + 8, toLevel.getMaxY() - 16);*/
+            //?} else {
             y = Mth.clamp(y, toLevel.getMinBuildHeight() + 8, toLevel.getMaxBuildHeight() - 16);
+            //?}
         }
         return new BlockPos(x, y, z);
     }
