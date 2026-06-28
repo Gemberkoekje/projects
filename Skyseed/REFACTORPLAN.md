@@ -242,7 +242,25 @@ The per-category plan, highest-leverage first (each links a category of the 120 
 swaps), then the file-local clusters (entity, commands, worlddata, recipe), then client + the 1-offs. Recompile after
 each cluster; the count only visibly drops below 100 once the bulk is cleared, so track the per-symbol histogram.
 
-**Progress (2026-06-28): 120 → 81.** DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob);
+**Progress (2026-06-28): 120 → 49.** Cleared this session also: the IslandSeedEntity port (the 1.21.5 NBT rewrite
+`addAdditionalSaveData(ValueOutput)`/`readAdditionalSaveData(ValueInput)` — `ValueOutput` keeps the `put*` names,
+`ValueInput` uses `getIntOr`/`getString().ifPresent`/`getDoubleOr`; imports `//?`-guarded as those classes don't
+exist on 1.21.1); the projectile ctor's new `ItemStack` arg; **`compat.Players`** (`displayClientMessage`→
+`ServerPlayer.sendSystemMessage`, `teleportTo`'s new `Set<Relative>`+`resetCamera` args); `Lookup.elements`
+(`holders`→`listElements`) + `Lookup.biomeHolder` (`getHolder`→`get`); `Entity.hasImpulse`→`hurtMarked`;
+`EntityType.Builder.build(ResourceKey)`; `swapDimensionSettings`→no-op on 26.1.2 (level.dat WorldGenSettings is gone).
+**The remaining 49 are the genuinely hard part — and several have NO 26.1.2 gametest coverage (compile-validated only):**
+THREE meaty rewrites — (a) **`SavedData`** became Codec-based (`SavedDataType(Identifier, Supplier, Codec)`; the
+`save(CompoundTag)`/`load` model is gone) in `SkyseedWorldData`; (b) the **recipe API** (`CustomRecipe` ctor +
+`getSerializer`/`matches`/`assemble` shapes, `SimpleCraftingRecipeSerializer` gone) in `GuideRecipe`/`ModRecipes`;
+(c) **`LootModifier`** codec/ctor in `AddDropModifier`. Plus deep/scattered renames: the **command/spawn API**
+(`CommandSourceStack.hasPermission`→`PermissionSet`, `Level.getSharedSpawnPos`, `ServerPlayer.setRespawnPosition`→
+`RespawnConfig`), **client** (`ModelResourceLocation` moved, `ModelEvent.getModels`, client `displayClientMessage`,
+`KeyMapping.Category`), `Item.releaseUsing` now returns `boolean`, `ChunkPos(BlockPos)` ctor + `MaxDistance` (Jigsaw),
+`WorldVersion.getDataVersion`→`dataVersion()`, `IModFile.findResource`, `FMLEnvironment.production`. These want a
+focused pass (the NeoForge sources jar is located, per below).
+
+(earlier this session: 120 → 81.) DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob);
 `registryOrThrow`→`lookupOrThrow` (NOT a clean swap — `//?` in `Lookup.registry()`, all callers route through it);
 `Registry.get`→`getValue` (`//?` in `Lookup.byId()`, block/entity route through it); the item/entity superclass
 import; **`compat.Entities`** (`Entity.moveTo`→`snapTo`, `EntityType.create` gained an `EntitySpawnReason` arg) +
