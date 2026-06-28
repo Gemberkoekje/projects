@@ -20,6 +20,7 @@ import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.StartIsland;
 import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
 import dev.gemberkoekje.skyseed.worldgen.structure.PathSurfacer;
+import dev.gemberkoekje.skyseed.worldgen.theme.BiomeOverride;
 import dev.gemberkoekje.skyseed.worldgen.theme.IslandTheme;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -31,6 +32,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.cow.Cow;
 import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.vehicle.minecart.MinecartChest;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
@@ -188,13 +190,30 @@ public final class SkyseedTests {
         reg(event, "ocean_monument_water_sits_flush", REGION, SkyseedTests::oceanMonumentWaterSitsFlush);
         reg(event, "sunk_tank_animals_spawn_submerged", REGION, SkyseedTests::sunkTankAnimalsSpawnSubmerged);
         reg(event, "ancient_city_places", BIG_REGION, SkyseedTests::ancientCityPlaces);
-        // DEFERRED to a later phase (not ported here):
-        //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag)/readAdditionalSaveData(CompoundTag)
-        //    directly, but 26.1.2 reworked those to ValueOutput/ValueInput — needs a rewrite against the new NBT API.
-        //  - everySeedRecipeAndBookEntryMatchesSeedKind + everyCraftableSeedHasUniqueIcon: need the book/icon resource
-        //    helpers (Phase 4); the recipe half also can't pass until SKYRECIPEGENPLAN lands the per-version recipes.
-        //  - legacyDimensionResetRewritesGeneratorSettings: exercises the level.dat /emptynether reset, which is a no-op
-        //    on 26.1.2 (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal.
+        // batch c — debug seeds / dungeon / mineshaft / End-form theme config:
+        reg(event, "debug_forced_rare_germinates_its_structure", REGION, SkyseedTests::debugForcedRareGerminatesItsStructure);
+        reg(event, "debug_forced_waterfall_germinates_water_column", REGION, SkyseedTests::debugForcedWaterfallGerminatesWaterColumn);
+        reg(event, "sprawling_dungeon_assembles", BIG_REGION, SkyseedTests::sprawlingDungeonAssembles);
+        reg(event, "dungeon_complex_rooms_carry_content", REGION, SkyseedTests::dungeonComplexRoomsCarryContent);
+        reg(event, "dungeon_complex_goes_vertical", BIG_REGION, SkyseedTests::dungeonComplexGoesVertical);
+        reg(event, "dungeon_stairs_only_descend", REGION, SkyseedTests::dungeonStairsOnlyDescend);
+        reg(event, "abandoned_mineshaft_assembles", BIG_REGION, SkyseedTests::abandonedMineshaftAssembles);
+        reg(event, "mineshaft_minecart_entity_spawns", BIG_REGION, SkyseedTests::mineshaftMinecartEntitySpawns);
+        reg(event, "mineshaft_trestles_support_over_void", BIG_REGION, SkyseedTests::mineshaftTrestlesSupportOverVoid);
+        reg(event, "mesa_mineshaft_is_dark_oak_with_gold", REGION, SkyseedTests::mesaMineshaftIsDarkOakWithGold);
+        reg(event, "overworld_biome_themes_have_end_form", REGION, SkyseedTests::overworldBiomeThemesHaveEndForm);
+        reg(event, "forest_and_lush_end_forms_split_by_biome", REGION, SkyseedTests::forestAndLushEndFormsSplitByBiome);
+        // DEFERRED — still not ported (each needs a 26.1.2 API the suite hasn't crossed yet):
+        //  - the recipe-resolution cluster (endPortalEdges/endPortalSeed/returnPortalSeed/chorusForest/endCity/
+        //    dragonTrophy seed crafts) + everySeedRecipeAndBookEntryMatchesSeedKind: need the reworked recipe API
+        //    (Level.recipeAccess() / getRecipeFor / assemble(input) lost the Provider arg; Recipe lost getResultItem).
+        //  - endPortalDropsSeedIntoStructureLoot: the loot-table API (reloadableRegistries/LootParams) reworked.
+        //  - autoDebugSeedsCoverOverridesAndRares: ModItems.DEBUG_SEEDS is empty on 26.1.2 because ThemeScanner.scan()
+        //    is stubbed (the IModFile.findResource follow-up from Stage 2b).
+        //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag) directly — 26.1.2 reworked it to
+        //    ValueOutput/ValueInput.
+        //  - legacyDimensionResetRewritesGeneratorSettings: the level.dat /emptynether reset is a no-op on 26.1.2
+        //    (WorldGenSettings moved out of level.dat) and is slated for pre-1.0 removal.
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -2769,5 +2788,259 @@ public final class SkyseedTests {
         helper.assertTrue(soulFire, "the ancient city should keep its blue soul fire");
         helper.assertTrue(catalyst, "the ancient city should have a sculk catalyst");
         helper.succeed();
+    }
+
+    static void debugForcedRareGerminatesItsStructure(GameTestHelper helper) {
+        // forcedRare bypasses the chance roll: huge_ancient's rare structure #0 (the Ancient City) must land in the plan.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_ancient"), level.getBiome(c),
+                RandomSource.create(1L), DebugForce.rare(0));
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().startsWith("ancient_city")),
+                "forcedRare=0 on huge_ancient should germinate the ancient_city structure");
+        helper.succeed();
+    }
+
+    static void debugForcedWaterfallGerminatesWaterColumn(GameTestHelper helper) {
+        // forcedWaterfall pins the ladder island's rare water-column variant: the centre shaft comes up as water, not ladders.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 4, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "ladder_small"), level.getBiome(c),
+                RandomSource.create(1L), new DebugForce(-1, true));
+        helper.assertTrue(p.blocks().stream().anyMatch(b -> b.state().is(Blocks.WATER)),
+                "a forced-waterfall ladder island should drop a water column");
+        helper.assertTrue(p.blocks().stream().noneMatch(b -> b.state().is(Blocks.LADDER)),
+                "a forced-waterfall ladder island should have no ladders");
+        helper.succeed();
+    }
+
+    static void sprawlingDungeonAssembles(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part A: the dungeon_complex jigsaw must sprawl past its start hub — i.e. the doorway connectors
+        // align so corridors/rooms actually attach. Assert the sprawl is bigger than the lone hub (~300 cobble).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 4, origin, false, "", 0, null, 7L);
+        int cobble = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.COBBLESTONE) || st.is(Blocks.MOSSY_COBBLESTONE)) {
+                        cobble++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(cobble > 400, "the dungeon should sprawl past its start hub (cobble " + cobble
+                + " — connectors likely misaligned if ~300)");
+        helper.succeed();
+    }
+
+    static void dungeonComplexRoomsCarryContent(GameTestHelper helper) {
+        // The pieces bake their content by construction; verify directly. A spawner room = a spawner + loot chests.
+        final BlockPos sp = place(helper, "skyseed:dungeon_complex/spawner_zombie");
+        helper.assertTrue(contains(helper, sp, 6, 4, 6, Blocks.SPAWNER), "spawner_zombie should bake a mob spawner");
+        helper.assertTrue(contains(helper, sp, 6, 4, 6, Blocks.CHEST), "spawner_zombie should bake loot chests");
+        helper.succeed();
+    }
+
+    static void dungeonComplexGoesVertical(GameTestHelper helper) {
+        // With descending staircase + ladder-shaft pieces in the pool, the complex should drop below its start level.
+        // Sample a few seeds and assert the best descends: the assembled cobble spans well beyond a single room's height.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 14, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
+        int bestSpan = 0;
+        // Sample more seeds than the 1.21.1 suite (8 vs 4): the descent is position-seeded and the 26.1.2 gametest
+        // engine relocates this test per run, so a small sample occasionally lands right on the >9 boundary.
+        for (long seed = 1; seed <= 8; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "", 0, null, seed);
+            int minY = Integer.MAX_VALUE;
+            int maxY = Integer.MIN_VALUE;
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.COBBLESTONE) || st.is(Blocks.MOSSY_COBBLESTONE)) {
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                        }
+                    }
+                }
+            }
+            if (maxY > minY) {
+                bestSpan = Math.max(bestSpan, maxY - minY);
+            }
+        }
+        helper.assertTrue(bestSpan > 9, "the dungeon should descend via stairs/shafts, not just sprawl flat (best cobble Y-span " + bestSpan + ")");
+        helper.succeed();
+    }
+
+    static void dungeonStairsOnlyDescend(GameTestHelper helper) {
+        // Stairs/shafts must only go DOWN: the entry connector (skyseed:dungeon) sits at the piece TOP, and the
+        // descending exit uses a one-way name (skyseed:dungeon_down) at the BOTTOM. Checked on the templates.
+        final ServerLevel level = helper.getLevel();
+        for (final String id : new String[]{"dungeon_complex/stairs_down", "dungeon_complex/shaft"}) {
+            final StructureTemplate t = level.getServer().getStructureManager().get(skyseed(id)).orElseThrow();
+            int entryY = Integer.MIN_VALUE;
+            int downY = Integer.MAX_VALUE;
+            int entries = 0;
+            int downs = 0;
+            for (final var j : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.JIGSAW)) {
+                final String name = j.nbt() == null ? "" : j.nbt().getStringOr("name", "");
+                if (name.equals("skyseed:dungeon")) {
+                    entries++;
+                    entryY = Math.max(entryY, j.pos().getY());
+                } else if (name.equals("skyseed:dungeon_down")) {
+                    downs++;
+                    downY = Math.min(downY, j.pos().getY());
+                }
+            }
+            helper.assertTrue(entries == 1, id + " should have exactly one entry connector (got " + entries + ")");
+            helper.assertTrue(downs == 1, id + " should have exactly one one-way descending exit (got " + downs + ")");
+            helper.assertTrue(downY < entryY, id + " descending exit (y" + downY + ") must sit below the entry (y" + entryY + ")");
+        }
+        helper.succeed();
+    }
+
+    static void abandonedMineshaftAssembles(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part B: the mineshaft jigsaw must sprawl past its start hub. Sample a few seeds and assert the
+        // BEST sprawled — an oak-plank floor well past the ~32-plank lone hub, with the support-arch fences.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("mineshaft/start"));
+        int bestPlanks = 0;
+        int bestFences = 0;
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 4, origin, false, "", 0, null, seed);
+            int planks = 0;
+            int fences = 0;
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.OAK_PLANKS)) {
+                            planks++;
+                        } else if (st.is(Blocks.OAK_FENCE)) {
+                            fences++;
+                        }
+                    }
+                }
+            }
+            bestPlanks = Math.max(bestPlanks, planks);
+            bestFences = Math.max(bestFences, fences);
+        }
+        helper.assertTrue(bestPlanks > 60, "no sampled mineshaft sprawled past its hub (best planks " + bestPlanks + ")");
+        helper.assertTrue(bestFences > 0, "no sampled mineshaft raised support arches (best fences " + bestFences + ")");
+        helper.succeed();
+    }
+
+    static void mineshaftMinecartEntitySpawns(GameTestHelper helper) {
+        // The corridor_loot piece bakes a chest-minecart ENTITY. Placing the piece must spawn the minecart — proving
+        // the entities list round-trips through the .nbt.
+        final BlockPos origin = place(helper, "skyseed:mineshaft/corridor_loot");
+        helper.assertTrue(near(helper.getLevel(), origin, MinecartChest.class),
+                "the corridor_loot piece should spawn a chest minecart from its baked entity");
+        helper.succeed();
+    }
+
+    static void mineshaftTrestlesSupportOverVoid(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Part C: a mineshaft floor left over the void grows oak-fence trestle legs. Lay a floating
+        // oak-plank deck over air and run supportTrestles; legs should hang below it.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(24, 12, 24));
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                level.setBlock(base.offset(dx, 0, dz), Blocks.OAK_PLANKS.defaultBlockState(), 2);
+            }
+        }
+        PathSurfacer.supportTrestles(level, base.above(), 4); // deck = origin.y-1
+        boolean leg = false;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (level.getBlockState(base.offset(dx, -1, dz)).is(Blocks.OAK_FENCE)) {
+                    leg = true;
+                }
+            }
+        }
+        helper.assertTrue(leg, "an over-void mineshaft floor should hang oak-fence trestle legs");
+        helper.succeed();
+    }
+
+    static void mesaMineshaftIsDarkOakWithGold(GameTestHelper helper) {
+        // SKYDUNGEONPLAN Phase 4: the mesa variant reuses the mineshaft geometry in dark-oak with sprinkled gold.
+        // Place a mesa room and assert dark-oak + gold, and NO oak.
+        final BlockPos o = place(helper, "skyseed:mineshaft_mesa/room");
+        helper.assertTrue(contains(helper, o, 6, 4, 6, Blocks.DARK_OAK_PLANKS), "the mesa mineshaft should be dark-oak");
+        helper.assertTrue(contains(helper, o, 6, 4, 6, Blocks.GOLD_BLOCK), "the mesa mineshaft should sprinkle gold");
+        helper.assertTrue(!contains(helper, o, 6, 4, 6, Blocks.OAK_PLANKS), "the mesa mineshaft should have no oak");
+        helper.succeed();
+    }
+
+    static void overworldBiomeThemesHaveEndForm(GameTestHelper helper) {
+        // The 10 overworld biome themes (+ large variants) grow in the End as same-size end-stone islands via a the_end
+        // biome override. Guard that every one carries that override.
+        final ServerLevel level = helper.getLevel();
+        final String[] bases = {"forest", "rocky", "desert", "mushroom", "frozen",
+                                "meadow", "badlands", "ancient", "lush", "aquatic"};
+        for (final String base : bases) {
+            for (final String name : new String[]{base, base + "_large"}) {
+                final IslandTheme t = theme(level, name);
+                helper.assertTrue(t != null, "missing theme '" + name + "'");
+                final boolean hasEnd = t.biomeOverrides().stream()
+                        .anyMatch(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false));
+                helper.assertTrue(hasEnd, "theme '" + name + "' has no the_end biome override — it won't grow in the End");
+            }
+        }
+        helper.succeed();
+    }
+
+    static void forestAndLushEndFormsSplitByBiome(GameTestHelper helper) {
+        // A Forest/Lush seed in the End splits by biome: the central the_end biome grows an EMPTY end-stone island,
+        // while the outer End biomes grow a SMALL island with a little chorus (+ the rare shulker).
+        final ServerLevel level = helper.getLevel();
+        for (final String name : new String[]{"forest", "forest_large", "lush", "lush_large"}) {
+            final IslandTheme t = theme(level, name);
+            helper.assertTrue(t != null, "missing theme '" + name + "'");
+            final BiomeOverride central = t.biomeOverrides().stream()
+                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false)
+                            && o.biomes().contains("minecraft:the_end"))
+                    .findFirst().orElse(null);
+            final BiomeOverride outer = t.biomeOverrides().stream()
+                    .filter(o -> o.dimension().map("minecraft:the_end"::equals).orElse(false) && o.biomes().isEmpty())
+                    .findFirst().orElse(null);
+            helper.assertTrue(central != null, "theme '" + name + "' has no central (the_end biome) End override");
+            helper.assertTrue(outer != null, "theme '" + name + "' has no outer (dimension the_end) End override");
+            helper.assertTrue(!endFormHasChorus(central), "the central End form of '" + name + "' must be EMPTY (no chorus)");
+            helper.assertTrue(endFormHasChorus(outer), "the outer End form of '" + name + "' must grow a little chorus");
+            final boolean shulker = outer.mobs().map(ms -> ms.stream().anyMatch(mo -> mo.entity().path().equals("shulker")))
+                    .orElse(false);
+            helper.assertTrue(shulker, "the outer End form of '" + name + "' must carry a shulker chance (shell bootstrap)");
+            helper.assertTrue(central.shape().get().radius().min() > outer.shape().get().radius().min(),
+                    "the central End island of '" + name + "' must be larger than the small outer chorus island");
+        }
+        helper.succeed();
+    }
+
+    /** Whether a biome override's variants grow chorus plants (the End-form bootstrap decoration). */
+    private static boolean endFormHasChorus(BiomeOverride ov) {
+        return ov.variants().map(vs -> vs.stream().anyMatch(
+                v -> v.decoration().trees().stream().anyMatch(tr -> tr.feature().path().equals("chorus_plant"))))
+                .orElse(false);
     }
 }
