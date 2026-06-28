@@ -32,8 +32,12 @@ public final class WorldSetupEvents {
     static void onServerStarted(ServerStartedEvent event) {
         MinecraftServer server = event.getServer();
         ServerLevel overworld = server.overworld();
+        //? if >=26.1.2 {
+        /*SkyseedWorldData data = overworld.getDataStorage().computeIfAbsent(SkyseedWorldData.TYPE);*/
+        //?} else {
         SkyseedWorldData data = overworld.getDataStorage()
                 .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
+        //?}
         if (data.isStartPlaced()) {
             // Existing world: keep raids off if this is a Skyseed world (it has a curated start island).
             if (data.getStartSpawn() != null) {

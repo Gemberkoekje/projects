@@ -31,8 +31,12 @@ public final class PlayerEvents {
         }
         // World-level SavedData (not the player's persistent data) so "first join" survives relogs reliably.
         ServerLevel overworld = server.overworld();
+        //? if >=26.1.2 {
+        /*SkyseedWorldData world = overworld.getDataStorage().computeIfAbsent(SkyseedWorldData.TYPE);*/
+        //?} else {
         SkyseedWorldData world = overworld.getDataStorage()
                 .computeIfAbsent(SkyseedWorldData.factory(), SkyseedWorldData.NAME);
+        //?}
 
         if (!world.hasGuided(player.getUUID())) {
             ItemStack guide = SkyseedGuide.book();

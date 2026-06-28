@@ -1,6 +1,13 @@
 package dev.gemberkoekje.skyseed.worldgen;
 
 import dev.gemberkoekje.skyseed.Skyseed;
+//? if >=26.1.2 {
+/*import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.gemberkoekje.skyseed.compat.Ids;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.world.level.saveddata.SavedDataType;*/
+//?}
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -11,6 +18,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -30,6 +38,32 @@ public final class SkyseedWorldData extends SavedData {
     private final Set<UUID> guided = new HashSet<>();
     private final Set<UUID> spawned = new HashSet<>();
 
+    /** No-arg constructor used for a fresh instance (and by the codec's {@code SavedDataType} supplier on 26.1.2). */
+    public SkyseedWorldData() {
+    }
+
+    // 26.1.2 replaced SavedData's save(CompoundTag)/load model with a Codec registered through a SavedDataType.
+    //? if >=26.1.2 {
+    /*public static final Codec<SkyseedWorldData> CODEC = RecordCodecBuilder.create(i -> i.group(
+            Codec.BOOL.optionalFieldOf("StartPlaced", false).forGetter(d -> d.startPlaced),
+            BlockPos.CODEC.optionalFieldOf("StartSpawn").forGetter(d -> Optional.ofNullable(d.startSpawn)),
+            Codec.STRING.optionalFieldOf("CreatedVersion").forGetter(d -> Optional.ofNullable(d.createdVersion)),
+            UUIDUtil.CODEC_SET.optionalFieldOf("Guided", new HashSet<>()).forGetter(d -> d.guided),
+            UUIDUtil.CODEC_SET.optionalFieldOf("Spawned", new HashSet<>()).forGetter(d -> d.spawned)
+    ).apply(i, SkyseedWorldData::new));
+
+    public static final SavedDataType<SkyseedWorldData> TYPE =
+            new SavedDataType<>(Ids.mod("world"), SkyseedWorldData::new, CODEC);
+
+    private SkyseedWorldData(boolean startPlaced, Optional<BlockPos> startSpawn, Optional<String> createdVersion,
+                             Set<UUID> guided, Set<UUID> spawned) {
+        this.startPlaced = startPlaced;
+        this.startSpawn = startSpawn.orElse(null);
+        this.createdVersion = createdVersion.orElse(null);
+        this.guided.addAll(guided);
+        this.spawned.addAll(spawned);
+    }
+    *///?} else {
     public static SavedData.Factory<SkyseedWorldData> factory() {
         return new SavedData.Factory<>(SkyseedWorldData::new, SkyseedWorldData::load);
     }
@@ -81,6 +115,7 @@ public final class SkyseedWorldData extends SavedData {
         }
         return list;
     }
+    //?}
 
     public boolean isStartPlaced() {
         return startPlaced;
