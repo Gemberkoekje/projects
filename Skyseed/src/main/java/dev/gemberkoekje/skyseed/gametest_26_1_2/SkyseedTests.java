@@ -7,6 +7,7 @@ import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.DebugForce;
+import dev.gemberkoekje.skyseed.worldgen.GenerationJob;
 import dev.gemberkoekje.skyseed.worldgen.IslandGenerator;
 import dev.gemberkoekje.skyseed.worldgen.IslandPlan;
 import dev.gemberkoekje.skyseed.worldgen.TwinPlacer;
@@ -30,6 +31,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
@@ -106,6 +108,17 @@ public final class SkyseedTests {
         reg(event, "hamlet_reuses_trade_post_shops", BIG_REGION, SkyseedTests::hamletReusesTradePostShops);
         reg(event, "trade_post_biome_pieces_use_their_wood", BIG_REGION, SkyseedTests::tradePostBiomePiecesUseTheirWood);
         reg(event, "trade_post_village_places_shops", BIG_REGION, SkyseedTests::tradePostVillagePlacesShops);
+        reg(event, "trade_post_desert_village_is_sandstone", BIG_REGION, SkyseedTests::tradePostDesertVillageIsSandstone);
+        reg(event, "nether_fortress_is_nether_native_with_fortress_jigsaw", REGION, SkyseedTests::netherFortressIsNetherNativeWithFortressJigsaw);
+        reg(event, "nether_fortress_assembles_a_bounded_bridge", BIG_REGION, SkyseedTests::netherFortressAssemblesABoundedBridge);
+        reg(event, "bastion_is_nether_native_with_bastion_jigsaw", REGION, SkyseedTests::bastionIsNetherNativeWithBastionJigsaw);
+        reg(event, "piglin_trading_post_is_nether_native_with_its_jigsaw", REGION, SkyseedTests::piglinTradingPostIsNetherNativeWithItsJigsaw);
+        reg(event, "piglin_trading_post_overworld_easter_egg_grows_the_cottage", REGION, SkyseedTests::piglinTradingPostOverworldEasterEggGrowsTheCottage);
+        reg(event, "wither_arena_is_nether_native_with_its_jigsaw", REGION, SkyseedTests::witherArenaIsNetherNativeWithItsJigsaw);
+        reg(event, "forest_in_snow_defers_ground_cover_past_trees", REGION, SkyseedTests::forestInSnowDefersGroundCoverPastTrees);
+        reg(event, "structure_connections_link_after_placement", REGION, SkyseedTests::structureConnectionsLinkAfterPlacement);
+        reg(event, "dimension_gate_grows_or_fizzles_by_implementation", REGION, SkyseedTests::dimensionGateGrowsOrFizzlesByImplementation);
+        reg(event, "dimension_override_never_inherits_overworld", REGION, SkyseedTests::dimensionOverrideNeverInheritsOverworld);
     }
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
@@ -1305,6 +1318,315 @@ public final class SkyseedTests {
                     "no sampled village reached the capped " + cap + " shops (best=" + best + ") — the fill is unreachable");
         }
         helper.assertTrue(crops > 0, "villages placed no crop fields (crops=" + crops + ")");
+        helper.succeed();
+    }
+
+    static void tradePostDesertVillageIsSandstone(GameTestHelper helper) {
+        // Biome diversity: a desert biome override swaps in the sand/sandstone piece set (its own jigsaw pool), built
+        // by the same generator from a desert palette. Assemble it and confirm the buildings are sandstone — not oak —
+        // while the shop cap + filler machinery still place shops and fields. (Loads dev-generated .nbt.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/start"));
+        final var fillers = Lookup.templatePool(level.registryAccess(), Ids.mod("trade_post_desert/fillers"));
+        int beds = 0;
+        int sandstone = 0;
+        int oakWall = 0;
+        // Position-seeded AND the gametest origin varies per run, so a single placement sometimes rolls zero shops;
+        // sample several explicit seeds and assert across them (a shop in at least one, oak in none).
+        for (long seed = 1; seed <= 4; seed++) {
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), y <= 2 ? Blocks.DIRT : Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "shop_", 3, fillers, seed);
+            for (int x = 4; x <= 44; x++) {
+                for (int z = 4; z <= 44; z++) {
+                    for (int y = 1; y <= 14; y++) {
+                        final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                        if (s.is(Blocks.RED_BED)) {
+                            beds++;
+                        } else if (s.is(Blocks.SMOOTH_SANDSTONE)) {
+                            sandstone++;
+                        } else if (s.is(Blocks.OAK_PLANKS)) {
+                            oakWall++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(beds > 0, "desert village placed no shops across 4 seeds (red_bed=" + beds + ")");
+        helper.assertTrue(sandstone > 0, "desert village has no sandstone walls (smooth_sandstone=" + sandstone + ")");
+        helper.assertTrue(oakWall == 0, "desert village still has oak plank walls (oak_planks=" + oakWall + ")");
+        helper.succeed();
+    }
+
+    static void netherFortressIsNetherNativeWithFortressJigsaw(GameTestHelper helper) {
+        // Nether-native fortress island (SKYNETHERPLAN): a netherrack island that assembles the fortress jigsaw — a keep
+        // with a caged blaze spawner, self-connecting arcaded bridge spans out over the void, wart-garden ends. The
+        // structure itself is placed later by the generation job, so the plan carries it as a jigsaw site.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme nf = theme(overworld, "nether_fortress");
+        helper.assertTrue(nf.baseValidIn(Lookup.dimensionId(Level.NETHER)), "nether_fortress must implement the_nether");
+        helper.assertTrue(!nf.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), "nether_fortress must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(nf, wastes, 64, Lookup.dimensionId(Level.NETHER)),
+                "nether_fortress should grow in the Nether");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), nf, wastes,
+                RandomSource.create(131L));
+        boolean netherrack = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+        }
+        helper.assertTrue(netherrack, "the nether fortress island should be a netherrack island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("nether_fortress/start")),
+                "the nether fortress island should assemble the fortress jigsaw (start pool = the keep)");
+        helper.succeed();
+    }
+
+    static void netherFortressAssemblesABoundedBridge(GameTestHelper helper) {
+        // Assemble the fortress jigsaw with the production span_ cap and confirm the pieces actually chain AND stay
+        // bounded: the keep places exactly one (blaze) spawner, the self-connecting arcaded spans (incl. branching
+        // crossings) lay a run of nether brick out from it, and the cap (≤ 8 span_ pieces, surplus re-stamped as
+        // wart-garden ends) keeps it a compact fortress — not a runaway sprawl that fills the 48² template. (Loads
+        // dev-generated .nbt; syncDevStructures keeps the node copy current.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 3, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/start"));
+        final var ends = Lookup.templatePool(level.registryAccess(), Ids.mod("nether_fortress/ends"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 5, origin, false, "span_", 8, ends, 1L);
+        int spawners = 0, netherBrick = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 16; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.SPAWNER)) spawners++;
+                    else if (s.is(Blocks.NETHER_BRICKS)) netherBrick++;
+                }
+            }
+        }
+        helper.assertTrue(spawners == 1, "the keep must place exactly one blaze spawner (got " + spawners + ")");
+        helper.assertTrue(netherBrick > 60, "the keep + bridge should lay nether brick (got " + netherBrick + ")");
+        helper.assertTrue(netherBrick < 1400, "the span_ cap should keep it bounded, not sprawling (got " + netherBrick + ")");
+        helper.succeed();
+    }
+
+    static void bastionIsNetherNativeWithBastionJigsaw(GameTestHelper helper) {
+        // Nether-native bastion remnant island: a blackstone island that assembles the hand-built bastion (a
+        // lodestone treasure plinth, a magma-cube spawner, bastion loot). The structure is placed later by the
+        // generation job, so the plan carries it as a jigsaw site.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme bastion = theme(overworld, "bastion");
+        helper.assertTrue(bastion.baseValidIn(Lookup.dimensionId(Level.NETHER)), "bastion must implement the_nether");
+        helper.assertTrue(!bastion.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), "bastion must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(bastion, wastes, 64, Lookup.dimensionId(Level.NETHER)),
+                "bastion should grow in the Nether");
+        final Holder<Biome> deltas = biome(nether, Biomes.BASALT_DELTAS);
+        helper.assertTrue(!IslandGenerator.formValidFor(bastion, deltas, 64, Lookup.dimensionId(Level.NETHER)),
+                "the bastion should fizzle in the basalt deltas (the vanilla rule)");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), bastion, wastes,
+                RandomSource.create(7L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the bastion island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("bastion/bastion")),
+                "the bastion should assemble the bastion jigsaw");
+        helper.succeed();
+    }
+
+    static void piglinTradingPostIsNetherNativeWithItsJigsaw(GameTestHelper helper) {
+        // Nether-native Piglin Trading Post: a blackstone island that assembles the hand-built trading-post hall and
+        // grows anywhere in the Nether — including the basalt deltas, since (unlike the bastion) it has no fizzle rule.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme post = theme(overworld, "piglin_trading_post");
+        helper.assertTrue(post.baseValidIn(Lookup.dimensionId(Level.NETHER)), "trading post must implement the_nether");
+        helper.assertTrue(!post.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), "trading post must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(post, wastes, 64, Lookup.dimensionId(Level.NETHER)),
+                "trading post should grow in the Nether");
+        final Holder<Biome> deltas = biome(nether, Biomes.BASALT_DELTAS);
+        helper.assertTrue(IslandGenerator.formValidFor(post, deltas, 64, Lookup.dimensionId(Level.NETHER)),
+                "the trading post has no fizzle rule — it should grow in the basalt deltas too");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), post, wastes,
+                RandomSource.create(11L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the trading post island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream()
+                        .anyMatch(j -> j.pool().path().equals("piglin_trading_post/trading_post")),
+                "the trading post should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    static void piglinTradingPostOverworldEasterEggGrowsTheCottage(GameTestHelper helper) {
+        // Easter egg: thrown topside the Nether-native trading post doesn't fizzle — an overworld biome_override grows
+        // a grass island and an overworld-dimensioned rare structure (chance 1.0) swaps the hall for the abandoned
+        // cottage (the Hamlet's 10% rare structure).
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme post = theme(overworld, "piglin_trading_post");
+        final Holder<Biome> plains = biome(overworld, Biomes.PLAINS);
+        helper.assertTrue(IslandGenerator.formValidFor(post, plains, 80, Lookup.dimensionId(Level.OVERWORLD)),
+                "the trading post should grow (not fizzle) in the overworld");
+
+        final IslandPlan p = IslandGenerator.planIsland(overworld, new BlockPos(40, 80, 40), post, plains,
+                RandomSource.create(5L));
+        boolean grass = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.GRASS_BLOCK)) {
+                grass = true;
+            }
+        }
+        helper.assertTrue(grass, "the overworld easter egg should be a grass island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("abandoned/cottage")),
+                "the overworld easter egg should assemble the abandoned cottage");
+        helper.assertTrue(p.jigsaws().stream()
+                        .noneMatch(j -> j.pool().path().equals("piglin_trading_post/trading_post")),
+                "the trading-post hall must not appear in the overworld");
+        helper.succeed();
+    }
+
+    static void witherArenaIsNetherNativeWithItsJigsaw(GameTestHelper helper) {
+        // Nether-native Wither Arena: the capstone venue. A blackstone island that assembles the hand-built obsidian
+        // arena jigsaw, and (like the other nether structures) grows only in the Nether.
+        final ServerLevel overworld = helper.getLevel();
+        final IslandTheme arena = theme(overworld, "wither_arena");
+        helper.assertTrue(arena.baseValidIn(Lookup.dimensionId(Level.NETHER)), "wither arena must implement the_nether");
+        helper.assertTrue(!arena.baseValidIn(Lookup.dimensionId(Level.OVERWORLD)), "wither arena must be the_nether-only");
+
+        final ServerLevel nether = overworld.getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        helper.assertTrue(IslandGenerator.formValidFor(arena, wastes, 64, Lookup.dimensionId(Level.NETHER)),
+                "wither arena should grow in the Nether");
+
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40), arena, wastes,
+                RandomSource.create(13L));
+        boolean blackstone = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.BLACKSTONE)) {
+                blackstone = true;
+            }
+        }
+        helper.assertTrue(blackstone, "the wither arena island should be a blackstone island");
+        helper.assertTrue(p.jigsaws().stream().anyMatch(j -> j.pool().path().equals("wither_arena/wither_arena")),
+                "the wither arena should assemble its jigsaw");
+        helper.succeed();
+    }
+
+    static void forestInSnowDefersGroundCoverPastTrees(GameTestHelper helper) {
+        // Regression: a Forest seed on snowy_plains came up bare — the 90% snow ground cover was placed before the
+        // (deferred) spruce sites, and a snow layer fails the vanilla tree feature's valid-position check. Ground cover
+        // is now recorded as scatter and placed AFTER the trees (GenerationJob), so it can never block one.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme forest = theme(level, "forest");
+        final Holder<Biome> snowy = biome(level, Biomes.SNOWY_PLAINS);
+        final IslandPlan p = IslandGenerator.planIsland(level, new BlockPos(40, 80, 40), forest, snowy,
+                RandomSource.create(3L));
+        helper.assertTrue(!p.trees().isEmpty(), "a Forest island must always plan at least one tree");
+        // every snow layer must be deferred scatter (placed after the trees), never an eager block that blocks them
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.SNOW)) {
+                helper.assertTrue(p.scatterPositions().contains(bp.pos()),
+                        "snow at " + bp.pos() + " is not deferred scatter — it would be placed before the trees");
+            }
+        }
+        helper.succeed();
+    }
+
+    static void structureConnectionsLinkAfterPlacement(GameTestHelper helper) {
+        // Jigsaw placement copies blockstates verbatim, so panes/fences land unconnected; GenerationJob.linkConnections
+        // re-derives them. Place three default-state glass panes in a row and confirm the middle one links E/W.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos mid = helper.absolutePos(new BlockPos(5, 2, 8));
+        // UPDATE_KNOWN_SHAPE suppresses the neighbour-shape update, leaving the panes unconnected the way a pasted
+        // structure does (plain UPDATE_CLIENTS would re-link them on placement).
+        for (int dx = -1; dx <= 1; dx++) {
+            level.setBlock(mid.offset(dx, 0, 0), Blocks.GLASS_PANE.defaultBlockState(),
+                    Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        }
+        final BlockState before = level.getBlockState(mid);
+        helper.assertTrue(!before.getValue(BlockStateProperties.EAST) && !before.getValue(BlockStateProperties.WEST),
+                "a pane placed with UPDATE_CLIENTS should start unconnected");
+        GenerationJob.linkConnections(level, mid);
+        final BlockState after = level.getBlockState(mid);
+        helper.assertTrue(after.getValue(BlockStateProperties.EAST) && after.getValue(BlockStateProperties.WEST),
+                "linkConnections should connect the middle pane to both neighbours");
+        helper.succeed();
+    }
+
+    static void dimensionGateGrowsOrFizzlesByImplementation(GameTestHelper helper) {
+        // The adapt-or-fizzle matrix (SKYNETHERPLAN): a seed grows only in dimensions it implements — its base
+        // `dimensions` or a dimension-keyed override — and fizzles elsewhere rather than growing the foreign base.
+        final ServerLevel level = helper.getLevel();
+        final Holder<Biome> biome = biome(level, Biomes.PLAINS);
+        final String ow = Lookup.dimensionId(Level.OVERWORLD);
+        final String nether = Lookup.dimensionId(Level.NETHER);
+        final String end = Lookup.dimensionId(Level.END);
+
+        record Case(String theme, boolean ow, boolean nether, boolean end) {}
+        final Case[] cases = {
+            new Case("gametest/dim_overworld", true, false, false),
+            new Case("gametest/dim_nether", false, true, false),
+            new Case("gametest/dim_end", false, false, true),
+            new Case("gametest/dim_ow_nether", true, true, false),
+            new Case("gametest/dim_all", true, true, true),
+        };
+        for (Case c : cases) {
+            final IslandTheme t = theme(level, c.theme());
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, ow) == c.ow(),
+                    c.theme() + ": overworld should " + (c.ow() ? "grow" : "fizzle"));
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, nether) == c.nether(),
+                    c.theme() + ": nether should " + (c.nether() ? "grow" : "fizzle"));
+            helper.assertTrue(IslandGenerator.formValidFor(t, biome, 100, end) == c.end(),
+                    c.theme() + ": end should " + (c.end() ? "grow" : "fizzle"));
+        }
+        helper.succeed();
+    }
+
+    static void dimensionOverrideNeverInheritsOverworld(GameTestHelper helper) {
+        // A Nether/End override is a complete spec — an unset field must NOT fall back to the overworld base. This
+        // theme's base has coal ore + grass; its bare Nether override sets only the surface, so the Nether island
+        // must carry none of that overworld content (neutral netherrack body, no coal, no grass).
+        final ServerLevel nether = helper.getLevel().getServer().getLevel(Level.NETHER);
+        helper.assertTrue(nether != null, "no the_nether level on the server");
+        final Holder<Biome> wastes = biome(nether, Biomes.NETHER_WASTES);
+        final IslandPlan p = IslandGenerator.planIsland(nether, new BlockPos(40, 64, 40),
+                theme(nether, "gametest/dim_leak"), wastes, RandomSource.create(1L));
+        boolean netherrack = false;
+        boolean coal = false;
+        boolean grass = false;
+        for (IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.NETHERRACK)) netherrack = true;
+            if (bp.state().is(Blocks.COAL_ORE)) coal = true;
+            if (bp.state().is(Blocks.GRASS_BLOCK)) grass = true;
+        }
+        helper.assertTrue(netherrack, "a bare nether override should give a neutral netherrack body");
+        helper.assertTrue(!coal, "a nether override must NOT inherit the base's overworld coal ore");
+        helper.assertTrue(!grass, "a nether override must NOT inherit the base's overworld grass");
         helper.succeed();
     }
 }
