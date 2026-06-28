@@ -191,8 +191,19 @@ After each phase: `:26.1.2:runGameTestServer` green + coverage delta recorded he
   `everySeedRecipeAndBookEntryMatchesSeedKind` + `everyCraftableSeedHasUniqueIcon` need the book/icon resource helpers
   (Phase 4), and the recipe half blocks on [[skyseed-refactor]]/SKYRECIPEGENPLAN; `legacyDimensionResetRewrites-
   GeneratorSettings` exercises the level.dat `/emptynether` reset that's a no-op on 26.1.2 (and slated for removal).
-- _Next: Phase 2 — world-apply (throw→germinate→GenerationJob, 7 tests), then Phase 3 (structure templates, 11),
-  Phase 4 (book/icon, 48 + the 2 deferred recipe/icon tests). The book/icon phase pairs with SKYRECIPEGENPLAN._
+- **★ Phases 2 + 3 COMPLETE — +17 tests (75 ported total; "All 76 passed" incl. the built-in)** (commits `63ead1d`
+  world-apply +6, `8d79916` structure +11, 2026-06-28). **Phase 2 (world-apply, 6 of 7):** the thrown-seed
+  germinate→GenerationJob pipeline (entity ticking via `succeedWhen` + `maxTicks` overload; mob spawns through the
+  26.1.2 subpackages `animal.cow.Cow`/`animal.golem.IronGolem`/`npc.villager.Villager`); `seedStateRoundTripsThroughNbt`
+  deferred (drives `addAdditionalSaveData(CompoundTag)` directly — 26.1.2 reworked it to ValueOutput/ValueInput).
+  **Phase 3 (structure templates, all 11):** template placement via `level.getServer().getStructureManager().get(id)`
+  + `placeInWorld`; jigsaw-NBT `filterBlocks` via `CompoundTag.getStringOr` (getString → `Optional` on 26.1.2); the
+  golem via the `Entities` compat helper; biome overrides via `biome()`. Also added a Modonomicon coverage test
+  (`modonomicon_guide_book_is_complete_and_degrades`) when SKYMODONOMICONPLAN Phase 2 landed.
+- _Next: Phase 4 — book/icon (48 tests, the big one) + the 3 deferred tests
+  (`everySeedRecipeAndBookEntryMatchesSeedKind`, `everyCraftableSeedHasUniqueIcon`, `seedStateRoundTripsThroughNbt`).
+  It needs the book/icon resource helpers (1.21.1 source lines ~1918–3097) and pairs with SKYRECIPEGENPLAN (recipes
+  now load) + SKYMODONOMICONPLAN (validate BOTH guide backends stay complete)._
 
 ## Resolved decisions
 - **Package = `gametest_26_1_2`** (Java can't have dots/digit-led segments, so the literal "26.1.2" renders with
