@@ -121,6 +121,7 @@ tasks.withType(ProcessResources).configureEach { dependsOn(generateRecipes) }
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
     maven { url = "https://maven.blamejared.com" } // Patchouli (guide book)
+    maven { url = "https://dl.cloudsmith.io/public/klikli-dev/mods/maven/" } // Modonomicon (guide book)
 }
 
 base {
@@ -222,6 +223,13 @@ dependencies {
     if (project.hasProperty("patchouli_${mcv}")) {
         compileOnly "vazkii.patchouli:Patchouli:${property("patchouli_${mcv}")}"
         localRuntime "vazkii.patchouli:Patchouli:${property("patchouli_${mcv}")}"
+    }
+    // Modonomicon — OPTIONAL, same compileOnly + localRuntime pattern. The PRIMARY guide backend on every node
+    // (preferred over Patchouli — see MODONOMICONPLAN.md); published for both 1.21.1 and 26.1.2. transitive=false:
+    // we only need its API to compile + the mod present at dev runtime, not its dependency graph.
+    if (project.hasProperty("modonomicon_${mcv}")) {
+        compileOnly("com.klikli_dev:modonomicon-${mcv}-neoforge:${property("modonomicon_${mcv}")}") { transitive = false }
+        localRuntime("com.klikli_dev:modonomicon-${mcv}-neoforge:${property("modonomicon_${mcv}")}") { transitive = false }
     }
 }
 
