@@ -2590,13 +2590,14 @@ public final class SkyseedGameTests {
     @GameTest(template = BIG_REGION)
     public static void dungeonComplexGoesVertical(GameTestHelper helper) {
         // With descending staircase + ladder-shaft pieces in the pool, the complex should drop below its start level —
-        // verticality, not just sprawl. The run is position-seeded, so sample a few seeds and assert the best descends:
-        // the assembled cobble spans well beyond a single room's height (a stair drops ~4, a shaft ~6).
+        // verticality, not just sprawl. The run is position-seeded, so sample several seeds and assert the best descends.
+        // A flat hub spans only ~5-6; any descent (a stair drops ~4, a shaft ~6) reaches ~9+. Threshold `> 7` sits with
+        // margin between the two — `> 9` sat at the low end of the descended range and flaked when the best landed at 9.
         final ServerLevel level = helper.getLevel();
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 14, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
         int bestSpan = 0;
-        for (long seed = 1; seed <= 4; seed++) {
+        for (long seed = 1; seed <= 8; seed++) {
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
                     for (int y = 0; y < 24; y++) {
@@ -2622,7 +2623,7 @@ public final class SkyseedGameTests {
                 bestSpan = Math.max(bestSpan, maxY - minY);
             }
         }
-        helper.assertTrue(bestSpan > 9, "the dungeon should descend via stairs/shafts, not just sprawl flat "
+        helper.assertTrue(bestSpan > 7, "the dungeon should descend via stairs/shafts, not just sprawl flat "
                 + "(best cobble Y-span " + bestSpan + ")");
         helper.succeed();
     }

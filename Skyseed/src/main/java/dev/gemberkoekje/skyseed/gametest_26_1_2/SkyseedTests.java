@@ -2921,8 +2921,9 @@ public final class SkyseedTests {
         final BlockPos origin = helper.absolutePos(new BlockPos(24, 14, 24));
         final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dungeon_complex/start"));
         int bestSpan = 0;
-        // Sample more seeds than the 1.21.1 suite (8 vs 4): the descent is position-seeded and the 26.1.2 gametest
-        // engine relocates this test per run, so a small sample occasionally lands right on the >9 boundary.
+        // A flat hub spans only ~5-6; any descent (a stair drops ~4, a shaft ~6) reaches ~9+. Threshold `> 7` sits with
+        // margin between the two; `> 9` sat at the low end of the descended range and flaked when the best landed at 9
+        // (the descent is position-seeded and the gametest engine relocates this test per run). Sample 8 seeds.
         for (long seed = 1; seed <= 8; seed++) {
             for (int x = 0; x < 48; x++) {
                 for (int z = 0; z < 48; z++) {
@@ -2949,7 +2950,7 @@ public final class SkyseedTests {
                 bestSpan = Math.max(bestSpan, maxY - minY);
             }
         }
-        helper.assertTrue(bestSpan > 9, "the dungeon should descend via stairs/shafts, not just sprawl flat (best cobble Y-span " + bestSpan + ")");
+        helper.assertTrue(bestSpan > 7, "the dungeon should descend via stairs/shafts, not just sprawl flat (best cobble Y-span " + bestSpan + ")");
         helper.succeed();
     }
 

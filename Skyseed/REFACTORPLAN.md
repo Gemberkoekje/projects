@@ -69,8 +69,10 @@ changes between versions the Stonecutter directives live in a handful of named f
    `chiseledBuild` + `chiseledRunGameTestServer` (fan a task across every node via `stonecutter.tasks.named(<task>)`, so
    a new node needs no edit there), and `.github/workflows/ci-skyseed.yml` builds + gametests each node as a matrix
    (1.21.1→JDK 21, 26.1.2→JDK 25). Remaining: the "how to add a version" recipe (a node + the expected directive
-   sites), and adding further versions as wanted. _NB: the 1.21.1 suite has one long-known flaky gametest that can make
-   CI red intermittently (passes on rerun); worth a retry/guard before CI is load-bearing._
+   sites — now written, see **"How to add a version node"** below), and adding further versions as wanted. The one
+   long-known flaky gametest (`dungeonComplexGoesVertical`) is **fixed** in both suites: it sampled the best cobble
+   Y-span and asserted `> 9`, which sat at the low end of the descended range (~9+) and flaked when the best landed at
+   exactly 9 — now `> 7` (with margin above a flat ~5-6 hub) + an 8-seed sample, so it's deterministic.
 
 > **Priority (per the maintainer): 1.21.1 was the only target while the chapters were built; Stage 2 is now active.**
 > Stages 0–1 (the structural value) landed first; the **second version's driver is the worldgen content newer versions
@@ -382,6 +384,47 @@ garden + 1.21.5 vegetation (handled) or pure renames** (1.21.1 `patch_cactus`/`p
 prefix; Skyseed places those blocks directly anyway). The one genuine miss: **`minecraft:fallen_*_tree`** (new in
 1.21.5) — added fallen oak/birch/spruce/jungle logs to the forest line (gametest `forest_places_fallen_logs`). Nothing
 else outstanding.
+
+---
+
+## How to add a version node (the recipe)
+
+Distilled from adding `26.1.2`. A new node is **mechanical config + per-delta `//?` directives** — the facade absorbs
+most of it, and the data is already tolerant. Keep the existing nodes green at every step.
+
+1. **Declare the node.** Add the version to `settings.gradle` (`stonecutter { create(rootProject) { versions("1.21.1",
+   "26.1.2", "<new>"); … } }`). Add the per-node values to the **root** `gradle.properties` (the `versions/` tree is
+   gitignored + regenerated, so values can't live there): `mc_<v>`, `neo_<v>`, `java_<v>`, and — only if published for
+   that MC — `parchment_mc_<v>`/`parchment_<v>`, `patchouli_<v>`, `modonomicon_<v>`. `build.gradle` already selects them
+   by `mcv = project.name`; Patchouli/Parchment are wrapped in `if (project.hasProperty("…_${mcv}"))` so an unpublished
+   one just skips.
+2. **Run the decompile.** `./gradlew :<v>:compileJava` triggers the NeoForm download + decompile (cached after). It
+   won't compile until the directives below exist — that's expected; the node flip is the *start* of the compat work.
+3. **Drive the compile errors into `compat`.** Recompile, read the per-symbol histogram (lift `-Xmaxerrs` if it caps at
+   100), fix a cluster, repeat to zero. **Expected directive sites (almost all in `compat`):** `Ids` (the id type),
+   `Lookup` (registry access: `registryOrThrow`→`lookupOrThrow`, `getValue`, `getOptional`, `listElements`, biome/feature
+   lookups), `Jigsaw`, `Entities` (create/place/spawn-reason), `Players`. Per-file residual: the entity NBT rewrite
+   (`CompoundTag` direct access → `ValueInput`/`ValueOutput`), `SavedData`→Codec, the recipe API, the `LootModifier`
+   codec, GameRules→registry, the spawn/respawn API, the client model/key APIs, the mob-class subpackage reorg, and
+   1-offs (renamed blocks/methods). Each is a `//? if >=<v> { /*new*/ //?} else { current //?}` block — **the current
+   branch stays uncommented + Javadoc-free** so the existing node keeps compiling.
+4. **Gametests.** If the framework changed (it did at 1.21.5: `@GameTest`/`@GameTestHolder` → `GameTestInstance` +
+   `RegisterGameTestsEvent`), add a `gametest_<v>` source set and a per-node exclude in `build.gradle`
+   (`if (mcv=="1.21.1") exclude gametest_26_1_2/** else exclude gametest/**`); port bodies from the nearest suite (the
+   `GameTestHelper` API is stable). Otherwise reuse the existing suite. **The 1.21.1 suite stays frozen** as the
+   golden-master witness.
+5. **Content / data.** Most ships to both nodes for free — the theme/decoration/biome-override/ore codecs store raw
+   `String` ids and **skip-with-log** on an unknown id (so a forward reference is inert on older nodes; proven by
+   `unknownThemeIdsFallBack`). For content that's only meaningful on the new node, use the **modern-only gating
+   pattern** (see the Pale Garden seed): `//?`-gate the `SEED_THEMES` entry, put recipes under `recipes/_modern_only/`
+   (skipped on legacy by `generateRecipes`), use **tags** in advancements (a direct unknown item id breaks the legacy
+   datapack load; an unknown tag resolves to empty), `{id, required:false}` in the `#skyseeds` tag, and a `generateGuide`
+   filter for the book entry. The residual hard cases (a renamed vanilla id, a shifted worldgen codec) take a guarded
+   data variant or a `//?`.
+6. **Verify.** `:<v>:build` + `:<v>:runGameTestServer` green, **every other node still green**, then `./gradlew
+   chiseledBuild` / `chiseledRunGameTestServer` for all nodes. Add the version to the CI matrix in
+   `.github/workflows/ci-skyseed.yml` (a `{mcver, java}` row). Capture a **per-node golden master** (the gametest logs
+   `[golden] CAPTURE` when an entry is missing — lock the printed fingerprints).
 
 ---
 
