@@ -57,6 +57,10 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
+import net.neoforged.neoforge.registries.RegisterEvent;
+import net.minecraft.gametest.framework.GameTestInstance;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.resources.RegistryOps;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -85,6 +89,16 @@ public final class SkyseedTests {
     private static final Identifier BIG_REGION = Ids.mod("gametest/big_region");
 
     private static Holder<TestEnvironmentDefinition<?>> env;
+
+    @SubscribeEvent
+    static void onRegisterTestInstanceType(RegisterEvent event) {
+        // test_instance is a network-synced registry: the client handshake serializes every entry, including our
+        // code-registered tests. Register the skyseed:gametest type codec so SkyseedTest.codec() resolves to a real,
+        // encodable codec — without this, runClient hangs on "Loading terrain" (RegistrySynchronization.packRegistry
+        // can't encode the test instances). See SkyseedTest.
+        event.register(Registries.TEST_INSTANCE_TYPE,
+                helper -> helper.register(Ids.mod("gametest"), SkyseedTest.CODEC));
+    }
 
     @SubscribeEvent
     static void onRegisterGameTests(RegisterGameTestsEvent event) {
@@ -195,6 +209,7 @@ public final class SkyseedTests {
         reg(event, "debug_forced_waterfall_germinates_water_column", REGION, SkyseedTests::debugForcedWaterfallGerminatesWaterColumn);
         reg(event, "auto_debug_seeds_cover_overrides_and_rares", REGION, SkyseedTests::autoDebugSeedsCoverOverridesAndRares);
         reg(event, "every_auto_debug_seed_has_a_model", REGION, SkyseedTests::everyAutoDebugSeedHasAModel);
+        reg(event, "every_test_instance_serializes_for_client_sync", REGION, SkyseedTests::everyTestInstanceSerializesForClientSync);
         reg(event, "seed_state_round_trips_through_nbt", REGION, SkyseedTests::seedStateRoundTripsThroughNbt);
         reg(event, "sprawling_dungeon_assembles", BIG_REGION, SkyseedTests::sprawlingDungeonAssembles);
         reg(event, "dungeon_complex_rooms_carry_content", REGION, SkyseedTests::dungeonComplexRoomsCarryContent);
@@ -2849,6 +2864,32 @@ public final class SkyseedTests {
         helper.assertTrue(theme.equals(b.getTheme()), "theme did not round-trip through NBT");
         helper.assertTrue(tag2.getBooleanOr("Precise", false) && tag2.getDoubleOr("TY", 0.0) == 2.5,
                 "precise target did not round-trip through read");
+        helper.succeed();
+    }
+
+    static void everyTestInstanceSerializesForClientSync(GameTestHelper helper) {
+        // The client handshake serializes the whole (network-synced) test_instance registry via the GameTestInstance
+        // dispatch codec; an unencodable entry hangs runClient on "Loading terrain". Encode every Skyseed test through
+        // DIRECT_CODEC (exactly what RegistrySynchronization.packRegistry does) and assert each round-trips cleanly.
+        final var access = helper.getLevel().registryAccess();
+        final RegistryOps<net.minecraft.nbt.Tag> ops = RegistryOps.create(NbtOps.INSTANCE, access);
+        final var registry = access.lookupOrThrow(Registries.TEST_INSTANCE);
+        int failed = 0;
+        String first = null;
+        for (final var entry : registry.entrySet()) {
+            if (!Skyseed.MODID.equals(entry.getKey().identifier().getNamespace())) {
+                continue;
+            }
+            final var result = GameTestInstance.DIRECT_CODEC.encodeStart(ops, entry.getValue());
+            if (result.isError()) {
+                failed++;
+                if (first == null) {
+                    first = entry.getKey().identifier() + " -> " + result.error().map(e -> e.message()).orElse("?");
+                }
+            }
+        }
+        helper.assertTrue(failed == 0, failed + " skyseed test instance(s) cannot serialize for the client handshake "
+                + "(first: " + first + ") — the test_instance_type codec is missing or broken");
         helper.succeed();
     }
 

@@ -13,15 +13,18 @@ import java.util.function.Consumer;
 
 /**
  * Minimal {@link GameTestInstance} that runs a plain {@code Consumer<GameTestHelper>} body. Skyseed's 26.1.2 gametests
- * are registered in code via {@link net.neoforged.neoforge.event.RegisterGameTestsEvent} (RegistrationInfo.BUILT_IN),
- * so they are never serialized — the {@link #codec()} contract is satisfied by a unit codec that is never invoked
- * (see {@code CHANGELOG_26.1.md}; if a run path ever does serialize built-in instances, the fallback is
- * {@code FunctionGameTestInstance} + a registered {@code TEST_INSTANCE_TYPE} codec).
+ * are registered in code via {@link net.neoforged.neoforge.event.RegisterGameTestsEvent}, but that does NOT make them
+ * exempt from serialization: {@code test_instance} is a network-synced registry, so the client handshake
+ * ({@code RegistrySynchronization.packRegistry}) encodes every entry — a throwing codec hangs {@code runClient} on
+ * "Loading terrain". So {@link #CODEC} is a real type codec, registered in {@code TEST_INSTANCE_TYPE} as
+ * {@code skyseed:gametest} (see {@link SkyseedTests#onRegisterTestInstanceType}). The {@code Consumer} body can't
+ * round-trip, but only the encode side matters for the handshake; decode yields a no-op test (the decoding side — the
+ * client — never runs gametests). The server keeps the real body because tests run from the in-memory instance, not a
+ * decoded one.
  */
 final class SkyseedTest extends GameTestInstance {
-    static final MapCodec<SkyseedTest> CODEC = MapCodec.<SkyseedTest>unit(() -> {
-        throw new UnsupportedOperationException("Skyseed gametests are code-registered, not serialized");
-    });
+    static final MapCodec<SkyseedTest> CODEC = TestData.CODEC.xmap(
+            data -> new SkyseedTest(data, helper -> {}), SkyseedTest::info);
 
     private final Consumer<GameTestHelper> body;
 
