@@ -176,6 +176,18 @@ public final class SkyseedTests {
         reg(event, "mansion_assembles_with_flush_wings", BIG_REGION, SkyseedTests::mansionAssemblesWithFlushWings);
         reg(event, "mansion_cores_have_distinct_footprints", REGION, SkyseedTests::mansionCoresHaveDistinctFootprints);
         reg(event, "village_houses_use_vanilla_blocks", BIG_REGION, SkyseedTests::villageHousesUseVanillaBlocks);
+        // batch b — End-chapter / monument / ancient-city structure assembly:
+        reg(event, "end_portal_chamber_has_twelve_empty_frames", BIG_REGION, SkyseedTests::endPortalChamberHasTwelveEmptyFrames);
+        reg(event, "return_portal_shrine_has_end_portal", BIG_REGION, SkyseedTests::returnPortalShrineHasEndPortal);
+        reg(event, "end_city_has_purpur_tower_and_ship_chest", BIG_REGION, SkyseedTests::endCityHasPurpurTowerAndShipChest);
+        reg(event, "end_city_sprouts_towers", BIG_REGION, SkyseedTests::endCitySproutsTowers);
+        reg(event, "end_city_bridges_across_void", BIG_REGION, SkyseedTests::endCityBridgesAcrossVoid);
+        reg(event, "end_city_tiers_are_detailed", REGION, SkyseedTests::endCityTiersAreDetailed);
+        reg(event, "dragon_trophy_monument_has_empty_egg_pedestal", BIG_REGION, SkyseedTests::dragonTrophyMonumentHasEmptyEggPedestal);
+        reg(event, "grand_ocean_monument_places", BIG_REGION, SkyseedTests::grandOceanMonumentPlaces);
+        reg(event, "ocean_monument_water_sits_flush", REGION, SkyseedTests::oceanMonumentWaterSitsFlush);
+        reg(event, "sunk_tank_animals_spawn_submerged", REGION, SkyseedTests::sunkTankAnimalsSpawnSubmerged);
+        reg(event, "ancient_city_places", BIG_REGION, SkyseedTests::ancientCityPlaces);
         // DEFERRED to a later phase (not ported here):
         //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag)/readAdditionalSaveData(CompoundTag)
         //    directly, but 26.1.2 reworked those to ValueOutput/ValueInput — needs a rewrite against the new NBT API.
@@ -2415,6 +2427,347 @@ public final class SkyseedTests {
         helper.assertTrue(strippedPost, "village house must use stripped-log corner posts (the vanilla frame)");
         helper.assertTrue(pane, "village house windows must be glass panes");
         helper.assertTrue(cobble, "village house must sit on a cobblestone foundation");
+        helper.succeed();
+    }
+
+    static void endPortalChamberHasTwelveEmptyFrames(GameTestHelper helper) {
+        // The End Portal Seed grows the portal chamber: a stronghold room with the vanilla 12-frame End portal ring,
+        // frames empty so the player lights it with Eyes of Ender. Assert exactly 12 frames, all empty, AND that every
+        // frame faces the ring's centre — the inward-facing layout vanilla requires to form a portal.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_portal/chamber"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        final java.util.List<BlockPos> frames = new java.util.ArrayList<>();
+        final java.util.List<net.minecraft.core.Direction> facings = new java.util.ArrayList<>();
+        int eyed = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 12; y++) {
+                    final BlockState s = helper.getBlockState(new BlockPos(x, y, z));
+                    if (s.is(Blocks.END_PORTAL_FRAME)) {
+                        frames.add(new BlockPos(x, y, z));
+                        facings.add(s.getValue(BlockStateProperties.HORIZONTAL_FACING));
+                        if (s.getValue(BlockStateProperties.EYE)) {
+                            eyed++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(frames.size() == 12, "the portal chamber must have exactly 12 end-portal frames (got " + frames.size() + ")");
+        helper.assertTrue(eyed == 0, "the frames must start empty so the player lights the portal (eyed=" + eyed + ")");
+        double sx = 0;
+        double sz = 0;
+        for (final BlockPos p : frames) {
+            sx += p.getX();
+            sz += p.getZ();
+        }
+        final double cx = sx / frames.size();
+        final double cz = sz / frames.size();
+        for (int i = 0; i < frames.size(); i++) {
+            final BlockPos p = frames.get(i);
+            final double dx = p.getX() - cx;
+            final double dz = p.getZ() - cz;
+            final net.minecraft.core.Direction want = Math.abs(dz) > Math.abs(dx)
+                    ? (dz < 0 ? net.minecraft.core.Direction.SOUTH : net.minecraft.core.Direction.NORTH)
+                    : (dx < 0 ? net.minecraft.core.Direction.EAST : net.minecraft.core.Direction.WEST);
+            helper.assertTrue(facings.get(i) == want,
+                    "frame at " + p + " faces " + facings.get(i) + " but must face the ring centre (" + want + ") to form the portal");
+        }
+        helper.succeed();
+    }
+
+    static void returnPortalShrineHasEndPortal(GameTestHelper helper) {
+        // The Return Portal Seed (End-only) grows an end-stone shrine around an End exit portal. Verify the 3x3 portal assembles.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("return_portal/shrine"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        int portal = 0;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 1; y <= 6; y++) {
+                    if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.END_PORTAL)) {
+                        portal++;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(portal == 9, "the return shrine should hold a 3x3 End exit portal (got " + portal + ")");
+        helper.succeed();
+    }
+
+    static void endCityHasPurpurTowerAndShipChest(GameTestHelper helper) {
+        // Full jigsaw: a base section + stacking overhanging tiers + a terraced roof, and a guaranteed fat tower off the
+        // base's east arm carrying the End ship. Verify it stacks vertically (not one box) — purpur, magenta-glass,
+        // two loot chests, and the ship's dragon-head bow riding ELEVATED on the fat tower.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 3, origin, false, "", 0, null, 1L);
+        int purpur = 0, chests = 0, maxPurpurY = Integer.MIN_VALUE, dragonY = Integer.MIN_VALUE;
+        boolean glass = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.PURPUR_BLOCK) || st.is(Blocks.PURPUR_PILLAR) || st.is(Blocks.PURPUR_STAIRS) || st.is(Blocks.PURPUR_SLAB)) {
+                        purpur++;
+                        maxPurpurY = Math.max(maxPurpurY, y);
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.DRAGON_HEAD)) {
+                        dragonY = Math.max(dragonY, y);
+                    } else if (st.is(Blocks.MAGENTA_STAINED_GLASS)) {
+                        glass = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(purpur > 80, "the End City should be built of purpur (got " + purpur + ")");
+        helper.assertTrue(chests >= 2, "the End City needs a tower chest and a ship chest (got " + chests + ")");
+        helper.assertTrue(glass, "the tiers should carry magenta-glass windows");
+        helper.assertTrue(maxPurpurY > 13, "the End City should stack tiers above its base, not be one box (top purpur Y " + maxPurpurY + ")");
+        helper.assertTrue(dragonY > 8, "the End ship (dragon-head bow) should ride the elevated fat tower, not the base (dragon head Y " + dragonY + ")");
+        helper.succeed();
+    }
+
+    static void endCitySproutsTowers(GameTestHelper helper) {
+        // Phase 2: the spire pieces assemble into a tall, end-rod-lit purpur tower. Place the tower_piece pool directly;
+        // sample plenty of seeds and assert the BEST rises well past a single segment, lit by end rods.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/tower_piece"));
+        int bestSpan = 0;
+        boolean rods = false;
+        for (long seed = 1; seed <= 24; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("skyseed:ec_spire"), 6, origin, false, "", 0, null, seed);
+            int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        final var st = helper.getBlockState(new BlockPos(x, y, z));
+                        if (st.is(Blocks.PURPUR_BLOCK)) {
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                        } else if (st.is(Blocks.END_ROD)) {
+                            rods = true;
+                        }
+                    }
+                }
+            }
+            if (maxY > minY) {
+                bestSpan = Math.max(bestSpan, maxY - minY);
+            }
+        }
+        helper.assertTrue(bestSpan > 6, "the spire should rise tall, not a stub (best purpur Y-span " + bestSpan + ")");
+        helper.assertTrue(rods, "the tower should be end-rod-lit");
+        helper.succeed();
+    }
+
+    static void endCityBridgesAcrossVoid(GameTestHelper helper) {
+        // Phase 3: side branches fling end-stone-brick bridges out over the void to a second 'wing' section. Sample
+        // plenty of seeds and assert the BEST flings a bridge well beyond the tiered core.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 2, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("end_city/start"));
+        int bestBrickReach = 0;
+        for (long seed = 1; seed <= 24; seed++) {
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                    }
+                }
+            }
+            Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 6, origin, false, "", 0, null, seed);
+            for (int x = 0; x < 48; x++) {
+                for (int z = 0; z < 48; z++) {
+                    for (int y = 0; y < 24; y++) {
+                        if (helper.getBlockState(new BlockPos(x, y, z)).is(Blocks.END_STONE_BRICKS)) {
+                            bestBrickReach = Math.max(bestBrickReach, Math.max(Math.abs(x - 24), Math.abs(z - 24)));
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(bestBrickReach > 6, "the End City should bridge out over the void to a second section (best reach " + bestBrickReach + ")");
+        helper.succeed();
+    }
+
+    static void endCityTiersAreDetailed(GameTestHelper helper) {
+        // Phase 5 detailing: every tier gets an end-stone-brick foundation course AND a corbel — a ring of upside-down
+        // purpur stairs under the lip (at y0, the lip floor). Checked on the templates.
+        final ServerLevel level = helper.getLevel();
+        for (final String id : new String[]{"end_city/floor_a", "end_city/floor_b"}) {
+            final StructureTemplate t = level.getServer().getStructureManager().get(skyseed(id)).orElseThrow();
+            final boolean brick = !t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.END_STONE_BRICKS).isEmpty();
+            int corbel = 0;
+            for (final var s : t.filterBlocks(BlockPos.ZERO, new StructurePlaceSettings(), Blocks.PURPUR_STAIRS)) {
+                if (s.pos().getY() == 0) {
+                    corbel++;
+                }
+            }
+            helper.assertTrue(brick, id + " should carry an end-stone-brick accent course");
+            helper.assertTrue(corbel >= 8, id + " should bevel its lip with a corbel ring (got " + corbel + " y0 stairs)");
+        }
+        helper.succeed();
+    }
+
+    static void dragonTrophyMonumentHasEmptyEggPedestal(GameTestHelper helper) {
+        // Phase 6 capstone: the Dragon Trophy grows a monument — a purpur-capped pedestal + four dragon heads — but
+        // NO dragon egg (the egg is unique; the player sets their own).
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("dragon_trophy/monument"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        int heads = 0;
+        boolean purpur = false, egg = false, brick = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.DRAGON_HEAD)) {
+                        heads++;
+                    } else if (st.is(Blocks.PURPUR_BLOCK)) {
+                        purpur = true;
+                    } else if (st.is(Blocks.DRAGON_EGG)) {
+                        egg = true;
+                    } else if (st.is(Blocks.END_STONE_BRICKS)) {
+                        brick = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(brick, "the trophy dais should be end-stone bricks");
+        helper.assertTrue(purpur, "the trophy pedestal should have a purpur cap");
+        helper.assertTrue(heads >= 4, "the trophy should have four dragon heads (got " + heads + ")");
+        helper.assertTrue(!egg, "the trophy must NOT include a dragon egg (it would duplicate the unique egg)");
+        helper.succeed();
+    }
+
+    static void grandOceanMonumentPlaces(GameTestHelper helper) {
+        // SKYHUGEPLAN: the bigger (19x19) Ocean Monument — the rare 5% bonus on the Huge Aquatic seed. Verify it
+        // assembles: a big prismarine basin, the eight-block gold cache, two buried-treasure chests, a sponge.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ocean_monument/grand"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        int prismarine = 0, gold = 0, chests = 0;
+        boolean sponge = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.PRISMARINE) || st.is(Blocks.PRISMARINE_BRICKS) || st.is(Blocks.DARK_PRISMARINE)) {
+                        prismarine++;
+                    } else if (st.is(Blocks.GOLD_BLOCK)) {
+                        gold++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.WET_SPONGE)) {
+                        sponge = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(prismarine > 250, "the grand monument should be a big prismarine basin (got " + prismarine + ")");
+        helper.assertTrue(gold == 8, "the grand monument should have an eight-block gold cache (got " + gold + ")");
+        helper.assertTrue(chests == 2, "the grand monument should have two buried-treasure chests (got " + chests + ")");
+        helper.assertTrue(sponge, "the grand monument should have a sponge niche");
+        helper.succeed();
+    }
+
+    static void oceanMonumentWaterSitsFlush(GameTestHelper helper) {
+        // The monument is sunk so the pool surface lands flush with the island top, not as a raised basin. The jigsaw
+        // assembles during placement (not in the plan), so check its recorded site: the anchor lands at origin.y - 1
+        // (the basin floor), the pool is 5 deep, so its surface (floor + 5) must be flush with the island's surface Y.
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme t = theme(level, "aquatic_large");
+        final int idx = rareIndex(t, "ocean_monument/start");
+        helper.assertTrue(idx >= 0, "aquatic_large should host the ocean monument rare structure");
+        final BlockPos c = new BlockPos(40, 80, 40);
+        final IslandPlan p = IslandGenerator.planIsland(level, c, t, level.getBiome(c),
+                RandomSource.create(3L), DebugForce.rare(idx));
+        final IslandPlan.JigsawSite site = p.jigsaws().stream()
+                .filter(j -> j.pool().path().equals("ocean_monument/start")).findFirst().orElse(null);
+        helper.assertTrue(site != null, "the forced monument should record a jigsaw site");
+        int maxLandY = Integer.MIN_VALUE;
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (!bp.state().isAir() && !bp.state().is(Blocks.WATER)) {
+                maxLandY = Math.max(maxLandY, bp.pos().getY());
+            }
+        }
+        final int poolTop = (site.origin().getY() - 1) + 5;
+        helper.assertTrue(poolTop <= maxLandY, "the monument pool must sit flush, not above the island surface "
+                + "(pool top " + poolTop + " vs land top " + maxLandY + ")");
+        helper.assertTrue(poolTop >= maxLandY - 1, "the monument pool should reach the island surface "
+                + "(pool top " + poolTop + " vs land top " + maxLandY + ")");
+        helper.succeed();
+    }
+
+    static void sunkTankAnimalsSpawnSubmerged(GameTestHelper helper) {
+        // Regression: the flush (sunk) Ocean Monument's water sits a block BELOW the rolled spawn spot, so every
+        // guardian used to be skipped — beached as dry air. submergedSpot must walk down to the real water column.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos surf = helper.absolutePos(new BlockPos(4, 9, 4));
+        for (int dy = 0; dy <= 4; dy++) {
+            level.setBlock(surf.below(dy), Blocks.WATER.defaultBlockState(), 3);
+        }
+        level.setBlock(surf.below(5), Blocks.PRISMARINE.defaultBlockState(), 3);
+        final BlockPos rolled = surf.above();
+        helper.assertTrue(level.getFluidState(rolled).isEmpty(), "setup: the rolled spot must be dry air");
+        final BlockPos wet = GenerationJob.submergedSpot(level, rolled);
+        helper.assertTrue(wet != null, "submergedSpot must find the sunk basin water below the dry rolled spot");
+        helper.assertTrue(!level.getFluidState(wet).isEmpty(), "the chosen spawn spot must be water");
+        helper.assertTrue(wet.getY() < surf.getY(), "the spawn spot must be submerged below the water surface");
+        final BlockPos dry = helper.absolutePos(new BlockPos(10, 9, 10));
+        helper.assertTrue(GenerationJob.submergedSpot(level, dry) == null, "dry land must yield no spawn spot");
+        helper.succeed();
+    }
+
+    static void ancientCityPlaces(GameTestHelper helper) {
+        // SKYHUGEPLAN: the Ancient City — the rare 6% bonus on the Huge Ancient seed. Verify it assembles: a deepslate
+        // plaza, three ancient_city loot chests, a can-summon sculk shrieker, the blue soul fire, and a sculk catalyst.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos origin = helper.absolutePos(new BlockPos(24, 4, 24));
+        final var pool = Lookup.templatePool(level.registryAccess(), Ids.mod("ancient_city/plaza"));
+        Jigsaw.placeCapped(level, pool, Id.of("minecraft:bottom"), 1, origin, false, "", 0, null, 1L);
+        int deepslate = 0, chests = 0;
+        boolean canSummon = false, soulFire = false, catalyst = false;
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 48; z++) {
+                for (int y = 0; y < 24; y++) {
+                    final var st = helper.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(Blocks.DEEPSLATE_TILES) || st.is(Blocks.DEEPSLATE_BRICKS)
+                            || st.is(Blocks.CRACKED_DEEPSLATE_TILES) || st.is(Blocks.CRACKED_DEEPSLATE_BRICKS)) {
+                        deepslate++;
+                    } else if (st.is(Blocks.CHEST)) {
+                        chests++;
+                    } else if (st.is(Blocks.SCULK_SHRIEKER)
+                            && st.getValue(BlockStateProperties.CAN_SUMMON)) {
+                        canSummon = true;
+                    } else if (st.is(Blocks.SOUL_FIRE)) {
+                        soulFire = true;
+                    } else if (st.is(Blocks.SCULK_CATALYST)) {
+                        catalyst = true;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(deepslate > 150, "the ancient city should be a big deepslate plaza (got " + deepslate + ")");
+        helper.assertTrue(chests == 3, "the ancient city should have three loot chests (got " + chests + ")");
+        helper.assertTrue(canSummon, "the ancient city should have a can-summon sculk shrieker (the Warden danger)");
+        helper.assertTrue(soulFire, "the ancient city should keep its blue soul fire");
+        helper.assertTrue(catalyst, "the ancient city should have a sculk catalyst");
         helper.succeed();
     }
 }
