@@ -2,6 +2,10 @@ package dev.gemberkoekje.skyseed.registry;
 
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
+//? if >=26.1.2 {
+/*import dev.gemberkoekje.skyseed.compat.Ids;
+import net.minecraft.resources.ResourceKey;*/
+//?}
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -19,7 +23,11 @@ public final class ModEntities {
                     .sized(0.25f, 0.25f)
                     .clientTrackingRange(4)
                     .updateInterval(10)
+                    //? if >=26.1.2 {
+                    /*.build(ResourceKey.create(Registries.ENTITY_TYPE, Ids.mod("island_seed"))));*/
+                    //?} else {
                     .build("island_seed"));
+                    //?}
 
     private ModEntities() {}
 

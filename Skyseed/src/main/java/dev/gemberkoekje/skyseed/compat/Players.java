@@ -1,9 +1,8 @@
 package dev.gemberkoekje.skyseed.compat;
 
 import net.minecraft.network.chat.Component;
-//? if >=26.1.2 {
-/*import net.minecraft.server.level.ServerPlayer;*/
-//?}
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -21,6 +20,16 @@ public final class Players {
         }*/
         //?} else {
         player.displayClientMessage(msg, true);
+        //?}
+    }
+
+    /** Teleport a player within a level. 26.1.2's {@code teleportTo} gained a {@code Set<Relative>} + a
+     *  {@code resetCamera} flag (an absolute teleport with no relatives, no camera reset). */
+    public static void teleport(ServerPlayer player, ServerLevel level, double x, double y, double z, float yRot, float xRot) {
+        //? if >=26.1.2 {
+        /*player.teleportTo(level, x, y, z, java.util.Set.of(), yRot, xRot, false);*/
+        //?} else {
+        player.teleportTo(level, x, y, z, yRot, xRot);
         //?}
     }
 }

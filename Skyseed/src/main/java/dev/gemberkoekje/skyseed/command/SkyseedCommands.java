@@ -3,6 +3,7 @@ package dev.gemberkoekje.skyseed.command;
 import com.mojang.brigadier.CommandDispatcher;
 import dev.gemberkoekje.skyseed.Skyseed;
 import dev.gemberkoekje.skyseed.compat.Ids;
+import dev.gemberkoekje.skyseed.compat.Players;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -141,7 +142,7 @@ public final class SkyseedCommands {
         int moved = 0;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (player.level().dimension().equals(dim)) {
-                player.teleportTo(overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
+                Players.teleport(player, overworld, spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5,
                         player.getYRot(), player.getXRot());
                 moved++;
             }
@@ -251,6 +252,11 @@ public final class SkyseedCommands {
      * pure so it can be unit-tested against a synthetic tag.
      */
     public static boolean swapDimensionSettings(CompoundTag root, String dimKey, String newSettingsId) {
+        //? if >=26.1.2 {
+        /*// WorldGenSettings moved out of level.dat into data/<world>/world_gen_settings.dat in 26.1, so this legacy
+        // level.dat editor is obsolete there (the /empty* rescue commands are slated for pre-1.0 removal anyway).
+        return false;*/
+        //?} else {
         if (!root.contains("Data", Tag.TAG_COMPOUND)) return false;
         CompoundTag data = root.getCompound("Data");
         if (!data.contains("WorldGenSettings", Tag.TAG_COMPOUND)) return false;
@@ -265,6 +271,7 @@ public final class SkyseedCommands {
         if (generator.getString("settings").equals(newSettingsId)) return false;
         generator.putString("settings", newSettingsId);
         return true;
+        //?}
     }
 
     private static void deleteRecursively(Path dir) throws IOException {

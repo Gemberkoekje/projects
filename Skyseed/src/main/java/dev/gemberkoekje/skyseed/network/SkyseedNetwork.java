@@ -56,7 +56,7 @@ public final class SkyseedNetwork {
                 }
                 seed.setPreciseTarget(target);
                 seed.setDeltaMovement(IslandSeedItem.requiredVelocity(seed.position(), target));
-                seed.hasImpulse = true;
+                seed.hurtMarked = true; // force a velocity sync to clients (hasImpulse was removed in 26.1.2)
             } else {
                 final float velocity = IslandSeedItem.MIN_VELOCITY + power * (IslandSeedItem.MAX_VELOCITY - IslandSeedItem.MIN_VELOCITY);
                 seed.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, velocity, 1.0F);
