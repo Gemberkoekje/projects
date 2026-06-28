@@ -52,6 +52,13 @@ if (mcv == "1.21.1") {
     sourceSets.main.java {
         exclude("dev/gemberkoekje/skyseed/gametest/**")        // newer nodes: only their native suite
     }
+    // The legacy {replace,entries} GLM index (data/neoforge/loot_modifiers/global_loot_modifiers.json) is obsolete on
+    // 1.21.5+: NeoForge's LootModifierManager now loads EVERY file in loot_modifiers/ as a codec GLM (no index), so the
+    // index file itself is parsed as a GLM and logs an ERROR ("No key type"). The per-relic GLMs (which carry "type")
+    // load directly and still drop, so just drop the index on modern nodes. (1.21.1's older loader still needs it.)
+    tasks.withType(ProcessResources).configureEach {
+        exclude("**/loot_modifiers/global_loot_modifiers.json")
+    }
 }
 
 // Stonecutter copies src/main into the per-version node, so processResources can see a resource from both the node
