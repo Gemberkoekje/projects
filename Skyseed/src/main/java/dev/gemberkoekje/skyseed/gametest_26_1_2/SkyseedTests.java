@@ -210,6 +210,18 @@ public final class SkyseedTests {
         reg(event, "chorus_forest_seed_crafts_from_chorus_and_end_stone", REGION, SkyseedTests::chorusForestSeedCraftsFromChorusAndEndStone);
         reg(event, "end_city_seed_crafts_from_shulker_shell_and_purpur", REGION, SkyseedTests::endCitySeedCraftsFromShulkerShellAndPurpur);
         reg(event, "dragon_trophy_seed_crafts_from_dragon_breath", REGION, SkyseedTests::dragonTrophySeedCraftsFromDragonBreath);
+        // batch e — End-City biome gating, huge-seed gates + sizing, theme-catalogue + fallback guards:
+        reg(event, "end_city_gates_to_highlands_and_midlands", REGION, SkyseedTests::endCityGatesToHighlandsAndMidlands);
+        reg(event, "huge_forest_seed_crafts_from_gate", REGION, SkyseedTests::hugeForestSeedCraftsFromGate);
+        reg(event, "huge_aquatic_seed_crafts_from_gate", REGION, SkyseedTests::hugeAquaticSeedCraftsFromGate);
+        reg(event, "huge_islands_are_significantly_bigger_than_large", REGION, SkyseedTests::hugeIslandsAreSignificantlyBiggerThanLarge);
+        reg(event, "huge_islands_carve_decorated_caves", REGION, SkyseedTests::hugeIslandsCarveDecoratedCaves);
+        reg(event, "huge_aquatic_is_mostly_water", REGION, SkyseedTests::hugeAquaticIsMostlyWater);
+        reg(event, "every_theme_plans_without_error", REGION, SkyseedTests::everyThemePlansWithoutError);
+        reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
+        reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
+        reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
+        reg(event, "aquatic_sub_zero_has_lava_lake", REGION, SkyseedTests::aquaticSubZeroHasLavaLake);
         // DEFERRED — still not ported (each needs a 26.1.2 API the suite hasn't crossed yet):
         //  - the recipe-resolution cluster (endPortalEdges/endPortalSeed/returnPortalSeed/chorusForest/endCity/
         //    dragonTrophy seed crafts) + everySeedRecipeAndBookEntryMatchesSeedKind: need the reworked recipe API
@@ -3162,6 +3174,158 @@ public final class SkyseedTests {
         helper.assertTrue(recipe.get().value().assemble(input)
                         .is(ModItems.SEEDS.get("dragon_trophy").get()),
                 "the dragon's breath + obsidian + end stone ring did not produce the Dragon Trophy Seed");
+        helper.succeed();
+    }
+
+    // ===== End-City gating / huge-seed / theme-catalogue tests =====
+
+    static void endCityGatesToHighlandsAndMidlands(GameTestHelper helper) {
+        // Phase 5 — End-biome gating: the End City grows only in its native biomes (end_highlands / end_midlands) and
+        // fizzles — with a hint — elsewhere in the End (central the_end, barrens, small islands).
+        final ServerLevel level = helper.getLevel();
+        final IslandTheme city = theme(level, "end_city");
+        helper.assertTrue(city != null, "missing theme 'end_city'");
+        final var lookup = level.registryAccess().lookupOrThrow(Registries.BIOME);
+        final String end = Ids.mc("the_end").toString();
+        for (final ResourceKey<Biome> k : java.util.List.of(Biomes.END_HIGHLANDS, Biomes.END_MIDLANDS)) {
+            helper.assertTrue(IslandGenerator.formValidFor(city, lookup.getOrThrow(k), 64, end),
+                    "End City should grow in " + k.identifier());
+        }
+        for (final ResourceKey<Biome> k : java.util.List.of(Biomes.THE_END, Biomes.END_BARRENS, Biomes.SMALL_END_ISLANDS)) {
+            final var b = lookup.getOrThrow(k);
+            helper.assertTrue(!IslandGenerator.formValidFor(city, b, 64, end), "End City should fizzle in " + k.identifier());
+            helper.assertTrue(city.fizzlesIn(b), "End City should show a fizzle hint in " + k.identifier());
+        }
+        helper.succeed();
+    }
+
+    static void hugeForestSeedCraftsFromGate(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 1: a huge seed's middle row is ender pearl / <theme>_large seed / blaze powder (the End +
+        // Nether farm gate), wrapped in the theme's bulk block. Huge Forest = dirt around that gate.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack t = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIRT);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.ItemStack l = new net.minecraft.world.item.ItemStack(ModItems.SEEDS.get("forest_large").get());
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BLAZE_POWDER);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(t, t, t, e, l, p, t, t, t));
+        final var recipe = level.recipeAccess().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Huge Forest Seed (dirt + ender pearl + large + blaze powder)");
+        helper.assertTrue(recipe.get().value().assemble(input).is(ModItems.SEEDS.get("huge_forest").get()),
+                "the gate recipe did not produce the Huge Forest Seed");
+        helper.succeed();
+    }
+
+    static void hugeAquaticSeedCraftsFromGate(GameTestHelper helper) {
+        // Same gate, sand-wrapped, consuming the Large Aquatic seed.
+        final ServerLevel level = helper.getLevel();
+        final net.minecraft.world.item.ItemStack t = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SAND);
+        final net.minecraft.world.item.ItemStack e = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ENDER_PEARL);
+        final net.minecraft.world.item.ItemStack l = new net.minecraft.world.item.ItemStack(ModItems.SEEDS.get("aquatic_large").get());
+        final net.minecraft.world.item.ItemStack p = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BLAZE_POWDER);
+        final net.minecraft.world.item.crafting.CraftingInput input =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(t, t, t, e, l, p, t, t, t));
+        final var recipe = level.recipeAccess().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, level);
+        helper.assertTrue(recipe.isPresent(), "no crafting recipe for the Huge Aquatic Seed");
+        helper.assertTrue(recipe.get().value().assemble(input).is(ModItems.SEEDS.get("huge_aquatic").get()),
+                "the gate recipe did not produce the Huge Aquatic Seed");
+        helper.succeed();
+    }
+
+    static void hugeIslandsAreSignificantlyBiggerThanLarge(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 1: a huge island must dwarf its *_large counterpart, and plan without error.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var b = level.getBiome(c);
+        final int largeF = IslandGenerator.planIsland(level, c, theme(level, "forest_large"), b, RandomSource.create(1L)).blocks().size();
+        final int largeA = IslandGenerator.planIsland(level, c, theme(level, "aquatic_large"), b, RandomSource.create(1L)).blocks().size();
+        final int hugeF = IslandGenerator.planIsland(level, c, theme(level, "huge_forest"), b, RandomSource.create(1L)).blocks().size();
+        final int hugeA = IslandGenerator.planIsland(level, c, theme(level, "huge_aquatic"), b, RandomSource.create(1L)).blocks().size();
+        helper.assertTrue(hugeF > largeF * 3 / 2, "huge_forest (" + hugeF + ") should dwarf forest_large (" + largeF + ")");
+        helper.assertTrue(hugeA > largeA * 3 / 2, "huge_aquatic (" + hugeA + ") should dwarf aquatic_large (" + largeA + ")");
+        helper.succeed();
+    }
+
+    static void hugeIslandsCarveDecoratedCaves(GameTestHelper helper) {
+        // SKYHUGEPLAN Phase 2: huge land islands carve an internal cave system, dressed from the underside palette (or
+        // a default of dripstone + glow lichen). huge_forest has no other source, so any in its plan came from the caves.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var biome = level.getBiome(c);
+        int caveDeco = 0;
+        for (long seed = 1; seed <= 6; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_forest"), biome, RandomSource.create(seed));
+            for (final var bp : p.blocks()) {
+                if (bp.state().is(Blocks.POINTED_DRIPSTONE) || bp.state().is(Blocks.GLOW_LICHEN)) {
+                    caveDeco++;
+                }
+            }
+        }
+        helper.assertTrue(caveDeco > 0, "huge_forest should carve decorated caves (dripstone/glow lichen) — got " + caveDeco);
+        helper.succeed();
+    }
+
+    static void hugeAquaticIsMostlyWater(GameTestHelper helper) {
+        // Huge Aquatic should be mostly its central lake/ocean (Pond.extent 0.80), not a sand bank with a tiny pond.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "huge_aquatic"), level.getBiome(c), RandomSource.create(1L));
+        int water = 0;
+        for (final var bp : p.blocks()) {
+            if (bp.state().is(Blocks.WATER)) water++;
+        }
+        helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void everyThemePlansWithoutError(GameTestHelper helper) {
+        // The broadest guard: plan every registered theme and require non-empty output.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var themes = Lookup.registry(level.registryAccess(), SkyseedRegistries.THEME);
+        int n = 0;
+        for (final var id : themes.keySet()) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, themes.getValue(id),
+                    level.getBiome(center), RandomSource.create(id.hashCode()));
+            helper.assertTrue(!p.blocks().isEmpty(), "theme '" + id + "' planned no blocks");
+            n++;
+        }
+        helper.assertTrue(n >= 10, "expected the full theme catalogue, only saw " + n);
+        helper.succeed();
+    }
+
+    static void riverPondCarvesWater(GameTestHelper helper) {
+        // A river-style pond exercises riverColumns + the pond-plant/bank/water-mob paths.
+        final IslandPlan p = plan(helper, "gametest/water", 4L);
+        helper.assertTrue(planHas(p, Blocks.WATER), "the river carved no water (riverColumns)");
+        helper.succeed();
+    }
+
+    static void mangroveAndWaterfallGenerate(GameTestHelper helper) {
+        // A hand-built mangrove (buildMangrove/leafBlob) + a biome-override waterfall (placeWaterfalls).
+        final IslandPlan p = plan(helper, "gametest/features", 4L);
+        helper.assertTrue(planHas(p, Blocks.MANGROVE_LOG), "no hand-built mangrove (buildMangrove)");
+        helper.assertTrue(planHas(p, Blocks.WATER), "no waterfall water (placeWaterfalls)");
+        helper.succeed();
+    }
+
+    static void unknownThemeIdsFallBack(GameTestHelper helper) {
+        // Every id in this theme is bogus; the generator must warn-and-skip and still build a grass island.
+        final IslandPlan p = plan(helper, "gametest/bad", 4L);
+        helper.assertTrue(!p.blocks().isEmpty(), "the bad theme produced no blocks");
+        helper.assertTrue(planHas(p, Blocks.GRASS_BLOCK), "surface did not fall back to grass");
+        helper.succeed();
+    }
+
+    static void aquaticSubZeroHasLavaLake(GameTestHelper helper) {
+        // Below Y0, an Aquatic island comes up as stone/deepslate with a 100% lava lake — not a water one.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos base = helper.absolutePos(new BlockPos(8, 8, 8));
+        final BlockPos deep = new BlockPos(base.getX(), -16, base.getZ());
+        final IslandPlan plan = IslandGenerator.planIsland(level, deep, theme(level, "aquatic"),
+                level.getBiome(deep), RandomSource.create(1L));
+        helper.assertTrue(planHas(plan, Blocks.LAVA), "sub-zero Aquatic did not generate its lava lake");
+        helper.assertTrue(!planHas(plan, Blocks.WATER), "sub-zero Aquatic still has water — the lava lake should replace it");
         helper.succeed();
     }
 }
