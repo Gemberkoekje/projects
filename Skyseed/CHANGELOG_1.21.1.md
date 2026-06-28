@@ -5,6 +5,15 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.157.0] - 2026-06-28
+
+### Fixed
+- **The Modonomicon guide book shows the Skyfarer's Almanac icon** instead of a missing-texture placeholder. The book's
+  `model: skyseed:guide` points at a model with no registered item behind it, so 1.21.1 doesn't bake it by default; a
+  `ModelEvent.RegisterAdditional` handler now force-bakes `MRL(skyseed:guide, "inventory")` — exactly the model
+  Modonomicon's 1.21.1 book renderer resolves (`getModel(new ModelResourceLocation(book.getModel(), "inventory"))`).
+  (On 26.1.2 the generated `items/guide.json` definition already covers this, so the handler is 1.21.1-only.)
+
 ## [0.156.0] - 2026-06-28
 
 26.1.2-only runClient fixes (see [CHANGELOG_26.1.md](CHANGELOG_26.1.md)) — the `test_instance` handshake hang, the

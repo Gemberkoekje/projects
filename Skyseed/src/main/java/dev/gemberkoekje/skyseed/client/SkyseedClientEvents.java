@@ -64,6 +64,18 @@ public final class SkyseedClientEvents {
         //?}
     }
 
+    //? if <26.1.2 {
+    @SubscribeEvent
+    static void onRegisterAdditionalModels(ModelEvent.RegisterAdditional event) {
+        // skyseed:guide is not a registered item, so MRL(skyseed:guide,"inventory") isn't baked by default. Modonomicon's
+        // 1.21.1 book renderer resolves the book's `model` field via exactly that MRL (getModel(new
+        // ModelResourceLocation(book.getModel(),"inventory"))), so register it here to force the model loaded + baked —
+        // the guide book then shows the Skyfarer's Almanac instead of a missing model. (On 26.1.2 the generated
+        // items/guide.json definition covers this; that client loads every items/ definition, registered or not.)
+        event.register(ModelResourceLocation.inventory(Ids.mod("guide")));
+    }
+    //?}
+
     @SubscribeEvent
     static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // ThrownItemRenderer draws the projectile as its item (the dirt-ball icon), like a snowball.
