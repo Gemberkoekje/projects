@@ -15,7 +15,7 @@ import java.util.function.Consumer;
  * Minimal {@link GameTestInstance} that runs a plain {@code Consumer<GameTestHelper>} body. Skyseed's 26.1.2 gametests
  * are registered in code via {@link net.neoforged.neoforge.event.RegisterGameTestsEvent} (RegistrationInfo.BUILT_IN),
  * so they are never serialized — the {@link #codec()} contract is satisfied by a unit codec that is never invoked
- * (see {@code GAMETESTPLAN.md}; if a run path ever does serialize built-in instances, the fallback is
+ * (see {@code CHANGELOG_26.1.md}; if a run path ever does serialize built-in instances, the fallback is
  * {@code FunctionGameTestInstance} + a registered {@code TEST_INSTANCE_TYPE} codec).
  */
 final class SkyseedTest extends GameTestInstance {

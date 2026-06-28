@@ -34,7 +34,7 @@ sourceSets.main.resources {
 // rewrite removed the @GameTest / @GameTestHolder annotation API (it's now the GameTestInstance / RegisterGameTestsEvent
 // framework), so the suites can't share source. Keeping them separate also means the 1.21.1 suite stays an UNCHANGING
 // golden-master witness while newer nodes get a native suite. Add a node → add a `gametest_<v>` package + a branch here.
-// See GAMETESTPLAN.md.
+// See CHANGELOG_26.1.md.
 if (mcv == "1.21.1") {
     sourceSets.main.java {
         exclude("dev/gemberkoekje/skyseed/gametest_26_1_2/**") // 1.21.1 node: only the old-API suite
@@ -75,7 +75,7 @@ if (project != rootProject) {
     tasks.withType(ProcessResources).configureEach { dependsOn(syncDevStructures) }
 }
 
-// --- Per-version recipe generation (golden source -> version-correct JSON). See RECIPEGENPLAN.md. ---
+// --- Per-version recipe generation (golden source -> version-correct JSON). See CHANGELOG_26.1.md. ---
 // Recipes are authored ONCE in the modern (26.1.2) string-ingredient form under the repo-root `recipes/` tree; this
 // task emits the node's data JSON into build/generated/recipes. Modern nodes copy verbatim; the legacy 1.21.1 node
 // downgrades each ingredient ("x"/"#tag" -> {"item":"x"}/{"tag":"x"}), since the 1.21.5+ ingredient formats are
@@ -132,7 +132,7 @@ def generateRecipes = tasks.register('generateRecipes') {
 sourceSets.main.resources.srcDir(generatedRecipesDir)
 tasks.withType(ProcessResources).configureEach { dependsOn(generateRecipes) }
 
-// --- Guide generation: the golden Patchouli book -> the Modonomicon book. See MODONOMICONPLAN.md. ---
+// --- Guide generation: the golden Patchouli book -> the Modonomicon book. See CHANGELOG_26.1.md. ---
 // The Patchouli guide (assets/.../patchouli_books/guide, hand-authored = golden) stays as-is and ships for the
 // Patchouli backend; this task DERIVES the Modonomicon edition from it into build/generated/guide (a resource srcDir,
 // ships on every node since Modonomicon is the primary backend). Mapping: patchouli:text -> modonomicon:text,
@@ -377,7 +377,7 @@ dependencies {
         localRuntime "vazkii.patchouli:Patchouli:${property("patchouli_${mcv}")}"
     }
     // Modonomicon — OPTIONAL, same compileOnly + localRuntime pattern. The PRIMARY guide backend on every node
-    // (preferred over Patchouli — see MODONOMICONPLAN.md); published for both 1.21.1 and 26.1.2. transitive=false:
+    // (preferred over Patchouli — see CHANGELOG_26.1.md); published for both 1.21.1 and 26.1.2. transitive=false:
     // we only need its API to compile + the mod present at dev runtime, not its dependency graph.
     if (project.hasProperty("modonomicon_${mcv}")) {
         compileOnly("com.klikli_dev:modonomicon-${mcv}-neoforge:${property("modonomicon_${mcv}")}") { transitive = false }
@@ -457,7 +457,7 @@ dependencies {
 }
 // JaCoCo 0.8.12 can't instrument Java 25 bytecode (class file major version 69), which the 26.1.2 node compiles to —
 // it throws on every mod class and pollutes the run. Attach the agent only on the 1.21.1 node for now; 26.1.2 coverage
-// tooling (a Java-25-capable JaCoCo or alternative) is tracked in GAMETESTPLAN.md.
+// tooling (a Java-25-capable JaCoCo or alternative) is tracked in CHANGELOG_26.1.md.
 if (mcv == "1.21.1") {
     neoForge.runs.named('gameTestServer').configure {
         def execFile = layout.buildDirectory.file('jacoco/gameTest.exec').get().asFile

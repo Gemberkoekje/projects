@@ -67,7 +67,7 @@ import java.util.function.Consumer;
  * framework (the {@code @GameTest}/{@code @GameTestHolder} annotation API was removed in 1.21.5+). This suite is fully
  * isolated from the 1.21.1 suite ({@code dev.gemberkoekje.skyseed.gametest}) by package + a per-version build.gradle
  * exclude, so the 1.21.1 suite stays the unchanging golden-master witness. Tests register in code via
- * {@link RegisterGameTestsEvent}; bodies are ported from the 1.21.1 suite. Coverage target + rollout in GAMETESTPLAN.md.
+ * {@link RegisterGameTestsEvent}; bodies are ported from the 1.21.1 suite. Coverage target + rollout in CHANGELOG_26.1.md.
  *
  * <p>Because this suite is 26.1.2-only it is written natively against the 26.1.2 API (no {@code //?} directives): the
  * two version-specific idioms the 1.21.1 bodies use are funnelled through helpers — {@link #biome} (was

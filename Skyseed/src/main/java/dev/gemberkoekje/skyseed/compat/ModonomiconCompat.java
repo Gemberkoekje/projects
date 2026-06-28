@@ -14,7 +14,7 @@ import net.minecraft.world.item.ItemStack;
  * whose API is absent on 26.1.2 — no {@code //?} directive is needed here; the only version-volatile thing is the MC
  * id type, which {@link Ids#parse} returns per node (so we keep it behind {@code var} and never name it). Modonomicon
  * is the PRIMARY guide backend (preferred over Patchouli on every version) — see
- * {@link dev.gemberkoekje.skyseed.item.SkyseedGuide} and MODONOMICONPLAN.md.
+ * {@link dev.gemberkoekje.skyseed.item.SkyseedGuide} and CHANGELOG_26.1.md.
  */
 public final class ModonomiconCompat {
     private ModonomiconCompat() {}

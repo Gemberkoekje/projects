@@ -20,7 +20,7 @@ import java.util.List;
  * <b>Modonomicon</b> (the preferred backend on every version) or, as a legacy fallback, <b>Patchouli</b>; with neither
  * installed it's a plain vanilla written book carrying the short text below (the rich editions are the full guide).
  * Both the first-join grant and the craft recipe ({@link dev.gemberkoekje.skyseed.recipe.GuideRecipe}) call
- * {@link #book()}, so they always agree on the one book to hand out. See MODONOMICONPLAN.md.
+ * {@link #book()}, so they always agree on the one book to hand out. See CHANGELOG_26.1.md.
  */
 public final class SkyseedGuide {
     private SkyseedGuide() {}
