@@ -1,8 +1,0 @@
-{
-  "criteria": {
-    "crafted": {
-      "trigger": "minecraft:recipe_crafted",
-      "conditions": { "recipe_id": "skyseed:pale_garden_skyseed" }
-    }
-  }
-}

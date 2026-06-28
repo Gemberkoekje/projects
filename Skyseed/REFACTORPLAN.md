@@ -320,36 +320,20 @@ gate), mobs (`MobPlanner.resolveEntity`/`hasEntityType`), features (`DecorationP
 gametested by `unknownThemeIdsFallBack` (a forward id is indistinguishable from an unknown id there) — so the suite
 stays frozen; the resolve-side proof is on the 26.1.2 node.
 
-**2d-1 Pale Garden — biome override ✅ DONE** (`dd2860b`): a `pale_garden` override on the Forest line (pale oak +
-moss + carpet + eyeblossom + hanging-moss underside). Same `forest.json` ships to both nodes — resolves on 26.1.2,
-inert on 1.21.1. Gametest `forest_over_pale_garden_grows_pale_variant` (resolve-side: pale moss in `p.blocks()` + the
-`pale_oak` CF in `p.trees()`). Both green: 1.21.1 126, 26.1.2 128. Verified 26.1.2 ids: `pale_oak`/`pale_oak_creaking`
-(configured features), pale_oak_log, pale_moss_block/carpet, pale_hanging_moss, open/closed_eyeblossom, creaking_heart,
-resin_*; entities creaking/nautilus/happy_ghast/copper_golem.
+**2d-1 Pale Garden — biome override on the Forest line ✅ DONE** (final design, 0.164.0): a `pale_garden` biome override on
+**forest, forest_large, AND huge_forest** — a Forest seed thrown over a pale_garden biome grows the full eerie pale variant:
+`pale_oak_creaking` (carries a creaking heart → a Creaking wakes at night) + `pale_oak`, pale moss + carpet, eyeblossom,
+hanging-moss underside (tree counts scaled per island size). The same theme JSONs ship to both nodes — resolve on 26.1.2,
+inert on 1.21.1 (every pale id is unknown there → the tolerant resolvers skip them, covered by `unknownThemeIdsFallBack`).
+Gametest `forest_over_pale_garden_grows_pale_variant` proves all three sizes grow pale moss + `pale_oak` + `pale_oak_creaking`.
 
-**2d-1 Pale Garden — dedicated seed ✅ DONE** (`c85e5d0`): a craftable 26.1.2-only Pale Garden Skyseed (pale_oak_creaking
-→ Creaking, pale moss, eyeblossom, hanging-moss underside; crafted from pale_oak_log + pale_moss_block). The full
-cross-version-gating pattern landed and is the **template for all future modern-only content** — both nodes green
-(1.21.1 126 clean, 26.1.2 All 129; recipe present on 26.1.2, absent on 1.21.1). It went exactly per the plan below,
-plus one find: the `#skyseeds` item tag needed the new entry as `{id, required:false}` (else the absent item breaks the
-1.21.1 tag load). Gametest `pale_garden_seed_grows_creaking_pale_forest` locks the content + confirms the theme resolves.
-The original (verified-correct) plan was:
-- **theme** `pale_garden.json` — the full eerie island (use `minecraft:pale_oak_creaking` so the trees carry creaking
-  hearts → Creakings; pale-moss surface, resin decoration). Ships to both, inert on 1.21.1.
-- **registration** — add `"pale_garden"` to `ModItems.SEED_THEMES` via a `//? if >=26.1.2` directive (26.1.2-only → no
-  dormant item on 1.21.1). NB this is what makes the coverage test demand the rest, on 26.1.2 only.
-- **recipe** — golden recipe with pale ingredients (e.g. pale_oak_planks); filter it to 26.1.2 in `generateRecipes`
-  (a `recipes/_26_1_2_only/…` subtree or a marker the task skips when `mcv=="1.21.1"`) so the 1.21.1 vanilla recipe
-  loader never sees the pale ids.
-- **advancements** — `craft_pale_garden` is safe as-is (references `recipe_id` as a STRING). `gathered_pale_garden`
-  references items: use a **tag** (`#minecraft:pale_oak_logs` — unknown tag resolves to empty, tolerant) NOT a direct
-  `minecraft:pale_oak_*` id (a direct unknown item id breaks the 1.21.1 advancement load). `reveal_pale_garden` per the
-  existing reveal pattern. ⚠ VERIFY the tag-tolerance assumption with a 1.21.1 datapack-load run.
-- **book** — a Patchouli source entry; filter it to 26.1.2 in `generateGuide` (the Modonomicon book) and confirm the
-  Patchouli book load on 1.21.1 (its crafting page references the 26.1.2-only recipe → likely also needs the 26.1.2
-  gate, or a tolerant page).
-- **lang + icon** — a `pale_garden_skyseed` lang name + a PowerShell-painted 16×16 pale seed texture/model.
-Then re-run both nodes (1.21.1 must stay 126 + load clean; 26.1.2 coverage test green with the new seed).
+**A dedicated Pale Garden seed was built (`c85e5d0`) and then REMOVED (0.164.0)** once it was clear it only added the
+Creaking over the biome override — which now lives in the override (folded in). Dropping it deleted the whole modern-only-
+seed apparatus for pale_garden (the `//?`-gated `SEED_THEMES` entry, the `_modern_only` recipe, the craft/gathered/reveal
+advancements, the `{id, required:false}` `#skyseeds` entry, the `generateGuide` `modernOnlyEntries` filter, the Patchouli
+entry, the lang/model/texture). The generic **modern-only-content gating pattern** it proved (string-id codecs, the
+`_modern_only/` recipe subtree + `generateRecipes` downgrade, tolerant tags, `//?` `SEED_THEMES`, the `generateGuide`/
+`processResources` filters) stays documented + wired (now unused) for the next genuinely node-only seed.
 
 **2d-2 vegetation ✅ DONE** (`f9d5bf1`): the 1.21.5 flora as decoration on existing themes — forest (leaf_litter,
 bush, firefly_bush, wildflowers), meadow (wildflowers, firefly_bush, bush, golden_dandelion), desert + badlands

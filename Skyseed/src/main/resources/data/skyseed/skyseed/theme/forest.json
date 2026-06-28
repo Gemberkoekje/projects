@@ -70,11 +70,11 @@
       "trees": [ { "feature": "minecraft:cherry", "tries": 4, "spacing": 3 } ],
       "ground": [ { "block": "minecraft:short_grass", "chance": 0.25 }, { "block": "minecraft:pink_petals", "chance": 0.15 }, { "block": "minecraft:dandelion", "chance": 0.04 } ] } } ] },
 
-    { "_comment": "Pale Garden (26.1.2 / MC 1.21.4+) — a Forest seed thrown over a pale_garden biome grows the eerie pale variant: pale oak, pale moss + carpet, eyeblossom, hanging moss underside. The full version (with Creakings) is the dedicated Pale Garden seed. Version-INERT on 1.21.1: every id here is unknown there, so the tolerant resolvers skip them (REFACTORPLAN 2d-1). Must precede the #is_forest catch-all below to win the match.",
-      "biomes": [ "minecraft:pale_garden" ], "surface_scatter": [ { "block": "minecraft:pale_moss_block", "chance": 0.35 } ], "variants": [ { "weight": 1, "name": "pale", "decoration": {
-      "trees": [ { "feature": "minecraft:pale_oak", "tries": 4, "spacing": 2 } ],
-      "ground": [ { "block": "minecraft:pale_moss_carpet", "chance": 0.30 }, { "block": "minecraft:closed_eyeblossom", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.10 } ],
-      "underside": [ { "block": "minecraft:pale_hanging_moss", "chance": 0.20 } ] } } ] },
+    { "_comment": "Pale Garden (26.1.2 / MC 1.21.4+) — a Forest seed thrown over a pale_garden biome grows the full eerie pale variant: pale oak WITH a creaking heart (a Creaking wakes at night), pale moss + carpet, eyeblossom, hanging moss underside. Version-INERT on 1.21.1: every id here is unknown there, so the tolerant resolvers skip them. Must precede the #is_forest catch-all below to win the match. (forest_large/huge_forest carry the same override.)",
+      "biomes": [ "minecraft:pale_garden" ], "surface_scatter": [ { "block": "minecraft:pale_moss_block", "chance": 0.45 } ], "variants": [ { "weight": 1, "name": "pale", "decoration": {
+      "trees": [ { "feature": "minecraft:pale_oak_creaking", "tries": 2, "spacing": 4 }, { "feature": "minecraft:pale_oak", "tries": 4, "spacing": 2 } ],
+      "ground": [ { "block": "minecraft:pale_moss_carpet", "chance": 0.35 }, { "block": "minecraft:closed_eyeblossom", "chance": 0.05 }, { "block": "minecraft:short_grass", "chance": 0.10 } ],
+      "underside": [ { "block": "minecraft:pale_hanging_moss", "chance": 0.25 } ] } } ] },
 
     { "biomes": [ "minecraft:grove" ], "snow": 1.0, "variants": [ { "weight": 1, "decoration": {
       "trees": [ { "feature": "minecraft:spruce", "tries": 4, "spacing": 2 } ] } } ] },

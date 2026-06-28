@@ -30,11 +30,8 @@ public final class ModItems {
             "mushroom", "mushroom_large", "frozen", "frozen_large", "meadow", "meadow_large",
             "badlands", "badlands_large", "ancient", "ancient_large", "lush", "lush_large",
             "aquatic", "aquatic_large",
-            //? if >=26.1.2 {
-            /*"pale_garden", // 26.1.2-only seed (needs the Pale Garden / 1.21.4+ content). Theme JSON ships to both
-            // nodes (inert on 1.21.1); recipe + Modonomicon entry are version-filtered, advancements use a tolerant
-            // tag, the #skyseeds tag entry is required:false. REFACTORPLAN 2d-1.*/
-            //?}
+            // (Pale Garden is no longer a dedicated seed — it's a pale_garden biome override on the forest/forest_large/
+            // huge_forest seeds, with the Creaking folded in; the pale content ships to both nodes, inert on 1.21.1.)
             "huge_forest", "huge_aquatic", "huge_rocky", "huge_desert", "huge_mushroom", "huge_frozen",
             "huge_meadow", "huge_badlands", "huge_ancient", "huge_lush",
             "ladder_small", "ladder_large",

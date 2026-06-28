@@ -39,15 +39,6 @@ if (mcv == "1.21.1") {
     sourceSets.main.java {
         exclude("dev/gemberkoekje/skyseed/gametest_26_1_2/**") // 1.21.1 node: only the old-API suite
     }
-    // Modern-only content (a //?-gated seed) ships its theme JSON to both nodes inert, but its advancements + Patchouli
-    // book entry reference ids that don't exist on 1.21.1 (the #minecraft:pale_oak_logs tag, the pale_oak_log icon, the
-    // gated recipe). They're harmless but log "tag/item/recipe not found" on the client. Drop those modern-only static
-    // files from the 1.21.1 jar — the recipe is already gated by recipes/_modern_only/, and the theme JSON (no leading
-    // `_`) is NOT matched here, so it still ships and stays inert. Add a node-only seed → add its files to this list.
-    tasks.withType(ProcessResources).configureEach {
-        exclude("**/*_pale_garden.json")              // craft_/gathered_/reveal_pale_garden advancements
-        exclude("**/entries/pale_garden_island.json") // the Patchouli book entry
-    }
 } else {
     sourceSets.main.java {
         exclude("dev/gemberkoekje/skyseed/gametest/**")        // newer nodes: only their native suite
@@ -188,8 +179,9 @@ def generateGuide = tasks.register('generateGuide') {
         }
 
         // Entries whose crafting page references a version-gated (26.1.2-only) recipe — skip them in the generated
-        // Modonomicon book on the legacy node, so that book never points at a recipe this node doesn't ship.
-        def modernOnlyEntries = ['pale_garden_island']
+        // Modonomicon book on the legacy node, so that book never points at a recipe this node doesn't ship. (Empty
+        // now that Pale Garden is a biome override rather than a node-only seed; add an entry id here for future node-only content.)
+        def modernOnlyEntries = []
         def byCat = [:].withDefault { [] }
         new File(patchouliGuideRoot, 'en_us/entries').eachFile { f ->
             if (!f.name.endsWith('.json')) return

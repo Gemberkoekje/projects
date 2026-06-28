@@ -5,6 +5,13 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.164.0] - 2026-06-28
+
+### Changed
+- **Pale Garden biome override extended to the large + huge forest seeds** (was forest-only), with the Creaking folded
+  in, and the (26.1.2-only) dedicated Pale Garden seed removed. The pale content ships to both nodes but is INERT on
+  1.21.1 (every pale id is unknown there → skipped), so no functional 1.21.1 change. See [CHANGELOG_26.1.md](CHANGELOG_26.1.md).
+
 ## [0.163.0] - 2026-06-28
 
 ### Fixed

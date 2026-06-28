@@ -9,6 +9,17 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.164.0] - 2026-06-28
+
+### Changed
+- **Pale Garden is now a biome override, not a dedicated seed.** Dropped the 26.1.2-only Pale Garden Skyseed and folded
+  its Creaking (`pale_oak_creaking`) into the `pale_garden` biome override — now on the **forest, forest_large, AND
+  huge_forest** seeds (tree counts scaled per size). Throw any forest-line seed over a pale_garden biome to grow the full
+  eerie pale variant: creaking pale oak, pale moss + carpet, eyeblossom, hanging-moss underside. Removed the whole
+  modern-only-seed apparatus for it (the `//?`-gated `SEED_THEMES` entry, the recipe, the craft/gathered/reveal
+  advancements, the `#skyseeds` tag entry, the guide entry, lang/model/texture). 26.1.2 seed items 70 → 69 (now matching
+  1.21.1); the generic modern-only-content pattern stays wired (unused) for future node-only content.
+
 ## [0.163.0] - 2026-06-28
 
 ### Fixed

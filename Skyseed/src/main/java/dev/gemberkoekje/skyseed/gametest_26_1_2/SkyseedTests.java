@@ -237,7 +237,6 @@ public final class SkyseedTests {
         reg(event, "huge_aquatic_is_mostly_water", REGION, SkyseedTests::hugeAquaticIsMostlyWater);
         reg(event, "every_theme_plans_without_error", REGION, SkyseedTests::everyThemePlansWithoutError);
         reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
-        reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
         reg(event, "forest_places_fallen_logs", REGION, SkyseedTests::forestPlacesFallenLogs);
         reg(event, "void_worldgen_setup_loads_and_is_void", REGION, SkyseedTests::voidWorldgenSetupLoadsAndIsVoid);
@@ -3537,66 +3536,44 @@ public final class SkyseedTests {
         helper.succeed();
     }
 
-    static void paleGardenSeedGrowsCreakingPaleForest(GameTestHelper helper) {
-        // REFACTORPLAN 2d-1: the dedicated Pale Garden seed's theme (a 26.1.2-only seed) grows pale oak WITH creaking
-        // hearts — the pale_oak_creaking feature embeds a creaking heart that wakes a Creaking at night — plus pale
-        // moss. Also independently confirms pale_garden is a registered, resolvable theme on 26.1.2.
-        final ServerLevel level = helper.getLevel();
-        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
-        final var cfReg = Lookup.registry(level.registryAccess(), Registries.CONFIGURED_FEATURE);
-        boolean creakingOak = false, paleMoss = false;
-        for (long seed = 1; seed <= 8 && !(creakingOak && paleMoss); seed++) {
-            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "pale_garden"),
-                    level.getBiome(c), RandomSource.create(seed));
-            for (final var t : p.trees()) {
-                final var fid = cfReg.getKey(t.feature());
-                if (fid != null && fid.toString().equals("minecraft:pale_oak_creaking")) {
-                    creakingOak = true;
-                    break;
-                }
-            }
-            for (final var bp : p.blocks()) {
-                if (bp.state().is(Blocks.PALE_MOSS_BLOCK) || bp.state().is(Blocks.PALE_MOSS_CARPET)) {
-                    paleMoss = true;
-                    break;
-                }
-            }
-        }
-        helper.assertTrue(paleMoss, "the pale_garden theme placed no pale moss");
-        helper.assertTrue(creakingOak, "the pale_garden theme scheduled no pale_oak_creaking tree (no Creaking source)");
-        helper.succeed();
-    }
-
     static void forestOverPaleGardenGrowsPaleVariant(GameTestHelper helper) {
-        // REFACTORPLAN 2d-1: a Forest seed over a pale_garden biome grows the pale variant (pale oak + pale moss). This
-        // is also the resolve-side proof of the §2.4 cross-version data strategy — these ids exist on 26.1.2 so they
-        // build, whereas on 1.21.1 they're unknown and the tolerant resolvers skip them (the SAME forest.json loads
-        // inert there, already covered by unknownThemeIdsFallBack).
+        // A Forest / Large Forest / Huge Forest seed over a pale_garden biome grows the FULL pale variant — pale moss +
+        // pale oak WITH a creaking heart (the pale_oak_creaking feature embeds a creaking heart → a Creaking wakes at
+        // night). Pale Garden is a biome override on all three forest seeds (not a dedicated seed). This is also the
+        // resolve-side proof of the §2.4 cross-version data strategy: these ids exist on 26.1.2 so they build, whereas
+        // on 1.21.1 they're unknown and the tolerant resolvers skip them (the same theme JSONs load inert there).
         final ServerLevel level = helper.getLevel();
         final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
         final var pale = biome(level, "minecraft:pale_garden");
         // Vanilla tree features land in p.trees() (deferred ConfiguredFeature placements), not p.blocks(); the pale
         // moss (surface_scatter + ground) IS in p.blocks() and is unique to this override.
         final var cfReg = Lookup.registry(level.registryAccess(), Registries.CONFIGURED_FEATURE);
-        boolean paleOak = false, paleMoss = false;
-        for (long seed = 1; seed <= 8 && !(paleOak && paleMoss); seed++) {
-            final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, "forest"), pale, RandomSource.create(seed));
-            for (final var t : p.trees()) {
-                final var fid = cfReg.getKey(t.feature());
-                if (fid != null && fid.toString().equals("minecraft:pale_oak")) {
-                    paleOak = true;
-                    break;
+        for (final String themeName : new String[] { "forest", "forest_large", "huge_forest" }) {
+            boolean paleOak = false, creakingOak = false, paleMoss = false;
+            for (long seed = 1; seed <= 8 && !(paleOak && creakingOak && paleMoss); seed++) {
+                final IslandPlan p = IslandGenerator.planIsland(level, c, theme(level, themeName), pale, RandomSource.create(seed));
+                for (final var t : p.trees()) {
+                    final var fid = cfReg.getKey(t.feature());
+                    if (fid == null) {
+                        continue;
+                    }
+                    if (fid.toString().equals("minecraft:pale_oak")) {
+                        paleOak = true;
+                    } else if (fid.toString().equals("minecraft:pale_oak_creaking")) {
+                        creakingOak = true;
+                    }
+                }
+                for (final var bp : p.blocks()) {
+                    if (bp.state().is(Blocks.PALE_MOSS_BLOCK) || bp.state().is(Blocks.PALE_MOSS_CARPET)) {
+                        paleMoss = true;
+                        break;
+                    }
                 }
             }
-            for (final var bp : p.blocks()) {
-                if (bp.state().is(Blocks.PALE_MOSS_BLOCK) || bp.state().is(Blocks.PALE_MOSS_CARPET)) {
-                    paleMoss = true;
-                    break;
-                }
-            }
+            helper.assertTrue(paleMoss, themeName + " over pale_garden placed no pale moss (the override did not match / decoration did not resolve)");
+            helper.assertTrue(paleOak, themeName + " over pale_garden scheduled no pale_oak tree");
+            helper.assertTrue(creakingOak, themeName + " over pale_garden scheduled no pale_oak_creaking tree (no Creaking source)");
         }
-        helper.assertTrue(paleMoss, "the Forest pale_garden override placed no pale moss (the override did not match / decoration did not resolve)");
-        helper.assertTrue(paleOak, "the Forest pale_garden override scheduled no pale_oak tree (the configured feature did not resolve)");
         helper.succeed();
     }
 

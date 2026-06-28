@@ -1027,6 +1027,35 @@
       ]
     },
     {
+      "_comment": "Pale Garden — a Huge Forest seed over a pale_garden biome grows the full eerie pale variant (creaking pale oak, pale moss/carpet, eyeblossom, hanging moss). Same override as the forest seed, tree counts scaled to the huge island; INERT on 1.21.1. Must precede the #is_forest catch-all.",
+      "biomes": [
+        "minecraft:pale_garden"
+      ],
+      "surface_scatter": [
+        { "block": "minecraft:pale_moss_block", "chance": 0.45 }
+      ],
+      "variants": [
+        {
+          "weight": 1,
+          "name": "pale",
+          "decoration": {
+            "trees": [
+              { "feature": "minecraft:pale_oak_creaking", "tries": 10, "spacing": 4 },
+              { "feature": "minecraft:pale_oak", "tries": 44, "spacing": 2 }
+            ],
+            "ground": [
+              { "block": "minecraft:pale_moss_carpet", "chance": 0.35 },
+              { "block": "minecraft:closed_eyeblossom", "chance": 0.05 },
+              { "block": "minecraft:short_grass", "chance": 0.10 }
+            ],
+            "underside": [
+              { "block": "minecraft:pale_hanging_moss", "chance": 0.25 }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "biomes": [
         "#minecraft:is_forest"
       ],
