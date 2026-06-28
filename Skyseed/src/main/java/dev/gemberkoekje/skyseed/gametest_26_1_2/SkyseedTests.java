@@ -223,6 +223,7 @@ public final class SkyseedTests {
         reg(event, "forest_over_pale_garden_grows_pale_variant", REGION, SkyseedTests::forestOverPaleGardenGrowsPaleVariant);
         reg(event, "pale_garden_seed_grows_creaking_pale_forest", REGION, SkyseedTests::paleGardenSeedGrowsCreakingPaleForest);
         reg(event, "new_vegetation_resolves_on_themes", REGION, SkyseedTests::newVegetationResolvesOnThemes);
+        reg(event, "new_mobs_resolve_on_themes", REGION, SkyseedTests::newMobsResolveOnThemes);
         reg(event, "river_pond_carves_water", REGION, SkyseedTests::riverPondCarvesWater);
         reg(event, "mangrove_and_waterfall_generate", REGION, SkyseedTests::mangroveAndWaterfallGenerate);
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
@@ -3321,6 +3322,47 @@ public final class SkyseedTests {
             if (bp.state().is(Blocks.WATER)) water++;
         }
         helper.assertTrue(water > 1500, "huge_aquatic should be mostly water (a big lake/ocean) — got " + water + " water blocks");
+        helper.succeed();
+    }
+
+    static void newMobsResolveOnThemes(GameTestHelper helper) {
+        // REFACTORPLAN 2d-3: the 1.21.5 mob placements resolve on 26.1.2 (skipped inert on 1.21.1 — unknown ids there).
+        // planMobs rolls chance ONCE per island, so sample enough seeds. Land placements (planMobs -> p.mobs()):
+        // village_center -> copper_golem, desert -> parched. The EntityType comes from the same registry as the
+        // planner's, so reference equality on p.mobs().type() holds. (The aquatic nautilus/zombie_nautilus are water_mobs
+        // routed through the same resolver as the existing squid — their pond placement isn't reliably reproducible in
+        // the tiny test region, so they're covered by the resolution check below.)
+        final ServerLevel level = helper.getLevel();
+        final BlockPos c = helper.absolutePos(new BlockPos(8, 8, 8));
+        final var copper = Lookup.entityType(Id.of("minecraft:copper_golem"));
+        final var parched = Lookup.entityType(Id.of("minecraft:parched"));
+        final var desert = biome(level, "minecraft:desert");
+        boolean foundCopper = false, foundParched = false;
+        for (long seed = 1; seed <= 60 && !(foundCopper && foundParched); seed++) {
+            if (!foundCopper) {
+                for (final var m : IslandGenerator.planIsland(level, c, theme(level, "village_center"), level.getBiome(c), RandomSource.create(seed)).mobs()) {
+                    if (m.type() == copper) {
+                        foundCopper = true;
+                        break;
+                    }
+                }
+            }
+            if (!foundParched) {
+                for (final var m : IslandGenerator.planIsland(level, c, theme(level, "desert"), desert, RandomSource.create(seed)).mobs()) {
+                    if (m.type() == parched) {
+                        foundParched = true;
+                        break;
+                    }
+                }
+            }
+        }
+        helper.assertTrue(foundCopper, "village_center placed no copper_golem over 60 seeds (1.21.5 mob did not resolve)");
+        helper.assertTrue(foundParched, "desert placed no parched over 60 seeds (1.21.5 arid undead did not resolve)");
+        // The aquatic water mobs + the rare happy_ghast reward are wired into their themes' mob lists and resolve here.
+        helper.assertTrue(Lookup.hasEntityType(Id.of("minecraft:nautilus"))
+                        && Lookup.hasEntityType(Id.of("minecraft:zombie_nautilus"))
+                        && Lookup.hasEntityType(Id.of("minecraft:happy_ghast")),
+                "a 1.21.5 placed-mob id is unknown on 26.1.2");
         helper.succeed();
     }
 

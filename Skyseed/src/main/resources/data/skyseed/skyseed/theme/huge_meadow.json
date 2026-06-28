@@ -79,6 +79,15 @@
         "min": 1,
         "max": 1
       }
+    },
+    {
+      "_comment": "1.21.5 (26.1.2) — a rare Happy Ghast: the serene huge meadow's sky-mount reward. Unknown on 1.21.1, so the resolver skips it (REFACTORPLAN 2d-3).",
+      "entity": "minecraft:happy_ghast",
+      "chance": 0.08,
+      "count": {
+        "min": 1,
+        "max": 1
+      }
     }
   ],
   "variants": [

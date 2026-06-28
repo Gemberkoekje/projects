@@ -4,6 +4,8 @@
   "shape": { "radius": { "min": 10, "max": 12 }, "rim_noise": 0.25, "underside": "teardrop", "top_dome": { "min": 1, "max": 1 }, "cluster_offsets": [ [0, 0, 19], [-16, 0, -10], [16, 0, -10] ] },
   "palette": { "surface": "minecraft:grass_block", "fill": "minecraft:dirt", "core": "minecraft:stone", "fill_depth": 3 },
   "ores": [],
+  "_mobs_comment": "1.21.5 (26.1.2) — a Copper Golem keeping the big village's mechanisms; unknown on 1.21.1, so the resolver skips it (REFACTORPLAN 2d-3).",
+  "mobs": [ { "entity": "minecraft:copper_golem", "chance": 0.30, "count": { "min": 1, "max": 1 } } ],
   "jigsaw": { "pool": "skyseed:trade_post/start_dense", "target": "minecraft:bottom", "depth": 6, "pad": 4, "reach": 64, "iron_golems": 1, "cap_prefix": "shop_", "cap_min": 4, "cap_count": 6, "cap_filler": "skyseed:trade_post/fillers", "centerpiece": "minecraft:anvil" },
   "biome_overrides": [
     { "_comment": "Desert: a sand cluster with the sand/sandstone village pieces.",
