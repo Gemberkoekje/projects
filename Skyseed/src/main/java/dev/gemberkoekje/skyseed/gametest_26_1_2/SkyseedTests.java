@@ -223,10 +223,8 @@ public final class SkyseedTests {
         reg(event, "unknown_theme_ids_fall_back", REGION, SkyseedTests::unknownThemeIdsFallBack);
         reg(event, "aquatic_sub_zero_has_lava_lake", REGION, SkyseedTests::aquaticSubZeroHasLavaLake);
         reg(event, "island_output_is_stable", REGION, SkyseedTests::islandOutputIsStable);
-        // DEFERRED — still not ported (each needs a 26.1.2 API the suite hasn't crossed yet):
-        //  - the recipe-resolution cluster (endPortalEdges/endPortalSeed/returnPortalSeed/chorusForest/endCity/
-        //    dragonTrophy seed crafts) + everySeedRecipeAndBookEntryMatchesSeedKind: need the reworked recipe API
-        //    (Level.recipeAccess() / getRecipeFor / assemble(input) lost the Provider arg; Recipe lost getResultItem).
+        reg(event, "every_seed_recipe_and_book_entry_matches_seed_kind", REGION, SkyseedTests::everySeedRecipeAndBookEntryMatchesSeedKind);
+        // DEFERRED — still not ported (each needs a 26.1.2 API/feature the suite hasn't crossed yet):
         //  - endPortalDropsSeedIntoStructureLoot: the loot-table API (reloadableRegistries/LootParams) reworked.
         //  - autoDebugSeedsCoverOverridesAndRares: ModItems.DEBUG_SEEDS is empty on 26.1.2 because ThemeScanner.scan()
         //    is stubbed (the IModFile.findResource follow-up from Stage 2b).
@@ -3375,4 +3373,37 @@ public final class SkyseedTests {
             "gametest/structure#11", "566/-538726431172054277/0/0/2/1/0",
             "gametest/bad#4", "197/5964512207029114459/0/0/0/1/0"
     );
+
+    static void everySeedRecipeAndBookEntryMatchesSeedKind(GameTestHelper helper) {
+        // Auto-discovered from the registry maps, so a new seed is covered with no test edit. A regular seed must have
+        // a field-notes entry that CARRIES its crafting recipe and a gathered_<seed> advancement (the page gate that
+        // reveals the recipe); a debug seed must have none of those. (Craftability itself is proven by the recipe-
+        // resolution tests + recipes loading with 0 errors; 26.1.2's Recipe dropped getResultItem, and a seed may have
+        // several recipe files — e.g. pasture from beef OR wool — so a per-seed recipe-file check isn't reliable.)
+        for (var e : ModItems.SEEDS.entrySet()) {
+            final String theme = e.getKey();
+            final String entry = readResource(entryPath(theme));
+            helper.assertTrue(entry != null, "seed '" + theme + "' has no field-notes entry (" + entryPath(theme) + ")");
+            helper.assertTrue(entry.contains(theme + "_skyseed"),
+                    "seed '" + theme + "' field-notes entry does not carry its crafting recipe");
+            helper.assertTrue(resourceExists(gatheredPath(theme)),
+                    "seed '" + theme + "' has no gathered-materials advancement (" + gatheredPath(theme) + ")");
+            // Every seed but the Forest root is gated by a reveal advancement (crafted prereq OR held all ingredients).
+            if (theme.equals("forest")) {
+                helper.assertTrue(!resourceExists(revealPath(theme)), "the Forest root must not be reveal-gated");
+            } else {
+                helper.assertTrue(resourceExists(revealPath(theme)),
+                        "seed '" + theme + "' has no reveal advancement (" + revealPath(theme) + ")");
+                helper.assertTrue(entry.contains("reveal_" + theme),
+                        "seed '" + theme + "' entry is not gated by its reveal advancement");
+            }
+        }
+        for (var e : ModItems.DEBUG_SEEDS.entrySet()) {
+            final String theme = e.getKey();
+            helper.assertTrue(!resourceExists(entryPath(theme)), "debug seed '" + theme + "' must not have a field-notes entry");
+            helper.assertTrue(!resourceExists(gatheredPath(theme)), "debug seed '" + theme + "' must not have a gathered advancement");
+            helper.assertTrue(!resourceExists(revealPath(theme)), "debug seed '" + theme + "' must not have a reveal advancement");
+        }
+        helper.succeed();
+    }
 }
