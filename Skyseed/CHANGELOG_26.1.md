@@ -9,6 +9,14 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.159.0] - 2026-06-28
+
+### Fixed
+- **The seed throw wind-up (raise-to-throw) animation plays again.** The port mapped 1.21.1's `UseAnim.SPEAR` to the
+  literal `ItemUseAnimation.SPEAR`, but on 26.1.2 that enum split: the trident raise (what 1.21.1's SPEAR was) is now
+  `ItemUseAnimation.TRIDENT`, while `SPEAR` is a new spear-weapon animation that shows no wind-up for a thrown item.
+  The seed now returns `TRIDENT`. Visual only — throwing and landing already worked.
+
 ## [0.158.0] - 2026-06-28
 
 ### Fixed

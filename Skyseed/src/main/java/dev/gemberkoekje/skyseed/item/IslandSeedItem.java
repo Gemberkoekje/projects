@@ -118,7 +118,10 @@ public class IslandSeedItem extends Item {
     //? if >=26.1.2 {
     /*@Override
     public ItemUseAnimation getUseAnimation(ItemStack stack) {
-        return ItemUseAnimation.SPEAR; // raise-to-throw, like a trident
+        // 1.21.1's UseAnim.SPEAR (the raise-to-throw) became ItemUseAnimation.TRIDENT on 26.1.2 — that's what vanilla's
+        // trident uses. The 26.1.2 ItemUseAnimation.SPEAR is a separate, new spear-weapon animation that shows no
+        // wind-up for a plain thrown item, so the seed must use TRIDENT to actually raise the arm.
+        return ItemUseAnimation.TRIDENT;
     }*/
     //?} else {
     @Override

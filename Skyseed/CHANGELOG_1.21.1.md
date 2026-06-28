@@ -5,6 +5,11 @@ Notable changes to the **1.21.1** Skyseed build. Skyseed is one codebase built f
 version-number sequence, so a version can appear in one changelog and not the other — the 1.21.1 build often won't
 change when only the 26.1 build does. Format loosely based on [Keep a Changelog](https://keepachangelog.com/); SemVer.
 
+## [0.159.0] - 2026-06-28
+
+26.1.2-only fix (see [CHANGELOG_26.1.md](CHANGELOG_26.1.md)): the seed throw wind-up animation. **No 1.21.1 change** —
+1.21.1's `UseAnim.SPEAR` is already the correct raise-to-throw animation.
+
 ## [0.158.0] - 2026-06-28
 
 ### Fixed
