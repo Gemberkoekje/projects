@@ -6,7 +6,9 @@ import dev.gemberkoekje.skyseed.compat.Ids;
 import dev.gemberkoekje.skyseed.compat.Jigsaw;
 import dev.gemberkoekje.skyseed.compat.Lookup;
 import dev.gemberkoekje.skyseed.compat.ModonomiconCompat;
+import dev.gemberkoekje.skyseed.entity.IslandSeedEntity;
 import dev.gemberkoekje.skyseed.item.SkyseedGuide;
+import dev.gemberkoekje.skyseed.registry.ModEntities;
 import dev.gemberkoekje.skyseed.registry.ModItems;
 import dev.gemberkoekje.skyseed.registry.SkyseedRegistries;
 import dev.gemberkoekje.skyseed.worldgen.DebugForce;
@@ -22,6 +24,11 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.cow.Cow;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.resources.Identifier;
@@ -134,7 +141,17 @@ public final class SkyseedTests {
         reg(event, "rocky_has_ore", REGION, SkyseedTests::rockyHasOre);
         reg(event, "placement_rejects_overlap_and_players", REGION, SkyseedTests::placementRejectsOverlapAndPlayers);
         reg(event, "bank_sugar_cane_stands_in_water", REGION, SkyseedTests::bankSugarCaneStandsInWater);
+
+        // --- world-apply: the throw -> germinate -> GenerationJob pipeline (covers IslandSeedEntity + GenerationJob) ---
+        reg(event, "seed_germinates_into_island", REGION, 200, SkyseedTests::seedGerminatesIntoIsland);
+        reg(event, "generation_job_builds_structure_island", REGION, 200, SkyseedTests::generationJobBuildsStructureIsland);
+        reg(event, "ladder_island_punches_a_shaft_to_a_landing", REGION, SkyseedTests::ladderIslandPunchesAShaftToALanding);
+        reg(event, "large_ladder_island_punches_deeper", REGION, SkyseedTests::largeLadderIslandPunchesDeeper);
+        reg(event, "ladder_shaft_rotation_varies", REGION, SkyseedTests::ladderShaftRotationVaries);
+        reg(event, "precise_seed_germinates_at_target", REGION, 200, SkyseedTests::preciseSeedGerminatesAtTarget);
         // DEFERRED to a later phase (not ported here):
+        //  - seedStateRoundTripsThroughNbt: drives addAdditionalSaveData(CompoundTag)/readAdditionalSaveData(CompoundTag)
+        //    directly, but 26.1.2 reworked those to ValueOutput/ValueInput — needs a rewrite against the new NBT API.
         //  - everySeedRecipeAndBookEntryMatchesSeedKind + everyCraftableSeedHasUniqueIcon: need the book/icon resource
         //    helpers (Phase 4); the recipe half also can't pass until SKYRECIPEGENPLAN lands the per-version recipes.
         //  - legacyDimensionResetRewritesGeneratorSettings: exercises the level.dat /emptynether reset, which is a no-op
@@ -143,8 +160,13 @@ public final class SkyseedTests {
 
     /** Build the standard per-test config and register it under {@code skyseed:<name>}. */
     private static void reg(RegisterGameTestsEvent event, String name, Identifier structure, Consumer<GameTestHelper> body) {
+        reg(event, name, structure, 100, body);
+    }
+
+    /** As above with an explicit maxTicks (the world-apply tests that tick a thrown seed / drain a job need &gt;100). */
+    private static void reg(RegisterGameTestsEvent event, String name, Identifier structure, int maxTicks, Consumer<GameTestHelper> body) {
         final TestData<Holder<TestEnvironmentDefinition<?>>> data = new TestData<>(
-                env, structure, /*maxTicks*/ 100, /*setupTicks*/ 0, /*required*/ true,
+                env, structure, maxTicks, /*setupTicks*/ 0, /*required*/ true,
                 Rotation.NONE, /*manualOnly*/ false, /*maxAttempts*/ 1, /*requiredSuccesses*/ 1,
                 /*skyAccess*/ false, /*padding*/ 0);
         event.registerTest(Ids.mod(name), new SkyseedTest(data, body));
@@ -1834,5 +1856,196 @@ public final class SkyseedTests {
     private static boolean isWaterAt(java.util.Map<BlockPos, BlockState> map, BlockPos p) {
         final BlockState s = map.get(p);
         return s != null && s.getFluidState().is(FluidTags.WATER);
+    }
+
+    // ===== world-apply tests =====
+
+    static void seedGerminatesIntoIsland(GameTestHelper helper) {
+        // End-to-end: a thrown seed arms (~40 ticks), germinates, and IslandGrowth drains the GenerationJob.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
+        final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        seed.setPos(center.getX() + 0.5, center.getY() + 0.5, center.getZ() + 0.5);
+        seed.setTheme(Id.of("skyseed:gametest/island"));
+        seed.setNoGravity(true); // rest in place and arm rather than fall through the region floor
+        level.addFreshEntity(seed);
+        helper.succeedWhen(() -> {
+            boolean grown = false;
+            for (final BlockPos p : BlockPos.betweenClosed(center.offset(-6, -6, -6), center.offset(6, 4, 6))) {
+                if (level.getBlockState(p).is(Blocks.GRASS_BLOCK)) {
+                    grown = true;
+                    break;
+                }
+            }
+            helper.assertTrue(grown, "the thrown seed has not germinated into an island yet");
+        });
+    }
+
+    static void generationJobBuildsStructureIsland(GameTestHelper helper) {
+        // Drain a GenerationJob for a structure island directly: covers the block stream, placeStructures
+        // (jigsaw cottage), the bed->villager scan, the iron-golem spawn and the animal pack.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 12, 8));
+        final IslandPlan plan = IslandGenerator.planIsland(level, center, theme(level, "gametest/structure"),
+                level.getBiome(center), RandomSource.create(11L));
+        final GenerationJob job = new GenerationJob(level, plan);
+        int guard = 0;
+        while (!job.tick() && guard++ < 2000) {
+            // drain the whole job synchronously (each tick() does a bounded slice)
+        }
+        helper.assertTrue(guard < 2000, "GenerationJob never reported completion");
+        helper.assertTrue(contains(helper, center.offset(-8, -3, -8), 16, 12, 16, Blocks.RED_BED),
+                "the cottage's bed was not placed (placeStructures)");
+        helper.assertTrue(near(level, center, Villager.class), "no villager spawned at the bed");
+        helper.assertTrue(near(level, center, IronGolem.class), "no iron golem spawned (iron_golems)");
+        helper.assertTrue(near(level, center, Cow.class), "no animal-pack cow spawned (spawnEnclosureAnimals)");
+        helper.succeed();
+    }
+
+    static void ladderIslandPunchesAShaftToALanding(GameTestHelper helper) {
+        // The Ladder Island's whole point: a climbable shaft through the centre, hanging ~20 blocks below the island
+        // to a 5x5 cobblestone landing at mining level. 5% of the time it comes up as a waterfall instead — a single
+        // surface water source that physics carries down the open shaft. Verified on the (deterministic) plan.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 40, 8));
+        final IslandTheme theme = theme(level, "ladder_small");
+        boolean sawLadders = false;
+        boolean sawWaterfall = false;
+        for (long seed = 0; seed < 200 && !(sawLadders && sawWaterfall); seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme,
+                    level.getBiome(center), RandomSource.create(seed));
+            int centreLadders = 0;
+            int centreWater = 0;
+            final java.util.Set<Long> cobble = new java.util.HashSet<>();
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                final boolean centreColumn = bp.pos().getX() == center.getX() && bp.pos().getZ() == center.getZ();
+                if (bp.state().is(Blocks.LADDER)) {
+                    if (centreColumn) {
+                        centreLadders++;
+                    }
+                } else if (bp.state().is(Blocks.WATER)) {
+                    if (centreColumn) {
+                        centreWater++;
+                    }
+                } else if (bp.state().is(Blocks.COBBLESTONE)) {
+                    cobble.add(bp.pos().asLong());
+                }
+            }
+            // The landing level, found from a cobble block at the 5x5's edge (clear of the shaft + backing column).
+            int landingY = Integer.MIN_VALUE;
+            for (int y = center.getY(); y > center.getY() - 60; y--) {
+                if (cobble.contains(new BlockPos(center.getX() + 2, y, center.getZ()).asLong())) {
+                    landingY = y;
+                    break;
+                }
+            }
+            helper.assertTrue(landingY != Integer.MIN_VALUE && center.getY() - landingY > 18,
+                    "landing should hang ~20 below the island (seed " + seed + "), landing dY=" + (center.getY() - landingY));
+            final long centreLanding = new BlockPos(center.getX(), landingY, center.getZ()).asLong();
+            final long centreCap = new BlockPos(center.getX(), landingY - 1, center.getZ()).asLong();
+            if (centreLadders > 0) {
+                sawLadders = true;
+                helper.assertTrue(centreLadders > 15,
+                        "ladder shaft too short (seed " + seed + "): " + centreLadders + " ladders");
+                helper.assertTrue(cobble.contains(centreLanding),
+                        "the ladder variant's landing centre should be solid (seed " + seed + ")");
+                helper.assertTrue(p.fluidTicks().isEmpty(),
+                        "the ladder variant should not schedule a waterfall (seed " + seed + ")");
+            }
+            if (centreWater > 0) {
+                sawWaterfall = true;
+                helper.assertTrue(centreWater == 1,
+                        "the waterfall should be a single surface source, was " + centreWater + " (seed " + seed + ")");
+                helper.assertTrue(p.fluidTicks().size() == 1,
+                        "the waterfall source should be recorded for a fluid tick (seed " + seed + ")");
+                helper.assertTrue(!cobble.contains(centreLanding),
+                        "the waterfall landing centre should be an open drain (seed " + seed + ")");
+                helper.assertTrue(cobble.contains(centreCap),
+                        "the waterfall drain should be capped one block below (seed " + seed + ")");
+            }
+        }
+        helper.assertTrue(sawLadders, "no seed produced the ladder shaft");
+        helper.assertTrue(sawWaterfall, "the 5% waterfall easter egg never rolled in 200 seeds");
+        helper.succeed();
+    }
+
+    static void largeLadderIslandPunchesDeeper(GameTestHelper helper) {
+        // The Large Ladder Island drops further — its cobblestone landing hangs ~30 blocks below the island (vs ~20
+        // for the small one). The landing depth is the same whether it comes up as ladders or a waterfall.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 50, 8));
+        final IslandPlan p = IslandGenerator.planIsland(level, center, theme(level, "ladder_large"),
+                level.getBiome(center), RandomSource.create(7L));
+        int lowestCobbleY = Integer.MAX_VALUE;
+        for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+            if (bp.state().is(Blocks.COBBLESTONE)) {
+                lowestCobbleY = Math.min(lowestCobbleY, bp.pos().getY());
+            }
+        }
+        helper.assertTrue(lowestCobbleY != Integer.MAX_VALUE && center.getY() - lowestCobbleY > 27,
+                "the large ladder landing should hang ~30 below the island, dY=" + (center.getY() - lowestCobbleY));
+        helper.succeed();
+    }
+
+    static void ladderShaftRotationVaries(GameTestHelper helper) {
+        // The shaft (and its cobblestone backing) faces a random one of the 4 directions per island, so they aren't
+        // all aligned. Sweep seeds until we see at least two different ladder facings.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos center = helper.absolutePos(new BlockPos(8, 40, 8));
+        final IslandTheme theme = theme(level, "ladder_small");
+        final java.util.Set<net.minecraft.core.Direction> facings = new java.util.HashSet<>();
+        for (long seed = 0; seed < 60 && facings.size() < 2; seed++) {
+            final IslandPlan p = IslandGenerator.planIsland(level, center, theme, level.getBiome(center),
+                    RandomSource.create(seed));
+            for (final IslandPlan.BlockPlacement bp : p.blocks()) {
+                if (bp.state().is(Blocks.LADDER)) {
+                    facings.add(bp.state().getValue(net.minecraft.world.level.block.LadderBlock.FACING));
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(facings.size() >= 2,
+                "the ladder shaft should face different directions across islands, saw " + facings);
+        helper.succeed();
+    }
+
+    static void preciseSeedGerminatesAtTarget(GameTestHelper helper) {
+        // A Precise throw germinates at its chosen target, not where the seed sits.
+        final ServerLevel level = helper.getLevel();
+        final BlockPos spawn = helper.absolutePos(new BlockPos(3, 18, 3));
+        final BlockPos target = helper.absolutePos(new BlockPos(10, 10, 10));
+        final IslandSeedEntity seed = new IslandSeedEntity(ModEntities.ISLAND_SEED.get(), level);
+        seed.setPos(spawn.getX() + 0.5, spawn.getY() + 0.5, spawn.getZ() + 0.5);
+        seed.setTheme(Id.of("skyseed:gametest/island"));
+        seed.setPreciseTarget(new Vec3(target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5));
+        seed.setNoGravity(true);
+        level.addFreshEntity(seed);
+        helper.succeedWhen(() -> {
+            boolean atTarget = false;
+            for (final BlockPos p : BlockPos.betweenClosed(target.offset(-6, -6, -6), target.offset(6, 4, 6))) {
+                if (level.getBlockState(p).is(Blocks.GRASS_BLOCK)) {
+                    atTarget = true;
+                    break;
+                }
+            }
+            helper.assertTrue(atTarget, "the precise seed has not germinated at its target yet");
+        });
+    }
+
+    /** True if an entity of {@code cls} is within ~14 blocks of {@code c}. */
+    private static boolean near(ServerLevel level, BlockPos c, Class<? extends Entity> cls) {
+        return !level.getEntitiesOfClass(cls, new AABB(c).inflate(14)).isEmpty();
+    }
+
+    /** True if any block in the [origin, origin+(dx,dy,dz)] box is {@code block}. */
+    private static boolean contains(GameTestHelper helper, BlockPos origin, int dx, int dy, int dz, Block block) {
+        final ServerLevel level = helper.getLevel();
+        for (BlockPos p : BlockPos.betweenClosed(origin, origin.offset(dx, dy, dz))) {
+            final BlockState state = level.getBlockState(p);
+            if (state.is(block)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
