@@ -199,7 +199,13 @@ def generateGuide = tasks.register('generateGuide') {
         byCat.each { cat, files ->
             files.sort { slurper.parse(it).sortnum ?: 0 }.eachWithIndex { f, i ->
                 def e = slurper.parse(f)
-                def pages = e.pages.collect { p ->
+                def pages = e.pages.findAll { pp ->
+                    // Drop the page-advancement-gated progress-checklist pages ("[x] … found it!"). Patchouli HIDES
+                    // such pages until their advancement is earned; Modonomicon doesn't honour page-level gates (we
+                    // drop them — an acceptable approximation for descriptive pages), so a "found it!" page would
+                    // always read as already-found. The Patchouli book keeps them (gated, correct there).
+                    !(pp.advancement && (pp.text ?: '').toString().contains('found it'))
+                }.collect { p ->
                     if (p.type == 'patchouli:crafting') {
                         def pg = [type: 'modonomicon:crafting_recipe', recipe_id_1: p.recipe]
                         if (p.text) pg.text = expandGuideMacros(p.text as String)

@@ -9,6 +9,15 @@ the version-number sequence, so a version can appear in one changelog and not th
 > Stage 3 (generalize/document) in `REFACTORPLAN.md`. The per-feature build plans (the gametest harness, the recipe
 > generator, and the Modonomicon guide) shipped and were retired into this changelog.
 
+## [0.161.0] - 2026-06-28
+
+### Fixed
+- **The Modonomicon guide really stops showing "found it!" now.** 0.158.0 dropped the entry-level reveal *condition*,
+  but the false "found it!" was the page-level checklist in "The Rare Catch": each `[x] … found it!` page is gated by a
+  page-level `advancement` that Patchouli hides until earned — and Modonomicon doesn't honour page gates, so they all
+  showed. `generateGuide` now drops those gated progress-checklist pages from the Modonomicon book. (The Patchouli book
+  keeps them; page gating works there.)
+
 ## [0.160.0] - 2026-06-28
 
 1.21.1-only fix (see [CHANGELOG_1.21.1.md](CHANGELOG_1.21.1.md)): the 0.157.0 guide-icon fix crashed the 1.21.1 client
