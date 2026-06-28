@@ -355,9 +355,20 @@ water_mobs), parched + camel_husk -> desert, happy_ghast -> huge_meadow (sky-mou
 village_center (mechanical helper). creaking already placed in 2d-1; mannequin skipped (display entity). Tolerant
 theme mobs data, inert on 1.21.1. Gametest new_mobs_resolve_on_themes. Both nodes green (1.21.1 126, 26.1.2 All 131).
 
-**2d-4 cow/pig/chicken biome-variant check** — still pending (a verification: the new cow/pig/chicken variants should
-default by biome temperature at the spawn position, so existing pasture/farm placements pick the right variant per
-island biome; force one only if a theme wants a specific variant).
+**2d-4 cow/pig/chicken biome-variant check ✅ DONE** (`af5b764`): verified the variant defaults by biome through the
+existing spawn path — GenerationJob's Entities.create + EventHooks.finalizeMobSpawn invokes Cow.finalizeSpawn, which
+selects the variant from the spawn biome (VariantUtils.selectVariantToSpawn(SpawnContext)). No code change (the "auto"
+case). Locked by the gametest farm_animals_default_to_biome_variant (sets a WRONG variant, finalizes, asserts it's reset
+to the biome choice). 26.1.2 All 132.
+
+**2c block-completeness audit ✅ DONE (folded into 2d):** no automated all-blocks gametest exists, so it's the §2.3
+manual bucketing — and the content above now delivers the new primary sources (pale-oak → all pale wood, creaking →
+resin, the 1.21.5 vegetation as decoration); the craftable remainder (copper expansion bars/chains/chests/lanterns,
+the 12 wooden shelves, dried ghast) is obtainable from already-obtainable materials. All 109 new ids obtainable.
+
+**★★ Stage 2d (worldgen content) COMPLETE** — all of 2b/2c/2d-1..4 done. Both nodes green every step (1.21.1 frozen at
+126; 26.1.2 grew 126 → 132 as the content + its gametests landed). The Pale Garden seed established the reusable
+modern-only-content gating pattern; everything else is tolerant theme data that ships to both nodes inert on 1.21.1.
 
 ---
 
