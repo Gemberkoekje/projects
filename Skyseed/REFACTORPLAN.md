@@ -242,11 +242,18 @@ The per-category plan, highest-leverage first (each links a category of the 120 
 swaps), then the file-local clusters (entity, commands, worlddata, recipe), then client + the 1-offs. Recompile after
 each cluster; the count only visibly drops below 100 once the bulk is cleared, so track the per-symbol histogram.
 
-**Progress (2026-06-28): 120 → 102.** DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob),
-`registryOrThrow`→`lookupOrThrow` (NOT a clean swap — `//?` in `Lookup.registry()`, all callers route through it),
-`Registry.get`→`getValue` (`//?` in `Lookup.byId()`, block/entity route through it), and the item/entity superclass
-import. **The whole `compat` facade now compiles clean on 26.1.2.** The remaining 102, accurately mapped from the
-full compile (`-Xmaxerrs` lifted), is dominated by **ONE recurring rewrite not in the table above:**
+**Progress (2026-06-28): 120 → 81.** DONE: mob reorg + `MobSpawnType`→`EntitySpawnReason` (GenerationJob);
+`registryOrThrow`→`lookupOrThrow` (NOT a clean swap — `//?` in `Lookup.registry()`, all callers route through it);
+`Registry.get`→`getValue` (`//?` in `Lookup.byId()`, block/entity route through it); the item/entity superclass
+import; **`compat.Entities`** (`Entity.moveTo`→`snapTo`, `EntityType.create` gained an `EntitySpawnReason` arg) +
+`VillagerType.byBiome` guarded out (GenerationJob clean); **`Lookup.dimensionId`** (`ResourceKey.location()`→
+`identifier()`); `getMinBuildHeight`/`getMaxBuildHeight`→`getMinY`/`getMaxY`; `Blocks.CHAIN`→`Blocks.IRON_CHAIN`
+(block + id renamed in the copper update). **The whole `compat` facade + GenerationJob now compile clean on 26.1.2.**
+**Tooling note:** the **NeoForge 26.1.2.76 sources** are in the gradle cache (`~/.gradle/caches/modules-2/files-2.1/
+net.neoforged/neoforge/26.1.2.76/<hash>/`) — needed for the NeoForge-specific deltas (`DeferredRegister.registerItem`,
+`FMLEnvironment.production`, `ModList.findResource`, `KeyMapping.Category`); the vanilla deltas come from the patched
+sources jar as before. The remaining 81, accurately mapped from the full compile (`-Xmaxerrs` lifted via a throwaway
+init script), is dominated by **ONE recurring rewrite not in the table above:**
 
 - **★ the 1.21.5 NBT/serialization rewrite — `CompoundTag` direct access → `ValueInput`/`ValueOutput` with
   `Optional<T>` getters.** Hits `IslandSeedEntity` (`addAdditionalSaveData(ValueOutput)`/`readAdditionalSaveData(
