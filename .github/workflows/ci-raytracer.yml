@@ -15,28 +15,11 @@ permissions:
   contents: read
 
 jobs:
-  core-tests:
-    name: Core + tests (ubuntu)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Restore
-        run: dotnet restore ./RayTracer/RayTracer.Tests/RayTracer.Tests.csproj
-
-      - name: Build
-        run: dotnet build ./RayTracer/RayTracer.Tests/RayTracer.Tests.csproj --no-restore --configuration Release
-
-      - name: Test
-        run: dotnet test ./RayTracer/RayTracer.Tests/RayTracer.Tests.csproj --no-build --configuration Release --verbosity normal
-
-  gpu-build:
-    name: GPU host build (windows)
+  build-test:
+    name: Build + test solution (windows)
+    # The solution contains net10.0-windows projects (RayTracer.Gpu, the WinForms
+    # app), so it only builds on Windows. The GPU host compiles here but its
+    # inline ray tracing cannot run (hosted runners have no RT-capable GPU).
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
@@ -46,13 +29,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # The Windows-only DXR host (RayTracer.Gpu) compiles but cannot run in CI
-      # (no RT-capable GPU on hosted runners). This job validates that the D3D12
-      # host, the RayTracer.Core reference, and the shader assets still build.
-      # RestoreLockedMode is relaxed here because the lock file self-heals on the
-      # dev machine's next restore.
+      # RestoreLockedMode is relaxed so a lock file that lags a project change
+      # (it self-heals on the next local restore) can't spuriously fail CI.
       - name: Restore
-        run: dotnet restore ./RayTracer/RayTracer.Gpu/RayTracer.Gpu.csproj -p:RestoreLockedMode=false
+        run: dotnet restore ./RayTracer/RayTracer.slnx -p:RestoreLockedMode=false
 
       - name: Build
-        run: dotnet build ./RayTracer/RayTracer.Gpu/RayTracer.Gpu.csproj --no-restore --configuration Release
+        run: dotnet build ./RayTracer/RayTracer.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test ./RayTracer/RayTracer.slnx --no-build --configuration Release --verbosity normal
