@@ -217,7 +217,7 @@ public class GpuPhase1Tests
                 foreach (var (pixelHash, sampleIdx) in samples)
                 {
                     uint heroIdx = Phase1Reference.HeroIndex(pixelHash, sampleIdx, DeterministicCount);
-                    uint stride = DeterministicCount / (uint)Phase1Reference.CompanionCount;
+                    uint stride = (uint)(DeterministicCount / Phase1Reference.CompanionCount);
 
                     // Hero hit gives us the exact hit point the shader would reconstruct UV from.
                     var heroRay = new Ray
@@ -235,7 +235,7 @@ public class GpuPhase1Tests
                     Vector3 baseXyzTruth = Vector3.Zero;
                     for (uint k = 0; k < Phase1Reference.CompanionCount; k++)
                     {
-                        uint idx = (heroIdx + k * stride) % DeterministicCount;
+                        uint idx = (heroIdx + k * stride) % (uint)DeterministicCount;
                         int wlK = res.DeterWavelengths[idx];
                         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wlK, Intensity = 1f };
                         var hit = tracable.Intersect(ray);

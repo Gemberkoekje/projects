@@ -40,6 +40,7 @@ RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
 RWStructuredBuffer<uint>   WavelengthCounter: register(u2);
 RWTexture2D<float4>        Output           : register(u3);
+RWStructuredBuffer<uint>   LastHit          : register(u4); // 1 = pixel hit geometry last sample
 
 cbuffer Constants : register(b0)
 {
@@ -185,7 +186,6 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     int y = int(tid.y);
 
     bool reset = (ResetFlag != 0u);
-    uint prevCount = reset ? 0u : SampleCount[ix];
     uint sampleIdx = reset ? 0u : WavelengthCounter[ix];
 
     // Sub-pixel jitter (matches TraceCore's PCG-style seed chain).
@@ -222,8 +222,9 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     q.Proceed();
 
+    bool hit = (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT);
     float3 corrected = float3(0.0, 0.0, 0.0);
-    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    if (hit)
     {
         // Two triangles per quad → quad index is the triangle index >> 1.
         uint primIndex = q.CommittedPrimitiveIndex() >> 1;
@@ -232,14 +233,19 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         corrected = ShadeHit(Primitives[primIndex], dir, hitPoint, pixelHash, sampleIdx);
     }
 
-    // Running-mean accumulation (Welford-style mean; matches AccumXYZ update).
+    // Running-mean accumulation. Restart the mean on a whole-frame reset, or when
+    // this pixel flips between hitting geometry and missing (matches TraceCore's
+    // 'hit != LastHit' reset). WavelengthCounter keeps advancing regardless.
+    bool restart = reset || (LastHit[ix] != (hit ? 1u : 0u));
+    uint prevCount = restart ? 0u : SampleCount[ix];
     uint count = min(prevCount + 1u, MaxSampleCount);
-    float3 prevAccum = (reset || prevCount == 0u) ? float3(0.0, 0.0, 0.0) : Accum[ix].xyz;
+    float3 prevAccum = (restart || prevCount == 0u) ? float3(0.0, 0.0, 0.0) : Accum[ix].xyz;
     float3 newAccum = prevAccum + (corrected - prevAccum) / float(count);
 
     Accum[ix] = float4(newAccum, 1.0);
     SampleCount[ix] = count;
     WavelengthCounter[ix] = sampleIdx + 1u;
+    LastHit[ix] = hit ? 1u : 0u;
 
     float3 srgb = saturate(ResolveToSRGB(newAccum));
     Output[tid.xy] = float4(srgb, 1.0);

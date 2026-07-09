@@ -61,6 +61,7 @@ internal sealed class Phase1Renderer : IDisposable
     private ID3D12Resource _accumBuffer = null!;
     private ID3D12Resource _sampleCountBuffer = null!;
     private ID3D12Resource _wavelengthCounterBuffer = null!;
+    private ID3D12Resource _lastHitBuffer = null!;
     private ID3D12Resource _constantBuffer = null!;
 
     private ID3D12Resource _blas = null!;
@@ -257,6 +258,7 @@ internal sealed class Phase1Renderer : IDisposable
         _accumBuffer = CreateUavBuffer((ulong)(pixels * 4 * sizeof(float)), ResourceStates.UnorderedAccess);
         _sampleCountBuffer = CreateUavBuffer((ulong)(pixels * sizeof(uint)), ResourceStates.UnorderedAccess);
         _wavelengthCounterBuffer = CreateUavBuffer((ulong)(pixels * sizeof(uint)), ResourceStates.UnorderedAccess);
+        _lastHitBuffer = CreateUavBuffer((ulong)(pixels * sizeof(uint)), ResourceStates.UnorderedAccess);
 
         // Constant buffers must be 256-byte aligned.
         _constantBuffer = _device.CreateCommittedResource(
@@ -278,6 +280,7 @@ internal sealed class Phase1Renderer : IDisposable
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(1, 0), ShaderVisibility.All), // 6: SampleCount (u1)
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(2, 0), ShaderVisibility.All), // 7: WavelengthCounter (u2)
             new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(0, 0), ShaderVisibility.All),  // 8: Constants (b0)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(4, 0), ShaderVisibility.All), // 9: LastHit (u4)
         };
 
         var rootSignatureDesc = new RootSignatureDescription1(RootSignatureFlags.None, rootParameters);
@@ -488,6 +491,7 @@ internal sealed class Phase1Renderer : IDisposable
         _commandList.SetComputeRootUnorderedAccessView(6, _sampleCountBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootUnorderedAccessView(7, _wavelengthCounterBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootConstantBufferView(8, _constantBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(9, _lastHitBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);
@@ -604,6 +608,7 @@ internal sealed class Phase1Renderer : IDisposable
         _tlas?.Dispose();
         _blas?.Dispose();
         _constantBuffer?.Dispose();
+        _lastHitBuffer?.Dispose();
         _wavelengthCounterBuffer?.Dispose();
         _sampleCountBuffer?.Dispose();
         _accumBuffer?.Dispose();
