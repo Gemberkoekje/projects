@@ -7,7 +7,7 @@ namespace RayTracer;
 /// determine whether each point is brick or mortar, and applies normal-based
 /// diffuse attenuation to simulate depth (mortar appears recessed).
 /// </summary>
-public class BrickRectangle : Plane, Tracable
+public class BrickRectangle : Plane, Tracable, IQuadPrimitive
 {
     private readonly MaterialData _brickMaterial;
     private readonly MaterialData _mortarMaterial;
@@ -49,6 +49,29 @@ public class BrickRectangle : Plane, Tracable
     }
 
     public override AABB Bounds => _bounds;
+
+    /// <inheritdoc/>
+    public Vector3 L1 => _l1;
+    /// <inheritdoc/>
+    public Vector3 Edge1 => _edge1;
+    /// <inheritdoc/>
+    public Vector3 Edge2 => _edge2;
+    /// <inheritdoc/>
+    public Vector3 QuadNormal => Normal;
+    /// <inheritdoc/>
+    public QuadPattern Pattern => QuadPattern.Brick;
+    /// <inheritdoc/>
+    public MaterialData PrimaryMaterial => _brickMaterial;
+    /// <inheritdoc/>
+    public MaterialData? SecondaryMaterial => _mortarMaterial;
+    /// <inheritdoc/>
+    public float PatternP0 => _bricksAcross;
+    /// <inheritdoc/>
+    public float PatternP1 => _bricksDown;
+    /// <inheritdoc/>
+    public float PatternP2 => _mortarFractionU;
+    /// <inheritdoc/>
+    public float PatternP3 => _mortarFractionV;
 
     public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
     {
