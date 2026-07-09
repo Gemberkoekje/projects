@@ -178,18 +178,40 @@ and the windowed path (`--frames N`) dispatches, copies, and presents without er
 **How to run:** `dotnet run --project RayTracer.Gpu -c Release -- --selftest` (headless
 pass/fail), or `dotnet run --project RayTracer.Gpu -c Release` (opens the window).
 
-### Phase 1 — Scene on GPU, fullbright spectral parity
-- [ ] **1.1** Scene packer: `Tracable[]`-producing code → vertex/index buffers +
-      `PrimitiveInfo` buffer (material ID, quad basis, pattern params).
-- [ ] **1.2** Upload CIE table, spectral reflectance texture, hero-wavelength cycle.
-- [ ] **1.3** Port camera ray generation, sub-pixel jitter, hero+companion wavelength
-      evaluation to the path-trace shader (no lighting: `LightingMode.None`
-      fullbright, as in Arc 1 of the original design).
-- [ ] **1.4** Port brick / ceiling-tile procedural pattern functions; verify against
-      CPU renders of the same scene and camera.
-- [ ] **1.5** Accumulation buffer (running mean) + XYZ→sRGB resolve pass on GPU.
-      *Milestone: static maze view converges to a near-identical image as the CPU
-      renderer.*
+### Phase 1 — Scene on GPU, fullbright spectral parity — ✅ IMPLEMENTED (pending dev-box validation)
+
+Phase 1 lives in `RayTracer.Core/Gpu/` (pure, unit-tested data) and
+`RayTracer.Gpu/` (D3D12 host + `Shaders/PathTrace.hlsl`). The renderer now
+references `RayTracer.Core`, packs the *same* `Tracable[]` the CPU renderer
+builds, and traces the real maze with fullbright spectral shading. Because no
+GPU is available in CI, the shader math is mirrored by `Phase1Reference.cs` and
+pinned to the CPU classes by `RayTracer.Tests/GpuPhase1Tests.cs`; the D3D12
+execution path is validated on the RTX dev box via `--phase1-selftest`.
+
+- [x] **1.1** Scene packer: `GpuScenePacker.Pack` turns the `Tracable[]` into
+      vertex/index buffers + a `GpuPrimitive[]` (quad basis, `1/|edge|²`, normal,
+      material rows, pattern params). Quads expose their basis via the new
+      `IQuadPrimitive` interface. Two triangles per quad; `primIndex >> 1` on the GPU.
+- [x] **1.2** `SpectralResourceBaker.Bake` uploads the CIE XYZ for the 50 hero
+      wavelengths (`DeterXYZ`), the per-material reflectance table
+      (`MaterialReflectance[material*50 + index]`), and `DeterministicCorrection`.
+      Both hero and companions are deterministic-cycle entries, so lookups collapse
+      to indexing by hero index — no CIE/spectral textures with runtime sampling needed.
+- [x] **1.3** `PathTrace.hlsl` ports camera ray generation, PCG sub-pixel jitter,
+      and hero+3-companion evaluation (`LightingMode.None` fullbright), a line-for-line
+      port of `Phase1Reference.cs`.
+- [x] **1.4** Brick running-bond and ceiling-tile bevel pattern functions ported to
+      HLSL; parity with `BrickRectangle`/`CeilingTileRectangle` asserted in tests
+      across straight and oblique rays, mortar and bevel regions.
+- [x] **1.5** Per-pixel running-mean accumulation buffer (UAV, persists across frames)
+      + inline XYZ→sRGB resolve to the output texture.
+      *Milestone: a static maze view accumulates toward the CPU image.* Run with
+      `dotnet run --project RayTracer.Gpu -c Release -- --phase1` (windowed) or
+      `--phase1-selftest` (headless CPU cross-check).
+
+> Not yet done in Phase 1: a *separate* resolve pass (resolve is inline; the
+> spatial/bilateral filter is a Phase 3 concern), accumulation reset on camera
+> motion beyond the frame-0 reset flag, and any lighting (Phase 2).
 
 ### Phase 2 — Lighting
 - [ ] **2.1** Light array in a constant/structured buffer; port weighted light

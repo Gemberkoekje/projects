@@ -1,0 +1,41 @@
+name: CI - RayTracer
+
+on:
+  push:
+    paths:
+      - 'RayTracer/**'
+      - '.github/workflows/ci-raytracer.yml'
+  pull_request:
+    paths:
+      - 'RayTracer/**'
+      - '.github/workflows/ci-raytracer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test solution (windows)
+    # The solution contains net10.0-windows projects (RayTracer.Gpu, the WinForms
+    # app), so it only builds on Windows. The GPU host compiles here but its
+    # inline ray tracing cannot run (hosted runners have no RT-capable GPU).
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # RestoreLockedMode is relaxed so a lock file that lags a project change
+      # (it self-heals on the next local restore) can't spuriously fail CI.
+      - name: Restore
+        run: dotnet restore ./RayTracer/RayTracer.slnx -p:RestoreLockedMode=false
+
+      - name: Build
+        run: dotnet build ./RayTracer/RayTracer.slnx --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test ./RayTracer/RayTracer.slnx --no-build --configuration Release --verbosity normal

@@ -106,6 +106,9 @@
         "type": "Transitive",
         "resolved": "2.1.0",
         "contentHash": "KK+SjNSuKdP+zbavekubi+vaeb1Jo4k87ZF6CMkVWjr6RjJwc8peVtmgzXXDIMy4ZC3ZISyk3llY3q65ISOkBQ=="
+      },
+      "raytracer": {
+        "type": "Project"
       }
     },
     "net10.0-windows7.0/linux-x64": {

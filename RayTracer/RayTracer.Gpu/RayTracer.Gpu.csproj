@@ -16,11 +16,18 @@
     <None Update="Shaders\RayQuery.hlsl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Shaders\PathTrace.hlsl">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Vortice.Direct3D12" />
     <PackageReference Include="Vortice.Dxc" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
   </ItemGroup>
 
 </Project>

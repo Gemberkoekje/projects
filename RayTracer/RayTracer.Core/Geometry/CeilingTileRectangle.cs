@@ -8,7 +8,7 @@ namespace RayTracer;
 /// at tile edges via normal-based diffuse attenuation, creating the
 /// appearance of raised tile borders.
 /// </summary>
-public class CeilingTileRectangle : Plane, Tracable
+public class CeilingTileRectangle : Plane, Tracable, IQuadPrimitive
 {
     private readonly MaterialData _tileMaterial;
     private readonly Vector3 _l1;
@@ -45,6 +45,30 @@ public class CeilingTileRectangle : Plane, Tracable
     }
 
     public override AABB Bounds => _bounds;
+
+    /// <inheritdoc/>
+    public Vector3 L1 => _l1;
+    /// <inheritdoc/>
+    public Vector3 Edge1 => _edge1;
+    /// <inheritdoc/>
+    public Vector3 Edge2 => _edge2;
+    /// <inheritdoc/>
+    public Vector3 QuadNormal => Normal;
+    /// <inheritdoc/>
+    public QuadPattern Pattern => QuadPattern.CeilingTile;
+    /// <inheritdoc/>
+    public MaterialData PrimaryMaterial => _tileMaterial;
+    /// <summary>Ceiling tiles use a single material; the "grid" is the bevel
+    /// darkening the tile material, so there is no secondary material.</summary>
+    public MaterialData? SecondaryMaterial => null;
+    /// <inheritdoc/>
+    public float PatternP0 => _tilesAcross;
+    /// <inheritdoc/>
+    public float PatternP1 => _tilesDown;
+    /// <inheritdoc/>
+    public float PatternP2 => _bevelFraction;
+    /// <inheritdoc/>
+    public float PatternP3 => 0f;
 
     public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
     {

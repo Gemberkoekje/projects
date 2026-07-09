@@ -11,7 +11,10 @@ public class PerformanceCalibratorTests
     {
         var (scene, lights, camera) = CreateCoreStartupState();
         var progressValues = new List<double>();
-        var progress = new Progress<double>(v => progressValues.Add(v));
+        // Use a synchronous IProgress: Progress<double> marshals its callbacks to
+        // the SynchronizationContext / thread pool, so they can arrive after this
+        // method's await completes, racing the assertions below (flaky on CI).
+        IProgress<double> progress = new ImmediateProgress<double>(progressValues.Add);
 
         double rps = await PerformanceCalibrator.MeasureRaysPerSecondAsync(
             scene,
@@ -76,5 +79,13 @@ public class PerformanceCalibratorTests
         };
 
         return (scene, lights, camera);
+    }
+
+    /// <summary>Synchronous <see cref="IProgress{T}"/> that invokes the handler
+    /// inline on <see cref="Report"/>, avoiding the thread-pool marshaling of
+    /// <see cref="Progress{T}"/> so progress is observable deterministically.</summary>
+    private sealed class ImmediateProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
     }
 }
