@@ -2,15 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Analyzer-only project: it runs the DotNetProjectFile analyzers over the
+         csproj/yaml/props files below and must NOT compile any source. Without
+         this it would glob every .cs under the repo (including the WinForms and
+         Vortice code) and fail to build. -->
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-  
+
   <ItemGroup>
     <AdditionalFiles Include="*.yaml" />
     <AdditionalFiles Include="src/props/**" />
-  </ItemGroup>
-  
-  <ItemGroup>
-    <Compile Remove="Benchmark\SmokeBenchmarks.cs" />
   </ItemGroup>
   
   <ItemGroup>
