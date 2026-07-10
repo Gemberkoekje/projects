@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Exposes internal TraceCore to the test project so the GPU Phase 2 shading
+         replica can be pinned to the actual CPU renderer output. -->
+    <InternalsVisibleTo Include="RayTracer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Data/00115_spectral.csv" />
     <EmbeddedResource Include="Data/01085_spectral.csv" />
     <EmbeddedResource Include="Data/01138_spectral.csv" />
