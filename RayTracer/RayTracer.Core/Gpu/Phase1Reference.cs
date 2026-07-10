@@ -130,21 +130,16 @@ public static class Phase1Reference
     }
 
     /// <summary>
-    /// Resolves the fullbright, deterministic-corrected XYZ for one sample at a
-    /// hit on <paramref name="prim"/>, using only the baked
-    /// <see cref="SpectralResources"/>. This is the exact per-sample value the
-    /// GPU accumulation buffer folds into its running mean, and it mirrors the
-    /// <c>Lighting == LightingMode.None</c> resolve in <c>TraceCore</c>.
+    /// Resolves a quad hit's effective reflectance <paramref name="row"/> (the
+    /// material row to sample — primary, or secondary/mortar where the brick
+    /// pattern selects it) and per-hit <paramref name="atten"/> (the
+    /// wavelength-independent pattern attenuation). Mirrors the pattern branches
+    /// of the rectangle <c>Intersect</c> methods; the reflectance at any
+    /// wavelength is then <c>MaterialReflectance[row*N + index] * atten</c>.
     /// </summary>
-    /// <param name="prim">The hit quad.</param>
-    /// <param name="res">Baked spectral tables.</param>
-    /// <param name="rayDir">Normalized primary ray direction.</param>
-    /// <param name="hitPoint">World-space hit position.</param>
-    /// <param name="pixelHash">Per-pixel hash (<see cref="Hash2D"/>).</param>
-    /// <param name="sampleIdx">Sample index for this pixel.</param>
-    public static Vector3 ShadeHit(
-        in GpuPrimitive prim, SpectralResources res,
-        Vector3 rayDir, Vector3 hitPoint, uint pixelHash, uint sampleIdx)
+    public static void PatternShade(
+        in GpuPrimitive prim, Vector3 rayDir, Vector3 hitPoint,
+        out uint row, out float atten)
     {
         Vector3 l1 = new(prim.L1X, prim.L1Y, prim.L1Z);
         Vector3 e1 = new(prim.E1X, prim.E1Y, prim.E1Z);
@@ -157,8 +152,8 @@ public static class Phase1Reference
 
         float cosTheta = MathF.Abs(Vector3.Dot(rayDir, n));
 
-        uint row = prim.MatPrimary;
-        float atten = 1f;
+        row = prim.MatPrimary;
+        atten = 1f;
         switch ((QuadPattern)prim.Pattern)
         {
             case QuadPattern.Brick:
@@ -182,6 +177,19 @@ public static class Phase1Reference
                 atten = 1f;
                 break;
         }
+    }
+
+    /// <summary>
+    /// The averaged hero + 3-companion spectral XYZ at a hit, <b>without</b> the
+    /// deterministic correction (the raw diffuse albedo colour). This is the
+    /// <c>baseXyz</c> that <c>TraceCore</c> multiplies by the lighting terms
+    /// before correcting; Phase 2 lighting builds on it.
+    /// </summary>
+    public static Vector3 BaseXyz(
+        in GpuPrimitive prim, SpectralResources res,
+        Vector3 rayDir, Vector3 hitPoint, uint pixelHash, uint sampleIdx)
+    {
+        PatternShade(prim, rayDir, hitPoint, out uint row, out float atten);
 
         int n50 = res.DeterministicCount;
         uint heroIdx = HeroIndex(pixelHash, sampleIdx, n50);
@@ -197,9 +205,26 @@ public static class Phase1Reference
             xyz += cie * refl;
         }
 
-        Vector3 baseXyz = xyz / CompanionCount;
-        return baseXyz * res.DeterministicCorrection;
+        return xyz / CompanionCount;
     }
+
+    /// <summary>
+    /// Resolves the fullbright, deterministic-corrected XYZ for one sample at a
+    /// hit on <paramref name="prim"/>, using only the baked
+    /// <see cref="SpectralResources"/>. This is the exact per-sample value the
+    /// GPU accumulation buffer folds into its running mean, and it mirrors the
+    /// <c>Lighting == LightingMode.None</c> resolve in <c>TraceCore</c>.
+    /// </summary>
+    /// <param name="prim">The hit quad.</param>
+    /// <param name="res">Baked spectral tables.</param>
+    /// <param name="rayDir">Normalized primary ray direction.</param>
+    /// <param name="hitPoint">World-space hit position.</param>
+    /// <param name="pixelHash">Per-pixel hash (<see cref="Hash2D"/>).</param>
+    /// <param name="sampleIdx">Sample index for this pixel.</param>
+    public static Vector3 ShadeHit(
+        in GpuPrimitive prim, SpectralResources res,
+        Vector3 rayDir, Vector3 hitPoint, uint pixelHash, uint sampleIdx)
+        => BaseXyz(prim, res, rayDir, hitPoint, pixelHash, sampleIdx) * res.DeterministicCorrection;
 
     /// <summary>
     /// Converts an accumulated XYZ colour to a display sRGB triplet in [0,1],

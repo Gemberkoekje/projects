@@ -213,16 +213,40 @@ execution path is validated on the RTX dev box via `--phase1-selftest`.
 > spatial/bilateral filter is a Phase 3 concern), accumulation reset on camera
 > motion beyond the frame-0 reset flag, and any lighting (Phase 2).
 
-### Phase 2 — Lighting
-- [ ] **2.1** Light array in a constant/structured buffer; port weighted light
-      selection (`SelectLight`) and NEE shadow rays (`RayQuery` occlusion mode —
-      use `RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH`).
-- [ ] **2.2** Port cosine-hemisphere sampling and the one-bounce + tertiary-bounce
-      indirect estimator (iterative loop, not recursion).
-- [ ] **2.3** Port sample clamping, Welford variance, direct/indirect variance splits,
-      per-bounce debug buffers.
-- [ ] **2.4** Decide the irradiance-cache question: measure 2-bounce cost; expected
-      outcome is to drop the cache.
+### Phase 2 — Lighting — ✅ IMPLEMENTED (pending dev-box validation)
+
+Phase 2 lives in `RayTracer.Core/Gpu/Phase2Reference.cs` (pure, unit-tested
+lighting math), `RayTracer.Gpu/Shaders/PathTracePhase2.hlsl` (the ported
+shader), and `RayTracer.Gpu/Phase2Renderer.cs` + `Phase2Scene.cs` (D3D12 host +
+light packing). As in Phase 1, the shader is a line-for-line port of the C#
+replica; because no GPU runs in CI, `RayTracer.Tests/GpuPhase2Tests.cs` pins the
+replica to the **actual** CPU renderer — one sample of `JobSystem.TraceCore`
+over the real `BVH`/lights (cache off, volumetrics off), matched bit-for-bit —
+and the D3D12 path is checked on the RTX dev box via `--phase2-selftest`.
+
+- [x] **2.1** Light positions packed into a `StructuredBuffer<float4>`
+      (`GpuLight`/`LightPacker`); weighted light selection (`SelectLight`) ported
+      — recomputed weights rather than a per-thread `MAX_LIGHTS` array — and NEE
+      shadow rays via an occlusion `RayQuery`
+      (`RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH`).
+- [x] **2.2** Cosine-hemisphere sampling and the one-bounce + tertiary-bounce
+      indirect estimator ported as an iterative (non-recursive) chain, with the
+      exact PCG RNG sequence of `TraceCore`.
+- [x] **2.3** Sample clamping (on the total only) and per-bounce direct/indirect
+      running-mean accumulation buffers (`DirectAccum`/`IndirectAccum`) ported.
+      *Welford variance and the direct/indirect variance splits are deferred to
+      Phase 5*, where the on-GPU statistics reduction + readback that consumes
+      them is built — the M2 buffers are write-only until then.
+- [x] **2.4** Irradiance-cache decision: **dropped**. The GPU re-traces the
+      tertiary ray every sample instead of maintaining a concurrent hash-grid
+      cache (hash probing + atomics + frame-lifetime management port poorly and
+      the GPU can afford the extra bounce). The port therefore mirrors the
+      cache-off CPU path; a fixed voxel-grid cache remains the GPU-friendly
+      redesign if 2+-bounce cost ever matters.
+
+> Run with `dotnet run --project RayTracer.Gpu -c Release -- --phase2` (windowed)
+> or `--phase2-selftest` (headless CPU cross-check). Phase 1's `--phase1`
+> fullbright path is untouched.
 
 ### Phase 3 — Temporal pipeline
 - [ ] **3.1** TAA reprojection pass: previous camera constants, ping-pong history
