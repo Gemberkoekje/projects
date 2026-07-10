@@ -349,7 +349,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     bool lit = (LightingMode != 0u) && (NumLights > 0u);
 
     float3 xyz;
-    float3 bounce0;
+    // TraceCore only commits the direct AOV (bounce0) inside the indirect-hit
+    // block; on a secondary miss it stays zero even though directTerm is already
+    // folded into the total. Mirror that exactly (start at zero).
+    float3 bounce0 = float3(0.0, 0.0, 0.0);
     float3 indirect = float3(0.0, 0.0, 0.0);
 
     if (!lit)
@@ -380,7 +383,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         }
 
         xyz = baseXyz * (ambientTerm + directTerm);
-        bounce0 = baseXyz * directTerm;
 
         // ── Indirect: one bounce + tertiary bounce ─────────────────────
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
@@ -433,6 +435,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
                 secBounce2Plus = secBaseXyz * tertIncoming;
             }
 
+            bounce0 = baseXyz * directTerm;
             float3 localBounce1 = baseXyz * secIncoming;
             float3 localBounce2Plus = baseXyz * secBounce2Plus;
             indirect = localBounce1 + localBounce2Plus;

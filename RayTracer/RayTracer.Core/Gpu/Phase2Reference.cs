@@ -197,7 +197,10 @@ public static class Phase2Reference
         bool lit = lighting != LightingMode.None && lights.Length > 0;
 
         Vector3 xyz;
-        Vector3 bounce0;
+        // TraceCore only commits the direct AOV (bounce0) inside the indirect-hit
+        // block; on a secondary miss it stays zero even though directTerm is
+        // already folded into the total. Mirror that exactly (start at zero).
+        Vector3 bounce0 = Vector3.Zero;
         Vector3 indirect = Vector3.Zero;
 
         if (!lit)
@@ -229,7 +232,6 @@ public static class Phase2Reference
             }
 
             xyz = baseXyz * (ambientTerm + directTerm);
-            bounce0 = baseXyz * directTerm;
 
             // ── Indirect: one bounce + tertiary bounce ─────────────────
             uint rng = pixelHash + sampleIdx * RngMul + RngAdd;
@@ -278,6 +280,7 @@ public static class Phase2Reference
                     secBounce2Plus = secBaseXyz * tertIncoming;
                 }
 
+                bounce0 = baseXyz * directTerm;
                 Vector3 localBounce1 = baseXyz * secIncoming;
                 Vector3 localBounce2Plus = baseXyz * secBounce2Plus;
                 indirect = localBounce1 + localBounce2Plus;
