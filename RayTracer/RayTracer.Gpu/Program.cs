@@ -36,11 +36,8 @@ internal static class Program
     {
         bool selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
         bool phase1SelfTest = args.Contains("--phase1-selftest", StringComparer.OrdinalIgnoreCase);
-        bool phase1 = args.Contains("--phase1", StringComparer.OrdinalIgnoreCase);
         bool phase2SelfTest = args.Contains("--phase2-selftest", StringComparer.OrdinalIgnoreCase);
-        bool phase2 = args.Contains("--phase2", StringComparer.OrdinalIgnoreCase);
         bool phase3SelfTest = args.Contains("--phase3-selftest", StringComparer.OrdinalIgnoreCase);
-        bool phase3 = args.Contains("--phase3", StringComparer.OrdinalIgnoreCase);
         bool phase4SelfTest = args.Contains("--phase4-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase4 = args.Contains("--phase4", StringComparer.OrdinalIgnoreCase);
         bool phase5SelfTest = args.Contains("--phase5-selftest", StringComparer.OrdinalIgnoreCase);
@@ -52,7 +49,6 @@ internal static class Program
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
         bool regenSelfTest = args.Contains("--regen-selftest", StringComparer.OrdinalIgnoreCase);
         bool setupSelfTest = args.Contains("--setup-selftest", StringComparer.OrdinalIgnoreCase);
-        bool phase0 = args.Contains("--phase0", StringComparer.OrdinalIgnoreCase);
         int maxFrames = ParseIntOption(args, "--frames", defaultValue: 0);
         float sampleClamp = ParseFloatOption(args, "--clamp", defaultValue: Phase3FireflyClamp);
         string? savePath = ParseStringOption(args, "--save", defaultValue: null);
@@ -88,28 +84,15 @@ internal static class Program
                     bumpyWalls: args.Contains("--bumpy", StringComparer.OrdinalIgnoreCase),
                     showOverheadMap: args.Contains("--map", StringComparer.OrdinalIgnoreCase),
                     showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase),
-                    reveal: ParseFloatOption(args, "--reveal", -1f));
-            if (phase6) return RunPhase6Windowed(Width, Height, maxFrames, sampleClamp, ParseSmokeMode(args), mazeSeed,
-                biomeIndicator, ParseFloatOption(args, "--fog-drift", 1f),
-                Phase5Reference.ParseMode(ParseStringOption(args, "--debug", null)),
-                startFullscreen: args.Contains("--fullscreen", StringComparer.OrdinalIgnoreCase),
-                style: args.Contains("--classic", StringComparer.OrdinalIgnoreCase) ? RenderStyle.Classic : RenderStyle.Enhanced,
-                regenerate: args.Contains("--regen", StringComparer.OrdinalIgnoreCase),
-                props: args.Contains("--props", StringComparer.OrdinalIgnoreCase) ? new MazeProps.Options(Seed: mazeSeed) : null,
-                bumpyWalls: args.Contains("--bumpy", StringComparer.OrdinalIgnoreCase),
-                showOverheadMap: args.Contains("--map", StringComparer.OrdinalIgnoreCase),
-                showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase),
-                showBuildIn: args.Contains("--buildin", StringComparer.OrdinalIgnoreCase),
-                showOutro: args.Contains("--outro", StringComparer.OrdinalIgnoreCase));
+                    reveal: ParseFloatOption(args, "--reveal", -1f),
+                    depthCue: ParseFloatOption(args, "--depthcue", 0f),
+                    pixelate: ParseIntOption(args, "--pixelate", 1));
             if (phase5SelfTest) return RunPhase5SelfTest();
             if (phase5 && savePath is not null)
                 return RunPhase5Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
                     biomeIndicator, Phase5Reference.ParseMode(ParseStringOption(args, "--debug", null)),
                     ParseFloatOption(args, "--walk", 0f),
                     ParseFloatOption(args, "--fog-time", 0f));
-            if (phase5) return RunPhase5Windowed(maxFrames, sampleClamp, ParseSmokeMode(args), mazeSeed,
-                biomeIndicator, ParseFloatOption(args, "--fog-drift", 1f),
-                Phase5Reference.ParseMode(ParseStringOption(args, "--debug", null)));
             if (phase4SelfTest) return RunPhase4SelfTest();
             if (phase4 && savePath is not null)
                 return RunPhase4Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -118,19 +101,13 @@ internal static class Program
                     ParseFloatOption(args, "--inscatter", -1f),
                     ParseFloatOption(args, "--sigma", -1f),
                     ParseFloatOption(args, "--fog-time", 0f));
-            if (phase4) return RunPhase4Windowed(maxFrames, sampleClamp, ParseSmokeMode(args), mazeSeed,
-                biomeIndicator, ParseFloatOption(args, "--fog-drift", 1f));
             if (phase3SelfTest) return RunPhase3SelfTest();
-            if (phase3) return RunPhase3Windowed(maxFrames, sampleClamp, mazeSeed);
             if (phase2SelfTest) return RunPhase2SelfTest();
-            if (phase2) return RunPhase2Windowed(maxFrames, mazeSeed);
             if (phase1SelfTest) return RunPhase1SelfTest();
-            if (phase1) return RunPhase1Windowed(maxFrames, mazeSeed);
-            if (phase0) return RunWindowed(maxFrames);
             if (selfTest) return RunSelfTest();
-            // Default launch: the productized app — a setup dialog, then the full
-            // renderer (Phase 6). Mirrors the original app's CalibrationForm → run flow.
-            return RunApp();
+            // Default launch: the productized app — the unified GPU/CPU config
+            // screen, then the chosen renderer.
+            return RunConfigApp();
         }
         catch (Exception ex)
         {
@@ -144,44 +121,6 @@ internal static class Program
     }
 
     // ── Phase 1: fullbright spectral maze render ──────────────────────
-
-    private static int RunPhase1Windowed(int maxFrames, int mazeSeed)
-    {
-        EnsureAppConfigured();
-        Phase1Scene built = Phase1Scene.Build(Width, Height, mazeSeed: mazeSeed);
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 1 (fullbright spectral)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-        };
-
-        using var renderer = new Phase1Renderer(Width, Height, built.Packed, built.Spectral, built.Camera);
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        form.Text = $"RayTracer.Gpu — Phase 1 — {renderer.AdapterName} — seed {mazeSeed}";
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            renderer.RenderFrame(reset: frame == 0);
-            frame++;
-            Application.DoEvents();
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                Console.WriteLine($"Rendered {frame} Phase 1 frame(s) to the swap chain without error.");
-                break;
-            }
-        }
-
-        return 0;
-    }
 
     /// <summary>
     /// Headless Phase 1 validation: render one deterministic (jitter-off) frame,
@@ -263,46 +202,6 @@ internal static class Program
 
     // ── Phase 2: spectral maze render with lighting (NEE + indirect) ──
 
-    private static int RunPhase2Windowed(int maxFrames, int mazeSeed)
-    {
-        EnsureAppConfigured();
-        Phase2Scene built = Phase2Scene.Build(Width, Height, mazeSeed: mazeSeed, lightSeed: LightSeedFrom(mazeSeed));
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 2 (spectral + lighting)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-        };
-
-        using var renderer = new Phase2Renderer(
-            Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
-            lightingMode: LightingMode.NEE);
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        form.Text = $"RayTracer.Gpu — Phase 2 — {renderer.AdapterName} — {built.PackedLights.Count} lights — seed {mazeSeed}";
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            renderer.RenderFrame(reset: frame == 0);
-            frame++;
-            Application.DoEvents();
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                Console.WriteLine($"Rendered {frame} Phase 2 frame(s) to the swap chain without error.");
-                break;
-            }
-        }
-
-        return 0;
-    }
-
     /// <summary>
     /// Headless Phase 2 validation: render one deterministic (jitter-off) NEE
     /// frame, then cross-check a grid of surface pixels against the CPU reference
@@ -382,110 +281,6 @@ internal static class Program
     }
 
     // ── Phase 3: temporal pipeline (TAA + bilateral filter + reset lifecycle) ──
-
-    private static int RunPhase3Windowed(int maxFrames, float sampleClamp, int mazeSeed)
-    {
-        EnsureAppConfigured();
-        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed, lightSeed: LightSeedFrom(mazeSeed));
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 3 (temporal pipeline)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-        };
-
-        using var renderer = new Phase3Renderer(
-            Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
-            lightingMode: LightingMode.NEE, sampleClamp: sampleClamp);
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        form.Text = $"RayTracer.Gpu — Phase 3 — {renderer.AdapterName} — {built.PackedLights.Count} lights — seed {mazeSeed}";
-
-        // Autonomous maze walk: motion drives the reset lifecycle and TAA. Brief
-        // still pauses keep the walk lively (long pauses just stare at a converged
-        // frame); motion is what exercises the temporal pipeline.
-        CameraController controller = built.CreateCameraController();
-        controller.StillTime = 1.5f;
-        controller.MoveTime = 0.9f;
-        controller.TurnTime = 0.7f;
-        Camera camera = built.Camera;
-        var clock = Stopwatch.StartNew();
-        double lastSeconds = 0;
-        int maxFireflies = 0;
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            double now = clock.Elapsed.TotalSeconds;
-            float dt = (float)Math.Min(now - lastSeconds, 0.1); // clamp large hitches
-            lastSeconds = now;
-
-            controller.Dirty = false;
-            controller.Update(dt, camera);
-            bool moving = controller.Dirty;
-
-            renderer.SetCamera(camera);
-            renderer.RenderFrame(reset: frame == 0, moving: moving);
-            frame++;
-            Application.DoEvents();
-
-            // Bounded diagnostic runs (--frames N) sample the firefly count
-            // periodically so the motion regime's peak is captured, not just a
-            // possibly-still final frame.
-            if (maxFrames > 0 && frame % 20 == 0)
-                maxFireflies = Math.Max(maxFireflies, CountFireflies(renderer.ReadbackOutput()));
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                int fireflies = CountFireflies(renderer.ReadbackOutput());
-                maxFireflies = Math.Max(maxFireflies, fireflies);
-                Console.WriteLine($"Rendered {frame} Phase 3 frame(s) without error " +
-                    $"(clamp={sampleClamp:0.##}, firefly pixels final={fireflies}, peak={maxFireflies}).");
-                break;
-            }
-        }
-
-        return 0;
-    }
-
-    // Firefly proxy: pixels whose luma spikes far above the median of their 8
-    // neighbors — isolated bright specks, the signature of unaveraged high-variance
-    // samples. A lower count means the clamp is suppressing more confetti.
-    private static int CountFireflies(byte[] image)
-    {
-        static double Luma(byte[] img, int i)
-        {
-            int o = i * 4;
-            return 0.299 * img[o] + 0.587 * img[o + 1] + 0.114 * img[o + 2];
-        }
-
-        const double spikeThreshold = 45.0; // out of 255
-        int count = 0;
-        Span<double> nb = stackalloc double[8];
-        for (int y = 1; y < Height - 1; y++)
-        {
-            for (int x = 1; x < Width - 1; x++)
-            {
-                int ix = y * Width + x;
-                double c = Luma(image, ix);
-                int n = 0;
-                for (int dy = -1; dy <= 1; dy++)
-                    for (int dx = -1; dx <= 1; dx++)
-                        if (dx != 0 || dy != 0)
-                            nb[n++] = Luma(image, (y + dy) * Width + (x + dx));
-                nb.Sort();
-                double median = (nb[3] + nb[4]) * 0.5;
-                if (c - median > spikeThreshold)
-                    count++;
-            }
-        }
-        return count;
-    }
 
     /// <summary>
     /// Headless Phase 3 validation, in two parts. Part A renders frame 0 — where
@@ -587,70 +382,6 @@ internal static class Program
     }
 
     // ── Phase 4: temporal pipeline + volumetrics (smoke / fog) ─────────
-
-    private static int RunPhase4Windowed(
-        int maxFrames, float sampleClamp, SmokeMode smokeMode, int mazeSeed, bool biomeIndicator, float fogDrift)
-    {
-        EnsureAppConfigured();
-        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed, lightSeed: LightSeedFrom(mazeSeed));
-        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, smokeMode);
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 4 (volumetrics)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-        };
-
-        using var renderer = new Phase4Renderer(
-            Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
-            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: biomeIndicator);
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        form.Text = $"RayTracer.Gpu — Phase 4 — {renderer.AdapterName} — {smokeMode} — {built.PackedLights.Count} lights — seed {mazeSeed}";
-
-        // Autonomous maze walk (as Phase 3): motion drives the reset lifecycle,
-        // TAA, and the moving-path half-step volumetric march.
-        CameraController controller = built.CreateCameraController();
-        controller.StillTime = 1.5f;
-        controller.MoveTime = 0.9f;
-        controller.TurnTime = 0.7f;
-        Camera camera = built.Camera;
-        var clock = Stopwatch.StartNew();
-        double lastSeconds = 0;
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            double now = clock.Elapsed.TotalSeconds;
-            float dt = (float)Math.Min(now - lastSeconds, 0.1); // clamp large hitches
-            lastSeconds = now;
-
-            controller.Dirty = false;
-            controller.Update(dt, camera);
-            bool moving = controller.Dirty;
-
-            renderer.SetCamera(camera);
-            renderer.SetFogTime((float)(now * fogDrift)); // rolls the fog over time
-            renderer.RenderFrame(reset: frame == 0, moving: moving);
-            frame++;
-            Application.DoEvents();
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                Console.WriteLine($"Rendered {frame} Phase 4 frame(s) without error " +
-                    $"({smokeMode} smoke, clamp={sampleClamp:0.##}, fog-drift={fogDrift:0.##}).");
-                break;
-            }
-        }
-
-        return 0;
-    }
 
     /// <summary>
     /// Headless Phase 4 validation, mirroring the Phase 3 self-test with
@@ -832,102 +563,6 @@ internal static class Program
     private static readonly Phase5DebugMode[] DebugModes =
         (Phase5DebugMode[])Enum.GetValues(typeof(Phase5DebugMode));
 
-    private static int RunPhase5Windowed(
-        int maxFrames, float sampleClamp, SmokeMode smokeMode, int mazeSeed, bool biomeIndicator,
-        float fogDrift, Phase5DebugMode debugMode)
-    {
-        EnsureAppConfigured();
-        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed, lightSeed: LightSeedFrom(mazeSeed));
-        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, smokeMode);
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 5 (debug views)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-            KeyPreview = true,
-        };
-
-        using var renderer = new Phase5Renderer(
-            Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
-            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: biomeIndicator, debugMode: debugMode);
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        // Live debug-view switching: number keys 0-8 select a view directly, and
-        // Left/Right (or Space/Tab) cycle. The title shows the active view so the
-        // single --phase5 profile can explore every AOV without a rebuild.
-        // Title shows the active view + the on-GPU reduction's frame stats.
-        void UpdateTitle()
-        {
-            Phase5Stats st = renderer.FrameStats;
-            form.Text = $"RayTracer.Gpu — Phase 5 — [{(int)renderer.DebugMode}] {renderer.DebugMode} — " +
-                $"spp {st.AverageEffectiveSpp:0.0}/{st.MaxObservedSampleCount} — var {st.AverageVariance:0.0000} — " +
-                $"clamp {st.ClampedPixelPercent:0.0}% — rej {st.RejectedHistoryPercent:0.0}% — " +
-                $"seed {mazeSeed}  (0-9 / ←→ to switch)";
-        }
-        form.KeyDown += (_, e) =>
-        {
-            int digit = -1;
-            if (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.D9) digit = e.KeyCode - Keys.D0;
-            else if (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) digit = e.KeyCode - Keys.NumPad0;
-
-            if (digit >= 0 && digit < DebugModes.Length)
-                renderer.DebugMode = DebugModes[digit];
-            else if (e.KeyCode is Keys.Right or Keys.Space or Keys.Tab)
-                renderer.DebugMode = DebugModes[((int)renderer.DebugMode + 1) % DebugModes.Length];
-            else if (e.KeyCode == Keys.Left)
-                renderer.DebugMode = DebugModes[((int)renderer.DebugMode + DebugModes.Length - 1) % DebugModes.Length];
-            UpdateTitle();
-        };
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        UpdateTitle();
-
-        // Autonomous maze walk (as Phase 3/4): motion drives the reset lifecycle,
-        // TAA, the half-step volumetric march, and the temporal debug signals.
-        CameraController controller = built.CreateCameraController();
-        controller.StillTime = 1.5f;
-        controller.MoveTime = 0.9f;
-        controller.TurnTime = 0.7f;
-        Camera camera = built.Camera;
-        var clock = Stopwatch.StartNew();
-        double lastSeconds = 0;
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            double now = clock.Elapsed.TotalSeconds;
-            float dt = (float)Math.Min(now - lastSeconds, 0.1); // clamp large hitches
-            lastSeconds = now;
-
-            controller.Dirty = false;
-            controller.Update(dt, camera);
-            bool moving = controller.Dirty;
-
-            renderer.SetCamera(camera);
-            renderer.SetFogTime((float)(now * fogDrift));
-            renderer.RenderFrame(reset: frame == 0, moving: moving);
-            frame++;
-            if (frame % 10 == 0) UpdateTitle(); // refresh the live stats read-out
-            Application.DoEvents();
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                Phase5Stats st = renderer.FrameStats;
-                Console.WriteLine($"Rendered {frame} Phase 5 frame(s) without error " +
-                    $"({smokeMode} smoke, view={renderer.DebugMode}, clamp={sampleClamp:0.##}) — " +
-                    $"stats: spp {st.AverageEffectiveSpp:0.0}/{st.MaxObservedSampleCount}, " +
-                    $"var {st.AverageVariance:0.0000}, clamp {st.ClampedPixelPercent:0.0}%, rej {st.RejectedHistoryPercent:0.0}%.");
-                break;
-            }
-        }
-
-        return 0;
-    }
 
     /// <summary>
     /// Headless Phase 5 validation. Part A renders frame 0 in Beauty mode and
@@ -1143,8 +778,8 @@ internal static class Program
     // ── Phase 6: productization (resize, device-removed recovery, fullscreen) ──
 
     /// <summary>
-    /// Windowed Phase 6 renderer — the shared body of both the productized default app
-    /// (<see cref="RunApp"/>) and the <c>--phase6</c> dev demo. Renders the same
+    /// Windowed Phase 6 renderer — the GPU backend of the productized default app
+    /// (<see cref="RunConfigApp"/>) and the screensaver. Renders the same
     /// autonomous maze walk as Phase 5 (identical shaders / image) on the productized
     /// <see cref="Phase6Renderer"/> with a resizable window, a fullscreen-borderless
     /// toggle (F11), and device-removed recovery. Esc leaves fullscreen (or closes when
@@ -1155,7 +790,7 @@ internal static class Program
         bool biomeIndicator, float fogDrift, Phase5DebugMode debugMode, bool startFullscreen, int mazeSize = 16,
         RenderStyle style = RenderStyle.Enhanced, bool regenerate = false, MazeProps.Options? props = null,
         bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, bool showBuildIn = false,
-        bool showOutro = false)
+        bool showOutro = false, bool classicDepthCue = false, int pixelSize = 1)
     {
         EnsureAppConfigured();
         // Classic look: unlit fullbright spectral (LightingMode.None) with smoke off —
@@ -1179,7 +814,9 @@ internal static class Program
             width, height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: lighting, sampleClamp: sampleClamp,
             biomeIndicator: biomeIndicator, debugMode: debugMode, bumpyWalls: bumpyWalls,
-            showOverheadMap: showOverheadMap, showRat: showRat);
+            showOverheadMap: showOverheadMap, showRat: showRat,
+            classicDepthCue: classic && classicDepthCue ? ClassicMode.DepthCueStrength : 0f,
+            pixelSize: classic ? pixelSize : 1);
 
         bool running = true;
         form.FormClosed += (_, _) => running = false;
@@ -1387,7 +1024,8 @@ internal static class Program
     private static int RunPhase6Capture(
         SmokeMode smokeMode, int frames, string savePath, float sampleClamp, int mazeSeed,
         Phase5DebugMode debugMode, float walkSeconds, RenderStyle style, MazeProps.Options? props = null,
-        bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, float reveal = -1f)
+        bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, float reveal = -1f,
+        float depthCue = 0f, int pixelate = 1)
     {
         if (frames <= 0) frames = 200; // enough samples to converge a clean still
         bool classic = style == RenderStyle.Classic;
@@ -1415,7 +1053,8 @@ internal static class Program
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: lighting, sampleClamp: sampleClamp,
             biomeIndicator: false, debugMode: debugMode, bumpyWalls: bumpyWalls,
-            showOverheadMap: showOverheadMap, showRat: showRat);
+            showOverheadMap: showOverheadMap, showRat: showRat,
+            classicDepthCue: classic ? depthCue : 0f, pixelSize: pixelate);
         renderer.Initialize(windowHandle: 0);
         if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
         if (reveal >= 0f) renderer.SetRevealHeight(reveal); // §9.3 frozen build-in still
@@ -1441,28 +1080,36 @@ internal static class Program
     // ── The productized app: config setup, then run ───────────────────
 
     /// <summary>
-    /// The default launch — the finished product. Like the original app's
-    /// <c>CalibrationForm → RayForm</c> flow, it shows a setup dialog first (resolution,
-    /// smoke mode, starting view, maze size, motion knobs — persisted across runs), then
-    /// runs the full renderer (the productized Phase 6 pipeline, which folds in every
-    /// phase: spectral shading, NEE + indirect lighting, the temporal denoiser,
-    /// volumetrics, debug views, and resize / fullscreen / device-recovery). Exit from
-    /// the dialog quits without running.
+    /// The default launch — the finished product. Shows the unified <see cref="ConfigForm"/>
+    /// (pick the GPU or CPU renderer plus every option for it, persisted across runs), then
+    /// runs the chosen backend: <b>GPU</b> → the productized Phase 6 pipeline (spectral
+    /// shading, NEE + indirect lighting, the temporal denoiser, volumetrics, debug views,
+    /// resize / fullscreen / device-recovery); <b>CPU</b> → the software <see cref="RayForm"/>
+    /// via <see cref="CpuLauncher"/>. Exit from the dialog quits without running.
     /// </summary>
-    private static int RunApp()
+    private static int RunConfigApp()
     {
         EnsureAppConfigured();
 
         AppSettings settings = AppSettings.Load();
-        using (var setup = new SetupDialog(settings))
+        RenderPreset cpuPreset;
+        using (var config = new ConfigForm(settings))
         {
-            if (setup.ShowDialog() != DialogResult.OK)
+            if (config.ShowDialog() != DialogResult.OK)
                 return 0; // user chose Exit
-            settings = setup.Result;
+            settings = config.Result;
+            cpuPreset = config.SelectedCpuPreset;
         }
         settings.Save();
 
-        // Fresh maze each run (like the original, which seeds from the clock).
+        // CPU backend: build the maze scene and run the software renderer.
+        if (settings.Backend == RenderBackend.Cpu)
+        {
+            CpuLauncher.Run(cpuPreset);
+            return 0;
+        }
+
+        // GPU backend: fresh maze each run (like the original, which seeds from the clock).
         int mazeSeed = Random.Shared.Next();
         return RunPhase6Windowed(
             settings.Width, settings.Height, maxFrames: 0, sampleClamp: settings.SampleClamp,
@@ -1475,37 +1122,45 @@ internal static class Program
                 : null,
             bumpyWalls: settings.BumpyWalls, showOverheadMap: settings.ShowOverheadMap,
             showRat: settings.ShowRat, showBuildIn: settings.MazeBuildInAnim,
-            showOutro: settings.MazeOutroAnim);
+            showOutro: settings.MazeOutroAnim, classicDepthCue: settings.ClassicDepthCue,
+            pixelSize: settings.RetroPixelation ? ClassicMode.RetroBlockFor(settings.Height) : 1);
     }
 
     /// <summary>
-    /// Constructs the setup dialog and reads back its defaults without showing it — a
+    /// Constructs the config screen and reads back its defaults without showing it — a
     /// non-interactive check that the config UI builds (control layout, enum binding)
-    /// and that <see cref="SetupDialog.Result"/> round-trips the incoming settings. Needs
+    /// and that <see cref="ConfigForm.Result"/> round-trips the incoming settings. Needs
     /// a desktop session (WinForms), so it is a dev-box check, not CI.
     /// </summary>
     private static int RunSetupSelfTest()
     {
         EnsureAppConfigured();
-        Console.WriteLine("RayTracer.Gpu — setup dialog self-test");
+        Console.WriteLine("RayTracer.Gpu — config screen self-test");
 
         var input = new AppSettings
         {
+            Backend = RenderBackend.Cpu,
             Width = 1920, Height = 1080, Fullscreen = true, Style = RenderStyle.Classic,
             SmokeMode = SmokeMode.AlwaysFog, StartView = Phase5DebugMode.Normal, MazeSize = 20,
+            CpuPreset = "High", CpuThrottle = CpuThrottle.Half,
             ShowRat = false, ShowOpenGlLogo = false, ShowWallSigns = false, ShowOverheadMap = true,
-            BumpyWalls = false, MazeBuildInAnim = false, MazeRegenerate = false, MazeOutroAnim = false,
+            BumpyWalls = false, ClassicDepthCue = true, RetroPixelation = true,
+            MazeBuildInAnim = false, MazeRegenerate = false, MazeOutroAnim = false,
         };
-        using var dlg = new SetupDialog(input);
+        using var dlg = new ConfigForm(input);
         bool builds = dlg.Controls.Count > 0;
         // Before OK is clicked, Result mirrors the incoming settings (a clone).
-        bool roundTrips = dlg.Result.Width == input.Width && dlg.Result.Height == input.Height
+        bool roundTrips = dlg.Result.Backend == input.Backend
+            && dlg.Result.Width == input.Width && dlg.Result.Height == input.Height
             && dlg.Result.Fullscreen == input.Fullscreen && dlg.Result.Style == input.Style
             && dlg.Result.SmokeMode == input.SmokeMode
             && dlg.Result.StartView == input.StartView && dlg.Result.MazeSize == input.MazeSize
+            && dlg.Result.CpuPreset == input.CpuPreset && dlg.Result.CpuThrottle == input.CpuThrottle
             && dlg.Result.ShowRat == input.ShowRat && dlg.Result.ShowOpenGlLogo == input.ShowOpenGlLogo
             && dlg.Result.ShowWallSigns == input.ShowWallSigns && dlg.Result.ShowOverheadMap == input.ShowOverheadMap
-            && dlg.Result.BumpyWalls == input.BumpyWalls && dlg.Result.MazeBuildInAnim == input.MazeBuildInAnim
+            && dlg.Result.BumpyWalls == input.BumpyWalls && dlg.Result.ClassicDepthCue == input.ClassicDepthCue
+            && dlg.Result.RetroPixelation == input.RetroPixelation
+            && dlg.Result.MazeBuildInAnim == input.MazeBuildInAnim
             && dlg.Result.MazeRegenerate == input.MazeRegenerate && dlg.Result.MazeOutroAnim == input.MazeOutroAnim;
 
         Console.WriteLine($"  [{(builds ? "ok" : "FAIL")}] dialog builds ({dlg.Controls.Count} controls)");
@@ -1872,43 +1527,4 @@ internal static class Program
         return SmokeMode.Biome;
     }
 
-    // maxFrames == 0 means run until the window is closed.
-    private static int RunWindowed(int maxFrames)
-    {
-        EnsureAppConfigured();
-
-        using var form = new Form
-        {
-            Text = "RayTracer.Gpu — Phase 0 (inline RayQuery)",
-            ClientSize = new Size(Width, Height),
-            FormBorderStyle = FormBorderStyle.FixedSingle,
-            MaximizeBox = false,
-        };
-
-        using var renderer = new GpuRayTracer(Width, Height);
-        bool initialized = false;
-        bool running = true;
-        form.FormClosed += (_, _) => running = false;
-
-        form.Show();
-        renderer.Initialize(form.Handle);
-        initialized = true;
-        form.Text = $"RayTracer.Gpu — Phase 0 — {renderer.AdapterName}";
-
-        uint frame = 0;
-        while (running && form.Created)
-        {
-            if (initialized)
-                renderer.RenderFrame(frame++);
-            Application.DoEvents();
-
-            if (maxFrames > 0 && frame >= (uint)maxFrames)
-            {
-                Console.WriteLine($"Rendered {frame} frame(s) to the swap chain without error.");
-                break;
-            }
-        }
-
-        return 0;
-    }
 }

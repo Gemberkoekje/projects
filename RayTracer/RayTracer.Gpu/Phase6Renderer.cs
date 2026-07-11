@@ -135,6 +135,8 @@ internal sealed class Phase6Renderer : IDisposable
     private readonly bool _showOverheadMap;
     // Animated rat billboard (plan §8): world position updated each frame by the host.
     private readonly bool _showRat;
+    private readonly float _classicDepthCue; // §1.4 classic depth-cue strength (0 = off)
+    private readonly int _pixelSize;         // §1.5 retro pixelation block edge in pixels (≤1 = off)
     private Vector3 _ratPos;
     // Build-in reveal height (plan §9.3): large ⇒ no cull (walls fully built).
     private float _revealHeight = 1e9f;
@@ -163,6 +165,8 @@ internal sealed class Phase6Renderer : IDisposable
     private ID3D12Resource _reduceConstantBuffer = null!;
     private ID3D12RootSignature _reduceRootSignature = null!;
     private ID3D12PipelineState _reducePipeline = null!;
+    private ID3D12RootSignature _pixelateRootSignature = null!; // §1.5 retro pixelation
+    private ID3D12PipelineState _pixelatePipeline = null!;
 
     // Ping-pong TAA history (index 0/1 selected per frame).
     private readonly ID3D12Resource[] _historyXyz = new ID3D12Resource[2];
@@ -192,7 +196,8 @@ internal sealed class Phase6Renderer : IDisposable
         uint motionSampleCap = 20, float temporalBlendAlpha = 0.1f,
         uint filterRadius = 1, bool biomeIndicator = false,
         Phase5DebugMode debugMode = Phase5DebugMode.Beauty, bool bumpyWalls = false,
-        bool showOverheadMap = false, bool showRat = false)
+        bool showOverheadMap = false, bool showRat = false, float classicDepthCue = 0f,
+        int pixelSize = 1)
     {
         _width = width;
         _height = height;
@@ -207,6 +212,8 @@ internal sealed class Phase6Renderer : IDisposable
         _bumpyWalls = bumpyWalls;
         _showOverheadMap = showOverheadMap;
         _showRat = showRat;
+        _classicDepthCue = classicDepthCue;
+        _pixelSize = Math.Max(1, pixelSize);
         _maxSampleCount = maxSampleCount;
         _subPixelJitter = subPixelJitter;
         _motionSampleCap = motionSampleCap;
@@ -254,7 +261,7 @@ internal sealed class Phase6Renderer : IDisposable
         public float RatPosX, RatPosY, RatPosZ, RatSize;     // §8 rat billboard
         public uint ShowRat, RatLayer;                        // §8
         public float FadeLevel;                               // §9.4 outro fade
-        public uint RPad3;
+        public float ClassicDepthCue;                         // §1.4 classic depth-cue strength (0 = off)
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -640,6 +647,26 @@ internal sealed class Phase6Renderer : IDisposable
             RootSignature = _reduceRootSignature,
             ComputeShader = reduceBytecode,
         });
+
+        // §1.5 retro pixelation: an in-place post-pass on the resolved Output image. Its root
+        // signature is just the Output UAV table (u3, reusing the resolve's descriptor heap
+        // slot) plus 3 root constants (Width, Height, BlockSize) — no per-frame buffer.
+        var pixelateOutputTable = new DescriptorRange1(DescriptorRangeType.UnorderedAccessView, 1, 3); // u3
+        var pixelateParams = new[]
+        {
+            new RootParameter1(new RootDescriptorTable1(pixelateOutputTable), ShaderVisibility.All), // 0: Output (u3)
+            new RootParameter1(new RootConstants(0, 0, 3), ShaderVisibility.All),                    // 1: PixelateConstants (b0)
+        };
+        _pixelateRootSignature = _device.CreateRootSignature(
+            new RootSignatureDescription1(RootSignatureFlags.None, pixelateParams));
+
+        byte[] pixelateBytecode = ShaderCompiler.CompileCompute(
+            LoadShaderSource("PixelatePhase6.hlsl"), "CSMain", "PixelatePhase6.hlsl");
+        _pixelatePipeline = _device.CreateComputePipelineState(new ComputePipelineStateDescription
+        {
+            RootSignature = _pixelateRootSignature,
+            ComputeShader = pixelateBytecode,
+        });
     }
 
     private static string LoadShaderSource(string fileName)
@@ -955,6 +982,7 @@ internal sealed class Phase6Renderer : IDisposable
             RatPosZ = _ratPos.Z,
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
+            ClassicDepthCue = _classicDepthCue,
             RatLayer = (uint)DecalLayer.Rat,
             FadeLevel = _fadeLevel,
         };
@@ -1046,6 +1074,24 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.Dispatch(1, 1, 1); // single group strides over all pixels
     }
 
+    // §1.5 retro pixelation post-pass: replaces each pixel with its block-centre pixel in place
+    // on Output (see PixelatePhase6.hlsl for why the in-place read/write is race-free). Only
+    // recorded when _pixelSize > 1.
+    private void RecordPixelate()
+    {
+        _commandList.SetDescriptorHeaps(_uavHeap);
+        _commandList.SetComputeRootSignature(_pixelateRootSignature);
+        _commandList.SetPipelineState(_pixelatePipeline);
+        _commandList.SetComputeRootDescriptorTable(0, _uavHeap.GetGPUDescriptorHandleForHeapStart());
+        _commandList.SetComputeRoot32BitConstant(1, (uint)_width, 0);
+        _commandList.SetComputeRoot32BitConstant(1, (uint)_height, 1);
+        _commandList.SetComputeRoot32BitConstant(1, (uint)_pixelSize, 2);
+
+        uint groupsX = (uint)((_width + 7) / 8);
+        uint groupsY = (uint)((_height + 7) / 8);
+        _commandList.Dispatch(groupsX, groupsY, 1);
+    }
+
     private void RecordTraceResolveReduce()
     {
         RecordTrace();
@@ -1063,6 +1109,15 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.ResourceBarrierUnorderedAccessView(_clampHitFrameBuffer);
 
         RecordResolve();
+
+        // §1.5 retro pixelation: chunk the freshly resolved Output in place. Skipped entirely
+        // when off (block ≤ 1), so the presented image is bit-identical to the resolve result.
+        if (_pixelSize > 1)
+        {
+            _commandList.ResourceBarrierUnorderedAccessView(_outputTexture);
+            RecordPixelate();
+            _commandList.ResourceBarrierUnorderedAccessView(_outputTexture);
+        }
 
         _commandList.ResourceBarrierUnorderedAccessView(_historyWeightBuffer);
         _commandList.ResourceBarrierUnorderedAccessView(_rejectedBuffer);
@@ -1314,6 +1369,8 @@ internal sealed class Phase6Renderer : IDisposable
         _resolveConstantBuffer?.Dispose();
         _traceConstantBuffer?.Dispose();
         DisposeSizeDependentResources();
+        _pixelatePipeline?.Dispose();
+        _pixelateRootSignature?.Dispose();
         _reducePipeline?.Dispose();
         _reduceRootSignature?.Dispose();
         _statsReadback?.Dispose();

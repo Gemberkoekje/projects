@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using RayTracer;
 
@@ -14,6 +15,13 @@ namespace RayTracer.Gpu;
 /// views are checked. Because the trace RNG is deterministic and the accumulation
 /// order is fixed, the same GPU reproduces each image run-to-run, so the tolerance can
 /// be tight (it only absorbs driver-level FP jitter, pitfall P4).
+///
+/// <para>On top of the Enhanced base scene it also renders a set of <b>Classic-mode
+/// variants</b> (plan §10) — the unlit look plus the emboss (§6.3), depth cue (§1.4),
+/// retro pixelation (§1.5), build-in reveal (§9.3), overhead map (§7) and rat (§8) —
+/// as Beauty goldens under <c>golden/classic/</c>, so a change to any of those Classic
+/// features shows up as a regression. Each feature is off in the base scene, so the
+/// Enhanced goldens stay bit-identical.</para>
 ///
 /// <para><c>--phase6-regress</c> compares (fails on any regression or missing golden);
 /// <c>--phase6-regress --update</c> (re-)writes the goldens. Goldens live under
@@ -35,9 +43,31 @@ internal static class RegressionHarness
     private static readonly Phase5DebugMode[] DebugModes =
         (Phase5DebugMode[])Enum.GetValues(typeof(Phase5DebugMode));
 
+    // Classic-mode Beauty variants (plan §10). Each toggles one Classic feature on the same
+    // deterministic scene / start camera, so the golden pins that feature's look.
+    private sealed record Variant(
+        string Name, bool Bumpy = false, bool DepthCue = false, int PixelSize = 1,
+        bool Map = false, bool Rat = false, float Reveal = -1f, bool Props = false);
+
+    // Fixed props seed so the sign placement (and hence the golden) is reproducible.
+    private const int PropsSeed = 12345;
+
+    private static readonly Variant[] ClassicVariants =
+    {
+        new("classic"),                                    // plain unlit look
+        new("emboss",   Bumpy: true),                      // §6.3 unlit brick emboss
+        new("depthcue", Bumpy: true, DepthCue: true),      // §1.4 depth-cue tone curve
+        new("pixelate", PixelSize: 3),                     // §1.5 retro pixelation
+        new("props",    Props: true),                      // §4/§5 decals: start-cell floor logo
+        new("buildin",  Reveal: MazeGeometryBuilder.WallHeight * 0.5f), // §9.3 mid-reveal
+        new("map",      Map: true),                        // §7 overhead minimap overlay
+        new("rat",      Rat: true),                        // §8 rat billboard
+    };
+
     public static int Run(bool update, string? dirOverride)
     {
         string dir = dirOverride ?? DefaultGoldenDir();
+        string classicDir = Path.Combine(dir, "classic");
         Console.WriteLine($"RayTracer.Gpu — Phase 6 regression harness ({(update ? "UPDATE goldens" : "compare")})");
         Console.WriteLine($"  golden dir: {dir}");
 
@@ -57,55 +87,106 @@ internal static class RegressionHarness
             renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
 
         if (update)
+        {
             Directory.CreateDirectory(dir);
+            Directory.CreateDirectory(classicDir);
+        }
 
         int failures = 0, compared = 0;
+
+        // ── Enhanced base scene: every debug view (unchanged golden set) ──
         foreach (Phase5DebugMode mode in DebugModes)
         {
             renderer.DebugMode = mode;
             renderer.RenderHeadlessFrame(reset: false, moving: false);
             byte[] img = renderer.ReadbackOutput();
-            string path = Path.Combine(dir, $"{mode}.png");
+            CompareOrUpdate(img, Path.Combine(dir, $"{mode}.png"), update, mode.ToString(), ref failures, ref compared);
+        }
 
-            if (update)
-            {
-                Program.SavePng(img, Width, Height, path);
-                Console.WriteLine($"  wrote {mode,-16} -> {Path.GetFileName(path)}");
-                continue;
-            }
-
-            if (!File.Exists(path))
-            {
-                Console.WriteLine($"  {mode,-16}: MISSING golden ({Path.GetFileName(path)}) — run --update");
-                failures++;
-                continue;
-            }
-
-            byte[] golden = LoadPngRgba(path, out int gw, out int gh);
-            compared++;
-            if (gw != Width || gh != Height)
-            {
-                Console.WriteLine($"  {mode,-16}: size mismatch (golden {gw}x{gh}) — FAIL");
-                failures++;
-                continue;
-            }
-
-            (double within, double meanAbs, int maxDiff) = Compare(img, golden);
-            bool pass = within >= MinWithinTolFraction && meanAbs < MaxMeanAbs;
-            Console.WriteLine($"  {mode,-16}: within {WithinTol}/255 {within:P2}, mean|Δ| {meanAbs:0.00}, max {maxDiff} " +
-                $"[{(pass ? "ok" : "REGRESSED")}]");
-            if (!pass) failures++;
+        // ── Classic-mode variants: Beauty golden per feature (plan §10) ──
+        foreach (Variant v in ClassicVariants)
+        {
+            byte[] img = RenderClassicVariantBeauty(v);
+            CompareOrUpdate(img, Path.Combine(classicDir, $"{v.Name}.png"), update, "classic/" + v.Name, ref failures, ref compared);
         }
 
         if (update)
         {
-            Console.WriteLine($"  wrote {DebugModes.Length} golden image(s). Commit them as the regression baseline.");
+            Console.WriteLine($"  wrote {DebugModes.Length + ClassicVariants.Length} golden image(s). Commit them as the regression baseline.");
             return 0;
         }
 
         bool overall = failures == 0 && compared > 0;
         Console.WriteLine($"  overall              : {(overall ? "PASS" : "FAIL")} ({compared} compared, {failures} failing)");
         return overall ? 0 : 1;
+    }
+
+    // Renders one Classic-mode variant's Beauty view from the deterministic start camera,
+    // converged, so its golden pins that feature. Each variant builds its own renderer since
+    // the Classic features are constructor-time (lighting/bump/depth-cue/pixel) or post-init
+    // uniforms (reveal/map/rat).
+    private static byte[] RenderClassicVariantBeauty(Variant v)
+    {
+        Phase3Scene built = Phase3Scene.Build(Width, Height, // same fixed default seeds
+            props: v.Props ? new MazeProps.Options(Seed: PropsSeed) : null);
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        Camera cam = ClassicMode.WithClassicFov(built.Camera);
+
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, cam,
+            volumetrics, lightingMode: LightingMode.None, sampleClamp: 0f,
+            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty,
+            bumpyWalls: v.Bumpy, showOverheadMap: v.Map, showRat: v.Rat,
+            classicDepthCue: v.DepthCue ? ClassicMode.DepthCueStrength : 0f,
+            pixelSize: v.PixelSize);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(cam);
+        if (v.Map) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
+        if (v.Reveal >= 0f) renderer.SetRevealHeight(v.Reveal);
+        if (v.Rat)
+        {
+            // Place the rat a few units ahead on the floor so it is in frame (mirrors the capture).
+            Vector3 fwd = Vector3.Transform(Vector3.UnitZ, cam.Rotation);
+            renderer.SetRatPosition(cam.Position + fwd * 2.6f - new Vector3(0, cam.Position.Y - 0.25f, 0));
+        }
+
+        for (int f = 0; f < ConvergeFrames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        return renderer.ReadbackOutput();
+    }
+
+    // Writes (update) or compares one image against its golden, tallying failures/compared.
+    private static void CompareOrUpdate(
+        byte[] img, string path, bool update, string label, ref int failures, ref int compared)
+    {
+        if (update)
+        {
+            Program.SavePng(img, Width, Height, path);
+            Console.WriteLine($"  wrote {label,-20} -> {Path.GetFileName(path)}");
+            return;
+        }
+
+        if (!File.Exists(path))
+        {
+            Console.WriteLine($"  {label,-20}: MISSING golden ({Path.GetFileName(path)}) — run --update");
+            failures++;
+            return;
+        }
+
+        byte[] golden = LoadPngRgba(path, out int gw, out int gh);
+        compared++;
+        if (gw != Width || gh != Height)
+        {
+            Console.WriteLine($"  {label,-20}: size mismatch (golden {gw}x{gh}) — FAIL");
+            failures++;
+            return;
+        }
+
+        (double within, double meanAbs, int maxDiff) = Compare(img, golden);
+        bool pass = within >= MinWithinTolFraction && meanAbs < MaxMeanAbs;
+        Console.WriteLine($"  {label,-20}: within {WithinTol}/255 {within:P2}, mean|Δ| {meanAbs:0.00}, max {maxDiff} " +
+            $"[{(pass ? "ok" : "REGRESSED")}]");
+        if (!pass) failures++;
     }
 
     // Fraction of RGB channels within WithinTol, mean absolute channel diff (0-255),

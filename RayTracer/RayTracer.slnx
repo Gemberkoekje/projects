@@ -10,9 +10,7 @@
   </Folder>
   <Project Path=".net.csproj" />
   <Project Path="Benchmark/Benchmarks.csproj" />
-  <Project Path="ConsoleApp1/ConsoleApp1.csproj" />
   <Project Path="RayTracer.Core/RayTracer.csproj" />
   <Project Path="RayTracer.Gpu/RayTracer.Gpu.csproj" />
   <Project Path="RayTracer.Tests/RayTracer.Tests.csproj" />
-  <Project Path="RayTracer/RayTracer.App.csproj" />
 </Solution>

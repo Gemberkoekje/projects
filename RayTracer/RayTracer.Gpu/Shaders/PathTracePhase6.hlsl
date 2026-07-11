@@ -135,6 +135,45 @@ float BevelFactor(float u, float w, float tilesAcross, float tilesDown, float be
     return 0.4 + 0.6 * smoothT;
 }
 
+// Unlit brick emboss for Classic mode (plan §6.3). Fullbright shading (LightingMode.None)
+// has no dot(N,L), so the BrickBumpNormal perturbation (further down) is invisible — the
+// mortar relief the original screensaver's "bumpy walls" showed would vanish. Fake it here by
+// modulating the brick attenuation with a fixed virtual key direction: the same bevel
+// micro-facet tilt BrickBumpNormal builds, dotted with a world-space key light, brightens the
+// near shoulder of each groove and darkens the far one. Returns a multiplier centred on 1.0
+// (== 1.0 on the flat brick face and mortar bottom, so only the bevels are touched). Only
+// called in unlit mode, so the lit Enhanced path stays bit-identical.
+float BrickEmboss(PrimitiveInfo prim, float3 hitPoint)
+{
+    float3 l1 = float3(prim.L1X, prim.L1Y, prim.L1Z);
+    float3 e1 = float3(prim.E1X, prim.E1Y, prim.E1Z);
+    float3 e2 = float3(prim.E2X, prim.E2Y, prim.E2Z);
+    float3 rel = hitPoint - l1;
+    float u = dot(rel, e1) * prim.InvEdge1LenSq;
+    float w = dot(rel, e2) * prim.InvEdge2LenSq;
+
+    float brickU = u * prim.P0;
+    float brickV = w * prim.P1;
+    int rowi = (int)floor(brickV);
+    float offsetU = brickU + (((rowi % 2) == 0) ? 0.0 : 0.5);
+    float cellU = frac(offsetU);
+    float cellV = frac(brickV);
+    float mortarU = prim.P2, mortarV = prim.P3;
+
+    // Same tangent-space slope BrickBumpNormal uses: +1 on the low edge, -1 on the high edge.
+    float su = (cellU < mortarU) ? 1.0 : ((cellU > 1.0 - mortarU) ? -1.0 : 0.0);
+    float sv = (cellV < mortarV) ? 1.0 : ((cellV > 1.0 - mortarV) ? -1.0 : 0.0);
+    if (su == 0.0 && sv == 0.0)
+        return 1.0; // flat face / mortar bottom — no relief
+
+    // World-space bevel tilt · a fixed top-left key = normalize(-1, 2, -1). The relief is
+    // consistent across walls of any orientation because both vectors live in world space.
+    float3 tilt = su * normalize(e1) + sv * normalize(e2);
+    const float3 keyDir = float3(-0.40825, 0.81650, -0.40825);
+    const float embossStrength = 0.35;
+    return 1.0 + embossStrength * dot(normalize(tilt), keyDir);
+}
+
 void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint row, out float atten)
 {
     float3 l1 = float3(prim.L1X, prim.L1Y, prim.L1Z);
@@ -159,6 +198,11 @@ void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint r
             atten *= 0.6;
             row = prim.MatSecondary;
         }
+        // §6.3 Classic-mode emboss: in unlit fullbright the bump normal can't affect a
+        // dot(N,L), so fake the mortar relief into the attenuation. Lit modes keep the real
+        // BrickBumpNormal perturbation (below) and stay bit-identical — this branch is skipped.
+        if (BumpyWalls != 0u && LightingMode == 0u)
+            atten *= BrickEmboss(prim, hitPoint);
     }
     else if (prim.Pattern == 2u) // ceiling tile
     {

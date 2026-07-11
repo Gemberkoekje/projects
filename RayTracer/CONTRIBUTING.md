@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - .NET 10 SDK
-- Windows environment for running the WinForms app (`RayTracer`)
+- Windows environment for running the WinForms app (`RayTracer.Gpu`); the GPU backend needs a DXR 1.1 GPU
 
 ## Build
 
@@ -21,7 +21,15 @@ dotnet test RayTracer.Tests/RayTracer.Tests.csproj --configuration Release
 ## Run app
 
 ```powershell
-dotnet run --project RayTracer/RayTracer.App.csproj --configuration Release
+dotnet run --project RayTracer.Gpu --configuration Release
+```
+
+The default launch opens the config screen, where you pick the **GPU** or **CPU**
+renderer and its options, then Start. Headless self-tests (dev box with a GPU):
+
+```powershell
+dotnet run --project RayTracer.Gpu -c Release -- --phase6-selftest
+dotnet run --project RayTracer.Gpu -c Release -- --setup-selftest
 ```
 
 ## Run benchmarks (optional)

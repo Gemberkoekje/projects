@@ -4,19 +4,24 @@ using System.Drawing.Imaging;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace MiniRay;
+namespace RayTracer.Gpu;
 
-static class Program
+/// <summary>
+/// Builds the CPU maze scene and runs the software <see cref="RayForm"/> renderer.
+/// Invoked when the unified <see cref="ConfigForm"/> selects the CPU backend — the
+/// GPU equivalent is <c>Program.RunPhase6Windowed</c>. Mirrors the original CPU
+/// app's <c>Program.Main</c>, minus the CalibrationForm benchmark (the config
+/// screen now picks the <see cref="RenderPreset"/> directly).
+/// </summary>
+internal static class CpuLauncher
 {
-    [STAThread]
-    static void Main()
+    public static void Run(RenderPreset preset)
     {
-        ApplicationConfiguration.Initialize();
+        Program.EnsureAppConfigured();
 
-        // ── Build the maze scene (shared between calibration and gameplay) ──
+        // ── Build the maze scene ──
         var materials = new MaterialsLookup();
-        // Use a non-deterministic seed by default so each run produces a
-        // different maze. This can be made configurable in the UI later.
+        // Non-deterministic seed so each run produces a different maze.
         var maze = new Maze(16, 16, seed: Environment.TickCount);
 
         MaterialData? goalMaterial = null;
@@ -37,37 +42,13 @@ static class Program
 
         var lights = MazeGeometryBuilder.BuildLights(
             maze,
-            lightSpawnChance: 0.4f,  // 40% of cells get ceiling lights (reduced from 70%)
+            lightSpawnChance: 0.4f,  // 40% of cells get ceiling lights
             biomeSize: 4,             // 4×4 cell torch biomes
             seed: Environment.TickCount);
 
-        // Camera starting point (used for both calibration and gameplay).
-        float cs = MazeGeometryBuilder.CellSize;
-        float wh = MazeGeometryBuilder.WallHeight;
-        float eyeHeight = wh * 0.5f;
-        Vector3 camPos = new(cs * 0.5f, eyeHeight, cs * 0.5f);
-
-        var benchCamera = new Camera
-        {
-            Position = camPos,
-            Rotation = CameraController.HeadingToQuaternion(Direction.South),
-            Fov = MathF.PI / 3f,
-            Aspect = 4f / 3f,
-            ImgPlaneZ = 1f
-        };
-
-        // ── Calibrate and let the user pick a quality preset ──
-        using var calibForm = new CalibrationForm(scene, benchCamera, lights);
-        if (calibForm.ShowDialog() != DialogResult.OK)
-            return;
-
-        var preset = calibForm.ChosenPreset;
-
-        // ── Launch the maze with the chosen settings ──
+        // ── Launch the maze with the chosen preset ──
         Application.Run(new RayForm(preset, scene, maze, lights));
     }
-
-
 }
 
 public class RayForm : Form

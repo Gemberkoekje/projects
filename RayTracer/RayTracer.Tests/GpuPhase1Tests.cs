@@ -15,7 +15,7 @@ public class GpuPhase1Tests
 {
     private const int DeterministicCount = 50;
 
-    // Build a small, deterministic maze scene mirroring MiniRay.Program's setup.
+    // Build a small, deterministic maze scene mirroring the CPU app's setup (CpuLauncher).
     private static (Tracable[] scene, WavelengthLookup wl, PackedScene packed, SpectralResources res) BuildScene()
     {
         var materials = new MaterialsLookup();

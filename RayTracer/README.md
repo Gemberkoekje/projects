@@ -25,10 +25,11 @@ The renderer currently implements the following features:
 
 Project layout
 
-- `RayTracer/` (application)
-  - `Program.cs` - application entry point for the UI app.
-  - `CalibrationForm.cs` - UI for calibration controls and runtime settings.
-  - other UI glue code and resources for the app.
+- `RayTracer.Gpu/` (the single application, WinForms)
+  - `Program.cs` - entry point; the default launch opens the config screen, and headless `--*-selftest` / `--phase6-regress` switches remain for validation.
+  - `ConfigForm.cs` - the unified config screen: pick the GPU or CPU renderer plus all options, then Start.
+  - `CpuRenderForm.cs` - the CPU software renderer (`RayForm`) and its launcher.
+  - `Phase1..6Renderer.cs`, `Screensaver.cs` - the GPU DXR renderers and the screensaver runtime.
 
 - `RayTracer.Core/` (core rendering library)
   - `JobSystem.cs` - tile-based worker system, accumulation, TAA, filtering, debug views and the main tracing loop.
@@ -50,8 +51,6 @@ Project layout
 - `Benchmark/` (benchmarks)
   - micro-benchmarks and experimental harnesses, e.g. `BVHBenchmark.cs`, `TracableRectangle.cs`, and a small `readme.md` describing benchmark usage.
 
-- `ConsoleApp1/` - small console app (sample/test harness).
-
 Key files and what they do (short)
 
 - `RayTracer.Core/JobSystem.cs`
@@ -66,8 +65,8 @@ Key files and what they do (short)
 - `RayTracer.Core/Camera.cs` and `CameraController.cs`
   - Camera data (position/rotation/projection) and interactive camera control code used by the application.
 
-- `RayTracer/Program.cs` and `CalibrationForm.cs`
-  - App startup and the form used to tweak render settings at runtime.
+- `RayTracer.Gpu/Program.cs` and `ConfigForm.cs`
+  - App startup and the unified config screen (GPU/CPU backend + all render settings).
 
 - `RayTracer.Tests/*` and `Benchmark/*`
   - Unit tests and simple benchmarking tools for validating and measuring performance of the core systems.
@@ -76,7 +75,7 @@ Building and running
 
 - Build everything: `dotnet build` from the repository root.
 - Run unit tests: `dotnet test`.
-- Run the UI application in Visual Studio (open solution and use the IDE). The `RayTracer.App` project is the application project (see `RayTracer\RayTracer.App.csproj`).
+- Run the application: `dotnet run --project RayTracer.Gpu` (or open the solution in the IDE). The default launch shows the config screen where you choose the GPU or CPU renderer; `RayTracer.Gpu` is the single application project.
 - Run benchmarks: `dotnet run --project Benchmark\Benchmarks.csproj` (or open the `Benchmark` project in your IDE).
 
 Notes

@@ -221,7 +221,7 @@ internal static class Screensaver
 
     private static int RunConfig(AppSettings settings)
     {
-        using var dialog = new SetupDialog(settings);
+        using var dialog = new ConfigForm(settings, gpuOnly: true);
         if (dialog.ShowDialog() == DialogResult.OK)
             dialog.Result.Save();
         return 0;
@@ -249,7 +249,9 @@ internal static class Screensaver
             width, height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: classic ? LightingMode.None : LightingMode.NEE,
             sampleClamp: s.SampleClamp, biomeIndicator: false, debugMode: Phase5DebugMode.Beauty,
-            bumpyWalls: s.BumpyWalls, showOverheadMap: s.ShowOverheadMap, showRat: s.ShowRat);
+            bumpyWalls: s.BumpyWalls, showOverheadMap: s.ShowOverheadMap, showRat: s.ShowRat,
+            classicDepthCue: classic && s.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
+            pixelSize: classic && s.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
     }
 
     // The autonomous maze-walk loop shared by /s and /p (mirrors RunPhase6Windowed's

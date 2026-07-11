@@ -5,7 +5,7 @@ namespace RayTracer.Gpu;
 
 /// <summary>
 /// Builds the maze scene, camera, and GPU resources for Phase 1, mirroring the
-/// CPU app's setup (<c>MiniRay.Program</c>) so the GPU render can be compared
+/// CPU app's setup (<c>CpuLauncher</c>) so the GPU render can be compared
 /// against the CPU reference.
 /// </summary>
 internal sealed class Phase1Scene

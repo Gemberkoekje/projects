@@ -3,10 +3,9 @@
 ## Solution map
 
 - `RayTracer.Core` (`net10.0`): rendering engine, geometry, lighting, sampling, diagnostics.
-- `RayTracer` (`net10.0-windows`): WinForms application host and UI.
+- `RayTracer.Gpu` (`net10.0-windows`): the single application executable — a WinForms host with the unified GPU/CPU config screen (`ConfigForm`), the GPU DXR renderers (Phase 1–6), the CPU software renderer (`RayForm` in `CpuRenderForm.cs`), and the screensaver. The default launch shows the config screen; a handful of headless `--*-selftest` / `--phase6-regress` switches remain for validation.
 - `RayTracer.Tests` (`net10.0`): MSTest test suite.
-- `Benchmark` (`net10.0`): BenchmarkDotNet performance harness.
-- `ConsoleApp1` (`net10.0`): auxiliary console sandbox.
+- `Benchmark` (`net10.0`): BenchmarkDotNet performance harness (dev-only).
 - `.net.csproj`: repo-level tooling/analyzer aggregation project.
 
 ## `RayTracer.Core` domain folders

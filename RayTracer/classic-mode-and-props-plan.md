@@ -27,9 +27,10 @@ The forked Phase 6 shaders keep the validated Beauty path **bit-identical (Phase
 100 %)** whenever a feature is toggled off.
 
 **Default launch** (no args) shows the setup dialog (look, resolution, fullscreen, smoke,
-start view, maze size, fog-drift, firefly clamp, and the eight prop/anim toggles — all
-persisted to `%APPDATA%\RayTracer.Gpu\settings.json`), then runs. The screensaver switches
-`/s`, `/p <hwnd>`, `/c` use the same settings.
+start view, maze size, fog-drift, firefly clamp, the eight prop/anim toggles, and the two
+Classic authenticity toggles — depth cue (§1.4) and retro pixelation (§1.5), enabled only when
+the Classic look is selected — all persisted to `%APPDATA%\RayTracer.Gpu\settings.json`), then
+runs. The screensaver switches `/s`, `/p <hwnd>`, `/c` use the same settings.
 
 **Feature flags** (on the `--phase6` windowed walk and the `--phase6 … --save out.png`
 capture):
@@ -45,6 +46,8 @@ capture):
 | `--buildin` | Walls rise from the floor at each maze start (§9.3) |
 | `--outro` | Fade to black on completion before regenerating (§9.4) |
 | `--seed N`, `--frames N`, `--fullscreen` | reproducible maze / bounded run / fullscreen |
+| `--depthcue K` | Classic depth-cue darkening rate (§1.4, capture; windowed reads the setting) |
+| `--pixelate N` | Retro pixelation block edge in pixels (§1.5, capture; windowed reads the setting) |
 | capture only: `--reveal H`, `--walk S`, `--debug <view>` | frozen build-in height / walk-in / debug view |
 
 **Dev-box self-tests:** `--phase6-selftest` (Beauty parity + resize + recovery),
@@ -162,9 +165,24 @@ opt-in so Classic-mode-with-them-off is still "spectral, just unlit."
       (+ `--phase6 --classic` test flag): `LightingMode.None`, volumetrics off, wider FOV
       (`ClassicMode.WithClassicFov`, ~90°). **Done & GPU-verified** (see capture). Palette
       pinning + walk cadence tuning remain a follow-up refinement.
-- [ ] **1.3** Goal = OpenGL logo (depends on §4).
-- [ ] **1.4** (optional) classic depth-cue tone curve in `ResolvePhase5.hlsl`, gated.
-- [ ] **1.5** (optional) retro low-res/nearest-neighbour present path, gated.
+- [x] **1.3** Goal = OpenGL logo — delivered by §4.2 (`MazeProps` places the logo on the
+      goal-cell floor); with `--classic --props` this is the Classic goal payoff.
+- [x] **1.4** Classic depth-cue tone curve in the forked `ResolvePhase6.hlsl` — a `ClassicDepthCue`
+      uniform applies an `exp(−k·hitDist)` display-space darkening in the **Beauty branch only**, so
+      unlit corridors fade toward dark with distance. Gated Classic-unlit + opt-in (default off):
+      `ClassicMode.DepthCueStrength` (0.15, tuned on the RTX 3070) drives `AppSettings.ClassicDepthCue`
+      → dialog checkbox (enabled only when Classic is selected) → `Phase6Renderer`; `--phase6 --classic
+      --depthcue <k>` tunes it for captures. Enhanced/lit + all debug views untouched (Phase 6 self-test
+      700/700; `--setup-selftest` round-trips the toggle). **Done & GPU-verified** (0.08/0.15/0.25 A/B).
+- [x] **1.5** Retro pixelation — a `PixelatePhase6.hlsl` compute post-pass runs **in place** on the
+      resolved Output: each pixel takes its `BlockSize×BlockSize` cell-centre pixel, so the beauty
+      reads as a chunky nearest-neighbour low-res upscale (block-centre pixels read/write themselves
+      unchanged → the in-place read/write is race-free; verified on the RTX 3070). New minimal PSO
+      (Output UAV table + 3 root constants), dispatched only when block > 1 so Output is bit-identical
+      when off (Phase 6 self-test 700/700). `ClassicMode.RetroBlockFor(height)` keeps the chunkiness
+      resolution-independent (~240 lines) behind `AppSettings.RetroPixelation` (dialog checkbox, Classic
+      only); `--phase6 --classic --pixelate <N>` tunes the block for captures. **Done & GPU-verified**
+      (block 2/3/4 A/B).
 - [x] **1.6** Dev-box capture: `RunPhase6Capture` (`--phase6 [--classic] --save out.png
       [--walk S] [--frames N]`); Classic vs Enhanced A/B confirmed on the RTX 3070.
 
@@ -297,8 +315,12 @@ perturbation** from the brick height field — no displacement, so silhouettes a
   - [x] **6.2** Perturbed normal drives the **direct-lighting** cosine (`SelectLight`); the
         geometric normal is kept for the G-buffer, shadow/secondary ray offsets, and indirect
         cosine sampling. GPU-verified (mortar bevels catch the light — see bump on/off A/B).
-  - [ ] **6.3** (optional) unlit emboss term for Classic mode — deferred (bump reads only in
-        lit/Enhanced mode for now).
+  - [x] **6.3** Unlit emboss term for Classic mode — `BrickEmboss` folds a fixed top-left
+        virtual-key relief into the brick `atten`, gated `BumpyWalls && LightingMode == None`
+        so the lit/Enhanced path is bit-identical (the emboss branch is unreachable when lit —
+        Phase 6 self-test stays 700/700). GPU-verified: mortar grooves emboss (raised bricks,
+        recessed mortar, top-left key, consistent across wall orientations) in unlit Classic
+        via `--phase6 --classic --bumpy` A/B on the RTX 3070. **Done.**
   - [x] **6.4** `bumpyWalls` through `AppSettings.BumpyWalls` → dialog → `Phase6Renderer`
         (cbuffer `BumpyWalls`, repurposed from a pad) + `--phase6 --bumpy`. **Done.**
 
@@ -457,22 +479,27 @@ A short transition on reaching the goal, before regenerating:
 
 | Feature | CI unit test | Dev-box selftest | Golden image |
 |---|---|---|---|
-| Classic preset | reuses Phase 1 `None` parity | ✅ `--phase6-selftest` 100% w/ features off | ⬜ classic golden |
+| Classic preset | reuses Phase 1 `None` parity | ✅ `--phase6-selftest` 100% w/ features off | ✅ `classic/classic` |
 | RGB→reflectance basis | ✅ `RgbToReflectanceBasisTests` (round-trip) | ✅ visual capture | — |
-| Decal shading (logo/signs) | basis pinned ✅; `DecalReference` parity ⬜ | ✅ visual capture | ⬜ |
-| Bumpy walls | perturbed-normal reference ⬜ | ✅ bump on/off A/B | ⬜ |
-| Overhead map | ✅ `MazeMinimapTests` (grid math) | ✅ visual capture | ⬜ |
-| Rat billboard | projection/occlusion parity ⬜ | ✅ visual capture | ⬜ |
-| Maze lifecycle | ✅ `CameraControllerTests` goal detection | ✅ `--regen-selftest` (6 mazes) | ⬜ |
+| Decal shading (logo/signs) | basis pinned ✅; `DecalReference` parity ⬜ | ✅ visual capture | ✅ `classic/props` |
+| Bumpy walls | perturbed-normal reference ⬜ | ✅ bump on/off A/B (lit + classic emboss) | ✅ `classic/emboss` |
+| Classic depth cue (§1.4) | — (resolve tone term) | ✅ 0.08/0.15/0.25 A/B | ✅ `classic/depthcue` |
+| Retro pixelation (§1.5) | — (in-place post-pass) | ✅ block 2/3/4 A/B | ✅ `classic/pixelate` |
+| Overhead map | ✅ `MazeMinimapTests` (grid math) | ✅ visual capture | ✅ `classic/map` |
+| Rat billboard | projection/occlusion parity ⬜ | ✅ visual capture | ✅ `classic/rat` |
+| Maze lifecycle | ✅ `CameraControllerTests` goal detection | ✅ `--regen-selftest` (6 mazes) | ✅ `classic/buildin` (mid-reveal) |
 | Settings/toggles | ✅ `--setup-selftest`/`--screensaver-selftest` round-trip | — | — |
 
 **Done:** the four CI unit tests above (200 total), all dev-box self-tests (`--phase6-selftest`
-stays 100% with every feature off), and the visual captures for every feature. **Remaining
-(dev-box follow-up):** golden-image regression captures — extend `--phase6-regress` to cover
-Classic, each prop, and a fixed-`--reveal` build-in frame (reproducible via `--seed`); and the
-optional bit-parity `DecalReference` / bump-normal / rat-projection references (the basis and
-minimap math are already unit-tested, and the shaders are visually validated + parity-safe
-when off). All GPU self-tests remain dev-box-only (RTX 3070, DXR 1.1) — see
+stays 100% with every feature off), the visual captures for every feature, and the
+**golden-image regression coverage** — `--phase6-regress` now renders the Enhanced base scene
+(all 11 debug views, unchanged goldens) **plus eight Classic-mode Beauty variants** (`classic`,
+`emboss`, `depthcue`, `pixelate`, `props`, `buildin`, `map`, `rat`) under
+`RayTracer.Gpu/Regression/golden/classic/`, all reproducing bit-exact on the RTX 3070 (19
+compared, mean |Δ| 0.00). **Remaining (optional):** the bit-parity `DecalReference` /
+bump-normal / rat-projection CPU references (the basis and minimap math are already
+unit-tested, the goldens now pin the shader output, and every feature is parity-safe when
+off). All GPU self-tests remain dev-box-only (RTX 3070, DXR 1.1) — see
 [`memory/gpu-devbox-local.md`].
 
 ---

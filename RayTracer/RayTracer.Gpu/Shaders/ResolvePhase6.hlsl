@@ -56,7 +56,7 @@ cbuffer ResolveConstants : register(b0)
     uint   MazeGw;       uint  MazeGh; uint PlayerGx; uint PlayerGy;         // §7 minimap dims + player cell
     float4 CurrCamRot;                                                       // §8 rat projection
     float3 RatPos;       float RatSize;                                      // §8 rat billboard
-    uint   ShowRat;      uint  RatLayer; float FadeLevel; uint _rpad3;       // §8 rat, §9.4 outro fade
+    uint   ShowRat;      uint  RatLayer; float FadeLevel; float ClassicDepthCue; // §8 rat, §9.4 fade, §1.4 depth cue
 };
 
 // ── Spatial (box) filter — mirrors JobSystem.ResolveFilteredXYZ ─────────
@@ -487,6 +487,13 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         float4 fog = FogIn[ix];
         float3 withFog = resolved * fog.w + fog.xyz;
         outColor = ResolveToSRGB(withFog);
+        // §1.4/§2.3 Classic depth cue: a deliberately non-physical, display-space darkening
+        // that falls off exponentially with the primary hit distance, so the unlit fullbright
+        // corridors fade toward dark down their length like the original screensaver. Opt-in
+        // (ClassicDepthCue == 0 disables it) and Beauty-only, so the debug views and the
+        // Enhanced/lit path are untouched. Background (no hit) keeps full brightness.
+        if (ClassicDepthCue > 0.0 && currentHit)
+            outColor *= exp(-ClassicDepthCue * length(currentHitPoint - CurrCamPos));
     }
 
     outColor = ApplyRat(outColor, tid.xy);
