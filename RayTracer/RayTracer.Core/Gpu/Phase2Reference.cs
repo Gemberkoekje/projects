@@ -203,7 +203,7 @@ public static class Phase2Reference
 
             uint specularRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
             Vector3 specularXyz = SpecularRadiance(
-                tracer, prims, res, lights, lighting, (SurfaceKind)prim.Surface, specularRefl, prim.Ior,
+                tracer, prims, res, lights, lighting, (SurfaceKind)prim.Surface, specularRefl, IorAtHero(prim, res, heroIdx),
                 hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false);
 
             float specularCorrection = res.DeterministicCorrection;
@@ -318,6 +318,20 @@ public static class Phase2Reference
     public const int MaxSpecularBounces = 8;
 
     /// <summary>
+    /// The primitive's index of refraction at the hero wavelength — the GPU replica of
+    /// <c>MaterialData.IorAt</c> for dispersion (spectral-effects-plan §2.1). The base
+    /// IOR (<c>Cauchy A</c>) rides in <see cref="GpuPrimitive.Ior"/> and the dispersion
+    /// coefficient (<c>Cauchy B</c>) in <see cref="GpuPrimitive.CauchyB"/>; a non-dispersive
+    /// material (<c>CauchyB == 0</c>) yields the constant <see cref="GpuPrimitive.Ior"/>.
+    /// </summary>
+    private static float IorAtHero(GpuPrimitive prim, SpectralResources res, uint heroIdx)
+    {
+        if (prim.CauchyB == 0f) return prim.Ior;
+        float um = res.DeterWavelengths[heroIdx] * 1e-3f;
+        return prim.Ior + prim.CauchyB / (um * um);
+    }
+
+    /// <summary>
     /// Scalar spectral radiance at the hero wavelength arriving back along a
     /// specular ray: each mirror/dielectric hit interacts and recurses (up to
     /// <see cref="MaxSpecularBounces"/>); the first diffuse hit is shaded diffusely;
@@ -338,7 +352,7 @@ public static class Phase2Reference
 
         var surface = (SurfaceKind)prim.Surface;
         if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
-            return SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, prim.Ior,
+            return SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, IorAtHero(prim, res, heroIdx),
                 hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass);
 
         // Terminal diffuse hit → CIE-weighted XYZ (the GPU port does not model smoke in

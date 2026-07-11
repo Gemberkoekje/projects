@@ -46,6 +46,8 @@ internal static class Program
         bool phase6 = args.Contains("--phase6", StringComparer.OrdinalIgnoreCase);
         bool mirrorDemo = args.Contains("--mirror-demo", StringComparer.OrdinalIgnoreCase);
         bool glassDemo = args.Contains("--glass-demo", StringComparer.OrdinalIgnoreCase);
+        bool prismDemo = args.Contains("--prism-demo", StringComparer.OrdinalIgnoreCase);
+        bool jewelDemo = args.Contains("--jewel-demo", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
@@ -61,7 +63,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
-            || mirrorDemo || glassDemo
+            || mirrorDemo || glassDemo || prismDemo || jewelDemo
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -82,6 +84,12 @@ internal static class Program
                     (uint)ParseIntOption(args, "--motion-cap", 12), args.Contains("--pan", StringComparer.OrdinalIgnoreCase));
             if (glassDemo)
                 return RunGlassDemo(maxFrames, savePath ?? "glass-demo.png", sampleClamp, mazeSeed);
+            if (prismDemo)
+                return RunPrismDemo(maxFrames, savePath ?? "prism-demo.png", sampleClamp,
+                    ParseFloatOption(args, "--cauchyb", 0.06f));
+            if (jewelDemo)
+                return RunJewelDemo(maxFrames, savePath ?? "jewel-demo.png", sampleClamp, mazeSeed,
+                    ParseFloatOption(args, "--cauchyb", 0.05f));
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -809,6 +817,7 @@ internal static class Program
             lightSeed: LightSeedFrom(mazeSeed), props: props,
             mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
             windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed),
+            jewels: new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed),
             wallThickness: 0.12f);
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
             VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
@@ -1313,6 +1322,206 @@ internal static class Program
             if (d < best) { best = d; center = c; normal = q.QuadNormal; }
         }
         return best < float.MaxValue;
+    }
+
+    /// <summary>
+    /// Headless dispersion demo (spectral-effects-plan §2.1): a triangular glass prism
+    /// with an exaggerated Cauchy-B dispersion coefficient stands between the camera and a
+    /// wall split into a brightly-lit white half and a dark half. Because the prism's index
+    /// of refraction now varies with the ray's wavelength, each hero wavelength refracts by
+    /// a different angle, so the vertical bright/dark boundary seen <em>through</em> the
+    /// prism fans out into a rainbow band — the classic prism spectrum — while the same
+    /// boundary seen directly beside the prism stays a crisp black/white edge. Converges a
+    /// still through the shipping Phase 6 pipeline and writes a PNG.
+    /// </summary>
+    private static int RunPrismDemo(int frames, string savePath, float sampleClamp, float cauchyB)
+    {
+        if (frames <= 0) frames = 900; // dispersion is hero-only (1 wavelength/sample) → noisy; converge hard
+        Console.WriteLine($"RayTracer.Gpu — prism dispersion demo ({frames} frames, CauchyB {cauchyB}) -> {savePath}");
+
+        const float H = 3.0f;      // room height
+        const float midY = 1.5f;   // eye / prism mid-height
+        const float backZ = 7.0f;  // background wall
+        const float split = 0.3f;  // x of the white|dark boundary on the back wall
+
+        var white = FlatDiffuse("prism-white", 0.95f);
+        var dark = FlatDiffuse("prism-dark", 0.02f);
+        var floorMat = FlatDiffuse("prism-floor", 0.20f);
+        var prismGlass = new MaterialData(
+            "prism-glass", "Prism", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.98f, cauchyA: 1.5f, cauchyB: cauchyB);
+
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -1f, backZ + 0.5f, floorMat),
+            FloorQuad(H, -6f, 6f, -1f, backZ + 0.5f, floorMat),          // ceiling
+            WallZ(backZ, -6f, split, 0f, H, white),                      // bright half
+            WallZ(backZ, split, 6f, 0f, H, dark),                        // dark half
+        };
+
+        // Vertical triangular prism (floor→ceiling), apex toward the camera so a ray entering
+        // a slanted front face and leaving the base is deviated — and dispersed — sideways.
+        Vector3 apex = new(0.0f, 0f, 2.6f);
+        Vector3 bl = new(-0.75f, 0f, 3.8f);
+        Vector3 br = new(0.75f, 0f, 3.8f);
+        AddPrismFace(scene, apex, br, H, prismGlass);
+        AddPrismFace(scene, apex, bl, H, prismGlass);
+        AddPrismFace(scene, bl, br, H, prismGlass);
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(0.95f, midY, 0.2f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0.0f, midY, backZ), worldUp),
+            Fov = MathF.PI / 4f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        var lights = new List<Light>
+        {
+            new() { Position = new Vector3(-3.0f, H * 0.75f, backZ - 1.2f), Color = Vector3.One },
+            new() { Position = new Vector3(-1.2f, H * 0.75f, backZ - 3.0f), Color = Vector3.One },
+            new() { Position = new Vector3(1.5f, H * 0.75f, 2.0f), Color = Vector3.One }, // fill on the prism/near side
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless demo of the maze's floating faceted crystals (<see cref="MazeJewels"/>,
+    /// spectral-effects-plan §2.1): builds the maze with jewels, stands the camera in the
+    /// cell of the jewel nearest the start looking across at it, back-lights it so light
+    /// bending through the dispersive glass splits into colour, converges a still through
+    /// the shipping Phase 6 pipeline, and writes a PNG.
+    /// </summary>
+    private static int RunJewelDemo(int frames, string savePath, float sampleClamp, int mazeSeed, float cauchyB)
+    {
+        if (frames <= 0) frames = 700; // dispersion is hero-only (1 wavelength/sample) → noisy
+        Console.WriteLine($"RayTracer.Gpu — jewel demo ({frames} frames, seed {mazeSeed}, CauchyB {cauchyB}) -> {savePath}");
+
+        var jewels = new MazeJewels.Options(Chance: 0.16f, Seed: mazeSeed, CauchyB: cauchyB);
+        var props = new MazeProps.Options(Logo: true, Signs: true, Seed: mazeSeed);
+
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, jewels: jewels, wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        float cs = probe.CellSize;
+        Vector3 startCenter = new(cs * 0.5f, eye, cs * 0.5f);
+
+        // Nearest jewel to the start (jewel placement is deterministic given the seed).
+        Vector3 jewelCenter = default;
+        float best = float.MaxValue;
+        bool found = false;
+        foreach (var (c, _) in MazeJewels.Placements(probe.Maze, jewels))
+        {
+            float d = Vector3.DistanceSquared(new Vector3(c.X, startCenter.Y, c.Z), startCenter);
+            if (d < best) { best = d; jewelCenter = c; found = true; }
+        }
+
+        Camera camera = probe.Camera;
+        var extraLights = new List<Light>();
+        if (found)
+        {
+            Vector3 worldUp = new(0, 1, 0);
+            // Stand back in an adjacent open cell (through a passage) so the jewel reads as a
+            // distinct floating crystal rather than filling the frame — the cell is only one
+            // unit wide, so there is no room to step back within it.
+            int gx = (int)MathF.Floor(jewelCenter.X / cs);
+            int gy = (int)MathF.Floor(jewelCenter.Z / cs);
+            Vector3 dir = new(0, 0, -1); // fallback
+            if (!probe.Maze.HasWall(gx, gy, Wall.North)) dir = new Vector3(0, 0, -1);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.South)) dir = new Vector3(0, 0, 1);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.West)) dir = new Vector3(-1, 0, 0);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.East)) dir = new Vector3(1, 0, 0);
+
+            Vector3 pos = new(jewelCenter.X + dir.X * cs * 1.25f, eye, jewelCenter.Z + dir.Z * cs * 1.25f);
+            camera = new Camera
+            {
+                Position = pos,
+                Rotation = LookRotation(pos, jewelCenter, worldUp),
+                Fov = MathF.PI / 4.5f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            // Back-light behind the jewel (light bending through it → "fire") plus a near fill.
+            extraLights.Add(new Light { Position = jewelCenter - dir * cs * 0.8f + new Vector3(0, 0.5f, 0), Color = Vector3.One });
+            extraLights.Add(new Light { Position = pos + new Vector3(0, 0.8f, 0), Color = Vector3.One });
+        }
+        else
+        {
+            Console.WriteLine("  (no jewel found — using default camera)");
+        }
+
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, jewels: jewels,
+            extraLights: extraLights, wallThickness: 0.12f);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    // A vertical glass face of the prism: a quad from floor point a to floor point b, raised by height.
+    private static void AddPrismFace(List<Tracable> scene, Vector3 a, Vector3 b, float height, MaterialData mat)
+        => scene.Add(new TracableRectangle((a, b, a + new Vector3(0, height, 0)), mat));
+
+    // A quad in the z = zPlane plane spanning [x0,x1] × [y0,y1].
+    private static TracableRectangle WallZ(float zPlane, float x0, float x1, float y0, float y1, MaterialData mat)
+        => new((new Vector3(x0, y0, zPlane), new Vector3(x1, y0, zPlane), new Vector3(x0, y1, zPlane)), mat);
+
+    // A horizontal quad at height y spanning [x0,x1] × [z0,z1].
+    private static TracableRectangle FloorQuad(float y, float x0, float x1, float z0, float z1, MaterialData mat)
+        => new((new Vector3(x0, y, z0), new Vector3(x1, y, z0), new Vector3(x0, y, z1)), mat);
+
+    private static MaterialData FlatDiffuse(string id, float reflectance)
+        => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, FlatSpectrum(reflectance), SurfaceKind.Diffuse);
+
+    private static SpectralData FlatSpectrum(float value)
+    {
+        const int min = 360, max = 830, step = 5;
+        int count = (max - min) / step + 1;
+        var wavelengths = new int[count];
+        var values = new float[count];
+        for (int i = 0; i < count; i++)
+        {
+            wavelengths[i] = min + i * step;
+            values[i] = value;
+        }
+        return new SpectralData(wavelengths, values, (float[])values.Clone());
     }
 
     // ── The productized app: config setup, then run ───────────────────

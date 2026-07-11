@@ -31,10 +31,10 @@ public sealed class GlassRefractionTests
     private static MaterialData Diffuse(string id, SpectralData spectrum)
         => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, spectrum, SurfaceKind.Diffuse);
 
-    private static MaterialData Glass(string id, float ior)
+    private static MaterialData Glass(string id, float ior, float cauchyB = 0f)
         => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
             spectralData: null, surface: SurfaceKind.Dielectric,
-            transmission: 0.95f, cauchyA: ior, cauchyB: 0f);
+            transmission: 0.95f, cauchyA: ior, cauchyB: cauchyB);
 
     // A large quad at z = zPlane, geometric normal facing −Z (toward a camera at the origin).
     private static TracableRectangle Wall(float zPlane, MaterialData material)
@@ -85,6 +85,39 @@ public sealed class GlassRefractionTests
     {
         Assert.IsTrue(Optics.IsSpecular(SurfaceKind.Dielectric));
         Assert.IsTrue(Optics.IsWavelengthDependent(SurfaceKind.Dielectric));
+    }
+
+    /// <summary>
+    /// Dispersion (spectral-effects-plan §2.1): a glass with a positive Cauchy B
+    /// coefficient has a higher index of refraction toward the blue end, so blue light
+    /// bends more than red at the same interface — the two wavelengths fan apart. This
+    /// pins the exact chain the render path uses: the IOR is resolved from the ray's
+    /// wavelength (<see cref="MaterialData.IorAt"/>) and the ray is bent with
+    /// <see cref="Optics.Refract"/> — the specular integrator does nothing more.
+    /// </summary>
+    [TestMethod]
+    public void DispersiveGlass_RefractsBlueMoreThanRed()
+    {
+        var glass = Glass("prism", ior: 1.5f, cauchyB: 0.01f);
+        float nBlue = glass.IorAt(430f);
+        float nRed = glass.IorAt(680f);
+        Assert.IsTrue(nBlue > nRed + 1e-3f, $"Blue should see a higher IOR than red (blue {nBlue}, red {nRed}).");
+
+        // Oblique ray crossing air → glass.
+        Vector3 incident = Vector3.Normalize(new Vector3(MathF.Sin(0.7f), 0f, MathF.Cos(0.7f)));
+        Vector3 normal = new(0f, 0f, -1f); // surface faces the incoming ray
+
+        Assert.IsTrue(Optics.Refract(incident, normal, 1f, nBlue, out Vector3 rBlue));
+        Assert.IsTrue(Optics.Refract(incident, normal, 1f, nRed, out Vector3 rRed));
+
+        // Higher-IOR blue bends toward the normal more, so it deviates from the incident
+        // direction further than red does.
+        float devBlue = MathF.Acos(Math.Clamp(Vector3.Dot(rBlue, incident), -1f, 1f));
+        float devRed = MathF.Acos(Math.Clamp(Vector3.Dot(rRed, incident), -1f, 1f));
+        Assert.IsTrue(devBlue > devRed + 1e-3f, $"Blue must bend more than red (devBlue {devBlue}, devRed {devRed}).");
+
+        float spread = MathF.Acos(Math.Clamp(Vector3.Dot(rBlue, rRed), -1f, 1f));
+        Assert.IsTrue(spread > 1e-3f, $"Blue and red should fan into different directions (spread {spread} rad).");
     }
 
     /// <summary>

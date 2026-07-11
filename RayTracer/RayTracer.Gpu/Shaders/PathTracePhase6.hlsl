@@ -40,7 +40,7 @@ struct PrimitiveInfo
     float P0; float P1; float P2; float P3;
     uint  Surface;        // SurfaceKind of the primary material (0 diffuse, 1 mirror, 2 dielectric)
     float Ior;            // index of refraction (constant / base Cauchy A) for dielectrics
-    float Pad2;
+    float CauchyB;        // Cauchy B dispersion coefficient (µm²); IOR = Ior + CauchyB / λ_µm²  (§2.1)
 };
 
 RaytracingAccelerationStructure Scene              : register(t0);
@@ -930,8 +930,13 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
 
         if (prim.Surface == SURFACE_DIELECTRIC && depth < MAX_SPECULAR_BOUNCES)
         {
-            float iorFrom = inGlass ? prim.Ior : 1.0;
-            float iorTo   = inGlass ? 1.0 : prim.Ior;
+            // Dispersion (§2.1): the IOR varies with the hero wavelength (Cauchy n = A + B/λ²),
+            // so each accumulated wavelength refracts by a different angle. The hero wavelength
+            // (nm) rides in DeterXYZ[heroIdx].w; CauchyB == 0 leaves n == prim.Ior (non-dispersive).
+            float um = DeterXYZ[heroIdx].w * 1e-3;   // hero wavelength in µm
+            float n = prim.Ior + prim.CauchyB / (um * um);
+            float iorFrom = inGlass ? n : 1.0;
+            float iorTo   = inGlass ? 1.0 : n;
             float cosI = abs(dot(normalize(dir), hitNormal));
             float R = FresnelDielectric(cosI, iorFrom, iorTo);
             float3 refr;

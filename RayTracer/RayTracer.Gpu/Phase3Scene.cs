@@ -28,6 +28,7 @@ internal sealed class Phase3Scene
         MazeProps.Options? props = null,
         MazeMirrors.Options? mirrors = null,
         MazeWindows.Options? windows = null,
+        MazeJewels.Options? jewels = null,
         IReadOnlyList<Light>? extraLights = null,
         float wallThickness = 0f)
     {
@@ -93,6 +94,16 @@ internal sealed class Phase3Scene
                 sillMaterial: grid, wallThickness: wallThickness);
             if (windowQuads.Count > 0)
                 tracables = [.. tracables, .. windowQuads];
+        }
+
+        // Floating faceted crystals — the maze's dispersive signature object
+        // (spectral-effects-plan §2.1). Gated the same way: null for fixed-seed
+        // self-test / golden scenes so those stay bit-exact.
+        if (jewels is not null)
+        {
+            List<Tracable> jewelQuads = MazeJewels.Build(maze, jewels);
+            if (jewelQuads.Count > 0)
+                tracables = [.. tracables, .. jewelQuads];
         }
 
         Light[] lights = MazeGeometryBuilder.BuildLights(

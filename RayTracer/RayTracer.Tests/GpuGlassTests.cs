@@ -33,9 +33,9 @@ public sealed class GpuGlassTests
     private static MaterialData Diffuse(string id, SpectralData spectrum)
         => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, spectrum, SurfaceKind.Diffuse);
 
-    private static MaterialData Glass(string id, float ior)
+    private static MaterialData Glass(string id, float ior, float cauchyB = 0f)
         => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
-            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.95f, cauchyA: ior, cauchyB: 0f);
+            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.95f, cauchyA: ior, cauchyB: cauchyB);
 
     private static TracableRectangle Wall(float zPlane, MaterialData material)
     {
@@ -50,9 +50,9 @@ public sealed class GpuGlassTests
         Tracable[] Tracables, PackedScene Packed, SpectralResources Res,
         Light[] Lights, Vector3[] LightPositions, Camera Camera);
 
-    private static Scene Build()
+    private static Scene Build(float cauchyB = 0f)
     {
-        var glass = Glass("glass", ior: 1.5f);
+        var glass = Glass("glass", ior: 1.5f, cauchyB: cauchyB);
         var wall = Diffuse("wall", Spectrum(w => 0.05f + 0.80f * Math.Clamp((w - 500f) / 150f, 0f, 1f)));
 
         var scene = new Tracable[] { Wall(2f, glass), Wall(6f, wall) };
@@ -119,9 +119,23 @@ public sealed class GpuGlassTests
     [TestMethod]
     [DataRow(LightingMode.NEE, DisplayName = "NEE")]
     [DataRow(LightingMode.None, DisplayName = "None")]
-    public void GlassShadeSample_MatchesTraceCore(LightingMode mode)
+    public void GlassShadeSample_MatchesTraceCore(LightingMode mode) => RunParity(Build(), mode);
+
+    /// <summary>
+    /// Dispersion parity (spectral-effects-plan §2.1): a strongly dispersive glass
+    /// (<c>CauchyB &gt; 0</c>) refracts each hero wavelength by a different angle, so the
+    /// refracted ray lands on a different part of the wall per wavelength. Both the CPU
+    /// renderer and the GPU replica resolve the IOR from the same hero wavelength
+    /// (<c>MaterialData.IorAt</c> vs <c>Phase2Reference.IorAtHero</c>), so they must still
+    /// agree per sample — this pins that the reference's wavelength-dependent IOR matches.
+    /// </summary>
+    [TestMethod]
+    [DataRow(LightingMode.NEE, DisplayName = "NEE")]
+    [DataRow(LightingMode.None, DisplayName = "None")]
+    public void DispersiveGlassShadeSample_MatchesTraceCore(LightingMode mode) => RunParity(Build(cauchyB: 0.02f), mode);
+
+    private static void RunParity(Scene s, LightingMode mode)
     {
-        var s = Build();
         var js = BuildGroundTruth(s, mode);
         var tracer = new BvhSceneTracer(s.Tracables, s.Res.DeterWavelengths[0]);
 

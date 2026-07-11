@@ -89,7 +89,7 @@ public static class SpectralResourceBaker
             deterXyz[i * 4 + 0] = xyz.X;
             deterXyz[i * 4 + 1] = xyz.Y;
             deterXyz[i * 4 + 2] = xyz.Z;
-            deterXyz[i * 4 + 3] = 0f;
+            deterXyz[i * 4 + 3] = wl; // hero wavelength (nm) rides the padding slot, for dispersion (§2.1)
         }
 
         var reflectance = new float[materials.Count * n];

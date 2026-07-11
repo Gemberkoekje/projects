@@ -72,6 +72,8 @@ public struct GpuPrimitive
     /// <summary>The primary material's index of refraction (constant / base Cauchy A),
     /// for dielectric refraction. 1 for non-refracting surfaces.</summary>
     public float Ior;
-    /// <summary>Padding.</summary>
-    public float Pad2;
+    /// <summary>The primary material's Cauchy B dispersion coefficient (µm²). The
+    /// wavelength-dependent IOR is <c>Ior + CauchyB / λ_µm²</c>; 0 = non-dispersive,
+    /// so the effective IOR is the constant <see cref="Ior"/>. (spectral-effects-plan §2.1)</summary>
+    public float CauchyB;
 }
