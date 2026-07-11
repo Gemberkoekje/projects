@@ -15,13 +15,16 @@ public static class Optics
     /// on the ray's wavelength. When a path touches one of these the integrator
     /// must fall back to hero-only single-wavelength sampling
     /// (spectral-effects-plan.md §0.3), since companion wavelengths would no
-    /// longer share the hero ray's geometry.
+    /// longer share the hero ray's geometry. Thin-film is deliberately excluded:
+    /// it is a reflectance-only modulation (§2.2) whose reflection geometry is
+    /// wavelength-independent, so companion wavelengths validly share the path and
+    /// each just re-evaluates the interference factor at its own λ.
     /// </summary>
     public static bool IsWavelengthDependent(SurfaceKind kind)
         => kind is SurfaceKind.Dielectric
-            or SurfaceKind.ThinFilm
             or SurfaceKind.Grating
-            or SurfaceKind.Fluorescent;
+            or SurfaceKind.Fluorescent
+            or SurfaceKind.Bubble;   // thin-film-tinted reflection → build the spectrum hero-only (§2.6)
 
     /// <summary>
     /// True for surfaces shaded by tracing a specular chain (mirror reflection or
@@ -29,7 +32,24 @@ public static class Optics
     /// specular-ray plumbing (spectral-effects-plan.md §1.1–§1.2).
     /// </summary>
     public static bool IsSpecular(SurfaceKind kind)
-        => kind is SurfaceKind.Mirror or SurfaceKind.Dielectric;
+        => kind is SurfaceKind.Mirror or SurfaceKind.Dielectric or SurfaceKind.Bubble;
+
+    /// <summary>
+    /// Beer–Lambert absorption coefficient σ (per world unit) at a wavelength, interpolated
+    /// from three anchors — red (630 nm), green (532 nm), blue (465 nm) — piecewise-linearly
+    /// (spectral-effects-plan §2.3). This is how a coloured glass/liquid gets its hue: it
+    /// absorbs the complement of its colour, so light travelling through it shifts hue and
+    /// darkens with distance via <c>exp(−σ(λ)·d)</c>. Shared by the CPU, the GPU reference,
+    /// and the HLSL shader so the tint matches.
+    /// </summary>
+    public static float AbsorptionAt(float sigmaRed, float sigmaGreen, float sigmaBlue, float wavelengthNm)
+    {
+        const float blue = 465f, green = 532f, red = 630f;
+        if (wavelengthNm <= blue) return sigmaBlue;
+        if (wavelengthNm <= green) return float.Lerp(sigmaBlue, sigmaGreen, (wavelengthNm - blue) / (green - blue));
+        if (wavelengthNm <= red) return float.Lerp(sigmaGreen, sigmaRed, (wavelengthNm - green) / (red - green));
+        return sigmaRed;
+    }
 
     /// <summary>
     /// Refracts <paramref name="incident"/> (pointing toward the surface) across
@@ -89,6 +109,58 @@ public static class Optics
         float rp = (iorFrom * cosThetaT - iorTo * cosThetaI) / (iorFrom * cosThetaT + iorTo * cosThetaI);
         return 0.5f * (rs * rs + rp * rp);
     }
+
+    /// <summary>
+    /// Two-beam thin-film interference reflectance factor in [0,1] at one wavelength
+    /// (spectral-effects-plan.md §2.2). A wave reflected off the top of a film of index
+    /// <paramref name="filmIor"/> and thickness <paramref name="filmThicknessNm"/>
+    /// interferes with the wave that travels through and reflects off the bottom; the two
+    /// are in phase (bright) where <c>2·n·d·cosθ_t</c> is an odd multiple of <c>λ/2</c>.
+    /// The result modulates a surface's base reflectance, so the reflected colour sweeps
+    /// the rainbow as the thickness or the view angle changes (goniochromism). Returns 1
+    /// (no modulation) for a zero-thickness film. <paramref name="cosThetaI"/> is the
+    /// cosine of the incidence angle in air; the angle inside the film follows from Snell.
+    /// </summary>
+    public static float ThinFilmReflectance(float cosThetaI, float wavelengthNm, float filmThicknessNm, float filmIor)
+    {
+        if (filmThicknessNm <= 0f) return 1f;
+
+        cosThetaI = Math.Clamp(MathF.Abs(cosThetaI), 0f, 1f);
+        float sinI2 = 1f - cosThetaI * cosThetaI;
+        float cosThetaT = MathF.Sqrt(MathF.Max(0f, 1f - sinI2 / (filmIor * filmIor)));
+
+        // Half the round-trip phase: δ/2 = 2π·n·d·cosθ_t / λ. Reflectance ∝ sin²(δ/2)
+        // (equal-amplitude two-beam interference with the π shift at the first interface).
+        float halfPhase = 2f * MathF.PI * filmIor * filmThicknessNm * cosThetaT / wavelengthNm;
+        float s = MathF.Sin(halfPhase);
+        return s * s;
+    }
+
+    /// <summary>
+    /// A smooth, world-position keyed swirl in roughly [-1,1] used to vary thin-film
+    /// thickness across a surface (the mottled bands of an oil slick, §2.2). A fixed sum
+    /// of sines so the CPU, the GPU reference, and the HLSL shader all agree bit-for-bit.
+    /// </summary>
+    public static float FilmSwirl(float x, float z)
+        => 0.55f * MathF.Sin(4.1f * x + 3.3f * z)
+         + 0.30f * MathF.Sin(2.7f * x - 5.2f * z + 1.3f)
+         + 0.15f * MathF.Sin(6.9f * x + 1.7f * z + 2.9f);
+
+    /// <summary>
+    /// Effective thin-film thickness at a world position: the base thickness plus the
+    /// spatial swirl scaled by <paramref name="ampNm"/>, clamped to a positive value.
+    /// Shared by every renderer so the interference pattern matches.
+    /// </summary>
+    public static float FilmThicknessAt(float baseNm, float ampNm, float x, float z)
+        => MathF.Max(1f, baseNm + ampNm * FilmSwirl(x, z));
+
+    /// <summary>
+    /// Desaturates a thin-film reflectance factor by pulling it toward its mean (½):
+    /// <c>½ + contrast·(raw − ½)</c>, clamped to [0,1]. <paramref name="contrast"/> = 1
+    /// leaves it untouched; lower values give a pastel sheen (§2.2).
+    /// </summary>
+    public static float ApplyFilmContrast(float raw, float contrast)
+        => Math.Clamp(0.5f + contrast * (raw - 0.5f), 0f, 1f);
 
     /// <summary>
     /// Schlick's approximation to <see cref="FresnelDielectric"/>. Cheaper (no

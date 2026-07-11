@@ -32,12 +32,18 @@ public sealed class PackedScene
     /// <summary>Number of quads (equals <c>Primitives.Length</c>).</summary>
     public int QuadCount => Primitives.Length;
 
-    internal PackedScene(float[] vertices, uint[] indices, GpuPrimitive[] primitives, IReadOnlyList<MaterialData> materials)
+    /// <summary>Analytic spheres (spectral-effects-plan §0.4), carried on the GPU as
+    /// procedural-AABB geometry. Empty for the (common) quad-only scenes.</summary>
+    public IReadOnlyList<GpuSphere> Spheres { get; }
+
+    internal PackedScene(float[] vertices, uint[] indices, GpuPrimitive[] primitives,
+        IReadOnlyList<MaterialData> materials, IReadOnlyList<GpuSphere> spheres)
     {
         Vertices = vertices;
         Indices = indices;
         Primitives = primitives;
         Materials = materials;
+        Spheres = spheres;
     }
 }
 
@@ -113,6 +119,8 @@ public static class GpuScenePacker
             int matPrimary = GetMaterialRow(quad.PrimaryMaterial);
             int matSecondary = quad.SecondaryMaterial is { } sec ? GetMaterialRow(sec) : matPrimary;
 
+            var (p0, p1, p2, cauchyB) = OpticalParams(quad.PrimaryMaterial, quad.PatternP0, quad.PatternP1, quad.PatternP2);
+
             primitives[q] = new GpuPrimitive
             {
                 L1X = l1.X, L1Y = l1.Y, L1Z = l1.Z,
@@ -124,17 +132,34 @@ public static class GpuScenePacker
                 Pattern = (uint)quad.Pattern,
                 MatPrimary = (uint)matPrimary,
                 MatSecondary = (uint)matSecondary,
-                P0 = quad.PatternP0,
-                P1 = quad.PatternP1,
-                P2 = quad.PatternP2,
+                P0 = p0,
+                P1 = p1,
+                P2 = p2,
                 P3 = quad.PatternP3,
                 Surface = (uint)quad.PrimaryMaterial.Surface,
                 Ior = quad.PrimaryMaterial.CauchyA,
-                CauchyB = quad.PrimaryMaterial.CauchyB,
+                CauchyB = cauchyB,
             };
         }
 
-        return new PackedScene(vertices, indices, primitives, materials);
+        // Analytic spheres (§0.4) — carried as procedural-AABB geometry on the GPU.
+        var spheres = new List<GpuSphere>();
+        foreach (Tracable t in scene)
+        {
+            if (t is not Sphere s) continue;
+            var (sp0, sp1, sp2, sCauchyB) = OpticalParams(s.Material, 0f, 0f, 0f);
+            spheres.Add(new GpuSphere
+            {
+                CX = s.Center.X, CY = s.Center.Y, CZ = s.Center.Z, Radius = s.Radius,
+                MatRow = (uint)GetMaterialRow(s.Material),
+                Surface = (uint)s.Material.Surface,
+                Ior = s.Material.CauchyA,
+                CauchyB = sCauchyB,
+                P0 = sp0, P1 = sp1, P2 = sp2,
+            });
+        }
+
+        return new PackedScene(vertices, indices, primitives, materials, spheres);
     }
 
     private static void WriteVertex(float[] dest, int offset, Vector3 v)
@@ -142,5 +167,29 @@ public static class GpuScenePacker
         dest[offset + 0] = v.X;
         dest[offset + 1] = v.Y;
         dest[offset + 2] = v.Z;
+    }
+
+    // The P0..P2 slots are pattern parameters for a Plain quad, so an optical surface (never
+    // patterned) reuses them: thin-film carries film amp/contrast (§2.2), a dielectric carries
+    // the Beer–Lambert absorption anchors σ(R/G/B)+base (§2.3). CauchyB doubles as the thin-film
+    // thickness (§2.2). Shared by quads and spheres so both pack identically.
+    private static (float p0, float p1, float p2, float cauchyB) OpticalParams(
+        MaterialData mat, float patternP0, float patternP1, float patternP2)
+    {
+        (float p0, float p1, float p2) = mat.Surface switch
+        {
+            SurfaceKind.ThinFilm => (mat.FilmSpatialAmpNm, mat.FilmContrast, patternP2),
+            SurfaceKind.Dielectric => (
+                mat.AbsorptionRgb.X + mat.ExtinctionSigma,
+                mat.AbsorptionRgb.Y + mat.ExtinctionSigma,
+                mat.AbsorptionRgb.Z + mat.ExtinctionSigma),
+            _ => (patternP0, patternP1, patternP2),
+        };
+        // Thin-film and bubble surfaces (§2.2, §2.6) carry the film thickness (nm) in the CauchyB
+        // slot; a dielectric uses it for real dispersion.
+        float cauchyB = mat.Surface is SurfaceKind.ThinFilm or SurfaceKind.Bubble
+            ? mat.FilmThicknessNm
+            : mat.CauchyB;
+        return (p0, p1, p2, cauchyB);
     }
 }

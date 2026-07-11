@@ -232,6 +232,10 @@ public partial class JobSystem
     /// </summary>
     private const int MaxSpecularBounces = 8;
 
+    /// <summary>Multiplier on a bubble's Fresnel reflectance (§2.6) so the thin-film rings read
+    /// across the whole bubble, not just at the grazing rim, while it stays mostly see-through.</summary>
+    private const float BubbleReflectBoost = 45f;
+
     /// <summary>
     /// Follows a specular ray through zero or more mirror/dielectric interactions and
     /// returns the (CIE-weighted, uncorrected) XYZ radiance arriving back along it at
@@ -240,23 +244,28 @@ public partial class JobSystem
     /// segment, so smoke shows in reflections and refractions.
     /// <paramref name="inGlass"/> tracks whether the ray is inside a dielectric medium.
     /// </summary>
-    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass)
+    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma)
     {
         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
-        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction) = _bvh.FindClosest(ray);
         if (!hit)
             return Vector3.Zero;
 
         Vector3 radiance;
         if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
         {
-            radiance = SpecularRadiance(surface, reflectance, ior, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass);
+            radiance = SpecularRadiance(surface, reflectance, ior, extinction, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass, mediumSigma);
         }
         else
         {
             float scalar = ShadeDiffuseScalar(reflectance, hitPoint, hitNormal, wavelength, ref rng);
             radiance = WavelengthLookup.TryGet((int)wavelength, out Vector3 cie) ? cie * scalar : Vector3.Zero;
         }
+
+        // Beer–Lambert absorption for the segment just travelled inside a coloured medium
+        // (§2.3): the radiance arriving back along it is attenuated by exp(−σ(λ)·distance).
+        if (mediumSigma > 0f)
+            radiance *= MathF.Exp(-mediumSigma * Vector3.Distance(origin, hitPoint));
 
         // Smoke/fog along this specular segment (identity when volumetrics are off, so the
         // no-smoke path stays bit-identical to the pre-media reflection).
@@ -272,18 +281,37 @@ public partial class JobSystem
     /// Then it recurses through <see cref="TraceSpecularRadiance"/>.
     /// </summary>
     private Vector3 SpecularRadiance(
-        SurfaceKind surface, float reflectance, float ior,
+        SurfaceKind surface, float reflectance, float ior, float hitExtinction,
         Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir,
-        float wavelength, ref uint rng, int depth, bool inGlass)
+        float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma)
     {
         if (surface == SurfaceKind.Mirror)
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass);
+            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma);
         }
 
-        // Dielectric (clear glass): reflect vs. refract by Russian roulette on Fresnel.
+        if (surface == SurfaceKind.Bubble)
+        {
+            // Thin-shell bubble (§2.6): the film reflectance is the reflect probability (colour is
+            // which wavelengths reflect most; `reflectance` carries base × film with the gravity
+            // gradient, folded in FromMaterial), boosted so the rings read across the whole bubble;
+            // the rest transmits straight through (mostly see-through, no lens warp).
+            float cosB = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
+            float rReflect = Math.Clamp(BubbleReflectBoost * Optics.FresnelDielectric(cosB, 1f, ior), 0f, 1f) * reflectance;
+            rng = rng * 747796405u + 2891336453u;
+            if (rng / 4294967296f < rReflect)
+            {
+                Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
+                Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
+                return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, false, 0f);
+            }
+            Vector3 throughOrigin = hitPoint + incidentDir * 1e-3f; // straight through the thin shell
+            return TraceSpecularRadiance(throughOrigin, incidentDir, wavelength, ref rng, depth + 1, false, 0f);
+        }
+
+        // Dielectric glass: reflect vs. refract by Russian roulette on Fresnel.
         float iorFrom = inGlass ? ior : 1f;
         float iorTo = inGlass ? 1f : ior;
         float cosI = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
@@ -296,11 +324,15 @@ public partial class JobSystem
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass);
+            // Reflection stays in the current medium → its absorption is unchanged.
+            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma);
         }
 
         Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
-        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, !inGlass);
+        bool newInGlass = !inGlass;
+        // Entering this dielectric → travel through its absorption (§2.3); exiting → clear air.
+        float newMediumSigma = newInGlass ? hitExtinction : 0f;
+        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, newInGlass, newMediumSigma);
     }
 
     /// <summary>
@@ -448,7 +480,7 @@ public partial class JobSystem
             Wavelength = heroWavelength,
             Intensity = 1f
         };
-        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor, heroExtinction) = _bvh.FindClosest(ray);
         Vector3 xyz = Vector3.Zero;
         Vector3 directLighting = Vector3.Zero;
         Vector3 indirectLighting = Vector3.Zero;
@@ -469,8 +501,8 @@ public partial class JobSystem
             // reflected/refracted segments); the camera→surface segment's fog is applied
             // by the shared volumetric step below.
             xyz = SpecularRadiance(
-                heroSurface, reflectance, heroIor, hitPoint, hitNormal, dir,
-                heroWavelength, ref specularRng, 0, inGlass: false);
+                heroSurface, reflectance, heroIor, heroExtinction, hitPoint, hitNormal, dir,
+                heroWavelength, ref specularRng, 0, inGlass: false, mediumSigma: 0f);
 
             // The specular radiance behaves like a direct view of the reflected/refracted
             // surface; book it as bounce-0/direct for the debug decomposition.
@@ -650,7 +682,7 @@ public partial class JobSystem
                     Intensity = 1f
                 };
 
-                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _) = _bvh.FindClosest(secRay);
+                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _, _) = _bvh.FindClosest(secRay);
                 if (secHit && secPrimitive is not null)
                 {
                     Vector3 secBaseXyz = Vector3.Zero;
@@ -715,7 +747,7 @@ public partial class JobSystem
                             Intensity = 1f
                         };
 
-                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive, _, _) = _bvh.FindClosest(tertRay);
+                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive, _, _, _) = _bvh.FindClosest(tertRay);
                         if (tertHit && tertPrimitive is not null)
                         {
                             Vector3 tertBaseXyz = Vector3.Zero;

@@ -14,6 +14,10 @@
 #define RNG_ADD             2891336453u
 #define SURFACE_MIRROR       1u  // SurfaceKind.Mirror
 #define SURFACE_DIELECTRIC   2u  // SurfaceKind.Dielectric
+#define SURFACE_THINFILM     3u  // SurfaceKind.ThinFilm
+#define SURFACE_BUBBLE       7u  // SurfaceKind.Bubble
+#define BUBBLE_REFLECT_BOOST 45.0 // §2.6: boosts a bubble's Fresnel so thin-film rings read across it
+#define BUBBLE_FIREFLY_CLAMP 1.5  // §2.6: per-sample luminance cap on a bubble (tames the reflect/transmit-split fireflies)
 #define MAX_SPECULAR_BOUNCES 8u  // JobSystem.MaxSpecularBounces
 
 // Volumetric constants (mirror Phase4Reference / JobSystem).
@@ -51,6 +55,16 @@ StructuredBuffer<float4>         Lights             : register(t4); // xyz = wor
 StructuredBuffer<float4>         LightColors        : register(t5); // xyz = colour (inscatter)
 StructuredBuffer<float4>         RgbBasis           : register(t6); // [i].xyz = linearRGB→reflectance basis row i (plan §3.1)
 StructuredBuffer<float4>         DecalPixels        : register(t7); // linear RGBA atlas, [layer*S*S + y*S + x]
+
+// Analytic spheres (§0.4), carried as procedural-AABB geometry. Only read when the BLAS has
+// sphere geometry (the shader gets CANDIDATE_PROCEDURAL_PRIMITIVE); a dummy buffer otherwise.
+struct SphereInfo
+{
+    float CX; float CY; float CZ; float Radius;
+    uint  MatRow; uint Surface; float Ior; float CauchyB;
+    float P0; float P1; float P2; float Pad;
+};
+StructuredBuffer<SphereInfo> Spheres : register(t8);
 
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
@@ -278,6 +292,40 @@ void DecalUv(PrimitiveInfo prim, float3 hitPoint, out float u, out float w)
     w = saturate(dot(rel, e2) * prim.InvEdge2LenSq);
 }
 
+// Two-beam thin-film interference reflectance in [0,1] at one wavelength (§2.2), a port of
+// Optics.ThinFilmReflectance. Bright where 2·n·d·cosθ_t is an odd multiple of λ/2.
+float ThinFilmReflectance(float cosThetaI, float wavelengthNm, float filmThicknessNm, float filmIor)
+{
+    if (filmThicknessNm <= 0.0) return 1.0;
+    cosThetaI = clamp(abs(cosThetaI), 0.0, 1.0);
+    float sinI2 = 1.0 - cosThetaI * cosThetaI;
+    float cosThetaT = sqrt(max(0.0, 1.0 - sinI2 / (filmIor * filmIor)));
+    float halfPhase = 2.0 * 3.14159265358979 * filmIor * filmThicknessNm * cosThetaT / wavelengthNm;
+    float s = sin(halfPhase);
+    return s * s;
+}
+
+// Smooth world-position swirl (port of Optics.FilmSwirl) for the oil-slick thickness variation.
+float FilmSwirl(float x, float z)
+{
+    return 0.55 * sin(4.1 * x + 3.3 * z)
+         + 0.30 * sin(2.7 * x - 5.2 * z + 1.3)
+         + 0.15 * sin(6.9 * x + 1.7 * z + 2.9);
+}
+
+// Thin-film interference factor for a hit at hero index `idx` (or 1 for non-thin-film),
+// mirroring Phase1Reference.ThinFilmFactor: cosθ from the ray and the unit geometric normal;
+// base thickness in prim.CauchyB with per-position swirl amplitude in prim.P0 (oil slick),
+// film IOR in prim.Ior; wavelength (nm) rides DeterXYZ.w.
+float ThinFilmFactor(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint idx)
+{
+    if (prim.Surface != SURFACE_THINFILM) return 1.0;
+    float cosTheta = abs(dot(normalize(rayDir), float3(prim.NX, prim.NY, prim.NZ)));
+    float thickness = max(1.0, prim.CauchyB + prim.P0 * FilmSwirl(hitPoint.x, hitPoint.z));
+    float raw = ThinFilmReflectance(cosTheta, DeterXYZ[idx].w, thickness, prim.Ior);
+    return saturate(0.5 + prim.P1 * (raw - 0.5)); // contrast (§2.2)
+}
+
 float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHash, uint sampleIdx)
 {
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
@@ -308,7 +356,7 @@ float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHas
     for (uint k = 0u; k < COMPANION_COUNT; k++)
     {
         uint idx = (heroIdx + k * stride) % DETERMINISTIC_COUNT;
-        float refl = MaterialReflectance[reflBase + idx] * atten;
+        float refl = MaterialReflectance[reflBase + idx] * atten * ThinFilmFactor(prim, rayDir, hitPoint, idx);
         xyz += DeterXYZ[idx].xyz * refl;
     }
     return xyz / float(COMPANION_COUNT);
@@ -327,7 +375,7 @@ float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint 
 
     uint row; float atten;
     PatternShade(prim, rayDir, hitPoint, row, atten);
-    float refl = MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
+    float refl = MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten * ThinFilmFactor(prim, rayDir, hitPoint, heroIdx);
     return DeterXYZ[heroIdx].xyz * refl;
 }
 
@@ -348,7 +396,40 @@ float3 CosineHemisphere(float3 n, float r1, float r2)
 
 // ── Ray casting (RayQuery) ────────────────────────────────────────────
 
-bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitPoint)
+// Synthesise a PrimitiveInfo for a sphere hit (§0.4): the analytic outward normal in N, and
+// the sphere's material row + optical params, so the whole quad-shading pipeline (PatternShade
+// on Plain, HeroReflectance, ThinFilmFactor, dielectric, absorption) runs on it unchanged.
+PrimitiveInfo SphereToPrim(SphereInfo s, float3 hitPoint)
+{
+    PrimitiveInfo p = (PrimitiveInfo)0;
+    float3 n = normalize(hitPoint - float3(s.CX, s.CY, s.CZ));
+    p.NX = n.x; p.NY = n.y; p.NZ = n.z;
+    p.Pattern = 0u;              // Plain — no brick/decal patterning
+    p.MatPrimary = s.MatRow;
+    p.MatSecondary = s.MatRow;
+    p.Surface = s.Surface;
+    p.Ior = s.Ior;
+    p.CauchyB = s.CauchyB;
+    p.P0 = s.P0; p.P1 = s.P1; p.P2 = s.P2;
+    return p;
+}
+
+// Nearest ray/sphere root ≥ tMin (half-b form), for the procedural candidate.
+bool IntersectSphere(SphereInfo s, float3 origin, float3 dir, float tMin, out float t)
+{
+    float3 oc = origin - float3(s.CX, s.CY, s.CZ);
+    float a = dot(dir, dir);
+    float halfB = dot(oc, dir);
+    float c = dot(oc, oc) - s.Radius * s.Radius;
+    float disc = halfB * halfB - a * c;
+    if (disc < 0.0) { t = 0.0; return false; }
+    float sq = sqrt(disc);
+    t = (-halfB - sq) / a;
+    if (t < tMin) t = (-halfB + sq) / a;
+    return t >= tMin;
+}
+
+bool TraceClosest(float3 origin, float3 dir, out PrimitiveInfo prim, out float3 hitPoint)
 {
     RayDesc ray;
     ray.Origin = origin;
@@ -359,29 +440,42 @@ bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitP
     // Build-in reveal (§9.3): while RevealHeight is below the wall top, force non-opaque
     // traversal and reject hits above the rising line, so walls appear to grow from the
     // floor (the floor at y=0 always passes; the ceiling appears when the reveal completes).
-    // Once RevealHeight >= WALL_HEIGHT the fast opaque path (no candidate loop) is used.
+    // Once RevealHeight >= WALL_HEIGHT the fast opaque path is used. The loop also intersects
+    // any procedural sphere candidates (§0.4) — a sphere-free BLAS surfaces none, so no-op.
     uint rayFlags = (RevealHeight < WALL_HEIGHT) ? RAY_FLAG_FORCE_NON_OPAQUE : RAY_FLAG_NONE;
     RayQuery<RAY_FLAG_NONE> q;
     q.TraceRayInline(Scene, rayFlags, 0xFF, ray);
     while (q.Proceed())
     {
-        if (q.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        uint ct = q.CandidateType();
+        if (ct == CANDIDATE_PROCEDURAL_PRIMITIVE)
+        {
+            float t;
+            if (IntersectSphere(Spheres[q.CandidatePrimitiveIndex()], origin, dir, q.RayTMin(), t))
+                q.CommitProceduralPrimitiveHit(t);
+        }
+        else if (ct == CANDIDATE_NON_OPAQUE_TRIANGLE)
         {
             float tc = q.CandidateTriangleRayT();
             if ((origin.y + dir.y * tc) <= RevealHeight)
                 q.CommitNonOpaqueTriangleHit(); // below the reveal line → solid
-            // else: not risen yet — ignore and keep traversing
         }
     }
 
-    if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    uint status = q.CommittedStatus();
+    if (status == COMMITTED_TRIANGLE_HIT)
     {
-        quadIndex = q.CommittedPrimitiveIndex() >> 1;
-        float tHit = q.CommittedRayT();
-        hitPoint = origin + dir * tHit;
+        prim = Primitives[q.CommittedPrimitiveIndex() >> 1];
+        hitPoint = origin + dir * q.CommittedRayT();
         return true;
     }
-    quadIndex = 0u;
+    if (status == COMMITTED_PROCEDURAL_PRIMITIVE_HIT)
+    {
+        hitPoint = origin + dir * q.CommittedRayT();
+        prim = SphereToPrim(Spheres[q.CommittedPrimitiveIndex()], hitPoint);
+        return true;
+    }
+    prim = (PrimitiveInfo)0;
     hitPoint = float3(0.0, 0.0, 0.0);
     return false;
 }
@@ -399,8 +493,20 @@ bool TraceOccluded(float3 origin, float3 dir, float maxDist)
 
     RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
     q.TraceRayInline(Scene, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, ray);
-    q.Proceed();
-    return q.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
+    while (q.Proceed())
+    {
+        if (q.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE)
+        {
+            SphereInfo s = Spheres[q.CandidatePrimitiveIndex()];
+            float t;
+            // Bubbles (§2.6) are see-through thin shells, so they must not cast solid shadows — a
+            // stream of them would stack into muddy dark blobs on the walls. Skip them for shadow
+            // rays; other spheres (diffuse/dielectric) still occlude.
+            if (s.Surface != SURFACE_BUBBLE && IntersectSphere(s, origin, dir, q.RayTMin(), t))
+                q.CommitProceduralPrimitiveHit(t); // any hit ends the search (shadow ray)
+        }
+    }
+    return q.CommittedStatus() != COMMITTED_NOTHING; // triangle or sphere occludes
 }
 
 // ── Lighting (mirrors Phase2Reference) ────────────────────────────────
@@ -807,7 +913,7 @@ float HeroReflectance(PrimitiveInfo prim, float3 dir, float3 hitPoint, uint hero
 
     uint row; float atten;
     PatternShade(prim, dir, hitPoint, row, atten);
-    return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
+    return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten * ThinFilmFactor(prim, dir, hitPoint, heroIdx);
 }
 
 // Snell refraction (line-for-line port of Optics.Refract). Returns false on TIR
@@ -877,25 +983,38 @@ bool IntersectRat(float3 origin, float3 dir, float maxT, uint heroIdx, out float
     return true;
 }
 
+// Beer–Lambert absorption σ at a wavelength, interpolated from red/green/blue anchors
+// (port of Optics.AbsorptionAt, §2.3). For a dielectric the anchors ride in P0/P1/P2.
+float AbsorptionAt(float sigmaR, float sigmaG, float sigmaB, float wavelengthNm)
+{
+    if (wavelengthNm <= 465.0) return sigmaB;
+    if (wavelengthNm <= 532.0) return lerp(sigmaB, sigmaG, (wavelengthNm - 465.0) / (532.0 - 465.0));
+    if (wavelengthNm <= 630.0) return lerp(sigmaG, sigmaR, (wavelengthNm - 532.0) / (630.0 - 532.0));
+    return sigmaR;
+}
+
 // XYZ radiance along a specular chain (mirror reflect + dielectric Fresnel
 // reflect/refract), with participating media integrated along every reflected segment
-// so smoke shows in reflections/refractions. Iterative (HLSL has no recursion), tracing
-// from the camera; the camera→primary segment (depth 1) is fogged by FogOut/resolve, so
-// it is skipped here to avoid double-counting. Mirrors JobSystem.TraceSpecularRadiance.
+// so smoke shows in reflections/refractions, and Beer–Lambert absorption applied along
+// every segment travelled inside a coloured glass (§2.3). Iterative (HLSL has no
+// recursion), tracing from the camera; the camera→primary segment (depth 1) is fogged by
+// FogOut/resolve, so it is skipped here to avoid double-counting.
+// Mirrors JobSystem.TraceSpecularRadiance.
 float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng)
 {
     float weight = 1.0;             // Π (transmittance × reflectance) so far
     float3 accum = float3(0.0, 0.0, 0.0);
     bool inGlass = false;
+    float mediumSigma = 0.0;        // Beer–Lambert σ of the medium the ray is inside (0 = clear air)
     [loop]
     for (uint depth = 1u; depth <= MAX_SPECULAR_BOUNCES; depth++)
     {
-        uint idx; float3 hitPoint;
-        bool sceneHit = TraceClosest(origin, dir, idx, hitPoint);
+        PrimitiveInfo prim; float3 hitPoint;
+        bool sceneHit = TraceClosest(origin, dir, prim, hitPoint);
         float sceneT = sceneHit ? length(hitPoint - origin) : 1e30;
 
-        // The rat is a real object for reflected rays (depth > 1); the primary view keeps
-        // the screen-space ApplyRat so a walking rat stays crisp through the accumulator.
+        // The rat is a real object for reflected rays (depth > 1); the primary ray (depth 1) tests
+        // it in ShadeSample instead, so it is skipped here to avoid testing the billboard twice.
         float3 ratHitPoint; float ratRefl;
         bool ratHit = depth > 1u && IntersectRat(origin, dir, sceneT, heroIdx, ratHitPoint, ratRefl);
 
@@ -903,6 +1022,11 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             return accum; // ray escapes; keep the fog it passed through
 
         float3 segEnd = ratHit ? ratHitPoint : hitPoint;
+
+        // Beer–Lambert absorption for the segment just travelled inside a coloured glass (§2.3).
+        if (mediumSigma > 0.0)
+            weight *= exp(-mediumSigma * length(segEnd - origin));
+
         if (depth > 1u) // fog the reflected segments (camera→primary is FogOut's job)
         {
             float fogT; float3 fogI;
@@ -917,7 +1041,6 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             return accum;
         }
 
-        PrimitiveInfo prim = Primitives[idx];
         float3 hitNormal = FaceNormal(prim, dir);
 
         if (prim.Surface == SURFACE_MIRROR && depth < MAX_SPECULAR_BOUNCES)
@@ -953,6 +1076,38 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
                 dir = refr;
                 origin = hitPoint - hitNormal * 1e-3;
                 inGlass = !inGlass;
+                // Enter this glass's absorption, or exit to clear air (§2.3).
+                mediumSigma = inGlass ? AbsorptionAt(prim.P0, prim.P1, prim.P2, DeterXYZ[heroIdx].w) : 0.0;
+            }
+            continue;
+        }
+
+        if (prim.Surface == SURFACE_BUBBLE && depth < MAX_SPECULAR_BOUNCES)
+        {
+            // Thin-shell soap bubble (§2.6): the film is microns thin, so the background passes
+            // nearly straight through (mostly see-through — real bubbles don't warp like a solid
+            // lens) with a vivid thin-film reflection. The film reflectance IS the reflect
+            // probability, so the colour is which wavelengths reflect most; a gravity thickness
+            // gradient (thin at the top, thick at the bottom, keyed on the sphere's outward normal
+            // prim.NY) gives the multiple swirling colour bands, and the Fresnel term (boosted,
+            // clamped) makes the grazing rim bright. prim.Ior = film index, prim.CauchyB = base nm.
+            float filmIor = prim.Ior;
+            float cosI = abs(dot(normalize(dir), hitNormal));
+            float grav = lerp(1.4, 0.6, (prim.NY + 1.0) * 0.5); // bottom thicker → top thinner: shifts the ring colour
+            float d = prim.CauchyB * grav;
+            float base = MaterialReflectance[prim.MatPrimary * DETERMINISTIC_COUNT + heroIdx];
+            float film = ThinFilmReflectance(cosI, DeterXYZ[heroIdx].w, d, filmIor);
+            float rReflect = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosI, 1.0, filmIor)) * base * film;
+            rng = rng * RNG_MUL + RNG_ADD;
+            float u = float(rng) / 4294967296.0;
+            if (u < rReflect)
+            {
+                dir = reflect(dir, hitNormal);
+                origin = hitPoint + hitNormal * 1e-3;
+            }
+            else
+            {
+                origin = hitPoint + dir * 1e-3;  // transmit straight through the thin shell
             }
             continue;
         }
@@ -968,7 +1123,8 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
 // primary-hit mask, the primary hit point + oriented normal for the G-buffer, and
 // (Phase 5) the primary hit's base reflectance luminance for the Albedo view.
 float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sampleIdx,
-                   out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect,
+                   out bool primaryHit, out bool primaryRatHit, out bool primaryBubbleHit,
+                   out float3 correctedDirect, out float3 correctedIndirect,
                    out float3 primaryHitPoint, out float3 primaryNormal, out float primaryAlbedo)
 {
     correctedDirect = float3(0.0, 0.0, 0.0);
@@ -976,30 +1132,65 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     primaryHitPoint = float3(0.0, 0.0, 0.0);
     primaryNormal = float3(0.0, 0.0, 0.0);
     primaryAlbedo = 0.0;
+    primaryRatHit = false;
+    primaryBubbleHit = false;
 
-    uint primIndex;
+    uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
+
+    PrimitiveInfo prim;
     float3 hitPoint;
-    primaryHit = TraceClosest(camPos, primaryDir, primIndex, hitPoint);
+    primaryHit = TraceClosest(camPos, primaryDir, prim, hitPoint);
+
+    // The rat is a real traced object for the primary ray too (plan §8): test its view-facing
+    // billboard, occluded by any nearer scene geometry. A hit is a fullbright sprite terminal
+    // written to the G-buffer, so it fogs (FogOut) and reprojects like any primary surface — no
+    // screen-space compositing. Reflections keep testing it inside TraceSpecularRadiance.
+    float sceneT = primaryHit ? length(hitPoint - camPos) : 1e30;
+    float3 ratHitPoint; float ratRefl;
+    if (IntersectRat(camPos, primaryDir, sceneT, heroIdx, ratHitPoint, ratRefl))
+    {
+        primaryHit = true;
+        primaryRatHit = true;
+        primaryHitPoint = ratHitPoint;
+        primaryNormal = -primaryDir;          // billboard faces the camera
+        primaryAlbedo = ratRefl;
+        float3 ratXyz = DeterXYZ[heroIdx].xyz * ratRefl * DeterministicCorrection;
+        correctedDirect = ratXyz;             // fullbright → all "direct" for the debug view
+        return ratXyz;
+    }
+
     if (!primaryHit)
         return float3(0.0, 0.0, 0.0);
 
-    PrimitiveInfo prim = Primitives[primIndex];
+    // A moving bubble is tagged so its pixels self-reset (like the rat), so a live stream does not
+    // need to force whole-frame motion mode — the static scene keeps converging around it.
+    primaryBubbleHit = (prim.Surface == SURFACE_BUBBLE);
+
     float3 hitNormal = FaceNormal(prim, primaryDir);
     primaryHitPoint = hitPoint;
     primaryNormal = hitNormal;
 
-    uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
-
-    // Specular surface — mirror reflection (§1.1) or dielectric reflect/refract
-    // (§1.2). Hero-only; accumulation builds the spectrum. G-buffer keeps the
-    // specular surface so TAA reprojects on it. Mirrors JobSystem.TraceCore.
-    if (prim.Surface == SURFACE_MIRROR || prim.Surface == SURFACE_DIELECTRIC)
+    // Specular surface — mirror (§1.1), dielectric (§1.2), or bubble (§2.6). Hero-only;
+    // accumulation builds the spectrum. G-buffer keeps the specular surface so TAA reprojects
+    // on it. Mirrors JobSystem.TraceCore.
+    if (prim.Surface == SURFACE_MIRROR || prim.Surface == SURFACE_DIELECTRIC || prim.Surface == SURFACE_BUBBLE)
     {
         primaryAlbedo = HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
 
         uint specRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
         // Already CIE-weighted XYZ, with smoke integrated along the reflected segments.
         float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng) * DeterministicCorrection;
+
+        // Soap-bubble firefly clamp (§2.6): the thin-shell reflect/transmit split is high-variance (a
+        // rare boosted reflection over a mostly see-through background), so cap each sample's luminance
+        // — scaling XYZ so the hue (the iridescent colour) is preserved, only the brightness outliers
+        // are tamed. The running mean still integrates the film colour over the wavelength cycle.
+        if (prim.Surface == SURFACE_BUBBLE)
+        {
+            float lum = max(specXyz.y, 1e-4);
+            if (lum > BUBBLE_FIREFLY_CLAMP)
+                specXyz *= BUBBLE_FIREFLY_CLAMP / lum;
+        }
         correctedDirect = specXyz;
         return specXyz;
     }
@@ -1053,11 +1244,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         float3 sampleDir = CosineHemisphere(hitNormal, r1, r2);
         float3 secOrigin = hitPoint + hitNormal * 1e-3;
 
-        uint secIndex;
+        PrimitiveInfo secPrim;
         float3 secHitPoint;
-        if (TraceClosest(secOrigin, sampleDir, secIndex, secHitPoint))
+        if (TraceClosest(secOrigin, sampleDir, secPrim, secHitPoint))
         {
-            PrimitiveInfo secPrim = Primitives[secIndex];
             float3 secHitNormal = FaceNormal(secPrim, sampleDir);
             float3 secBaseXyz = IndirectBaseXyz(secPrim, sampleDir, secHitPoint, heroIdx);
 
@@ -1077,11 +1267,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             float3 tertDir = CosineHemisphere(secHitNormal, r3, r4);
             float3 tertOrigin = secHitPoint + secHitNormal * 1e-3;
 
-            uint tertIndex;
+            PrimitiveInfo tertPrim;
             float3 tertHitPoint;
-            if (TraceClosest(tertOrigin, tertDir, tertIndex, tertHitPoint))
+            if (TraceClosest(tertOrigin, tertDir, tertPrim, tertHitPoint))
             {
-                PrimitiveInfo tertPrim = Primitives[tertIndex];
                 float3 tertHitNormal = FaceNormal(tertPrim, tertDir);
                 float3 tertBaseXyz = IndirectBaseXyz(tertPrim, tertDir, tertHitPoint, heroIdx);
 
@@ -1193,10 +1382,10 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
 
     uint pixelHash = Hash2D(x, y);
 
-    bool hit;
+    bool hit, ratHit, bubbleHit;
     float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
     float gAlbedo;
-    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit,
+    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit, ratHit, bubbleHit,
                                    correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo);
 
     // Ceiling biome-category overlay (debug). Oriented normal points down (-Y)
@@ -1214,7 +1403,12 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         clampDelta = abs(unclamped.x - corrected.x) + abs(unclamped.y - corrected.y) + abs(unclamped.z - corrected.z);
     }
 
-    bool restart = reset || (LastHit[ix] != (hit ? 1u : 0u));
+    // Hit mask tags the moving traced objects — rat 2u, bubble 3u (vs 1u static geometry / 0u miss).
+    // A pixel that a mover crosses flips the mask both ways (mover→wall and wall→mover), forcing a
+    // per-pixel accumulation reset, so the mover stays crisp and — crucially — the static scene keeps
+    // converging around it without the whole frame being dropped to motion quality.
+    uint hitMask = ratHit ? 2u : (bubbleHit ? 3u : (hit ? 1u : 0u));
+    bool restart = reset || (LastHit[ix] != hitMask);
     uint prevCount = restart ? 0u : SampleCount[ix];
     if (SoftResetFlag != 0u && !restart)
         prevCount = min(prevCount, MotionSampleCap);
@@ -1235,7 +1429,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     IndirectAccum[ix] = float4(newIndirect, 1.0);
     SampleCount[ix] = count;
     WavelengthCounter[ix] = sampleIdx + 1u;
-    LastHit[ix] = hit ? 1u : 0u;
+    LastHit[ix] = hitMask;
 
     // Welford variance of luma (mirrors PathTracer.cs: M2 += (ySample - newMean)^2,
     // using the just-updated mean; reset alongside the running mean). The resolve /

@@ -99,7 +99,7 @@ public class SmokeBenchmarks
         int hits = 0;
         for (int i = 0; i < Iterations; i++)
         {
-            var (_, _, _, _, hit, _, _, _) = _bvh.FindClosest(_rays[i]);
+            var (_, _, _, _, hit, _, _, _, _) = _bvh.FindClosest(_rays[i]);
             if (hit) hits++;
         }
         return hits;

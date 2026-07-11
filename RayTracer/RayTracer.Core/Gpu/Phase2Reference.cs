@@ -62,6 +62,7 @@ public static class Phase2Reference
     {
         Phase1Reference.PatternShade(prim, rayDir, hitPoint, out uint row, out float atten);
         float refl = res.MaterialReflectance[(int)row * res.DeterministicCount + (int)heroIdx] * atten;
+        refl *= Phase1Reference.ThinFilmFactor(prim, rayDir, hitPoint, res.DeterWavelengths[heroIdx]);
         var cie = new Vector3(
             res.DeterXYZ[heroIdx * 4 + 0],
             res.DeterXYZ[heroIdx * 4 + 1],
@@ -204,7 +205,7 @@ public static class Phase2Reference
             uint specularRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
             Vector3 specularXyz = SpecularRadiance(
                 tracer, prims, res, lights, lighting, (SurfaceKind)prim.Surface, specularRefl, IorAtHero(prim, res, heroIdx),
-                hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false);
+                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false, mediumSigma: 0f);
 
             float specularCorrection = res.DeterministicCorrection;
             correctedDirect = specularXyz * specularCorrection;
@@ -331,6 +332,12 @@ public static class Phase2Reference
         return prim.Ior + prim.CauchyB / (um * um);
     }
 
+    /// <summary>The dielectric's Beer–Lambert absorption σ at the hero wavelength (§2.3) —
+    /// the GPU replica of <c>MaterialData.ExtinctionAt</c>. The absorption anchors σ(R/G/B)
+    /// (plus the uniform base) ride in the free pattern slots P0/P1/P2 for a dielectric.</summary>
+    private static float AbsorptionAtHero(GpuPrimitive prim, SpectralResources res, uint heroIdx)
+        => Optics.AbsorptionAt(prim.P0, prim.P1, prim.P2, res.DeterWavelengths[heroIdx]);
+
     /// <summary>
     /// Scalar spectral radiance at the hero wavelength arriving back along a
     /// specular ray: each mirror/dielectric hit interacts and recurses (up to
@@ -340,7 +347,7 @@ public static class Phase2Reference
     public static Vector3 TraceSpecularRadiance(
         ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
         ReadOnlySpan<Vector3> lights, LightingMode lighting,
-        Vector3 origin, Vector3 dir, uint heroIdx, ref uint rng, int depth, bool inGlass)
+        Vector3 origin, Vector3 dir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma)
     {
         if (!tracer.ClosestHit(origin, dir, out int idx, out Vector3 hitPoint))
             return Vector3.Zero;
@@ -349,17 +356,28 @@ public static class Phase2Reference
         Vector3 hitNormal = FaceNormal(prim, dir);
         Phase1Reference.PatternShade(prim, dir, hitPoint, out uint row, out float atten);
         float refl = res.MaterialReflectance[(int)row * res.DeterministicCount + (int)heroIdx] * atten;
+        refl *= Phase1Reference.ThinFilmFactor(prim, dir, hitPoint, res.DeterWavelengths[heroIdx]); // iridescent surface seen in a reflection
 
         var surface = (SurfaceKind)prim.Surface;
+        Vector3 radiance;
         if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
-            return SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, IorAtHero(prim, res, heroIdx),
-                hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass);
+        {
+            radiance = SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, IorAtHero(prim, res, heroIdx),
+                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass, mediumSigma);
+        }
+        else
+        {
+            // Terminal diffuse hit → CIE-weighted XYZ (the GPU port does not model smoke in
+            // reflections in this replica; the HLSL applies per-segment fog).
+            float scalar = MirrorDiffuseScalar(tracer, lights, lighting, refl, hitPoint, hitNormal, ref rng);
+            var cie = new Vector3(res.DeterXYZ[heroIdx * 4 + 0], res.DeterXYZ[heroIdx * 4 + 1], res.DeterXYZ[heroIdx * 4 + 2]);
+            radiance = cie * scalar;
+        }
 
-        // Terminal diffuse hit → CIE-weighted XYZ (the GPU port does not model smoke in
-        // reflections in this replica; the HLSL applies per-segment fog).
-        float scalar = MirrorDiffuseScalar(tracer, lights, lighting, refl, hitPoint, hitNormal, ref rng);
-        var cie = new Vector3(res.DeterXYZ[heroIdx * 4 + 0], res.DeterXYZ[heroIdx * 4 + 1], res.DeterXYZ[heroIdx * 4 + 2]);
-        return cie * scalar;
+        // Beer–Lambert absorption for the segment just travelled inside a coloured medium (§2.3).
+        if (mediumSigma > 0f)
+            radiance *= MathF.Exp(-mediumSigma * Vector3.Distance(origin, hitPoint));
+        return radiance;
     }
 
     /// <summary>
@@ -370,18 +388,18 @@ public static class Phase2Reference
     public static Vector3 SpecularRadiance(
         ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
         ReadOnlySpan<Vector3> lights, LightingMode lighting,
-        SurfaceKind surface, float reflectance, float ior,
-        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir, uint heroIdx, ref uint rng, int depth, bool inGlass)
+        SurfaceKind surface, float reflectance, float ior, float hitExtinction,
+        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma)
     {
         if (surface == SurfaceKind.Mirror)
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             return reflectance * TraceSpecularRadiance(
-                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass);
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma);
         }
 
-        // Dielectric (clear glass): reflect vs. refract by Russian roulette on Fresnel.
+        // Dielectric glass: reflect vs. refract by Russian roulette on Fresnel.
         float iorFrom = inGlass ? ior : 1f;
         float iorTo = inGlass ? 1f : ior;
         float cosI = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
@@ -395,12 +413,14 @@ public static class Phase2Reference
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             return TraceSpecularRadiance(
-                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass);
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma);
         }
 
         Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
+        bool newInGlass = !inGlass;
+        float newMediumSigma = newInGlass ? hitExtinction : 0f; // enter this glass's absorption, or exit to clear air (§2.3)
         return TraceSpecularRadiance(
-            tracer, prims, res, lights, lighting, refractOrigin, refractDir, heroIdx, ref rng, depth + 1, !inGlass);
+            tracer, prims, res, lights, lighting, refractOrigin, refractDir, heroIdx, ref rng, depth + 1, newInGlass, newMediumSigma);
     }
 
     /// <summary><c>reflectance × (ambient + direct)</c> at a diffuse surface reached

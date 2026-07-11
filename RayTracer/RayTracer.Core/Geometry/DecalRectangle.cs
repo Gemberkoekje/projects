@@ -89,7 +89,7 @@ public sealed class DecalRectangle : Plane, Tracable, IQuadPrimitive
 
         var faceNormal = denom < 0 ? Normal : -Normal;
         return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w),
-            _material.GetSpectralReflectance((int)ray.Wavelength), _material, (int)ray.Wavelength);
+            _material.GetSpectralReflectance((int)ray.Wavelength), _material, (int)ray.Wavelength, ray.Direction);
     }
 
     private static AABB ComputeBounds((Vector3 l1, Vector3 l2, Vector3 l3) loc)

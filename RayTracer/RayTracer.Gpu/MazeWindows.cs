@@ -20,11 +20,41 @@ internal static class MazeWindows
 {
     /// <param name="Chance">Probability a given interior wall becomes a window.</param>
     /// <param name="Seed">Seed for reproducible placement.</param>
-    internal sealed record Options(float Chance = 0.15f, int Seed = 0);
+    /// <param name="StainedChance">Probability a window's glass is a coloured stained pane
+    /// (Beer–Lambert absorption, §2.3) rather than clear. 0 = all clear.</param>
+    internal sealed record Options(float Chance = 0.15f, int Seed = 0, float StainedChance = 0f);
 
     private static readonly MaterialData GlassMat = new(
         "glass-window", "Glass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
         spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.95f, cauchyA: 1.5f, cauchyB: 0f);
+
+    private static MaterialData Stained(string id, float r, float g, float b) => new(
+        id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+        spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.95f, cauchyA: 1.5f, cauchyB: 0f,
+        absorptionRgb: new Vector3(r, g, b));
+
+    // Stained-glass tints — σ at the R/G/B anchors, high because a window pane is thin so the
+    // in-glass path is short (§2.3). A pane transmits its low-σ channel(s).
+    private static readonly MaterialData[] StainedPalette =
+    [
+        Stained("stain-red", 1.5f, 22f, 28f),
+        Stained("stain-amber", 1.5f, 6f, 30f),
+        Stained("stain-green", 22f, 2.5f, 24f),
+        Stained("stain-teal", 26f, 3f, 7f),
+        Stained("stain-blue", 28f, 20f, 1.5f),
+        Stained("stain-violet", 6f, 26f, 4f),
+    ];
+
+    /// <summary>The glass for a given window — clear, or a deterministically-chosen stained
+    /// tint when <see cref="Options.StainedChance"/> fires for that pane.</summary>
+    private static MaterialData WindowGlass(int gx, int gy, bool horizontal, Options opt)
+    {
+        if (opt.StainedChance <= 0f) return GlassMat;
+        uint h = (uint)(gx * 2654435761 ^ gy * 40503431 ^ (horizontal ? 1013904223 : 0) ^ opt.Seed * 374761393);
+        h ^= h >> 15; h *= 2246822519u; h ^= h >> 13; h *= 3266489917u; h ^= h >> 16;
+        if ((h & 0xFFFFFFu) / 16777216f >= opt.StainedChance) return GlassMat;
+        return StainedPalette[(int)((h >> 8) % (uint)StainedPalette.Length)];
+    }
 
     private const float SlabHalfGap = 0.03f;
     private const float SillFrac = 0.32f;
@@ -86,7 +116,7 @@ internal static class MazeWindows
                 AddWindow(result, plane: gx * cs, perpAxis: new Vector3(1, 0, 0), widthAxis: new Vector3(0, 0, 1),
                     lo: gy * cs, hi: (gy + 1) * cs, wh, wallThickness,
                     nearHasWall: HasVWall(maze, gx, gy - 1), farHasWall: HasVWall(maze, gx, gy + 1),
-                    wallMaterial, mortarMaterial, sillMaterial);
+                    wallMaterial, mortarMaterial, sillMaterial, WindowGlass(gx, gy, false, opt));
             }
         }
 
@@ -101,7 +131,7 @@ internal static class MazeWindows
                 AddWindow(result, plane: gy * cs, perpAxis: new Vector3(0, 0, 1), widthAxis: new Vector3(1, 0, 0),
                     lo: gx * cs, hi: (gx + 1) * cs, wh, wallThickness,
                     nearHasWall: HasHWall(maze, gx - 1, gy), farHasWall: HasHWall(maze, gx + 1, gy),
-                    wallMaterial, mortarMaterial, sillMaterial);
+                    wallMaterial, mortarMaterial, sillMaterial, WindowGlass(gx, gy, true, opt));
             }
         }
 
@@ -111,7 +141,7 @@ internal static class MazeWindows
     private static void AddWindow(
         List<Tracable> list, float plane, Vector3 perpAxis, Vector3 widthAxis, float lo, float hi, float wh, float t,
         bool nearHasWall, bool farHasWall,
-        MaterialData wall, MaterialData mortar, MaterialData sill)
+        MaterialData wall, MaterialData mortar, MaterialData sill, MaterialData glass)
     {
         Vector3 up = new(0, 1, 0);
         Vector3 p = perpAxis * plane;                 // the wall-plane offset (only the perp component is nonzero)
@@ -129,8 +159,8 @@ internal static class MazeWindows
         }
 
         // Glass slab (two panes), full width, between sill and header.
-        AddGlass(list, p + perpAxis * SlabHalfGap + loP + up * sillY, widthAxis * width, up * (topY - sillY));
-        AddGlass(list, p - perpAxis * SlabHalfGap + loP + up * sillY, widthAxis * width, up * (topY - sillY));
+        AddGlass(list, p + perpAxis * SlabHalfGap + loP + up * sillY, widthAxis * width, up * (topY - sillY), glass);
+        AddGlass(list, p - perpAxis * SlabHalfGap + loP + up * sillY, widthAxis * width, up * (topY - sillY), glass);
 
         // Stone sill ledge on the knee-wall, overhanging into both cells.
         float sillReach = ht + SillOverhang;
@@ -157,8 +187,8 @@ internal static class MazeWindows
         list.Add(new BrickRectangle((l1, l1 + edgeU, l1 + edgeV), wall, mortar, bricksAcross: 2f, bricksDown: bricksDown));
     }
 
-    private static void AddGlass(List<Tracable> list, Vector3 l1, Vector3 edgeU, Vector3 edgeV)
-        => list.Add(new TracableRectangle((l1, l1 + edgeU, l1 + edgeV), GlassMat));
+    private static void AddGlass(List<Tracable> list, Vector3 l1, Vector3 edgeU, Vector3 edgeV, MaterialData glass)
+        => list.Add(new TracableRectangle((l1, l1 + edgeU, l1 + edgeV), glass));
 
     // A full-height brick reveal closing one end of the opening (spans the wall thickness).
     private static void AddJamb(List<Tracable> list, Vector3 endCentreFloor, Vector3 perpAxis, Vector3 up, float ht, float wh, MaterialData wall)

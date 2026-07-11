@@ -99,7 +99,7 @@ public class CeilingTileRectangle : Plane, Tracable, IQuadPrimitive
 
         float reflectance = _tileMaterial.GetSpectralReflectance((int)ray.Wavelength) * attenuation;
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, _tileMaterial, (int)ray.Wavelength);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, _tileMaterial, (int)ray.Wavelength, ray.Direction);
     }
 
     /// <summary>

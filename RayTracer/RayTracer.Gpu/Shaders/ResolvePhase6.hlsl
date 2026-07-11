@@ -247,54 +247,9 @@ float3 PaletteNormal(float3 normal)
 
 // ── Kernel ────────────────────────────────────────────────────────────
 
-// Animated rat billboard (plan §8): the rat never enters the path tracer — its world
-// position is projected to screen here, alpha-tested against its sprite, and depth-occluded
-// against the G-buffer, then composited. Gated by ShowRat (off = identical to Phase 5).
-float3 ApplyRat(float3 col, uint2 pix)
-{
-    if (ShowRat == 0u)
-        return col;
-
-    float4 invRot = float4(-CurrCamRot.xyz, CurrCamRot.w);
-    float3 local = RotateByQuaternion(invRot, RatPos - CurrCamPos);
-    if (local.z <= 0.05)
-        return col; // behind camera / too close
-
-    float ndcX = local.x / (local.z * AspectTanHalfFov);
-    float ndcY = local.y / (local.z * TanHalfFov);
-    float cx = ((ndcX + 1.0) * 0.5) * float(Width);
-    float cy = ((1.0 - ndcY) * 0.5) * float(Height);
-
-    // Pixel half-size of a world-space square of side RatSize at depth local.z.
-    float halfPix = (RatSize * 0.5 / local.z / TanHalfFov) * 0.5 * float(Height);
-    if (halfPix < 1.0)
-        return col;
-
-    float dx = float(pix.x) - cx;
-    float dy = float(pix.y) - cy;
-    if (abs(dx) > halfPix || abs(dy) > halfPix)
-        return col;
-
-    float u = (dx + halfPix) / (2.0 * halfPix);
-    float v = (dy + halfPix) / (2.0 * halfPix);
-    uint tx = min((uint)(u * float(DECAL_SIZE)), DECAL_SIZE - 1u);
-    uint ty = min((uint)(v * float(DECAL_SIZE)), DECAL_SIZE - 1u);
-    float4 texel = DecalPixels[RatLayer * (DECAL_SIZE * DECAL_SIZE) + ty * DECAL_SIZE + tx];
-    if (texel.a < 0.5)
-        return col; // transparent sprite pixel — show the scene
-
-    // Depth occlusion: hide the rat behind nearer geometry.
-    uint ix = pix.y * Width + pix.x;
-    if (LastHit[ix] != 0u)
-    {
-        float hitDist = length(HitPointIn[ix].xyz - CurrCamPos);
-        float ratDist = length(RatPos - CurrCamPos);
-        if (hitDist < ratDist)
-            return col;
-    }
-
-    return lerp(col, texel.rgb, texel.a);
-}
+// The animated rat (plan §8) used to be a screen-space billboard composited here. It is now a
+// first-class path-traced object (IntersectRat in the primary trace of PathTracePhase6), so it
+// fogs, occludes, and reflects like real geometry with no resolve-side compositing.
 
 // Overhead-map overlay (plan §7): a top-right corner minimap of the maze wall bitmap with
 // a player marker. Screen-space, so it costs nothing except the corner pixels; gated by
@@ -311,15 +266,18 @@ float3 ApplyMinimap(float3 col, uint2 pix)
     if (pix.x < x0 || pix.x >= x0 + mapPx || pix.y < y0 || pix.y >= y0 + mapPx)
         return col;
 
+    // Stationary, North-up map, but with the X axis flipped (East on the left). The flip is
+    // needed because this engine's camera is left-handed — a plain top-down would be a mirror
+    // image of the first-person view, making left turns read as right. With X flipped the
+    // map's chirality matches the view, so a left turn traces as a left turn, at every heading.
     float mx = float(pix.x - x0) / float(mapPx);
     float my = float(pix.y - y0) / float(mapPx);
-    uint gx = min((uint)(mx * float(MazeGw)), MazeGw - 1u);
-    uint gy = min((uint)(my * float(MazeGh)), MazeGh - 1u);
+    uint gx = min((uint)((1.0 - mx) * float(MazeGw)), MazeGw - 1u); // flipped: East→left, West→right
+    uint gy = min((uint)(my * float(MazeGh)), MazeGh - 1u);         // North→top
 
     float3 mapCol = (MazeGrid[gy * MazeGw + gx] != 0u)
         ? float3(0.13, 0.13, 0.16)   // wall
         : float3(0.85, 0.85, 0.90);  // corridor
-
     if (gx == PlayerGx && gy == PlayerGy)
         mapCol = float3(0.95, 0.18, 0.18); // player
 
@@ -496,7 +454,9 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
             outColor *= exp(-ClassicDepthCue * length(currentHitPoint - CurrCamPos));
     }
 
-    outColor = ApplyRat(outColor, tid.xy);
+    // The rat is now a first-class path-traced primary hit (see PathTracePhase6.ShadeSample), so it
+    // is already in outColor — fogged, occluded, and reprojected like any surface. No screen-space
+    // compositing here.
     outColor = ApplyMinimap(outColor, tid.xy);
     outColor *= (1.0 - FadeLevel); // §9.4 outro fade-to-black between mazes
     Output[tid.xy] = float4(saturate(outColor), 1.0);

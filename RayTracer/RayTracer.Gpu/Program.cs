@@ -48,6 +48,12 @@ internal static class Program
         bool glassDemo = args.Contains("--glass-demo", StringComparer.OrdinalIgnoreCase);
         bool prismDemo = args.Contains("--prism-demo", StringComparer.OrdinalIgnoreCase);
         bool jewelDemo = args.Contains("--jewel-demo", StringComparer.OrdinalIgnoreCase);
+        bool thinFilmDemo = args.Contains("--thinfilm-demo", StringComparer.OrdinalIgnoreCase);
+        bool oilDemo = args.Contains("--oil-demo", StringComparer.OrdinalIgnoreCase);
+        bool absorptionDemo = args.Contains("--absorption-demo", StringComparer.OrdinalIgnoreCase);
+        bool sphereDemo = args.Contains("--sphere-demo", StringComparer.OrdinalIgnoreCase);
+        bool bubbleDemo = args.Contains("--bubble-demo", StringComparer.OrdinalIgnoreCase);
+        bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
@@ -63,7 +69,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
-            || mirrorDemo || glassDemo || prismDemo || jewelDemo
+            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -90,6 +96,22 @@ internal static class Program
             if (jewelDemo)
                 return RunJewelDemo(maxFrames, savePath ?? "jewel-demo.png", sampleClamp, mazeSeed,
                     ParseFloatOption(args, "--cauchyb", 0.05f));
+            if (thinFilmDemo)
+                return RunThinFilmDemo(maxFrames, savePath ?? "thinfilm-demo.png", sampleClamp);
+            if (oilDemo)
+                return RunOilDemo(maxFrames, savePath ?? "oil-demo.png", sampleClamp, mazeSeed);
+            if (absorptionDemo)
+                return RunAbsorptionDemo(maxFrames, savePath ?? "absorption-demo.png", sampleClamp);
+            if (sphereDemo)
+                return RunSphereDemo(maxFrames, savePath ?? "sphere-demo.png", sampleClamp);
+            if (bubbleDemo)
+                return RunBubbleDemo(maxFrames, savePath ?? "bubble-demo.png", sampleClamp,
+                    ParseFloatOption(args, "--thickness", 440f));
+            if (bubbleMazeDemo)
+                return RunBubbleMazeDemo(maxFrames, savePath ?? "bubble-maze-demo.png", sampleClamp, mazeSeed,
+                    ParseFloatOption(args, "--thickness", 440f),
+                    drift: args.Contains("--drift", StringComparer.OrdinalIgnoreCase),
+                    showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase));
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -813,11 +835,15 @@ internal static class Program
         // the spectral equivalent of the original screensaver's flat textures (plan §2).
         bool classic = style == RenderStyle.Classic;
         LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
+        // Drifting-bubble placement (§2.6) — same options for the initial build and each regeneration.
+        static MazeBubbles.Options BubbleOptions(int seed) => new(Chance: 0.05f, Seed: seed);
         Phase3Scene built = Phase3Scene.Build(width, height, mazeSeed: mazeSeed, mazeSize: mazeSize,
             lightSeed: LightSeedFrom(mazeSeed), props: props,
             mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
-            windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed),
+            windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed, StainedChance: 0.5f),
             jewels: new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed),
+            oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
+            bubbles: BubbleOptions(mazeSeed),
             wallThickness: 0.12f);
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
             VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
@@ -921,6 +947,15 @@ internal static class Program
 
         uint frame = 0;
 
+        // Streaming soap bubbles (§2.6): the maze's only moving geometry. Bubble machines fire
+        // continuously (wall-clock driven), so every frame we advance the streams and refit their
+        // sphere BLAS — a live stream keeps the frame in motion mode. Refreshed on Regenerate (a new
+        // maze has a fresh set of emitters).
+        MazeBubbles.Options bubbleOpts = BubbleOptions(mazeSeed);
+        IReadOnlyList<MazeBubbles.Bubble> bubbleList = built.Bubbles;
+        var bubbleCenters = new Vector3[bubbleList.Count];
+        var bubbleRadii = new float[bubbleList.Count];
+
         // Generates a fresh maze and rebuilds the scene in place (shared by the outro and
         // the no-outro instant cut). Resets the build-in clock so the new maze rises.
         void Regenerate()
@@ -928,7 +963,15 @@ internal static class Program
             mazeSeed = Random.Shared.Next();
             built = Phase3Scene.Build(renderer.Width, renderer.Height, mazeSeed: mazeSeed,
                 mazeSize: mazeSize, lightSeed: LightSeedFrom(mazeSeed),
-                props: props is null ? null : props with { Seed = mazeSeed });
+                props: props is null ? null : props with { Seed = mazeSeed },
+                // Match the initial build (else the regenerated maze loses these — the
+                // features were only placed on the first maze).
+                mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
+                windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed, StainedChance: 0.5f),
+                jewels: new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed),
+                oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
+                bubbles: BubbleOptions(mazeSeed),
+                wallThickness: 0.12f);
             camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
             controller = built.CreateCameraController();
             controller.StillTime = 1.5f;
@@ -937,6 +980,11 @@ internal static class Program
             renderer.RebuildScene(built.Packed, built.Spectral, built.PackedLights, camera);
             if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
             if (showRat) ratCtrl = built.CreateRatController(out ratCam);
+            // Fresh maze → fresh bubble emitters (count/positions differ); resize the animation buffers.
+            bubbleOpts = BubbleOptions(mazeSeed);
+            bubbleList = built.Bubbles;
+            bubbleCenters = new Vector3[bubbleList.Count];
+            bubbleRadii = new float[bubbleList.Count];
             mazeStartTime = clock.Elapsed.TotalSeconds;
             frame = 0;
         }
@@ -1004,10 +1052,27 @@ internal static class Program
                 continue;
             }
 
-            if (ratCtrl is not null && !holdWalker) { ratCtrl.Update(dt, ratCam); renderer.SetRatPosition(ratCam.Position); }
+            // The rat is a path-traced object, but it self-resets per pixel (hitMask==2 in the shader),
+            // so it stays crisp without forcing whole-frame motion mode — just keep its position current.
+            if (ratCtrl is not null && !holdWalker)
+            {
+                ratCtrl.Update(dt, ratCam);
+                renderer.SetRatPosition(ratCam.Position);
+            }
 
             renderer.SetCamera(camera);
             renderer.SetFogTime((float)(now * fogDrift));
+
+            // Stream the bubbles continuously (§2.6) — a bubble machine keeps firing whether or not the
+            // walker moves. Like the rat they self-reset per pixel (hitMask==3), so the static scene keeps
+            // converging around them (no forced motion mode → far fewer fireflies). Held during the
+            // build-in/outro while the geometry is changing/fading.
+            if (bubbleList.Count > 0 && !holdWalker)
+            {
+                MazeBubbles.Animate(bubbleList, bubbleOpts, (float)now, bubbleCenters, bubbleRadii);
+                renderer.UpdateSpheres(bubbleCenters, bubbleRadii);
+            }
+
             if (!renderer.RenderFrame(reset: frame == 0 || building, moving: moving))
             {
                 // Device lost (TDR / driver reset) — rebuild and continue (P10/P12).
@@ -1384,6 +1449,555 @@ internal static class Program
             new() { Position = new Vector3(-3.0f, H * 0.75f, backZ - 1.2f), Color = Vector3.One },
             new() { Position = new Vector3(-1.2f, H * 0.75f, backZ - 3.0f), Color = Vector3.One },
             new() { Position = new Vector3(1.5f, H * 0.75f, 2.0f), Color = Vector3.One }, // fill on the prism/near side
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless demo of the maze's iridescent oil puddles (<see cref="MazeOilSlicks"/>,
+    /// spectral-effects-plan §2.2): builds the maze with puddles, stands the camera in the
+    /// cell of the puddle nearest the start looking down across it at a grazing angle (where
+    /// the thin-film colour is strongest), converges a still through the shipping Phase 6
+    /// pipeline, and writes a PNG.
+    /// </summary>
+    private static int RunOilDemo(int frames, string savePath, float sampleClamp, int mazeSeed)
+    {
+        if (frames <= 0) frames = 600;
+        Console.WriteLine($"RayTracer.Gpu — oil-slick demo ({frames} frames, seed {mazeSeed}) -> {savePath}");
+
+        var oil = new MazeOilSlicks.Options(Chance: 0.18f, Seed: mazeSeed);
+        var props = new MazeProps.Options(Logo: true, Signs: true, Seed: mazeSeed);
+
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, oilSlicks: oil, wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        float cs = probe.CellSize;
+        Vector3 startCenter = new(cs * 0.5f, eye, cs * 0.5f);
+
+        // Nearest puddle to the start.
+        int bx = -1, by = -1;
+        float best = float.MaxValue;
+        foreach (var (gx, gy, _, _) in MazeOilSlicks.Cells(probe.Maze, oil))
+        {
+            var c = new Vector3((gx + 0.5f) * cs, eye, (gy + 0.5f) * cs);
+            float d = Vector3.DistanceSquared(c, startCenter);
+            if (d < best) { best = d; bx = gx; by = gy; }
+        }
+
+        Camera camera = probe.Camera;
+        var extraLights = new List<Light>();
+        if (bx >= 0)
+        {
+            Vector3 worldUp = new(0, 1, 0);
+            Vector3 puddle = new((bx + 0.5f) * cs, 0.02f, (by + 0.5f) * cs);
+            // Stand at the near edge of the puddle's own cell and look down across it.
+            Vector3 dir = new(0, 0, -1);
+            if (!probe.Maze.HasWall(bx, by, Wall.North)) dir = new Vector3(0, 0, -1);
+            else if (!probe.Maze.HasWall(bx, by, Wall.South)) dir = new Vector3(0, 0, 1);
+            else if (!probe.Maze.HasWall(bx, by, Wall.West)) dir = new Vector3(-1, 0, 0);
+            else if (!probe.Maze.HasWall(bx, by, Wall.East)) dir = new Vector3(1, 0, 0);
+
+            Vector3 pos = new(puddle.X + dir.X * cs * 0.62f, eye, puddle.Z + dir.Z * cs * 0.62f);
+            camera = new Camera
+            {
+                Position = pos,
+                Rotation = LookRotation(pos, puddle, worldUp),
+                Fov = MathF.PI / 3.2f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            // Keep the puddle softly lit — a strong direct light clips the thin-film colour to white.
+            extraLights.Add(new Light { Position = puddle - dir * 0.5f + new Vector3(0.4f, 1.1f, 0.4f), Color = new Vector3(0.5f) });
+        }
+        else
+        {
+            Console.WriteLine("  (no oil puddle found — using default camera)");
+        }
+
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, oilSlicks: oil,
+            extraLights: extraLights, wallThickness: 0.12f);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless soap-bubble demo (spectral-effects-plan §2.6): a spherical thin-shell bubble in
+    /// front of a lit room with objects behind it. The room shows through the bubble nearly
+    /// undistorted (straight-through transmission), while the reflected component is tinted by
+    /// thin-film interference — smooth concentric colour rings that grow toward a bright,
+    /// strongly-reflective grazing rim. Converges a still through Phase 6 and writes a PNG.
+    /// </summary>
+    private static int RunBubbleDemo(int frames, string savePath, float sampleClamp, float thicknessNm)
+    {
+        if (frames <= 0) frames = 700; // bubble roulette is hero-only → noisy
+        Console.WriteLine($"RayTracer.Gpu — bubble demo ({frames} frames, thickness {thicknessNm}nm) -> {savePath}");
+
+        const float H = 3.4f, backZ = 8.0f, frontZ = -1.6f;
+        // Key to vivid film colour: the bubble must REFLECT something bright but TRANSMIT
+        // something darker — otherwise "reflect + transmit ≈ white" cancels the tint to grey (as
+        // real bubbles reflect a bright sky over dark foliage). So: a bright front wall (behind the
+        // camera, which the bubble's front reflects) over a dark back (the see-through background).
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -7f, 7f, frontZ - 0.5f, backZ + 0.5f, FlatDiffuse("bub-floor", 0.35f)),
+            FloorQuad(H, -7f, 7f, frontZ - 0.5f, backZ + 0.5f, FlatDiffuse("bub-ceil", 0.85f)),
+            WallZ(backZ, -7f, 7f, 0f, H, FlatDiffuse("bub-back", 0.14f)),   // dark — the transmit background
+            WallZ(frontZ, -7f, 7f, 0f, H, FlatDiffuse("bub-front", 0.97f)), // bright — the reflected "sky"
+            // Dark-ish objects behind the bubble (the "foliage" seen through it).
+            new Sphere(new Vector3(-1.6f, 0.7f, 6.4f), 0.7f, ColoredDiffuse("bub-b1", new Vector3(0.35f, 0.12f, 0.12f))),
+            new Sphere(new Vector3(1.7f, 0.55f, 6.8f), 0.55f, ColoredDiffuse("bub-b2", new Vector3(0.12f, 0.28f, 0.4f))),
+            new Sphere(new Vector3(0.2f, 0.5f, 7.2f), 0.5f, ColoredDiffuse("bub-b3", new Vector3(0.12f, 0.36f, 0.15f))),
+        };
+
+        // The bubble: a thin shell, film index ~1.33 (soapy water), constant thickness.
+        var bubbleMat = new MaterialData(
+            "bubble", "Bubble", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            FlatSpectrum(1.0f), SurfaceKind.Bubble, cauchyA: 1.33f, cauchyB: 0f, filmThicknessNm: thicknessNm);
+        scene.Add(new Sphere(new Vector3(0f, 1.5f, 4.2f), 1.35f, bubbleMat));
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(0f, 1.5f, 0.3f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, 1.4f, 5f), worldUp),
+            Fov = MathF.PI / 3f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        var lights = new List<Light>
+        {
+            // Many dim lights spread across the front wall so it glows evenly at a mid brightness
+            // (no bright point-light hotspots to clip in the bubble's reflection), over the dark back.
+            new() { Position = new Vector3(-3.5f, 1.0f, -1.0f), Color = new Vector3(0.55f) },
+            new() { Position = new Vector3(-1.2f, 2.8f, -1.0f), Color = new Vector3(0.55f) },
+            new() { Position = new Vector3(1.2f, 2.8f, -1.0f), Color = new Vector3(0.55f) },
+            new() { Position = new Vector3(3.5f, 1.0f, -1.0f), Color = new Vector3(0.55f) },
+            new() { Position = new Vector3(0f, 1.4f, -1.0f), Color = new Vector3(0.55f) },
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless in-maze soap-bubble demo (spectral-effects-plan §2.6): places drifting bubbles in the
+    /// maze, aims the camera at the nearest one from an adjacent open cell, and — crucially — moves
+    /// every bubble to a mid-lifecycle position via <c>Phase6Renderer.UpdateSpheres</c> before
+    /// converging. That exercises the moving-sphere BLAS refit (the deferred §0.4 work) on real
+    /// hardware: the rendered bubbles sit at their <em>animated</em> positions, not the built rest
+    /// points, so a correct image proves the per-frame sphere upload + AS refit path.
+    /// </summary>
+    private static int RunBubbleMazeDemo(int frames, string savePath, float sampleClamp, int mazeSeed, float thicknessNm,
+        bool drift = false, bool showRat = false)
+    {
+        if (frames <= 0) frames = 600; // bubble reflection is hero-only → noisy
+        Console.WriteLine($"RayTracer.Gpu — bubble maze demo ({frames} frames, seed {mazeSeed}, thickness {thicknessNm}nm) -> {savePath}");
+
+        // A generous chance so an emitter lands near the start; deterministic given the seed. Jewels
+        // and oil slicks are placed too so the demo shows the features coexisting AND exercises the
+        // rule that a bubble stream never shares a cell with another feature.
+        var bubbles = new MazeBubbles.Options(Chance: 0.14f, Seed: mazeSeed, ThicknessNm: thicknessNm);
+        var jewels = new MazeJewels.Options(Chance: 0.12f, Seed: mazeSeed);
+        var oil = new MazeOilSlicks.Options(Chance: 0.12f, Seed: mazeSeed);
+
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), bubbles: bubbles, jewels: jewels, oilSlicks: oil,
+            wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        float cs = probe.CellSize;
+        Vector3 startCenter = new(cs * 0.5f, eye, cs * 0.5f);
+
+        // Nearest emitter to the start, taken from the actual (feature-excluded) bubble list so the
+        // camera aims at a stream that really exists — each emitter's bubbles share one Origin.
+        Vector3 emitter = default;
+        bool found = false;
+        float best = float.MaxValue;
+        foreach (MazeBubbles.Bubble b in probe.Bubbles)
+        {
+            float d = Vector3.DistanceSquared(new Vector3(b.Origin.X, startCenter.Y, b.Origin.Z), startCenter);
+            if (d < best) { best = d; emitter = b.Origin; found = true; }
+        }
+
+        // Verify §2.6 placement: no bubble emitter shares a cell with a jewel or an oil slick.
+        const float cs2 = MazeGeometryBuilder.CellSize;
+        var featureCells = new HashSet<(int, int)>();
+        foreach ((Vector3 c, float _) in MazeJewels.Placements(probe.Maze, jewels))
+            featureCells.Add(((int)MathF.Floor(c.X / cs2), (int)MathF.Floor(c.Z / cs2)));
+        foreach ((int gx, int gy, int _, float _) in MazeOilSlicks.Cells(probe.Maze, oil))
+            featureCells.Add((gx, gy));
+        int overlaps = probe.Bubbles.Count(b =>
+            featureCells.Contains(((int)MathF.Floor(b.Origin.X / cs2), (int)MathF.Floor(b.Origin.Z / cs2))));
+        Console.WriteLine($"  jewel+oil cells: {featureCells.Count}, bubble/feature cell overlaps: {overlaps} (want 0)");
+
+        // Snapshot the streams mid-flight (phases are staggered, so any time fills the whole column);
+        // the rendered bubbles sit at these animated positions, proving the per-frame refit path.
+        IReadOnlyList<MazeBubbles.Bubble> flights = probe.Bubbles;
+        var centers = new Vector3[flights.Count];
+        var radii = new float[flights.Count];
+        const float animTime = 1.3f;
+        MazeBubbles.Animate(flights, bubbles, animTime, centers, radii);
+
+        Camera camera = probe.Camera;
+        var extraLights = new List<Light>();
+        if (found)
+        {
+            Vector3 streamMid = emitter + new Vector3(0, bubbles.RiseHeight * 0.5f, 0);
+            Vector3 worldUp = new(0, 1, 0);
+            // Stand back in an adjacent open cell (through a passage) so the whole rising column is in
+            // frame — the cell is only one unit wide, so there is no room to step back within it.
+            int gx = (int)MathF.Floor(emitter.X / cs);
+            int gy = (int)MathF.Floor(emitter.Z / cs);
+            Vector3 dir = new(0, 0, -1); // fallback
+            if (!probe.Maze.HasWall(gx, gy, Wall.North)) dir = new Vector3(0, 0, -1);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.South)) dir = new Vector3(0, 0, 1);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.West)) dir = new Vector3(-1, 0, 0);
+            else if (!probe.Maze.HasWall(gx, gy, Wall.East)) dir = new Vector3(1, 0, 0);
+
+            Vector3 pos = new(emitter.X + dir.X * cs * 1.3f, eye, emitter.Z + dir.Z * cs * 1.3f);
+            camera = new Camera
+            {
+                Position = pos,
+                Rotation = LookRotation(pos, streamMid, worldUp),
+                Fov = MathF.PI / 3.2f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            // A bright fill on the camera side (the "sky" the bubbles' fronts reflect → vivid film
+            // colour) plus a soft light beyond the stream so the see-through shells have something to
+            // transmit. Behind it the lit corridor completes the environment.
+            extraLights.Add(new Light { Position = pos + new Vector3(0, 0.6f, 0), Color = Vector3.One });
+            extraLights.Add(new Light { Position = streamMid - dir * cs * 0.8f + new Vector3(0, 0.3f, 0), Color = new Vector3(0.5f) });
+        }
+        else
+        {
+            Console.WriteLine("  (no emitter found — using default camera)");
+        }
+
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), bubbles: bubbles, jewels: jewels, oilSlicks: oil,
+            extraLights: extraLights, wallThickness: 0.12f);
+        Console.WriteLine($"  bubbles packed: {built.Packed.Spheres.Count}");
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: showRat);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        // A rat that slides across the floor in front of the stream, to show the moving-rat smear too.
+        Vector3 ratBase = found ? new Vector3(emitter.X, 0.25f, emitter.Z) : camera.Position;
+        Vector3 camRight = Vector3.Normalize(Vector3.Transform(Vector3.UnitX, camera.Rotation) * new Vector3(1, 0, 1));
+
+        bool hasBubbles = built.Packed.Spheres.Count > 0;
+        if (drift && hasBubbles)
+        {
+            // Mirror the product cadence with a STILL camera: every frame advance the bubbles (and slide
+            // the rat) and refit the sphere BLAS/TLAS, rendering with moving:false. The bubbles/rat
+            // self-reset per pixel (hitMask 3/2 in the shader), so the static scene converges around them
+            // while they stay put — the whole point is far fewer fireflies than forcing motion mode.
+            const float dt = 1f / 60f;
+            for (int f = 0; f < frames; f++)
+            {
+                MazeBubbles.Animate(built.Bubbles, bubbles, animTime + f * dt, centers, radii);
+                renderer.UpdateSpheres(centers, radii);
+                if (showRat)
+                {
+                    float s = frames > 1 ? (float)f / (frames - 1) : 0.5f; // 0→1 across the run
+                    renderer.SetRatPosition(ratBase + camRight * float.Lerp(-0.4f, 0.4f, s)); // slow amble
+                }
+                renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+            }
+        }
+        else
+        {
+            // Move the bubbles to their animated positions and refit once (§2.6), then converge a
+            // still at those positions — the same moving-sphere path, shown noise-free.
+            if (hasBubbles)
+                renderer.UpdateSpheres(centers, radii);
+            for (int f = 0; f < frames; f++)
+                renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        }
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    // A diffuse material with a smooth RGB-derived spectral reflectance (for coloured demo props).
+    private static MaterialData ColoredDiffuse(string id, Vector3 rgb)
+    {
+        const int min = 360, max = 830, step = 5;
+        int count = (max - min) / step + 1;
+        var wavelengths = new int[count];
+        var values = new float[count];
+        for (int i = 0; i < count; i++)
+        {
+            int w = min + i * step;
+            wavelengths[i] = w;
+            // Broad, overlapping RGB bands so the colour reads without harsh spectral edges.
+            float r = MathF.Exp(-MathF.Pow((w - 620f) / 70f, 2f));
+            float g = MathF.Exp(-MathF.Pow((w - 540f) / 60f, 2f));
+            float b = MathF.Exp(-MathF.Pow((w - 460f) / 55f, 2f));
+            values[i] = Math.Clamp(rgb.X * r + rgb.Y * g + rgb.Z * b, 0f, 1f);
+        }
+        return new MaterialData(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            new SpectralData(wavelengths, values, (float[])values.Clone()), SurfaceKind.Diffuse);
+    }
+
+    /// <summary>
+    /// Headless analytic-sphere demo (spectral-effects-plan §0.4): a diffuse ball on a floor
+    /// in front of a lit wall. It verifies the procedural-AABB sphere renders as a genuinely
+    /// round object with a smooth shading gradient (the analytic normal) and a circular
+    /// silhouette — not a faceted quad-sphere. Converges a still through Phase 6 and writes a PNG.
+    /// </summary>
+    private static int RunSphereDemo(int frames, string savePath, float sampleClamp)
+    {
+        if (frames <= 0) frames = 400;
+        Console.WriteLine($"RayTracer.Gpu — sphere demo ({frames} frames) -> {savePath}");
+
+        const float H = 3.0f, backZ = 7.0f;
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -1f, backZ + 0.5f, FlatDiffuse("sph-floor", 0.4f)),
+            WallZ(backZ, -6f, 6f, 0f, H, FlatDiffuse("sph-wall", 0.6f)),
+            // Three diffuse balls at different radii/positions to show the round silhouette.
+            new Sphere(new Vector3(0f, 1.1f, 4.2f), 1.0f, FlatDiffuse("sph-a", 0.82f)),
+            new Sphere(new Vector3(-2.1f, 0.6f, 5.0f), 0.6f, FlatDiffuse("sph-b", 0.82f)),
+            new Sphere(new Vector3(2.0f, 0.45f, 3.4f), 0.45f, FlatDiffuse("sph-c", 0.82f)),
+        };
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(0f, 1.7f, 0.2f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0.9f, 4.5f), worldUp),
+            Fov = MathF.PI / 3f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        var lights = new List<Light>
+        {
+            new() { Position = new Vector3(-2.5f, 2.6f, 2.0f), Color = Vector3.One },
+            new() { Position = new Vector3(2.5f, 2.4f, 5.0f), Color = new Vector3(0.6f) },
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+        Console.WriteLine($"  spheres packed: {packed.Spheres.Count}");
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless Beer–Lambert absorption demo (spectral-effects-plan §2.3): a wedge of
+    /// coloured glass (thin at the top, thick at the bottom) stands in front of a brightly
+    /// lit white wall. Because each in-glass segment is attenuated by <c>exp(−σ(λ)·distance)</c>
+    /// with a wavelength-dependent σ, the wall seen through the thin top is only faintly
+    /// tinted, while through the thick bottom it deepens to a dark, saturated colour — the
+    /// continuous hue-vs-thickness gradient RGB can't reproduce. Converges a still through
+    /// the shipping Phase 6 pipeline and writes a PNG.
+    /// </summary>
+    private static int RunAbsorptionDemo(int frames, string savePath, float sampleClamp)
+    {
+        if (frames <= 0) frames = 700; // dielectric roulette is hero-only → noisy
+        Console.WriteLine($"RayTracer.Gpu — absorption demo ({frames} frames) -> {savePath}");
+
+        const float H = 3.0f, midY = 1.5f, backZ = 6.0f;
+
+        // Red glass: transmits red, absorbs green/blue increasingly with depth.
+        var redGlass = new MaterialData(
+            "abs-glass", "Glass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.98f, cauchyA: 1.5f, cauchyB: 0f,
+            absorptionRgb: new Vector3(0.3f, 4.0f, 6.0f));
+
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -1f, backZ + 0.5f, FlatDiffuse("abs-floor", 0.35f)),
+            FloorQuad(H, -6f, 6f, -1f, backZ + 0.5f, FlatDiffuse("abs-ceil", 0.6f)),
+            WallZ(backZ, -6f, 6f, 0f, H, FlatDiffuse("abs-wall", 0.92f)), // bright white backdrop
+        };
+
+        // A glass wedge: front face vertical at z=3.2; back face tilted so the glass is thin
+        // (0.05) at the top and thick (1.3) at the bottom. Two quads (open sides); a horizontal
+        // view ray enters the front and exits the back, travelling the wedge's local thickness.
+        const float fz = 3.2f, halfW = 1.6f, yb = 0.35f, yt = H - 0.2f, tThin = 0.05f, tThick = 1.3f;
+        // Front (vertical).
+        scene.Add(new TracableRectangle(
+            (new Vector3(-halfW, yb, fz), new Vector3(halfW, yb, fz), new Vector3(-halfW, yt, fz)), redGlass));
+        // Back (tilted: z = fz + tThin at the top, fz + tThick at the bottom).
+        scene.Add(new TracableRectangle(
+            (new Vector3(-halfW, yt, fz + tThin), new Vector3(halfW, yt, fz + tThin), new Vector3(-halfW, yb, fz + tThick)),
+            redGlass));
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(0f, midY, 0.2f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, midY, backZ), worldUp),
+            Fov = MathF.PI / 3f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        var lights = new List<Light>
+        {
+            new() { Position = new Vector3(-2.5f, H * 0.8f, backZ - 1.5f), Color = Vector3.One },
+            new() { Position = new Vector3(2.5f, H * 0.8f, backZ - 1.5f), Color = Vector3.One },
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless thin-film interference demo (spectral-effects-plan §2.2): a back wall made
+    /// of many vertical strips whose film thickness climbs left→right, so at (near) normal
+    /// incidence each strip constructively reflects a different wavelength — the interference
+    /// spectrum sweeps the rainbow across the wall. RGB has no wavelength to plug into
+    /// <c>Δφ = 4π·n·d·cosθ/λ</c>, so this colour is impossible without a spectral renderer.
+    /// Converges a still through the shipping Phase 6 pipeline and writes a PNG.
+    /// </summary>
+    private static int RunThinFilmDemo(int frames, string savePath, float sampleClamp)
+    {
+        if (frames <= 0) frames = 500;
+        Console.WriteLine($"RayTracer.Gpu — thin-film demo ({frames} frames) -> {savePath}");
+
+        const float H = 3.0f, midY = 1.4f, backZ = 6.0f;
+        const int strips = 48;
+        const float x0 = -4.6f, x1 = 4.6f;
+
+        var floorMat = FlatDiffuse("tf-floor", 0.18f);
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, x0 - 1f, x1 + 1f, -1f, backZ + 0.5f, floorMat),
+            FloorQuad(H, x0 - 1f, x1 + 1f, -1f, backZ + 0.5f, floorMat),
+        };
+
+        // Vertical thin-film strips, thickness climbing 250 → 720 nm across the wall.
+        for (int i = 0; i < strips; i++)
+        {
+            float sx0 = x0 + (x1 - x0) * i / strips;
+            float sx1 = x0 + (x1 - x0) * (i + 1) / strips;
+            float thickness = 250f + (720f - 250f) * i / (strips - 1);
+            var film = new MaterialData(
+                $"tf-{i}", "Film", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+                FlatSpectrum(0.95f), SurfaceKind.ThinFilm, cauchyA: 1.4f, filmThicknessNm: thickness);
+            scene.Add(WallZ(backZ, sx0, sx1, 0f, H, film));
+        }
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(0f, midY, 0.3f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, midY, backZ), worldUp),
+            Fov = MathF.PI / 3f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        var lights = new List<Light>
+        {
+            new() { Position = new Vector3(-2.5f, H * 0.8f, backZ - 2.0f), Color = Vector3.One },
+            new() { Position = new Vector3(2.5f, H * 0.8f, backZ - 2.0f), Color = Vector3.One },
+            new() { Position = new Vector3(0f, H * 0.6f, 1.5f), Color = Vector3.One },
         };
 
         PackedScene packed = GpuScenePacker.Pack(scene);

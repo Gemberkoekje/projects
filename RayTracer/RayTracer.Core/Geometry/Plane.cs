@@ -28,6 +28,6 @@ public class Plane(Vector3 point, Vector3 normal, MaterialData material) : Traca
             return null;
         var faceNormal = denom < 0 ? n : -n;
         return HitInfo.FromMaterial(d, l0 + l * d, faceNormal, null,
-            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength);
+            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength, ray.Direction);
     }
 }

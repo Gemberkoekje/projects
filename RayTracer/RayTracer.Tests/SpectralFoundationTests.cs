@@ -100,9 +100,11 @@ public sealed class SpectralFoundationTests
         Assert.IsFalse(Optics.IsWavelengthDependent(SurfaceKind.Diffuse));
         Assert.IsFalse(Optics.IsWavelengthDependent(SurfaceKind.Mirror));
         Assert.IsFalse(Optics.IsWavelengthDependent(SurfaceKind.Emissive));
+        // Thin-film modulates reflectance only; its reflection geometry is the same for
+        // every wavelength, so companions validly share the path (§2.2) — not hero-only.
+        Assert.IsFalse(Optics.IsWavelengthDependent(SurfaceKind.ThinFilm));
 
         Assert.IsTrue(Optics.IsWavelengthDependent(SurfaceKind.Dielectric));
-        Assert.IsTrue(Optics.IsWavelengthDependent(SurfaceKind.ThinFilm));
         Assert.IsTrue(Optics.IsWavelengthDependent(SurfaceKind.Grating));
         Assert.IsTrue(Optics.IsWavelengthDependent(SurfaceKind.Fluorescent));
     }
@@ -148,7 +150,7 @@ public sealed class SpectralFoundationTests
     public void FromMaterial_DiffuseMaterial_LeavesOpticalDefaults()
     {
         var diffuse = MakeDiffuse(roughness: 0.3f);
-        var hit = HitInfo.FromMaterial(2f, Vector3.Zero, Vector3.UnitY, null, 0.42f, diffuse, 550);
+        var hit = HitInfo.FromMaterial(2f, Vector3.Zero, Vector3.UnitY, null, 0.42f, diffuse, 550, -Vector3.UnitY);
 
         Assert.AreEqual(0.42f, hit.Reflectance);
         Assert.AreEqual(0.3f, hit.Roughness);
@@ -161,7 +163,7 @@ public sealed class SpectralFoundationTests
     public void FromMaterial_DielectricMaterial_ResolvesOpticalChannels()
     {
         var glass = MakeGlass(cauchyA: 1.5f, cauchyB: 0.004f, transmission: 0.95f);
-        var hit = HitInfo.FromMaterial(2f, Vector3.Zero, Vector3.UnitY, null, 0.05f, glass, 400);
+        var hit = HitInfo.FromMaterial(2f, Vector3.Zero, Vector3.UnitY, null, 0.05f, glass, 400, -Vector3.UnitY);
 
         Assert.AreEqual(SurfaceKind.Dielectric, hit.Surface);
         Assert.AreEqual(0.95f, hit.Transmission, 1e-6f);

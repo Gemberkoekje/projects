@@ -72,8 +72,9 @@ public struct GpuPrimitive
     /// <summary>The primary material's index of refraction (constant / base Cauchy A),
     /// for dielectric refraction. 1 for non-refracting surfaces.</summary>
     public float Ior;
-    /// <summary>The primary material's Cauchy B dispersion coefficient (µm²). The
-    /// wavelength-dependent IOR is <c>Ior + CauchyB / λ_µm²</c>; 0 = non-dispersive,
-    /// so the effective IOR is the constant <see cref="Ior"/>. (spectral-effects-plan §2.1)</summary>
+    /// <summary>Dual-purpose optical scratch slot keyed on <see cref="Surface"/>:
+    /// for a dielectric it is the Cauchy B dispersion coefficient (µm²), so the
+    /// wavelength-dependent IOR is <c>Ior + CauchyB / λ_µm²</c> (§2.1); for a thin-film
+    /// surface it is the film thickness in nanometres (§2.2). 0 = non-dispersive / no film.</summary>
     public float CauchyB;
 }

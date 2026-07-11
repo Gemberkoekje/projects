@@ -98,6 +98,42 @@ emitted wavelength depends on λ.
 guard), and a single refracting quad bends a ray by the Snell-predicted angle in a
 unit test.
 
+### 0.4 Analytic sphere primitive (procedural geometry)
+
+*A later-identified foundation: 0.1–0.3 were built up front; this one is only needed
+once truly round objects are wanted (soap bubbles §2.6, and any future ball/planet). The
+engine is otherwise **quad-only** — every primitive is a parallelogram and the GPU BLAS
+is `RaytracingGeometryType.Triangles` (a quad = 2 triangles) indexed by
+`PrimitiveIndex >> 1`.*
+
+- **What:** a first-class `Sphere` with an exact ray/sphere intersection and a smooth
+  outward normal, so a ball is genuinely round rather than a faceted quad-sphere. (A
+  tessellated quad-sphere is the cheap alternative and needs no pipeline change, but its
+  per-facet flat normals *band* any normal-sensitive shading — thin-film colour in
+  particular — so a real bubble wants the analytic surface.)
+- **CPU (easy):** add `Sphere : Tracable` — solve the quadratic in `Intersect`, return a
+  `HitInfo` with normal `(hit − center)/r`; `Bounds` is the AABB `center ± r`. The BVH
+  already accepts any `Tracable` by its `Bounds`, so **no BVH change**.
+- **GPU (the real work):** inline `RayQuery` can traverse *procedural* geometry, so no
+  separate intersection-shader hit group / SBT is needed, but the pipeline must grow:
+  1. Build a second geometry of type `RaytracingGeometryType.ProceduralPrimitiveAABBs`
+     (one AABB per sphere) in the BLAS (or a second BLAS under the TLAS).
+  2. In each shader's `RayQuery` loop, handle `CANDIDATE_PROCEDURAL_PRIMITIVE`: solve the
+     ray/sphere quadratic in HLSL and `CommitProceduralPrimitiveHit(t)` when nearer.
+  3. Add a parallel `Spheres` structured buffer (center, radius, `SurfaceKind`, material
+     row, IOR/film params) indexed by the committed procedural index; compute the smooth
+     normal analytically at the hit.
+  4. Mirror all of this in the CPU reference tracer (`BvhSceneTracer` / `Phase2Reference`)
+     so the HLSL stays a line-for-line port; touches all six `PathTracePhase*.hlsl`
+     traversals. **Gate it** so triangle-only scenes stay byte-identical (goldens).
+- **Moving spheres** (a bubble drifts): refit/rebuild the small procedural-AABB BLAS per
+  frame, or keep the sphere set static and pass motion as a constant — note the
+  AS-update cost.
+- **Dependencies:** none new. **Effort:** Medium–High (GPU pipeline; CPU trivial).
+- **Verify:** a lit sphere renders as a round ball with correct smooth shading and a
+  circular silhouette; CPU↔reference parity on a sphere scene; a `--sphere-selftest` on
+  the DXR box; goldens unchanged.
+
 ---
 
 ## Phase 1 — Generic optics (foundation payoff)
@@ -240,6 +276,39 @@ Ordered by impact-to-effort. Each is something an RGB renderer gets wrong or can
 - **Effort:** Medium–High. **Verify:** white sun + Rayleigh → blue zenith, warm
   horizon; sunset reddens as sun elevation drops.
 
+### 2.6 Soap bubbles — spherical, see-through, thin-film ⭐
+
+- **What:** a truly spherical, mostly-transparent bubble sheathed in a thin iridescent
+  film, drifting through open cells — the canonical thin-film-on-a-sphere. Distinct from
+  the §2.2 oil slick (a flat, opaque, lit iridescent albedo): a bubble is *round*,
+  *see-through*, and its colour is a Fresnel *reflection* tinted by interference.
+- **Why spectral:** the iridescence is the §2.2 per-wavelength interference; on a curved
+  shell it forms smooth concentric colour rings that shift with view angle and drain to
+  a dark crown where the film thins — a look RGB cannot produce.
+- **Ingredients (each independently visible):**
+  1. **Spherical geometry (§0.4).** The analytic sphere, so the shell is smooth — a
+     faceted quad-sphere would band the normal-sensitive film colour.
+  2. **See-through (thin-shell dielectric).** A bubble is a ~sub-micron shell of soapy
+     water between air and air, i.e. two near-coincident interfaces: net refraction ≈ 0
+     (the room shows through nearly undistorted), just a small lateral nudge plus a
+     Fresnel reflection. Model it as one surface that splits into a Fresnel-reflected ray
+     + a transmitted ray (reuse §1.2 Fresnel), with **no interior path** (thin-shell
+     approximation). The grazing rim goes strongly reflective — the bright bubble edge.
+  3. **Thin-film on the shell.** Modulate the *reflected* (Fresnel) component by the §2.2
+     factor `R(λ, d, cosθ)` at the ray's wavelength; transmit the complement. Vary
+     thickness `d` over the sphere — thicker at the bottom, thinning toward the top under
+     "gravity" — for the classic top-drains-to-black gradient (constant `d` also works;
+     angle alone already gives rings).
+  4. **Drift + pop.** Animate the sphere centre through an open cell (bob/drift), respawn
+     on "pop"; needs the moving-sphere AS handling from §0.4.
+- **Scene hook:** a bubble drifting through a roofless/open cell or near a vent,
+  reflecting the lit cell and its neighbours; a small cluster as a set-piece.
+- **Dependencies:** **§0.4 (sphere), §1.2 (dielectric/Fresnel), §2.2 (thin-film).**
+- **Effort:** Medium (given the three deps — mostly a new material combining them).
+- **Verify:** a still bubble shows smooth concentric interference rings that rotate with
+  camera angle; the room is visible through it with a bright Fresnel rim; increasing the
+  top-thinning drains colour to a dark crown at the top.
+
 ---
 
 ## Phase 3 — Exotic showpieces (maximum "how is it doing that?")
@@ -293,7 +362,10 @@ Lower priority, highest novelty. Each is a strong standalone demo.
    once the foundation exists.
 4. **1.3 Water** (flat → ripples → depth tint → caustics), reusing dielectric + 2.3.
 5. **2.3 Absorption**, then **2.4 Blackbody** + **2.5 Rayleigh** for the atmospheric arc.
-6. **Phase 3** exotics as showcase set-pieces.
+6. **0.4 Analytic spheres → 2.6 Soap bubbles** — schedulable any time after 2.2; the only
+   new engine work is the procedural-AABB sphere primitive, after which the bubble is a
+   thin-shell dielectric (1.2) whose Fresnel reflection is tinted by thin-film (2.2).
+7. **Phase 3** exotics as showcase set-pieces.
 
 ## Cross-cutting concerns
 

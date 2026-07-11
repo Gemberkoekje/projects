@@ -4,15 +4,15 @@ using RayTracer;
 namespace RayTracer.Tests;
 
 /// <summary>
-/// GPU-port parity for Phase 1.2 clear dielectric (glass). Pins the pure-C# GPU
-/// replica (<see cref="Phase2Reference.ShadeSample"/>, whose dielectric branch the
-/// HLSL <c>PathTracePhase*.hlsl</c> shaders port) to the CPU renderer's own
-/// <c>JobSystem.TraceCore</c> over a scene whose primary rays strike a glass pane in
-/// front of a lit wall. The Fresnel reflect/refract roulette is deterministic given
-/// the pixel/sample seed, so per-sample the two must agree.
+/// GPU-port parity for Phase 2.2 thin-film iridescence. Thin-film is a reflectance-only
+/// modulation whose reflection geometry is wavelength-independent, so — unlike glass — it
+/// keeps the ordinary companion-wavelength diffuse path on both sides. This pins the pure-C#
+/// GPU replica (<see cref="Phase2Reference.ShadeSample"/>, whose thin-film branch the HLSL
+/// <c>PathTracePhase6.hlsl</c> ports) to the CPU renderer's <c>JobSystem.TraceCore</c> over a
+/// scene whose primary rays strike an iridescent panel, so per sample the two must agree.
 /// </summary>
 [TestClass]
-public sealed class GpuGlassTests
+public sealed class GpuThinFilmTests
 {
     private const int Width = 64;
     private const int Height = 48;
@@ -30,13 +30,10 @@ public sealed class GpuGlassTests
         return new SpectralData(wavelengths.ToArray(), v, (float[])v.Clone());
     }
 
-    private static MaterialData Diffuse(string id, SpectralData spectrum)
-        => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, spectrum, SurfaceKind.Diffuse);
-
-    private static MaterialData Glass(string id, float ior, float cauchyB = 0f, Vector3 absorptionRgb = default)
+    // A flat-albedo iridescent film: neutral base, thickness d, film IOR in CauchyA.
+    private static MaterialData Film(string id, float thicknessNm, float filmIor = 1.4f)
         => new(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
-            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.95f, cauchyA: ior, cauchyB: cauchyB,
-            absorptionRgb: absorptionRgb);
+            Spectrum(_ => 0.9f), SurfaceKind.ThinFilm, cauchyA: filmIor, filmThicknessNm: thicknessNm);
 
     private static TracableRectangle Wall(float zPlane, MaterialData material)
     {
@@ -51,13 +48,13 @@ public sealed class GpuGlassTests
         Tracable[] Tracables, PackedScene Packed, SpectralResources Res,
         Light[] Lights, Vector3[] LightPositions, Camera Camera);
 
-    private static Scene Build(float cauchyB = 0f, Vector3 absorptionRgb = default)
+    private static Scene Build()
     {
-        var glass = Glass("glass", ior: 1.5f, cauchyB: cauchyB, absorptionRgb: absorptionRgb);
-        var wall = Diffuse("wall", Spectrum(w => 0.05f + 0.80f * Math.Clamp((w - 500f) / 150f, 0f, 1f)));
-
-        var scene = new Tracable[] { Wall(2f, glass), Wall(6f, wall) };
-        var lights = new[] { new Light { Position = new Vector3(1.5f, 1.0f, 4.5f), Color = Vector3.One } };
+        // A tilted iridescent panel so primary rays hit it across a spread of angles
+        // (goniochromism), backed by nothing — the film's own albedo is what shows.
+        var film = Film("film", thicknessNm: 320f);
+        var scene = new Tracable[] { Wall(3f, film) };
+        var lights = new[] { new Light { Position = new Vector3(1.0f, 1.5f, 0.5f), Color = Vector3.One } };
 
         var wl = new WavelengthLookup();
         var packed = GpuScenePacker.Pack(scene);
@@ -120,51 +117,24 @@ public sealed class GpuGlassTests
     [TestMethod]
     [DataRow(LightingMode.NEE, DisplayName = "NEE")]
     [DataRow(LightingMode.None, DisplayName = "None")]
-    public void GlassShadeSample_MatchesTraceCore(LightingMode mode) => RunParity(Build(), mode);
-
-    /// <summary>
-    /// Dispersion parity (spectral-effects-plan §2.1): a strongly dispersive glass
-    /// (<c>CauchyB &gt; 0</c>) refracts each hero wavelength by a different angle, so the
-    /// refracted ray lands on a different part of the wall per wavelength. Both the CPU
-    /// renderer and the GPU replica resolve the IOR from the same hero wavelength
-    /// (<c>MaterialData.IorAt</c> vs <c>Phase2Reference.IorAtHero</c>), so they must still
-    /// agree per sample — this pins that the reference's wavelength-dependent IOR matches.
-    /// </summary>
-    [TestMethod]
-    [DataRow(LightingMode.NEE, DisplayName = "NEE")]
-    [DataRow(LightingMode.None, DisplayName = "None")]
-    public void DispersiveGlassShadeSample_MatchesTraceCore(LightingMode mode) => RunParity(Build(cauchyB: 0.02f), mode);
-
-    /// <summary>
-    /// Beer–Lambert absorption parity (spectral-effects-plan §2.3): a coloured glass with a
-    /// wavelength-dependent σ attenuates each in-glass segment by <c>exp(−σ(λ)·distance)</c>.
-    /// Both the CPU renderer and the GPU replica resolve σ from the same hero wavelength
-    /// (<c>MaterialData.ExtinctionAt</c> vs the reference's <c>AbsorptionAtHero</c>, both
-    /// driven by <c>Optics.AbsorptionAt</c>), so they must still agree per sample.
-    /// </summary>
-    [TestMethod]
-    [DataRow(LightingMode.NEE, DisplayName = "NEE")]
-    [DataRow(LightingMode.None, DisplayName = "None")]
-    public void ColouredGlassShadeSample_MatchesTraceCore(LightingMode mode)
-        => RunParity(Build(absorptionRgb: new Vector3(0.3f, 2.5f, 3.5f)), mode);
-
-    private static void RunParity(Scene s, LightingMode mode)
+    public void ThinFilmShadeSample_MatchesTraceCore(LightingMode mode)
     {
+        var s = Build();
         var js = BuildGroundTruth(s, mode);
         var tracer = new BvhSceneTracer(s.Tracables, s.Res.DeterWavelengths[0]);
 
-        int compared = 0, glassHits = 0, lit = 0;
+        int compared = 0, filmHits = 0, coloured = 0;
         for (uint sampleIdx = 0; sampleIdx < 4; sampleIdx++)
         {
-            for (int y = 4; y < Height; y += 7)
+            for (int y = 4; y < Height; y += 6)
             {
-                for (int x = 4; x < Width; x += 7)
+                for (int x = 4; x < Width; x += 6)
                 {
                     Vector3 dir = PrimaryDir(s.Camera, x, y);
                     if (!tracer.ClosestHit(s.Camera.Position, dir, out int quad, out _))
                         continue;
-                    if (s.Packed.Primitives[quad].Surface == (uint)SurfaceKind.Dielectric)
-                        glassHits++;
+                    if (s.Packed.Primitives[quad].Surface == (uint)SurfaceKind.ThinFilm)
+                        filmHits++;
 
                     var truth = TraceOneSample(js, s.Camera, x, y, sampleIdx);
 
@@ -179,13 +149,13 @@ public sealed class GpuGlassTests
                     AssertClose(truth.direct, refDirect, $"direct {at}");
 
                     compared++;
-                    if (refTotal.Y > 1e-4f) lit++;
+                    if (refTotal.Y > 1e-4f) coloured++;
                 }
             }
         }
 
         Assert.IsTrue(compared > 50, $"expected many comparisons, got {compared}");
-        Assert.IsTrue(glassHits > 50, $"primary rays should strike the glass, got {glassHits}");
-        Assert.IsTrue(lit > 0, "glass transmitting the lit wall should be non-black somewhere");
+        Assert.IsTrue(filmHits > 50, $"primary rays should strike the film, got {filmHits}");
+        Assert.IsTrue(coloured > 0, "the iridescent film should be non-black somewhere");
     }
 }

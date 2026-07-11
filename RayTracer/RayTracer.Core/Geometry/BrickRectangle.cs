@@ -106,7 +106,7 @@ public class BrickRectangle : Plane, Tracable, IQuadPrimitive
 
         float reflectance = mat.GetSpectralReflectance((int)ray.Wavelength) * attenuation;
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, mat, (int)ray.Wavelength);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, mat, (int)ray.Wavelength, ray.Direction);
     }
 
     private bool IsMortar(float u, float w)

@@ -362,12 +362,46 @@ public class MaterialData
     public float CauchyB { get; }
 
     /// <summary>
-    /// Base Beer–Lambert absorption coefficient σ (per world unit) for light
-    /// travelling inside the medium. Spectral variation of σ arrives with the
-    /// absorption effect (spectral-effects-plan.md §2.3); for now this is a
-    /// single control value, 0 for non-absorbing media.
+    /// Base (wavelength-flat) Beer–Lambert absorption coefficient σ (per world unit) for
+    /// light travelling inside the medium — a uniform darkening added on top of the coloured
+    /// <see cref="AbsorptionRgb"/>. 0 for non-absorbing media.
     /// </summary>
     public float ExtinctionSigma { get; }
+
+    /// <summary>
+    /// Coloured Beer–Lambert absorption: the σ (per world unit) at the red (630 nm), green
+    /// (532 nm), and blue (465 nm) anchors, interpolated across the spectrum by
+    /// <see cref="Optics.AbsorptionAt"/>. A coloured glass absorbs the complement of its
+    /// tint, so light through it shifts hue and darkens with depth (spectral-effects-plan
+    /// §2.3). Default (0,0,0) = clear.
+    /// </summary>
+    public Vector3 AbsorptionRgb { get; }
+
+    /// <summary>
+    /// Thin-film thickness <c>d</c> in nanometres for iridescent surfaces
+    /// (<see cref="SurfaceKind.ThinFilm"/> — soap bubble, oil slick, beetle shell).
+    /// The reflectance is modulated by two-beam interference across the film
+    /// (<c>Optics.ThinFilmReflectance</c>), with the film's index of refraction taken
+    /// from <see cref="CauchyA"/>. Zero means no film (spectral-effects-plan.md §2.2).
+    /// </summary>
+    public float FilmThicknessNm { get; }
+
+    /// <summary>
+    /// Amplitude (nm) of a smooth per-position variation added to
+    /// <see cref="FilmThicknessNm"/> for thin-film surfaces, so a single flat quad shows
+    /// gently-shifting interference colour across it (the swirl of an oil slick) rather
+    /// than one flat hue. 0 = uniform film. The variation is <c>Optics.FilmSwirl(x,z)</c>
+    /// keyed on world position (spectral-effects-plan §2.2).
+    /// </summary>
+    public float FilmSpatialAmpNm { get; }
+
+    /// <summary>
+    /// Saturation of the thin-film interference in [0,1]: the reflectance factor is pulled
+    /// toward its mean (½) by <c>factor = ½ + FilmContrast·(sin²φ − ½)</c>. 1 = full,
+    /// vivid interference (default); lower values give a subtler, pastel sheen (an oil
+    /// slick rather than a neon rainbow). Only affects <see cref="SurfaceKind.ThinFilm"/>.
+    /// </summary>
+    public float FilmContrast { get; }
 
     public bool HasSpectralData => SpectralData != null;
 
@@ -390,7 +424,11 @@ public class MaterialData
         float transmission = 0f,
         float cauchyA = 1f,
         float cauchyB = 0f,
-        float extinctionSigma = 0f)
+        float extinctionSigma = 0f,
+        float filmThicknessNm = 0f,
+        float filmSpatialAmpNm = 0f,
+        float filmContrast = 1f,
+        Vector3 absorptionRgb = default)
     {
         Id = id;
         Name = name;
@@ -411,6 +449,10 @@ public class MaterialData
         CauchyA = cauchyA;
         CauchyB = cauchyB;
         ExtinctionSigma = extinctionSigma;
+        FilmThicknessNm = filmThicknessNm;
+        FilmSpatialAmpNm = filmSpatialAmpNm;
+        FilmContrast = filmContrast;
+        AbsorptionRgb = absorptionRgb;
     }
 
     // Convenience property to get the RGB reflectance as a Vector3
@@ -450,9 +492,13 @@ public class MaterialData
     }
 
     /// <summary>
-    /// Beer–Lambert absorption coefficient σ at the given wavelength. Currently a
-    /// wavelength-flat value (<see cref="ExtinctionSigma"/>); the spectral
-    /// absorption effect will make this vary with λ (spectral-effects-plan.md §2.3).
+    /// Beer–Lambert absorption coefficient σ at the given wavelength: the coloured
+    /// <see cref="AbsorptionRgb"/> anchors (plus the uniform <see cref="ExtinctionSigma"/>)
+    /// interpolated across the spectrum (spectral-effects-plan.md §2.3).
     /// </summary>
-    public float ExtinctionAt(int wavelength) => ExtinctionSigma;
+    public float ExtinctionAt(int wavelength) => Optics.AbsorptionAt(
+        AbsorptionRgb.X + ExtinctionSigma,
+        AbsorptionRgb.Y + ExtinctionSigma,
+        AbsorptionRgb.Z + ExtinctionSigma,
+        wavelength);
 }

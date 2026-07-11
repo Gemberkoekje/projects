@@ -24,11 +24,18 @@ internal sealed class Phase3Scene
     public required float CellSize { get; init; }
     public required float EyeHeight { get; init; }
 
+    /// <summary>Streaming-bubble flight descriptors (spectral-effects-plan §2.6), in the same order as
+    /// <see cref="PackedScene.Spheres"/> — bubbles are the only spheres in the maze. Empty when
+    /// bubbles are off. The windowed loop animates these each frame via <c>Phase6Renderer.UpdateSpheres</c>.</summary>
+    public required IReadOnlyList<MazeBubbles.Bubble> Bubbles { get; init; }
+
     public static Phase3Scene Build(int width, int height, int mazeSeed = 12345, int mazeSize = 16, int lightSeed = 777,
         MazeProps.Options? props = null,
         MazeMirrors.Options? mirrors = null,
         MazeWindows.Options? windows = null,
         MazeJewels.Options? jewels = null,
+        MazeOilSlicks.Options? oilSlicks = null,
+        MazeBubbles.Options? bubbles = null,
         IReadOnlyList<Light>? extraLights = null,
         float wallThickness = 0f)
     {
@@ -106,6 +113,41 @@ internal sealed class Phase3Scene
                 tracables = [.. tracables, .. jewelQuads];
         }
 
+        // Iridescent oil puddles on select cell floors (thin-film interference, §2.2).
+        // Gated the same way: null for fixed-seed self-test / golden scenes.
+        if (oilSlicks is not null)
+        {
+            List<Tracable> oilQuads = MazeOilSlicks.Build(maze, oilSlicks);
+            if (oilQuads.Count > 0)
+                tracables = [.. tracables, .. oilQuads];
+        }
+
+        // Streaming soap bubbles — thin-film-on-a-sphere (§2.6), the only spheres (and the only moving
+        // geometry) in the maze. Gated null for fixed-seed self-test / golden scenes so those stay
+        // bit-exact (no spheres ⇒ triangle-only BLAS). The flight list is returned so the windowed
+        // loop can animate the streams each frame; the built spheres go in at their time-0 positions.
+        // A bubble emitter never shares a cell with another feature — collect the occupied cells
+        // (jewels + oil slicks by cell, mirrors + signs by their wall's cell) and exclude them.
+        var occupiedCells = new HashSet<(int, int)>();
+        if (jewels is not null)
+            foreach ((Vector3 c, float _) in MazeJewels.Placements(maze, jewels))
+                occupiedCells.Add(((int)MathF.Floor(c.X / MazeGeometryBuilder.CellSize),
+                                   (int)MathF.Floor(c.Z / MazeGeometryBuilder.CellSize)));
+        if (oilSlicks is not null)
+            foreach ((int gx, int gy, int _, float _) in MazeOilSlicks.Cells(maze, oilSlicks))
+                occupiedCells.Add((gx, gy));
+        foreach ((int gx, int gy, bool _) in decalWalls) occupiedCells.Add((gx, gy));
+        foreach ((int gx, int gy, bool _) in mirrorWalls) occupiedCells.Add((gx, gy));
+
+        IReadOnlyList<MazeBubbles.Bubble> bubbleList = bubbles is not null
+            ? MazeBubbles.Bubbles(maze, bubbles, occupiedCells)
+            : [];
+        if (bubbles is not null && bubbleList.Count > 0)
+        {
+            List<Tracable> bubbleSpheres = MazeBubbles.Build(maze, bubbles, occupiedCells);
+            tracables = [.. tracables, .. bubbleSpheres];
+        }
+
         Light[] lights = MazeGeometryBuilder.BuildLights(
             maze,
             lightSpawnChance: 0.4f,
@@ -145,6 +187,7 @@ internal sealed class Phase3Scene
             Wavelengths = wavelengths,
             CellSize = cs,
             EyeHeight = eyeHeight,
+            Bubbles = bubbleList,
         };
     }
 
@@ -158,7 +201,10 @@ internal sealed class Phase3Scene
 
     /// <summary>
     /// Creates the animated rat's walker (plan §8): its own right-hand-rule navigator starting
-    /// near the maze centre, low to the floor, moving/turning faster than the camera (a scurry).
+    /// near the maze centre, low to the floor. It is now the maze's only traced moving object
+    /// alongside the bubbles, so it moves at a gentle amble rather than a fast scurry — slower
+    /// per-frame motion lets the temporal accumulator hold more consistent samples per pixel, so
+    /// the hero-sampled sprite shows far fewer fireflies while still forcing motion mode.
     /// The <paramref name="ratCam"/> is a throw-away camera whose <c>Position</c> is the rat's
     /// world position each frame.
     /// </summary>
@@ -169,9 +215,9 @@ internal sealed class Phase3Scene
         var navigator = new MazeNavigator(Maze, sx, sy, Direction.East);
         var ctrl = new CameraController(navigator, CellSize, ratHeight)
         {
-            MoveTime = 0.45f,
-            TurnTime = 0.35f,
-            StillTime = 0.25f,
+            MoveTime = 1.6f,
+            TurnTime = 1.2f,
+            StillTime = 1.0f,
         };
         Camera sceneCam = Camera;
         ratCam = new Camera

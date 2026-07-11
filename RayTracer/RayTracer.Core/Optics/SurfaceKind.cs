@@ -29,4 +29,9 @@ public enum SurfaceKind
 
     /// <summary>Self-emitting surface (area/emissive light).</summary>
     Emissive,
+
+    /// <summary>Soap bubble (spectral-effects-plan §2.6): a thin shell that transmits nearly
+    /// straight through (the room shows through) but reflects a thin-film-tinted Fresnel
+    /// component — iridescent rings and a bright grazing rim, on the analytic sphere (§0.4).</summary>
+    Bubble,
 }

@@ -66,7 +66,7 @@ public class TracableRectangle((Vector3 l1, Vector3 l2, Vector3 l3) Location, Ma
         // Material lookup ONLY for confirmed rectangle hits.
         var faceNormal = denom < 0 ? Normal : -Normal;
         return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w),
-            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength);
+            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength, ray.Direction);
     }
 
     private static AABB ComputeBounds((Vector3 l1, Vector3 l2, Vector3 l3) loc)

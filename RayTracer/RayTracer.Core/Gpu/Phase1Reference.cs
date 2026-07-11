@@ -195,17 +195,34 @@ public static class Phase1Reference
         uint heroIdx = HeroIndex(pixelHash, sampleIdx, n50);
         uint stride = (uint)(n50 / CompanionCount);
         int reflBase = (int)row * n50;
+        bool thinFilm = (SurfaceKind)prim.Surface == SurfaceKind.ThinFilm;
 
         Vector3 xyz = Vector3.Zero;
         for (uint k = 0; k < CompanionCount; k++)
         {
             uint idx = (heroIdx + k * stride) % (uint)n50;
             float refl = res.MaterialReflectance[reflBase + (int)idx] * atten;
+            if (thinFilm) refl *= ThinFilmFactor(prim, rayDir, hitPoint, res.DeterWavelengths[idx]);
             var cie = new Vector3(res.DeterXYZ[idx * 4 + 0], res.DeterXYZ[idx * 4 + 1], res.DeterXYZ[idx * 4 + 2]);
             xyz += cie * refl;
         }
 
         return xyz / CompanionCount;
+    }
+
+    /// <summary>
+    /// Thin-film interference factor in [0,1] for a hit at one wavelength (§2.2), or 1 for
+    /// a non-thin-film surface. The GPU replica of the CPU fold in <c>HitInfo.FromMaterial</c>:
+    /// cosθ from the ray and the (unit) geometric normal, film thickness from
+    /// <see cref="GpuPrimitive.CauchyB"/> and film IOR from <see cref="GpuPrimitive.Ior"/>.
+    /// </summary>
+    public static float ThinFilmFactor(in GpuPrimitive prim, Vector3 rayDir, Vector3 hitPoint, int wavelengthNm)
+    {
+        if ((SurfaceKind)prim.Surface != SurfaceKind.ThinFilm) return 1f;
+        float cosTheta = MathF.Abs(Vector3.Dot(Vector3.Normalize(rayDir), new Vector3(prim.NX, prim.NY, prim.NZ)));
+        float thickness = Optics.FilmThicknessAt(prim.CauchyB, prim.P0, hitPoint.X, hitPoint.Z);
+        float raw = Optics.ThinFilmReflectance(cosTheta, wavelengthNm, thickness, prim.Ior);
+        return Optics.ApplyFilmContrast(raw, prim.P1);
     }
 
     /// <summary>

@@ -118,6 +118,15 @@ internal sealed class Phase6Renderer : IDisposable
     private ID3D12Resource _vertexBuffer = null!;
     private ID3D12Resource _indexBuffer = null!;
     private ID3D12Resource _primitiveBuffer = null!;
+    // Analytic spheres (§0.4): a GpuSphere buffer (t8) + a procedural-AABB buffer for the BLAS.
+    // A 1-element dummy when the scene has no spheres, so the SRV binding stays valid and the
+    // BLAS stays triangle-only (byte-identical to the pre-sphere path).
+    private ID3D12Resource _sphereBuffer = null!;
+    private ID3D12Resource _aabbBuffer = null!;
+    private int _sphereCount;
+    // CPU-side copy of the packed spheres, so UpdateSpheres can rewrite just the centre/radius
+    // of moving bubbles (§2.6) while preserving each sphere's material/optical fields.
+    private GpuSphere[] _sphereData = [];
     private ID3D12Resource _deterXyzBuffer = null!;
     private ID3D12Resource _materialReflectanceBuffer = null!;
     private ID3D12Resource _lightBuffer = null!;
@@ -181,6 +190,10 @@ internal sealed class Phase6Renderer : IDisposable
     private ID3D12Resource _blasScratch = null!;
     private ID3D12Resource _tlasScratch = null!;
     private ID3D12Resource _instanceBuffer = null!;
+    // Spheres live in a separate BLAS (§0.4): D3D12 forbids mixing triangle + AABB geometry in
+    // one BLAS, so the TLAS references both (a second instance) when the scene has spheres.
+    private ID3D12Resource _sphereBlas = null!;
+    private ID3D12Resource _sphereBlasScratch = null!;
 
     private IDXGISwapChain3? _swapChain;
     private readonly ID3D12Resource[] _backBuffers = new ID3D12Resource[FrameCount];
@@ -498,6 +511,22 @@ internal sealed class Phase6Renderer : IDisposable
         _indexBuffer = CreateUploadBuffer<uint>(_scene.Indices, _scene.Indices.Length * sizeof(uint));
         int primBytes = _scene.Primitives.Length * Unsafe.SizeOf<GpuPrimitive>();
         _primitiveBuffer = CreateUploadBuffer<GpuPrimitive>(_scene.Primitives, primBytes);
+
+        // Analytic spheres (§0.4): the GpuSphere buffer + a parallel procedural-AABB buffer
+        // (min/max per sphere) for the BLAS. Fall back to a single dummy so the SRV binding is
+        // always valid; the BLAS omits the procedural geometry entirely when _sphereCount == 0.
+        _sphereCount = _scene.Spheres.Count;
+        _sphereData = _sphereCount > 0 ? [.. _scene.Spheres] : [default];
+        _sphereBuffer = CreateUploadBuffer<GpuSphere>(_sphereData, _sphereData.Length * Unsafe.SizeOf<GpuSphere>());
+
+        var aabbs = new float[Math.Max(1, _sphereCount) * 6];
+        for (int i = 0; i < _sphereCount; i++)
+        {
+            GpuSphere s = _scene.Spheres[i];
+            aabbs[i * 6 + 0] = s.CX - s.Radius; aabbs[i * 6 + 1] = s.CY - s.Radius; aabbs[i * 6 + 2] = s.CZ - s.Radius;
+            aabbs[i * 6 + 3] = s.CX + s.Radius; aabbs[i * 6 + 4] = s.CY + s.Radius; aabbs[i * 6 + 5] = s.CZ + s.Radius;
+        }
+        _aabbBuffer = CreateUploadBuffer<float>(aabbs, aabbs.Length * sizeof(float));
     }
 
     private void CreateSpectralResources()
@@ -580,6 +609,7 @@ internal sealed class Phase6Renderer : IDisposable
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(12, 0), ShaderVisibility.All), // 18: ClampHitFrame (u12)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(6, 0), ShaderVisibility.All),   // 19: RgbBasis (t6)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(7, 0), ShaderVisibility.All),   // 20: DecalPixels (t7)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(8, 0), ShaderVisibility.All),   // 21: Spheres (t8, §0.4)
         };
         _traceRootSignature = _device.CreateRootSignature(
             new RootSignatureDescription1(RootSignatureFlags.None, traceParams));
@@ -687,19 +717,22 @@ internal sealed class Phase6Renderer : IDisposable
         int vertexCount = _scene.Vertices.Length / 3;
         int indexCount = _scene.Indices.Length;
 
-        var geometryDesc = new RaytracingGeometryDescription
+        var geometries = new List<RaytracingGeometryDescription>
         {
-            Type = RaytracingGeometryType.Triangles,
-            Flags = RaytracingGeometryFlags.Opaque,
-            Triangles = new RaytracingGeometryTrianglesDescription
+            new()
             {
-                VertexBuffer = new GpuVirtualAddressAndStride(_vertexBuffer.GPUVirtualAddress, 3 * sizeof(float)),
-                VertexCount = (uint)vertexCount,
-                VertexFormat = Format.R32G32B32_Float,
-                IndexBuffer = _indexBuffer.GPUVirtualAddress,
-                IndexCount = (uint)indexCount,
-                IndexFormat = Format.R32_UInt,
-                Transform3x4 = 0,
+                Type = RaytracingGeometryType.Triangles,
+                Flags = RaytracingGeometryFlags.Opaque,
+                Triangles = new RaytracingGeometryTrianglesDescription
+                {
+                    VertexBuffer = new GpuVirtualAddressAndStride(_vertexBuffer.GPUVirtualAddress, 3 * sizeof(float)),
+                    VertexCount = (uint)vertexCount,
+                    VertexFormat = Format.R32G32B32_Float,
+                    IndexBuffer = _indexBuffer.GPUVirtualAddress,
+                    IndexCount = (uint)indexCount,
+                    IndexFormat = Format.R32_UInt,
+                    Transform3x4 = 0,
+                },
             },
         };
 
@@ -708,8 +741,8 @@ internal sealed class Phase6Renderer : IDisposable
             Type = RaytracingAccelerationStructureType.BottomLevel,
             Layout = ElementsLayout.Array,
             Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
-            DescriptorsCount = 1,
-            GeometryDescriptions = new[] { geometryDesc },
+            DescriptorsCount = (uint)geometries.Count,
+            GeometryDescriptions = geometries.ToArray(),
         };
         RaytracingAccelerationStructurePrebuildInfo blasPrebuild =
             _device.GetRaytracingAccelerationStructurePrebuildInfo(blasInputs);
@@ -717,25 +750,33 @@ internal sealed class Phase6Renderer : IDisposable
         _blasScratch = CreateUavBuffer(blasPrebuild.ScratchDataSizeInBytes, ResourceStates.UnorderedAccess);
         _blas = CreateUavBuffer(blasPrebuild.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
 
-        var instanceDesc = new RaytracingInstanceDescription
+        // A separate sphere BLAS (procedural AABBs) — D3D12 forbids mixing geometry types (§0.4).
+        BuildRaytracingAccelerationStructureInputs sphereBlasInputs = default;
+        if (_sphereCount > 0)
         {
-            Transform = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0),
-            InstanceMask = 0xFF,
-            Flags = RaytracingInstanceFlags.None,
-            AccelerationStructure = _blas.GPUVirtualAddress,
-        };
-        _instanceBuffer = CreateUploadBuffer(
-            MemoryMarshal.CreateReadOnlySpan(ref instanceDesc, 1),
-            Unsafe.SizeOf<RaytracingInstanceDescription>());
+            sphereBlasInputs = SphereBlasInputs();
+            RaytracingAccelerationStructurePrebuildInfo sBuild =
+                _device.GetRaytracingAccelerationStructurePrebuildInfo(sphereBlasInputs);
+            _sphereBlasScratch = CreateUavBuffer(sBuild.ScratchDataSizeInBytes, ResourceStates.UnorderedAccess);
+            _sphereBlas = CreateUavBuffer(sBuild.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
+        }
 
-        var tlasInputs = new BuildRaytracingAccelerationStructureInputs
+        var identity = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0);
+        var instances = new List<RaytracingInstanceDescription>
         {
-            Type = RaytracingAccelerationStructureType.TopLevel,
-            Layout = ElementsLayout.Array,
-            Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
-            DescriptorsCount = 1,
-            InstanceDescriptions = _instanceBuffer.GPUVirtualAddress,
+            new() { Transform = identity, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None, AccelerationStructure = _blas.GPUVirtualAddress },
         };
+        if (_sphereCount > 0)
+            instances.Add(new RaytracingInstanceDescription
+            {
+                Transform = identity, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None,
+                AccelerationStructure = _sphereBlas.GPUVirtualAddress,
+            });
+        _instanceBuffer = CreateUploadBuffer(
+            new ReadOnlySpan<RaytracingInstanceDescription>(instances.ToArray()),
+            instances.Count * Unsafe.SizeOf<RaytracingInstanceDescription>());
+
+        BuildRaytracingAccelerationStructureInputs tlasInputs = TlasInputs(instances.Count);
         RaytracingAccelerationStructurePrebuildInfo tlasPrebuild =
             _device.GetRaytracingAccelerationStructurePrebuildInfo(tlasInputs);
 
@@ -753,6 +794,17 @@ internal sealed class Phase6Renderer : IDisposable
         });
         _commandList.ResourceBarrierUnorderedAccessView(_blas);
 
+        if (_sphereCount > 0)
+        {
+            _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
+            {
+                Inputs = sphereBlasInputs,
+                ScratchAccelerationStructureData = _sphereBlasScratch.GPUVirtualAddress,
+                DestinationAccelerationStructureData = _sphereBlas.GPUVirtualAddress,
+            });
+            _commandList.ResourceBarrierUnorderedAccessView(_sphereBlas);
+        }
+
         _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
         {
             Inputs = tlasInputs,
@@ -761,6 +813,96 @@ internal sealed class Phase6Renderer : IDisposable
         });
         _commandList.ResourceBarrierUnorderedAccessView(_tlas);
 
+        _commandList.Close();
+        _queue.ExecuteCommandList(_commandList);
+        WaitForGpu();
+    }
+
+    // Inputs for the procedural-AABB sphere BLAS (§0.4). Reads the current _aabbBuffer/_sphereCount,
+    // so it is reused both for the initial build and the per-frame refit (UpdateSpheres).
+    private BuildRaytracingAccelerationStructureInputs SphereBlasInputs() => new()
+    {
+        Type = RaytracingAccelerationStructureType.BottomLevel,
+        Layout = ElementsLayout.Array,
+        Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
+        DescriptorsCount = 1,
+        GeometryDescriptions = new[]
+        {
+            new RaytracingGeometryDescription
+            {
+                Type = RaytracingGeometryType.ProceduralPrimitiveAabbs,
+                Flags = RaytracingGeometryFlags.Opaque,
+                AABBs = new RaytracingGeometryAabbsDescription
+                {
+                    AABBCount = (ulong)_sphereCount,
+                    AABBs = new GpuVirtualAddressAndStride(_aabbBuffer.GPUVirtualAddress, 6 * sizeof(float)),
+                },
+            },
+        },
+    };
+
+    // Inputs for the TLAS over the current _instanceBuffer (triangle BLAS, plus the sphere BLAS when
+    // present). Reused by the initial build and the per-frame refit.
+    private BuildRaytracingAccelerationStructureInputs TlasInputs(int instanceCount) => new()
+    {
+        Type = RaytracingAccelerationStructureType.TopLevel,
+        Layout = ElementsLayout.Array,
+        Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
+        DescriptorsCount = (uint)instanceCount,
+        InstanceDescriptions = _instanceBuffer.GPUVirtualAddress,
+    };
+
+    /// <summary>
+    /// Moves the analytic spheres (drifting bubbles, §2.6) for the current frame: rewrites each
+    /// sphere's centre/radius in the GpuSphere + procedural-AABB upload buffers and refits the sphere
+    /// BLAS and the TLAS in place (the static triangle BLAS is untouched). A no-op when the scene has
+    /// no spheres. The material/optical fields are preserved (only position + radius change).
+    /// Call before rendering a frame with <c>moving: true</c> so the accumulator does not smear the
+    /// motion. <paramref name="centers"/>/<paramref name="radii"/> must be in packed-sphere order.
+    /// </summary>
+    public void UpdateSpheres(ReadOnlySpan<Vector3> centers, ReadOnlySpan<float> radii)
+    {
+        if (_device is null || _sphereCount == 0)
+            return;
+        if (centers.Length != _sphereCount || radii.Length != _sphereCount)
+            throw new ArgumentException($"Expected {_sphereCount} spheres, got {centers.Length}/{radii.Length}.");
+
+        WaitForGpu(); // the previous frame may still be reading the sphere/AABB buffers + BLAS
+
+        Span<GpuSphere> sphereDst = _sphereBuffer.Map<GpuSphere>(0, _sphereCount);
+        Span<float> aabbDst = _aabbBuffer.Map<float>(0, _sphereCount * 6);
+        for (int i = 0; i < _sphereCount; i++)
+        {
+            float r = MathF.Max(0f, radii[i]);
+            GpuSphere s = _sphereData[i];
+            s.CX = centers[i].X; s.CY = centers[i].Y; s.CZ = centers[i].Z; s.Radius = r;
+            _sphereData[i] = s;
+            sphereDst[i] = s;
+            aabbDst[i * 6 + 0] = s.CX - r; aabbDst[i * 6 + 1] = s.CY - r; aabbDst[i * 6 + 2] = s.CZ - r;
+            aabbDst[i * 6 + 3] = s.CX + r; aabbDst[i * 6 + 4] = s.CY + r; aabbDst[i * 6 + 5] = s.CZ + r;
+        }
+        _sphereBuffer.Unmap(0);
+        _aabbBuffer.Unmap(0);
+
+        // Refit the sphere BLAS (its AABBs moved) then the TLAS (its cached bounds for that instance
+        // are now stale). Both rebuild in place — same addresses/sizes — so the instance buffer and
+        // scratch/result buffers are reused as-is.
+        _allocator.Reset();
+        _commandList.Reset(_allocator, null);
+        _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
+        {
+            Inputs = SphereBlasInputs(),
+            ScratchAccelerationStructureData = _sphereBlasScratch.GPUVirtualAddress,
+            DestinationAccelerationStructureData = _sphereBlas.GPUVirtualAddress,
+        });
+        _commandList.ResourceBarrierUnorderedAccessView(_sphereBlas);
+        _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
+        {
+            Inputs = TlasInputs(2), // triangle instance + sphere instance
+            ScratchAccelerationStructureData = _tlasScratch.GPUVirtualAddress,
+            DestinationAccelerationStructureData = _tlas.GPUVirtualAddress,
+        });
+        _commandList.ResourceBarrierUnorderedAccessView(_tlas);
         _commandList.Close();
         _queue.ExecuteCommandList(_commandList);
         WaitForGpu();
@@ -1026,6 +1168,7 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.SetComputeRootUnorderedAccessView(18, _clampHitFrameBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(19, _rgbBasisBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(20, _decalBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(21, _sphereBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);

@@ -48,10 +48,41 @@ public readonly record struct HitInfo(
         Vector2? uv,
         float reflectance,
         MaterialData material,
-        int wavelength)
+        int wavelength,
+        Vector3 rayDirection)
     {
         if (material.Surface == SurfaceKind.Diffuse)
             return new HitInfo(t, location, normal, uv, reflectance, material.Roughness);
+
+        // Thin-film iridescence (§2.2) is a reflectance-only effect: modulate the base
+        // reflectance by the interference factor at this wavelength and view angle, then
+        // shade the surface as an ordinary (hero-only) diffuse hit. cosθ comes from the
+        // ray and the unit face normal.
+        if (material.Surface == SurfaceKind.ThinFilm)
+        {
+            float cosTheta = MathF.Abs(Vector3.Dot(Vector3.Normalize(rayDirection), normal));
+            float thickness = Optics.FilmThicknessAt(
+                material.FilmThicknessNm, material.FilmSpatialAmpNm, location.X, location.Z);
+            float raw = Optics.ThinFilmReflectance(cosTheta, wavelength, thickness, material.IorAt(wavelength));
+            reflectance *= Optics.ApplyFilmContrast(raw, material.FilmContrast);
+            return new HitInfo(t, location, normal, uv, reflectance, material.Roughness,
+                SurfaceKind.ThinFilm);
+        }
+
+        // Soap bubble (§2.6): a thin shell. The reflected component is tinted by the thin-film
+        // interference at this wavelength + angle (constant shell thickness → angle alone gives
+        // the rings); the specular chain applies the Fresnel reflect/transmit-straight split and
+        // carries this tint on the reflection. Ior holds the film's index (for that Fresnel).
+        if (material.Surface == SurfaceKind.Bubble)
+        {
+            // Thickness follows a gravity gradient over the sphere (thin at the top, thick at the
+            // bottom), keyed on the surface normal's up-component, for the swirling colour bands.
+            float cosTheta = MathF.Abs(Vector3.Dot(Vector3.Normalize(rayDirection), normal));
+            float d = material.FilmThicknessNm * float.Lerp(1.4f, 0.6f, (normal.Y + 1f) * 0.5f);
+            reflectance *= Optics.ThinFilmReflectance(cosTheta, wavelength, d, material.IorAt(wavelength));
+            return new HitInfo(t, location, normal, uv, reflectance, material.Roughness,
+                SurfaceKind.Bubble, material.Transmission, material.IorAt(wavelength), material.ExtinctionAt(wavelength));
+        }
 
         return new HitInfo(
             t,
