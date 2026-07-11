@@ -128,6 +128,8 @@ public static class GpuScenePacker
                 P1 = quad.PatternP1,
                 P2 = quad.PatternP2,
                 P3 = quad.PatternP3,
+                Surface = (uint)quad.PrimaryMaterial.Surface,
+                Ior = quad.PrimaryMaterial.CauchyA,
             };
         }
 

@@ -9,7 +9,8 @@ public class Plane(Vector3 point, Vector3 normal, MaterialData material) : Traca
 
     public virtual AABB Bounds => new(new Vector3(-1e10f), new Vector3(1e10f));
 
-    public virtual (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+    /// <inheritdoc/>
+    public virtual HitInfo? Intersect(Ray ray)
     {
         var p0 = Point;
         var l0 = ray.Origin;
@@ -26,6 +27,7 @@ public class Plane(Vector3 point, Vector3 normal, MaterialData material) : Traca
         if (d < 1e-4f)
             return null;
         var faceNormal = denom < 0 ? n : -n;
-        return (d, l0 + l * d, faceNormal, null, material.GetSpectralReflectance((int)ray.Wavelength), material.Roughness);
+        return HitInfo.FromMaterial(d, l0 + l * d, faceNormal, null,
+            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength);
     }
 }

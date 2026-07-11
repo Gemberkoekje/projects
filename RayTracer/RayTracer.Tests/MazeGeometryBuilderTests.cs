@@ -109,7 +109,7 @@ public class MazeGeometryBuilderTests
             if (hit.HasValue)
             {
                 anyHit = true;
-                Assert.AreEqual(0f, hit.Value.location.Z, 0.01f,
+                Assert.AreEqual(0f, hit.Value.Location.Z, 0.01f,
                     "North perimeter wall should be at Z = 0.");
                 break;
             }
@@ -146,7 +146,7 @@ public class MazeGeometryBuilderTests
             if (hit.HasValue)
             {
                 anyHit = true;
-                Assert.AreEqual(0f, hit.Value.location.X, 0.01f,
+                Assert.AreEqual(0f, hit.Value.Location.X, 0.01f,
                     "West perimeter wall should be at X = 0.");
                 break;
             }
@@ -180,7 +180,7 @@ public class MazeGeometryBuilderTests
         foreach (var t in scene)
         {
             var hit = t.Intersect(ray);
-            if (hit.HasValue && MathF.Abs(hit.Value.location.Y) < 0.01f)
+            if (hit.HasValue && MathF.Abs(hit.Value.Location.Y) < 0.01f)
             {
                 hitFloor = true;
                 break;
@@ -215,7 +215,7 @@ public class MazeGeometryBuilderTests
         foreach (var t in scene)
         {
             var hit = t.Intersect(ray);
-            if (hit.HasValue && MathF.Abs(hit.Value.location.Y - wh) < 0.01f)
+            if (hit.HasValue && MathF.Abs(hit.Value.Location.Y - wh) < 0.01f)
             {
                 hitCeiling = true;
                 break;
@@ -274,7 +274,7 @@ public class MazeGeometryBuilderTests
         foreach (var t in scene)
         {
             var hit = t.Intersect(rayDown);
-            if (hit.HasValue && MathF.Abs(hit.Value.location.Y) < 0.01f)
+            if (hit.HasValue && MathF.Abs(hit.Value.Location.Y) < 0.01f)
             {
                 hitFloor = true;
                 break;

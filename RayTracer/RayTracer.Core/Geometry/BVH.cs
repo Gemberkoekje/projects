@@ -38,16 +38,21 @@ public sealed class BVH
     /// <summary>
     /// Finds the closest intersection in the BVH.
     /// Returns the spectral reflectance, hit point, surface normal,
-    /// surface roughness, whether any hit occurred, and the hit primitive
-    /// (for companion wavelength evaluation).
+    /// surface roughness, whether any hit occurred, the hit primitive
+    /// (for companion wavelength evaluation), the surface kind
+    /// (so the integrator can branch into wavelength-dependent effects),
+    /// and the index of refraction resolved at the ray's wavelength
+    /// (for dielectric refraction).
     /// </summary>
-    public (float reflectance, Vector3 hitPoint, Vector3 hitNormal, float roughness, bool hit, Tracable? hitPrimitive) FindClosest(Ray ray)
+    public (float reflectance, Vector3 hitPoint, Vector3 hitNormal, float roughness, bool hit, Tracable? hitPrimitive, SurfaceKind surface, float ior) FindClosest(Ray ray)
     {
         float closestT = float.MaxValue;
         float closestReflectance = 0f;
         float closestRoughness = 0f;
         Vector3 closestPoint = Vector3.Zero;
         Vector3 closestNormal = Vector3.Zero;
+        SurfaceKind closestSurface = SurfaceKind.Diffuse;
+        float closestIor = 1f;
         bool anyHit = false;
         Tracable? closestPrimitive = null;
         Vector3 origin = ray.Origin;
@@ -70,13 +75,16 @@ public sealed class BVH
                     for (int i = node.Offset; i < end; i++)
                     {
                         var intersect = _primitives[i].Intersect(ray);
-                        if (intersect.HasValue && intersect.Value.t < closestT)
+                        if (intersect.HasValue && intersect.Value.T < closestT)
                         {
-                            closestT = intersect.Value.t;
-                            closestReflectance = intersect.Value.reflectance;
-                            closestRoughness = intersect.Value.roughness;
-                            closestPoint = intersect.Value.location;
-                            closestNormal = intersect.Value.normal;
+                            var h = intersect.Value;
+                            closestT = h.T;
+                            closestReflectance = h.Reflectance;
+                            closestRoughness = h.Roughness;
+                            closestPoint = h.Location;
+                            closestNormal = h.Normal;
+                            closestSurface = h.Surface;
+                            closestIor = h.Ior;
                             closestPrimitive = _primitives[i];
                             anyHit = true;
                         }
@@ -95,7 +103,7 @@ public sealed class BVH
             current = stack[--stackPtr];
         }
 
-        return (closestReflectance, closestPoint, closestNormal, closestRoughness, anyHit, closestPrimitive);
+        return (closestReflectance, closestPoint, closestNormal, closestRoughness, anyHit, closestPrimitive, closestSurface, closestIor);
     }
 
     /// <summary>
@@ -123,7 +131,7 @@ public sealed class BVH
                     for (int i = node.Offset; i < end; i++)
                     {
                         var intersect = _primitives[i].Intersect(ray);
-                        if (intersect.HasValue && intersect.Value.t < maxDist)
+                        if (intersect.HasValue && intersect.Value.T < maxDist)
                             return true;
                     }
                 }

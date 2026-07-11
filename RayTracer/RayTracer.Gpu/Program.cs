@@ -44,6 +44,8 @@ internal static class Program
         bool phase5 = args.Contains("--phase5", StringComparer.OrdinalIgnoreCase);
         bool phase6SelfTest = args.Contains("--phase6-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6 = args.Contains("--phase6", StringComparer.OrdinalIgnoreCase);
+        bool mirrorDemo = args.Contains("--mirror-demo", StringComparer.OrdinalIgnoreCase);
+        bool glassDemo = args.Contains("--glass-demo", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
@@ -59,6 +61,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
+            || mirrorDemo || glassDemo
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -74,6 +77,11 @@ internal static class Program
                 update: args.Contains("--update", StringComparer.OrdinalIgnoreCase),
                 dirOverride: ParseStringOption(args, "--dir", null));
             if (phase6SelfTest) return RunPhase6SelfTest();
+            if (mirrorDemo)
+                return RunMirrorDemo(maxFrames, savePath ?? "mirror-demo.png", sampleClamp, mazeSeed, ParseSmokeMode(args),
+                    (uint)ParseIntOption(args, "--motion-cap", 12), args.Contains("--pan", StringComparer.OrdinalIgnoreCase));
+            if (glassDemo)
+                return RunGlassDemo(maxFrames, savePath ?? "glass-demo.png", sampleClamp, mazeSeed);
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -798,7 +806,10 @@ internal static class Program
         bool classic = style == RenderStyle.Classic;
         LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
         Phase3Scene built = Phase3Scene.Build(width, height, mazeSeed: mazeSeed, mazeSize: mazeSize,
-            lightSeed: LightSeedFrom(mazeSeed), props: props);
+            lightSeed: LightSeedFrom(mazeSeed), props: props,
+            mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
+            windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed),
+            wallThickness: 0.12f);
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
             VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
 
@@ -1075,6 +1086,233 @@ internal static class Program
         SavePng(rgba, Width, Height, savePath);
         Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
         return 0;
+    }
+
+    // ── Mirror demo (spectral-effects-plan §1.1) ──────────────────────
+
+    /// <summary>
+    /// Headless capture of the maze with generator-placed framed mirrors
+    /// (<see cref="MazeMirrors"/>): builds the normal maze with mirrors on a subset of
+    /// walls, points the camera head-on at the mirror nearest the start (with a light in
+    /// that cell so the reflection is lit), converges a still through the shipping Phase 6
+    /// pipeline, and writes a PNG. The mirror reflects the lit maze in front of it, so a
+    /// recognisable reflected scene proves the whole CPU→GPU mirror path renders on
+    /// hardware. Fixed-seed self-test / golden scenes pass <c>mirrors: null</c>, so they
+    /// are unaffected.
+    /// </summary>
+    private static int RunMirrorDemo(int frames, string savePath, float sampleClamp, int mazeSeed, SmokeMode smokeMode,
+        uint motionCap = 12, bool pan = false)
+    {
+        if (frames <= 0) frames = pan ? 90 : 300; // pan: show the moving image; else converge a still
+        Console.WriteLine($"RayTracer.Gpu — mirror demo ({frames} frames, seed {mazeSeed}, smoke {smokeMode}, motionCap {motionCap}, pan {pan}) -> {savePath}");
+
+        var mirrors = new MazeMirrors.Options(Chance: 0.5f, Seed: mazeSeed);
+        // Wall signs + floor logo, so the demo also shows decals reflected in mirrors.
+        var props = new MazeProps.Options(Logo: true, Signs: true, Seed: mazeSeed);
+
+        // First pass: place mirrors and find the one nearest the start cell.
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, mirrors: mirrors, wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        Vector3 startCenter = new(1f, eye, 1f);
+
+        Camera camera = probe.Camera;
+        var extraLights = new List<Light>();
+        Vector3 ratPos = new(1f, 0.35f, 1f);
+        if (TryFindNearestMirror(probe.Tracables, startCenter, out Vector3 mCenter, out Vector3 mNormal))
+        {
+            // Stand in the facing cell, look head-on at the mirror; light that cell so
+            // both the mirror wall and its reflection are lit.
+            Vector3 pos = new Vector3(mCenter.X, eye, mCenter.Z) + mNormal * 1.5f;
+            camera = new Camera
+            {
+                Position = pos,
+                Rotation = CameraController.HeadingToQuaternion(HeadingFromForward(-mNormal)),
+                Fov = MathF.PI / 3f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            extraLights.Add(new Light { Position = pos + mNormal * -0.3f + new Vector3(0, 0.85f, 0), Color = Vector3.One });
+            // Stand the rat just behind the camera: the screen-space ApplyRat can't draw
+            // anything behind the camera, so seeing it in the mirror proves it's the traced
+            // reflection (the mirror reflects the whole near-side hemisphere).
+            ratPos = pos + mNormal * 0.35f;
+            ratPos.Y = 0.35f;
+            extraLights.Add(new Light { Position = ratPos + new Vector3(0, 1.4f, 0), Color = Vector3.One });
+        }
+        else
+        {
+            Console.WriteLine("  (no mirror found — using default camera)");
+        }
+
+        // Rebuild with the light in the chosen cell (same seed → identical mirrors).
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, mirrors: mirrors, extraLights: extraLights, wallThickness: 0.12f);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, smokeMode);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: true, motionSampleCap: motionCap);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        renderer.SetRatPosition(ratPos);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        Quaternion baseRot = camera.Rotation;
+        for (int f = 0; f < frames; f++)
+        {
+            if (pan)
+            {
+                // Yaw the camera up to the final base orientation, so the last frame shows
+                // the ghost trail from the recent motion (moving = true, so it accumulates).
+                float angle = -0.22f * (1f - f / (float)(frames - 1)); // ~-12.6° → 0
+                camera.Rotation = Quaternion.Normalize(Quaternion.CreateFromAxisAngle(Vector3.UnitY, angle) * baseRot);
+                renderer.SetCamera(camera);
+            }
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: pan);
+        }
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>Finds the mirror quad (<see cref="SurfaceKind.Mirror"/>) whose centre is
+    /// nearest <paramref name="near"/> (compared in the XZ plane), returning its centre
+    /// and facing normal.</summary>
+    private static bool TryFindNearestMirror(
+        IReadOnlyList<Tracable> scene, Vector3 near, out Vector3 center, out Vector3 normal)
+    {
+        center = default;
+        normal = default;
+        float best = float.MaxValue;
+        foreach (Tracable t in scene)
+        {
+            if (t is not IQuadPrimitive q || q.PrimaryMaterial.Surface != SurfaceKind.Mirror)
+                continue;
+            Vector3 c = q.L1 + q.Edge1 * 0.5f + q.Edge2 * 0.5f;
+            float d = Vector3.DistanceSquared(new Vector3(c.X, near.Y, c.Z), near);
+            if (d < best) { best = d; center = c; normal = q.QuadNormal; }
+        }
+        return best < float.MaxValue;
+    }
+
+    /// <summary>Maps an axis-aligned forward vector to the nearest maze heading.</summary>
+    private static Direction HeadingFromForward(Vector3 f)
+    {
+        if (MathF.Abs(f.Z) >= MathF.Abs(f.X))
+            return f.Z >= 0f ? Direction.South : Direction.North;
+        return f.X >= 0f ? Direction.East : Direction.West;
+    }
+
+    /// <summary>Builds the camera rotation that points local forward (+Z) from
+    /// <paramref name="pos"/> toward <paramref name="target"/> (matching the camera's
+    /// <c>Vector3.Transform(localDir, Rotation)</c> convention).</summary>
+    private static Quaternion LookRotation(Vector3 pos, Vector3 target, Vector3 up)
+    {
+        Vector3 f = Vector3.Normalize(target - pos);
+        Vector3 r = Vector3.Normalize(Vector3.Cross(up, f));
+        Vector3 u = Vector3.Cross(f, r);
+        var m = new Matrix4x4(
+            r.X, r.Y, r.Z, 0f,
+            u.X, u.Y, u.Z, 0f,
+            f.X, f.Y, f.Z, 0f,
+            0f, 0f, 0f, 1f);
+        return Quaternion.CreateFromRotationMatrix(m);
+    }
+
+    /// <summary>
+    /// Headless capture of the maze with generator-placed glass windows
+    /// (<see cref="MazeWindows"/>): builds the maze with windows in passage openings,
+    /// stands the camera in a cell looking through the window nearest the start into the
+    /// far cell (lighting both cells), converges a still through the shipping Phase 6
+    /// pipeline, and writes a PNG. Seeing the far cell refracted through the pane — with
+    /// a faint Fresnel reflection of the near cell — proves the CPU→GPU dielectric path
+    /// renders on hardware.
+    /// </summary>
+    private static int RunGlassDemo(int frames, string savePath, float sampleClamp, int mazeSeed)
+    {
+        if (frames <= 0) frames = 400; // glass roulette is noisier; give it more samples
+        Console.WriteLine($"RayTracer.Gpu — glass demo ({frames} frames, seed {mazeSeed}) -> {savePath}");
+
+        var windows = new MazeWindows.Options(Chance: 0.6f, Seed: mazeSeed);
+        var mirrors = new MazeMirrors.Options(Chance: 0.2f, Seed: mazeSeed);
+        var props = new MazeProps.Options(Logo: true, Signs: true, Seed: mazeSeed);
+
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, mirrors: mirrors, windows: windows, wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        Vector3 startCenter = new(1f, eye, 1f);
+
+        Camera camera = probe.Camera;
+        var extraLights = new List<Light>();
+        if (TryFindNearestGlass(probe.Tracables, startCenter, out Vector3 wCenter, out Vector3 wNormal))
+        {
+            // View the pane obliquely from the near cell: at an angle the Fresnel
+            // reflection of the near cell is strong and the refracted far cell is
+            // laterally shifted, so the glass reads as glass (head-on it is ~invisible).
+            Vector3 worldUp = new(0, 1, 0);
+            Vector3 flat = new(wCenter.X, eye, wCenter.Z);
+            Vector3 side = Vector3.Normalize(Vector3.Cross(wNormal, worldUp)); // along the passage
+            Vector3 pos = flat + wNormal * 1.7f + side * 0.55f;
+            camera = new Camera
+            {
+                Position = pos,
+                Rotation = LookRotation(pos, wCenter, worldUp), // aim at the glass centre (raised by the sill)
+                Fov = MathF.PI / 3f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            Vector3 up = new(0, 0.85f, 0);
+            extraLights.Add(new Light { Position = flat - wNormal * 1.1f + up, Color = Vector3.One });        // far cell (transmission)
+            extraLights.Add(new Light { Position = flat + wNormal * 1.1f - side * 0.6f + up, Color = Vector3.One }); // near cell (reflection)
+        }
+        else
+        {
+            Console.WriteLine("  (no window found — using default camera)");
+        }
+
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), props: props, mirrors: mirrors, windows: windows,
+            extraLights: extraLights, wallThickness: 0.12f);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>Finds the dielectric (glass) quad whose centre is nearest
+    /// <paramref name="near"/> (in the XZ plane), returning its centre and facing normal.</summary>
+    private static bool TryFindNearestGlass(
+        IReadOnlyList<Tracable> scene, Vector3 near, out Vector3 center, out Vector3 normal)
+    {
+        center = default;
+        normal = default;
+        float best = float.MaxValue;
+        foreach (Tracable t in scene)
+        {
+            if (t is not IQuadPrimitive q || q.PrimaryMaterial.Surface != SurfaceKind.Dielectric)
+                continue;
+            Vector3 c = q.L1 + q.Edge1 * 0.5f + q.Edge2 * 0.5f;
+            float d = Vector3.DistanceSquared(new Vector3(c.X, near.Y, c.Z), near);
+            if (d < best) { best = d; center = c; normal = q.QuadNormal; }
+        }
+        return best < float.MaxValue;
     }
 
     // ── The productized app: config setup, then run ───────────────────

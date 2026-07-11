@@ -40,7 +40,8 @@ public class TracableRectangle((Vector3 l1, Vector3 l2, Vector3 l3) Location, Ma
     /// <inheritdoc/>
     public float PatternP3 => 0f;
 
-    public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+    /// <inheritdoc/>
+    public override HitInfo? Intersect(Ray ray)
     {
         // Inline plane intersection - avoids the base.Intersect() material
         // lookup that was wasted on every plane hit that fell outside the
@@ -64,7 +65,8 @@ public class TracableRectangle((Vector3 l1, Vector3 l2, Vector3 l3) Location, Ma
 
         // Material lookup ONLY for confirmed rectangle hits.
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return (d, hitPoint, faceNormal, new Vector2(u, w), material.GetSpectralReflectance((int)ray.Wavelength), material.Roughness);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w),
+            material.GetSpectralReflectance((int)ray.Wavelength), material, (int)ray.Wavelength);
     }
 
     private static AABB ComputeBounds((Vector3 l1, Vector3 l2, Vector3 l3) loc)

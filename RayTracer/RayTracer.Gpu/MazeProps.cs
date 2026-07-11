@@ -48,17 +48,18 @@ internal static class MazeProps
             mat, (int)DecalLayer.OpenGlLogo));
     }
 
-    private static void AddWallSigns(
-        List<Tracable> decals, Maze maze, MaterialData mat, int seed, float cs, float wh)
+    private static readonly DecalLayer[] SignLayers = [DecalLayer.SignExit, DecalLayer.SignArrow, DecalLayer.SignSmiley];
+
+    /// <summary>
+    /// Deterministic wall-sign selection (the RNG order matches <see cref="AddWallSigns"/>
+    /// exactly, so placement is unchanged). Both the geometry builder and
+    /// <see cref="SignWalls"/> use this, so mirrors/windows can avoid sign walls.
+    /// </summary>
+    private static List<(int gx, int gy, bool horizontal, DecalLayer layer)> SelectSigns(Maze maze, int seed)
     {
+        var result = new List<(int, int, bool, DecalLayer)>();
         var rng = new Random(seed);
-        DecalLayer[] signs = [DecalLayer.SignExit, DecalLayer.SignArrow, DecalLayer.SignSmiley];
 
-        // Decal spans the middle band of a wall's width and height.
-        float sy = 0.28f * wh, h = 0.44f * wh;
-        float w = 0.6f * cs;
-
-        // Horizontal walls (normal ±Z): width runs +X, height +Y.
         for (int gy = 0; gy <= maze.Height; gy++)
         {
             for (int gx = 0; gx < maze.Width; gx++)
@@ -67,14 +68,10 @@ internal static class MazeProps
                     ? maze.HasWall(gx, gy, Wall.North)
                     : maze.HasWall(gx, maze.Height - 1, Wall.South);
                 if (!hasWall || rng.NextSingle() > 0.22f) continue;
-
-                var origin = new Vector3((gx + 0.2f) * cs, sy, gy * cs);
-                AddDoubleSided(decals, mat, origin, new Vector3(w, 0, 0), new Vector3(0, h, 0),
-                    new Vector3(0, 0, 1), (int)signs[rng.Next(signs.Length)]);
+                result.Add((gx, gy, true, SignLayers[rng.Next(SignLayers.Length)]));
             }
         }
 
-        // Vertical walls (normal ±X): width runs +Z, height +Y.
         for (int gx = 0; gx <= maze.Width; gx++)
         {
             for (int gy = 0; gy < maze.Height; gy++)
@@ -83,10 +80,44 @@ internal static class MazeProps
                     ? maze.HasWall(gx, gy, Wall.West)
                     : maze.HasWall(maze.Width - 1, gy, Wall.East);
                 if (!hasWall || rng.NextSingle() > 0.22f) continue;
+                result.Add((gx, gy, false, SignLayers[rng.Next(SignLayers.Length)]));
+            }
+        }
 
+        return result;
+    }
+
+    /// <summary>The set of walls (grid key <c>(gx, gy, horizontal)</c>) that carry a wall
+    /// sign, so mirrors and windows can steer clear of them. Empty when signs are off.</summary>
+    internal static HashSet<(int, int, bool)> SignWalls(Maze maze, Options opt)
+    {
+        var set = new HashSet<(int, int, bool)>();
+        if (opt.Signs)
+            foreach (var (gx, gy, horizontal, _) in SelectSigns(maze, opt.Seed))
+                set.Add((gx, gy, horizontal));
+        return set;
+    }
+
+    private static void AddWallSigns(
+        List<Tracable> decals, Maze maze, MaterialData mat, int seed, float cs, float wh)
+    {
+        // Decal spans the middle band of a wall's width and height.
+        float sy = 0.28f * wh, h = 0.44f * wh;
+        float w = 0.6f * cs;
+
+        foreach (var (gx, gy, horizontal, layer) in SelectSigns(maze, seed))
+        {
+            if (horizontal) // normal ±Z: width runs +X, height +Y
+            {
+                var origin = new Vector3((gx + 0.2f) * cs, sy, gy * cs);
+                AddDoubleSided(decals, mat, origin, new Vector3(w, 0, 0), new Vector3(0, h, 0),
+                    new Vector3(0, 0, 1), (int)layer);
+            }
+            else // normal ±X: width runs +Z, height +Y
+            {
                 var origin = new Vector3(gx * cs, sy, (gy + 0.2f) * cs);
                 AddDoubleSided(decals, mat, origin, new Vector3(0, 0, w), new Vector3(0, h, 0),
-                    new Vector3(-1, 0, 0), (int)signs[rng.Next(signs.Length)]);
+                    new Vector3(-1, 0, 0), (int)layer);
             }
         }
     }

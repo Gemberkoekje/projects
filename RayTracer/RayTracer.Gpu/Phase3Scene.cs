@@ -25,7 +25,11 @@ internal sealed class Phase3Scene
     public required float EyeHeight { get; init; }
 
     public static Phase3Scene Build(int width, int height, int mazeSeed = 12345, int mazeSize = 16, int lightSeed = 777,
-        MazeProps.Options? props = null)
+        MazeProps.Options? props = null,
+        MazeMirrors.Options? mirrors = null,
+        MazeWindows.Options? windows = null,
+        IReadOnlyList<Light>? extraLights = null,
+        float wallThickness = 0f)
     {
         var materials = new MaterialsLookup();
         var maze = new Maze(mazeSize, mazeSize, seed: mazeSeed);
@@ -34,6 +38,24 @@ internal sealed class Phase3Scene
         materials.TryGetMaterial("01085", out MaterialData mortar);
         materials.TryGetMaterial("01138", out MaterialData grid);
 
+        // Resolve wall-feature conflicts with a precedence (decal > mirror > window):
+        //   • a mirror only lands on a wall that has no sign;
+        //   • a window only replaces a wall that has neither a sign nor a mirror.
+        // All three are keyed on the same (gx, gy, horizontal) wall id, so the exclusions
+        // are just set membership. Everything stays null-safe for the fixed-seed scenes.
+        HashSet<(int, int, bool)> decalWalls = props is not null ? MazeProps.SignWalls(maze, props) : [];
+        HashSet<(int, int, bool)> mirrorWalls = mirrors is not null
+            ? MazeMirrors.SelectWalls(maze, mirrors, decalWalls)
+            : [];
+        var windowBlocked = new HashSet<(int, int, bool)>(decalWalls);
+        windowBlocked.UnionWith(mirrorWalls);
+
+        // Windows replace a subset of interior walls: those brick walls are omitted here
+        // so the window (built below) shows through to the adjacent cell.
+        Func<int, int, bool, bool>? skipWall = windows is not null
+            ? MazeWindows.SkipPredicate(maze, windows, windowBlocked)
+            : null;
+
         Tracable[] tracables = MazeGeometryBuilder.Build(
             maze,
             wallMaterial: materials["00115"],
@@ -41,7 +63,9 @@ internal sealed class Phase3Scene
             ceilingMaterial: materials["01085"],
             mortarMaterial: mortar,
             ceilingGridMaterial: grid,
-            goalMaterial: goal);
+            goalMaterial: goal,
+            skipWall: skipWall,
+            wallThickness: wallThickness);
 
         // Classic prop decals (rat/logo/signs — plan §3–§5), appended before packing so
         // they become GPU quads. Off by default (fixed-seed self-test scenes stay
@@ -53,11 +77,32 @@ internal sealed class Phase3Scene
                 tracables = [.. tracables, .. decals];
         }
 
+        // Framed mirrors on the selected (sign-free) walls (spectral-effects-plan §1.1).
+        if (mirrors is not null && mirrorWalls.Count > 0)
+        {
+            List<Tracable> mirrorQuads = MazeMirrors.Build(maze, mirrorWalls, wallThickness: wallThickness);
+            if (mirrorQuads.Count > 0)
+                tracables = [.. tracables, .. mirrorQuads];
+        }
+
+        // Clear-glass windows replacing the walls skipped above (spectral-effects-plan §1.2).
+        if (windows is not null)
+        {
+            List<Tracable> windowQuads = MazeWindows.Build(
+                maze, windows, windowBlocked, wallMaterial: materials["00115"], mortarMaterial: mortar,
+                sillMaterial: grid, wallThickness: wallThickness);
+            if (windowQuads.Count > 0)
+                tracables = [.. tracables, .. windowQuads];
+        }
+
         Light[] lights = MazeGeometryBuilder.BuildLights(
             maze,
             lightSpawnChance: 0.4f,
             biomeSize: 4,
             seed: lightSeed);
+
+        if (extraLights is { Count: > 0 })
+            lights = [.. lights, .. extraLights];
 
         float cs = MazeGeometryBuilder.CellSize;
         float wh = MazeGeometryBuilder.WallHeight;

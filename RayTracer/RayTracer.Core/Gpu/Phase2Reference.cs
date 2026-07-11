@@ -192,6 +192,25 @@ public static class Phase2Reference
 
         int deterCount = res.DeterministicCount;
         uint heroIdx = Phase1Reference.HeroIndex(pixelHash, sampleIdx, deterCount);
+
+        // Specular surface — mirror (§1.1) or dielectric reflect/refract (§1.2).
+        // Hero-wavelength sampling; accumulation builds the spectrum. A line-for-line
+        // replica of JobSystem.TraceCore's specular branch.
+        if (Optics.IsSpecular((SurfaceKind)prim.Surface))
+        {
+            Phase1Reference.PatternShade(prim, primaryDir, hitPoint, out uint mRow, out float mAtten);
+            float specularRefl = res.MaterialReflectance[(int)mRow * deterCount + (int)heroIdx] * mAtten;
+
+            uint specularRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
+            Vector3 specularXyz = SpecularRadiance(
+                tracer, prims, res, lights, lighting, (SurfaceKind)prim.Surface, specularRefl, prim.Ior,
+                hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false);
+
+            float specularCorrection = res.DeterministicCorrection;
+            correctedDirect = specularXyz * specularCorrection;
+            return specularXyz * specularCorrection;
+        }
+
         Vector3 baseXyz = Phase1Reference.BaseXyz(prim, res, primaryDir, hitPoint, pixelHash, sampleIdx);
 
         bool lit = lighting != LightingMode.None && lights.Length > 0;
@@ -292,6 +311,112 @@ public static class Phase2Reference
         correctedDirect = bounce0 * correction;
         correctedIndirect = indirect * correction;
         return xyz * correction;
+    }
+
+    /// <summary>Number of specular bounces followed through mirror/dielectric
+    /// surfaces (mirrors <c>JobSystem.MaxSpecularBounces</c>).</summary>
+    public const int MaxSpecularBounces = 8;
+
+    /// <summary>
+    /// Scalar spectral radiance at the hero wavelength arriving back along a
+    /// specular ray: each mirror/dielectric hit interacts and recurses (up to
+    /// <see cref="MaxSpecularBounces"/>); the first diffuse hit is shaded diffusely;
+    /// a miss returns 0. A line-for-line replica of <c>JobSystem.TraceSpecularRadiance</c>.
+    /// </summary>
+    public static Vector3 TraceSpecularRadiance(
+        ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
+        ReadOnlySpan<Vector3> lights, LightingMode lighting,
+        Vector3 origin, Vector3 dir, uint heroIdx, ref uint rng, int depth, bool inGlass)
+    {
+        if (!tracer.ClosestHit(origin, dir, out int idx, out Vector3 hitPoint))
+            return Vector3.Zero;
+
+        GpuPrimitive prim = prims[idx];
+        Vector3 hitNormal = FaceNormal(prim, dir);
+        Phase1Reference.PatternShade(prim, dir, hitPoint, out uint row, out float atten);
+        float refl = res.MaterialReflectance[(int)row * res.DeterministicCount + (int)heroIdx] * atten;
+
+        var surface = (SurfaceKind)prim.Surface;
+        if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
+            return SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, prim.Ior,
+                hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass);
+
+        // Terminal diffuse hit → CIE-weighted XYZ (the GPU port does not model smoke in
+        // reflections in this replica; the HLSL applies per-segment fog).
+        float scalar = MirrorDiffuseScalar(tracer, lights, lighting, refl, hitPoint, hitNormal, ref rng);
+        var cie = new Vector3(res.DeterXYZ[heroIdx * 4 + 0], res.DeterXYZ[heroIdx * 4 + 1], res.DeterXYZ[heroIdx * 4 + 2]);
+        return cie * scalar;
+    }
+
+    /// <summary>
+    /// One specular interaction (mirror reflect, or dielectric Fresnel reflect/refract
+    /// via Russian roulette through <see cref="Optics"/>), then recurses. A line-for-line
+    /// replica of <c>JobSystem.SpecularRadiance</c>.
+    /// </summary>
+    public static Vector3 SpecularRadiance(
+        ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
+        ReadOnlySpan<Vector3> lights, LightingMode lighting,
+        SurfaceKind surface, float reflectance, float ior,
+        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir, uint heroIdx, ref uint rng, int depth, bool inGlass)
+    {
+        if (surface == SurfaceKind.Mirror)
+        {
+            Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
+            Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
+            return reflectance * TraceSpecularRadiance(
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass);
+        }
+
+        // Dielectric (clear glass): reflect vs. refract by Russian roulette on Fresnel.
+        float iorFrom = inGlass ? ior : 1f;
+        float iorTo = inGlass ? 1f : ior;
+        float cosI = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
+        float fresnel = Optics.FresnelDielectric(cosI, iorFrom, iorTo);
+        bool transmits = Optics.Refract(incidentDir, hitNormal, iorFrom, iorTo, out Vector3 refractDir);
+
+        rng = rng * RngMul + RngAdd;
+        float u = rng / 4294967296f;
+        if (!transmits || u < fresnel)
+        {
+            Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
+            Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
+            return TraceSpecularRadiance(
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass);
+        }
+
+        Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
+        return TraceSpecularRadiance(
+            tracer, prims, res, lights, lighting, refractOrigin, refractDir, heroIdx, ref rng, depth + 1, !inGlass);
+    }
+
+    /// <summary><c>reflectance × (ambient + direct)</c> at a diffuse surface reached
+    /// through a mirror, matching <c>JobSystem.ShadeDiffuseScalar</c> /
+    /// <c>DirectTermAt</c> (same importance-sampled NEE as the primary path).</summary>
+    private static float MirrorDiffuseScalar(
+        ISceneTracer tracer, ReadOnlySpan<Vector3> lights, LightingMode lighting,
+        float reflectance, Vector3 point, Vector3 normal, ref uint rng)
+    {
+        float ambient = 1f;
+        float direct = 0f;
+        if (lighting != LightingMode.None && lights.Length > 0)
+        {
+            ambient = AmbientLevel;
+            _ = SelectLight(ref rng, lights, point, normal,
+                out float lightP, out Vector3 lightDir, out float lightDistSq, out float lightCos);
+            if (lightCos > 0f)
+            {
+                bool visible = true;
+                if (lighting == LightingMode.NEE)
+                {
+                    Vector3 shadowOrigin = point + normal * 1e-3f;
+                    visible = !tracer.Occluded(shadowOrigin, lightDir, MathF.Sqrt(lightDistSq) - 2e-3f);
+                }
+                if (visible)
+                    direct = lightCos / lightDistSq * LightIntensity / MathF.Max(lightP, 1e-9f);
+            }
+        }
+
+        return reflectance * (ambient + direct);
     }
 
     /// <summary>

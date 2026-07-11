@@ -69,7 +69,8 @@ public sealed class DecalRectangle : Plane, Tracable, IQuadPrimitive
     /// <inheritdoc/>
     public float PatternP3 => 0f;
 
-    public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+    /// <inheritdoc/>
+    public override HitInfo? Intersect(Ray ray)
     {
         var denom = Vector3.Dot(ray.Direction, Normal);
         if (MathF.Abs(denom) < 1e-6f)
@@ -87,8 +88,8 @@ public sealed class DecalRectangle : Plane, Tracable, IQuadPrimitive
         if (w < 0f || w > 1f) return null;
 
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return (d, hitPoint, faceNormal, new Vector2(u, w),
-            _material.GetSpectralReflectance((int)ray.Wavelength), _material.Roughness);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w),
+            _material.GetSpectralReflectance((int)ray.Wavelength), _material, (int)ray.Wavelength);
     }
 
     private static AABB ComputeBounds((Vector3 l1, Vector3 l2, Vector3 l3) loc)

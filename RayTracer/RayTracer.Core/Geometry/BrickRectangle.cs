@@ -73,7 +73,8 @@ public class BrickRectangle : Plane, Tracable, IQuadPrimitive
     /// <inheritdoc/>
     public float PatternP3 => _mortarFractionV;
 
-    public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+    /// <inheritdoc/>
+    public override HitInfo? Intersect(Ray ray)
     {
         var denom = Vector3.Dot(ray.Direction, Normal);
         if (MathF.Abs(denom) < 1e-6f)
@@ -105,7 +106,7 @@ public class BrickRectangle : Plane, Tracable, IQuadPrimitive
 
         float reflectance = mat.GetSpectralReflectance((int)ray.Wavelength) * attenuation;
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return (d, hitPoint, faceNormal, new Vector2(u, w), reflectance, mat.Roughness);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, mat, (int)ray.Wavelength);
     }
 
     private bool IsMortar(float u, float w)

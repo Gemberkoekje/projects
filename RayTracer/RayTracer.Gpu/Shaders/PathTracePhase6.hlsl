@@ -12,6 +12,9 @@
 #define PI                  3.14159265
 #define RNG_MUL             747796405u
 #define RNG_ADD             2891336453u
+#define SURFACE_MIRROR       1u  // SurfaceKind.Mirror
+#define SURFACE_DIELECTRIC   2u  // SurfaceKind.Dielectric
+#define MAX_SPECULAR_BOUNCES 8u  // JobSystem.MaxSpecularBounces
 
 // Volumetric constants (mirror Phase4Reference / JobSystem).
 #define ISOTROPIC_PHASE  0.07957747
@@ -35,7 +38,9 @@ struct PrimitiveInfo
     uint  MatPrimary;
     uint  MatSecondary;
     float P0; float P1; float P2; float P3;
-    float Pad0; float Pad1; float Pad2;
+    uint  Surface;        // SurfaceKind of the primary material (0 diffuse, 1 mirror, 2 dielectric)
+    float Ior;            // index of refraction (constant / base Cauchy A) for dielectrics
+    float Pad2;
 };
 
 RaytracingAccelerationStructure Scene              : register(t0);
@@ -74,7 +79,8 @@ cbuffer Constants : register(b0)
     uint   VolEnabled;           uint  VolSmokeMode; uint VolMarchSteps; uint VolShadowStepInterval;
     float  VolMaxMarchDistance;  float VolSigmaScaleFog; float VolSigmaScaleGround; float VolAnisotropyG;
     float  VolInscatterStrength; float VolEarlyOutTransmittance; uint BiomeIndicator; float VolTime;
-    float  RevealHeight;         float _rpadA; float _rpadB; float _rpadC; // §9.3 build-in reveal
+    float  RevealHeight;         float RatPosX; float RatPosY; float RatPosZ; // §9.3 reveal, §8 rat billboard
+    float  RatSize;              uint  ShowRat; uint  RatLayer; float _rpad;
 };
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
@@ -756,6 +762,203 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
     }
 }
 
+// ── Mirror specular reflection (spectral-effects-plan.md §1.1) ─────────
+// Line-for-line port of Phase2Reference.MirrorDiffuseScalar / TraceMirrorRadiance
+// (and JobSystem's mirror branch). HLSL has no recursion, so the mirror chain is
+// an iterative loop accumulating a reflectance product.
+
+float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng)
+{
+    float ambient = 1.0;
+    float direct = 0.0;
+    if (LightingMode != 0u && NumLights > 0u)
+    {
+        ambient = AmbientLevel;
+        float p; float3 ldir; float distSq; float cosv;
+        SelectLight(rng, pt, normal, p, ldir, distSq, cosv);
+        if (cosv > 0.0)
+        {
+            bool visible = true;
+            if (LightingMode == 2u) // NEE
+            {
+                float3 shadowOrigin = pt + normal * 1e-3;
+                visible = !TraceOccluded(shadowOrigin, ldir, sqrt(distSq) - 2e-3);
+            }
+            if (visible)
+                direct = cosv / distSq * LightIntensity / max(p, 1e-9);
+        }
+    }
+    return refl * (ambient + direct);
+}
+
+// Hero-wavelength scalar reflectance at a hit, including the decal atlas colour
+// (Pattern 3) via the RGB→reflectance basis — so a decal (wall sign / logo) seen in
+// a mirror keeps its texture rather than falling back to its placeholder material.
+// Mirrors IndirectBaseXyz's decal branch.
+float HeroReflectance(PrimitiveInfo prim, float3 dir, float3 hitPoint, uint heroIdx)
+{
+    if (prim.Pattern == 3u) // decal
+    {
+        float u, w;
+        DecalUv(prim, hitPoint, u, w);
+        float3 texel = DecalTexel((uint)prim.P0, u, w);
+        return dot(RgbBasis[heroIdx].xyz, texel);
+    }
+
+    uint row; float atten;
+    PatternShade(prim, dir, hitPoint, row, atten);
+    return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
+}
+
+// Snell refraction (line-for-line port of Optics.Refract). Returns false on TIR
+// (then 'refracted' is the mirror reflection).
+bool Refract(float3 incident, float3 normal, float iorFrom, float iorTo, out float3 refracted)
+{
+    float3 i = normalize(incident);
+    float3 n = normal;
+    float cosI = dot(i, n);
+    if (cosI > 0.0) n = -n; else cosI = -cosI;
+    float eta = iorFrom / iorTo;
+    float k = 1.0 - eta * eta * (1.0 - cosI * cosI);
+    if (k < 0.0) { refracted = reflect(i, n); return false; }
+    refracted = normalize(eta * i + (eta * cosI - sqrt(k)) * n);
+    return true;
+}
+
+// Exact unpolarized Fresnel reflectance (port of Optics.FresnelDielectric).
+float FresnelDielectric(float cosThetaI, float iorFrom, float iorTo)
+{
+    cosThetaI = clamp(abs(cosThetaI), 0.0, 1.0);
+    float sinI = sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
+    float sinT = iorFrom / iorTo * sinI;
+    if (sinT >= 1.0) return 1.0;
+    float cosT = sqrt(max(0.0, 1.0 - sinT * sinT));
+    float rs = (iorFrom * cosThetaI - iorTo * cosT) / (iorFrom * cosThetaI + iorTo * cosT);
+    float rp = (iorFrom * cosT - iorTo * cosThetaI) / (iorFrom * cosT + iorTo * cosThetaI);
+    return 0.5 * (rs * rs + rp * rp);
+}
+
+// Analytic view-facing rat billboard (plan §8): makes the rat a real object for the ray
+// tracer, so it appears in reflections/refractions (fogged and occluded correctly),
+// unlike the screen-space ApplyRat used for the crisp primary view. Returns the
+// hero-wavelength reflectance of an opaque sprite texel hit before maxT. The sprite is
+// shaded fullbright (unlit) to match the primary billboard.
+bool IntersectRat(float3 origin, float3 dir, float maxT, uint heroIdx, out float3 hitPoint, out float refl)
+{
+    hitPoint = float3(0.0, 0.0, 0.0);
+    refl = 0.0;
+    if (ShowRat == 0u)
+        return false;
+
+    float3 ratPos = float3(RatPosX, RatPosY, RatPosZ);
+    float t = dot(ratPos - origin, dir);            // plane through ratPos ⟂ dir
+    if (t <= 1e-3 || t >= maxT)
+        return false;
+
+    float3 hp = origin + dir * t;
+    float3 rel = hp - ratPos;
+    float3 up = abs(dir.y) < 0.99 ? float3(0, 1, 0) : float3(0, 0, 1);
+    float3 right = normalize(cross(up, dir));
+    float3 vup = cross(dir, right);
+    float halfSize = RatSize * 0.5;
+    float u = dot(rel, right) / halfSize;
+    float v = dot(rel, vup) / halfSize;
+    if (abs(u) > 1.0 || abs(v) > 1.0)
+        return false;
+
+    uint tx = min((uint)(0.5 * (u + 1.0) * float(DECAL_SIZE)), DECAL_SIZE - 1u);
+    uint ty = min((uint)(0.5 * (1.0 - v) * float(DECAL_SIZE)), DECAL_SIZE - 1u); // sprite row 0 = top
+    float4 texel = DecalPixels[RatLayer * (DECAL_SIZE * DECAL_SIZE) + ty * DECAL_SIZE + tx];
+    if (texel.a < 0.5)
+        return false; // transparent sprite pixel
+
+    hitPoint = hp;
+    refl = dot(RgbBasis[heroIdx].xyz, texel.rgb);
+    return true;
+}
+
+// XYZ radiance along a specular chain (mirror reflect + dielectric Fresnel
+// reflect/refract), with participating media integrated along every reflected segment
+// so smoke shows in reflections/refractions. Iterative (HLSL has no recursion), tracing
+// from the camera; the camera→primary segment (depth 1) is fogged by FogOut/resolve, so
+// it is skipped here to avoid double-counting. Mirrors JobSystem.TraceSpecularRadiance.
+float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng)
+{
+    float weight = 1.0;             // Π (transmittance × reflectance) so far
+    float3 accum = float3(0.0, 0.0, 0.0);
+    bool inGlass = false;
+    [loop]
+    for (uint depth = 1u; depth <= MAX_SPECULAR_BOUNCES; depth++)
+    {
+        uint idx; float3 hitPoint;
+        bool sceneHit = TraceClosest(origin, dir, idx, hitPoint);
+        float sceneT = sceneHit ? length(hitPoint - origin) : 1e30;
+
+        // The rat is a real object for reflected rays (depth > 1); the primary view keeps
+        // the screen-space ApplyRat so a walking rat stays crisp through the accumulator.
+        float3 ratHitPoint; float ratRefl;
+        bool ratHit = depth > 1u && IntersectRat(origin, dir, sceneT, heroIdx, ratHitPoint, ratRefl);
+
+        if (!sceneHit && !ratHit)
+            return accum; // ray escapes; keep the fog it passed through
+
+        float3 segEnd = ratHit ? ratHitPoint : hitPoint;
+        if (depth > 1u) // fog the reflected segments (camera→primary is FogOut's job)
+        {
+            float fogT; float3 fogI;
+            IntegrateVolumetric(origin, segEnd, dir, VolTime, fogT, fogI);
+            accum += weight * fogI;
+            weight *= fogT;
+        }
+
+        if (ratHit) // fullbright sprite terminal
+        {
+            accum += weight * DeterXYZ[heroIdx].xyz * ratRefl;
+            return accum;
+        }
+
+        PrimitiveInfo prim = Primitives[idx];
+        float3 hitNormal = FaceNormal(prim, dir);
+
+        if (prim.Surface == SURFACE_MIRROR && depth < MAX_SPECULAR_BOUNCES)
+        {
+            weight *= HeroReflectance(prim, dir, hitPoint, heroIdx);
+            dir = reflect(dir, hitNormal);
+            origin = hitPoint + hitNormal * 1e-3;
+            continue;
+        }
+
+        if (prim.Surface == SURFACE_DIELECTRIC && depth < MAX_SPECULAR_BOUNCES)
+        {
+            float iorFrom = inGlass ? prim.Ior : 1.0;
+            float iorTo   = inGlass ? 1.0 : prim.Ior;
+            float cosI = abs(dot(normalize(dir), hitNormal));
+            float R = FresnelDielectric(cosI, iorFrom, iorTo);
+            float3 refr;
+            bool transmits = Refract(dir, hitNormal, iorFrom, iorTo, refr);
+            rng = rng * RNG_MUL + RNG_ADD;
+            float u = float(rng) / 4294967296.0;
+            if (!transmits || u < R)
+            {
+                dir = reflect(dir, hitNormal);
+                origin = hitPoint + hitNormal * 1e-3;
+            }
+            else
+            {
+                dir = refr;
+                origin = hitPoint - hitNormal * 1e-3;
+                inGlass = !inGlass;
+            }
+            continue;
+        }
+
+        accum += weight * DeterXYZ[heroIdx].xyz
+            * MirrorDiffuseScalar(HeroReflectance(prim, dir, hitPoint, heroIdx), hitPoint, hitNormal, rng);
+        return accum;
+    }
+    return accum;
+}
+
 // Full per-sample corrected XYZ; also returns direct/indirect components, the
 // primary-hit mask, the primary hit point + oriented normal for the G-buffer, and
 // (Phase 5) the primary hit's base reflectance luminance for the Albedo view.
@@ -781,6 +984,21 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     primaryNormal = hitNormal;
 
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
+
+    // Specular surface — mirror reflection (§1.1) or dielectric reflect/refract
+    // (§1.2). Hero-only; accumulation builds the spectrum. G-buffer keeps the
+    // specular surface so TAA reprojects on it. Mirrors JobSystem.TraceCore.
+    if (prim.Surface == SURFACE_MIRROR || prim.Surface == SURFACE_DIELECTRIC)
+    {
+        primaryAlbedo = HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
+
+        uint specRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
+        // Already CIE-weighted XYZ, with smoke integrated along the reflected segments.
+        float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng) * DeterministicCorrection;
+        correctedDirect = specXyz;
+        return specXyz;
+    }
+
     float3 baseXyz = BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
     primaryAlbedo = baseXyz.y; // base reflectance luminance (Albedo debug view)
 

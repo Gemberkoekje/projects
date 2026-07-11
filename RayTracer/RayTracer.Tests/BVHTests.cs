@@ -57,18 +57,18 @@ public class BVHTests
                 var intersect = t.Intersect(ray);
                 if (intersect.HasValue)
                 {
-                    float d = Vector3.Distance(origin, intersect.Value.location);
+                    float d = Vector3.Distance(origin, intersect.Value.Location);
                     if (d < linearDist)
                     {
                         linearDist = d;
-                        linearReflectance = intersect.Value.reflectance;
+                        linearReflectance = intersect.Value.Reflectance;
                         linearHit = true;
                     }
                 }
             }
 
             // BVH
-            var (bvhReflectance, _, _, _, bvhHit, _) = bvh.FindClosest(ray);
+            var (bvhReflectance, _, _, _, bvhHit, _, _, _) = bvh.FindClosest(ray);
 
             Assert.AreEqual(linearHit, bvhHit, $"Hit mismatch for direction {dir}");
             if (linearHit)
@@ -126,7 +126,7 @@ public class BVHTests
 
         var bvh = new BVH(scene.ToArray());
         var (linearReflectance, linearT, linearHit) = FindClosestLinear(scene, ray);
-        var (bvhReflectance, bvhPoint, _, _, bvhHit, _) = bvh.FindClosest(ray);
+        var (bvhReflectance, bvhPoint, _, _, bvhHit, _, _, _) = bvh.FindClosest(ray);
 
         Assert.AreEqual(linearHit, bvhHit);
         if (linearHit)
@@ -158,7 +158,7 @@ public class BVHTests
             Intensity = 1f
         };
 
-        var (_, hitPoint, _, _, hit, hitPrimitive) = bvh.FindClosest(ray);
+        var (_, hitPoint, _, _, hit, hitPrimitive, _, _) = bvh.FindClosest(ray);
 
         Assert.IsTrue(hit, "BVH should still report a hit in the presence of many zero-volume bounds.");
         Assert.IsInstanceOfType<TracableRectangle>(hitPrimitive);
@@ -174,10 +174,10 @@ public class BVHTests
         foreach (var t in scene)
         {
             var intersect = t.Intersect(ray);
-            if (intersect.HasValue && intersect.Value.t < closestT)
+            if (intersect.HasValue && intersect.Value.T < closestT)
             {
-                closestT = intersect.Value.t;
-                closestReflectance = intersect.Value.reflectance;
+                closestT = intersect.Value.T;
+                closestReflectance = intersect.Value.Reflectance;
                 hit = true;
             }
         }
@@ -189,7 +189,7 @@ public class BVHTests
     {
         public AABB Bounds { get; } = new(point, point);
 
-        public (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+        public HitInfo? Intersect(Ray ray)
             => null;
     }
 }

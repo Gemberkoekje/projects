@@ -26,6 +26,28 @@ Each effect below lists: **what**, **why spectral** (or why generic), **scene ho
 (where it lives in the maze), **implementation sketch** against real types, **effort**,
 **dependencies**, and **how to verify**.
 
+## Implementation workflow — CPU then GPU, in succession
+
+**Every step in this plan ships on the CPU renderer first, then is ported to the GPU
+before moving to the next step.** The GPU port is not a deferred afterthought; it is
+part of "done" for each effect. Concretely, each step is complete only when it exists in
+both places and both are verified:
+
+1. **CPU** — implement in `RayTracer.Core` (the `JobSystem.TraceCore` path in
+   `PathTracer.cs`, plus `Optics`/`MaterialData`), with unit tests on the physics and a
+   render/regression check.
+2. **GPU** — port the same math to (a) the shared pure-C# reference replicas in
+   `RayTracer.Core/Gpu/*Reference.cs`, and (b) the HLSL shaders in
+   `RayTracer.Gpu/Shaders/PathTracePhase*.hlsl` (Phase 6 ships the Phase 5 shaders). Add
+   a CI parity test in `RayTracer.Tests/GpuPhaseNTests.cs` pinning the reference to the
+   CPU `TraceCore` result, and run the on-hardware `--phaseN-selftest` on the DXR box.
+
+The GPU scene/material model must carry whatever the effect needs (surface kind, IOR,
+transmission, extinction) through `GpuPrimitive`/`PackedScene`/`SpectralResources`. Keep
+the CPU and GPU in lockstep: because CI has no GPU, the C# reference *is* the contract the
+HLSL is a line-for-line port of (see `gpu-raytracing-plan.md`). Don't let a step's CPU and
+GPU implementations drift apart across effects.
+
 ---
 
 ## Phase 0 — Shared foundation (do this first)

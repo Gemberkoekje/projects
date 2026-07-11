@@ -70,7 +70,8 @@ public class CeilingTileRectangle : Plane, Tracable, IQuadPrimitive
     /// <inheritdoc/>
     public float PatternP3 => 0f;
 
-    public override (float t, Vector3 location, Vector3 normal, Vector2? UV, float reflectance, float roughness)? Intersect(Ray ray)
+    /// <inheritdoc/>
+    public override HitInfo? Intersect(Ray ray)
     {
         var denom = Vector3.Dot(ray.Direction, Normal);
         if (MathF.Abs(denom) < 1e-6f)
@@ -98,7 +99,7 @@ public class CeilingTileRectangle : Plane, Tracable, IQuadPrimitive
 
         float reflectance = _tileMaterial.GetSpectralReflectance((int)ray.Wavelength) * attenuation;
         var faceNormal = denom < 0 ? Normal : -Normal;
-        return (d, hitPoint, faceNormal, new Vector2(u, w), reflectance, _tileMaterial.Roughness);
+        return HitInfo.FromMaterial(d, hitPoint, faceNormal, new Vector2(u, w), reflectance, _tileMaterial, (int)ray.Wavelength);
     }
 
     /// <summary>

@@ -14,6 +14,21 @@ public static class MazeGeometryBuilder
     /// <summary>Height of the maze walls.</summary>
     public const float WallHeight = 2f;
 
+    // Whether a vertical wall exists on grid line gx at row gy (matches the vertical
+    // wall loop's West/East convention). Used to decide where a thick wall needs a jamb.
+    private static bool HasVWall(Maze maze, int gx, int gy)
+    {
+        if (gx < 0 || gx > maze.Width || gy < 0 || gy >= maze.Height) return false;
+        return gx < maze.Width ? maze.HasWall(gx, gy, Wall.West) : maze.HasWall(maze.Width - 1, gy, Wall.East);
+    }
+
+    // Whether a horizontal wall exists on grid line gy at column gx (North/South convention).
+    private static bool HasHWall(Maze maze, int gx, int gy)
+    {
+        if (gx < 0 || gx >= maze.Width || gy < 0 || gy > maze.Height) return false;
+        return gy < maze.Height ? maze.HasWall(gx, gy, Wall.North) : maze.HasWall(gx, maze.Height - 1, Wall.South);
+    }
+
     /// <summary>
     /// Builds the 3D geometry for the given maze. Each cell becomes a
     /// <paramref name="cellSize"/>×<paramref name="cellSize"/> square in
@@ -29,6 +44,10 @@ public static class MazeGeometryBuilder
     /// <param name="ceilingGridMaterial">Material for ceiling grid lines. When null, ceiling uses a plain rectangle.</param>
     /// <param name="cellSize">World-space size of each cell. Defaults to <see cref="CellSize"/>.</param>
     /// <param name="wallHeight">Wall height. Defaults to <see cref="WallHeight"/>.</param>
+    /// <param name="skipWall">Optional predicate <c>(gridX, gridY, horizontal) =&gt; skip</c>; when it
+    /// returns true the wall at that grid line is omitted (e.g. so a window can replace it).</param>
+    /// <param name="wallThickness">Wall thickness. 0 (default) builds zero-thickness single-quad walls
+    /// (unchanged); &gt;0 builds each wall as two brick faces plus jamb side-walls at exposed ends.</param>
     public static Tracable[] Build(
         Maze maze,
         MaterialData wallMaterial,
@@ -38,12 +57,24 @@ public static class MazeGeometryBuilder
         MaterialData? ceilingGridMaterial = null,
         MaterialData? goalMaterial = null,
         float cellSize = CellSize,
-        float wallHeight = WallHeight)
+        float wallHeight = WallHeight,
+        Func<int, int, bool, bool>? skipWall = null,
+        float wallThickness = 0f)
     {
         var tracables = new List<Tracable>();
 
         float cs = cellSize;
         float wh = wallHeight;
+        float ht = wallThickness * 0.5f;
+
+        // A brick wall panel (matches the maze wall look); a jamb is a plain-material
+        // side wall closing a thick wall's exposed end.
+        void AddPanel(Vector3 l1, Vector3 l2, Vector3 l3) =>
+            tracables.Add(mortarMaterial is not null
+                ? new BrickRectangle((l1, l2, l3), wallMaterial, mortarMaterial)
+                : new TracableRectangle((l1, l2, l3), wallMaterial));
+        void AddJamb(Vector3 l1, Vector3 l2, Vector3 l3) =>
+            tracables.Add(new TracableRectangle((l1, l2, l3), wallMaterial));
 
         // ── Horizontal walls (perpendicular to Z axis) ──────────────
         // Walk every horizontal grid line from y=0 to y=maze.Height.
@@ -57,15 +88,28 @@ public static class MazeGeometryBuilder
                     ? maze.HasWall(gx, gy, Wall.North)
                     : maze.HasWall(gx, maze.Height - 1, Wall.South);
 
-                if (hasWall)
+                if (hasWall && skipWall?.Invoke(gx, gy, true) != true)
                 {
                     float z = gy * cs;
-                    var loc = (new Vector3(gx * cs, 0, z),
-                               new Vector3((gx + 1) * cs, 0, z),
-                               new Vector3(gx * cs, wh, z));
-                    tracables.Add(mortarMaterial is not null
-                        ? new BrickRectangle(loc, wallMaterial, mortarMaterial)
-                        : new TracableRectangle(loc, wallMaterial));
+                    float x0 = gx * cs, x1 = (gx + 1) * cs;
+                    if (ht <= 0f)
+                    {
+                        var loc = (new Vector3(x0, 0, z), new Vector3(x1, 0, z), new Vector3(x0, wh, z));
+                        tracables.Add(mortarMaterial is not null
+                            ? new BrickRectangle(loc, wallMaterial, mortarMaterial)
+                            : new TracableRectangle(loc, wallMaterial));
+                    }
+                    else
+                    {
+                        // Two brick faces a thickness apart, and a jamb closing each end
+                        // that no collinear wall continues (a 180° corner / opening).
+                        AddPanel(new Vector3(x0, 0, z - ht), new Vector3(x1, 0, z - ht), new Vector3(x0, wh, z - ht));
+                        AddPanel(new Vector3(x0, 0, z + ht), new Vector3(x1, 0, z + ht), new Vector3(x0, wh, z + ht));
+                        if (!HasHWall(maze, gx - 1, gy))
+                            AddJamb(new Vector3(x0, 0, z - ht), new Vector3(x0, 0, z + ht), new Vector3(x0, wh, z - ht));
+                        if (!HasHWall(maze, gx + 1, gy))
+                            AddJamb(new Vector3(x1, 0, z - ht), new Vector3(x1, 0, z + ht), new Vector3(x1, wh, z - ht));
+                    }
                 }
             }
         }
@@ -80,15 +124,26 @@ public static class MazeGeometryBuilder
                     ? maze.HasWall(gx, gy, Wall.West)
                     : maze.HasWall(maze.Width - 1, gy, Wall.East);
 
-                if (hasWall)
+                if (hasWall && skipWall?.Invoke(gx, gy, false) != true)
                 {
                     float x = gx * cs;
-                    var loc = (new Vector3(x, 0, gy * cs),
-                               new Vector3(x, 0, (gy + 1) * cs),
-                               new Vector3(x, wh, gy * cs));
-                    tracables.Add(mortarMaterial is not null
-                        ? new BrickRectangle(loc, wallMaterial, mortarMaterial)
-                        : new TracableRectangle(loc, wallMaterial));
+                    float z0 = gy * cs, z1 = (gy + 1) * cs;
+                    if (ht <= 0f)
+                    {
+                        var loc = (new Vector3(x, 0, z0), new Vector3(x, 0, z1), new Vector3(x, wh, z0));
+                        tracables.Add(mortarMaterial is not null
+                            ? new BrickRectangle(loc, wallMaterial, mortarMaterial)
+                            : new TracableRectangle(loc, wallMaterial));
+                    }
+                    else
+                    {
+                        AddPanel(new Vector3(x - ht, 0, z0), new Vector3(x - ht, 0, z1), new Vector3(x - ht, wh, z0));
+                        AddPanel(new Vector3(x + ht, 0, z0), new Vector3(x + ht, 0, z1), new Vector3(x + ht, wh, z0));
+                        if (!HasVWall(maze, gx, gy - 1))
+                            AddJamb(new Vector3(x - ht, 0, z0), new Vector3(x + ht, 0, z0), new Vector3(x - ht, wh, z0));
+                        if (!HasVWall(maze, gx, gy + 1))
+                            AddJamb(new Vector3(x - ht, 0, z1), new Vector3(x + ht, 0, z1), new Vector3(x - ht, wh, z1));
+                    }
                 }
             }
         }

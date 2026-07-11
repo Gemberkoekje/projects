@@ -19,6 +19,8 @@
 #define PI                  3.14159265
 #define RNG_MUL             747796405u
 #define RNG_ADD             2891336453u
+#define SURFACE_MIRROR      1u   // SurfaceKind.Mirror
+#define MAX_MIRROR_BOUNCES  8u   // JobSystem.MaxMirrorBounces
 
 // Volumetric constants (mirror Phase4Reference / JobSystem).
 #define ISOTROPIC_PHASE  0.07957747
@@ -40,7 +42,8 @@ struct PrimitiveInfo
     uint  MatPrimary;
     uint  MatSecondary;
     float P0; float P1; float P2; float P3;
-    float Pad0; float Pad1; float Pad2;
+    uint  Surface;        // SurfaceKind of the primary material (0 diffuse, 1 mirror, …)
+    float Pad1; float Pad2;
 };
 
 RaytracingAccelerationStructure Scene              : register(t0);
@@ -625,6 +628,64 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
 
 // Full per-sample corrected XYZ; also returns direct/indirect components, the
 // primary-hit mask, and the primary hit point + oriented normal for the G-buffer.
+// ── Mirror specular reflection (spectral-effects-plan.md §1.1) ─────────
+// Line-for-line port of Phase2Reference.MirrorDiffuseScalar / TraceMirrorRadiance
+// (and JobSystem's mirror branch). HLSL has no recursion, so the mirror chain is
+// an iterative loop accumulating a reflectance product.
+
+float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng)
+{
+    float ambient = 1.0;
+    float direct = 0.0;
+    if (LightingMode != 0u && NumLights > 0u)
+    {
+        ambient = AmbientLevel;
+        float p; float3 ldir; float distSq; float cosv;
+        SelectLight(rng, pt, normal, p, ldir, distSq, cosv);
+        if (cosv > 0.0)
+        {
+            bool visible = true;
+            if (LightingMode == 2u) // NEE
+            {
+                float3 shadowOrigin = pt + normal * 1e-3;
+                visible = !TraceOccluded(shadowOrigin, ldir, sqrt(distSq) - 2e-3);
+            }
+            if (visible)
+                direct = cosv / distSq * LightIntensity / max(p, 1e-9);
+        }
+    }
+    return refl * (ambient + direct);
+}
+
+float TraceMirrorRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng)
+{
+    float throughput = 1.0;
+    [loop]
+    for (uint depth = 1u; depth <= MAX_MIRROR_BOUNCES; depth++)
+    {
+        uint idx; float3 hitPoint;
+        if (!TraceClosest(origin, dir, idx, hitPoint))
+            return 0.0; // miss: nothing to reflect
+
+        PrimitiveInfo prim = Primitives[idx];
+        float3 hitNormal = FaceNormal(prim, dir);
+        uint row; float atten;
+        PatternShade(prim, dir, hitPoint, row, atten);
+        float refl = MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
+
+        if (prim.Surface == SURFACE_MIRROR && depth < MAX_MIRROR_BOUNCES)
+        {
+            throughput *= refl;
+            dir = reflect(dir, hitNormal);
+            origin = hitPoint + hitNormal * 1e-3;
+            continue;
+        }
+
+        return throughput * MirrorDiffuseScalar(refl, hitPoint, hitNormal, rng);
+    }
+    return 0.0;
+}
+
 float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sampleIdx,
                    out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect,
                    out float3 primaryHitPoint, out float3 primaryNormal)
@@ -646,6 +707,27 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     primaryNormal = hitNormal;
 
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
+
+    // Specular mirror: follow the achromatic reflected ray (hero-only) and let
+    // accumulation build the spectrum. G-buffer keeps the mirror surface so TAA
+    // reprojects on it. Mirrors JobSystem.TraceCore's mirror branch.
+    if (prim.Surface == SURFACE_MIRROR)
+    {
+        uint mRow; float mAtten;
+        PatternShade(prim, primaryDir, hitPoint, mRow, mAtten);
+        float mirrorRefl = MaterialReflectance[mRow * DETERMINISTIC_COUNT + heroIdx] * mAtten;
+
+        uint mirrorRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
+        float3 reflectDir = reflect(primaryDir, hitNormal);
+        float3 reflectOrigin = hitPoint + hitNormal * 1e-3;
+        float reflectedRadiance = mirrorRefl * TraceMirrorRadiance(reflectOrigin, reflectDir, heroIdx, mirrorRng);
+
+        float3 mirrorXyz = DeterXYZ[heroIdx].xyz * reflectedRadiance;
+        float corr = DeterministicCorrection;
+        correctedDirect = mirrorXyz * corr;
+        return mirrorXyz * corr;
+    }
+
     float3 baseXyz = BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
 
     bool lit = (LightingMode != 0u) && (NumLights > 0u);

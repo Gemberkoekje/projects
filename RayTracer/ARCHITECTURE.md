@@ -11,8 +11,9 @@
 ## `RayTracer.Core` domain folders
 
 - `Rendering/`: orchestration facade and render pipeline components (`JobSystem`, schedulers, resolvers).
-- `Geometry/`: scene primitives and intersection acceleration (`BVH`, `AABB`, maze geometry).
+- `Geometry/`: scene primitives and intersection acceleration (`BVH`, `AABB`, maze geometry, the `HitInfo` intersection result).
 - `Lighting/`: light definitions, cone helpers, material and spectral lookup integration.
+- `Optics/`: wavelength-dependent surface behaviour — `SurfaceKind` classification and the `Optics` refraction/Fresnel helpers shared by the spectral & optical effects (see `spectral-effects-plan.md`).
 - `Sampling/`: wavelength sampling and spectral distribution support.
 - `Pipeline/`: camera, controller, and matrix/pipeline transforms.
 - `Debug/`: debug modes and debug visualization support.

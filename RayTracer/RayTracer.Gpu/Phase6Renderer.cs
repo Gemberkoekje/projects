@@ -193,7 +193,7 @@ internal sealed class Phase6Renderer : IDisposable
         VolumetricOptions volumetrics,
         LightingMode lightingMode = LightingMode.NEE, float sampleClamp = 0f,
         uint maxSampleCount = 2048, bool subPixelJitter = true,
-        uint motionSampleCap = 20, float temporalBlendAlpha = 0.1f,
+        uint motionSampleCap = 12, float temporalBlendAlpha = 0.1f,
         uint filterRadius = 1, bool biomeIndicator = false,
         Phase5DebugMode debugMode = Phase5DebugMode.Beauty, bool bumpyWalls = false,
         bool showOverheadMap = false, bool showRat = false, float classicDepthCue = 0f,
@@ -242,7 +242,10 @@ internal sealed class Phase6Renderer : IDisposable
         public uint BiomeIndicator;
         public float VolTime;
         public float RevealHeight; // §9.3 build-in reveal
-        public float RPadA, RPadB, RPadC;
+        public float RatPosX, RatPosY, RatPosZ; // §8 rat billboard (for reflections)
+        public float RatSize;
+        public uint ShowRat, RatLayer;
+        public float RPad;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -925,6 +928,12 @@ internal sealed class Phase6Renderer : IDisposable
             BumpyWalls = _bumpyWalls ? 1u : 0u,
             RevealHeight = _revealHeight,
             VolTime = _volTime,
+            RatPosX = _ratPos.X,
+            RatPosY = _ratPos.Y,
+            RatPosZ = _ratPos.Z,
+            RatSize = 0.7f,
+            ShowRat = _showRat ? 1u : 0u,
+            RatLayer = (uint)DecalLayer.Rat,
         };
 
         Span<TraceConstants> dest = _traceConstantBuffer.Map<TraceConstants>(0, 1);

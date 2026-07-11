@@ -229,7 +229,7 @@ public class GpuPhase1Tests
                     };
                     var heroHit = tracable.Intersect(heroRay);
                     Assert.IsTrue(heroHit.HasValue, $"{pattern} hero ray should hit");
-                    Vector3 hitPoint = heroHit.Value.location;
+                    Vector3 hitPoint = heroHit.Value.Location;
 
                     // CPU "truth": sum CIE(wl) * primitive.Intersect(wl).reflectance over the 4 wavelengths.
                     Vector3 baseXyzTruth = Vector3.Zero;
@@ -241,7 +241,7 @@ public class GpuPhase1Tests
                         var hit = tracable.Intersect(ray);
                         Assert.IsTrue(hit.HasValue, $"{pattern} companion ray should hit");
                         Assert.IsTrue(wl.TryGet(wlK, out Vector3 cie), "CIE lookup");
-                        baseXyzTruth += cie * hit.Value.reflectance;
+                        baseXyzTruth += cie * hit.Value.Reflectance;
                     }
                     baseXyzTruth /= Phase1Reference.CompanionCount;
                     Vector3 correctedTruth = baseXyzTruth * wl.DeterministicCorrection;

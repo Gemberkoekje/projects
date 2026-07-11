@@ -341,6 +341,34 @@ public class MaterialData
     public float Roughness { get; }
     public SpectralData? SpectralData { get; }
 
+    /// <summary>
+    /// How this material interacts with light. Measured maze materials are
+    /// <see cref="SurfaceKind.Diffuse"/>; optical materials (glass, water,
+    /// mirrors, …) set this so the integrator branches into the corresponding
+    /// effect (spectral-effects-plan.md §0.1).
+    /// </summary>
+    public SurfaceKind Surface { get; }
+
+    /// <summary>Fraction of light transmitted through the surface (0 = opaque).</summary>
+    public float Transmission { get; }
+
+    /// <summary>Cauchy coefficient <c>A</c> — the base index of refraction (dimensionless).</summary>
+    public float CauchyA { get; }
+
+    /// <summary>
+    /// Cauchy coefficient <c>B</c> (in µm²) — the dispersion term in
+    /// <c>n(λ) = A + B/λ²</c>. Zero means a non-dispersive medium.
+    /// </summary>
+    public float CauchyB { get; }
+
+    /// <summary>
+    /// Base Beer–Lambert absorption coefficient σ (per world unit) for light
+    /// travelling inside the medium. Spectral variation of σ arrives with the
+    /// absorption effect (spectral-effects-plan.md §2.3); for now this is a
+    /// single control value, 0 for non-absorbing media.
+    /// </summary>
+    public float ExtinctionSigma { get; }
+
     public bool HasSpectralData => SpectralData != null;
 
     public MaterialData(
@@ -357,7 +385,12 @@ public class MaterialData
         float bReflectance,
         float specularity,
         float roughness,
-        SpectralData? spectralData = null)
+        SpectralData? spectralData = null,
+        SurfaceKind surface = SurfaceKind.Diffuse,
+        float transmission = 0f,
+        float cauchyA = 1f,
+        float cauchyB = 0f,
+        float extinctionSigma = 0f)
     {
         Id = id;
         Name = name;
@@ -373,6 +406,11 @@ public class MaterialData
         Specularity = specularity;
         Roughness = roughness;
         SpectralData = spectralData;
+        Surface = surface;
+        Transmission = transmission;
+        CauchyA = cauchyA;
+        CauchyB = cauchyB;
+        ExtinctionSigma = extinctionSigma;
     }
 
     // Convenience property to get the RGB reflectance as a Vector3
@@ -394,4 +432,27 @@ public class MaterialData
         // separate array accesses on every intersection.
         return SpectralData.GetMaxReflectance(wavelength);
     }
+
+    /// <summary>
+    /// Index of refraction at <paramref name="wavelengthNm"/> via Cauchy's
+    /// equation <c>n(λ) = A + B/λ²</c> (λ in µm). Non-dispersive materials
+    /// (<see cref="CauchyB"/> = 0) return <see cref="CauchyA"/> directly. This is
+    /// the sole entry point for dispersion — a wavelength-dependent IOR is what
+    /// splits white light through a prism (spectral-effects-plan.md §2.1).
+    /// </summary>
+    public float IorAt(float wavelengthNm)
+    {
+        if (CauchyB == 0f)
+            return CauchyA;
+
+        float um = wavelengthNm * 1e-3f;
+        return CauchyA + CauchyB / (um * um);
+    }
+
+    /// <summary>
+    /// Beer–Lambert absorption coefficient σ at the given wavelength. Currently a
+    /// wavelength-flat value (<see cref="ExtinctionSigma"/>); the spectral
+    /// absorption effect will make this vary with λ (spectral-effects-plan.md §2.3).
+    /// </summary>
+    public float ExtinctionAt(int wavelength) => ExtinctionSigma;
 }

@@ -225,6 +225,171 @@ public partial class JobSystem
     /// </summary>
     private const int CompanionCount = 4;
 
+    /// <summary>
+    /// Maximum number of specular bounces followed through mirror and dielectric
+    /// surfaces. Caps the cost (and terminates the infinite regress) of facing
+    /// mirrors or nested glass (spectral-effects-plan.md §1.1–§1.2).
+    /// </summary>
+    private const int MaxSpecularBounces = 8;
+
+    /// <summary>
+    /// Follows a specular ray through zero or more mirror/dielectric interactions and
+    /// returns the (CIE-weighted, uncorrected) XYZ radiance arriving back along it at
+    /// <paramref name="wavelength"/>. The first diffuse (or bounce-capped) hit is shaded
+    /// diffusely; a miss returns zero. Participating media is integrated along every
+    /// segment, so smoke shows in reflections and refractions.
+    /// <paramref name="inGlass"/> tracks whether the ray is inside a dielectric medium.
+    /// </summary>
+    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass)
+    {
+        var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
+        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior) = _bvh.FindClosest(ray);
+        if (!hit)
+            return Vector3.Zero;
+
+        Vector3 radiance;
+        if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
+        {
+            radiance = SpecularRadiance(surface, reflectance, ior, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass);
+        }
+        else
+        {
+            float scalar = ShadeDiffuseScalar(reflectance, hitPoint, hitNormal, wavelength, ref rng);
+            radiance = WavelengthLookup.TryGet((int)wavelength, out Vector3 cie) ? cie * scalar : Vector3.Zero;
+        }
+
+        // Smoke/fog along this specular segment (identity when volumetrics are off, so the
+        // no-smoke path stays bit-identical to the pre-media reflection).
+        return IntegrateVolumetricSegment(origin, hitPoint, dir).Apply(radiance);
+    }
+
+    /// <summary>
+    /// One specular interaction at a hit, returning the XYZ radiance arriving back along
+    /// <paramref name="incidentDir"/>. A mirror reflects and multiplies in its spectral
+    /// reflectance. A dielectric computes the Fresnel reflectance and stochastically
+    /// reflects or refracts (Russian roulette on Fresnel) via <see cref="Optics"/>,
+    /// toggling <paramref name="inGlass"/> on transmission (spectral-effects-plan.md §1.2).
+    /// Then it recurses through <see cref="TraceSpecularRadiance"/>.
+    /// </summary>
+    private Vector3 SpecularRadiance(
+        SurfaceKind surface, float reflectance, float ior,
+        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir,
+        float wavelength, ref uint rng, int depth, bool inGlass)
+    {
+        if (surface == SurfaceKind.Mirror)
+        {
+            Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
+            Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
+            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass);
+        }
+
+        // Dielectric (clear glass): reflect vs. refract by Russian roulette on Fresnel.
+        float iorFrom = inGlass ? ior : 1f;
+        float iorTo = inGlass ? 1f : ior;
+        float cosI = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
+        float fresnel = Optics.FresnelDielectric(cosI, iorFrom, iorTo);
+        bool transmits = Optics.Refract(incidentDir, hitNormal, iorFrom, iorTo, out Vector3 refractDir);
+
+        rng = rng * 747796405u + 2891336453u;
+        float u = rng / 4294967296f;
+        if (!transmits || u < fresnel)
+        {
+            Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
+            Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
+            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass);
+        }
+
+        Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
+        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, !inGlass);
+    }
+
+    /// <summary>
+    /// Scalar (CIE-weight-free) diffuse radiance leaving <paramref name="point"/>
+    /// toward the viewer: <c>reflectance × (ambient + direct)</c>, matching the
+    /// primary path's ambient/direct model so a surface seen in a mirror shades
+    /// like the same surface seen directly.
+    /// </summary>
+    private float ShadeDiffuseScalar(float reflectance, Vector3 point, Vector3 normal, float wavelength, ref uint rng)
+    {
+        float ambient = 1f;
+        float direct = 0f;
+        if (Lighting != LightingMode.None && _lights.Length > 0)
+        {
+            ambient = AmbientLevel;
+            direct = DirectTermAt(point, normal, wavelength, ref rng);
+        }
+
+        return reflectance * (ambient + direct);
+    }
+
+    /// <summary>
+    /// Next-event-estimation direct-lighting term at a surface point, using the
+    /// same 1/d²·cos importance selection and shadow-ray occlusion as the primary
+    /// path. Returns the unshadowed contribution for <see cref="LightingMode.Direct"/>.
+    /// </summary>
+    private float DirectTermAt(Vector3 point, Vector3 normal, float wavelength, ref uint rng)
+    {
+        int nLights = _lights.Length;
+        if (nLights == 0)
+            return 0f;
+
+        Span<float> weights = stackalloc float[nLights];
+        float totalW = 0f;
+        for (int li = 0; li < nLights; li++)
+        {
+            Vector3 toLight = _lights[li].Position - point;
+            float dsq = Vector3.Dot(toLight, toLight);
+            float dist = MathF.Sqrt(dsq);
+            Vector3 ldir = toLight / dist;
+            float cos = Vector3.Dot(normal, ldir);
+            float w = cos > 0f ? 1f / MathF.Max(dsq, 1e-6f) : 0f;
+            weights[li] = w;
+            totalW += w;
+        }
+
+        if (totalW <= 0f)
+            return 0f;
+
+        rng = rng * 747796405u + 2891336453u;
+        float u = rng / 4294967296f * totalW;
+        float acc = 0f;
+        int chosen = nLights - 1;
+        for (int li = 0; li < nLights; li++)
+        {
+            acc += weights[li];
+            if (u <= acc)
+            {
+                chosen = li;
+                break;
+            }
+        }
+
+        Vector3 toSelected = _lights[chosen].Position - point;
+        float distSq = MathF.Max(Vector3.Dot(toSelected, toSelected), 1e-6f);
+        float d = MathF.Sqrt(distSq);
+        Vector3 lightDir = toSelected / d;
+        float lightCos = Vector3.Dot(normal, lightDir);
+        if (lightCos <= 0f)
+            return 0f;
+
+        float lightP = weights[chosen] / totalW;
+
+        if (Lighting == LightingMode.NEE)
+        {
+            var shadowRay = new Ray
+            {
+                Origin = point + normal * 1e-3f,
+                Direction = lightDir,
+                Wavelength = wavelength,
+                Intensity = 1f,
+            };
+            if (_bvh.IsOccluded(shadowRay, d - 2e-3f))
+                return 0f;
+        }
+
+        return lightCos / distSq * LightIntensity / MathF.Max(lightP, 1e-9f);
+    }
+
     internal void TraceCore(Camera camera, int y, int x)
     {
         RenderBuffers buffers = _buffers;
@@ -283,7 +448,7 @@ public partial class JobSystem
             Wavelength = heroWavelength,
             Intensity = 1f
         };
-        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor) = _bvh.FindClosest(ray);
         Vector3 xyz = Vector3.Zero;
         Vector3 directLighting = Vector3.Zero;
         Vector3 indirectLighting = Vector3.Zero;
@@ -291,7 +456,29 @@ public partial class JobSystem
         Vector3 bounce0 = Vector3.Zero;
         Vector3 bounce1 = Vector3.Zero;
         Vector3 bounce2plus = Vector3.Zero;
-        if (hit)
+        if (hit && Optics.IsSpecular(heroSurface))
+        {
+            // Specular surface — mirror reflection (§1.1) or dielectric reflect/refract
+            // (§1.2). The interaction is achromatic in *direction* for clear glass, so
+            // companion wavelengths would share this geometry; we sample the hero
+            // wavelength and let accumulation build the spectrum. A mirror's spectral
+            // reflectance curve colours the reflection (gold warm, silver neutral);
+            // glass splits reflect vs. refract by Fresnel.
+            uint specularRng = pixelHash + (uint)(sampleIdx * 2654435761u) + 1013904223u;
+            // SpecularRadiance returns CIE-weighted XYZ (with smoke integrated along the
+            // reflected/refracted segments); the camera→surface segment's fog is applied
+            // by the shared volumetric step below.
+            xyz = SpecularRadiance(
+                heroSurface, reflectance, heroIor, hitPoint, hitNormal, dir,
+                heroWavelength, ref specularRng, 0, inGlass: false);
+
+            // The specular radiance behaves like a direct view of the reflected/refracted
+            // surface; book it as bounce-0/direct for the debug decomposition.
+            directLighting = xyz;
+            bounce0 = xyz;
+            diffuseCacheState[ix] = 0;
+        }
+        else if (hit)
         {
             float ambientTerm = 1f;
             float directTerm = 0f;
@@ -396,21 +583,33 @@ public partial class JobSystem
             if (WavelengthLookup.TryGet(heroWavelength, out var heroXyz))
                 xyz = heroXyz * reflectance;
 
-            int evaluated = 1;
-            for (int c = 1; c < CompanionCount; c++)
-            {
-                int compIdx = (heroIdx + c * stride) % deterCount;
-                int compWl = WavelengthLookup.GetDeterministicWavelength(compIdx);
+            // Companion wavelengths reuse the hero ray's geometry and only
+            // re-look-up reflectance. That reuse is valid only where the path is
+            // wavelength-independent (diffuse/mirror). On a dispersive dielectric,
+            // thin-film, grating, or fluorescent surface each wavelength takes a
+            // different path or shifts colour, so we fall back to hero-only
+            // sampling and let accumulation build the spectrum over frames
+            // (spectral-effects-plan.md §0.3).
+            bool wavelengthDependentPath = Optics.IsWavelengthDependent(heroSurface);
 
-                if (WavelengthLookup.TryGet(compWl, out var compXyz))
+            int evaluated = 1;
+            if (!wavelengthDependentPath)
+            {
+                for (int c = 1; c < CompanionCount; c++)
                 {
-                    var compRay = ray;
-                    compRay.Wavelength = compWl;
-                    var compHit = hitPrimitive!.Intersect(compRay);
-                    if (compHit.HasValue)
+                    int compIdx = (heroIdx + c * stride) % deterCount;
+                    int compWl = WavelengthLookup.GetDeterministicWavelength(compIdx);
+
+                    if (WavelengthLookup.TryGet(compWl, out var compXyz))
                     {
-                        xyz += compXyz * compHit.Value.reflectance;
-                        evaluated++;
+                        var compRay = ray;
+                        compRay.Wavelength = compWl;
+                        var compHit = hitPrimitive!.Intersect(compRay);
+                        if (compHit.HasValue)
+                        {
+                            xyz += compXyz * compHit.Value.Reflectance;
+                            evaluated++;
+                        }
                     }
                 }
             }
@@ -451,7 +650,7 @@ public partial class JobSystem
                     Intensity = 1f
                 };
 
-                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive) = _bvh.FindClosest(secRay);
+                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _) = _bvh.FindClosest(secRay);
                 if (secHit && secPrimitive is not null)
                 {
                     Vector3 secBaseXyz = Vector3.Zero;
@@ -516,7 +715,7 @@ public partial class JobSystem
                             Intensity = 1f
                         };
 
-                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive) = _bvh.FindClosest(tertRay);
+                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive, _, _) = _bvh.FindClosest(tertRay);
                         if (tertHit && tertPrimitive is not null)
                         {
                             Vector3 tertBaseXyz = Vector3.Zero;

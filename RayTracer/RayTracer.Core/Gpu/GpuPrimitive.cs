@@ -63,10 +63,15 @@ public struct GpuPrimitive
     /// <summary>Pattern parameter 3.</summary>
     public float P3;
 
-    /// <summary>Padding to a 96-byte (16-aligned) stride.</summary>
-    public float Pad0;
-    /// <summary>Padding.</summary>
-    public float Pad1;
+    /// <summary>
+    /// The primary material's <see cref="SurfaceKind"/> (as a <c>uint</c>), so the
+    /// shader can branch into the optical effects (mirror, dielectric, …). Occupies
+    /// the former first padding slot, keeping the 96-byte (16-aligned) stride.
+    /// </summary>
+    public uint Surface;
+    /// <summary>The primary material's index of refraction (constant / base Cauchy A),
+    /// for dielectric refraction. 1 for non-refracting surfaces.</summary>
+    public float Ior;
     /// <summary>Padding.</summary>
     public float Pad2;
 }
