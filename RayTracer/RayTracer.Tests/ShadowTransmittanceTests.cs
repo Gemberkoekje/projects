@@ -164,9 +164,13 @@ public sealed class ShadowTransmittanceTests
     {
         var from = new Vector3(0f, 1f, 0f);
         var to = new Vector3(0f, 1f, 8f);
+        // EarlyOutTransmittance is disabled so the comparison stays in the exact
+        // (non-early-out) regime: with the optimization on, two results that both fall below
+        // the 1% cutoff stop at different step counts and are not meaningfully ordered. Along a
+        // fixed segment and density field, higher σ can only lower the transmittance integral.
         VolumetricOptions thin = VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog)
-            with { SigmaScaleFog = 5f };
-        VolumetricOptions thick = thin with { SigmaScaleFog = 15f };
+            with { SigmaScaleFog = 1f, EarlyOutTransmittance = 0f };
+        VolumetricOptions thick = thin with { SigmaScaleFog = 3f };
 
         float thinT = JobSystem.SegmentTransmittance(from, to, Vector3.UnitZ, thin, isMoving: false);
         float thickT = JobSystem.SegmentTransmittance(from, to, Vector3.UnitZ, thick, isMoving: false);
