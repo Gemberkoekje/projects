@@ -86,6 +86,28 @@ public static class Optics
     }
 
     /// <summary>
+    /// Multiplier on a bubble's Fresnel reflectance (spectral-effects-plan.md §2.6) so the
+    /// thin-film rings read across the whole shell, not just at the grazing rim, while the
+    /// bubble stays mostly see-through. Shared by the specular chain and the shadow-ray
+    /// transmittance so a bubble's reflected tint and its cast shadow use the same split.
+    /// Mirrors the HLSL <c>BUBBLE_REFLECT_BOOST</c>.
+    /// </summary>
+    public const float BubbleReflectBoost = 45f;
+
+    /// <summary>
+    /// Probability that a ray reflects off (rather than transmits straight through) a
+    /// thin-shell soap bubble at one wavelength: the boosted air→film Fresnel reflectance
+    /// times the thin-film-tinted base reflectance, clamped to [0,1]
+    /// (spectral-effects-plan.md §2.6). The transmitted fraction is <c>1 − this</c>, which is
+    /// what a shadow ray keeps when it passes through a bubble (a faint, tinted shadow rather
+    /// than a hard black disc). <paramref name="tintedReflectance"/> is the base reflectance
+    /// already modulated by <see cref="ThinFilmReflectance"/> (as folded in
+    /// <c>HitInfo.FromMaterial</c>); <paramref name="filmIor"/> is the film's index.
+    /// </summary>
+    public static float BubbleReflectProbability(float cosTheta, float filmIor, float tintedReflectance)
+        => Math.Clamp(BubbleReflectBoost * FresnelDielectric(cosTheta, 1f, filmIor), 0f, 1f) * tintedReflectance;
+
+    /// <summary>
     /// Exact (unpolarized) Fresnel reflectance at a dielectric boundary.
     /// <paramref name="cosThetaI"/> is the cosine of the incidence angle in the
     /// <paramref name="iorFrom"/> medium (use its absolute value). Returns a

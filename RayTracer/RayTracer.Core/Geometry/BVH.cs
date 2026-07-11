@@ -152,6 +152,85 @@ public sealed class BVH
         return false;
     }
 
+    /// <summary>
+    /// Fraction of light in [0,1] that survives a shadow ray up to
+    /// <paramref name="maxDist"/>. Unlike the binary <see cref="IsOccluded"/>, thin
+    /// dielectrics do not fully block the ray: it returns 0 as soon as an opaque
+    /// primitive is hit, otherwise the product of the transmitted fractions through
+    /// each bubble/glass it passes — a bubble keeps <c>1 − reflectProbability</c>
+    /// (thin-film-tinted, via <see cref="Optics.BubbleReflectProbability"/>), a
+    /// dielectric keeps <c>1 − Fresnel</c>. This lets bubbles and glass cast soft,
+    /// tinted shadows instead of hard black discs (shadows-and-caustics-plan §A).
+    /// The result is order-independent because an opaque hit short-circuits to 0.
+    /// Refractive bending (caustics) is out of scope here — that is forward
+    /// transport (plan §B); this only softens the occlusion term.
+    /// </summary>
+    /// <remarks>
+    /// For a scene of only opaque primitives this returns exactly 0 (blocked) or 1
+    /// (clear), matching <c>!IsOccluded</c> bit-for-bit, so existing renders are
+    /// unchanged where no transmissive geometry lies on the shadow ray.
+    /// </remarks>
+    public float Transmittance(Ray ray, float maxDist)
+    {
+        Vector3 origin = ray.Origin;
+        Vector3 invDir = new(1f / ray.Direction.X, 1f / ray.Direction.Y, 1f / ray.Direction.Z);
+        Vector3 dir = Vector3.Normalize(ray.Direction);
+
+        float transmittance = 1f;
+
+        Span<int> stack = stackalloc int[MaxStackDepth];
+        int stackPtr = 0;
+        int current = 0;
+
+        while (true)
+        {
+            ref FlatNode node = ref _nodes[current];
+
+            if (node.Bounds.Intersects(origin, invDir, maxDist))
+            {
+                if (node.Count > 0)
+                {
+                    int end = node.Offset + node.Count;
+                    for (int i = node.Offset; i < end; i++)
+                    {
+                        var intersect = _primitives[i].Intersect(ray);
+                        if (!intersect.HasValue || intersect.Value.T >= maxDist)
+                            continue;
+
+                        var h = intersect.Value;
+                        float cos = MathF.Abs(Vector3.Dot(dir, h.Normal));
+                        switch (h.Surface)
+                        {
+                            case SurfaceKind.Bubble:
+                                transmittance *= 1f - Optics.BubbleReflectProbability(cos, h.Ior, h.Reflectance);
+                                break;
+                            case SurfaceKind.Dielectric:
+                                transmittance *= 1f - Optics.FresnelDielectric(cos, 1f, h.Ior);
+                                break;
+                            default:
+                                // Opaque (diffuse, mirror, oil-slick thin-film, emissive, …) → hard shadow.
+                                return 0f;
+                        }
+
+                        if (transmittance <= 1e-4f)
+                            return 0f;
+                    }
+                }
+                else
+                {
+                    stack[stackPtr++] = node.Offset;
+                    current++;
+                    continue;
+                }
+            }
+
+            if (stackPtr == 0) break;
+            current = stack[--stackPtr];
+        }
+
+        return transmittance;
+    }
+
     // ── Build ──────────────────────────────────────────────────────
 
     private static void Build(List<FlatNode> nodes, Tracable[] scene, List<Tracable> orderedPrims, int start, int count)

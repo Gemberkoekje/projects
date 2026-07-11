@@ -119,7 +119,23 @@ public record RenderPreset(
         Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysGroundSmoke) with { SigmaScaleGround = 1.45f, MaxMarchDistance = 12f },
         IsDebugSmokePreset: true);
 
-    public static RenderPreset[] All => [Low, Playable, Medium, High, Ultra, FogDebug, GroundSmokeDebug];
+    /// <summary>
+    /// Demonstrates volumetric shadows (shadows-and-caustics-plan §A2): always-on fog under
+    /// full NEE, so shadow rays integrate the fog optical depth and the moving smoke visibly
+    /// dims lit surfaces behind it. Distinct from <see cref="FogDebug"/> (which uses shadow-free
+    /// <see cref="LightingMode.Direct"/> and only shows the camera-ray fog).
+    /// </summary>
+    public static RenderPreset FogShadowDebug => new(
+        "Fog Shadow Debug", 480, 360, 2, 250, 12, 32,
+        SubPixelJitter: true, ResolutionScale: 1.0f,
+        FilterRadius: 1, EdgeAwareFilter: true,
+        Lighting: LightingMode.NEE,
+        CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
+        SmokeMode: SmokeMode.AlwaysFog,
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog) with { SigmaScaleFog = 1.35f },
+        IsDebugSmokePreset: true);
+
+    public static RenderPreset[] All => [Low, Playable, Medium, High, Ultra, FogDebug, GroundSmokeDebug, FogShadowDebug];
 
     public static RenderPreset[] QualityPresets => [Low, Playable, Medium, High, Ultra];
 

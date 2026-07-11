@@ -100,6 +100,71 @@ public partial class JobSystem
         return IntegrateVolumetricSegment(rayOrigin, hitPoint, rayDirection, Volumetrics, IsMoving, _lights, _bvh);
     }
 
+    /// <summary>
+    /// Transmittance in [0,1] of the participating medium along the segment
+    /// [<paramref name="from"/> → <paramref name="to"/>], with no in-scatter — the
+    /// extinction-only companion to <see cref="IntegrateVolumetricSegment(Vector3,Vector3,Vector3,VolumetricOptions)"/>.
+    /// Used by NEE shadow rays so moving fog dims the light reaching a surface and casts
+    /// shadows (shadows-and-caustics-plan §A2). Returns exactly 1 (no attenuation) when
+    /// volumetrics or the <see cref="VolumetricOptions.ShadowTransmittance"/> opt-in is off, so
+    /// the cheaper presets are byte-for-byte unaffected. It marches at a coarse step count (half
+    /// the camera march) since a shadow term tolerates more noise than the primary view.
+    /// </summary>
+    public static float SegmentTransmittance(
+        Vector3 from,
+        Vector3 to,
+        Vector3 direction,
+        VolumetricOptions options,
+        bool isMoving)
+    {
+        if (!options.EnableVolumetrics || options.SmokeMode == SmokeMode.None
+            || !options.ShadowTransmittance || options.MarchSteps <= 0)
+            return 1f;
+
+        Vector3 segment = to - from;
+        float rayLength = segment.Length();
+        if (rayLength <= 1e-5f)
+            return 1f;
+
+        float marchLength = MathF.Min(rayLength, MathF.Max(options.MaxMarchDistance, 0f));
+        if (marchLength <= 1e-5f)
+            return 1f;
+
+        int steps = Math.Max(2, options.MarchSteps / 2);
+        if (isMoving && steps > 1)
+            steps = Math.Max(1, (steps + 1) / 2);
+
+        Vector3 dir = segment / rayLength;
+        if (direction.LengthSquared() > 1e-10f)
+            dir = Vector3.Normalize(direction);
+
+        float stepLength = marchLength / steps;
+        float transmittance = 1f;
+        float sigmaScale = GetSigmaScale(options, options.SmokeMode);
+
+        for (int i = 0; i < steps; i++)
+        {
+            float distance = (i + 0.5f) * stepLength;
+            Vector3 p = from + dir * distance;
+            float density = GetDensity(p, options.SmokeMode);
+            if (density <= 0f)
+                continue;
+
+            float sigmaT = density * sigmaScale;
+            if (sigmaT <= 0f)
+                continue;
+
+            transmittance *= MathF.Exp(-sigmaT * stepLength);
+            if (transmittance < options.EarlyOutTransmittance)
+                return transmittance;
+        }
+
+        return transmittance;
+    }
+
+    internal float SegmentTransmittance(Vector3 from, Vector3 to, Vector3 direction)
+        => SegmentTransmittance(from, to, direction, Volumetrics, IsMoving);
+
     private static float GetSigmaScale(VolumetricOptions options, SmokeMode smokeMode)
     {
         return smokeMode == SmokeMode.AlwaysGroundSmoke ? options.SigmaScaleGround : options.SigmaScaleFog;

@@ -33,7 +33,14 @@ public readonly record struct VolumetricOptions(
     /// 1 = every step (full shadow tracing — used for Ultra).
     /// N = every Nth step (e.g. 2 fires on steps 0, 2, 4, … — used for High).
     /// </summary>
-    int ShadowStepInterval = 0)
+    int ShadowStepInterval = 0,
+    /// <summary>
+    /// When <c>true</c>, NEE shadow rays integrate the fog optical depth along the way to the
+    /// light, so moving fog casts shadows onto lit surfaces (shadows-and-caustics-plan §A2).
+    /// Costs an extra coarse march per shadow ray, so it is enabled only on the NEE tiers
+    /// (High/Ultra); the cheaper tiers leave it off and behave exactly as before.
+    /// </summary>
+    bool ShadowTransmittance = false)
 {
     public static VolumetricOptions FromQuality(VolumetricQuality quality, SmokeMode smokeMode)
     {
@@ -67,6 +74,7 @@ public readonly record struct VolumetricOptions(
                 SigmaScaleGround: 1f,
                 InscatterStrength: 0.18f,
                 ShadowStepInterval: 4,
+                ShadowTransmittance: true,
                 Quality: quality),
             VolumetricQuality.Ultra => new VolumetricOptions(
                 EnableVolumetrics: smokeMode != SmokeMode.None,
@@ -78,6 +86,7 @@ public readonly record struct VolumetricOptions(
                 AnisotropyG: 0.35f,
                 InscatterStrength: 0.20f,
                 ShadowStepInterval: 1,
+                ShadowTransmittance: true,
                 Quality: quality),
             _ => new VolumetricOptions(
                 EnableVolumetrics: smokeMode != SmokeMode.None,
