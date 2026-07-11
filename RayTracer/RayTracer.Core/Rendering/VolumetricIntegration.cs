@@ -100,9 +100,111 @@ public partial class JobSystem
         return IntegrateVolumetricSegment(rayOrigin, hitPoint, rayDirection, Volumetrics, IsMoving, _lights, _bvh);
     }
 
+    /// <summary>
+    /// Transmittance in [0,1] of the participating medium along the segment
+    /// [<paramref name="from"/> → <paramref name="to"/>], with no in-scatter — the
+    /// extinction-only companion to <see cref="IntegrateVolumetricSegment(Vector3,Vector3,Vector3,VolumetricOptions)"/>.
+    /// Used by NEE shadow rays so moving fog dims the light reaching a surface and casts
+    /// shadows (shadows-and-caustics-plan §A2). Returns exactly 1 (no attenuation) when
+    /// volumetrics or the <see cref="VolumetricOptions.ShadowTransmittance"/> opt-in is off, so
+    /// the cheaper presets are byte-for-byte unaffected. It marches at a coarse step count (half
+    /// the camera march) since a shadow term tolerates more noise than the primary view.
+    /// </summary>
+    public static float SegmentTransmittance(
+        Vector3 from,
+        Vector3 to,
+        Vector3 direction,
+        VolumetricOptions options,
+        bool isMoving)
+    {
+        if (!options.EnableVolumetrics || options.SmokeMode == SmokeMode.None
+            || !options.ShadowTransmittance || options.MarchSteps <= 0)
+            return 1f;
+
+        Vector3 segment = to - from;
+        float rayLength = segment.Length();
+        if (rayLength <= 1e-5f)
+            return 1f;
+
+        float marchLength = MathF.Min(rayLength, MathF.Max(options.MaxMarchDistance, 0f));
+        if (marchLength <= 1e-5f)
+            return 1f;
+
+        int steps = Math.Max(2, options.MarchSteps / 2);
+        if (isMoving && steps > 1)
+            steps = Math.Max(1, (steps + 1) / 2);
+
+        Vector3 dir = segment / rayLength;
+        if (direction.LengthSquared() > 1e-10f)
+            dir = Vector3.Normalize(direction);
+
+        float stepLength = marchLength / steps;
+        float transmittance = 1f;
+        float sigmaScale = GetSigmaScale(options, options.SmokeMode);
+
+        for (int i = 0; i < steps; i++)
+        {
+            float distance = (i + 0.5f) * stepLength;
+            Vector3 p = from + dir * distance;
+            float density = GetDensity(p, options.SmokeMode);
+            if (density <= 0f)
+                continue;
+
+            float sigmaT = density * sigmaScale;
+            if (sigmaT <= 0f)
+                continue;
+
+            transmittance *= MathF.Exp(-sigmaT * stepLength);
+            if (transmittance < options.EarlyOutTransmittance)
+                return transmittance;
+        }
+
+        return transmittance;
+    }
+
+    internal float SegmentTransmittance(Vector3 from, Vector3 to, Vector3 direction)
+        => SegmentTransmittance(from, to, direction, Volumetrics, IsMoving);
+
     private static float GetSigmaScale(VolumetricOptions options, SmokeMode smokeMode)
     {
         return smokeMode == SmokeMode.AlwaysGroundSmoke ? options.SigmaScaleGround : options.SigmaScaleFog;
+    }
+
+    /// <summary>
+    /// Fog transmittance in [0,1] from an in-scatter sample point toward a light, marched over the
+    /// density field so the medium shadows itself (shadows-and-caustics-plan §A2). A coarse march
+    /// (a quarter of the camera step count) — a self-shadow term tolerates more noise than the
+    /// primary view. Mirrors <c>Phase4Reference.InscatterShadowTransmittance</c> for GPU parity.
+    /// </summary>
+    private static float InscatterShadowTransmittance(Vector3 from, Vector3 lightDir, float dist, VolumetricOptions options)
+    {
+        float marchLength = MathF.Min(dist, MathF.Max(options.MaxMarchDistance, 0f));
+        if (marchLength <= 1e-5f)
+            return 1f;
+
+        int steps = Math.Max(2, options.MarchSteps / 4);
+        float stepLength = marchLength / steps;
+        float sigmaScale = GetSigmaScale(options, options.SmokeMode);
+        float transmittance = 1f;
+
+        for (int i = 0; i < steps; i++)
+        {
+            float distance = (i + 0.5f) * stepLength;
+            Vector3 p = from + lightDir * distance;
+            float density = GetDensity(p, options.SmokeMode);
+            if (density <= 0f)
+                continue;
+
+            float sigmaT = density * sigmaScale;
+            if (sigmaT <= 0f)
+                continue;
+
+            transmittance *= MathF.Exp(-sigmaT * stepLength);
+            if (transmittance < options.EarlyOutTransmittance)
+                return transmittance;
+        }
+
+        return transmittance;
     }
 
     private static float EvaluatePhase(Vector3 viewDirection, Vector3 samplePoint, VolumetricOptions options, Light[] lights)
@@ -145,7 +247,14 @@ public partial class JobSystem
                     continue;
             }
 
-            lighting += light.Color * (LightIntensity / distSq);
+            float lightWeight = LightIntensity / distSq;
+            // Fog self-shadow (shadows-and-caustics-plan §A2): thick fog between this sample and
+            // the light dims the in-scatter, so shafts fall off with depth into the smoke. Tied to
+            // the same shadow-step cadence (bvh non-null) as the geometry occlusion above.
+            if (options.ShadowTransmittance && bvh is not null)
+                lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, options);
+
+            lighting += light.Color * lightWeight;
         }
 
         if (lighting == Vector3.Zero)

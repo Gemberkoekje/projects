@@ -232,10 +232,6 @@ public partial class JobSystem
     /// </summary>
     private const int MaxSpecularBounces = 8;
 
-    /// <summary>Multiplier on a bubble's Fresnel reflectance (§2.6) so the thin-film rings read
-    /// across the whole bubble, not just at the grazing rim, while it stays mostly see-through.</summary>
-    private const float BubbleReflectBoost = 45f;
-
     /// <summary>
     /// Follows a specular ray through zero or more mirror/dielectric interactions and
     /// returns the (CIE-weighted, uncorrected) XYZ radiance arriving back along it at
@@ -299,7 +295,7 @@ public partial class JobSystem
             // gradient, folded in FromMaterial), boosted so the rings read across the whole bubble;
             // the rest transmits straight through (mostly see-through, no lens warp).
             float cosB = MathF.Abs(Vector3.Dot(Vector3.Normalize(incidentDir), hitNormal));
-            float rReflect = Math.Clamp(BubbleReflectBoost * Optics.FresnelDielectric(cosB, 1f, ior), 0f, 1f) * reflectance;
+            float rReflect = Optics.BubbleReflectProbability(cosB, ior, reflectance);
             rng = rng * 747796405u + 2891336453u;
             if (rng / 4294967296f < rReflect)
             {
@@ -355,6 +351,39 @@ public partial class JobSystem
     }
 
     /// <summary>
+    /// Shadow-ray visibility in [0,1] from <paramref name="origin"/> toward a light
+    /// <paramref name="lightDist"/> away along <paramref name="lightDir"/>: the geometry
+    /// transmittance (opaque → 0; bubbles and glass attenuate rather than fully block, via
+    /// <see cref="BVH.Transmittance"/>) times, when <paramref name="includeFog"/> is set, the
+    /// participating-medium transmittance along the same segment (<see cref="SegmentTransmittance(Vector3,Vector3,Vector3)"/>).
+    /// This replaces the former binary occlusion so bubbles and glass cast soft, tinted shadows
+    /// and moving fog casts shadows onto lit surfaces (shadows-and-caustics-plan §A). For an
+    /// opaque, fog-free shadow ray it returns exactly 0 or 1, so such scenes shade bit-for-bit
+    /// as before. <paramref name="wavelength"/> is the hero wavelength the shadow ray carries, so
+    /// a coloured glass or thin-film tint enters the shadow per wavelength as accumulation builds
+    /// the spectrum.
+    /// </summary>
+    private float ShadowVisibility(Vector3 origin, Vector3 lightDir, float lightDist, float wavelength, bool includeFog)
+    {
+        var shadowRay = new Ray
+        {
+            Origin = origin,
+            Direction = lightDir,
+            Wavelength = wavelength,
+            Intensity = 1f,
+        };
+
+        float vis = _bvh.Transmittance(shadowRay, lightDist);
+        if (vis <= 0f)
+            return 0f;
+
+        if (includeFog)
+            vis *= SegmentTransmittance(origin, origin + lightDir * lightDist, lightDir);
+
+        return vis;
+    }
+
+    /// <summary>
     /// Next-event-estimation direct-lighting term at a surface point, using the
     /// same 1/d²·cos importance selection and shadow-ray occlusion as the primary
     /// path. Returns the unshadowed contribution for <see cref="LightingMode.Direct"/>.
@@ -406,20 +435,15 @@ public partial class JobSystem
 
         float lightP = weights[chosen] / totalW;
 
+        float vis = 1f;
         if (Lighting == LightingMode.NEE)
         {
-            var shadowRay = new Ray
-            {
-                Origin = point + normal * 1e-3f,
-                Direction = lightDir,
-                Wavelength = wavelength,
-                Intensity = 1f,
-            };
-            if (_bvh.IsOccluded(shadowRay, d - 2e-3f))
+            vis = ShadowVisibility(point + normal * 1e-3f, lightDir, d - 2e-3f, wavelength, includeFog: true);
+            if (vis <= 0f)
                 return 0f;
         }
 
-        return lightCos / distSq * LightIntensity / MathF.Max(lightP, 1e-9f);
+        return vis * (lightCos / distSq * LightIntensity / MathF.Max(lightP, 1e-9f));
     }
 
     internal void TraceCore(Camera camera, int y, int x)
@@ -590,21 +614,14 @@ public partial class JobSystem
 
                 if (lightCos > 0f)
                 {
-                    bool visible = true;
+                    float vis = 1f;
                     if (Lighting == LightingMode.NEE)
-                    {
-                        var shadowRay = new Ray
-                        {
-                            Origin = hitPoint + hitNormal * 1e-3f,
-                            Direction = lightDir,
-                            Wavelength = ray.Wavelength,
-                            Intensity = 1f
-                        };
-                        visible = !_bvh.IsOccluded(shadowRay, MathF.Sqrt(lightDistSq) - 2e-3f);
-                    }
+                        vis = ShadowVisibility(
+                            hitPoint + hitNormal * 1e-3f, lightDir,
+                            MathF.Sqrt(lightDistSq) - 2e-3f, ray.Wavelength, includeFog: true);
 
-                    if (visible)
-                        directTerm += lightCos / lightDistSq * LightIntensity / Math.Max(lightP, 1e-9f);
+                    if (vis > 0f)
+                        directTerm += vis * (lightCos / lightDistSq * LightIntensity / Math.Max(lightP, 1e-9f));
                 }
             }
 
@@ -702,16 +719,11 @@ public partial class JobSystem
                         float cosTheta2 = Vector3.Dot(secHitNormal, lightDir2);
                         if (cosTheta2 > 0f)
                         {
-                            var shadow = new Ray
-                            {
-                                Origin = secHitPoint + secHitNormal * 1e-3f,
-                                Direction = lightDir2,
-                                Wavelength = secRay.Wavelength,
-                                Intensity = 1f
-                            };
-                            bool visible2 = !_bvh.IsOccluded(shadow, dist2 - 2e-3f);
-                            if (visible2)
-                                secDirectTerm += cosTheta2 / distSq2 * LightIntensity * _lights.Length;
+                            float vis2 = ShadowVisibility(
+                                secHitPoint + secHitNormal * 1e-3f, lightDir2,
+                                dist2 - 2e-3f, secRay.Wavelength, includeFog: false);
+                            if (vis2 > 0f)
+                                secDirectTerm += vis2 * (cosTheta2 / distSq2 * LightIntensity * _lights.Length);
                         }
                     }
 
@@ -767,16 +779,11 @@ public partial class JobSystem
                                 float cosTheta3 = Vector3.Dot(tertHitNormal, lightDir3);
                                 if (cosTheta3 > 0f)
                                 {
-                                    var shadow3 = new Ray
-                                    {
-                                        Origin = tertHitPoint + tertHitNormal * 1e-3f,
-                                        Direction = lightDir3,
-                                        Wavelength = tertRay.Wavelength,
-                                        Intensity = 1f
-                                    };
-                                    bool visible3 = !_bvh.IsOccluded(shadow3, dist3 - 2e-3f);
-                                    if (visible3)
-                                        tertDirectTerm += cosTheta3 / distSq3 * LightIntensity * _lights.Length;
+                                    float vis3 = ShadowVisibility(
+                                        tertHitPoint + tertHitNormal * 1e-3f, lightDir3,
+                                        dist3 - 2e-3f, tertRay.Wavelength, includeFog: false);
+                                    if (vis3 > 0f)
+                                        tertDirectTerm += vis3 * (cosTheta3 / distSq3 * LightIntensity * _lights.Length);
                                 }
                             }
 
