@@ -19,6 +19,12 @@ public enum QuadPattern
     /// <summary>Regular ceiling tiles with a bevelled border
     /// (<see cref="CeilingTileRectangle"/>).</summary>
     CeilingTile = 2,
+
+    /// <summary>Image decal (plan §3): a wall-mounted plaque / sign / logo whose colour
+    /// comes from a layer of the decal atlas, sampled through the RGB→reflectance basis
+    /// (<see cref="DecalRectangle"/>). The atlas layer index rides in
+    /// <see cref="IQuadPrimitive.PatternP0"/>.</summary>
+    Decal = 3,
 }
 
 /// <summary>

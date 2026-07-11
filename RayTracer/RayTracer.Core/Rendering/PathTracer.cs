@@ -39,20 +39,37 @@ public partial class JobSystem
         return 0.35f + 0.65f * (0.6f * bands + 0.4f * swirl);
     }
 
+    // Non-turbulence density profiles shared by the Always* modes and the biome
+    // sub-types, so a "fog" biome is exactly corridor fog and a "ground" biome is
+    // exactly ground smoke — the same strength you get from AlwaysFog /
+    // AlwaysGroundSmoke, which is what the ceiling indicator's amber/green promise.
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float FogProfile(Vector3 p, float coverage)
+    {
+        float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
+        float thickCoverage = 0.72f + 0.28f * coverage;
+        float heightWeight = 0.70f + 0.30f * midHeight;
+        return 0.50f * thickCoverage * heightWeight;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float GroundProfile(Vector3 p, float coverage)
+    {
+        float thickCoverage = 0.72f + 0.28f * coverage;
+        float groundLayer = MathF.Exp(-MathF.Max(p.Y, 0f) * 2.35f);
+        return 0.50f * thickCoverage * groundLayer;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static float GetBiomeCellDensity(int biomeX, int biomeY, Vector3 p, float coverage)
     {
         if (!IsSmokeBiome(biomeX, biomeY))
             return 0f;
 
-        if (IsFogBiome(biomeX, biomeY))
-        {
-            float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
-            return 0.022f * coverage * (0.35f + 0.65f * midHeight);
-        }
-
-        float groundLayer = MathF.Exp(-MathF.Max(p.Y, 0f) * 2.6f);
-        return 0.045f * coverage * groundLayer;
+        return IsFogBiome(biomeX, biomeY)
+            ? FogProfile(p, coverage)
+            : GroundProfile(p, coverage);
     }
 
     private static float SmoothStep01(float t)
@@ -61,21 +78,109 @@ public partial class JobSystem
         return t * t * (3f - 2f * t);
     }
 
+    // ── Smoke turbulence (texture-free 3D value-noise fBm) ─────────────
+    // Gives the medium a wispy, clumpy 3D shape — dense billows separated by
+    // thin gaps — instead of a uniform depth haze. Pure integer-hash math so it
+    // ports verbatim to HLSL and stays deterministic across CPU/GPU.
+
+    private static float Hash3ToUnit(int x, int y, int z)
+    {
+        uint h = (uint)(x * 374761393 + y * 668265263 + z * 1013904223);
+        h ^= h >> 16;
+        h *= 2246822519u;
+        h ^= h >> 13;
+        h *= 3266489917u;
+        h ^= h >> 16;
+        return h * (1f / 4294967296f);
+    }
+
+    // Trilinearly interpolated hashed lattice noise in [0,1], smoothstep-faded.
+    private static float ValueNoise3D(Vector3 p)
+    {
+        float fx = MathF.Floor(p.X), fy = MathF.Floor(p.Y), fz = MathF.Floor(p.Z);
+        int ix = (int)fx, iy = (int)fy, iz = (int)fz;
+        float tx = p.X - fx, ty = p.Y - fy, tz = p.Z - fz;
+        float ux = tx * tx * (3f - 2f * tx);
+        float uy = ty * ty * (3f - 2f * ty);
+        float uz = tz * tz * (3f - 2f * tz);
+
+        float c000 = Hash3ToUnit(ix, iy, iz);
+        float c100 = Hash3ToUnit(ix + 1, iy, iz);
+        float c010 = Hash3ToUnit(ix, iy + 1, iz);
+        float c110 = Hash3ToUnit(ix + 1, iy + 1, iz);
+        float c001 = Hash3ToUnit(ix, iy, iz + 1);
+        float c101 = Hash3ToUnit(ix + 1, iy, iz + 1);
+        float c011 = Hash3ToUnit(ix, iy + 1, iz + 1);
+        float c111 = Hash3ToUnit(ix + 1, iy + 1, iz + 1);
+
+        float x00 = c000 + (c100 - c000) * ux;
+        float x10 = c010 + (c110 - c010) * ux;
+        float x01 = c001 + (c101 - c001) * ux;
+        float x11 = c011 + (c111 - c011) * ux;
+        float y0 = x00 + (x10 - x00) * uy;
+        float y1 = x01 + (x11 - x01) * uy;
+        return y0 + (y1 - y0) * uz;
+    }
+
+    // Fractal Brownian motion: three octaves of value noise at halving amplitude.
+    private static float SmokeFbm(Vector3 p)
+    {
+        float sum = 0f;
+        float amp = 0.5f;
+        for (int o = 0; o < 3; o++)
+        {
+            sum += amp * ValueNoise3D(p);
+            p *= 2.02f;
+            amp *= 0.5f;
+        }
+        return sum; // ~[0, 0.875]
+    }
+
+    // Density multiplier in ~[0.3, 1.6]: a low baseline haze that swells into
+    // dense clumps and thins toward gaps. Sampled anisotropically (stretched
+    // horizontally, finer vertically) so the smoke billows rather than tiling.
+    private static float SmokeTurbulence(Vector3 p)
+    {
+        // Low horizontal frequency => billows several world-units across (so
+        // neighbouring rays integrate visibly different amounts, rather than the
+        // detail averaging out into a smooth depth haze).
+        var q = new Vector3(p.X * 0.22f + 11.3f, p.Y * 0.40f + 4.7f, p.Z * 0.22f + 19.1f);
+        float f = SmokeFbm(q);
+        float n = Math.Clamp((f - 0.33f) * 2.6f, 0f, 1f); // carve near-clear gaps
+        n = n * n * (3f - 2f * n);                        // soft billow edges
+        return 0.05f + 2.15f * n;                         // [0.05, 2.2]: gaps -> dense clumps
+    }
+
+    // Confines biome blending to a narrow band around the boundary (f = 0.5) so a
+    // biome's interior is purely its own smoke type and only feathers into the
+    // neighbour near the edge, instead of blending across the whole cell.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float BiomeEdgeBlend(float f)
+    {
+        const float halfBand = 0.2f;
+        float t = Math.Clamp((f - (0.5f - halfBand)) / (2f * halfBand), 0f, 1f);
+        return t * t * (3f - 2f * t);
+    }
+
     private static float GetDensityBiome(Vector3 p)
     {
         const int biomeSizeCells = 4;
         float biomeWorldSize = MazeGeometryBuilder.CellSize * biomeSizeCells;
 
-        float biomeFx = p.X / biomeWorldSize;
-        float biomeFy = p.Z / biomeWorldSize;
+        // Centre the interpolation on biome centres (shift by half a cell) so a
+        // biome's interior samples purely itself; the previous origin-aligned blend
+        // made the centre of every biome a 50/50 mix with its +X/+Y neighbour,
+        // which bled smoke a full half-biome outside where it belonged.
+        float gx = p.X / biomeWorldSize - 0.5f;
+        float gy = p.Z / biomeWorldSize - 0.5f;
 
-        int bx0 = (int)MathF.Floor(biomeFx);
-        int by0 = (int)MathF.Floor(biomeFy);
+        int bx0 = (int)MathF.Floor(gx);
+        int by0 = (int)MathF.Floor(gy);
         int bx1 = bx0 + 1;
         int by1 = by0 + 1;
 
-        float tx = SmoothStep01(biomeFx - bx0);
-        float ty = SmoothStep01(biomeFy - by0);
+        float tx = BiomeEdgeBlend(gx - bx0);
+        float ty = BiomeEdgeBlend(gy - by0);
 
         float coverage = SmokeCoverage(p.X, p.Z);
         float d00 = GetBiomeCellDensity(bx0, by0, p, coverage);
@@ -85,31 +190,21 @@ public partial class JobSystem
 
         float dx0 = d00 + (d10 - d00) * tx;
         float dx1 = d01 + (d11 - d01) * tx;
-        return dx0 + (dx1 - dx0) * ty;
+        // Biome banding sets where smoke lives (dry biomes stay at zero); the
+        // turbulence sculpts wisps and clumps within the smoky regions.
+        return (dx0 + (dx1 - dx0) * ty) * SmokeTurbulence(p);
     }
 
     private static float GetDensityFog(Vector3 p)
     {
         float coverage = SmokeCoverage(p.X, p.Z);
-        float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
-
-        // Match the perceived thickness of ground smoke, but distributed
-        // through the full corridor volume with a mild center-height bias.
-        float thickCoverage = 0.72f + 0.28f * coverage;
-        float heightWeight = 0.70f + 0.30f * midHeight;
-        return 0.50f * thickCoverage * heightWeight;
+        return FogProfile(p, coverage) * SmokeTurbulence(p);
     }
 
     private static float GetDensityGround(Vector3 p)
     {
         float coverage = SmokeCoverage(p.X, p.Z);
-
-        // Keep the floor layer thick, but make it fall off quickly with height
-        // so smoke does not fill the full corridor volume.
-        float thickCoverage = 0.72f + 0.28f * coverage;
-        float height = MathF.Max(p.Y, 0f);
-        float groundLayer = MathF.Exp(-height * 2.35f);
-        return 0.50f * thickCoverage * groundLayer;
+        return GroundProfile(p, coverage) * SmokeTurbulence(p);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

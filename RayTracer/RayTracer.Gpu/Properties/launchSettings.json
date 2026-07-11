@@ -1,0 +1,112 @@
+{
+  "profiles": {
+    "RayTracer.Gpu (config, then run)": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    },
+    "GPU Phase 1 (windowed)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase1"
+    },
+    "GPU Phase 2 (windowed)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase2"
+    },
+    "GPU Phase 3 (windowed)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase3"
+    },
+    "GPU Phase 4 (windowed, biome smoke)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase4"
+    },
+    "GPU Phase 4 (windowed, fog)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase4 --fog"
+    },
+    "GPU Phase 4 (windowed, ground smoke)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase4 --ground"
+    },
+    "GPU Phase 5 (windowed, debug views)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase5"
+    },
+    "GPU Phase 5 (windowed, normals)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase5 --debug Normal"
+    },
+    "GPU Phase 5 (windowed, sample count)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase5 --debug SampleCount"
+    },
+    "GPU Phase 5 (windowed, variance)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase5 --debug Variance"
+    },
+    "GPU Phase 6 (windowed, resizable)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase6"
+    },
+    "GPU Phase 6 (fullscreen borderless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase6 --fullscreen"
+    },
+    "GPU Phase 1 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase1-selftest"
+    },
+    "GPU Phase 2 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase2-selftest"
+    },
+    "GPU Phase 3 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase3-selftest"
+    },
+    "GPU Phase 4 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase4-selftest"
+    },
+    "GPU Phase 5 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase5-selftest"
+    },
+    "GPU Phase 6 self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase6-selftest"
+    },
+    "Screensaver /s (show, fullscreen)": {
+      "commandName": "Project",
+      "commandLineArgs": "/s"
+    },
+    "Screensaver /c (config dialog)": {
+      "commandName": "Project",
+      "commandLineArgs": "/c"
+    },
+    "Screensaver self-test (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--screensaver-selftest"
+    },
+    "Screensaver /p preview self-test": {
+      "commandName": "Project",
+      "commandLineArgs": "--screensaver-preview-selftest --frames 30"
+    },
+    "GPU Phase 6 regression (compare)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase6-regress"
+    },
+    "GPU Phase 6 regression (update goldens)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase6-regress --update"
+    },
+    "Setup dialog self-test (dev-box)": {
+      "commandName": "Project",
+      "commandLineArgs": "--setup-selftest"
+    },
+    "GPU Phase 0 (inline RayQuery)": {
+      "commandName": "Project",
+      "commandLineArgs": "--phase0"
+    }
+  }
+}

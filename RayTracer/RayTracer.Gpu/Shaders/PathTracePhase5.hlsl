@@ -1,23 +1,23 @@
-// Phase 2 — spectral path tracer with lighting (DXR 1.1 inline ray tracing).
+// Phase 5 — trace pass with volumetrics + a debug albedo AOV (DXR 1.1 inline RT).
 //
-// Extends the Phase 1 fullbright shader with next-event-estimation direct
-// lighting (weighted light selection + shadow RayQuery) and a one-bounce +
-// tertiary-bounce indirect estimator, exactly mirroring JobSystem.TraceCore's
-// LightingMode.None / Direct / NEE branches with the diffuse irradiance cache
-// dropped (see the plan's Phase 2.4 — the GPU re-traces the tertiary ray every
-// sample instead).
-//
-// One thread per pixel; the per-sample result is folded into persistent
-// running-mean accumulation buffers (total + direct + indirect), then resolved
-// to sRGB. This is a line-for-line port of RayTracer.Core's Phase2Reference.cs,
-// which the unit tests pin to the CPU renderer (JobSystem.TraceCore). Requires
-// Shader Model 6.5 (RayQuery).
+// Identical to the Phase 4 trace pass (spectral NEE path tracing + volumetric fog
+// + G-buffer for the temporal resolve) with one addition for the Phase 5 debug
+// views: the primary hit's base reflectance luminance is written into the unused
+// w channel of the normal G-buffer (NormalOut.w). The resolve pass reads it back
+// for the Albedo debug view; every other buffer and the shading math are unchanged,
+// so Beauty stays a line-for-line match with Phase 4. Requires Shader Model 6.5.
 
 #define DETERMINISTIC_COUNT 50u
 #define COMPANION_COUNT     4u
 #define PI                  3.14159265
 #define RNG_MUL             747796405u
 #define RNG_ADD             2891336453u
+
+// Volumetric constants (mirror Phase4Reference / JobSystem).
+#define ISOTROPIC_PHASE  0.07957747
+#define VOL_CELL_SIZE    2.0  // MazeGeometryBuilder.CellSize
+#define VOL_BIOME_CELLS  4.0  // Phase4Reference.BiomeSizeCells
+static const float3 SMOKE_TINT = float3(0.97, 0.97, 0.97);
 
 // ── Bindings ──────────────────────────────────────────────────────────
 
@@ -41,14 +41,21 @@ StructuredBuffer<PrimitiveInfo>  Primitives        : register(t1);
 StructuredBuffer<float4>         DeterXYZ           : register(t2); // xyz used
 StructuredBuffer<float>          MaterialReflectance: register(t3); // [material*50 + index]
 StructuredBuffer<float4>         Lights             : register(t4); // xyz = world position
+StructuredBuffer<float4>         LightColors        : register(t5); // xyz = colour (inscatter)
 
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
 RWStructuredBuffer<uint>   WavelengthCounter: register(u2);
-RWTexture2D<float4>        Output           : register(u3);
 RWStructuredBuffer<uint>   LastHit          : register(u4); // 1 = pixel hit geometry last sample
 RWStructuredBuffer<float4> DirectAccum      : register(u5); // xyz running mean (direct)
 RWStructuredBuffer<float4> IndirectAccum    : register(u6); // xyz running mean (indirect)
+RWStructuredBuffer<float4> HitPointOut      : register(u7); // xyz = world hit point (G-buffer)
+RWStructuredBuffer<float4> NormalOut        : register(u8); // xyz = oriented normal, w = albedo (G-buffer)
+RWStructuredBuffer<float4> FogOut           : register(u9); // xyz = inscatter*correction, w = transmittance
+// Phase 5.2 statistics AOVs.
+RWStructuredBuffer<float>  LumaM2           : register(u10); // Welford M2 of luma (total)
+RWStructuredBuffer<float>  ClampAmount      : register(u11); // cumulative L1 clamp amount
+RWStructuredBuffer<uint>   ClampHitFrame    : register(u12); // 1 = this pixel clamped this frame
 
 cbuffer Constants : register(b0)
 {
@@ -58,7 +65,11 @@ cbuffer Constants : register(b0)
     float  ImgPlaneZ;            float DeterministicCorrection; float AmbientLevel; float LightIntensity;
     uint   Width;                uint  Height; uint MaxSampleCount; uint ResetFlag;
     uint   NumPrimitives;        uint  SubPixelJitter; uint NumLights; uint LightingMode; // 0 none, 1 direct, 2 NEE
-    float  SampleClamp;          float _pad1; float _pad2; float _pad3;
+    float  SampleClamp;          uint  SoftResetFlag; uint MotionSampleCap; float _pad1;
+    // Volumetric (Phase 4). SoftResetFlag doubles as the volumetric IsMoving flag.
+    uint   VolEnabled;           uint  VolSmokeMode; uint VolMarchSteps; uint VolShadowStepInterval;
+    float  VolMaxMarchDistance;  float VolSigmaScaleFog; float VolSigmaScaleGround; float VolAnisotropyG;
+    float  VolInscatterStrength; float VolEarlyOutTransmittance; uint BiomeIndicator; float VolTime;
 };
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
@@ -119,7 +130,6 @@ float BevelFactor(float u, float w, float tilesAcross, float tilesDown, float be
     return 0.4 + 0.6 * smoothT;
 }
 
-// Effective reflectance row + wavelength-independent pattern attenuation.
 void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint row, out float atten)
 {
     float3 l1 = float3(prim.L1X, prim.L1Y, prim.L1Z);
@@ -151,14 +161,12 @@ void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint r
     }
 }
 
-// Face normal flipped to oppose the ray (denom < 0 ? Normal : -Normal).
 float3 FaceNormal(PrimitiveInfo prim, float3 rayDir)
 {
     float3 n = float3(prim.NX, prim.NY, prim.NZ);
     return (dot(rayDir, n) < 0.0) ? n : -n;
 }
 
-// Averaged hero + 3-companion diffuse albedo XYZ (no correction).
 float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHash, uint sampleIdx)
 {
     uint row; float atten;
@@ -179,7 +187,6 @@ float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHas
     return xyz / float(COMPANION_COUNT);
 }
 
-// Single-hero-wavelength diffuse albedo XYZ (for indirect bounces).
 float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
 {
     uint row; float atten;
@@ -219,7 +226,6 @@ bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitP
 
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        // Two triangles per quad → quad index is the triangle index >> 1.
         quadIndex = q.CommittedPrimitiveIndex() >> 1;
         float tHit = q.CommittedRayT();
         hitPoint = origin + dir * tHit;
@@ -232,8 +238,6 @@ bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitP
 
 bool TraceOccluded(float3 origin, float3 dir, float maxDist)
 {
-    // No valid interval → nothing occludes (matches BVH.IsOccluded, whose hits
-    // require t >= 1e-4 and t < maxDist).
     if (maxDist <= 1e-4)
         return false;
 
@@ -270,9 +274,6 @@ void FillLight(float3 lightPos, float3 samplePoint, float3 normal, out float3 ou
     outCos = dot(normal, outDir);
 }
 
-// Weighted light importance sampling. Weights are recomputed (not cached) so no
-// per-thread MAX_LIGHTS array is needed; recomputation is bit-identical to the
-// CPU's cached array, so the pick and pdf match exactly.
 void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
                  out float outP, out float3 outDir, out float outDistSq, out float outCos)
 {
@@ -308,7 +309,6 @@ void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
     outP = 1.0 / float(NumLights);
 }
 
-// Uniform-selection NEE direct term at an indirect bounce.
 float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
 {
     float3 toLight = Lights[lightIdx].xyz - hitPoint;
@@ -326,13 +326,304 @@ float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
     return cosTheta / distSq * LightIntensity * float(NumLights);
 }
 
-// Full per-sample corrected XYZ; also returns the direct/indirect components and
-// whether the primary ray hit geometry.
+// ── Volumetrics (mirrors Phase4Reference / VolumetricIntegration.cs) ────
+
+uint VolHashCell(int x, int y)
+{
+    uint h = uint(x * 374761393 + y * 668265263);
+    h ^= h >> 16;
+    h *= 2246822519u;
+    h ^= h >> 13;
+    h *= 3266489917u;
+    return h ^ (h >> 16);
+}
+
+bool IsSmokeBiome(int biomeX, int biomeY)
+{
+    return ((biomeX + biomeY) % 3) == 1;
+}
+
+bool IsFogBiome(int biomeX, int biomeY)
+{
+    uint biomeHash = VolHashCell(biomeX, biomeY);
+    return (biomeHash & 1u) == 0u;
+}
+
+float SmokeCoverage(float x, float z)
+{
+    float bands = 0.5 + 0.5 * sin(x * 0.37 + z * 0.53);
+    float swirl = 0.5 + 0.5 * sin(x * 0.19 - z * 0.29 + bands * 3.1);
+    return 0.35 + 0.65 * (0.6 * bands + 0.4 * swirl);
+}
+
+// Non-turbulence density profiles shared by the Always* modes and the biome
+// sub-types (mirror Phase4Reference.FogProfile / GroundProfile).
+float FogProfile(float3 p, float coverage)
+{
+    float midHeight = exp(-abs(p.y - 1.0) * 1.35);
+    float thickCoverage = 0.72 + 0.28 * coverage;
+    float heightWeight = 0.70 + 0.30 * midHeight;
+    return 0.50 * thickCoverage * heightWeight;
+}
+
+float GroundProfile(float3 p, float coverage)
+{
+    float thickCoverage = 0.72 + 0.28 * coverage;
+    float groundLayer = exp(-max(p.y, 0.0) * 2.35);
+    return 0.50 * thickCoverage * groundLayer;
+}
+
+float GetBiomeCellDensity(int biomeX, int biomeY, float3 p, float coverage)
+{
+    if (!IsSmokeBiome(biomeX, biomeY))
+        return 0.0;
+
+    return IsFogBiome(biomeX, biomeY)
+        ? FogProfile(p, coverage)
+        : GroundProfile(p, coverage);
+}
+
+float SmoothStep01(float t)
+{
+    t = clamp(t, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+// ── Smoke turbulence (texture-free 3D value-noise fBm) ─────────────────
+
+float Hash3ToUnit(int x, int y, int z)
+{
+    uint h = uint(x * 374761393 + y * 668265263 + z * 1013904223);
+    h ^= h >> 16;
+    h *= 2246822519u;
+    h ^= h >> 13;
+    h *= 3266489917u;
+    h ^= h >> 16;
+    return float(h) * (1.0 / 4294967296.0);
+}
+
+float ValueNoise3D(float3 p)
+{
+    float fx = floor(p.x), fy = floor(p.y), fz = floor(p.z);
+    int ix = (int)fx, iy = (int)fy, iz = (int)fz;
+    float tx = p.x - fx, ty = p.y - fy, tz = p.z - fz;
+    float ux = tx * tx * (3.0 - 2.0 * tx);
+    float uy = ty * ty * (3.0 - 2.0 * ty);
+    float uz = tz * tz * (3.0 - 2.0 * tz);
+
+    float c000 = Hash3ToUnit(ix,     iy,     iz);
+    float c100 = Hash3ToUnit(ix + 1, iy,     iz);
+    float c010 = Hash3ToUnit(ix,     iy + 1, iz);
+    float c110 = Hash3ToUnit(ix + 1, iy + 1, iz);
+    float c001 = Hash3ToUnit(ix,     iy,     iz + 1);
+    float c101 = Hash3ToUnit(ix + 1, iy,     iz + 1);
+    float c011 = Hash3ToUnit(ix,     iy + 1, iz + 1);
+    float c111 = Hash3ToUnit(ix + 1, iy + 1, iz + 1);
+
+    float x00 = c000 + (c100 - c000) * ux;
+    float x10 = c010 + (c110 - c010) * ux;
+    float x01 = c001 + (c101 - c001) * ux;
+    float x11 = c011 + (c111 - c011) * ux;
+    float y0 = x00 + (x10 - x00) * uy;
+    float y1 = x01 + (x11 - x01) * uy;
+    return y0 + (y1 - y0) * uz;
+}
+
+float SmokeFbm(float3 p)
+{
+    float sum = 0.0;
+    float amp = 0.5;
+    [unroll]
+    for (int o = 0; o < 3; o++)
+    {
+        sum += amp * ValueNoise3D(p);
+        p *= 2.02;
+        amp *= 0.5;
+    }
+    return sum;
+}
+
+float SmokeTurbulence(float3 p, float time)
+{
+    float3 q = float3(p.x * 0.22 + 11.3, p.y * 0.40 + 4.7, p.z * 0.22 + 19.1);
+    q += time * float3(0.30, 0.10, 0.18);
+    float f = SmokeFbm(q);
+    float n = clamp((f - 0.33) * 2.6, 0.0, 1.0);
+    n = n * n * (3.0 - 2.0 * n);
+    return 0.05 + 2.15 * n;
+}
+
+// Narrow-band biome boundary blend: pure biome outside [0.5 - hb, 0.5 + hb].
+float BiomeEdgeBlend(float f)
+{
+    const float halfBand = 0.2;
+    float t = clamp((f - (0.5 - halfBand)) / (2.0 * halfBand), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+float GetDensityBiome(float3 p, float time)
+{
+    float biomeWorldSize = VOL_CELL_SIZE * VOL_BIOME_CELLS;
+
+    // Centre the interpolation on biome centres (shift by half a cell) so a
+    // biome's interior samples purely itself; the previous origin-aligned blend
+    // mixed the centre of every biome 50/50 with its +X/+Y neighbour.
+    float gx = p.x / biomeWorldSize - 0.5;
+    float gy = p.z / biomeWorldSize - 0.5;
+
+    int bx0 = (int)floor(gx);
+    int by0 = (int)floor(gy);
+    int bx1 = bx0 + 1;
+    int by1 = by0 + 1;
+
+    float tx = BiomeEdgeBlend(gx - float(bx0));
+    float ty = BiomeEdgeBlend(gy - float(by0));
+
+    float coverage = SmokeCoverage(p.x, p.z);
+    float d00 = GetBiomeCellDensity(bx0, by0, p, coverage);
+    float d10 = GetBiomeCellDensity(bx1, by0, p, coverage);
+    float d01 = GetBiomeCellDensity(bx0, by1, p, coverage);
+    float d11 = GetBiomeCellDensity(bx1, by1, p, coverage);
+
+    float dx0 = d00 + (d10 - d00) * tx;
+    float dx1 = d01 + (d11 - d01) * tx;
+    return (dx0 + (dx1 - dx0) * ty) * SmokeTurbulence(p, time);
+}
+
+float GetDensityFog(float3 p, float time)
+{
+    float coverage = SmokeCoverage(p.x, p.z);
+    return FogProfile(p, coverage) * SmokeTurbulence(p, time);
+}
+
+float GetDensityGround(float3 p, float time)
+{
+    float coverage = SmokeCoverage(p.x, p.z);
+    return GroundProfile(p, coverage) * SmokeTurbulence(p, time);
+}
+
+float GetDensity(float3 p, uint smokeMode, float time)
+{
+    if (smokeMode == 1u) return GetDensityBiome(p, time);   // Biome
+    if (smokeMode == 2u) return GetDensityFog(p, time);     // AlwaysFog
+    if (smokeMode == 3u) return GetDensityGround(p, time);  // AlwaysGroundSmoke
+    return 0.0;                                             // None
+}
+
+float VolEvaluatePhase(float3 viewDirection, float3 samplePoint)
+{
+    float g = clamp(VolAnisotropyG, -0.95, 0.95);
+    if (abs(g) <= 1e-4 || NumLights == 0u)
+        return ISOTROPIC_PHASE;
+
+    float3 lightDirection = normalize(Lights[0].xyz - samplePoint);
+    float cosTheta = clamp(dot(lightDirection, -viewDirection), -1.0, 1.0);
+    float denom = 1.0 + g * g - 2.0 * g * cosTheta;
+    return (1.0 - g * g) / (4.0 * PI * pow(denom, 1.5));
+}
+
+float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool traceShadow)
+{
+    if (NumLights == 0u)
+        return SMOKE_TINT;
+
+    float3 lighting = float3(0.0, 0.0, 0.0);
+    for (uint i = 0u; i < NumLights; i++)
+    {
+        float3 toLight = Lights[i].xyz - samplePoint;
+        float distSq = max(dot(toLight, toLight), 1e-6);
+        float dist = sqrt(distSq);
+        float3 lightDir = toLight / dist;
+
+        if (traceShadow)
+        {
+            float3 shadowOrigin = samplePoint + lightDir * 1e-3;
+            if (TraceOccluded(shadowOrigin, lightDir, dist - 2e-3))
+                continue;
+        }
+
+        lighting += LightColors[i].xyz * (LightIntensity / distSq);
+    }
+
+    if (all(lighting == float3(0.0, 0.0, 0.0)))
+        return SMOKE_TINT * 0.08;
+
+    float3 ambient = SMOKE_TINT * AmbientLevel;
+    return clamp(ambient + lighting * SMOKE_TINT, float3(0.0, 0.0, 0.0), float3(1.5, 1.5, 1.5));
+}
+
+void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection, float time,
+                         out float transmittance, out float3 inscatter)
+{
+    transmittance = 1.0;
+    inscatter = float3(0.0, 0.0, 0.0);
+
+    if (VolEnabled == 0u || VolSmokeMode == 0u || VolMarchSteps == 0u)
+        return;
+
+    float3 segment = hitPoint - rayOrigin;
+    float rayLength = length(segment);
+    if (rayLength <= 1e-5)
+        return;
+
+    float marchLength = min(rayLength, max(VolMaxMarchDistance, 0.0));
+    if (marchLength <= 1e-5)
+        return;
+
+    uint steps = max(1u, VolMarchSteps);
+    if (SoftResetFlag != 0u && steps > 1u)
+        steps = max(1u, (steps + 1u) / 2u);
+
+    float3 dir = segment / rayLength;
+    if (dot(rayDirection, rayDirection) > 1e-10)
+        dir = normalize(rayDirection);
+
+    float stepLength = marchLength / float(steps);
+    float sigmaScale = (VolSmokeMode == 3u) ? VolSigmaScaleGround : VolSigmaScaleFog;
+    float inscatterScale = VolInscatterStrength / ISOTROPIC_PHASE;
+
+    for (uint i = 0u; i < steps; i++)
+    {
+        float distance = (float(i) + 0.5) * stepLength;
+        float3 p = rayOrigin + dir * distance;
+        float density = GetDensity(p, VolSmokeMode, time);
+        if (density <= 0.0)
+            continue;
+
+        float sigmaT = density * sigmaScale;
+        if (sigmaT <= 0.0)
+            continue;
+
+        float opticalDepth = sigmaT * stepLength;
+        float stepTransmittance = exp(-opticalDepth);
+        float scatterWeight = transmittance * (1.0 - stepTransmittance);
+        float phase = VolEvaluatePhase(dir, p);
+
+        bool traceShadow = false;
+        if (VolShadowStepInterval > 0u)
+            traceShadow = (i % VolShadowStepInterval) == 0u;
+        float3 localLight = EstimateInscatterLight(p, dir, traceShadow);
+
+        inscatter += localLight * (scatterWeight * inscatterScale * phase);
+        transmittance *= stepTransmittance;
+
+        if (transmittance < VolEarlyOutTransmittance)
+            break;
+    }
+}
+
+// Full per-sample corrected XYZ; also returns direct/indirect components, the
+// primary-hit mask, the primary hit point + oriented normal for the G-buffer, and
+// (Phase 5) the primary hit's base reflectance luminance for the Albedo view.
 float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sampleIdx,
-                   out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect)
+                   out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect,
+                   out float3 primaryHitPoint, out float3 primaryNormal, out float primaryAlbedo)
 {
     correctedDirect = float3(0.0, 0.0, 0.0);
     correctedIndirect = float3(0.0, 0.0, 0.0);
+    primaryHitPoint = float3(0.0, 0.0, 0.0);
+    primaryNormal = float3(0.0, 0.0, 0.0);
+    primaryAlbedo = 0.0;
 
     uint primIndex;
     float3 hitPoint;
@@ -342,16 +633,16 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
     PrimitiveInfo prim = Primitives[primIndex];
     float3 hitNormal = FaceNormal(prim, primaryDir);
+    primaryHitPoint = hitPoint;
+    primaryNormal = hitNormal;
 
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
     float3 baseXyz = BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
+    primaryAlbedo = baseXyz.y; // base reflectance luminance (Albedo debug view)
 
     bool lit = (LightingMode != 0u) && (NumLights > 0u);
 
     float3 xyz;
-    // TraceCore only commits the direct AOV (bounce0) inside the indirect-hit
-    // block; on a secondary miss it stays zero even though directTerm is already
-    // folded into the total. Mirror that exactly (start at zero).
     float3 bounce0 = float3(0.0, 0.0, 0.0);
     float3 indirect = float3(0.0, 0.0, 0.0);
 
@@ -364,7 +655,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     {
         float ambientTerm = AmbientLevel;
 
-        // ── Direct lighting (NEE) ──────────────────────────────────────
         float directTerm = 0.0;
         uint rngLight = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         float lightP; float3 lightDir; float lightDistSq; float lightCos;
@@ -384,7 +674,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
         xyz = baseXyz * (ambientTerm + directTerm);
 
-        // ── Indirect: one bounce + tertiary bounce ─────────────────────
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         rng = rng * RNG_MUL + RNG_ADD;
         float r1 = (rng & 0xFFFF) / 65536.0;
@@ -449,19 +738,51 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     return xyz * correction;
 }
 
-float LinearToSRGB(float c)
+// ── Biome indicator (ceiling category overlay) ────────────────────────
+
+float3 XyzToLinRgb(float3 xyz)
 {
-    if (c <= 0.0031308)
-        return 12.92 * c;
-    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
+    return float3(
+        xyz.x * 3.2406 + xyz.y * (-1.5372) + xyz.z * (-0.4986),
+        xyz.x * (-0.9689) + xyz.y * 1.8758 + xyz.z * 0.0415,
+        xyz.x * 0.0557 + xyz.y * (-0.2040) + xyz.z * 1.0570);
 }
 
-float3 ResolveToSRGB(float3 xyz)
+float3 LinRgbToXyz(float3 c)
 {
-    float lr = xyz.x * 3.2406 + xyz.y * (-1.5372) + xyz.z * (-0.4986);
-    float lg = xyz.x * (-0.9689) + xyz.y * 1.8758 + xyz.z * 0.0415;
-    float lb = xyz.x * 0.0557 + xyz.y * (-0.2040) + xyz.z * 1.0570;
-    return float3(LinearToSRGB(lr), LinearToSRGB(lg), LinearToSRGB(lb));
+    return float3(
+        c.r * 0.4124 + c.g * 0.3576 + c.b * 0.1805,
+        c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722,
+        c.r * 0.0193 + c.g * 0.1192 + c.b * 0.9505);
+}
+
+uint BiomeCategory(float3 hitPoint)
+{
+    if (VolSmokeMode == 2u) return 2u; // AlwaysFog
+    if (VolSmokeMode == 3u) return 1u; // AlwaysGroundSmoke
+    if (VolSmokeMode == 1u)            // Biome
+    {
+        float biomeWorldSize = VOL_CELL_SIZE * VOL_BIOME_CELLS;
+        int bx = (int)floor(hitPoint.x / biomeWorldSize);
+        int by = (int)floor(hitPoint.z / biomeWorldSize);
+        if (!IsSmokeBiome(bx, by)) return 0u;
+        return IsFogBiome(bx, by) ? 2u : 1u;
+    }
+    return 0u; // None
+}
+
+float3 ApplyBiomeIndicator(float3 xyz, float3 hitPoint)
+{
+    uint category = BiomeCategory(hitPoint);
+    if (category == 0u)
+        return xyz; // clear — leave the ceiling untinted
+
+    float3 lin = XyzToLinRgb(xyz);
+    float lum = max(dot(lin, float3(0.2126, 0.7152, 0.0722)), 0.0);
+    float b = 0.35 + 0.65 * saturate(lum * 0.5);
+    float3 hue = (category == 2u) ? float3(0.95, 0.45, 0.12)   // full fog -> amber
+                                  : float3(0.25, 0.85, 0.30);  // ground   -> green
+    return LinRgbToXyz(hue * b);
 }
 
 // ── Kernel ────────────────────────────────────────────────────────────
@@ -479,7 +800,6 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     bool reset = (ResetFlag != 0u);
     uint sampleIdx = reset ? 0u : WavelengthCounter[ix];
 
-    // Sub-pixel jitter (matches TraceCore's PCG-style seed chain).
     float jx, jy;
     if (SubPixelJitter != 0u)
     {
@@ -504,19 +824,30 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     uint pixelHash = Hash2D(x, y);
 
     bool hit;
-    float3 correctedDirect, correctedIndirect;
-    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit, correctedDirect, correctedIndirect);
+    float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
+    float gAlbedo;
+    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit,
+                                   correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo);
 
-    // Firefly clamp on the total only (matches TraceCore's SampleClamp, which
-    // leaves the direct/indirect debug channels unclamped).
+    // Ceiling biome-category overlay (debug). Oriented normal points down (-Y)
+    // on a ceiling hit; gated off (BiomeIndicator=0) for the parity self-test.
+    if (BiomeIndicator != 0u && hit && gNormal.y < -0.5)
+        corrected = ApplyBiomeIndicator(corrected, gHitPoint);
+
+    // Per-sample firefly clamp; also record how much was clamped (mirrors the
+    // clampDelta L1 sum in PathTracer.cs) for the Phase 5.2 clamp heatmap + stat.
+    float clampDelta = 0.0;
     if (SampleClamp > 0.0)
+    {
+        float3 unclamped = corrected;
         corrected = clamp(corrected, float3(0.0, 0.0, 0.0), float3(SampleClamp, SampleClamp, SampleClamp));
+        clampDelta = abs(unclamped.x - corrected.x) + abs(unclamped.y - corrected.y) + abs(unclamped.z - corrected.z);
+    }
 
-    // Running-mean accumulation. Restart the mean on a whole-frame reset, or when
-    // this pixel flips between hitting geometry and missing (matches TraceCore's
-    // 'hit != LastHit' reset). WavelengthCounter keeps advancing regardless.
     bool restart = reset || (LastHit[ix] != (hit ? 1u : 0u));
     uint prevCount = restart ? 0u : SampleCount[ix];
+    if (SoftResetFlag != 0u && !restart)
+        prevCount = min(prevCount, MotionSampleCap);
     uint count = min(prevCount + 1u, MaxSampleCount);
     bool clearMean = restart || (prevCount == 0u);
 
@@ -536,6 +867,30 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     WavelengthCounter[ix] = sampleIdx + 1u;
     LastHit[ix] = hit ? 1u : 0u;
 
-    float3 srgb = saturate(ResolveToSRGB(newAccum));
-    Output[tid.xy] = float4(srgb, 1.0);
+    // Welford variance of luma (mirrors PathTracer.cs: M2 += (ySample - newMean)^2,
+    // using the just-updated mean; reset alongside the running mean). The resolve /
+    // reduction derive variance = count > 1 ? M2 / (count - 1) : 0.
+    float ySample = corrected.y;
+    float dV = ySample - newAccum.y;
+    float prevM2 = clearMean ? 0.0 : LumaM2[ix];
+    LumaM2[ix] = prevM2 + dV * dV;
+
+    // Clamp heatmap AOV: cumulative L1 clamp amount (reset with the mean) + the
+    // per-frame clamped flag the reduction counts for ClampedPixelPercent.
+    float prevClamp = clearMean ? 0.0 : ClampAmount[ix];
+    ClampAmount[ix] = prevClamp + clampDelta;
+    ClampHitFrame[ix] = (clampDelta > 0.0) ? 1u : 0u;
+
+    // G-buffer for the resolve pass. Zeroed on a miss (the resolve gates use on the
+    // hit mask). w carries the primary albedo for the Phase 5 Albedo debug view.
+    HitPointOut[ix] = float4(gHitPoint, hit ? 1.0 : 0.0);
+    NormalOut[ix] = float4(gNormal, hit ? gAlbedo : 0.0);
+
+    // Volumetric fog for this pixel's camera segment (see Phase 4). Composited by
+    // the resolve pass onto the converged surface.
+    float fogT = 1.0;
+    float3 fogInscatter = float3(0.0, 0.0, 0.0);
+    if (hit)
+        IntegrateVolumetric(CamPos, gHitPoint, dir, VolTime, fogT, fogInscatter);
+    FogOut[ix] = float4(fogInscatter * DeterministicCorrection, fogT);
 }

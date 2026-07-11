@@ -1,17 +1,21 @@
-// Phase 2 — spectral path tracer with lighting (DXR 1.1 inline ray tracing).
+// Phase 3 — trace pass of the temporal pipeline (DXR 1.1 inline ray tracing).
 //
-// Extends the Phase 1 fullbright shader with next-event-estimation direct
-// lighting (weighted light selection + shadow RayQuery) and a one-bounce +
-// tertiary-bounce indirect estimator, exactly mirroring JobSystem.TraceCore's
-// LightingMode.None / Direct / NEE branches with the diffuse irradiance cache
-// dropped (see the plan's Phase 2.4 — the GPU re-traces the tertiary ray every
-// sample instead).
+// Identical spectral path tracing to Phase 2 (NEE direct + one/tertiary-bounce
+// indirect, diffuse cache dropped) but restructured for a two-pass temporal
+// pipeline:
 //
-// One thread per pixel; the per-sample result is folded into persistent
-// running-mean accumulation buffers (total + direct + indirect), then resolved
-// to sRGB. This is a line-for-line port of RayTracer.Core's Phase2Reference.cs,
-// which the unit tests pin to the CPU renderer (JobSystem.TraceCore). Requires
-// Shader Model 6.5 (RayQuery).
+//   * It writes the running-mean accumulation (total/direct/indirect) plus a
+//     G-buffer — per-pixel world hit point, oriented face normal, and hit mask —
+//     that the separate resolve pass (ResolvePhase3.hlsl) consumes for TAA
+//     reprojection and the bilateral spatial filter. It does NOT resolve to
+//     sRGB itself; the resolve pass owns the output image.
+//   * A soft-reset flag caps each pixel's effective sample count to
+//     MotionSampleCap so new samples dominate during camera motion (mirrors
+//     JobSystem.SoftResetAccumulationCore); ResetFlag still hard-clears.
+//
+// The shading math is the same line-for-line port of RayTracer.Core's
+// Phase2Reference.cs that Phase 2 uses (unit-tested against JobSystem.TraceCore).
+// Requires Shader Model 6.5 (RayQuery).
 
 #define DETERMINISTIC_COUNT 50u
 #define COMPANION_COUNT     4u
@@ -45,10 +49,11 @@ StructuredBuffer<float4>         Lights             : register(t4); // xyz = wor
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
 RWStructuredBuffer<uint>   WavelengthCounter: register(u2);
-RWTexture2D<float4>        Output           : register(u3);
 RWStructuredBuffer<uint>   LastHit          : register(u4); // 1 = pixel hit geometry last sample
 RWStructuredBuffer<float4> DirectAccum      : register(u5); // xyz running mean (direct)
 RWStructuredBuffer<float4> IndirectAccum    : register(u6); // xyz running mean (indirect)
+RWStructuredBuffer<float4> HitPointOut      : register(u7); // xyz = world hit point (G-buffer)
+RWStructuredBuffer<float4> NormalOut        : register(u8); // xyz = oriented face normal (G-buffer)
 
 cbuffer Constants : register(b0)
 {
@@ -58,7 +63,7 @@ cbuffer Constants : register(b0)
     float  ImgPlaneZ;            float DeterministicCorrection; float AmbientLevel; float LightIntensity;
     uint   Width;                uint  Height; uint MaxSampleCount; uint ResetFlag;
     uint   NumPrimitives;        uint  SubPixelJitter; uint NumLights; uint LightingMode; // 0 none, 1 direct, 2 NEE
-    float  SampleClamp;          float _pad1; float _pad2; float _pad3;
+    float  SampleClamp;          uint  SoftResetFlag; uint MotionSampleCap; float _pad1;
 };
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
@@ -119,7 +124,6 @@ float BevelFactor(float u, float w, float tilesAcross, float tilesDown, float be
     return 0.4 + 0.6 * smoothT;
 }
 
-// Effective reflectance row + wavelength-independent pattern attenuation.
 void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint row, out float atten)
 {
     float3 l1 = float3(prim.L1X, prim.L1Y, prim.L1Z);
@@ -151,14 +155,12 @@ void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint r
     }
 }
 
-// Face normal flipped to oppose the ray (denom < 0 ? Normal : -Normal).
 float3 FaceNormal(PrimitiveInfo prim, float3 rayDir)
 {
     float3 n = float3(prim.NX, prim.NY, prim.NZ);
     return (dot(rayDir, n) < 0.0) ? n : -n;
 }
 
-// Averaged hero + 3-companion diffuse albedo XYZ (no correction).
 float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHash, uint sampleIdx)
 {
     uint row; float atten;
@@ -179,7 +181,6 @@ float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHas
     return xyz / float(COMPANION_COUNT);
 }
 
-// Single-hero-wavelength diffuse albedo XYZ (for indirect bounces).
 float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
 {
     uint row; float atten;
@@ -219,7 +220,6 @@ bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitP
 
     if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        // Two triangles per quad → quad index is the triangle index >> 1.
         quadIndex = q.CommittedPrimitiveIndex() >> 1;
         float tHit = q.CommittedRayT();
         hitPoint = origin + dir * tHit;
@@ -232,8 +232,6 @@ bool TraceClosest(float3 origin, float3 dir, out uint quadIndex, out float3 hitP
 
 bool TraceOccluded(float3 origin, float3 dir, float maxDist)
 {
-    // No valid interval → nothing occludes (matches BVH.IsOccluded, whose hits
-    // require t >= 1e-4 and t < maxDist).
     if (maxDist <= 1e-4)
         return false;
 
@@ -270,9 +268,6 @@ void FillLight(float3 lightPos, float3 samplePoint, float3 normal, out float3 ou
     outCos = dot(normal, outDir);
 }
 
-// Weighted light importance sampling. Weights are recomputed (not cached) so no
-// per-thread MAX_LIGHTS array is needed; recomputation is bit-identical to the
-// CPU's cached array, so the pick and pdf match exactly.
 void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
                  out float outP, out float3 outDir, out float outDistSq, out float outCos)
 {
@@ -308,7 +303,6 @@ void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
     outP = 1.0 / float(NumLights);
 }
 
-// Uniform-selection NEE direct term at an indirect bounce.
 float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
 {
     float3 toLight = Lights[lightIdx].xyz - hitPoint;
@@ -326,13 +320,16 @@ float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
     return cosTheta / distSq * LightIntensity * float(NumLights);
 }
 
-// Full per-sample corrected XYZ; also returns the direct/indirect components and
-// whether the primary ray hit geometry.
+// Full per-sample corrected XYZ; also returns direct/indirect components, the
+// primary-hit mask, and the primary hit point + oriented normal for the G-buffer.
 float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sampleIdx,
-                   out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect)
+                   out bool primaryHit, out float3 correctedDirect, out float3 correctedIndirect,
+                   out float3 primaryHitPoint, out float3 primaryNormal)
 {
     correctedDirect = float3(0.0, 0.0, 0.0);
     correctedIndirect = float3(0.0, 0.0, 0.0);
+    primaryHitPoint = float3(0.0, 0.0, 0.0);
+    primaryNormal = float3(0.0, 0.0, 0.0);
 
     uint primIndex;
     float3 hitPoint;
@@ -342,6 +339,8 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
     PrimitiveInfo prim = Primitives[primIndex];
     float3 hitNormal = FaceNormal(prim, primaryDir);
+    primaryHitPoint = hitPoint;
+    primaryNormal = hitNormal;
 
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
     float3 baseXyz = BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
@@ -349,9 +348,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     bool lit = (LightingMode != 0u) && (NumLights > 0u);
 
     float3 xyz;
-    // TraceCore only commits the direct AOV (bounce0) inside the indirect-hit
-    // block; on a secondary miss it stays zero even though directTerm is already
-    // folded into the total. Mirror that exactly (start at zero).
     float3 bounce0 = float3(0.0, 0.0, 0.0);
     float3 indirect = float3(0.0, 0.0, 0.0);
 
@@ -364,7 +360,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     {
         float ambientTerm = AmbientLevel;
 
-        // ── Direct lighting (NEE) ──────────────────────────────────────
         float directTerm = 0.0;
         uint rngLight = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         float lightP; float3 lightDir; float lightDistSq; float lightCos;
@@ -384,7 +379,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
         xyz = baseXyz * (ambientTerm + directTerm);
 
-        // ── Indirect: one bounce + tertiary bounce ─────────────────────
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         rng = rng * RNG_MUL + RNG_ADD;
         float r1 = (rng & 0xFFFF) / 65536.0;
@@ -449,21 +443,6 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     return xyz * correction;
 }
 
-float LinearToSRGB(float c)
-{
-    if (c <= 0.0031308)
-        return 12.92 * c;
-    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
-}
-
-float3 ResolveToSRGB(float3 xyz)
-{
-    float lr = xyz.x * 3.2406 + xyz.y * (-1.5372) + xyz.z * (-0.4986);
-    float lg = xyz.x * (-0.9689) + xyz.y * 1.8758 + xyz.z * 0.0415;
-    float lb = xyz.x * 0.0557 + xyz.y * (-0.2040) + xyz.z * 1.0570;
-    return float3(LinearToSRGB(lr), LinearToSRGB(lg), LinearToSRGB(lb));
-}
-
 // ── Kernel ────────────────────────────────────────────────────────────
 
 [numthreads(8, 8, 1)]
@@ -479,7 +458,6 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     bool reset = (ResetFlag != 0u);
     uint sampleIdx = reset ? 0u : WavelengthCounter[ix];
 
-    // Sub-pixel jitter (matches TraceCore's PCG-style seed chain).
     float jx, jy;
     if (SubPixelJitter != 0u)
     {
@@ -504,19 +482,20 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     uint pixelHash = Hash2D(x, y);
 
     bool hit;
-    float3 correctedDirect, correctedIndirect;
-    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit, correctedDirect, correctedIndirect);
+    float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
+    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit,
+                                   correctedDirect, correctedIndirect, gHitPoint, gNormal);
 
-    // Firefly clamp on the total only (matches TraceCore's SampleClamp, which
-    // leaves the direct/indirect debug channels unclamped).
     if (SampleClamp > 0.0)
         corrected = clamp(corrected, float3(0.0, 0.0, 0.0), float3(SampleClamp, SampleClamp, SampleClamp));
 
-    // Running-mean accumulation. Restart the mean on a whole-frame reset, or when
-    // this pixel flips between hitting geometry and missing (matches TraceCore's
-    // 'hit != LastHit' reset). WavelengthCounter keeps advancing regardless.
+    // Running-mean accumulation. Restart on a whole-frame reset or a hit/miss
+    // flip; a soft reset caps the effective sample count so recent samples
+    // dominate during motion while preserving the current mean.
     bool restart = reset || (LastHit[ix] != (hit ? 1u : 0u));
     uint prevCount = restart ? 0u : SampleCount[ix];
+    if (SoftResetFlag != 0u && !restart)
+        prevCount = min(prevCount, MotionSampleCap);
     uint count = min(prevCount + 1u, MaxSampleCount);
     bool clearMean = restart || (prevCount == 0u);
 
@@ -536,6 +515,8 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     WavelengthCounter[ix] = sampleIdx + 1u;
     LastHit[ix] = hit ? 1u : 0u;
 
-    float3 srgb = saturate(ResolveToSRGB(newAccum));
-    Output[tid.xy] = float4(srgb, 1.0);
+    // G-buffer for the resolve pass. Zeroed on a miss (the resolve gates use on
+    // the hit mask, so the miss value is never consumed for reprojection).
+    HitPointOut[ix] = float4(gHitPoint, hit ? 1.0 : 0.0);
+    NormalOut[ix] = float4(gNormal, 0.0);
 }

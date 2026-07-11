@@ -32,6 +32,9 @@ public class CameraController
     // Expose whether the controller is currently performing a turn.
     public bool IsTurning => _state == State.Turning;
 
+    /// <summary>The walker's current maze cell (used e.g. for goal detection).</summary>
+    public (int X, int Y) CurrentCell => (_nav.CellX, _nav.CellY);
+
     private enum State { Still, Moving, Turning }
     private State _state;
 

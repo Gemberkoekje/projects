@@ -242,6 +242,46 @@ public class CameraControllerTests
         Assert.IsTrue(ctrl.Dirty, "Turn start should mark camera as dirty.");
     }
 
+    // ── Goal detection (drives maze regeneration, plan §9.1) ───────
+
+    [TestMethod]
+    [DataRow(6, 6, 1, DisplayName = "6×6 seed 1")]
+    [DataRow(8, 8, 42, DisplayName = "8×8 seed 42")]
+    [DataRow(16, 16, 7, DisplayName = "16×16 seed 7")]
+    public void Walk_ReachesGoalCell_SoRegenerationFires(int w, int h, int seed)
+    {
+        var maze = new Maze(w, h, seed);
+        var nav = new MazeNavigator(maze, 0, 0, Direction.South);
+        var ctrl = new CameraController(nav, 2f, 1f)
+        {
+            StillTime = 0.01f,
+            MoveTime = 0.05f,
+            TurnTime = 0.05f,
+        };
+        var cam = new Camera
+        {
+            Position = new Vector3(1, 1, 1),
+            Rotation = Quaternion.Identity,
+            Fov = MathF.PI / 3f,
+            Aspect = 16f / 9f,
+            ImgPlaneZ = 1f,
+        };
+
+        var goal = (w - 1, h - 1);
+        bool reachedGoal = false;
+        // The right-hand walker traverses a perfect maze fully, so the goal is reached
+        // in well under this bound; the host uses exactly this CurrentCell == goal test.
+        for (int i = 0; i < w * h * 200 && !reachedGoal; i++)
+        {
+            ctrl.Update(0.1f, cam);
+            if (ctrl.CurrentCell == goal)
+                reachedGoal = true;
+        }
+
+        Assert.IsTrue(reachedGoal,
+            $"Walker never reached the goal cell {goal} in a {w}x{h} maze (seed {seed}).");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────
 
     static void AssertVec3Near(Vector3 expected, Vector3 actual, float eps)

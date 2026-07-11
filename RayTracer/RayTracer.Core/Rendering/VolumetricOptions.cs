@@ -24,7 +24,7 @@ public readonly record struct VolumetricOptions(
     float SigmaScaleFog = 1f,
     float SigmaScaleGround = 1f,
     float AnisotropyG = 0f,
-    float InscatterStrength = 0.35f,
+    float InscatterStrength = 0.16f,
     float EarlyOutTransmittance = 0.01f,
     VolumetricQuality Quality = VolumetricQuality.Medium,
     /// <summary>
@@ -55,7 +55,7 @@ public readonly record struct VolumetricOptions(
                 MaxMarchDistance: 12f,
                 SigmaScaleFog: 0.85f,
                 SigmaScaleGround: 0.85f,
-                InscatterStrength: 0.25f,
+                InscatterStrength: 0.12f,
                 ShadowStepInterval: 0,
                 Quality: quality),
             VolumetricQuality.High => new VolumetricOptions(
@@ -65,7 +65,7 @@ public readonly record struct VolumetricOptions(
                 MaxMarchDistance: 20f,
                 SigmaScaleFog: 1f,
                 SigmaScaleGround: 1f,
-                InscatterStrength: 0.38f,
+                InscatterStrength: 0.18f,
                 ShadowStepInterval: 4,
                 Quality: quality),
             VolumetricQuality.Ultra => new VolumetricOptions(
@@ -76,7 +76,7 @@ public readonly record struct VolumetricOptions(
                 SigmaScaleFog: 1f,
                 SigmaScaleGround: 1f,
                 AnisotropyG: 0.35f,
-                InscatterStrength: 0.42f,
+                InscatterStrength: 0.20f,
                 ShadowStepInterval: 1,
                 Quality: quality),
             _ => new VolumetricOptions(
@@ -86,7 +86,7 @@ public readonly record struct VolumetricOptions(
                 MaxMarchDistance: 16f,
                 SigmaScaleFog: 1f,
                 SigmaScaleGround: 1f,
-                InscatterStrength: 0.35f,
+                InscatterStrength: 0.16f,
                 ShadowStepInterval: 0,
                 Quality: VolumetricQuality.Medium),
         };

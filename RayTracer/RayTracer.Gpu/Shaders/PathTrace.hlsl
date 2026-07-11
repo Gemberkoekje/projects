@@ -158,11 +158,11 @@ float3 ShadeHit(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHa
     return baseXyz * DeterministicCorrection;
 }
 
-float LinearToSRGB(float linear)
+float LinearToSRGB(float c)
 {
-    if (linear <= 0.0031308)
-        return 12.92 * linear;
-    return 1.055 * pow(linear, 1.0 / 2.4) - 0.055;
+    if (c <= 0.0031308)
+        return 12.92 * c;
+    return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 
 float3 ResolveToSRGB(float3 xyz)

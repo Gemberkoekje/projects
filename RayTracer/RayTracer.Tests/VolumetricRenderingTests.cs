@@ -37,33 +37,39 @@ public class VolumetricRenderingTests
     }
 
     [TestMethod]
-    public void IntegrateVolumetricSegment_AttenuationDecreasesWithDistance()
+    public void IntegrateVolumetricSegment_DenserMediumAttenuatesMore()
     {
-        VolumetricOptions options = VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog) with
+        // Along the *same* segment, scaling the extinction coefficient up must
+        // transmit no more light: every step's optical depth scales, so the
+        // product of step transmittances can only fall. This holds for any
+        // density field — including the spatially non-uniform (turbulent) smoke —
+        // whereas comparing two rays of different length/direction does not, since
+        // a longer or differently-aimed ray can legitimately pass through sparser
+        // gaps between billows.
+        var origin = new Vector3(0f, 1f, 0f);
+        var hit = new Vector3(0f, 1f, 8f);
+        VolumetricOptions thin = VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog) with
         {
             InscatterStrength = 0f,
+            SigmaScaleFog = 1f,
         };
+        VolumetricOptions thick = thin with { SigmaScaleFog = 3f };
 
-        VolumetricSample near = JobSystem.IntegrateVolumetricSegment(
-            Vector3.Zero,
-            new Vector3(0f, 1f, 2f),
-            Vector3.UnitZ,
-            options);
-        VolumetricSample far = JobSystem.IntegrateVolumetricSegment(
-            Vector3.Zero,
-            new Vector3(0f, 1f, 8f),
-            Vector3.UnitZ,
-            options);
+        VolumetricSample thinSample = JobSystem.IntegrateVolumetricSegment(origin, hit, Vector3.UnitZ, thin);
+        VolumetricSample thickSample = JobSystem.IntegrateVolumetricSegment(origin, hit, Vector3.UnitZ, thick);
 
-        Assert.IsTrue(far.Transmittance < near.Transmittance);
+        Assert.IsTrue(thickSample.Transmittance < thinSample.Transmittance,
+            $"denser medium should attenuate more (thin={thinSample.Transmittance}, thick={thickSample.Transmittance})");
     }
 
     [TestMethod]
     public void IntegrateVolumetricSegment_HighDensityLongPath_StronglyAttenuates()
     {
+        // Large sigma so the path attenuates strongly even where the turbulent
+        // density thins to its floor (a gap between billows) along this ray.
         VolumetricOptions options = VolumetricOptions.FromQuality(VolumetricQuality.Ultra, SmokeMode.AlwaysFog) with
         {
-            SigmaScaleFog = 3f,
+            SigmaScaleFog = 20f,
             InscatterStrength = 0f,
         };
 
