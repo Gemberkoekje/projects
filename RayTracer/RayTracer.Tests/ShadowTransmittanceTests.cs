@@ -201,4 +201,49 @@ public sealed class ShadowTransmittanceTests
         Assert.IsTrue(p.Volumetrics.ShadowTransmittance);
         Assert.IsTrue(p.IsDebugSmokePreset);
     }
+
+    // ── A2: fog self-shadow / god-ray falloff in the volumetric march ──────
+
+    [TestMethod]
+    public void InscatterFogSelfShadow_DimsInscatterVsUnshadowed()
+    {
+        // A foggy segment lit by a side light at the same (foggy) height, with only a distant floor
+        // that never occludes the horizontal shadow rays. Turning on fog self-shadow (A2) must dim
+        // the in-scatter, since thick smoke now lies between each march sample and the light.
+        var floor = new TracableRectangle(
+            (new Vector3(-50f, 0f, -50f), new Vector3(-50f, 0f, 50f), new Vector3(50f, 0f, -50f)), DiffuseMat());
+        Tracable[] scene = [floor];
+        var light = new Light { Position = new Vector3(8f, 1f, 4f), Color = Vector3.One };
+        var camera = new Camera
+        {
+            Position = new Vector3(0f, 1f, 0f),
+            Rotation = Quaternion.Identity,
+            Fov = MathF.PI / 3f,
+            Aspect = 1f,
+            ImgPlaneZ = 1f,
+        };
+
+        JobSystem Build(bool selfShadow)
+        {
+            VolumetricOptions vol = VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.AlwaysFog)
+                with { ShadowTransmittance = selfShadow };
+            return new JobSystem(
+                4, 4, scene, camera, stride: 16, lights: [light],
+                renderOptions: new RenderOptions(Lighting: LightingMode.NEE, MaxSampleCount: 100),
+                samplingOptions: new SamplingOptions(SubPixelJitter: false),
+                denoiseOptions: new DenoiseOptions(
+                    EnableTaa: false, EnableDiffuseCache: false,
+                    SmokeMode: SmokeMode.AlwaysFog, Volumetrics: vol),
+                debugOptions: new DebugOptions());
+        }
+
+        var from = new Vector3(0f, 1f, 0f);
+        var to = new Vector3(0f, 1f, 8f);
+        VolumetricSample shadowed = Build(selfShadow: true).IntegrateVolumetricSegment(from, to, Vector3.UnitZ);
+        VolumetricSample lit = Build(selfShadow: false).IntegrateVolumetricSegment(from, to, Vector3.UnitZ);
+
+        Assert.IsTrue(lit.Inscatter.Length() > 0f, "the lit fog should in-scatter some light");
+        Assert.IsTrue(shadowed.Inscatter.Length() < lit.Inscatter.Length(),
+            $"fog self-shadow must dim in-scatter (shadowed={shadowed.Inscatter.Length()}, lit={lit.Inscatter.Length()})");
+    }
 }

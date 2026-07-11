@@ -170,6 +170,43 @@ public partial class JobSystem
         return smokeMode == SmokeMode.AlwaysGroundSmoke ? options.SigmaScaleGround : options.SigmaScaleFog;
     }
 
+    /// <summary>
+    /// Fog transmittance in [0,1] from an in-scatter sample point toward a light, marched over the
+    /// density field so the medium shadows itself (shadows-and-caustics-plan §A2). A coarse march
+    /// (a quarter of the camera step count) — a self-shadow term tolerates more noise than the
+    /// primary view. Mirrors <c>Phase4Reference.InscatterShadowTransmittance</c> for GPU parity.
+    /// </summary>
+    private static float InscatterShadowTransmittance(Vector3 from, Vector3 lightDir, float dist, VolumetricOptions options)
+    {
+        float marchLength = MathF.Min(dist, MathF.Max(options.MaxMarchDistance, 0f));
+        if (marchLength <= 1e-5f)
+            return 1f;
+
+        int steps = Math.Max(2, options.MarchSteps / 4);
+        float stepLength = marchLength / steps;
+        float sigmaScale = GetSigmaScale(options, options.SmokeMode);
+        float transmittance = 1f;
+
+        for (int i = 0; i < steps; i++)
+        {
+            float distance = (i + 0.5f) * stepLength;
+            Vector3 p = from + lightDir * distance;
+            float density = GetDensity(p, options.SmokeMode);
+            if (density <= 0f)
+                continue;
+
+            float sigmaT = density * sigmaScale;
+            if (sigmaT <= 0f)
+                continue;
+
+            transmittance *= MathF.Exp(-sigmaT * stepLength);
+            if (transmittance < options.EarlyOutTransmittance)
+                return transmittance;
+        }
+
+        return transmittance;
+    }
+
     private static float EvaluatePhase(Vector3 viewDirection, Vector3 samplePoint, VolumetricOptions options, Light[] lights)
     {
         float g = Math.Clamp(options.AnisotropyG, -0.95f, 0.95f);
@@ -210,7 +247,14 @@ public partial class JobSystem
                     continue;
             }
 
-            lighting += light.Color * (LightIntensity / distSq);
+            float lightWeight = LightIntensity / distSq;
+            // Fog self-shadow (shadows-and-caustics-plan §A2): thick fog between this sample and
+            // the light dims the in-scatter, so shafts fall off with depth into the smoke. Tied to
+            // the same shadow-step cadence (bvh non-null) as the geometry occlusion above.
+            if (options.ShadowTransmittance && bvh is not null)
+                lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, options);
+
+            lighting += light.Color * lightWeight;
         }
 
         if (lighting == Vector3.Zero)

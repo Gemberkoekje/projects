@@ -270,7 +270,7 @@ public static class Phase4Reference
     private static Vector3 EstimateInscatterLight(
         Vector3 samplePoint, Vector3 viewDirection, VolumetricOptions options,
         ReadOnlySpan<Vector3> lightPositions, ReadOnlySpan<Vector3> lightColors,
-        Phase2Reference.ISceneTracer? occluder)
+        Phase2Reference.ISceneTracer? occluder, float time)
     {
         if (lightPositions.Length == 0)
             return SmokeTint;
@@ -290,7 +290,13 @@ public static class Phase4Reference
                     continue;
             }
 
-            lighting += lightColors[i] * (LightIntensity / distSq);
+            float lightWeight = LightIntensity / distSq;
+            // Fog self-shadow (shadows-and-caustics-plan §A2): mirrors the CPU
+            // JobSystem.EstimateInscatterLight so the GPU dims in-scatter through thick smoke.
+            if (options.ShadowTransmittance && occluder is not null)
+                lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, options, time);
+
+            lighting += lightColors[i] * lightWeight;
         }
 
         if (lighting == Vector3.Zero)
@@ -298,6 +304,44 @@ public static class Phase4Reference
 
         Vector3 ambient = SmokeTint * AmbientLevel;
         return Vector3.Clamp(ambient + lighting * SmokeTint, Vector3.Zero, new Vector3(1.5f));
+    }
+
+    /// <summary>
+    /// Fog transmittance in [0,1] from an in-scatter sample point toward a light, marched over the
+    /// density field so the medium shadows itself. A line-for-line mirror of the CPU
+    /// <c>JobSystem.InscatterShadowTransmittance</c> (shadows-and-caustics-plan §A2), advecting the
+    /// density with <paramref name="time"/> exactly as the camera march does.
+    /// </summary>
+    private static float InscatterShadowTransmittance(
+        Vector3 from, Vector3 lightDir, float dist, VolumetricOptions options, float time)
+    {
+        float marchLength = MathF.Min(dist, MathF.Max(options.MaxMarchDistance, 0f));
+        if (marchLength <= 1e-5f)
+            return 1f;
+
+        int steps = Math.Max(2, options.MarchSteps / 4);
+        float stepLength = marchLength / steps;
+        float sigmaScale = GetSigmaScale(options, options.SmokeMode);
+        float transmittance = 1f;
+
+        for (int i = 0; i < steps; i++)
+        {
+            float distance = (i + 0.5f) * stepLength;
+            Vector3 p = from + lightDir * distance;
+            float density = GetDensity(p, options.SmokeMode, time);
+            if (density <= 0f)
+                continue;
+
+            float sigmaT = density * sigmaScale;
+            if (sigmaT <= 0f)
+                continue;
+
+            transmittance *= MathF.Exp(-sigmaT * stepLength);
+            if (transmittance < options.EarlyOutTransmittance)
+                return transmittance;
+        }
+
+        return transmittance;
     }
 
     /// <summary>
@@ -363,7 +407,7 @@ public static class Phase4Reference
             bool traceShadow = options.ShadowStepInterval > 0
                 && i % options.ShadowStepInterval == 0;
             Vector3 localLight = EstimateInscatterLight(
-                p, dir, options, lightPositions, lightColors, traceShadow ? occluder : null);
+                p, dir, options, lightPositions, lightColors, traceShadow ? occluder : null, time);
 
             inscatter += localLight * (scatterWeight * inscatterScale * phase);
             transmittance *= stepTransmittance;
