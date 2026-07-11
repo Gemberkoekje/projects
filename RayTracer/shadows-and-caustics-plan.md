@@ -213,6 +213,28 @@ path, gate the fog integral behind `ShadowStepInterval`, and cap transmitter cha
 
 ## Phase B — Caustics: rainbows on the walls (ask 3) ⭐ the big one
 
+> **Status: CPU foundation implemented & CI-green.** Spectral photon mapping (B0) is chosen and its
+> core is built and tested in `RayTracer.Core/Lighting/`:
+> - `Photon` — a wavelength-carrying energy packet stored only for light→specular→diffuse paths.
+> - `PhotonMap` — uniform spatial-hash storage + a spectral density estimate
+>   (`Σ power·XYZ(λ) / (π r²)`), with normal rejection and focus diagnostics.
+> - `PhotonTracer` — forward emission toward the caster bounds and forward tracing through the
+>   specular surfaces (dielectric dispersion via the per-wavelength IOR, bubble thin-shell split,
+>   mirror, Beer–Lambert), depositing caustic photons. Deterministic RNG.
+> - `CausticsTests` — map storage/estimate/rejection/scaling; tracer caustic-only invariant,
+>   glass-sphere focus, energy bound, and a dispersion test (blue vs red caustics shift by
+>   wavelength — the prism rainbow in miniature).
+>
+> **Remaining (not yet done):**
+> 1. **Composite the map into the render** — build the map per frame from the caster bounds and add
+>    the caustic estimate at each diffuse hit in `PathTracer.TraceCore`, folded into accumulation.
+>    This needs a way to enumerate the specular casters (e.g. a defaulted `Surface` member on
+>    `Tracable`, which today exposes only `Bounds`/`Intersect`) and touches the hot path + the
+>    map's per-frame lifecycle (rebuild as the bubbles drift) — a design step, called out here
+>    rather than guessed at.
+> 2. **B2/B3 tuning** (prism rainbow on a wall, bubble ring) and **B4 GPU port** (compute-shader
+>    photon pass + splat) — the GPU work needs the DXR box.
+
 **Goal:** light that refracts through a jewel/window or reflects off a bubble film should land on
 the floor/walls as a **caustic** — a focused bright pattern for glass, a **wavelength-ordered
 rainbow** for a dispersive prism, and a **faint iridescent ring** for a bubble. A pure backward
