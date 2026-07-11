@@ -116,6 +116,16 @@ forward / light-toward-surface direction.
 
 ## Phase A — Transmittance-aware shadow rays (asks 1 & 2)
 
+> **Status (CPU): implemented & CI-green.** A0 (`BVH.Transmittance`), A1 (NEE wiring via the
+> `PathTracer.ShadowVisibility` helper at all four shadow sites), the fog shadow term
+> (`JobSystem.SegmentTransmittance` + `VolumetricOptions.ShadowTransmittance`, on for High/Ultra),
+> the shared `Optics.BubbleReflectProbability`, the **Fog Shadow Debug** preset, and
+> `ShadowTransmittanceTests` all shipped in `RayTracer.Core`. The full solution builds on Windows
+> and all tests pass, with existing renders verified byte-identical where no transmitter/fog lies
+> on a shadow ray. **Remaining:** A2 (fog *self*-shadow / god-rays inside the march) and A3 (GPU
+> reference + HLSL port — needs the DXR box, untestable in CI). A4 presets partly done (the debug
+> preset; the per-tier quality mapping already flows through `FromQuality`).
+
 **Goal:** replace the binary occlusion test with a **transmittance** that a shadow ray accumulates
 as it passes through fog and thin dielectrics. Opaque geometry still returns 0; fog returns
 `exp(−∫σ)`; a bubble returns "most of the light minus the Fresnel/film reflection"; coloured glass
