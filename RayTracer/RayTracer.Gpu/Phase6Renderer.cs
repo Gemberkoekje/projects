@@ -336,6 +336,7 @@ internal sealed class Phase6Renderer : IDisposable
         public float LX, LY, LZ; public uint PhotonBase;
         public float BMinX, BMinY, BMinZ; public uint PhotonCount;
         public float BMaxX, BMaxY, BMaxZ; public uint Seed;
+        public float DirX, DirY, DirZ; public uint Mode; // Mode 1 = collimated beam along Dir
     }
 
     // §B4 caustic-emit cbuffer (b1): job count, photon-buffer capacity, bounce cap, the grid cell size
@@ -695,7 +696,46 @@ internal sealed class Phase6Renderer : IDisposable
             _causticEnabled = false;
             return;
         }
+        RunCausticBuild(emitJobs, total, gatherRadius, strength, maxBounces);
+    }
 
+    /// <summary>
+    /// §B2 collimated-beam caustic: emits a <b>parallel-ray</b> beam (fixed <paramref name="dir"/>) over
+    /// the cross-section box [<paramref name="beamMin"/>, <paramref name="beamMax"/>] and traces + bins
+    /// it on the GPU exactly like <see cref="BuildCausticsGpu"/>. Unlike the point-emission overload (a
+    /// diverging cone), a real collimated beam through a dispersive prism disperses into a clean
+    /// wavelength-ordered rainbow band. Make the box thin along the deviation axis for the crispest band.
+    /// </summary>
+    public void BuildCausticsBeamGpu(
+        Vector3 beamMin, Vector3 beamMax, Vector3 dir, int photons, float gatherRadius, float strength, int maxBounces = 8, uint seed = 1u)
+    {
+        _causticCellSize = gatherRadius;
+        _causticRadius = gatherRadius;
+        _causticStrength = strength;
+        int count = Math.Max(0, photons);
+        if (_device is null || count == 0)
+        {
+            _causticEnabled = false;
+            return;
+        }
+        var emitJobs = new[]
+        {
+            new GpuEmitJob
+            {
+                PhotonBase = 0u, PhotonCount = (uint)count, Seed = seed == 0u ? 1u : seed,
+                BMinX = beamMin.X, BMinY = beamMin.Y, BMinZ = beamMin.Z,
+                BMaxX = beamMax.X, BMaxY = beamMax.Y, BMaxZ = beamMax.Z,
+                DirX = dir.X, DirY = dir.Y, DirZ = dir.Z, Mode = 1u,
+            },
+        };
+        RunCausticBuild(emitJobs, count, gatherRadius, strength, maxBounces);
+    }
+
+    // Shared GPU caustic build: grows the buffers, uploads the (prefix-summed) emit jobs, and runs the
+    // five-stage trace + bin pipeline in one submission with no readback. Leaves the map bound for the
+    // render trace's gather.
+    private void RunCausticBuild(GpuEmitJob[] emitJobs, int total, float gatherRadius, float strength, int maxBounces)
+    {
         WaitForGpu();
 
         // Grow the photon store + linked-list-next buffers to the emission budget (deposits ≤ emitted).
@@ -714,7 +754,7 @@ internal sealed class Phase6Renderer : IDisposable
         Span<CausticEmitConstants> ec = _causticEmitConstantBuffer.Map<CausticEmitConstants>(0, 1);
         ec[0] = new CausticEmitConstants
         {
-            EmitJobCount = (uint)jobs.Count,
+            EmitJobCount = (uint)emitJobs.Length,
             PhotonCapacity = (uint)_photonCapacity,
             EmitMaxBounces = (uint)Math.Max(1, maxBounces),
             EmitCellSize = gatherRadius,

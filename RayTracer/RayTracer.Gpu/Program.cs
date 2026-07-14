@@ -56,6 +56,8 @@ internal static class Program
         bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
         bool causticDemo = args.Contains("--caustic-demo", StringComparer.OrdinalIgnoreCase);
         bool causticMaze = args.Contains("--caustic-maze", StringComparer.OrdinalIgnoreCase);
+        bool prismCaustic = args.Contains("--prism-caustic", StringComparer.OrdinalIgnoreCase);
+        bool bubbleCaustic = args.Contains("--bubble-caustic", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
@@ -72,6 +74,7 @@ internal static class Program
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
             || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo || causticDemo || causticMaze
+            || prismCaustic || bubbleCaustic
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -126,6 +129,16 @@ internal static class Program
                     ParseFloatOption(args, "--cauchyb", 0.05f),
                     ParseIntOption(args, "--photons", 400000),
                     ParseFloatOption(args, "--strength", 22f));
+            if (prismCaustic)
+                return RunPrismCausticDemo(maxFrames, savePath ?? "prism-caustic.png", sampleClamp,
+                    ParseFloatOption(args, "--cauchyb", 0.12f),  // exaggerated dispersion for a wide showpiece rainbow
+                    ParseIntOption(args, "--photons", 400000),
+                    ParseFloatOption(args, "--strength", 26f));
+            if (bubbleCaustic)
+                return RunBubbleCausticDemo(maxFrames, savePath ?? "bubble-caustic.png", sampleClamp,
+                    ParseFloatOption(args, "--thickness", 440f),
+                    ParseIntOption(args, "--photons", 400000),
+                    ParseFloatOption(args, "--strength", 40f));
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -2395,6 +2408,169 @@ internal static class Program
 
         for (int f = 0; f < frames; f++)
             renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// §B2 dispersive prism caustic: a quasi-collimated white beam (a far caustic light) refracts
+    /// through a dispersive triangular prism and lands on the receiving wall/floor as a continuous
+    /// wavelength-ordered rainbow band — each photon's single wavelength sets its Cauchy bend angle
+    /// (<c>n(λ)=A+B/λ²</c>), so ascending λ lands in spectral order. Traced + binned entirely on the
+    /// GPU (<see cref="Phase6Renderer.BuildCausticsGpu"/>); widen <c>--cauchyb</c> to widen the rainbow.
+    /// </summary>
+    private static int RunPrismCausticDemo(int frames, string savePath, float sampleClamp, float cauchyB, int photons, float strength)
+    {
+        if (frames <= 0) frames = 500; // dispersion is hero-only (1 λ/sample) → converge hard for a clean band
+        Console.WriteLine($"RayTracer.Gpu — prism caustic ({frames} frames, cauchyB {cauchyB}, {photons} photons, strength {strength}) -> {savePath}");
+
+        var neutral = FlatDiffuse("prismc-floor", 0.55f);
+        var prismGlass = new MaterialData(
+            "prismc-glass", "Prism", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.98f, cauchyA: 1.5f, cauchyB: cauchyB);
+
+        const float H = 4.0f;
+        // Fully enclosed neutral box so the deviated + dispersed beam paints a visible band wherever it
+        // lands (floor / ceiling / any of the four walls).
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -3f, 9f, neutral),                                                     // floor
+            FloorQuad(H, -6f, 6f, -3f, 9f, neutral),                                                      // ceiling
+            WallZ(8f, -6f, 6f, 0f, H, neutral),                                                            // back (+Z)
+            WallZ(-2f, -6f, 6f, 0f, H, neutral),                                                           // front (−Z)
+            new TracableRectangle((new Vector3(6f, 0f, -2f), new Vector3(6f, 0f, 8f), new Vector3(6f, H, -2f)), neutral),   // right (+X)
+            new TracableRectangle((new Vector3(-6f, 0f, -2f), new Vector3(-6f, 0f, 8f), new Vector3(-6f, H, -2f)), neutral),// left (−X)
+        };
+
+        // Vertical triangular prism (floor→ceiling): a horizontal +X beam enters the left slant face and
+        // leaves the right slant, deviated — and dispersed — as it travels on toward the +X wall.
+        Vector3 apex = new(-0.4f, 0f, 2.6f);
+        Vector3 bl = new(-1.15f, 0f, 3.8f);
+        Vector3 br = new(0.35f, 0f, 3.8f);
+        AddPrismFace(scene, apex, br, H, prismGlass);
+        AddPrismFace(scene, apex, bl, H, prismGlass);
+        AddPrismFace(scene, bl, br, H, prismGlass);
+
+        // A collimated (parallel-ray) beam: a tall thin sheet just left of the prism, travelling +X.
+        // Thin in Z (the dispersion axis) so the prism fans it out cleanly by wavelength; tall in Y so
+        // the rainbow reads as a full-height band on the +X wall (a point-source cone would smear it).
+        var beamMin = new Vector3(-2.0f, 0.5f, 3.05f);
+        var beamMax = new Vector3(-2.0f, H - 0.5f, 3.20f);
+        var beamDir = new Vector3(1f, 0f, 0f);
+
+        // The prism bends the beam toward its base (+Z), so the rainbow lands on the back (+Z) wall.
+        // Sit just behind the prism (camera z past the prism → no occlusion) and look at the band.
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(-0.3f, 2.0f, 4.3f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(1.5f, 1.75f, 8f), worldUp),
+            Fov = MathF.PI / 2.7f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        // A dim fill light low in the front corner so the neutral box is faintly visible without a
+        // hotspot near the receiving wall (the rainbow reads as the bright accent).
+        PackedLights packedLights = LightPacker.Pack([new Light { Position = new Vector3(-4f, 1.0f, -1f), Color = new Vector3(0.28f) }]);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        // Progressive accumulation: re-seed the beam every frame so each accumulated sample is an
+        // independent caustic realization and the running mean converges the band to a smooth, low-noise
+        // gradient (the scene is static, so nothing else moves).
+        for (int f = 0; f < frames; f++)
+        {
+            renderer.BuildCausticsBeamGpu(beamMin, beamMax, beamDir, photons, 0.06f, strength, seed: (uint)(f + 1));
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        }
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// §B3 bubble caustic: an overhead beam strikes a soap bubble; most light transmits nearly straight
+    /// (a soft disc on the floor) but a few percent reflects off the thin film — tinted by
+    /// <see cref="Optics.ThinFilmReflectance"/> — and lands as a faint iridescent ring whose colour
+    /// tracks the same gravity-graded film bands the camera sees on the bubble. The bubble is frozen
+    /// (static) so the accumulation converges cleanly (the reflection is hero-only and noisy). Traced +
+    /// binned entirely on the GPU (<see cref="Phase6Renderer.BuildCausticsGpu"/>).
+    /// </summary>
+    private static int RunBubbleCausticDemo(int frames, string savePath, float sampleClamp, float thicknessNm, int photons, float strength)
+    {
+        if (frames <= 0) frames = 900; // faint + hero-only bubble reflection → converge hard, no motion
+        Console.WriteLine($"RayTracer.Gpu — bubble caustic ({frames} frames, thickness {thicknessNm}nm, {photons} photons, strength {strength}) -> {savePath}");
+
+        var floorMat = FlatDiffuse("bubc-floor", 0.6f);
+        var bubbleMat = new MaterialData(
+            "bubc-bubble", "Bubble", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            FlatSpectrum(1.0f), SurfaceKind.Bubble, cauchyA: 1.33f, cauchyB: 0f, filmThicknessNm: thicknessNm);
+
+        const float bubbleY = 1.3f, bubbleZ = 3.2f, bubbleR = 1.1f;
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -1f, 9f, floorMat),
+            new Sphere(new Vector3(0f, bubbleY, bubbleZ), bubbleR, bubbleMat),
+        };
+        var bubbleBounds = new AABB(
+            new Vector3(-bubbleR, bubbleY - bubbleR, bubbleZ - bubbleR),
+            new Vector3(bubbleR, bubbleY + bubbleR, bubbleZ + bubbleR));
+
+        // Overhead caustic light (emission origin only): photons rain down onto the bubble, most passing
+        // through to a soft floor disc, a tinted few reflecting out to the iridescent ring.
+        var causticLight = new Vector3(0f, 5.0f, bubbleZ);
+
+        Vector3 worldUp = new(0, 1, 0);
+        Vector3 camPos = new(2.6f, 2.2f, 0.2f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0f, bubbleZ + 0.2f), worldUp),
+            Fov = MathF.PI / 3.2f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        // A dim fill so the floor + bubble read; the caustic ring is the accent.
+        PackedLights packedLights = LightPacker.Pack([new Light { Position = new Vector3(-2f, 3.5f, 0.5f), Color = new Vector3(0.3f) }]);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        // The bubble is frozen (no motion → no reprojection fireflies), but the reflection is faint and
+        // hero-only, so a single photon map leaves the floor speckled. Progressive accumulation fixes
+        // it: re-seed the map every frame so each accumulated sample is an INDEPENDENT caustic
+        // realization, and the running mean converges to a smooth iridescent ring (the plan's "lean on
+        // the accumulation buffer to average stochastic noise over frames").
+        for (int f = 0; f < frames; f++)
+        {
+            renderer.BuildCausticsGpu([(causticLight, bubbleBounds, photons, (uint)(f + 1))], 0.07f, strength);
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        }
 
         byte[] rgba = renderer.ReadbackOutput();
         SavePng(rgba, Width, Height, savePath);

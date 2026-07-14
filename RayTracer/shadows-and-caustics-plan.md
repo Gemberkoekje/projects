@@ -368,9 +368,25 @@ path, gate the fog integral behind `ShadowStepInterval`, and cap transmitter cha
 > jewel-caustic build no longer touches the CPU at all, so the "Jewel caustics" toggle is cheap enough
 > to default on (kept opt-in here as a separate product decision).
 >
-> **Remaining (not yet done):**
-> 1. **B2/B3 aesthetic tuning** — a dedicated "Prism Caustics" scene (collimated beam + prism) for the
->    cleanest *wavelength-ordered* rainbow band, and the drifting-bubble iridescent ring.
+> **B2/B3 — dedicated prism + bubble caustic scenes — done.** Two purpose-built demos exercise the
+> dispersive and thin-film branches of the forward tracer:
+> - **`--prism-caustic` (B2):** a **collimated** white beam through a dispersive triangular prism lands
+>   a clean wavelength-ordered rainbow band (red→violet) on the receiving wall. Collimation needed a new
+>   `BuildCausticsBeamGpu` emit mode (parallel rays over a thin cross-section box, vs the point-light
+>   cone) — a point source smears the band into a 2-D fan. `--cauchyb` widens the rainbow (default 0.12,
+>   exaggerated for a showpiece).
+> - **`--bubble-caustic` (B3):** an overhead beam on a soap bubble casts a vivid **iridescent ring** —
+>   concentric thin-film-tinted rings whose colour tracks the film's gravity-graded bands — via the
+>   bubble reflect branch. The bubble is **frozen** (no motion → no reprojection fireflies).
+> - Both converge cleanly by **progressive accumulation**: the map is re-seeded every frame, so each
+>   accumulated sample is an independent caustic realisation and the running mean smooths the hero-only
+>   photon noise (the plan's "lean on the accumulation buffer"). A single fixed-seed map left the floor
+>   speckled no matter the frame count; re-seeding fixed it. Validated on the RTX 3070; `--phase6-selftest`
+>   (700/700), `--phase6-regress` (19 bit-exact), point-mode caustics (bit-identical), and `dotnet test`
+>   (279) all stay green after the `EmitJob` mode addition.
+>
+> **Phase B is complete** (B0–B5): spectral photon mapping, monochrome focus, dispersive prism rainbow,
+> bubble iridescent ring, full-GPU trace+bin transport, and presets/demos — all on the GPU.
 
 **Goal:** light that refracts through a jewel/window or reflects off a bubble film should land on
 the floor/walls as a **caustic** — a focused bright pattern for glass, a **wavelength-ordered

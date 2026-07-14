@@ -86,6 +86,7 @@ struct EmitJob
     float LX, LY, LZ; uint PhotonBase;            // light position + first global photon index
     float BMinX, BMinY, BMinZ; uint PhotonCount;  // caster bounds min + photons in this job
     float BMaxX, BMaxY, BMaxZ; uint Seed;         // caster bounds max + RNG seed
+    float DirX, DirY, DirZ; uint Mode;            // Mode 1 = collimated beam along Dir from a point in [BMin,BMax]
 };
 StructuredBuffer<EmitJob>         EmitJobs      : register(t11);
 RWStructuredBuffer<CausticPhoton> PhotonsOut    : register(u13); // deposited caustic photons (unsorted)
@@ -1805,19 +1806,32 @@ void CausticCS(uint3 tid : SV_DispatchThreadID)
 
     float3 bmin = float3(job.BMinX, job.BMinY, job.BMinZ);
     float3 bmax = float3(job.BMaxX, job.BMaxY, job.BMaxZ);
-    float3 lightPos = float3(job.LX, job.LY, job.LZ);
-    float3 target = bmin + (bmax - bmin) * float3(rx, ry, rz);
-    float3 dir = target - lightPos;
-    float len = length(dir);
-    if (len < 1e-6)
-        return;
-    dir /= len;
+    float3 spot = bmin + (bmax - bmin) * float3(rx, ry, rz);
+
+    float3 origin, dir;
+    if (job.Mode == 1u)
+    {
+        // Collimated beam: parallel rays (fixed Dir) over the cross-section box [BMin,BMax] — a real
+        // beam, so a prism disperses it into a clean wavelength-ordered band (no point-source fan).
+        origin = spot;
+        dir = normalize(float3(job.DirX, job.DirY, job.DirZ));
+    }
+    else
+    {
+        // Point emission: from the light toward a random point in the caster bounds (diverging cone).
+        float3 lightPos = float3(job.LX, job.LY, job.LZ);
+        float3 d = spot - lightPos;
+        float len = length(d);
+        if (len < 1e-6)
+            return;
+        origin = lightPos;
+        dir = d / len;
+    }
 
     uint row = photonIndex % DETERMINISTIC_COUNT;   // matches WavelengthLookup.GetDeterministicWavelength(p)
     float wavelength = DeterXYZ[row].w;
     float power = 1.0 / max(job.PhotonCount, 1u);
 
-    float3 origin = lightPos;
     bool inGlass = false;
     float mediumSigma = 0.0;
     uint specularBounces = 0u;
