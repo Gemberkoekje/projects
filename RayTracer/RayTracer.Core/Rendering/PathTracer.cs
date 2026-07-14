@@ -425,7 +425,8 @@ public partial class JobSystem
             }
         }
 
-        Vector3 toSelected = _lights[chosen].Position - point;
+        // §C1: target a sampled point on the (area) light — its centre for a point light (no RNG drawn).
+        Vector3 toSelected = _lights[chosen].SamplePoint(ref rng) - point;
         float distSq = MathF.Max(Vector3.Dot(toSelected, toSelected), 1e-6f);
         float d = MathF.Sqrt(distSq);
         Vector3 lightDir = toSelected / d;
@@ -610,7 +611,16 @@ public partial class JobSystem
                 Vector3 lightDir;
                 float lightDistSq;
                 float lightCos;
-                _ = SelectLight(ref rngLight, hitPoint, hitNormal, out lightP, out lightDir, out lightDistSq, out lightCos);
+                int chosenLight = SelectLight(ref rngLight, hitPoint, hitNormal, out lightP, out lightDir, out lightDistSq, out lightCos);
+
+                // §C1: retarget the shadow ray to a sampled point on the chosen (area) light so the
+                // visibility softens into a penumbra. A point light (radius 0) draws no RNG and this
+                // recomputes the identical centre direction/distance, so its hard shadow is unchanged.
+                Vector3 lightToSample = _lights[chosenLight].SamplePoint(ref rngLight) - hitPoint;
+                lightDistSq = MathF.Max(Vector3.Dot(lightToSample, lightToSample), 1e-6f);
+                float chosenDist = MathF.Sqrt(lightDistSq);
+                lightDir = lightToSample / chosenDist;
+                lightCos = Vector3.Dot(hitNormal, lightDir);
 
                 if (lightCos > 0f)
                 {
@@ -711,8 +721,7 @@ public partial class JobSystem
                     {
                         rng = rng * 747796405u + 2891336453u;
                         int lightIdx2 = (int)(rng % (uint)_lights.Length);
-                        var light2 = _lights[lightIdx2];
-                        Vector3 toLight2 = light2.Position - secHitPoint;
+                        Vector3 toLight2 = _lights[lightIdx2].SamplePoint(ref rng) - secHitPoint;
                         float distSq2 = Vector3.Dot(toLight2, toLight2);
                         float dist2 = MathF.Sqrt(distSq2);
                         Vector3 lightDir2 = toLight2 / dist2;
@@ -771,8 +780,7 @@ public partial class JobSystem
                             {
                                 rng = rng * 747796405u + 2891336453u;
                                 int lightIdx3 = (int)(rng % (uint)_lights.Length);
-                                var light3 = _lights[lightIdx3];
-                                Vector3 toLight3 = light3.Position - tertHitPoint;
+                                Vector3 toLight3 = _lights[lightIdx3].SamplePoint(ref rng) - tertHitPoint;
                                 float distSq3 = Vector3.Dot(toLight3, toLight3);
                                 float dist3 = MathF.Sqrt(distSq3);
                                 Vector3 lightDir3 = toLight3 / dist3;

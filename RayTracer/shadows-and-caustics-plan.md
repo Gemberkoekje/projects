@@ -465,6 +465,19 @@ photons aimed at caster AABBs keeps the photon budget small.
 
 ## Phase C — Supporting: area lights & soft shadows (recommended, unblocks "soft"/"vague")
 
+> **Status: C1 (CPU) implemented & tested.** `Light` gained a `Radius` and a `SamplePoint(ref rng)`:
+> radius 0 is an ideal point light that returns the centre and **draws no RNG**, so its hard shadow
+> and the whole random stream are byte-identical to before (all pre-existing tests still pass); a
+> positive radius returns a uniform point on the light's sphere. `PathTracer` calls it at all four NEE
+> shadow sites (`DirectTermAt`, the primary `SelectLight` site, and the secondary/tertiary bounces),
+> so each sample targets a different point on an area light and the accumulated visibility (via the
+> Phase A transmittance shadow ray) softens into a penumbra. New `SoftShadowTests` pin the sampler
+> (centre + no-RNG for radius 0; on-sphere for radius R) and the visibility-averaging through a real
+> BVH occluder (fully dark behind a point light; fractional, widening penumbra as the radius grows).
+> **Remaining:** the GPU-reference + HLSL port of C1 in lockstep (thread a per-sample light point
+> through `PackedLights`/`SelectLight`; maze lights are radius 0 so goldens stay bit-exact), and **C2**
+> (directional / sun light).
+
 The "something's missing" feeling is partly that **every** shadow is a razor-sharp point-light
 shadow. Soft shadows are cheap relative to Phase B and make fog/bubble shadows read as physical.
 
