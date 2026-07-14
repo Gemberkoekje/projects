@@ -305,9 +305,9 @@ path, gate the fog integral behind `ShadowStepInterval`, and cap transmitter cha
 > (`albedo/π · strength`) before the shared correction so the resolve's fog composites it like any
 > surface. `Phase6Renderer` grew the two SRVs (dummy when off), two root params, the cbuffer grid
 > params, and `SetCausticGrid(grid, radius, strength)` which uploads the flattened grid (each photon's
-> wavelength baked to its `DeterXYZ` row). Photon *tracing* runs CPU-side for now (the tested
-> `PhotonTracer` against a CPU `BVH`), feeding the GPU gather — the first cut of the port; the grid +
-> gather contract is fixed, so the forward trace can later move to a compute pass. The new
+> wavelength baked to its `DeterXYZ` row). Photon *tracing* was CPU-side in this first cut (the tested
+> `PhotonTracer` against a CPU `BVH`), feeding the GPU gather; the grid + gather contract is fixed, so
+> the forward trace has since moved to a GPU compute pass (see **B4** below). The new
 > **`--caustic-demo`** (dispersive glass sphere over a lit floor) renders a bright focused caustic on
 > the RTX 3070; **`--phase6-selftest` (700/700) and `--phase6-regress` (19 views bit-exact) confirm no
 > regression** with caustics off (`CausticEnabled == 0` → the gather early-outs).
@@ -328,17 +328,49 @@ path, gate the fog integral behind `ShadowStepInterval`, and cap transmitter cha
 > disrupted the live bubble stream via that hitch). Validated on the RTX 3070: `--caustic-maze` (all
 > jewels, **windows in the scene**, no contamination) renders a vivid wavelength-ordered rainbow;
 > `--jewel-demo` shows the crystal plus its floor caustic; `--bubble-maze-demo --caustics` confirms
-> bubbles and jewel caustics render together. Moving the photon trace to a GPU compute pass (below) is
-> what makes it cheap enough to enable by default.
+> bubbles and jewel caustics render together.
+>
+> **B4 — GPU compute photon pass (forward trace on the GPU) — done (hybrid first cut).** The forward
+> photon *tracing* now runs on the GPU against the **live TLAS**, so no separate CPU `BVH` is built and
+> the trace is hardware-accelerated + massively parallel. `PathTracePhase6.hlsl` gained a `CausticCS`
+> compute entry — the GPU twin of `PhotonTracer.TracePhoton`: one thread per photon emits toward its
+> caster's bounds and forward-traces through the specular surfaces (mirror / bubble thin-shell /
+> dielectric with Cauchy dispersion + Beer–Lambert), reusing the same closest-hit and `Optics` helpers
+> as the eye path (a reveal-free `TraceClosestNoReveal`), and appends caustic deposits to a UAV via an
+> atomic counter. `Phase6Renderer.TracePhotonsGpu(jobs, …)` dispatches it (one `EmitJob` per caster,
+> the twin of a per-caster `EmitInto`), reads the deposits back once, and returns a `PhotonMap` — so
+> the existing `BuildGrid` + gather run unchanged. This first cut kept a single photon readback + CPU
+> grid build per map, since superseded by the full-GPU pipeline below.
+>
+> **B4 — full GPU pipeline (trace **and** bin on the GPU, no readback) — done.** The photon map now
+> lives entirely on the GPU: `Phase6Renderer.BuildCausticsGpu(jobs, radius, strength)` runs the whole
+> build in one submission with **no CPU readback**, so a moving caster's per-frame rebuild costs no
+> stall. The binning avoids a GPU prefix-sum by using a **per-cell singly-linked list**:
+> 1. `CausticCS` emits + forward-traces + deposits (as before), and additionally grows the photons'
+>    cell **bounding box** by atomic `InterlockedMin/Max` into a `Bbox` buffer.
+> 2. `CausticParamsCS` (1 thread) turns the bbox + deposited count into the grid origin/dims in a
+>    `GridParams` buffer (the GPU twin of the head of `PhotonMap.BuildGrid`).
+> 3. `CausticClearHeadCS` resets the per-cell heads to empty.
+> 4. `CausticLinkCS` threads each photon onto its cell's list via `InterlockedExchange` on the head
+>    (order-independent — the gather sums the whole list).
+>
+> The render trace's `TraceCausticEstimate` reads the photon store + `PhotonNext`/`CellHead` lists +
+> `GridParams` directly (as read UAVs, no re-upload), walking each neighbour cell's list. The gather
+> math is the same constant kernel `CausticReference`/`PhotonMap.EstimateXyz` pin — only the storage
+> differs (linked list vs sorted ranges) — so the CI parity test still validates the estimate. Every
+> caustic entry point uses `BuildCausticsGpu` (`--caustic-demo`, `--move`, `--jewel-demo`,
+> `--caustic-maze`, product `RunPhase6Windowed`); the CPU `PhotonTracer`/`PhotonMap`/`CausticReference`
+> + their tests stay for CI. Validated on the RTX 3070: full-GPU output is **bit-identical** to the
+> hybrid on `--caustic-demo` (mean |Δ| 0.00, max 0) and within max 1/255 on `--caustic-maze`
+> (2.25 M-cell grid), `--jewel-demo`, and `--caustic-demo --move` (per-frame GPU rebuild, TDR-free,
+> tracks the sphere); `--phase6-selftest` (700/700) and `--phase6-regress` (19 bit-exact) still pass
+> (the pass is never dispatched when caustics are off), and `dotnet test` (279) is green. The product's
+> jewel-caustic build no longer touches the CPU at all, so the "Jewel caustics" toggle is cheap enough
+> to default on (kept opt-in here as a separate product decision).
 >
 > **Remaining (not yet done):**
 > 1. **B2/B3 aesthetic tuning** — a dedicated "Prism Caustics" scene (collimated beam + prism) for the
 >    cleanest *wavelength-ordered* rainbow band, and the drifting-bubble iridescent ring.
-> 2. **B4 perf — GPU compute photon pass.** The forward photon *tracing* is CPU-side today (fine for
->    stills/static casters, ~per-frame CPU work for movers). Moving it to a compute pass (emit + forward
->    `RayQuery` trace against the live TLAS + deposit) would make real-time moving caustics free and let
->    the maze bubbles cast caustics in the product. The grid + gather contract (`CausticReference`,
->    CI-pinned) is already fixed, so this is a self-contained transport swap behind the same interface.
 
 **Goal:** light that refracts through a jewel/window or reflects off a bubble film should land on
 the floor/walls as a **caustic** — a focused bright pattern for glass, a **wavelength-ordered

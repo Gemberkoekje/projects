@@ -941,14 +941,14 @@ internal static class Program
         if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
 
         // Caustics (§B4): OPT-IN. When enabled, build a static photon grid from the maze's jewels so
-        // they cast a caustic on the floor below (rebuilt on each regeneration). Off by default because
-        // the forward photon trace is a CPU pass that briefly hitches startup and each regeneration
-        // (the GPU compute-pass port removes that) — so the default app is unchanged. Also skipped in
-        // Classic (unlit) mode, where an additive caustic on a fullbright scene has nothing to land on.
+        // they cast a caustic on the floor below (rebuilt on each regeneration). The forward photon
+        // trace now runs on the GPU compute pass (against the live TLAS), so the old CPU-trace startup /
+        // regeneration hitch is gone — the toggle stays opt-in for now, but the pass is cheap enough to
+        // default on. Skipped in Classic (unlit) mode, where an additive caustic has nothing to land on.
         void UpdateCaustics()
         {
             if (classic || !jewelCaustics) return;
-            renderer.SetCausticGrid(BuildJewelCausticGrid(built, jewelOpts, 0.10f, totalPhotons: 200_000), 0.10f, 22f);
+            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f);
         }
         UpdateCaustics();
 
@@ -1581,9 +1581,6 @@ internal static class Program
             extraLights: extraLights, wallThickness: 0.12f);
 
         const float gatherRadius = 0.10f;
-        CausticGrid grid = BuildJewelCausticGrid(built, jewels, gatherRadius, photons);
-        Console.WriteLine($"  jewel caustic photons deposited: {grid.Photons.Length}, grid {grid.DimX}x{grid.DimY}x{grid.DimZ}");
-
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
@@ -1591,7 +1588,7 @@ internal static class Program
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
-        renderer.SetCausticGrid(grid, gatherRadius, strength);
+        renderer.BuildCausticsGpu(JewelCausticJobs(built, jewels, photons), gatherRadius, strength); // §B4 full GPU
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         for (int f = 0; f < frames; f++)
@@ -1604,40 +1601,37 @@ internal static class Program
     }
 
     /// <summary>
-    /// Builds one static caustic photon grid covering <b>every</b> floating jewel in the scene
-    /// (shadows-and-caustics-plan §B4) — the shared path used by the product and the maze demo. For each
-    /// jewel, forward photons are shot from a synthetic light just under the ceiling above it (used only
-    /// as an emission origin, not added to the scene) through the jewel and onto the floor, merged into
-    /// one map via <see cref="PhotonTracer.EmitInto"/>. Each jewel's target box is its known
-    /// cube-on-corner AABB (<c>center ± ScaleFrac·CellSize·√3</c>), so scene window glass — also
-    /// dielectric — is never mistaken for jewel geometry. Returns an empty grid when there are no jewels
-    /// (the shader gather then early-outs). The whole <paramref name="totalPhotons"/> budget is split
-    /// across the jewels, so the one-time build cost is bounded no matter how many the maze floats.
+    /// The per-jewel photon-emission jobs for the GPU caustic build (shadows-and-caustics-plan §B4) —
+    /// the shared path used by the product and the maze/jewel demos. One job per floating jewel: a
+    /// synthetic overhead light just under the ceiling above it (an emission origin, not scene geometry)
+    /// aimed at the jewel's known cube-on-corner AABB (<c>center ± ScaleFrac·CellSize·√3</c>), so scene
+    /// window glass — also dielectric — is never mistaken for jewel geometry. Empty when there are no
+    /// jewels (the gather then early-outs). The whole <paramref name="totalPhotons"/> budget is split
+    /// across the jewels, so the build cost is bounded no matter how many the maze floats.
     /// </summary>
-    private static CausticGrid BuildJewelCausticGrid(Phase3Scene built, MazeJewels.Options jewelOpts, float gatherRadius, int totalPhotons)
+    private static List<(Vector3 Light, AABB Bounds, int Photons, uint Seed)> JewelCausticJobs(
+        Phase3Scene built, MazeJewels.Options jewelOpts, int totalPhotons)
     {
         const float cell = MazeGeometryBuilder.CellSize;
         const float wall = MazeGeometryBuilder.WallHeight;
         var centers = new List<Vector3>();
         foreach (var (c, _) in MazeJewels.Placements(built.Maze, jewelOpts))
             centers.Add(c);
+
+        var jobs = new List<(Vector3, AABB, int, uint)>();
         if (centers.Count == 0)
-            return CausticGrid.Empty(gatherRadius);
+            return jobs;
 
         float half = 0.10f * cell * MathF.Sqrt(3f) * 1.1f; // MazeJewels.ScaleFrac (0.10) cube-on-corner reach + margin
         int perJewel = Math.Max(1, totalPhotons / centers.Count);
-
-        var map = new PhotonMap(gatherRadius);
-        var bvh = new BVH([.. built.Tracables]);
         uint seed = 1u;
         foreach (Vector3 c in centers)
         {
             var jb = new AABB(c - new Vector3(half), c + new Vector3(half));
-            var light = new Light { Position = new Vector3(c.X, wall - 0.06f, c.Z), Color = Vector3.One };
-            PhotonTracer.EmitInto(map, [light], bvh, jb, built.Wavelengths, perJewel, seed: seed);
+            jobs.Add((new Vector3(c.X, wall - 0.06f, c.Z), jb, perJewel, seed));
             seed += 0x9E3779B9u;
         }
-        return map.BuildGrid();
+        return jobs;
     }
 
     /// <summary>
@@ -1909,7 +1903,7 @@ internal static class Program
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         if (caustics)
-            renderer.SetCausticGrid(BuildJewelCausticGrid(built, jewels, 0.10f, 200_000), 0.10f, 22f);
+            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewels, 200_000), 0.10f, 22f);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         // A rat that slides across the floor in front of the stream, to show the moving-rat smear too.
@@ -1983,16 +1977,10 @@ internal static class Program
         const float gatherRadius = 0.12f;
         var wl = new WavelengthLookup();
 
-        // Forward photon transport on the CPU (the tested tracer): with the sphere at `x`, emit photons
-        // toward it, land the focused caustic on the floor, and flatten into the GPU grid. Rebuilt each
-        // frame in --move so the caustic tracks the drifting caster (the moving-caster showpiece).
-        CausticGrid GridForSphereAt(float x)
-        {
-            var s = new Sphere(new Vector3(x, sphereY, sphereZ), sphereR, glass);
-            var scn = new Tracable[] { FloorQuad(0f, -6f, 6f, -2f, 9f, floorMat), WallZ(8f, -6f, 6f, 0f, 4f, wallMat), s };
-            var bvh = new BVH(scn);
-            return PhotonTracer.Emit(lightArr, bvh, s.Bounds, wl, photonsPerLight: photons, gatherRadius).BuildGrid();
-        }
+        // The emit job for the sphere at `x`: one caster (light → sphere bounds), the GPU twin of a
+        // per-caster PhotonTracer.EmitInto. BuildCausticsGpu traces + bins it entirely on the GPU.
+        (Vector3, AABB, int, uint)[] JobsForSphereAt(float x) =>
+            [(lightArr[0].Position, new Sphere(new Vector3(x, sphereY, sphereZ), sphereR, glass).Bounds, photons, 1u)];
 
         // The GPU scene: floor + wall + one (procedural) sphere, moved each frame via UpdateSpheres.
         var packScene = new List<Tracable>
@@ -2024,22 +2012,20 @@ internal static class Program
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
+        Console.WriteLine("  photon transport: full GPU pipeline (§B4 — trace + bin, no readback)");
 
         if (!move)
         {
-            CausticGrid grid = GridForSphereAt(0f);
-            Console.WriteLine($"  caustic photons deposited: {grid.Photons.Length}, grid {grid.DimX}x{grid.DimY}x{grid.DimZ}");
-            renderer.SetCausticGrid(grid, gatherRadius, strength);
+            renderer.BuildCausticsGpu(JobsForSphereAt(0f), gatherRadius, strength);
             for (int f = 0; f < frames; f++)
                 renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
         }
         else
         {
-            // The sphere slides across the first half (each frame: rebuild the CPU photon map at its new
-            // position + UpdateSpheres so the GPU sphere follows + SetCausticGrid), then holds so the
-            // final position converges to a clean still — proving the caustic is rebuilt per frame and
-            // tracks the caster. Photon tracing here is CPU-side; a compute pass over the same grid
-            // contract is the next step for real-time movers.
+            // The sphere slides across the first half (each frame: UpdateSpheres so the GPU sphere
+            // follows + BuildCausticsGpu rebuilds the whole photon map on the GPU at its new position),
+            // then holds so the final position converges to a clean still — proving the caustic is
+            // rebuilt per frame with no readback and tracks the caster.
             int moveFrames = Math.Max(1, frames / 2);
             var centers = new Vector3[1];
             var radii = new[] { sphereR };
@@ -2049,11 +2035,11 @@ internal static class Program
                 float x = float.Lerp(-1.6f, 1.6f, t);
                 centers[0] = new Vector3(x, sphereY, sphereZ);
                 renderer.UpdateSpheres(centers, radii);
-                renderer.SetCausticGrid(GridForSphereAt(x), gatherRadius, strength);
+                renderer.BuildCausticsGpu(JobsForSphereAt(x), gatherRadius, strength);
                 bool moving = f < moveFrames; // hold + converge the final position for a clean capture
                 renderer.RenderHeadlessFrame(reset: f == 0, moving: moving);
             }
-            Console.WriteLine("  moving caster: caustic rebuilt per frame, tracks the sphere");
+            Console.WriteLine("  moving caster: caustic rebuilt per frame on the GPU, tracks the sphere");
         }
 
         byte[] rgba = renderer.ReadbackOutput();
@@ -2385,8 +2371,9 @@ internal static class Program
         renderer.SetCamera(camera);
 
         // Caustics (§B4): trace forward photons from the overhead light through this jewel onto the
-        // floor. The jewel-demo scene has no windows, so every dielectric primitive near the jewel is
-        // one of its faces — union them into its bounds and aim the tested CPU tracer at it.
+        // floor on the GPU (against the live TLAS). The jewel-demo scene has no windows, so every
+        // dielectric primitive near the jewel is one of its faces — union them into its bounds and aim
+        // the GPU photon pass at it.
         if (causticLight is Light cl)
         {
             AABB jb = default; bool have = false;
@@ -2400,12 +2387,10 @@ internal static class Program
             if (have)
             {
                 const float gr = 0.10f;
-                var bvh = new BVH([.. built.Tracables]);
-                PhotonMap map = PhotonTracer.Emit([cl], bvh, jb, built.Wavelengths, photonsPerLight: 400000, gr);
-                Console.WriteLine($"  jewel caustic photons deposited: {map.Count}");
-                renderer.SetCausticGrid(map.BuildGrid(), gr, 22f);
+                renderer.BuildCausticsGpu([(cl.Position, jb, 400000, 1u)], gr, 22f);
             }
         }
+
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         for (int f = 0; f < frames; f++)

@@ -129,14 +129,11 @@ internal sealed class Phase6Renderer : IDisposable
     private GpuSphere[] _sphereData = [];
     private ID3D12Resource _deterXyzBuffer = null!;
     private ID3D12Resource _materialReflectanceBuffer = null!;
-    // Caustic photon grid (shadows-and-caustics-plan §B4): the flattened PhotonMap uploaded as a photon
-    // SRV (t9) + a per-cell (start,count) SRV (t10). A 1-element dummy binds when caustics are off, so
-    // the trace root signature stays valid and the shader's gather early-outs (CausticEnabled == 0).
-    private ID3D12Resource _causticPhotonBuffer = null!;
-    private ID3D12Resource _causticCellBuffer = null!;
+    // Caustics (shadows-and-caustics-plan §B4): the whole photon map lives on the GPU — the gather
+    // reads the photon store + per-cell linked list + grid params the compute passes build, so nothing
+    // is uploaded/read back per frame. These scalars stay CPU-known (cbuffer): the gather radius/cell
+    // size, the composite strength, and whether caustics are on at all.
     private bool _causticEnabled;
-    private (int X, int Y, int Z) _causticMinCell;
-    private (uint X, uint Y, uint Z) _causticDim = (1u, 1u, 1u);
     private float _causticCellSize = 1f;
     private float _causticRadius = 1f;
     private float _causticStrength = 1f;
@@ -145,9 +142,28 @@ internal sealed class Phase6Renderer : IDisposable
     // instead of hard black ones. False for glass-free mazes → the shadow ray keeps the pure
     // accept-first-hit fast path and stays byte-identical (selftest / regress carry no glass).
     private bool _shadowTransmitTriangles;
-    // Maps a deterministic wavelength (nm) to its DeterXYZ row, so an uploaded photon carries the row
-    // the shader indexes for XYZ(λ). Built in CreateCausticResources from the spectral tables.
-    private readonly Dictionary<int, uint> _deterWavelengthRow = [];
+    // §B4 full GPU caustic pipeline: forward trace (CausticCS) + binning (params / clear-heads / link)
+    // all run on the GPU with no readback. The render trace's gather reads PhotonsOut + PhotonNext +
+    // CellHead + GridParams directly (as read UAVs). One shared root signature spans all build passes.
+    private ID3D12RootSignature _causticBuildRootSignature = null!;
+    private ID3D12PipelineState _causticTracePipeline = null!;      // CausticCS: emit + forward trace + deposit
+    private ID3D12PipelineState _causticParamsPipeline = null!;     // CausticParamsCS: bbox → grid origin/dims
+    private ID3D12PipelineState _causticClearHeadPipeline = null!;  // CausticClearHeadCS: reset cell heads to -1
+    private ID3D12PipelineState _causticLinkPipeline = null!;       // CausticLinkCS: thread photons onto cell lists
+    private ID3D12Resource _photonOutBuffer = null!;       // u13: deposited photons (grown to the budget)
+    private ID3D12Resource _photonCounterBuffer = null!;   // u14: atomic append counter (1 uint)
+    private ID3D12Resource _photonNextBuffer = null!;      // u15: per-photon linked-list next
+    private ID3D12Resource _cellHeadBuffer = null!;        // u16: per-cell linked-list head (fixed capacity)
+    private ID3D12Resource _gridParamsBuffer = null!;      // u17: grid origin/dims/count (8 ints)
+    private ID3D12Resource _bboxBuffer = null!;            // u18: atomic photon-cell bbox (6 ints)
+    private ID3D12Resource _photonCounterZero = null!;     // upload {0} to reset the counter per build
+    private ID3D12Resource _bboxInitBuffer = null!;        // upload {INT_MAX×3, INT_MIN×3} to reset the bbox
+    private ID3D12Resource _emitJobBuffer = null!;         // upload: one EmitJob per caster
+    private ID3D12Resource _causticEmitConstantBuffer = null!;
+    private int _photonCapacity;                           // current _photonOutBuffer capacity (photons)
+    // Fixed cell-head capacity: max linear grid cells the binning supports (16 MB int buffer). The maze
+    // caustic grid is ≈ 320×22×320 ≈ 2.25 M cells; a build that would exceed this disables the map.
+    private const int CellHeadCapacity = 4 * 1024 * 1024;
     private ID3D12Resource _lightBuffer = null!;
     private ID3D12Resource _lightColorBuffer = null!;
     // Decal shading (plan §3): RGB→reflectance basis + the prop atlas. Both are static
@@ -309,6 +325,27 @@ internal sealed class Phase6Renderer : IDisposable
         public float NX, NY, NZ;
         public float Power;
         public uint WlRow;
+    }
+
+    // Matches the shader's EmitJob (§B4): one caster's photon-emission job — a light position, the
+    // caster's world bounds, how many photons to shoot, this job's base offset into the global thread
+    // range, and an RNG seed. 48 bytes.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GpuEmitJob
+    {
+        public float LX, LY, LZ; public uint PhotonBase;
+        public float BMinX, BMinY, BMinZ; public uint PhotonCount;
+        public float BMaxX, BMaxY, BMaxZ; public uint Seed;
+    }
+
+    // §B4 caustic-emit cbuffer (b1): job count, photon-buffer capacity, bounce cap, the grid cell size
+    // (= gather radius), and the fixed cell-head capacity.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CausticEmitConstants
+    {
+        public uint EmitJobCount, PhotonCapacity, EmitMaxBounces;
+        public float EmitCellSize;
+        public uint CellHeadCapacity, Pad1, Pad2, Pad3;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -594,70 +631,163 @@ internal sealed class Phase6Renderer : IDisposable
     /// </summary>
     private void CreateCausticResources()
     {
-        _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>([default], Unsafe.SizeOf<GpuCausticPhoton>());
-        _causticCellBuffer = CreateUploadBuffer<uint>([0u, 0u], 2 * sizeof(uint));
         _causticEnabled = false;
 
-        _deterWavelengthRow.Clear();
-        int[] deter = _spectral.DeterWavelengths;
-        for (uint i = 0; i < deter.Length; i++)
-            _deterWavelengthRow[deter[i]] = i;
+        // §B4 full-GPU pipeline resources. Fixed: the atomic counter, the grid-params (8 ints) and
+        // bbox (6 ints) scratch, the cell-head buffer (fixed capacity), and the tiny reset upload
+        // buffers. The per-photon buffers (photons + next) are grown lazily to the emission budget.
+        _photonCounterBuffer = CreateUavBuffer(sizeof(uint), ResourceStates.UnorderedAccess);
+        _gridParamsBuffer = CreateUavBuffer(8 * sizeof(int), ResourceStates.UnorderedAccess);
+        _bboxBuffer = CreateUavBuffer(6 * sizeof(int), ResourceStates.UnorderedAccess);
+        _cellHeadBuffer = CreateUavBuffer((ulong)CellHeadCapacity * sizeof(int), ResourceStates.UnorderedAccess);
+        _photonCounterZero = CreateUploadBuffer<uint>([0u], sizeof(uint));
+        _bboxInitBuffer = CreateUploadBuffer<int>([int.MaxValue, int.MaxValue, int.MaxValue, int.MinValue, int.MinValue, int.MinValue], 6 * sizeof(int));
+        _causticEmitConstantBuffer = _device.CreateCommittedResource(
+            new HeapProperties(HeapType.Upload), HeapFlags.None,
+            ResourceDescription.Buffer(256), ResourceStates.GenericRead);
+
+        // Dummy 1-element buffers so the fields are always a live resource (grown on first build);
+        // keeps device teardown/reinit from leaving a stale disposed reference to double-dispose.
+        _photonOutBuffer = CreateUavBuffer((ulong)Unsafe.SizeOf<GpuCausticPhoton>(), ResourceStates.UnorderedAccess);
+        _photonNextBuffer = CreateUavBuffer(sizeof(int), ResourceStates.UnorderedAccess);
+        _emitJobBuffer = CreateUploadBuffer<GpuEmitJob>([default], Unsafe.SizeOf<GpuEmitJob>());
+        _photonCapacity = 0;
     }
 
     /// <summary>
-    /// Uploads a flattened caustic photon grid (<see cref="PhotonMap.BuildGrid"/>) so the trace shader
-    /// gathers it at diffuse hits (§B4). Photons carry their wavelength as a DeterXYZ row. Pass an empty
-    /// grid (or never call this) to leave caustics off — the shader then early-outs and the image is
-    /// byte-identical. Safe to call after <see cref="Initialize"/> and again per frame as casters drift.
+    /// §B4 full GPU caustic build: forward-traces the caustic photons for <paramref name="jobs"/> and
+    /// bins them into a per-cell linked list entirely on the GPU (against the live TLAS), with no CPU
+    /// readback. Each job is one caster (light position, world bounds, photon budget, RNG seed) — the
+    /// GPU twin of a per-caster <see cref="PhotonTracer.EmitInto"/>. Five stages run in one submission:
+    /// reset counter/bbox → CausticCS (emit + trace + deposit + atomic bbox) → CausticParamsCS (bbox →
+    /// grid origin/dims) → CausticClearHeadCS (reset cell heads) → CausticLinkCS (thread photons onto
+    /// their cell's list). The render trace's gather then reads those buffers directly. Turns caustics
+    /// on; pass an empty list to leave them off (the gather early-outs and the image is unchanged).
     /// </summary>
-    /// <param name="grid">The flattened photon grid to gather.</param>
-    /// <param name="gatherRadius">Density-estimate radius (typically the grid's cell size).</param>
-    /// <param name="strength">Overall composite multiplier for the caustic irradiance.</param>
-    public void SetCausticGrid(CausticGrid grid, float gatherRadius, float strength)
+    public void BuildCausticsGpu(
+        IReadOnlyList<(Vector3 Light, AABB Bounds, int Photons, uint Seed)> jobs,
+        float gatherRadius, float strength, int maxBounces = 8)
     {
-        ArgumentNullException.ThrowIfNull(grid);
-        if (_device is null) return;
-        WaitForGpu();
-        _causticPhotonBuffer?.Dispose();
-        _causticCellBuffer?.Dispose();
+        ArgumentNullException.ThrowIfNull(jobs);
+        _causticCellSize = gatherRadius;
+        _causticRadius = gatherRadius;
+        _causticStrength = strength;
+        if (_device is null)
+            return;
 
-        if (grid.IsEmpty)
+        // Flatten to EmitJobs with prefix-summed photon bases; total threads = Σ photons = capacity.
+        var emitJobs = new GpuEmitJob[jobs.Count];
+        int total = 0;
+        for (int i = 0; i < jobs.Count; i++)
         {
-            _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>([default], Unsafe.SizeOf<GpuCausticPhoton>());
-            _causticCellBuffer = CreateUploadBuffer<uint>([0u, 0u], 2 * sizeof(uint));
+            (Vector3 light, AABB bounds, int photons, uint seed) = jobs[i];
+            int count = Math.Max(0, photons);
+            emitJobs[i] = new GpuEmitJob
+            {
+                LX = light.X, LY = light.Y, LZ = light.Z, PhotonBase = (uint)total,
+                BMinX = bounds.Min.X, BMinY = bounds.Min.Y, BMinZ = bounds.Min.Z, PhotonCount = (uint)count,
+                BMaxX = bounds.Max.X, BMaxY = bounds.Max.Y, BMaxZ = bounds.Max.Z, Seed = seed == 0u ? 1u : seed,
+            };
+            total += count;
+        }
+        if (jobs.Count == 0 || total == 0)
+        {
             _causticEnabled = false;
             return;
         }
 
-        var photons = new GpuCausticPhoton[grid.Photons.Length];
-        for (int i = 0; i < photons.Length; i++)
+        WaitForGpu();
+
+        // Grow the photon store + linked-list-next buffers to the emission budget (deposits ≤ emitted).
+        if (_photonCapacity < total)
         {
-            Photon p = grid.Photons[i];
-            _deterWavelengthRow.TryGetValue(p.Wavelength, out uint row);
-            photons[i] = new GpuCausticPhoton
-            {
-                PX = p.Position.X, PY = p.Position.Y, PZ = p.Position.Z,
-                NX = p.Normal.X, NY = p.Normal.Y, NZ = p.Normal.Z,
-                Power = p.Power, WlRow = row,
-            };
+            _photonOutBuffer?.Dispose();
+            _photonNextBuffer?.Dispose();
+            _photonOutBuffer = CreateUavBuffer((ulong)total * (ulong)Unsafe.SizeOf<GpuCausticPhoton>(), ResourceStates.UnorderedAccess);
+            _photonNextBuffer = CreateUavBuffer((ulong)total * sizeof(int), ResourceStates.UnorderedAccess);
+            _photonCapacity = total;
         }
 
-        var cells = new uint[grid.CellStart.Length * 2];
-        for (int c = 0; c < grid.CellStart.Length; c++)
-        {
-            cells[c * 2] = (uint)grid.CellStart[c];
-            cells[c * 2 + 1] = (uint)grid.CellCount[c];
-        }
+        _emitJobBuffer?.Dispose();
+        _emitJobBuffer = CreateUploadBuffer<GpuEmitJob>(emitJobs, emitJobs.Length * Unsafe.SizeOf<GpuEmitJob>());
 
-        _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>(photons, photons.Length * Unsafe.SizeOf<GpuCausticPhoton>());
-        _causticCellBuffer = CreateUploadBuffer<uint>(cells, cells.Length * sizeof(uint));
-        _causticMinCell = (grid.MinCellX, grid.MinCellY, grid.MinCellZ);
-        _causticDim = ((uint)grid.DimX, (uint)grid.DimY, (uint)grid.DimZ);
-        _causticCellSize = grid.CellSize;
-        _causticRadius = gatherRadius;
-        _causticStrength = strength;
+        Span<CausticEmitConstants> ec = _causticEmitConstantBuffer.Map<CausticEmitConstants>(0, 1);
+        ec[0] = new CausticEmitConstants
+        {
+            EmitJobCount = (uint)jobs.Count,
+            PhotonCapacity = (uint)_photonCapacity,
+            EmitMaxBounces = (uint)Math.Max(1, maxBounces),
+            EmitCellSize = gatherRadius,
+            CellHeadCapacity = (uint)CellHeadCapacity,
+        };
+        _causticEmitConstantBuffer.Unmap(0);
+
+        _allocator.Reset();
+        _commandList.Reset(_allocator, _causticTracePipeline);
+        _commandList.SetComputeRootSignature(_causticBuildRootSignature);
+
+        // Reset the append counter to 0 and the bbox to ±INF (from the small upload buffers).
+        _commandList.ResourceBarrierTransition(_photonCounterBuffer, ResourceStates.UnorderedAccess, ResourceStates.CopyDest);
+        _commandList.ResourceBarrierTransition(_bboxBuffer, ResourceStates.UnorderedAccess, ResourceStates.CopyDest);
+        _commandList.CopyBufferRegion(_photonCounterBuffer, 0, _photonCounterZero, 0, sizeof(uint));
+        _commandList.CopyBufferRegion(_bboxBuffer, 0, _bboxInitBuffer, 0, 6 * sizeof(int));
+        _commandList.ResourceBarrierTransition(_photonCounterBuffer, ResourceStates.CopyDest, ResourceStates.UnorderedAccess);
+        _commandList.ResourceBarrierTransition(_bboxBuffer, ResourceStates.CopyDest, ResourceStates.UnorderedAccess);
+
+        BindCausticBuild();
+
+        // 1) Emit + forward-trace + deposit (also accumulates the atomic photon-cell bbox).
+        _commandList.SetPipelineState(_causticTracePipeline);
+        _commandList.Dispatch((uint)((total + 63) / 64), 1, 1);
+        _commandList.ResourceBarrierUnorderedAccessView(_photonOutBuffer);
+        _commandList.ResourceBarrierUnorderedAccessView(_photonCounterBuffer);
+        _commandList.ResourceBarrierUnorderedAccessView(_bboxBuffer);
+
+        // 2) bbox + count → grid origin/dims.
+        _commandList.SetPipelineState(_causticParamsPipeline);
+        _commandList.Dispatch(1, 1, 1);
+        _commandList.ResourceBarrierUnorderedAccessView(_gridParamsBuffer);
+
+        // 3) Reset every cell-head to empty (-1).
+        _commandList.SetPipelineState(_causticClearHeadPipeline);
+        _commandList.Dispatch((uint)((CellHeadCapacity + 63) / 64), 1, 1);
+        _commandList.ResourceBarrierUnorderedAccessView(_cellHeadBuffer);
+
+        // 4) Thread each deposited photon onto its cell's linked list.
+        _commandList.SetPipelineState(_causticLinkPipeline);
+        _commandList.Dispatch((uint)((total + 63) / 64), 1, 1);
+        _commandList.ResourceBarrierUnorderedAccessView(_cellHeadBuffer);
+        _commandList.ResourceBarrierUnorderedAccessView(_photonNextBuffer);
+
+        _commandList.Close();
+        _queue.ExecuteCommandList(_commandList);
+        WaitForGpu();
+
         _causticEnabled = true;
     }
+
+    // Binds the shared caustic-build resources; all five stages use a superset root signature so the
+    // bindings are set once per build (each stage's shader references only the subset it needs).
+    private void BindCausticBuild()
+    {
+        _commandList.SetComputeRootShaderResourceView(0, _tlas.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(1, _primitiveBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(2, _deterXyzBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(3, _materialReflectanceBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(4, _rgbBasisBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(5, _decalBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(6, _sphereBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(7, _emitJobBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(8, _photonOutBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(9, _photonCounterBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(10, _photonNextBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(11, _cellHeadBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(12, _gridParamsBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(13, _bboxBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootConstantBufferView(14, _traceConstantBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootConstantBufferView(15, _causticEmitConstantBuffer.GPUVirtualAddress);
+    }
+
 
     private void CreateLightResources()
     {
@@ -733,8 +863,10 @@ internal sealed class Phase6Renderer : IDisposable
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(6, 0), ShaderVisibility.All),   // 19: RgbBasis (t6)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(7, 0), ShaderVisibility.All),   // 20: DecalPixels (t7)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(8, 0), ShaderVisibility.All),   // 21: Spheres (t8, §0.4)
-            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(9, 0), ShaderVisibility.All),   // 22: CausticPhotons (t9, §B4)
-            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(10, 0), ShaderVisibility.All),  // 23: CausticCells (t10, §B4)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(13, 0), ShaderVisibility.All), // 22: PhotonsOut (u13, §B4 gather)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(15, 0), ShaderVisibility.All), // 23: PhotonNext (u15, §B4 gather)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(16, 0), ShaderVisibility.All), // 24: CellHead (u16, §B4 gather)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(17, 0), ShaderVisibility.All), // 25: GridParams (u17, §B4 gather)
         };
         _traceRootSignature = _device.CreateRootSignature(
             new RootSignatureDescription1(RootSignatureFlags.None, traceParams));
@@ -825,6 +957,43 @@ internal sealed class Phase6Renderer : IDisposable
             RootSignature = _pixelateRootSignature,
             ComputeShader = pixelateBytecode,
         });
+
+        // §B4 full-GPU caustic build: one superset root signature shared by all four passes (each shader
+        // references only the subset it needs). Scene SRVs + material/decal tables feed the forward
+        // trace's shared closest-hit + reflectance helpers; EmitJobs (t11) drive emission; the photon
+        // store/counter/next/head/params/bbox UAVs (u13–u18) hold the map; Constants (b0) resolves the
+        // shading helpers and CausticEmitConstants (b1) carries the emit params.
+        var causticBuildParams = new[]
+        {
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(0, 0), ShaderVisibility.All),  // 0: TLAS (t0)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(1, 0), ShaderVisibility.All),  // 1: Primitives (t1)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(2, 0), ShaderVisibility.All),  // 2: DeterXYZ (t2)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(3, 0), ShaderVisibility.All),  // 3: MaterialReflectance (t3)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(6, 0), ShaderVisibility.All),  // 4: RgbBasis (t6)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(7, 0), ShaderVisibility.All),  // 5: DecalPixels (t7)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(8, 0), ShaderVisibility.All),  // 6: Spheres (t8)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(11, 0), ShaderVisibility.All), // 7: EmitJobs (t11)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(13, 0), ShaderVisibility.All),// 8: PhotonsOut (u13)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(14, 0), ShaderVisibility.All),// 9: PhotonCounter (u14)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(15, 0), ShaderVisibility.All),// 10: PhotonNext (u15)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(16, 0), ShaderVisibility.All),// 11: CellHead (u16)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(17, 0), ShaderVisibility.All),// 12: GridParams (u17)
+            new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(18, 0), ShaderVisibility.All),// 13: Bbox (u18)
+            new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(0, 0), ShaderVisibility.All),  // 14: Constants (b0)
+            new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(1, 0), ShaderVisibility.All),  // 15: CausticEmitConstants (b1)
+        };
+        _causticBuildRootSignature = _device.CreateRootSignature(
+            new RootSignatureDescription1(RootSignatureFlags.None, causticBuildParams));
+
+        ID3D12PipelineState CausticPso(string entry) => _device.CreateComputePipelineState(new ComputePipelineStateDescription
+        {
+            RootSignature = _causticBuildRootSignature,
+            ComputeShader = ShaderCompiler.CompileCompute(LoadShaderSource("PathTracePhase6.hlsl"), entry, "PathTracePhase6.hlsl"),
+        });
+        _causticTracePipeline = CausticPso("CausticCS");
+        _causticParamsPipeline = CausticPso("CausticParamsCS");
+        _causticClearHeadPipeline = CausticPso("CausticClearHeadCS");
+        _causticLinkPipeline = CausticPso("CausticLinkCS");
     }
 
     private static string LoadShaderSource(string fileName)
@@ -1203,12 +1372,10 @@ internal sealed class Phase6Renderer : IDisposable
             RatLayer = (uint)DecalLayer.Rat,
             VolShadowTransmittance = _volumetrics.ShadowTransmittance ? 1u : 0u,
             CausticEnabled = _causticEnabled ? 1u : 0u,
-            CausticMinCellX = _causticMinCell.X,
-            CausticMinCellY = _causticMinCell.Y,
-            CausticMinCellZ = _causticMinCell.Z,
-            CausticDimX = _causticDim.X,
-            CausticDimY = _causticDim.Y,
-            CausticDimZ = _causticDim.Z,
+            // §B4 full-GPU: the grid origin/dims now live in the GridParams buffer (built on the GPU),
+            // so these cbuffer slots are unused — kept only to preserve the shared cbuffer layout.
+            CausticMinCellX = 0, CausticMinCellY = 0, CausticMinCellZ = 0,
+            CausticDimX = 0u, CausticDimY = 0u, CausticDimZ = 0u,
             CausticCellSize = _causticCellSize,
             CausticRadius = _causticRadius,
             CausticStrength = _causticStrength,
@@ -1306,8 +1473,10 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.SetComputeRootShaderResourceView(19, _rgbBasisBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(20, _decalBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(21, _sphereBuffer.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(22, _causticPhotonBuffer.GPUVirtualAddress);
-        _commandList.SetComputeRootShaderResourceView(23, _causticCellBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(22, _photonOutBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(23, _photonNextBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(24, _cellHeadBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootUnorderedAccessView(25, _gridParamsBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);
@@ -1667,8 +1836,21 @@ internal sealed class Phase6Renderer : IDisposable
         _reduceRootSignature?.Dispose();
         _statsReadback?.Dispose();
         _statsBuffer?.Dispose();
-        _causticPhotonBuffer?.Dispose();
-        _causticCellBuffer?.Dispose();
+        _causticBuildRootSignature?.Dispose();
+        _causticTracePipeline?.Dispose();
+        _causticParamsPipeline?.Dispose();
+        _causticClearHeadPipeline?.Dispose();
+        _causticLinkPipeline?.Dispose();
+        _photonOutBuffer?.Dispose();
+        _photonCounterBuffer?.Dispose();
+        _photonNextBuffer?.Dispose();
+        _cellHeadBuffer?.Dispose();
+        _gridParamsBuffer?.Dispose();
+        _bboxBuffer?.Dispose();
+        _photonCounterZero?.Dispose();
+        _bboxInitBuffer?.Dispose();
+        _emitJobBuffer?.Dispose();
+        _causticEmitConstantBuffer?.Dispose();
         _mazeGridBuffer?.Dispose();
         _decalBuffer?.Dispose();
         _rgbBasisBuffer?.Dispose();

@@ -73,8 +73,33 @@ StructuredBuffer<SphereInfo> Spheres : register(t8);
 // PhotonMap.BuildGrid and gathered by TraceCausticEstimate (the port of CausticReference.EstimateXyz).
 // A 1-element dummy binds when caustics are off (CausticEnabled == 0), so the gather is never entered.
 struct CausticPhoton { float3 Pos; float3 Normal; float Power; uint WlIndex; }; // WlIndex → DeterXYZ row
-StructuredBuffer<CausticPhoton> CausticPhotons : register(t9);
-StructuredBuffer<uint2>         CausticCells   : register(t10); // per linear cell: (start, count)
+
+// §B4 full GPU caustic pipeline. The forward photon *trace* (CausticCS) and the *binning* both run on
+// the GPU, with no CPU readback: photons are deposited to PhotonsOut with an atomic PhotonCounter,
+// their cell bounding box is accumulated by atomic min/max into Bbox, a 1-thread pass turns that into
+// GridParams (origin cell + dims), and a link pass threads each photon onto its cell's singly-linked
+// list (CellHead → PhotonNext). The gather (TraceCausticEstimate) walks those lists, reading the grid
+// origin/dims from GridParams — so the whole map lives on the GPU and moving casters cost no stall.
+// One EmitJob per caster (matching the CPU PhotonTracer's per-caster EmitInto call).
+struct EmitJob
+{
+    float LX, LY, LZ; uint PhotonBase;            // light position + first global photon index
+    float BMinX, BMinY, BMinZ; uint PhotonCount;  // caster bounds min + photons in this job
+    float BMaxX, BMaxY, BMaxZ; uint Seed;         // caster bounds max + RNG seed
+};
+StructuredBuffer<EmitJob>         EmitJobs      : register(t11);
+RWStructuredBuffer<CausticPhoton> PhotonsOut    : register(u13); // deposited caustic photons (unsorted)
+RWStructuredBuffer<uint>          PhotonCounter : register(u14); // atomic append counter (element 0)
+RWStructuredBuffer<int>           PhotonNext    : register(u15); // per-photon linked-list next (-1 = tail)
+RWStructuredBuffer<int>           CellHead      : register(u16); // per linear cell: head photon index (-1 = empty)
+RWStructuredBuffer<int>           GridParams    : register(u17); // [minCX,minCY,minCZ, dimX,dimY,dimZ, photonCount, cellCount]
+RWStructuredBuffer<int>           Bbox          : register(u18); // [minCX,minCY,minCZ, maxCX,maxCY,maxCZ] (atomic min/max)
+
+cbuffer CausticEmitConstants : register(b1)
+{
+    uint  EmitJobCount; uint PhotonCapacity; uint EmitMaxBounces; float EmitCellSize;
+    uint  CellHeadCapacity; uint _emitPad1; uint _emitPad2; uint _emitPad3;
+};
 
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
@@ -1288,15 +1313,22 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
     return accum;
 }
 
-// Caustic density estimate at a diffuse receiver (shadows-and-caustics-plan §B4): a line-for-line
-// port of CausticReference.EstimateXyz. Gathers the flattened photon grid — the same ±ceil(r/cell)
-// cell scan (clamped to the grid), normal rejection, and Σ power·XYZ(λ)/(π r²) as PhotonMap — so the
-// result matches the CPU map the CI parity test pins. Photons carry their wavelength as a DeterXYZ row
-// (baked at upload), so XYZ(λ) is DeterXYZ[WlIndex]. Returns 0 when caustics are off (dummy grid).
+// Caustic density estimate at a diffuse receiver (shadows-and-caustics-plan §B4): the same
+// constant-kernel gather CausticReference.EstimateXyz / PhotonMap.EstimateXyz compute — the
+// ±ceil(r/cell) cell scan (clamped to the grid), normal rejection, and Σ power·XYZ(λ)/(π r²) — so the
+// result matches the CPU map the CI parity test pins. The storage differs: the full-GPU pipeline keeps
+// each cell's photons on a singly-linked list (CellHead → PhotonNext) rather than a sorted range, and
+// the grid origin/dims come from the GPU-built GridParams buffer (no CPU readback). Photons carry
+// their wavelength as a DeterXYZ row, so XYZ(λ) is DeterXYZ[WlIndex]. Returns 0 when caustics are off.
 float3 TraceCausticEstimate(float3 pos, float3 normal)
 {
     if (CausticEnabled == 0u)
         return float3(0.0, 0.0, 0.0);
+    if (GridParams[6] <= 0)   // no photons deposited
+        return float3(0.0, 0.0, 0.0);
+
+    int minCX = GridParams[0], minCY = GridParams[1], minCZ = GridParams[2];
+    int dimX = GridParams[3], dimY = GridParams[4], dimZ = GridParams[5];
 
     float cellSize = CausticCellSize;
     float radius = CausticRadius;
@@ -1309,27 +1341,29 @@ float3 TraceCausticEstimate(float3 pos, float3 normal)
     float3 sum = float3(0.0, 0.0, 0.0);
     for (int dz = -span; dz <= span; dz++)
     {
-        int gz = cz + dz - CausticMinCellZ;
-        if (gz < 0 || gz >= (int)CausticDimZ) continue;
+        int gz = cz + dz - minCZ;
+        if (gz < 0 || gz >= dimZ) continue;
         for (int dy = -span; dy <= span; dy++)
         {
-            int gy = cy + dy - CausticMinCellY;
-            if (gy < 0 || gy >= (int)CausticDimY) continue;
+            int gy = cy + dy - minCY;
+            if (gy < 0 || gy >= dimY) continue;
             for (int dx = -span; dx <= span; dx++)
             {
-                int gx = cx + dx - CausticMinCellX;
-                if (gx < 0 || gx >= (int)CausticDimX) continue;
+                int gx = cx + dx - minCX;
+                if (gx < 0 || gx >= dimX) continue;
 
-                uint cell = uint(gx) + CausticDimX * (uint(gy) + CausticDimY * uint(gz));
-                uint2 range = CausticCells[cell];
-                uint end = range.x + range.y;
-                for (uint i = range.x; i < end; i++)
+                int cell = gx + dimX * (gy + dimY * gz);
+                int idx = CellHead[cell];
+                [loop] for (int guard = 0; idx >= 0 && guard < 1000000; guard++)
                 {
-                    CausticPhoton ph = CausticPhotons[i];
-                    if (dot(ph.Normal, normal) < 0.5) continue;
-                    float3 d = ph.Pos - pos;
-                    if (dot(d, d) > radiusSq) continue;
-                    sum += DeterXYZ[ph.WlIndex].xyz * ph.Power;
+                    CausticPhoton ph = PhotonsOut[idx];
+                    if (dot(ph.Normal, normal) >= 0.5)
+                    {
+                        float3 d = ph.Pos - pos;
+                        if (dot(d, d) <= radiusSq)
+                            sum += DeterXYZ[ph.WlIndex].xyz * ph.Power;
+                    }
+                    idx = PhotonNext[idx];
                 }
             }
         }
@@ -1691,4 +1725,269 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     if (hit)
         IntegrateVolumetric(CamPos, gHitPoint, dir, VolTime, fogT, fogInscatter);
     FogOut[ix] = float4(fogInscatter * DeterministicCorrection, fogT);
+}
+
+// ── §B4: GPU forward photon trace ─────────────────────────────────────
+// Closest hit for the photon pass: like TraceClosest but with no build-in reveal (the maze is always
+// complete during a caustic build), so opaque triangles keep the hardware fast path and only spheres
+// run the candidate loop. Decouples the pass from the render's RevealHeight.
+bool TraceClosestNoReveal(float3 origin, float3 dir, out PrimitiveInfo prim, out float3 hitPoint)
+{
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = dir;
+    ray.TMin = 1e-4;
+    ray.TMax = 1e4;
+
+    RayQuery<RAY_FLAG_NONE> q;
+    q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    while (q.Proceed())
+    {
+        if (q.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE)
+        {
+            float t;
+            if (IntersectSphere(Spheres[q.CandidatePrimitiveIndex()], origin, dir, q.RayTMin(), t))
+                q.CommitProceduralPrimitiveHit(t);
+        }
+    }
+
+    uint status = q.CommittedStatus();
+    if (status == COMMITTED_TRIANGLE_HIT)
+    {
+        prim = Primitives[q.CommittedPrimitiveIndex() >> 1];
+        hitPoint = origin + dir * q.CommittedRayT();
+        return true;
+    }
+    if (status == COMMITTED_PROCEDURAL_PRIMITIVE_HIT)
+    {
+        hitPoint = origin + dir * q.CommittedRayT();
+        prim = SphereToPrim(Spheres[q.CommittedPrimitiveIndex()], hitPoint);
+        return true;
+    }
+    prim = (PrimitiveInfo)0;
+    hitPoint = float3(0.0, 0.0, 0.0);
+    return false;
+}
+
+// The GPU twin of PhotonTracer.TracePhoton (shadows-and-caustics-plan §B4): one thread emits one
+// photon toward its caster's bounds and forward-traces it through the specular surfaces (mirror /
+// bubble thin-shell / dielectric with dispersion + Beer–Lambert), depositing on the first diffuse
+// receiver reached after ≥1 specular bounce. The refraction / Fresnel / absorption maths reuse the
+// same helpers as the eye-side chain — only the direction of travel differs. Per-thread RNG is
+// independent of the CPU's serial stream (accumulation / TAA average the stochastic noise); the map
+// stays deterministic per build because the seed is fixed.
+[numthreads(64, 1, 1)]
+void CausticCS(uint3 tid : SV_DispatchThreadID)
+{
+    uint gid = tid.x;
+
+    // Which caster (emit job) does this global photon index belong to? Few jobs → linear scan.
+    EmitJob job = (EmitJob)0;
+    bool found = false;
+    [loop] for (uint j = 0; j < EmitJobCount; j++)
+    {
+        EmitJob e = EmitJobs[j];
+        if (gid >= e.PhotonBase && gid < e.PhotonBase + e.PhotonCount) { job = e; found = true; break; }
+    }
+    if (!found)
+        return;
+
+    uint photonIndex = gid - job.PhotonBase;
+
+    // Per-thread deterministic RNG seed (hash of the job seed and global index), then the same LCG
+    // the CPU tracer uses for the emission jitter and Russian-roulette draws.
+    uint rng = job.Seed ^ (gid * 2654435761u);
+    rng ^= rng >> 15; rng *= 2246822519u; rng ^= rng >> 13; rng *= 3266489917u; rng ^= rng >> 16;
+
+    rng = rng * 747796405u + 2891336453u; float rx = rng / 4294967296.0;
+    rng = rng * 747796405u + 2891336453u; float ry = rng / 4294967296.0;
+    rng = rng * 747796405u + 2891336453u; float rz = rng / 4294967296.0;
+
+    float3 bmin = float3(job.BMinX, job.BMinY, job.BMinZ);
+    float3 bmax = float3(job.BMaxX, job.BMaxY, job.BMaxZ);
+    float3 lightPos = float3(job.LX, job.LY, job.LZ);
+    float3 target = bmin + (bmax - bmin) * float3(rx, ry, rz);
+    float3 dir = target - lightPos;
+    float len = length(dir);
+    if (len < 1e-6)
+        return;
+    dir /= len;
+
+    uint row = photonIndex % DETERMINISTIC_COUNT;   // matches WavelengthLookup.GetDeterministicWavelength(p)
+    float wavelength = DeterXYZ[row].w;
+    float power = 1.0 / max(job.PhotonCount, 1u);
+
+    float3 origin = lightPos;
+    bool inGlass = false;
+    float mediumSigma = 0.0;
+    uint specularBounces = 0u;
+
+    [loop] for (uint depth = 0u; depth < EmitMaxBounces; depth++)
+    {
+        PrimitiveInfo prim; float3 hitPoint;
+        if (!TraceClosestNoReveal(origin, dir, prim, hitPoint))
+            return; // escaped the scene
+
+        // Beer–Lambert absorption for the segment just travelled inside a coloured medium.
+        if (mediumSigma > 0.0)
+            power *= exp(-mediumSigma * distance(origin, hitPoint));
+
+        float3 n = FaceNormal(prim, dir);
+
+        if (prim.Surface == SURFACE_MIRROR)
+        {
+            power *= HeroReflectance(prim, dir, hitPoint, row);
+            dir = reflect(dir, n);
+            origin = hitPoint + n * 1e-3;
+            specularBounces++;
+            continue;
+        }
+
+        if (prim.Surface == SURFACE_BUBBLE)
+        {
+            // Thin-shell reflect probability = the specular branch's rReflect (boosted Fresnel ×
+            // base reflectance × thin-film tint, gravity-graded thickness via the sphere normal Y).
+            float cosv = abs(dot(normalize(dir), n));
+            float grav = lerp(1.4, 0.6, (prim.NY + 1.0) * 0.5);
+            float d = prim.CauchyB * grav;
+            float baseR = MaterialReflectance[prim.MatPrimary * DETERMINISTIC_COUNT + row];
+            float film = ThinFilmReflectance(cosv, wavelength, d, prim.Ior);
+            float reflectProb = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosv, 1.0, prim.Ior)) * baseR * film;
+            rng = rng * 747796405u + 2891336453u;
+            if (rng / 4294967296.0 < reflectProb)
+            {
+                dir = reflect(dir, n);
+                origin = hitPoint + n * 1e-3;
+            }
+            else
+            {
+                origin = hitPoint + dir * 1e-3; // transmit straight through the thin shell
+            }
+            specularBounces++;
+            continue;
+        }
+
+        if (prim.Surface == SURFACE_DIELECTRIC)
+        {
+            float um = wavelength * 1e-3;
+            float nIor = prim.Ior + prim.CauchyB / (um * um);
+            float iorFrom = inGlass ? nIor : 1.0;
+            float iorTo   = inGlass ? 1.0 : nIor;
+            float cosv = abs(dot(normalize(dir), n));
+            float fresnel = FresnelDielectric(cosv, iorFrom, iorTo);
+            float3 refr;
+            bool transmits = Refract(dir, n, iorFrom, iorTo, refr);
+            rng = rng * 747796405u + 2891336453u;
+            float u = rng / 4294967296.0;
+            if (!transmits || u < fresnel)
+            {
+                dir = reflect(dir, n);
+                origin = hitPoint + n * 1e-3;
+            }
+            else
+            {
+                dir = refr;
+                origin = hitPoint - n * 1e-3;
+                inGlass = !inGlass;
+                mediumSigma = inGlass ? AbsorptionAt(prim.P0, prim.P1, prim.P2, wavelength) : 0.0;
+            }
+            specularBounces++;
+            continue;
+        }
+
+        // Diffuse / opaque receiver: deposit only after ≥1 specular bounce (else it is ordinary
+        // direct light NEE already accounts for). Append via an atomic bump on the shared counter.
+        if (specularBounces > 0u)
+        {
+            uint idx;
+            InterlockedAdd(PhotonCounter[0], 1u, idx);
+            if (idx < PhotonCapacity)
+            {
+                CausticPhoton ph;
+                ph.Pos = hitPoint;
+                ph.Normal = n;
+                ph.Power = power;
+                ph.WlIndex = row;
+                PhotonsOut[idx] = ph;
+
+                // Grow the photon-cell bounding box (atomic min/max) so CausticParamsCS can size the
+                // grid — the full-GPU replacement for CPU BuildGrid's bbox scan. Same cell key as the
+                // link pass + gather: floor(pos / cellSize).
+                int ccx = (int)floor(hitPoint.x / EmitCellSize);
+                int ccy = (int)floor(hitPoint.y / EmitCellSize);
+                int ccz = (int)floor(hitPoint.z / EmitCellSize);
+                InterlockedMin(Bbox[0], ccx); InterlockedMin(Bbox[1], ccy); InterlockedMin(Bbox[2], ccz);
+                InterlockedMax(Bbox[3], ccx); InterlockedMax(Bbox[4], ccy); InterlockedMax(Bbox[5], ccz);
+            }
+        }
+        return;
+    }
+}
+
+// §B4 full-GPU binning, step 2: turn the atomic photon-cell bounding box (Bbox) + deposited count into
+// the grid origin/dims (GridParams). One thread. The CPU twin is the head of PhotonMap.BuildGrid.
+[numthreads(1, 1, 1)]
+void CausticParamsCS(uint3 tid : SV_DispatchThreadID)
+{
+    int count = min((int)PhotonCounter[0], (int)PhotonCapacity);
+    GridParams[6] = count;
+    if (count <= 0)
+    {
+        GridParams[0] = 0; GridParams[1] = 0; GridParams[2] = 0;
+        GridParams[3] = 0; GridParams[4] = 0; GridParams[5] = 0;
+        GridParams[7] = 0;
+        return;
+    }
+
+    int minX = Bbox[0], minY = Bbox[1], minZ = Bbox[2];
+    int dimX = Bbox[3] - minX + 1, dimY = Bbox[4] - minY + 1, dimZ = Bbox[5] - minZ + 1;
+    int cellCount = dimX * dimY * dimZ;
+    // If the grid would exceed the cell-head capacity, disable the map rather than index out of range
+    // (should not happen with a sane capacity; a loud, safe fallback).
+    if (cellCount <= 0 || cellCount > (int)CellHeadCapacity)
+    {
+        GridParams[6] = 0;
+        return;
+    }
+    GridParams[0] = minX; GridParams[1] = minY; GridParams[2] = minZ;
+    GridParams[3] = dimX; GridParams[4] = dimY; GridParams[5] = dimZ;
+    GridParams[7] = cellCount;
+}
+
+// §B4 full-GPU binning, step 3: reset every cell's linked-list head to empty (-1). Dispatched over the
+// full fixed CellHead capacity (independent of the dynamic grid), so it needs no prior pass.
+[numthreads(64, 1, 1)]
+void CausticClearHeadCS(uint3 tid : SV_DispatchThreadID)
+{
+    if (tid.x < CellHeadCapacity)
+        CellHead[tid.x] = -1;
+}
+
+// §B4 full-GPU binning, step 4: thread each deposited photon onto its cell's singly-linked list via an
+// atomic exchange on the head (order-independent: the gather sums the whole list). The CPU twin is the
+// counting-sort scatter in PhotonMap.BuildGrid; the linked list avoids a GPU prefix-sum entirely.
+[numthreads(64, 1, 1)]
+void CausticLinkCS(uint3 tid : SV_DispatchThreadID)
+{
+    int i = (int)tid.x;
+    if (i >= GridParams[6])
+        return;
+
+    CausticPhoton ph = PhotonsOut[i];
+    int minX = GridParams[0], minY = GridParams[1], minZ = GridParams[2];
+    int dimX = GridParams[3], dimY = GridParams[4], dimZ = GridParams[5];
+
+    int gx = (int)floor(ph.Pos.x / EmitCellSize) - minX;
+    int gy = (int)floor(ph.Pos.y / EmitCellSize) - minY;
+    int gz = (int)floor(ph.Pos.z / EmitCellSize) - minZ;
+    if (gx < 0 || gx >= dimX || gy < 0 || gy >= dimY || gz < 0 || gz >= dimZ)
+    {
+        PhotonNext[i] = -1;
+        return;
+    }
+
+    int cell = gx + dimX * (gy + dimY * gz);
+    int old;
+    InterlockedExchange(CellHead[cell], i, old);
+    PhotonNext[i] = old;
 }
