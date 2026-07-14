@@ -37,6 +37,16 @@ public sealed class ShadowTransmittanceTests
         => new("glass", "Glass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
             FlatSpectrum(1.0f), SurfaceKind.Dielectric, cauchyA: 1.5f, cauchyB: 0f);
 
+    // A red-transmitting stained pane: strong σ on green/blue, weak on red (same shape as the
+    // MazeWindows "stain-red" palette), so its shadow should read red — the surviving channel.
+    private static MaterialData RedStainedGlassMat()
+        => new("stain-red", "Glass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            FlatSpectrum(1.0f), SurfaceKind.Dielectric, cauchyA: 1.5f, cauchyB: 0f,
+            absorptionRgb: new Vector3(1.5f, 22f, 28f));
+
+    private static Ray AlongZAt(int wavelength)
+        => new() { Origin = Vector3.Zero, Direction = Vector3.UnitZ, Wavelength = wavelength, Intensity = 1f };
+
     private static Ray AlongZ()
         => new() { Origin = Vector3.Zero, Direction = Vector3.UnitZ, Wavelength = Wavelength, Intensity = 1f };
 
@@ -95,6 +105,33 @@ public sealed class ShadowTransmittanceTests
         float actual = bvh.Transmittance(ray, 100f);
         Assert.AreEqual(expected, actual, 1e-5f, "dielectric transmittance == 1 − Fresnel");
         Assert.IsTrue(actual > 0f && actual < 1f, $"glass casts a soft shadow (T={actual})");
+    }
+
+    [TestMethod]
+    public void Transmittance_StainedGlass_TintsShadowTowardTransmittedHue()
+    {
+        // A red-transmitting pane must let more red than blue through — a red-tinted shadow, not a
+        // uniform grey one — and each channel must equal (1 − Fresnel)·exp(−σ(λ)·d) exactly.
+        var glass = new Sphere(new Vector3(0f, 0f, 5f), 1f, RedStainedGlassMat());
+        var bvh = new BVH([glass]);
+
+        static float Expected(Sphere g, Ray ray)
+        {
+            HitInfo h = g.Intersect(ray).Value;
+            float cos = MathF.Abs(Vector3.Dot(Vector3.Normalize(ray.Direction), h.Normal));
+            return (1f - Optics.FresnelDielectric(cos, 1f, h.Ior))
+                * MathF.Exp(-h.Extinction * Optics.GlassShadowInterfaceThickness);
+        }
+
+        float red = bvh.Transmittance(AlongZAt(630), 100f);
+        float blue = bvh.Transmittance(AlongZAt(465), 100f);
+
+        Assert.AreEqual(Expected(glass, AlongZAt(630)), red, 1e-5f, "red channel = (1 − Fresnel)·exp(−σ·d)");
+        Assert.AreEqual(Expected(glass, AlongZAt(465)), blue, 1e-5f, "blue channel = (1 − Fresnel)·exp(−σ·d)");
+        Assert.IsTrue(red > blue, $"red-transmitting glass casts a red-tinted shadow (T_red={red} > T_blue={blue})");
+        // Absorption dims below the clear-glass Fresnel-only transmittance at the absorbed wavelength.
+        var clear = new BVH([new Sphere(new Vector3(0f, 0f, 5f), 1f, GlassMat())]);
+        Assert.IsTrue(blue < clear.Transmittance(AlongZAt(465), 100f), "stained blue is darker than clear glass");
     }
 
     [TestMethod]

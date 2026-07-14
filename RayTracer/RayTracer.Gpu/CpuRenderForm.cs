@@ -180,7 +180,8 @@ public class RayForm : Form
                 EnableTaa: preset.TemporalBlendAlpha > 0f,
                 SampleClamp: preset.SampleClamp,
                 SmokeMode: preset.SmokeMode,
-                Volumetrics: preset.Volumetrics),
+                Volumetrics: preset.Volumetrics,
+                Caustics: preset.Caustics),
             debugOptions: new DebugOptions());
 
         jobSystem.SetupJobs(CancellationToken.None);

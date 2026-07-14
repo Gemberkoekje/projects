@@ -12,6 +12,14 @@ public interface Tracable
     AABB Bounds { get; }
 
     /// <summary>
+    /// How this primitive interacts with light, exposed without an intersection so the caustic
+    /// pass can enumerate the specular casters (glass/jewels/bubbles) and aim photons at their
+    /// bounds (shadows-and-caustics-plan §B). Defaults to <see cref="SurfaceKind.Diffuse"/>;
+    /// primitives that carry a material override it with their material's surface.
+    /// </summary>
+    SurfaceKind Surface => SurfaceKind.Diffuse;
+
+    /// <summary>
     /// Intersects <paramref name="ray"/> with this primitive, returning the hit
     /// (geometry, shading, and optical channels) or <c>null</c> if the ray misses.
     /// </summary>

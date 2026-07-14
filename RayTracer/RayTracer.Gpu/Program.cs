@@ -54,6 +54,8 @@ internal static class Program
         bool sphereDemo = args.Contains("--sphere-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleDemo = args.Contains("--bubble-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
+        bool causticDemo = args.Contains("--caustic-demo", StringComparer.OrdinalIgnoreCase);
+        bool causticMaze = args.Contains("--caustic-maze", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
@@ -69,7 +71,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
-            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo
+            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo || causticDemo || causticMaze
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -111,7 +113,19 @@ internal static class Program
                 return RunBubbleMazeDemo(maxFrames, savePath ?? "bubble-maze-demo.png", sampleClamp, mazeSeed,
                     ParseFloatOption(args, "--thickness", 440f),
                     drift: args.Contains("--drift", StringComparer.OrdinalIgnoreCase),
-                    showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase));
+                    showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase),
+                    caustics: args.Contains("--caustics", StringComparer.OrdinalIgnoreCase));
+            if (causticDemo)
+                return RunCausticDemo(maxFrames, savePath ?? "caustic-demo.png", sampleClamp,
+                    ParseFloatOption(args, "--cauchyb", 0.03f),
+                    ParseIntOption(args, "--photons", 300000),
+                    ParseFloatOption(args, "--strength", 18f),
+                    move: args.Contains("--move", StringComparer.OrdinalIgnoreCase));
+            if (causticMaze)
+                return RunCausticMazeDemo(maxFrames, savePath ?? "caustic-maze.png", sampleClamp, mazeSeed,
+                    ParseFloatOption(args, "--cauchyb", 0.05f),
+                    ParseIntOption(args, "--photons", 400000),
+                    ParseFloatOption(args, "--strength", 22f));
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -124,7 +138,8 @@ internal static class Program
                     showRat: args.Contains("--rat", StringComparer.OrdinalIgnoreCase),
                     reveal: ParseFloatOption(args, "--reveal", -1f),
                     depthCue: ParseFloatOption(args, "--depthcue", 0f),
-                    pixelate: ParseIntOption(args, "--pixelate", 1));
+                    pixelate: ParseIntOption(args, "--pixelate", 1),
+                    fogShadows: args.Contains("--fog-shadows", StringComparer.OrdinalIgnoreCase));
             if (phase5SelfTest) return RunPhase5SelfTest();
             if (phase5 && savePath is not null)
                 return RunPhase5Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -828,7 +843,7 @@ internal static class Program
         bool biomeIndicator, float fogDrift, Phase5DebugMode debugMode, bool startFullscreen, int mazeSize = 16,
         RenderStyle style = RenderStyle.Enhanced, bool regenerate = false, MazeProps.Options? props = null,
         bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, bool showBuildIn = false,
-        bool showOutro = false, bool classicDepthCue = false, int pixelSize = 1)
+        bool showOutro = false, bool classicDepthCue = false, int pixelSize = 1, bool jewelCaustics = false)
     {
         EnsureAppConfigured();
         // Classic look: unlit fullbright spectral (LightingMode.None) with smoke off —
@@ -837,11 +852,14 @@ internal static class Program
         LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
         // Drifting-bubble placement (§2.6) — same options for the initial build and each regeneration.
         static MazeBubbles.Options BubbleOptions(int seed) => new(Chance: 0.05f, Seed: seed);
+        // Jewel placement is kept in a variable so the §B4 caustic build below can re-derive the jewels'
+        // positions; it is refreshed with the new seed on each regeneration.
+        var jewelOpts = new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed);
         Phase3Scene built = Phase3Scene.Build(width, height, mazeSeed: mazeSeed, mazeSize: mazeSize,
             lightSeed: LightSeedFrom(mazeSeed), props: props,
             mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
             windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed, StainedChance: 0.5f),
-            jewels: new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed),
+            jewels: jewelOpts,
             oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
             bubbles: BubbleOptions(mazeSeed),
             wallThickness: 0.12f);
@@ -921,6 +939,19 @@ internal static class Program
         form.Show();
         renderer.Initialize(form.Handle);
         if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
+
+        // Caustics (§B4): OPT-IN. When enabled, build a static photon grid from the maze's jewels so
+        // they cast a caustic on the floor below (rebuilt on each regeneration). Off by default because
+        // the forward photon trace is a CPU pass that briefly hitches startup and each regeneration
+        // (the GPU compute-pass port removes that) — so the default app is unchanged. Also skipped in
+        // Classic (unlit) mode, where an additive caustic on a fullbright scene has nothing to land on.
+        void UpdateCaustics()
+        {
+            if (classic || !jewelCaustics) return;
+            renderer.SetCausticGrid(BuildJewelCausticGrid(built, jewelOpts, 0.10f, totalPhotons: 200_000), 0.10f, 22f);
+        }
+        UpdateCaustics();
+
         if (startFullscreen) SetFullscreen(true);
         UpdateTitle();
 
@@ -961,6 +992,7 @@ internal static class Program
         void Regenerate()
         {
             mazeSeed = Random.Shared.Next();
+            jewelOpts = new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed);
             built = Phase3Scene.Build(renderer.Width, renderer.Height, mazeSeed: mazeSeed,
                 mazeSize: mazeSize, lightSeed: LightSeedFrom(mazeSeed),
                 props: props is null ? null : props with { Seed = mazeSeed },
@@ -968,7 +1000,7 @@ internal static class Program
                 // features were only placed on the first maze).
                 mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: mazeSeed),
                 windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed, StainedChance: 0.5f),
-                jewels: new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed),
+                jewels: jewelOpts,
                 oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
                 bubbles: BubbleOptions(mazeSeed),
                 wallThickness: 0.12f);
@@ -979,6 +1011,7 @@ internal static class Program
             controller.TurnTime = 0.7f;
             renderer.RebuildScene(built.Packed, built.Spectral, built.PackedLights, camera);
             if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
+            UpdateCaustics(); // fresh jewels → rebuild the caustic grid for the new maze
             if (showRat) ratCtrl = built.CreateRatController(out ratCam);
             // Fresh maze → fresh bubble emitters (count/positions differ); resize the animation buffers.
             bubbleOpts = BubbleOptions(mazeSeed);
@@ -1052,8 +1085,9 @@ internal static class Program
                 continue;
             }
 
-            // The rat is a path-traced object, but it self-resets per pixel (hitMask==2 in the shader),
-            // so it stays crisp without forcing whole-frame motion mode — just keep its position current.
+            // The rat is a path-traced object that now accumulates with the same per-pixel sample
+            // budget as the rest of the frame (no special mover reset) — walked slowly so its temporal
+            // smear stays legible. Just keep its position current each frame.
             if (ratCtrl is not null && !holdWalker)
             {
                 ratCtrl.Update(dt, ratCam);
@@ -1064,9 +1098,9 @@ internal static class Program
             renderer.SetFogTime((float)(now * fogDrift));
 
             // Stream the bubbles continuously (§2.6) — a bubble machine keeps firing whether or not the
-            // walker moves. Like the rat they self-reset per pixel (hitMask==3), so the static scene keeps
-            // converging around them (no forced motion mode → far fewer fireflies). Held during the
-            // build-in/outro while the geometry is changing/fading.
+            // walker moves. They accumulate with the same per-pixel budget as the rest of the frame (no
+            // special mover reset), rising slowly (MazeBubbles.Options.Lifetime) so their temporal smear
+            // stays sub-radius. Held during the build-in/outro while the geometry is changing/fading.
             if (bubbleList.Count > 0 && !holdWalker)
             {
                 MazeBubbles.Animate(bubbleList, bubbleOpts, (float)now, bubbleCenters, bubbleRadii);
@@ -1110,17 +1144,20 @@ internal static class Program
         SmokeMode smokeMode, int frames, string savePath, float sampleClamp, int mazeSeed,
         Phase5DebugMode debugMode, float walkSeconds, RenderStyle style, MazeProps.Options? props = null,
         bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, float reveal = -1f,
-        float depthCue = 0f, int pixelate = 1)
+        float depthCue = 0f, int pixelate = 1, bool fogShadows = false)
     {
         if (frames <= 0) frames = 200; // enough samples to converge a clean still
         bool classic = style == RenderStyle.Classic;
         LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
 
         Console.WriteLine($"RayTracer.Gpu — Phase 6 capture (style={style}, props={props is not null}, {frames} frames, " +
-            $"walk {walkSeconds:0.#}s, seed {mazeSeed}) -> {savePath}");
+            $"walk {walkSeconds:0.#}s, seed {mazeSeed}, fogShadows={fogShadows}) -> {savePath}");
         Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed, lightSeed: LightSeedFrom(mazeSeed), props: props);
+        // --fog-shadows bumps to High volumetrics, which turns on ShadowTransmittance (the §A2 fog
+        // self-shadow) + a non-zero ShadowStepInterval so the shafts fall off with depth into the fog
+        // (the GPU analog of the CPU FogShadowDebug preset).
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
-            VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
+            fogShadows ? VolumetricQuality.High : VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
 
         Camera camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
         if (walkSeconds > 0f)
@@ -1474,6 +1511,136 @@ internal static class Program
     }
 
     /// <summary>
+    /// Caustics in the real product scene (shadows-and-caustics-plan §B2/§B4): builds the maze with its
+    /// dispersive floating <see cref="MazeJewels"/> (glass cubes, <c>CauchyB &gt; 0</c>), shoots forward
+    /// photons from a light above the nearest jewel through it, and lands a <b>wavelength-ordered</b>
+    /// caustic on the floor below (via the tested CPU <see cref="PhotonTracer"/> → <see cref="PhotonMap.BuildGrid"/>
+    /// → <see cref="Phase6Renderer.SetCausticGrid"/> gather). Because each photon carries one wavelength
+    /// and the jewel disperses, the caustic fans into colour — the prism rainbow in the maze, a caustic a
+    /// backward path tracer cannot form. Reuses the validated CPU-trace + GPU-gather path (no compute pass).
+    /// </summary>
+    private static int RunCausticMazeDemo(int frames, string savePath, float sampleClamp, int mazeSeed, float cauchyB, int photons, float strength)
+    {
+        if (frames <= 0) frames = 500; // caustics are hero-only + localized → converge hard
+        Console.WriteLine($"RayTracer.Gpu — caustics maze demo ({frames} frames, seed {mazeSeed}, cauchyB {cauchyB}, {photons} photons, strength {strength}) -> {savePath}");
+
+        var jewels = new MazeJewels.Options(Chance: 0.16f, Seed: mazeSeed, CauchyB: cauchyB);
+        Phase3Scene probe = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), jewels: jewels, wallThickness: 0.12f);
+        float eye = probe.EyeHeight;
+        float cs = probe.CellSize;
+        Vector3 startCenter = new(cs * 0.5f, eye, cs * 0.5f);
+
+        Vector3 jewelCenter = default;
+        float best = float.MaxValue;
+        bool found = false;
+        foreach (var (c, _) in MazeJewels.Placements(probe.Maze, jewels))
+        {
+            float d = Vector3.DistanceSquared(new Vector3(c.X, startCenter.Y, c.Z), startCenter);
+            if (d < best) { best = d; jewelCenter = c; found = true; }
+        }
+        if (!found)
+        {
+            Console.WriteLine("  (no jewel found — nothing to demonstrate)");
+            return 1;
+        }
+
+        // A caustic light just under the ceiling directly above the jewel, so photons refract downward
+        // through it to the floor. It must sit BELOW the ceiling (≈ 2·eyeHeight) — a light above the
+        // ceiling would have every photon strike the ceiling (diffuse, 0 specular bounces) and be
+        // discarded before reaching the jewel.
+        var causticLight = new Light { Position = new Vector3(jewelCenter.X, eye * 2f - 0.06f, jewelCenter.Z), Color = Vector3.One };
+        var extraLights = new List<Light> { causticLight };
+
+        // Stand in an adjacent open cell and look down at the floor beneath the jewel (where the caustic
+        // lands); the jewel hovers above the sightline so it doesn't occlude the patch.
+        int gx = (int)MathF.Floor(jewelCenter.X / cs);
+        int gy = (int)MathF.Floor(jewelCenter.Z / cs);
+        Vector3 dir = new(0, 0, -1);
+        if (!probe.Maze.HasWall(gx, gy, Wall.North)) dir = new Vector3(0, 0, -1);
+        else if (!probe.Maze.HasWall(gx, gy, Wall.South)) dir = new Vector3(0, 0, 1);
+        else if (!probe.Maze.HasWall(gx, gy, Wall.West)) dir = new Vector3(-1, 0, 0);
+        else if (!probe.Maze.HasWall(gx, gy, Wall.East)) dir = new Vector3(1, 0, 0);
+
+        Vector3 camPos = new(jewelCenter.X + dir.X * cs * 1.15f, eye * 1.25f, jewelCenter.Z + dir.Z * cs * 1.15f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(jewelCenter.X, 0.05f, jewelCenter.Z), new Vector3(0, 1, 0)),
+            Fov = MathF.PI / 3.5f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        // Include stained-glass windows so the caustic build runs against a scene that ALSO has
+        // dielectric window glass — the shared helper takes each jewel's bounds from its known
+        // cube-on-corner geometry, so a window is never mistaken for jewel geometry.
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed,
+            lightSeed: LightSeedFrom(mazeSeed), jewels: jewels,
+            windows: new MazeWindows.Options(Chance: 0.15f, Seed: mazeSeed, StainedChance: 0.5f),
+            extraLights: extraLights, wallThickness: 0.12f);
+
+        const float gatherRadius = 0.10f;
+        CausticGrid grid = BuildJewelCausticGrid(built, jewels, gatherRadius, photons);
+        Console.WriteLine($"  jewel caustic photons deposited: {grid.Photons.Length}, grid {grid.DimX}x{grid.DimY}x{grid.DimZ}");
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        renderer.SetCausticGrid(grid, gatherRadius, strength);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Builds one static caustic photon grid covering <b>every</b> floating jewel in the scene
+    /// (shadows-and-caustics-plan §B4) — the shared path used by the product and the maze demo. For each
+    /// jewel, forward photons are shot from a synthetic light just under the ceiling above it (used only
+    /// as an emission origin, not added to the scene) through the jewel and onto the floor, merged into
+    /// one map via <see cref="PhotonTracer.EmitInto"/>. Each jewel's target box is its known
+    /// cube-on-corner AABB (<c>center ± ScaleFrac·CellSize·√3</c>), so scene window glass — also
+    /// dielectric — is never mistaken for jewel geometry. Returns an empty grid when there are no jewels
+    /// (the shader gather then early-outs). The whole <paramref name="totalPhotons"/> budget is split
+    /// across the jewels, so the one-time build cost is bounded no matter how many the maze floats.
+    /// </summary>
+    private static CausticGrid BuildJewelCausticGrid(Phase3Scene built, MazeJewels.Options jewelOpts, float gatherRadius, int totalPhotons)
+    {
+        const float cell = MazeGeometryBuilder.CellSize;
+        const float wall = MazeGeometryBuilder.WallHeight;
+        var centers = new List<Vector3>();
+        foreach (var (c, _) in MazeJewels.Placements(built.Maze, jewelOpts))
+            centers.Add(c);
+        if (centers.Count == 0)
+            return CausticGrid.Empty(gatherRadius);
+
+        float half = 0.10f * cell * MathF.Sqrt(3f) * 1.1f; // MazeJewels.ScaleFrac (0.10) cube-on-corner reach + margin
+        int perJewel = Math.Max(1, totalPhotons / centers.Count);
+
+        var map = new PhotonMap(gatherRadius);
+        var bvh = new BVH([.. built.Tracables]);
+        uint seed = 1u;
+        foreach (Vector3 c in centers)
+        {
+            var jb = new AABB(c - new Vector3(half), c + new Vector3(half));
+            var light = new Light { Position = new Vector3(c.X, wall - 0.06f, c.Z), Color = Vector3.One };
+            PhotonTracer.EmitInto(map, [light], bvh, jb, built.Wavelengths, perJewel, seed: seed);
+            seed += 0x9E3779B9u;
+        }
+        return map.BuildGrid();
+    }
+
+    /// <summary>
     /// Headless demo of the maze's iridescent oil puddles (<see cref="MazeOilSlicks"/>,
     /// spectral-effects-plan §2.2): builds the maze with puddles, stands the camera in the
     /// cell of the puddle nearest the start looking down across it at a grazing angle (where
@@ -1644,7 +1811,7 @@ internal static class Program
     /// points, so a correct image proves the per-frame sphere upload + AS refit path.
     /// </summary>
     private static int RunBubbleMazeDemo(int frames, string savePath, float sampleClamp, int mazeSeed, float thicknessNm,
-        bool drift = false, bool showRat = false)
+        bool drift = false, bool showRat = false, bool caustics = false)
     {
         if (frames <= 0) frames = 600; // bubble reflection is hero-only → noisy
         Console.WriteLine($"RayTracer.Gpu — bubble maze demo ({frames} frames, seed {mazeSeed}, thickness {thicknessNm}nm) -> {savePath}");
@@ -1741,6 +1908,8 @@ internal static class Program
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: showRat);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
+        if (caustics)
+            renderer.SetCausticGrid(BuildJewelCausticGrid(built, jewels, 0.10f, 200_000), 0.10f, 22f);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         // A rat that slides across the floor in front of the stream, to show the moving-rat smear too.
@@ -1775,6 +1944,116 @@ internal static class Program
                 renderer.UpdateSpheres(centers, radii);
             for (int f = 0; f < frames; f++)
                 renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        }
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Headless caustics demo (shadows-and-caustics-plan §B4): a dispersive glass sphere over a lit
+    /// floor. The forward <see cref="PhotonTracer"/> (CPU, the tested transport) shoots photons from the
+    /// light toward the sphere; they refract through it and land focused on the floor, and the resulting
+    /// <see cref="PhotonMap"/> is flattened (<see cref="PhotonMap.BuildGrid"/>) and uploaded via
+    /// <see cref="Phase6Renderer.SetCausticGrid"/> so the shipping Phase 6 shader adds the caustic at
+    /// each diffuse hit — a bright, wavelength-tinted focus a backward path tracer cannot form. Converges
+    /// a still and writes a PNG. This is the CPU-trace + GPU-gather first cut of the GPU caustics port;
+    /// the forward tracing later moves to a compute pass over the same grid contract.
+    /// </summary>
+    private static int RunCausticDemo(int frames, string savePath, float sampleClamp, float cauchyB, int photons, float strength, bool move)
+    {
+        if (frames <= 0) frames = 400; // caustics are localized + hero-only → converge a clean still
+        Console.WriteLine($"RayTracer.Gpu — caustics demo ({frames} frames, cauchyB {cauchyB}, {photons} photons, strength {strength}, move {move}) -> {savePath}");
+
+        var floorMat = FlatDiffuse("caustic-floor", 0.35f);
+        var wallMat = FlatDiffuse("caustic-wall", 0.30f);
+        var glass = new MaterialData(
+            "caustic-glass", "CausticGlass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.98f, cauchyA: 1.5f, cauchyB: cauchyB);
+
+        const float sphereY = 1.4f, sphereZ = 3.0f, sphereR = 1.0f;
+        var lights = new List<Light>
+        {
+            new() { Position = new Vector3(0f, 4.5f, sphereZ), Color = Vector3.One }, // above the sphere's travel
+        };
+        Light[] lightArr = [.. lights];
+
+        const float gatherRadius = 0.12f;
+        var wl = new WavelengthLookup();
+
+        // Forward photon transport on the CPU (the tested tracer): with the sphere at `x`, emit photons
+        // toward it, land the focused caustic on the floor, and flatten into the GPU grid. Rebuilt each
+        // frame in --move so the caustic tracks the drifting caster (the moving-caster showpiece).
+        CausticGrid GridForSphereAt(float x)
+        {
+            var s = new Sphere(new Vector3(x, sphereY, sphereZ), sphereR, glass);
+            var scn = new Tracable[] { FloorQuad(0f, -6f, 6f, -2f, 9f, floorMat), WallZ(8f, -6f, 6f, 0f, 4f, wallMat), s };
+            var bvh = new BVH(scn);
+            return PhotonTracer.Emit(lightArr, bvh, s.Bounds, wl, photonsPerLight: photons, gatherRadius).BuildGrid();
+        }
+
+        // The GPU scene: floor + wall + one (procedural) sphere, moved each frame via UpdateSpheres.
+        var packScene = new List<Tracable>
+        {
+            FloorQuad(0f, -6f, 6f, -2f, 9f, floorMat),
+            WallZ(8f, -6f, 6f, 0f, 4f, wallMat),
+            new Sphere(new Vector3(0f, sphereY, sphereZ), sphereR, glass),
+        };
+        PackedScene packed = GpuScenePacker.Pack(packScene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(wl, packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        // Camera above and to the side, angled down at the floor so the sphere never occludes the caustic.
+        Vector3 camPos = new(2.8f, 2.0f, 0.3f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0f, 3.2f), new Vector3(0, 1, 0)),
+            Fov = MathF.PI / 3.2f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        if (!move)
+        {
+            CausticGrid grid = GridForSphereAt(0f);
+            Console.WriteLine($"  caustic photons deposited: {grid.Photons.Length}, grid {grid.DimX}x{grid.DimY}x{grid.DimZ}");
+            renderer.SetCausticGrid(grid, gatherRadius, strength);
+            for (int f = 0; f < frames; f++)
+                renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+        }
+        else
+        {
+            // The sphere slides across the first half (each frame: rebuild the CPU photon map at its new
+            // position + UpdateSpheres so the GPU sphere follows + SetCausticGrid), then holds so the
+            // final position converges to a clean still — proving the caustic is rebuilt per frame and
+            // tracks the caster. Photon tracing here is CPU-side; a compute pass over the same grid
+            // contract is the next step for real-time movers.
+            int moveFrames = Math.Max(1, frames / 2);
+            var centers = new Vector3[1];
+            var radii = new[] { sphereR };
+            for (int f = 0; f < frames; f++)
+            {
+                float t = moveFrames > 1 ? MathF.Min(1f, (float)f / (moveFrames - 1)) : 1f;
+                float x = float.Lerp(-1.6f, 1.6f, t);
+                centers[0] = new Vector3(x, sphereY, sphereZ);
+                renderer.UpdateSpheres(centers, radii);
+                renderer.SetCausticGrid(GridForSphereAt(x), gatherRadius, strength);
+                bool moving = f < moveFrames; // hold + converge the final position for a clean capture
+                renderer.RenderHeadlessFrame(reset: f == 0, moving: moving);
+            }
+            Console.WriteLine("  moving caster: caustic rebuilt per frame, tracks the sphere");
         }
 
         byte[] rgba = renderer.ReadbackOutput();
@@ -2055,6 +2334,7 @@ internal static class Program
 
         Camera camera = probe.Camera;
         var extraLights = new List<Light>();
+        Light? causticLight = null;
         if (found)
         {
             Vector3 worldUp = new(0, 1, 0);
@@ -2069,18 +2349,23 @@ internal static class Program
             else if (!probe.Maze.HasWall(gx, gy, Wall.West)) dir = new Vector3(-1, 0, 0);
             else if (!probe.Maze.HasWall(gx, gy, Wall.East)) dir = new Vector3(1, 0, 0);
 
-            Vector3 pos = new(jewelCenter.X + dir.X * cs * 1.25f, eye, jewelCenter.Z + dir.Z * cs * 1.25f);
+            // Aim between the jewel and the floor beneath it so the caustic patch shares the frame
+            // with the crystal (a touch higher + looking down more than the pure jewel portrait).
+            Vector3 pos = new(jewelCenter.X + dir.X * cs * 1.25f, eye * 1.15f, jewelCenter.Z + dir.Z * cs * 1.25f);
             camera = new Camera
             {
                 Position = pos,
-                Rotation = LookRotation(pos, jewelCenter, worldUp),
-                Fov = MathF.PI / 4.5f,
+                Rotation = LookRotation(pos, new Vector3(jewelCenter.X, jewelCenter.Y - 0.7f, jewelCenter.Z), worldUp),
+                Fov = MathF.PI / 4.0f,
                 Aspect = (float)Width / Height,
                 ImgPlaneZ = 1f,
             };
-            // Back-light behind the jewel (light bending through it → "fire") plus a near fill.
+            // Back-light behind the jewel (light bending through it → "fire") plus a near fill, and a
+            // caustic light just under the ceiling above the jewel that drives the floor caustic (§B4).
             extraLights.Add(new Light { Position = jewelCenter - dir * cs * 0.8f + new Vector3(0, 0.5f, 0), Color = Vector3.One });
             extraLights.Add(new Light { Position = pos + new Vector3(0, 0.8f, 0), Color = Vector3.One });
+            causticLight = new Light { Position = new Vector3(jewelCenter.X, eye * 2f - 0.06f, jewelCenter.Z), Color = Vector3.One };
+            extraLights.Add(causticLight);
         }
         else
         {
@@ -2098,6 +2383,29 @@ internal static class Program
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
+
+        // Caustics (§B4): trace forward photons from the overhead light through this jewel onto the
+        // floor. The jewel-demo scene has no windows, so every dielectric primitive near the jewel is
+        // one of its faces — union them into its bounds and aim the tested CPU tracer at it.
+        if (causticLight is Light cl)
+        {
+            AABB jb = default; bool have = false;
+            foreach (Tracable t in built.Tracables)
+            {
+                if (t.Surface != SurfaceKind.Dielectric) continue;
+                AABB b = t.Bounds; Vector3 bc = (b.Min + b.Max) * 0.5f;
+                if (Vector3.DistanceSquared(new Vector3(bc.X, jewelCenter.Y, bc.Z), jewelCenter) > 1.2f) continue;
+                jb = have ? AABB.Union(jb, b) : b; have = true;
+            }
+            if (have)
+            {
+                const float gr = 0.10f;
+                var bvh = new BVH([.. built.Tracables]);
+                PhotonMap map = PhotonTracer.Emit([cl], bvh, jb, built.Wavelengths, photonsPerLight: 400000, gr);
+                Console.WriteLine($"  jewel caustic photons deposited: {map.Count}");
+                renderer.SetCausticGrid(map.BuildGrid(), gr, 22f);
+            }
+        }
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         for (int f = 0; f < frames; f++)
@@ -2184,7 +2492,8 @@ internal static class Program
             bumpyWalls: settings.BumpyWalls, showOverheadMap: settings.ShowOverheadMap,
             showRat: settings.ShowRat, showBuildIn: settings.MazeBuildInAnim,
             showOutro: settings.MazeOutroAnim, classicDepthCue: settings.ClassicDepthCue,
-            pixelSize: settings.RetroPixelation ? ClassicMode.RetroBlockFor(settings.Height) : 1);
+            pixelSize: settings.RetroPixelation ? ClassicMode.RetroBlockFor(settings.Height) : 1,
+            jewelCaustics: settings.JewelCaustics);
     }
 
     /// <summary>

@@ -859,6 +859,22 @@ public partial class JobSystem
             albedoScalar[ix] = Math.Clamp(reflectance, 0f, 1f);
             normalWorld[ix] = hitNormal;
 
+            // Caustics (shadows-and-caustics-plan §B): add the forward photon map's density estimate
+            // at diffuse receivers — the light→specular→diffuse paths NEE cannot connect. The XYZ
+            // estimate is scaled by the receiver's albedo/π (its diffuse response) and the tunable
+            // strength, then folded into the accumulated radiance and the indirect decomposition. It is
+            // added before the volumetric step, so fog attenuates it, and before the deterministic
+            // correction, so it is normalised spectrally like the direct term. Skipped on specular
+            // hero hits (caustics land on diffuse surfaces) and whenever the map is absent.
+            if (_causticMap is not null && !Optics.IsSpecular(heroSurface))
+            {
+                Vector3 caustic = _causticMap.EstimateXyz(hitPoint, hitNormal, Caustics.GatherRadius, WavelengthLookup)
+                    * (reflectance * Caustics.Strength * (1f / MathF.PI));
+                xyz += caustic;
+                indirectLighting += caustic;
+                bounce2plus += caustic;
+            }
+
             VolumetricSample volume = IntegrateVolumetricSegment(camera.Position, hitPoint, dir);
             xyz = volume.Apply(xyz);
             directLighting *= volume.Transmittance;

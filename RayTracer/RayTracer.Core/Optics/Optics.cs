@@ -42,6 +42,17 @@ public static class Optics
     /// darkens with distance via <c>exp(−σ(λ)·d)</c>. Shared by the CPU, the GPU reference,
     /// and the HLSL shader so the tint matches.
     /// </summary>
+    /// <summary>
+    /// Effective glass path length (world units) a shadow ray accrues per dielectric interface it
+    /// crosses, giving coloured (stained) glass a Beer–Lambert-tinted shadow — <c>exp(−σ(λ)·d)</c> —
+    /// rather than a merely Fresnel-dimmed one (shadows-and-caustics-plan §A). A thin architectural
+    /// pane is two dielectric quads, so a full pane contributes ≈ 2× this, matching the forward
+    /// render's absorption over the pane's in-glass segment so the shadow's hue tracks the pane's
+    /// transmitted colour. Clear glass (σ = 0) yields <c>exp(0) = 1</c>, so clear-only and glass-free
+    /// scenes stay byte-identical. The HLSL twin is <c>GLASS_SHADOW_INTERFACE_THICKNESS</c>.
+    /// </summary>
+    public const float GlassShadowInterfaceThickness = 0.03f;
+
     public static float AbsorptionAt(float sigmaRed, float sigmaGreen, float sigmaBlue, float wavelengthNm)
     {
         const float blue = 465f, green = 532f, red = 630f;

@@ -142,4 +142,64 @@ public sealed class PhotonMap
         (int)MathF.Floor(p.X / _cellSize),
         (int)MathF.Floor(p.Y / _cellSize),
         (int)MathF.Floor(p.Z / _cellSize));
+
+    /// <summary>
+    /// Flattens the dictionary spatial hash into a GPU-uploadable uniform grid (shadows-and-caustics
+    /// plan §B4): the photons sorted into cell order, plus per-cell <c>(start, count)</c> ranges into
+    /// that array, over a bounded box that exactly covers the occupied cells. The cell size and cell
+    /// keys (<c>floor(coord / cellSize)</c>) match this map's own, so a gather over the grid returns
+    /// the identical density estimate — that equivalence is the CPU/GPU contract the caustic compute
+    /// shader is a line-for-line port of, pinned by <c>CausticReference</c> in CI. Cells outside the
+    /// box are empty; a query there sees no photons, exactly as in the sparse hash.
+    /// </summary>
+    public CausticGrid BuildGrid()
+    {
+        if (_photons.Count == 0)
+            return CausticGrid.Empty(_cellSize);
+
+        // Bounding cell range over all photons (absolute floor(coord/cellSize), like CellOf).
+        (int cx0, int cy0, int cz0) = CellOf(_photons[0].Position);
+        int minX = cx0, minY = cy0, minZ = cz0, maxX = cx0, maxY = cy0, maxZ = cz0;
+        for (int i = 1; i < _photons.Count; i++)
+        {
+            (int cx, int cy, int cz) = CellOf(_photons[i].Position);
+            if (cx < minX) minX = cx; else if (cx > maxX) maxX = cx;
+            if (cy < minY) minY = cy; else if (cy > maxY) maxY = cy;
+            if (cz < minZ) minZ = cz; else if (cz > maxZ) maxZ = cz;
+        }
+
+        int dimX = maxX - minX + 1;
+        int dimY = maxY - minY + 1;
+        int dimZ = maxZ - minZ + 1;
+        int cellCount = dimX * dimY * dimZ;
+
+        int Linear(int cx, int cy, int cz) => (cx - minX) + dimX * ((cy - minY) + dimY * (cz - minZ));
+
+        // Counting sort into cell order: first tally per-cell counts, then prefix-sum to starts.
+        var counts = new int[cellCount];
+        for (int i = 0; i < _photons.Count; i++)
+        {
+            (int cx, int cy, int cz) = CellOf(_photons[i].Position);
+            counts[Linear(cx, cy, cz)]++;
+        }
+
+        var starts = new int[cellCount];
+        int running = 0;
+        for (int c = 0; c < cellCount; c++)
+        {
+            starts[c] = running;
+            running += counts[c];
+        }
+
+        var sorted = new Photon[_photons.Count];
+        var cursor = (int[])starts.Clone();
+        for (int i = 0; i < _photons.Count; i++)
+        {
+            Photon ph = _photons[i];
+            (int cx, int cy, int cz) = CellOf(ph.Position);
+            sorted[cursor[Linear(cx, cy, cz)]++] = ph;
+        }
+
+        return new CausticGrid(sorted, starts, counts, minX, minY, minZ, dimX, dimY, dimZ, _cellSize);
+    }
 }

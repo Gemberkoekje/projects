@@ -129,6 +129,25 @@ internal sealed class Phase6Renderer : IDisposable
     private GpuSphere[] _sphereData = [];
     private ID3D12Resource _deterXyzBuffer = null!;
     private ID3D12Resource _materialReflectanceBuffer = null!;
+    // Caustic photon grid (shadows-and-caustics-plan §B4): the flattened PhotonMap uploaded as a photon
+    // SRV (t9) + a per-cell (start,count) SRV (t10). A 1-element dummy binds when caustics are off, so
+    // the trace root signature stays valid and the shader's gather early-outs (CausticEnabled == 0).
+    private ID3D12Resource _causticPhotonBuffer = null!;
+    private ID3D12Resource _causticCellBuffer = null!;
+    private bool _causticEnabled;
+    private (int X, int Y, int Z) _causticMinCell;
+    private (uint X, uint Y, uint Z) _causticDim = (1u, 1u, 1u);
+    private float _causticCellSize = 1f;
+    private float _causticRadius = 1f;
+    private float _causticStrength = 1f;
+    // §A3: true when the scene carries dielectric triangles (glass windows §1.2 / glass jewels), so
+    // TraceTransmittance forces triangles non-opaque and lets glass cast soft Fresnel-dimmed shadows
+    // instead of hard black ones. False for glass-free mazes → the shadow ray keeps the pure
+    // accept-first-hit fast path and stays byte-identical (selftest / regress carry no glass).
+    private bool _shadowTransmitTriangles;
+    // Maps a deterministic wavelength (nm) to its DeterXYZ row, so an uploaded photon carries the row
+    // the shader indexes for XYZ(λ). Built in CreateCausticResources from the spectral tables.
+    private readonly Dictionary<int, uint> _deterWavelengthRow = [];
     private ID3D12Resource _lightBuffer = null!;
     private ID3D12Resource _lightColorBuffer = null!;
     // Decal shading (plan §3): RGB→reflectance basis + the prop atlas. Both are static
@@ -215,6 +234,7 @@ internal sealed class Phase6Renderer : IDisposable
         _width = width;
         _height = height;
         _scene = scene;
+        _shadowTransmitTriangles = HasTransmissiveTriangles(scene);
         _spectral = spectral;
         _lights = lights;
         _lightingMode = lightingMode;
@@ -233,6 +253,17 @@ internal sealed class Phase6Renderer : IDisposable
         _temporalBlendAlpha = temporalBlendAlpha;
         _filterRadius = filterRadius;
         DebugMode = debugMode;
+    }
+
+    // True if any triangle primitive is a dielectric (glass window / jewel) — those are the only
+    // triangles that transmit a shadow ray (mirror / thin-film / diffuse all cast hard shadows,
+    // like BVH.Transmittance's default case). Bubbles are procedural spheres, handled separately.
+    private static bool HasTransmissiveTriangles(PackedScene scene)
+    {
+        foreach (GpuPrimitive p in scene.Primitives)
+            if (p.Surface == (uint)SurfaceKind.Dielectric)
+                return true;
+        return false;
     }
 
     // ── Constant buffer layouts (identical to Phase 5) ────────────────
@@ -258,7 +289,26 @@ internal sealed class Phase6Renderer : IDisposable
         public float RatPosX, RatPosY, RatPosZ; // §8 rat billboard (for reflections)
         public float RatSize;
         public uint ShowRat, RatLayer;
-        public float RPad;
+        public uint VolShadowTransmittance; // §A2 fog self-shadow opt-in (repurposed from RPad)
+        // §B4 caustic photon-grid params (match PathTracePhase6.hlsl + CausticReference).
+        public uint CausticEnabled;
+        public int CausticMinCellX, CausticMinCellY, CausticMinCellZ;
+        public uint CausticDimX, CausticDimY, CausticDimZ;
+        public float CausticCellSize;
+        public float CausticRadius, CausticStrength;
+        public uint ShadowTransmitTriangles; // §A3: glass triangles cast soft shadows (repurposed from CPad0)
+        public float CPad1;
+    }
+
+    // Matches the shader's CausticPhoton (32-byte structured-buffer element): a caustic photon's world
+    // landing point, receiver normal, radiant power, and its DeterXYZ row (baked wavelength → XYZ).
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GpuCausticPhoton
+    {
+        public float PX, PY, PZ;
+        public float NX, NY, NZ;
+        public float Power;
+        public uint WlRow;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -301,6 +351,7 @@ internal sealed class Phase6Renderer : IDisposable
         CreateSpectralResources();
         CreateLightResources();
         CreateDecalResources();
+        CreateCausticResources();
         CreatePipelines();
         BuildAccelerationStructures();
 
@@ -536,6 +587,78 @@ internal sealed class Phase6Renderer : IDisposable
             _spectral.MaterialReflectance, _spectral.MaterialReflectance.Length * sizeof(float));
     }
 
+    /// <summary>
+    /// Creates the caustic photon-grid SRVs (§B4) as 1-element dummies so the trace root signature is
+    /// always bindable; a real grid is uploaded later by <see cref="SetCausticGrid"/>. Also caches the
+    /// deterministic wavelength → DeterXYZ row map used to bake each uploaded photon's XYZ index.
+    /// </summary>
+    private void CreateCausticResources()
+    {
+        _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>([default], Unsafe.SizeOf<GpuCausticPhoton>());
+        _causticCellBuffer = CreateUploadBuffer<uint>([0u, 0u], 2 * sizeof(uint));
+        _causticEnabled = false;
+
+        _deterWavelengthRow.Clear();
+        int[] deter = _spectral.DeterWavelengths;
+        for (uint i = 0; i < deter.Length; i++)
+            _deterWavelengthRow[deter[i]] = i;
+    }
+
+    /// <summary>
+    /// Uploads a flattened caustic photon grid (<see cref="PhotonMap.BuildGrid"/>) so the trace shader
+    /// gathers it at diffuse hits (§B4). Photons carry their wavelength as a DeterXYZ row. Pass an empty
+    /// grid (or never call this) to leave caustics off — the shader then early-outs and the image is
+    /// byte-identical. Safe to call after <see cref="Initialize"/> and again per frame as casters drift.
+    /// </summary>
+    /// <param name="grid">The flattened photon grid to gather.</param>
+    /// <param name="gatherRadius">Density-estimate radius (typically the grid's cell size).</param>
+    /// <param name="strength">Overall composite multiplier for the caustic irradiance.</param>
+    public void SetCausticGrid(CausticGrid grid, float gatherRadius, float strength)
+    {
+        ArgumentNullException.ThrowIfNull(grid);
+        if (_device is null) return;
+        WaitForGpu();
+        _causticPhotonBuffer?.Dispose();
+        _causticCellBuffer?.Dispose();
+
+        if (grid.IsEmpty)
+        {
+            _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>([default], Unsafe.SizeOf<GpuCausticPhoton>());
+            _causticCellBuffer = CreateUploadBuffer<uint>([0u, 0u], 2 * sizeof(uint));
+            _causticEnabled = false;
+            return;
+        }
+
+        var photons = new GpuCausticPhoton[grid.Photons.Length];
+        for (int i = 0; i < photons.Length; i++)
+        {
+            Photon p = grid.Photons[i];
+            _deterWavelengthRow.TryGetValue(p.Wavelength, out uint row);
+            photons[i] = new GpuCausticPhoton
+            {
+                PX = p.Position.X, PY = p.Position.Y, PZ = p.Position.Z,
+                NX = p.Normal.X, NY = p.Normal.Y, NZ = p.Normal.Z,
+                Power = p.Power, WlRow = row,
+            };
+        }
+
+        var cells = new uint[grid.CellStart.Length * 2];
+        for (int c = 0; c < grid.CellStart.Length; c++)
+        {
+            cells[c * 2] = (uint)grid.CellStart[c];
+            cells[c * 2 + 1] = (uint)grid.CellCount[c];
+        }
+
+        _causticPhotonBuffer = CreateUploadBuffer<GpuCausticPhoton>(photons, photons.Length * Unsafe.SizeOf<GpuCausticPhoton>());
+        _causticCellBuffer = CreateUploadBuffer<uint>(cells, cells.Length * sizeof(uint));
+        _causticMinCell = (grid.MinCellX, grid.MinCellY, grid.MinCellZ);
+        _causticDim = ((uint)grid.DimX, (uint)grid.DimY, (uint)grid.DimZ);
+        _causticCellSize = grid.CellSize;
+        _causticRadius = gatherRadius;
+        _causticStrength = strength;
+        _causticEnabled = true;
+    }
+
     private void CreateLightResources()
     {
         float[] data = _lights.Count > 0 ? _lights.Data : new float[4];
@@ -610,6 +733,8 @@ internal sealed class Phase6Renderer : IDisposable
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(6, 0), ShaderVisibility.All),   // 19: RgbBasis (t6)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(7, 0), ShaderVisibility.All),   // 20: DecalPixels (t7)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(8, 0), ShaderVisibility.All),   // 21: Spheres (t8, §0.4)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(9, 0), ShaderVisibility.All),   // 22: CausticPhotons (t9, §B4)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(10, 0), ShaderVisibility.All),  // 23: CausticCells (t10, §B4)
         };
         _traceRootSignature = _device.CreateRootSignature(
             new RootSignatureDescription1(RootSignatureFlags.None, traceParams));
@@ -1076,6 +1201,18 @@ internal sealed class Phase6Renderer : IDisposable
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
             RatLayer = (uint)DecalLayer.Rat,
+            VolShadowTransmittance = _volumetrics.ShadowTransmittance ? 1u : 0u,
+            CausticEnabled = _causticEnabled ? 1u : 0u,
+            CausticMinCellX = _causticMinCell.X,
+            CausticMinCellY = _causticMinCell.Y,
+            CausticMinCellZ = _causticMinCell.Z,
+            CausticDimX = _causticDim.X,
+            CausticDimY = _causticDim.Y,
+            CausticDimZ = _causticDim.Z,
+            CausticCellSize = _causticCellSize,
+            CausticRadius = _causticRadius,
+            CausticStrength = _causticStrength,
+            ShadowTransmitTriangles = _shadowTransmitTriangles ? 1u : 0u,
         };
 
         Span<TraceConstants> dest = _traceConstantBuffer.Map<TraceConstants>(0, 1);
@@ -1169,6 +1306,8 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.SetComputeRootShaderResourceView(19, _rgbBasisBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(20, _decalBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(21, _sphereBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(22, _causticPhotonBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(23, _causticCellBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);
@@ -1411,6 +1550,7 @@ internal sealed class Phase6Renderer : IDisposable
             _vertexBuffer?.Dispose();
 
             _scene = scene;
+            _shadowTransmitTriangles = HasTransmissiveTriangles(scene);
             _spectral = spectral;
             _lights = lights;
             _camera = camera;
@@ -1527,6 +1667,8 @@ internal sealed class Phase6Renderer : IDisposable
         _reduceRootSignature?.Dispose();
         _statsReadback?.Dispose();
         _statsBuffer?.Dispose();
+        _causticPhotonBuffer?.Dispose();
+        _causticCellBuffer?.Dispose();
         _mazeGridBuffer?.Dispose();
         _decalBuffer?.Dispose();
         _rgbBasisBuffer?.Dispose();

@@ -159,7 +159,10 @@ public sealed class BVH
     /// primitive is hit, otherwise the product of the transmitted fractions through
     /// each bubble/glass it passes — a bubble keeps <c>1 − reflectProbability</c>
     /// (thin-film-tinted, via <see cref="Optics.BubbleReflectProbability"/>), a
-    /// dielectric keeps <c>1 − Fresnel</c>. This lets bubbles and glass cast soft,
+    /// dielectric keeps <c>(1 − Fresnel)·exp(−σ(λ)·d)</c> so coloured (stained) glass
+    /// tints the shadow toward its transmitted hue (Beer–Lambert, §2.3, over
+    /// <see cref="Optics.GlassShadowInterfaceThickness"/> per interface) while clear
+    /// glass keeps just the Fresnel dim. This lets bubbles and glass cast soft,
     /// tinted shadows instead of hard black discs (shadows-and-caustics-plan §A).
     /// The result is order-independent because an opaque hit short-circuits to 0.
     /// Refractive bending (caustics) is out of scope here — that is forward
@@ -205,7 +208,11 @@ public sealed class BVH
                                 transmittance *= 1f - Optics.BubbleReflectProbability(cos, h.Ior, h.Reflectance);
                                 break;
                             case SurfaceKind.Dielectric:
-                                transmittance *= 1f - Optics.FresnelDielectric(cos, 1f, h.Ior);
+                                // 1 − Fresnel (the reflected loss) × Beer–Lambert absorption through
+                                // the glass, so coloured (stained) glass casts a shadow tinted toward
+                                // its transmitted hue; clear glass (σ = 0) keeps just the Fresnel dim.
+                                transmittance *= (1f - Optics.FresnelDielectric(cos, 1f, h.Ior))
+                                    * MathF.Exp(-h.Extinction * Optics.GlassShadowInterfaceThickness);
                                 break;
                             default:
                                 // Opaque (diffuse, mirror, oil-slick thin-film, emissive, …) → hard shadow.

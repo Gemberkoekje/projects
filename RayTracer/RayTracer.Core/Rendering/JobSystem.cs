@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using System.Threading.Channels;
 
@@ -194,6 +195,23 @@ public partial class JobSystem
     public VolumetricOptions Volumetrics { get; }
 
     /// <summary>
+    /// Forward caustic transport controls (shadows-and-caustics-plan §B). When
+    /// <see cref="CausticOptions.Enable"/> is set and the scene holds specular casters, a spectral
+    /// photon map is built from the lights toward those casters and its density estimate is added at
+    /// each diffuse hit in <see cref="TraceCore"/>. Disabled by default, so ordinary renders are
+    /// untouched.
+    /// </summary>
+    public CausticOptions Caustics { get; }
+
+    /// <summary>
+    /// The caustic photon map, built once after the BVH from the caster bounds (the CPU scene is
+    /// static, so a single build is stable and folds cleanly into accumulation). <c>null</c> when
+    /// caustics are off, there are no lights, or the scene has no specular casters — in which case the
+    /// composite in <see cref="TraceCore"/> is skipped and output stays byte-identical.
+    /// </summary>
+    private readonly PhotonMap? _causticMap;
+
+    /// <summary>
     /// Controls how surfaces are shaded: <see cref="LightingMode.None"/>
     /// for raw albedo, <see cref="LightingMode.Direct"/> for ambient +
     /// Lambertian without shadows, or <see cref="LightingMode.NEE"/> for
@@ -312,6 +330,7 @@ public partial class JobSystem
             ? VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode)
             : effectiveDenoiseOptions.Volumetrics;
         Volumetrics = effectiveVolumetrics.ForSmokeMode(SmokeMode);
+        Caustics = effectiveDenoiseOptions.Caustics;
 
         _sampleClampVec = new Vector3(SampleClamp);
         _irradianceCache = new DiffuseIrradianceCache(DiffuseCacheCellSize, DiffuseCacheMinSamples);
@@ -326,6 +345,7 @@ public partial class JobSystem
         Scene = scene;
         _bvh = new BVH(scene);
         _lights = lights ?? [];
+        _causticMap = BuildCausticMap();
         Camera = camera;
         int byteCount = stride * height;
         DisplayBuffer = new byte[byteCount];
@@ -372,6 +392,46 @@ public partial class JobSystem
         int tilesX = (width + TileSize - 1) / TileSize;
         int tilesY = (height + TileSize - 1) / TileSize;
         TotalTiles = tilesX * tilesY;
+    }
+
+    /// <summary>
+    /// Builds the caustic photon map from the lights toward every specular caster in the scene
+    /// (shadows-and-caustics-plan §B). Returns <c>null</c> — so the composite is skipped entirely —
+    /// when caustics are disabled, there are no lights, or the scene has no dielectric/bubble casters.
+    /// The total <see cref="CausticOptions.PhotonsPerFrame"/> budget is split across the casters so the
+    /// cost is bounded regardless of how many casters the scene holds. The CPU scene is static (the BVH
+    /// is built once), so a single build is correct; the GPU port rebuilds per frame as bubbles drift.
+    /// </summary>
+    private PhotonMap? BuildCausticMap()
+    {
+        if (!Caustics.Enable || Caustics.PhotonsPerFrame <= 0 || _lights.Length == 0)
+            return null;
+
+        var casterBounds = new List<AABB>();
+        foreach (Tracable prim in Scene)
+        {
+            // Refractive casters throw the focused/dispersed caustics the plan targets (glass windows,
+            // jewels, bubbles). Mirrors are left out for now: a maze wall mirror's bounds would swamp
+            // the photon-aiming target, and the plan scopes caustics to the refractive casters.
+            if (prim.Surface is SurfaceKind.Dielectric or SurfaceKind.Bubble)
+                casterBounds.Add(prim.Bounds);
+        }
+
+        if (casterBounds.Count == 0)
+            return null;
+
+        var map = new PhotonMap(Caustics.GatherRadius);
+        int photonsPerCaster = Math.Max(1, Caustics.PhotonsPerFrame / (casterBounds.Count * _lights.Length));
+        uint seed = 1u;
+        foreach (AABB bounds in casterBounds)
+        {
+            PhotonTracer.EmitInto(
+                map, _lights, _bvh, bounds, WavelengthLookup,
+                photonsPerCaster, Caustics.MaxBounces, seed);
+            seed += 0x9E3779B9u; // decorrelate each caster's photon stream
+        }
+
+        return map;
     }
 
     public void SetupJobs(CancellationToken cancellationToken)

@@ -116,7 +116,7 @@ forward / light-toward-surface direction.
 
 ## Phase A — Transmittance-aware shadow rays (asks 1 & 2)
 
-> **Status: CPU + C# GPU-reference implemented & CI-green.**
+> **Status: CPU + C# GPU-reference + HLSL implemented; CI-green and validated on the RTX 3070 (DXR 1.1).**
 > - **A0** — `BVH.Transmittance` (opaque→0; bubble keeps `1−reflectProb`; glass keeps `1−Fresnel`).
 > - **A1** — NEE wiring via the `PathTracer.ShadowVisibility` helper at all four shadow sites; the
 >   fog shadow term (`JobSystem.SegmentTransmittance` + `VolumetricOptions.ShadowTransmittance`, on
@@ -126,13 +126,59 @@ forward / light-toward-surface direction.
 >   on the CPU (`JobSystem.EstimateInscatterLight`) and the pure-C# reference
 >   (`Phase4Reference.EstimateInscatterLight`); the existing `GpuPhase4Tests` parity test now pins
 >   CPU==reference for it.
+> - **A3 (GPU / HLSL port) — done, including glass triangles.** `PathTracePhase6.hlsl` gained
+>   `TraceTransmittance` (the GPU twin of `BVH.Transmittance`): opaque geometry keeps the hardware
+>   `ACCEPT_FIRST_HIT` fast path and returns exactly 0/1, but bubble/dielectric **spheres** attenuate
+>   (`1−reflectProb` / `1−Fresnel`, the bubble reflect probability computed identically to the specular
+>   branch) and let the ray continue — closing the CPU↔GPU bubble divergence (the old `TraceOccluded`
+>   skipped bubbles, so they cast *no* GPU shadow). Wired at all three surface NEE sites (`heroIdx`
+>   threaded through `UniformLightTerm`/`MirrorDiffuseScalar`). The A2 fog self-shadow is
+>   `InscatterShadowTransmittance` in the shader's `EstimateInscatterLight`, gated by a new
+>   `VolShadowTransmittance` cbuffer flag (from `_volumetrics.ShadowTransmittance`).
+> - **Glass-window / jewel triangles now transmit too** (the former "left for later" divergence is
+>   closed). When the scene carries dielectric **triangles** (glass windows §1.2, glass jewels) the
+>   host sets a `ShadowTransmitTriangles` cbuffer flag (`Phase6Renderer.HasTransmissiveTriangles` scans
+>   the packed primitives once per scene build/rebuild); `TraceTransmittance` then adds
+>   `RAY_FLAG_FORCE_NON_OPAQUE` so glass quads surface as `CANDIDATE_NON_OPAQUE_TRIANGLE` and attenuate
+>   while every other triangle stays an opaque blocker that commits and — via `ACCEPT_FIRST_HIT` — ends
+>   the ray on first hit. **Glass-free mazes never set the flag, so they keep the pure accept-first-hit
+>   fast path and stay byte-identical** (the selftest / regress scenes carry no glass — see validation
+>   below). This is the exact GPU twin of `BVH.Transmittance`'s dielectric case, which already handled
+>   triangles uniformly on the CPU.
+> - **Beer–Lambert-tinted glass shadows.** The dielectric transmittance is now
+>   `(1 − Fresnel)·exp(−σ(λ)·d)` (dispersion via Cauchy `n = A + B/λ²`, absorption σ from the same
+>   R/G/B anchors the specular branch uses), so **stained glass casts a shadow tinted toward its
+>   transmitted hue**, not a merely dimmed grey one — clear glass (σ = 0) is unchanged. The per-interface
+>   path `d` is the shared `Optics.GlassShadowInterfaceThickness` (= HLSL `GLASS_SHADOW_INTERFACE_THICKNESS`,
+>   0.03), so a two-quad pane accrues ≈ the pane's in-glass absorption and the shadow's hue tracks the
+>   pane's transmitted colour. Applied identically on the CPU (`BVH.Transmittance`, one dielectric
+>   `case` covering spheres and triangles) and in both HLSL dielectric branches (sphere + triangle),
+>   keeping CPU/GPU parity exact (`HitInfo.Extinction` == `AbsorptionAt(P0,P1,P2,λ)` by construction).
+>   Pinned by a new CPU unit test (`ShadowTransmittanceTests.Transmittance_StainedGlass_TintsShadowTowardTransmittedHue`).
+> - Sphere/triangle glass shadows are Phase6-only (spheres/windows have no CI reference, like the
+>   other sphere/bubble/window features), so they are validated on the box, not in CI.
 >
-> The full solution builds on Windows and all tests pass; existing renders are byte-identical where
-> no transmitter/fog lies on a shadow ray. **Remaining: A3** — the HLSL port of the A1/A2 terms
-> (`TraceOccluded`→transmittance in `PathTracePhase6.hlsl`, and the fog self-shadow in the shader's
-> `EstimateInscatterLight`). The C# reference already carries the A2 math, so the HLSL is a
-> line-for-line port of it — but it needs the DXR box and can't be exercised in CI, so it is staged
-> separately.
+> Validation on the RTX 3070: **`--phase6-selftest` 700/700 within 8/255** (bit-for-bit unchanged —
+> the plain maze has no spheres and `ShadowTransmittance` is off at Medium, so `TraceTransmittance`
+> equals `TraceOccluded`); **`--phase6-regress` all 19 golden views bit-exact**; `--bubble-maze-demo`
+> renders the bubble stream cleanly (no artifacts); and a new **`--phase6 --fog --fog-shadows`** capture
+> (High volumetrics → `ShadowTransmittance` on, the GPU analog of the CPU **Fog Shadow Debug** preset)
+> shows the fog self-shadowing — bright at the ceiling light, falling off with depth. The CPU/CI build
+> and all `dotnet test` stay green; existing renders are byte-identical where no transmitter/fog lies
+> on a shadow ray.
+>
+> For the glass-triangle work: `--phase6-selftest` **still 700/700 within 8/255** and `--phase6-regress`
+> **all 19 goldens bit-exact** (both scenes are glass-free → the `ShadowTransmitTriangles` flag stays 0
+> → the accept-first-hit fast path is unchanged), confirming the change is inert where there is no
+> glass. A controlled A/B on `--glass-demo --seed 42` (same maze, flag forced off vs on) shows the
+> window glass switch from a **hard black shadow** to a **soft Fresnel-dimmed** one: the room seen
+> through the pane is lit through the glass instead of falling dark, ~38 % of pixels change (all behind
+> or around the glass; glass-free walls/ceiling untouched), and the scene brightens sensibly. A second
+> A/B with **stained** panes (same seed, tinted-shadow on vs hard-shadow off) shows the far room not
+> just brightening but taking on a **coloured** cast — over the window region 83 % of pixels change
+> with a warm-weighted shift (ΔR +10, ΔG +5, ΔB +2), i.e. the transmitted light is tinted, matching the
+> Beer–Lambert `exp(−σ(λ)·d)` term. The full `dotnet test` suite (279) stays green.
+> **Phase A is now complete end-to-end (CPU + reference + HLSL), glass triangles + Beer–Lambert tint included.**
 
 **Goal:** replace the binary occlusion test with a **transmittance** that a shadow ray accumulates
 as it passes through fog and thin dielectrics. Opaque geometry still returns 0; fog returns
@@ -213,27 +259,86 @@ path, gate the fog integral behind `ShadowStepInterval`, and cap transmitter cha
 
 ## Phase B — Caustics: rainbows on the walls (ask 3) ⭐ the big one
 
-> **Status: CPU foundation implemented & CI-green.** Spectral photon mapping (B0) is chosen and its
-> core is built and tested in `RayTracer.Core/Lighting/`:
+> **Status: CPU foundation + render compositing implemented & CI-green.** Spectral photon mapping
+> (B0) is chosen and its core is built and tested in `RayTracer.Core/Lighting/`:
 > - `Photon` — a wavelength-carrying energy packet stored only for light→specular→diffuse paths.
 > - `PhotonMap` — uniform spatial-hash storage + a spectral density estimate
 >   (`Σ power·XYZ(λ) / (π r²)`), with normal rejection and focus diagnostics.
 > - `PhotonTracer` — forward emission toward the caster bounds and forward tracing through the
 >   specular surfaces (dielectric dispersion via the per-wavelength IOR, bubble thin-shell split,
->   mirror, Beer–Lambert), depositing caustic photons. Deterministic RNG.
+>   mirror, Beer–Lambert), depositing caustic photons. Deterministic RNG. `Emit` now delegates to a
+>   reusable `EmitInto(map, …)` so several casters accumulate into one shared map.
 > - `CausticsTests` — map storage/estimate/rejection/scaling; tracer caustic-only invariant,
 >   glass-sphere focus, energy bound, and a dispersion test (blue vs red caustics shift by
 >   wavelength — the prism rainbow in miniature).
 >
+> **Compositing into the render (B1 done, CPU):** the map is now folded into `PathTracer.TraceCore`:
+> - **Caster enumeration** — `Tracable` gained a defaulted `Surface` member (`Diffuse` by default,
+>   overridden by `Plane`/`Sphere` to their material's kind), so `JobSystem` collects the
+>   dielectric/bubble casters and unions their bounds without an intersection.
+> - **Map lifecycle** — the CPU scene/BVH is static, so `JobSystem` builds the map **once** after the
+>   BVH (`BuildCausticMap`), splitting the `CausticOptions.PhotonsPerFrame` budget across the casters
+>   (bounded cost regardless of caster count) via `EmitInto`. Deterministic → it converges cleanly
+>   under the existing accumulation. (The GPU port will rebuild per frame as bubbles drift.)
+> - **Shade-time add** — at each diffuse hit the caustic estimate `EstimateXyz(…)·albedo/π·Strength`
+>   is added to the radiance (and the indirect decomposition) **before** the volumetric step (so fog
+>   attenuates it) and the deterministic correction (so it is normalised like the direct term).
+>   Skipped on specular hits and when the map is absent.
+> - **Knobs** — `CausticOptions { Enable, PhotonsPerFrame, GatherRadius, Strength, MaxBounces }` +
+>   `CausticQuality.FromQuality` (off ≤ Medium, modest High, full Ultra), threaded through
+>   `DenoiseOptions` → `JobSystem` and `RenderPreset` → `CpuRenderForm`. Default **off**; the standard
+>   quality presets keep it off until the GPU port lands (CPU/GPU parity), so no shipped render moves.
+> - **Tests** — composite render (a glass sphere brightens the floor caustic vs off; caustics never
+>   darken a pixel), the byte-identical-with-no-casters guarantee, the quality mapping, `Surface`
+>   enumeration, and `EmitInto` multi-caster merge.
+>
+> **B4 GPU port — implemented & validated on the RTX 3070.** The parity-first bridge is built:
+> `PhotonMap.BuildGrid()` flattens the dictionary hash into a GPU-uploadable **uniform grid** (photons
+> sorted into cell order + per-cell `(start,count)` ranges + origin/dims/cell-size over the photons'
+> bounding box), and `RayTracer.Core/Gpu/CausticReference.EstimateXyz` gathers over it with a fixed
+> loop the shader ports line-for-line. `CausticsTests` pins the grid gather to `PhotonMap.EstimateXyz`
+> bit-for-bit over a real dispersive glass-sphere caustic (dense probe sweep) — CPU/GPU caustic parity
+> testable in CI, like the other `*Reference` replicas.
+>
+> On the GPU: `PathTracePhase6.hlsl` gained `TraceCausticEstimate` (the line-for-line port of the
+> reference gather) over a photon SRV (`t9`) + cell-range SRV (`t10`), added to the diffuse term
+> (`albedo/π · strength`) before the shared correction so the resolve's fog composites it like any
+> surface. `Phase6Renderer` grew the two SRVs (dummy when off), two root params, the cbuffer grid
+> params, and `SetCausticGrid(grid, radius, strength)` which uploads the flattened grid (each photon's
+> wavelength baked to its `DeterXYZ` row). Photon *tracing* runs CPU-side for now (the tested
+> `PhotonTracer` against a CPU `BVH`), feeding the GPU gather — the first cut of the port; the grid +
+> gather contract is fixed, so the forward trace can later move to a compute pass. The new
+> **`--caustic-demo`** (dispersive glass sphere over a lit floor) renders a bright focused caustic on
+> the RTX 3070; **`--phase6-selftest` (700/700) and `--phase6-regress` (19 views bit-exact) confirm no
+> regression** with caustics off (`CausticEnabled == 0` → the gather early-outs).
+>
+> **Per-frame rebuild (moving casters) — done.** `--caustic-demo --move` slides the glass sphere and
+> rebuilds the photon map every frame (`UpdateSpheres` + `SetCausticGrid` from the caster's new
+> position); the caustic **tracks the sphere** across the floor, TDR-free, with dispersive colour
+> fringes at its edges (B2). This is the moving-caster showpiece capability the drifting bubbles need.
+>
+> **Caustics in the product — done, opt-in (off by default).** The shared `Program.BuildJewelCausticGrid`
+> helper builds one static caustic grid covering every floating jewel (forward photons from a synthetic
+> light under the ceiling above each jewel, through it, onto the floor; each jewel's target box is its
+> known cube-on-corner AABB, so scene window glass — also dielectric — is never mistaken for jewel
+> geometry). `RunPhase6Windowed` calls it after `Initialize` and on every `Regenerate` **only when the
+> "Jewel caustics" config toggle is on** (`AppSettings.JewelCaustics`, default false; skipped in
+> Classic/unlit mode). It is off by default because the forward photon trace is a **CPU** pass that
+> hitches startup and each regeneration — leaving the default app unchanged (the on-by-default first cut
+> disrupted the live bubble stream via that hitch). Validated on the RTX 3070: `--caustic-maze` (all
+> jewels, **windows in the scene**, no contamination) renders a vivid wavelength-ordered rainbow;
+> `--jewel-demo` shows the crystal plus its floor caustic; `--bubble-maze-demo --caustics` confirms
+> bubbles and jewel caustics render together. Moving the photon trace to a GPU compute pass (below) is
+> what makes it cheap enough to enable by default.
+>
 > **Remaining (not yet done):**
-> 1. **Composite the map into the render** — build the map per frame from the caster bounds and add
->    the caustic estimate at each diffuse hit in `PathTracer.TraceCore`, folded into accumulation.
->    This needs a way to enumerate the specular casters (e.g. a defaulted `Surface` member on
->    `Tracable`, which today exposes only `Bounds`/`Intersect`) and touches the hot path + the
->    map's per-frame lifecycle (rebuild as the bubbles drift) — a design step, called out here
->    rather than guessed at.
-> 2. **B2/B3 tuning** (prism rainbow on a wall, bubble ring) and **B4 GPU port** (compute-shader
->    photon pass + splat) — the GPU work needs the DXR box.
+> 1. **B2/B3 aesthetic tuning** — a dedicated "Prism Caustics" scene (collimated beam + prism) for the
+>    cleanest *wavelength-ordered* rainbow band, and the drifting-bubble iridescent ring.
+> 2. **B4 perf — GPU compute photon pass.** The forward photon *tracing* is CPU-side today (fine for
+>    stills/static casters, ~per-frame CPU work for movers). Moving it to a compute pass (emit + forward
+>    `RayQuery` trace against the live TLAS + deposit) would make real-time moving caustics free and let
+>    the maze bubbles cast caustics in the product. The grid + gather contract (`CausticReference`,
+>    CI-pinned) is already fixed, so this is a self-contained transport swap behind the same interface.
 
 **Goal:** light that refracts through a jewel/window or reflects off a bubble film should land on
 the floor/walls as a **caustic** — a focused bright pattern for glass, a **wavelength-ordered

@@ -43,13 +43,35 @@ public static class PhotonTracer
         uint seed = 1u,
         int wavelengthOverride = 0)
     {
+        var map = new PhotonMap(gatherRadius);
+        EmitInto(map, lights, bvh, targetBounds, wavelengths, photonsPerLight, maxBounces, seed, wavelengthOverride);
+        return map;
+    }
+
+    /// <summary>
+    /// Emits photons into an <b>existing</b> <paramref name="map"/> instead of allocating a fresh one,
+    /// so a scene with several casters can accumulate one shared caustic map by calling this once per
+    /// caster (each toward its own <paramref name="targetBounds"/>, with a distinct <paramref name="seed"/>).
+    /// Otherwise identical to <see cref="Emit"/>. The map's gather radius is fixed at its construction.
+    /// </summary>
+    public static void EmitInto(
+        PhotonMap map,
+        Light[] lights,
+        BVH bvh,
+        AABB targetBounds,
+        WavelengthLookup wavelengths,
+        int photonsPerLight,
+        int maxBounces = 8,
+        uint seed = 1u,
+        int wavelengthOverride = 0)
+    {
+        System.ArgumentNullException.ThrowIfNull(map);
         System.ArgumentNullException.ThrowIfNull(lights);
         System.ArgumentNullException.ThrowIfNull(bvh);
         System.ArgumentNullException.ThrowIfNull(wavelengths);
 
-        var map = new PhotonMap(gatherRadius);
         if (lights.Length == 0 || photonsPerLight <= 0)
-            return map;
+            return;
 
         Vector3 boundsMin = targetBounds.Min;
         Vector3 boundsSize = targetBounds.Max - targetBounds.Min;
@@ -82,8 +104,6 @@ public static class PhotonTracer
                 TracePhoton(bvh, lightPos, dir, power, wavelength, maxBounces, ref rng, map);
             }
         }
-
-        return map;
     }
 
     /// <summary>

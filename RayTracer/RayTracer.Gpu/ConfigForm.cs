@@ -106,6 +106,11 @@ internal sealed class AppSettings
     public bool ShowOverheadMap { get; set; }
     public bool BumpyWalls { get; set; } = true;
 
+    /// <summary>Jewel caustics (shadows-and-caustics-plan §B4): the floating crystals throw a coloured
+    /// caustic onto the floor. OFF by default — the forward photon map is built on the CPU, which
+    /// briefly hitches startup and every maze regeneration (the GPU compute-pass port removes that).</summary>
+    public bool JewelCaustics { get; set; }
+
     /// <summary>Classic-only depth cue (§1.4): fade corridors toward dark with distance. Off by
     /// default so Classic stays "spectral, just unlit" unless the user opts in.</summary>
     public bool ClassicDepthCue { get; set; }
@@ -178,6 +183,7 @@ internal sealed class AppSettings
         ShowWallSigns = ShowWallSigns,
         ShowOverheadMap = ShowOverheadMap,
         BumpyWalls = BumpyWalls,
+        JewelCaustics = JewelCaustics,
         ClassicDepthCue = ClassicDepthCue,
         RetroPixelation = RetroPixelation,
         MazeBuildInAnim = MazeBuildInAnim,
@@ -298,6 +304,7 @@ internal sealed class ConfigForm : Form
     private readonly CheckBox _outro;
     private readonly CheckBox _depthCue;
     private readonly CheckBox _retro;
+    private readonly CheckBox _jewelCaustics;
 
     // ── CPU controls ──
     private readonly Panel _cpuPanel;
@@ -401,7 +408,7 @@ internal sealed class ConfigForm : Form
             _clampLabel = Row("Firefly clamp");
             y += rowH + 6;
 
-            var propsBox = new GroupBox { Left = 12, Top = y, Width = 388, Height = 158, Text = "Classic props & animations" };
+            var propsBox = new GroupBox { Left = 12, Top = y, Width = 388, Height = 184, Text = "Classic props & animations" };
             _showRat = new CheckBox { Left = 12, Top = 22, Width = 176, Text = "Rat", Checked = Result.ShowRat };
             _showLogo = new CheckBox { Left = 12, Top = 48, Width = 176, Text = "OpenGL logo", Checked = Result.ShowOpenGlLogo };
             _showSigns = new CheckBox { Left = 12, Top = 74, Width = 176, Text = "Wall signs", Checked = Result.ShowWallSigns };
@@ -412,7 +419,8 @@ internal sealed class ConfigForm : Form
             _regen = new CheckBox { Left = 198, Top = 74, Width = 182, Text = "Regenerate on finish", Checked = Result.MazeRegenerate };
             _outro = new CheckBox { Left = 198, Top = 100, Width = 182, Text = "Completion animation", Checked = Result.MazeOutroAnim };
             _retro = new CheckBox { Left = 198, Top = 126, Width = 182, Text = "Retro pixelation", Checked = Result.RetroPixelation };
-            propsBox.Controls.AddRange([_showRat, _showLogo, _showSigns, _showMap, _depthCue, _bumpy, _buildIn, _regen, _outro, _retro]);
+            _jewelCaustics = new CheckBox { Left = 12, Top = 152, Width = 368, Text = "Jewel caustics (adds a startup/regeneration hitch)", Checked = Result.JewelCaustics };
+            propsBox.Controls.AddRange([_showRat, _showLogo, _showSigns, _showMap, _depthCue, _bumpy, _buildIn, _regen, _outro, _retro, _jewelCaustics]);
 
             _gpuPanel.Controls.AddRange([
                 styleLabel, _style,
@@ -435,6 +443,7 @@ internal sealed class ConfigForm : Form
                     c.Enabled = !classic;
                 _depthCue.Enabled = classic; // §1.4 depth cue only applies to the unlit Classic look
                 _retro.Enabled = classic;    // §1.5 retro pixelation is a Classic authenticity toggle
+                _jewelCaustics.Enabled = !classic; // §B4 caustics need lighting — not in the unlit Classic look
 
             }
             _style.SelectedIndexChanged += (_, _) => SyncGpuEnabled();
@@ -581,6 +590,7 @@ internal sealed class ConfigForm : Form
         Result.ShowWallSigns = _showSigns.Checked;
         Result.ShowOverheadMap = _showMap.Checked;
         Result.BumpyWalls = _bumpy.Checked;
+        Result.JewelCaustics = _jewelCaustics.Checked;
         Result.ClassicDepthCue = _depthCue.Checked;
         Result.RetroPixelation = _retro.Checked;
         Result.MazeBuildInAnim = _buildIn.Checked;

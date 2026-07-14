@@ -10,6 +10,9 @@ public class Plane(Vector3 point, Vector3 normal, MaterialData material) : Traca
     public virtual AABB Bounds => new(new Vector3(-1e10f), new Vector3(1e10f));
 
     /// <inheritdoc/>
+    public virtual SurfaceKind Surface => material.Surface;
+
+    /// <inheritdoc/>
     public virtual HitInfo? Intersect(Ray ray)
     {
         var p0 = Point;

@@ -168,4 +168,202 @@ public sealed class CausticsTests
         float shift = MathF.Abs(MeanX(blue.Photons) - MeanX(red.Photons));
         Assert.IsTrue(shift > 0.01f, $"dispersion must shift the caustic by wavelength (|Δmean X|={shift})");
     }
+
+    [TestMethod]
+    public void EmitInto_AccumulatesMultipleCastersIntoOneMap()
+    {
+        // Two glass spheres, one map: EmitInto lets a scene with several casters share a single caustic
+        // map (what JobSystem does across all its casters) rather than one map per caster.
+        var left = new Sphere(new Vector3(-3f, 2f, 0f), 1f, GlassMat(cauchyB: 0f));
+        var right = new Sphere(new Vector3(3f, 2f, 0f), 1f, GlassMat(cauchyB: 0f));
+        var bvh = new BVH([Floor(), left, right]);
+        Light[] lights = [new Light { Position = new Vector3(0f, 6f, 0f), Color = Vector3.One }];
+
+        var map = new PhotonMap(0.25f);
+        PhotonTracer.EmitInto(map, lights, bvh, left.Bounds, Wl, photonsPerLight: 3000, seed: 1u);
+        int afterFirst = map.Count;
+        PhotonTracer.EmitInto(map, lights, bvh, right.Bounds, Wl, photonsPerLight: 3000, seed: 2u);
+
+        Assert.IsTrue(afterFirst > 0, "the first caster deposits caustics into the map");
+        Assert.IsTrue(map.Count > afterFirst, "the second caster adds more photons into the same map");
+        Assert.IsTrue(map.CountNear(new Vector3(-3f, 0f, 0f), 3f) > 0, "left sphere's caustic lands under it");
+        Assert.IsTrue(map.CountNear(new Vector3(3f, 0f, 0f), 3f) > 0, "right sphere's caustic lands under it");
+    }
+
+    // ── CausticOptions: quality mapping ────────────────────────────────────
+
+    [TestMethod]
+    public void FromQuality_OffOnCheaperTiers_OnForHighUltra()
+    {
+        Assert.IsFalse(CausticOptions.FromQuality(CausticQuality.Off).Enable);
+        Assert.IsFalse(CausticOptions.FromQuality(CausticQuality.Low).Enable);
+        Assert.IsFalse(CausticOptions.FromQuality(CausticQuality.Medium).Enable);
+        Assert.IsTrue(CausticOptions.FromQuality(CausticQuality.High).Enable, "High enables modest caustics");
+        Assert.IsTrue(CausticOptions.FromQuality(CausticQuality.Ultra).Enable, "Ultra enables full caustics");
+        Assert.IsTrue(
+            CausticOptions.FromQuality(CausticQuality.Ultra).PhotonsPerFrame >
+            CausticOptions.FromQuality(CausticQuality.High).PhotonsPerFrame,
+            "Ultra traces more photons than High");
+    }
+
+    [TestMethod]
+    public void DefaultCausticOptions_AreDisabled()
+    {
+        // The record default must be off so ordinary presets/renders stay byte-identical.
+        Assert.IsFalse(default(CausticOptions).Enable);
+    }
+
+    // ── Tracable.Surface: caster enumeration ───────────────────────────────
+
+    [TestMethod]
+    public void Surface_ExposesMaterialKindForEnumeration()
+    {
+        Tracable floor = Floor();
+        Tracable glass = new Sphere(Vector3.Zero, 1f, GlassMat(cauchyB: 0f));
+        Assert.AreEqual(SurfaceKind.Diffuse, floor.Surface, "a diffuse rectangle is not a caster");
+        Assert.AreEqual(SurfaceKind.Dielectric, glass.Surface, "a glass sphere is a caster");
+    }
+
+    // ── Compositing the map into the render (PathTracer.TraceCore) ──────────
+
+    private static Light[] OverheadLight()
+        => [new Light { Position = new Vector3(0f, 6f, 0f), Color = Vector3.One }];
+
+    // A camera above and behind the origin, angled down at the floor spot under the sphere, so the
+    // sphere (up at y = 2) does not occlude the caustic that focuses near the origin.
+    private static Camera CausticCamera() => new()
+    {
+        Position = new Vector3(0f, 4f, -7f),
+        Rotation = Quaternion.CreateFromAxisAngle(Vector3.UnitX, MathF.Atan2(4f, 7f)),
+        Fov = MathF.PI / 3f,
+        Aspect = 1f,
+        ImgPlaneZ = 1f,
+    };
+
+    private static Vector3[] RenderFloor(Tracable[] scene, Light[] lights, CausticOptions caustics, int frames = 64, int size = 24)
+    {
+        Camera camera = CausticCamera();
+        var js = new JobSystem(
+            size, size, scene, camera, stride: size * 4, lights: lights,
+            renderOptions: new RenderOptions(Lighting: LightingMode.NEE, MaxSampleCount: 4000),
+            samplingOptions: new SamplingOptions(SubPixelJitter: false),
+            denoiseOptions: new DenoiseOptions(
+                EnableTaa: false, EnableDiffuseCache: false, SmokeMode: SmokeMode.None, Caustics: caustics),
+            debugOptions: new DebugOptions());
+
+        for (int f = 0; f < frames; f++)
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    js.TraceCore(camera, y, x);
+
+        return (Vector3[])js.AccumXYZ.Clone();
+    }
+
+    private static float SumY(Vector3[] buffer)
+    {
+        float sum = 0f;
+        for (int i = 0; i < buffer.Length; i++)
+            sum += buffer[i].Y;
+        return sum;
+    }
+
+    [TestMethod]
+    public void Composite_GlassSphereOverFloor_BrightensTheCaustic()
+    {
+        var sphere = new Sphere(new Vector3(0f, 2f, 0f), 1f, GlassMat(cauchyB: 0f));
+        Tracable[] scene = [Floor(), sphere];
+        Light[] lights = OverheadLight();
+
+        // Dense gather so the focused caustic reads clearly against the lit floor.
+        CausticOptions on = CausticOptions.FromQuality(CausticQuality.High) with { GatherRadius = 0.3f };
+
+        Vector3[] off = RenderFloor(scene, lights, default);
+        Vector3[] lit = RenderFloor(scene, lights, on);
+
+        float sumOff = SumY(off);
+        float sumOn = SumY(lit);
+        Assert.IsTrue(sumOn > sumOff * 1.001f,
+            $"the glass sphere's caustic must add light to the floor (off={sumOff:F4}, on={sumOn:F4})");
+
+        // Caustics only add energy, never remove it: on ≥ off at every pixel.
+        for (int i = 0; i < off.Length; i++)
+            Assert.IsTrue(lit[i].Y >= off[i].Y - 1e-4f,
+                $"caustics must not darken any pixel (i={i}, off={off[i].Y}, on={lit[i].Y})");
+    }
+
+    // ── GPU port foundation (B4): flattened grid + reference gather parity ──
+
+    [TestMethod]
+    public void BuildGrid_Empty_GathersZero()
+    {
+        CausticGrid grid = new PhotonMap(0.5f).BuildGrid();
+        Assert.IsTrue(grid.IsEmpty);
+        Assert.AreEqual(0f, CausticReference.EstimateXyz(grid, Vector3.Zero, Vector3.UnitY, 0.5f, Wl).Length(), 1e-9f);
+    }
+
+    [TestMethod]
+    public void GridGather_MatchesPhotonMapEstimate_ForAGlassSphereCaustic()
+    {
+        // Build a real caustic, flatten it, and assert the GPU-shaped grid gather reproduces the map's
+        // own density estimate bit-for-bit at many probe points — the CPU/GPU parity the HLSL relies on.
+        var sphere = new Sphere(new Vector3(0f, 2f, 0f), 1f, GlassMat(cauchyB: 0.05f));
+        var bvh = new BVH([Floor(), sphere]);
+        Light[] lights = [new Light { Position = new Vector3(1f, 6f, 0f), Color = Vector3.One }];
+
+        const float radius = 0.25f;
+        PhotonMap map = PhotonTracer.Emit(lights, bvh, sphere.Bounds, Wl, photonsPerLight: 6000, gatherRadius: radius);
+        Assert.IsTrue(map.Count > 100, $"need a populated caustic to compare ({map.Count} photons)");
+
+        CausticGrid grid = map.BuildGrid();
+        Assert.AreEqual(map.Count, grid.Photons.Length, "every photon survives the flatten");
+
+        int probed = 0, matched = 0;
+        for (float x = -4f; x <= 4f; x += 0.5f)
+        {
+            for (float z = -4f; z <= 4f; z += 0.5f)
+            {
+                var p = new Vector3(x, 0f, z);
+                Vector3 mapXyz = map.EstimateXyz(p, Vector3.UnitY, radius, Wl);
+                Vector3 gridXyz = CausticReference.EstimateXyz(grid, p, Vector3.UnitY, radius, Wl);
+                probed++;
+                Assert.AreEqual(mapXyz.X, gridXyz.X, 1e-4f, $"X mismatch at {p}");
+                Assert.AreEqual(mapXyz.Y, gridXyz.Y, 1e-4f, $"Y mismatch at {p}");
+                Assert.AreEqual(mapXyz.Z, gridXyz.Z, 1e-4f, $"Z mismatch at {p}");
+                if (mapXyz.Length() > 0f) matched++;
+            }
+        }
+
+        Assert.IsTrue(matched > 0, "at least some probes should land on the caustic (non-zero estimate)");
+        Assert.IsTrue(probed > 100, "swept a dense grid of probe points");
+    }
+
+    [TestMethod]
+    public void GridGather_RespectsNormalRejection_LikeTheMap()
+    {
+        int lambda = Wl.GetDeterministicWavelength(5);
+        var map = new PhotonMap(1f);
+        map.Store(new Photon(Vector3.Zero, Vector3.UnitY, 1f, lambda));
+        CausticGrid grid = map.BuildGrid();
+
+        // Aligned receiver gathers it; opposite-facing receiver rejects it — matching the map.
+        Assert.AreEqual(
+            map.EstimateXyz(Vector3.Zero, Vector3.UnitY, 1f, Wl).Length(),
+            CausticReference.EstimateXyz(grid, Vector3.Zero, Vector3.UnitY, 1f, Wl).Length(), 1e-6f);
+        Assert.AreEqual(0f, CausticReference.EstimateXyz(grid, Vector3.Zero, -Vector3.UnitY, 1f, Wl).Length(), 1e-9f);
+    }
+
+    [TestMethod]
+    public void Composite_NoCasters_IsByteIdentical()
+    {
+        // A caster-free scene builds no photon map, so enabling caustics must leave the render exactly
+        // as it was — the plan's "no-effect path stays byte-identical" guarantee.
+        Tracable[] scene = [Floor()];
+        Light[] lights = OverheadLight();
+
+        Vector3[] off = RenderFloor(scene, lights, default);
+        Vector3[] on = RenderFloor(scene, lights, CausticOptions.FromQuality(CausticQuality.High));
+
+        for (int i = 0; i < off.Length; i++)
+            Assert.AreEqual(off[i], on[i], $"no caster → byte-identical (pixel {i})");
+    }
 }

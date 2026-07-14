@@ -201,10 +201,10 @@ internal sealed class Phase3Scene
 
     /// <summary>
     /// Creates the animated rat's walker (plan §8): its own right-hand-rule navigator starting
-    /// near the maze centre, low to the floor. It is now the maze's only traced moving object
-    /// alongside the bubbles, so it moves at a gentle amble rather than a fast scurry — slower
-    /// per-frame motion lets the temporal accumulator hold more consistent samples per pixel, so
-    /// the hero-sampled sprite shows far fewer fireflies while still forcing motion mode.
+    /// near the maze centre, low to the floor. The rat and bubbles no longer get a per-pixel
+    /// accumulation reset — they converge with the same sample budget as the rest of the frame — so
+    /// the rat is now walked at a slow amble (roughly half the previous speed) to keep the temporal
+    /// smear of a moving object short enough that it still reads as a rat rather than a streak.
     /// The <paramref name="ratCam"/> is a throw-away camera whose <c>Position</c> is the rat's
     /// world position each frame.
     /// </summary>
@@ -215,9 +215,9 @@ internal sealed class Phase3Scene
         var navigator = new MazeNavigator(Maze, sx, sy, Direction.East);
         var ctrl = new CameraController(navigator, CellSize, ratHeight)
         {
-            MoveTime = 1.6f,
-            TurnTime = 1.2f,
-            StillTime = 1.0f,
+            MoveTime = 3.2f,
+            TurnTime = 2.2f,
+            StillTime = 2.0f,
         };
         Camera sceneCam = Camera;
         ratCam = new Camera

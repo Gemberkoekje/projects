@@ -17,6 +17,9 @@
 #define SURFACE_THINFILM     3u  // SurfaceKind.ThinFilm
 #define SURFACE_BUBBLE       7u  // SurfaceKind.Bubble
 #define BUBBLE_REFLECT_BOOST 45.0 // §2.6: boosts a bubble's Fresnel so thin-film rings read across it
+// §A: effective glass path (world units) a shadow ray accrues per dielectric interface, so coloured
+// glass casts a Beer–Lambert-tinted shadow. Must equal Optics.GlassShadowInterfaceThickness (CPU).
+#define GLASS_SHADOW_INTERFACE_THICKNESS 0.03
 #define BUBBLE_FIREFLY_CLAMP 1.5  // §2.6: per-sample luminance cap on a bubble (tames the reflect/transmit-split fireflies)
 #define MAX_SPECULAR_BOUNCES 8u  // JobSystem.MaxSpecularBounces
 
@@ -66,6 +69,13 @@ struct SphereInfo
 };
 StructuredBuffer<SphereInfo> Spheres : register(t8);
 
+// Caustic photon map (shadows-and-caustics-plan §B4), flattened into a GPU-uploadable uniform grid by
+// PhotonMap.BuildGrid and gathered by TraceCausticEstimate (the port of CausticReference.EstimateXyz).
+// A 1-element dummy binds when caustics are off (CausticEnabled == 0), so the gather is never entered.
+struct CausticPhoton { float3 Pos; float3 Normal; float Power; uint WlIndex; }; // WlIndex → DeterXYZ row
+StructuredBuffer<CausticPhoton> CausticPhotons : register(t9);
+StructuredBuffer<uint2>         CausticCells   : register(t10); // per linear cell: (start, count)
+
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
 RWStructuredBuffer<uint>   SampleCount      : register(u1);
 RWStructuredBuffer<uint>   WavelengthCounter: register(u2);
@@ -94,7 +104,11 @@ cbuffer Constants : register(b0)
     float  VolMaxMarchDistance;  float VolSigmaScaleFog; float VolSigmaScaleGround; float VolAnisotropyG;
     float  VolInscatterStrength; float VolEarlyOutTransmittance; uint BiomeIndicator; float VolTime;
     float  RevealHeight;         float RatPosX; float RatPosY; float RatPosZ; // §9.3 reveal, §8 rat billboard
-    float  RatSize;              uint  ShowRat; uint  RatLayer; float _rpad;
+    float  RatSize;              uint  ShowRat; uint  RatLayer; uint VolShadowTransmittance; // §A: fog self-shadow opt-in
+    // Caustics (§B4): the flattened photon-grid params, matching PhotonMap.BuildGrid / CausticReference.
+    uint   CausticEnabled;       int   CausticMinCellX; int CausticMinCellY; int CausticMinCellZ;
+    uint   CausticDimX;          uint  CausticDimY; uint CausticDimZ; float CausticCellSize;
+    float  CausticRadius;        float CausticStrength; uint ShadowTransmitTriangles; float _cpad1;
 };
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
@@ -509,6 +523,141 @@ bool TraceOccluded(float3 origin, float3 dir, float maxDist)
     return q.CommittedStatus() != COMMITTED_NOTHING; // triangle or sphere occludes
 }
 
+// Exact unpolarized Fresnel reflectance (port of Optics.FresnelDielectric). Defined here (ahead of
+// the specular chain that also uses it) because the transmittance shadow ray below needs it.
+float FresnelDielectric(float cosThetaI, float iorFrom, float iorTo)
+{
+    cosThetaI = clamp(abs(cosThetaI), 0.0, 1.0);
+    float sinI = sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
+    float sinT = iorFrom / iorTo * sinI;
+    if (sinT >= 1.0) return 1.0;
+    float cosT = sqrt(max(0.0, 1.0 - sinT * sinT));
+    float rs = (iorFrom * cosThetaI - iorTo * cosT) / (iorFrom * cosThetaI + iorTo * cosT);
+    float rp = (iorFrom * cosT - iorTo * cosThetaI) / (iorFrom * cosT + iorTo * cosThetaI);
+    return 0.5 * (rs * rs + rp * rp);
+}
+
+// Beer–Lambert absorption σ at a wavelength, interpolated from red/green/blue anchors
+// (port of Optics.AbsorptionAt, §2.3). For a dielectric the anchors ride in P0/P1/P2. Defined
+// here (ahead of the specular chain that also uses it) because the transmittance shadow ray below
+// tints coloured-glass shadows with it.
+float AbsorptionAt(float sigmaR, float sigmaG, float sigmaB, float wavelengthNm)
+{
+    if (wavelengthNm <= 465.0) return sigmaB;
+    if (wavelengthNm <= 532.0) return lerp(sigmaB, sigmaG, (wavelengthNm - 465.0) / (532.0 - 465.0));
+    if (wavelengthNm <= 630.0) return lerp(sigmaG, sigmaR, (wavelengthNm - 532.0) / (630.0 - 532.0));
+    return sigmaR;
+}
+
+// Transmittance-aware shadow ray (shadows-and-caustics-plan §A1): the fraction of light in [0,1]
+// that survives to the light, the GPU twin of CPU BVH.Transmittance. Opaque geometry returns 0 (a
+// hard shadow, bit-identical to TraceOccluded), but thin dielectric / bubble geometry attenuates
+// instead of fully blocking — so bubbles cast a soft, thin-film-tinted shadow (closing the old
+// divergence where TraceOccluded skipped bubbles entirely, giving them no shadow) and glass spheres
+// a faint Fresnel-dimmed one.
+//
+// Dielectric *triangles* (glass windows §1.2, glass jewels) attenuate too — but only when the scene
+// actually contains them (ShadowTransmitTriangles), so window-free scenes keep the pure hardware
+// accept-first-hit fast path (opaque triangles auto-commit, ending the ray) and stay byte-identical
+// to TraceOccluded — the selftest/regress mazes carry no glass and pay no candidate cost. When glass
+// triangles are present we force them non-opaque so they surface as candidates we can multiply
+// through (1 − Fresnel, dispersion via Cauchy to match the specular branch) and continue; every
+// other triangle stays an opaque blocker and, with accept-first-hit, ends the ray on its first
+// commit. Procedural spheres always run the accumulate loop. Order-independent: any opaque commit
+// short-circuits to 0.
+float TraceTransmittance(float3 origin, float3 dir, float maxDist, uint heroIdx)
+{
+    if (maxDist <= 1e-4)
+        return 1.0;
+
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = dir;
+    ray.TMin = 1e-4;
+    ray.TMax = maxDist;
+
+    // Accept-first-hit ends the ray on the first committed (opaque) hit — a hard shadow. Only when
+    // the scene has glass triangles do we also force triangles non-opaque, so they become candidates
+    // we can attenuate-and-continue through instead of blocking; otherwise the fast path is exact.
+    uint rayFlags = RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+    if (ShadowTransmitTriangles != 0u)
+        rayFlags |= RAY_FLAG_FORCE_NON_OPAQUE;
+
+    RayQuery<RAY_FLAG_NONE> q;
+    q.TraceRayInline(Scene, rayFlags, 0xFF, ray);
+
+    float transmittance = 1.0;
+    float3 ndir = normalize(dir);
+    while (q.Proceed())
+    {
+        uint ct = q.CandidateType();
+        if (ct == CANDIDATE_PROCEDURAL_PRIMITIVE)
+        {
+            SphereInfo s = Spheres[q.CandidatePrimitiveIndex()];
+            float t;
+            if (!IntersectSphere(s, origin, dir, q.RayTMin(), t))
+                continue;
+
+            float3 outward = normalize((origin + dir * t) - float3(s.CX, s.CY, s.CZ));
+            float cosv = abs(dot(ndir, outward));
+            if (s.Surface == SURFACE_BUBBLE)
+            {
+                // The reflect probability is exactly the specular bubble branch's rReflect:
+                // boosted Fresnel × base reflectance × thin-film tint (gravity-graded thickness).
+                float grav = lerp(1.4, 0.6, (outward.y + 1.0) * 0.5);
+                float d = s.CauchyB * grav;
+                float base = MaterialReflectance[s.MatRow * DETERMINISTIC_COUNT + heroIdx];
+                float film = ThinFilmReflectance(cosv, DeterXYZ[heroIdx].w, d, s.Ior);
+                float rReflect = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosv, 1.0, s.Ior)) * base * film;
+                transmittance *= 1.0 - rReflect;
+            }
+            else if (s.Surface == SURFACE_DIELECTRIC)
+            {
+                float um = DeterXYZ[heroIdx].w * 1e-3;
+                float n = s.Ior + s.CauchyB / (um * um);
+                float sigma = AbsorptionAt(s.P0, s.P1, s.P2, DeterXYZ[heroIdx].w);
+                transmittance *= (1.0 - FresnelDielectric(cosv, 1.0, n))
+                               * exp(-sigma * GLASS_SHADOW_INTERFACE_THICKNESS);
+            }
+            else
+            {
+                q.CommitProceduralPrimitiveHit(t); // opaque sphere → hard shadow (ends the search)
+            }
+            // Transmissive spheres are not committed, so the ray keeps travelling toward the light.
+        }
+        else if (ct == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            // Reached only when ShadowTransmitTriangles forced triangles non-opaque. A glass
+            // window/jewel quad attenuates by its Fresnel-transmitted fraction × Beer–Lambert
+            // absorption (the GPU twin of BVH.Transmittance's dielectric case; n = Ior + CauchyB/λ²
+            // and σ from the P0/P1/P2 anchors, as in the specular branch) and lets the ray continue;
+            // every other triangle is an opaque blocker that commits and, with accept-first-hit, ends
+            // the search. A pane is two coincident quads, so a clear window keeps (1 − Fresnel)² and a
+            // stained one is additionally tinted toward its transmitted hue — a faint, coloured shadow.
+            PrimitiveInfo p = Primitives[q.CandidatePrimitiveIndex() >> 1];
+            if (p.Surface == SURFACE_DIELECTRIC)
+            {
+                float cosv = abs(dot(ndir, float3(p.NX, p.NY, p.NZ)));
+                float um = DeterXYZ[heroIdx].w * 1e-3;
+                float n = p.Ior + p.CauchyB / (um * um);
+                float sigma = AbsorptionAt(p.P0, p.P1, p.P2, DeterXYZ[heroIdx].w);
+                transmittance *= (1.0 - FresnelDielectric(cosv, 1.0, n))
+                               * exp(-sigma * GLASS_SHADOW_INTERFACE_THICKNESS);
+            }
+            else
+            {
+                q.CommitNonOpaqueTriangleHit(); // opaque triangle → hard shadow (ends the search)
+            }
+        }
+    }
+
+    // A committed hit is an opaque triangle or an opaque sphere → fully shadowed.
+    if (q.CommittedStatus() != COMMITTED_NOTHING)
+        return 0.0;
+
+    return transmittance;
+}
+
 // ── Lighting (mirrors Phase2Reference) ────────────────────────────────
 
 float LightWeight(float3 lightPos, float3 samplePoint, float3 normal)
@@ -565,7 +714,7 @@ void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
     outP = 1.0 / float(NumLights);
 }
 
-float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
+float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal, uint heroIdx)
 {
     float3 toLight = Lights[lightIdx].xyz - hitPoint;
     float distSq = dot(toLight, toLight);
@@ -576,10 +725,11 @@ float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal)
         return 0.0;
 
     float3 shadowOrigin = hitPoint + hitNormal * 1e-3;
-    if (TraceOccluded(shadowOrigin, lightDir, dist - 2e-3))
+    float vis = TraceTransmittance(shadowOrigin, lightDir, dist - 2e-3, heroIdx);
+    if (vis <= 0.0)
         return 0.0;
 
-    return cosTheta / distSq * LightIntensity * float(NumLights);
+    return vis * (cosTheta / distSq * LightIntensity * float(NumLights));
 }
 
 // ── Volumetrics (mirrors Phase4Reference / VolumetricIntegration.cs) ────
@@ -778,6 +928,42 @@ float VolEvaluatePhase(float3 viewDirection, float3 samplePoint)
     return (1.0 - g * g) / (4.0 * PI * pow(denom, 1.5));
 }
 
+// Fog self-shadow (shadows-and-caustics-plan §A2): the medium's transmittance in [0,1] from an
+// in-scatter sample toward a light, marched over the density field (advected by time) so thick smoke
+// nearer the light dims the in-scatter — real volumetric shafts that fall off with depth. A
+// line-for-line port of Phase4Reference.InscatterShadowTransmittance (a coarser quarter-step march
+// than the camera one). Off unless the VolShadowTransmittance opt-in is set (High/Ultra).
+float InscatterShadowTransmittance(float3 from, float3 lightDir, float dist, float time)
+{
+    float marchLength = min(dist, max(VolMaxMarchDistance, 0.0));
+    if (marchLength <= 1e-5)
+        return 1.0;
+
+    uint steps = max(2u, VolMarchSteps / 4u);
+    float stepLength = marchLength / float(steps);
+    float sigmaScale = (VolSmokeMode == 3u) ? VolSigmaScaleGround : VolSigmaScaleFog;
+    float transmittance = 1.0;
+
+    for (uint i = 0u; i < steps; i++)
+    {
+        float distance = (float(i) + 0.5) * stepLength;
+        float3 p = from + lightDir * distance;
+        float density = GetDensity(p, VolSmokeMode, time);
+        if (density <= 0.0)
+            continue;
+
+        float sigmaT = density * sigmaScale;
+        if (sigmaT <= 0.0)
+            continue;
+
+        transmittance *= exp(-sigmaT * stepLength);
+        if (transmittance < VolEarlyOutTransmittance)
+            return transmittance;
+    }
+
+    return transmittance;
+}
+
 float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool traceShadow)
 {
     if (NumLights == 0u)
@@ -798,7 +984,13 @@ float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool tra
                 continue;
         }
 
-        lighting += LightColors[i].xyz * (LightIntensity / distSq);
+        float lightWeight = LightIntensity / distSq;
+        // Dim the in-scatter by the fog optical depth toward this light (§A2), tied to the same
+        // shadow-step cadence (traceShadow) as the geometry occlusion above.
+        if (VolShadowTransmittance != 0u && traceShadow)
+            lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, VolTime);
+
+        lighting += LightColors[i].xyz * lightWeight;
     }
 
     if (all(lighting == float3(0.0, 0.0, 0.0)))
@@ -873,7 +1065,7 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
 // (and JobSystem's mirror branch). HLSL has no recursion, so the mirror chain is
 // an iterative loop accumulating a reflectance product.
 
-float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng)
+float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng, uint heroIdx)
 {
     float ambient = 1.0;
     float direct = 0.0;
@@ -884,14 +1076,14 @@ float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng)
         SelectLight(rng, pt, normal, p, ldir, distSq, cosv);
         if (cosv > 0.0)
         {
-            bool visible = true;
+            float vis = 1.0;
             if (LightingMode == 2u) // NEE
             {
                 float3 shadowOrigin = pt + normal * 1e-3;
-                visible = !TraceOccluded(shadowOrigin, ldir, sqrt(distSq) - 2e-3);
+                vis = TraceTransmittance(shadowOrigin, ldir, sqrt(distSq) - 2e-3, heroIdx);
             }
-            if (visible)
-                direct = cosv / distSq * LightIntensity / max(p, 1e-9);
+            if (vis > 0.0)
+                direct = vis * (cosv / distSq * LightIntensity / max(p, 1e-9));
         }
     }
     return refl * (ambient + direct);
@@ -931,19 +1123,6 @@ bool Refract(float3 incident, float3 normal, float iorFrom, float iorTo, out flo
     return true;
 }
 
-// Exact unpolarized Fresnel reflectance (port of Optics.FresnelDielectric).
-float FresnelDielectric(float cosThetaI, float iorFrom, float iorTo)
-{
-    cosThetaI = clamp(abs(cosThetaI), 0.0, 1.0);
-    float sinI = sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
-    float sinT = iorFrom / iorTo * sinI;
-    if (sinT >= 1.0) return 1.0;
-    float cosT = sqrt(max(0.0, 1.0 - sinT * sinT));
-    float rs = (iorFrom * cosThetaI - iorTo * cosT) / (iorFrom * cosThetaI + iorTo * cosT);
-    float rp = (iorFrom * cosT - iorTo * cosThetaI) / (iorFrom * cosT + iorTo * cosThetaI);
-    return 0.5 * (rs * rs + rp * rp);
-}
-
 // Analytic view-facing rat billboard (plan §8): makes the rat a real object for the ray
 // tracer, so it appears in reflections/refractions (fogged and occluded correctly),
 // unlike the screen-space ApplyRat used for the crisp primary view. Returns the
@@ -981,16 +1160,6 @@ bool IntersectRat(float3 origin, float3 dir, float maxT, uint heroIdx, out float
     hitPoint = hp;
     refl = dot(RgbBasis[heroIdx].xyz, texel.rgb);
     return true;
-}
-
-// Beer–Lambert absorption σ at a wavelength, interpolated from red/green/blue anchors
-// (port of Optics.AbsorptionAt, §2.3). For a dielectric the anchors ride in P0/P1/P2.
-float AbsorptionAt(float sigmaR, float sigmaG, float sigmaB, float wavelengthNm)
-{
-    if (wavelengthNm <= 465.0) return sigmaB;
-    if (wavelengthNm <= 532.0) return lerp(sigmaB, sigmaG, (wavelengthNm - 465.0) / (532.0 - 465.0));
-    if (wavelengthNm <= 630.0) return lerp(sigmaG, sigmaR, (wavelengthNm - 532.0) / (630.0 - 532.0));
-    return sigmaR;
 }
 
 // XYZ radiance along a specular chain (mirror reflect + dielectric Fresnel
@@ -1113,10 +1282,60 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
         }
 
         accum += weight * DeterXYZ[heroIdx].xyz
-            * MirrorDiffuseScalar(HeroReflectance(prim, dir, hitPoint, heroIdx), hitPoint, hitNormal, rng);
+            * MirrorDiffuseScalar(HeroReflectance(prim, dir, hitPoint, heroIdx), hitPoint, hitNormal, rng, heroIdx);
         return accum;
     }
     return accum;
+}
+
+// Caustic density estimate at a diffuse receiver (shadows-and-caustics-plan §B4): a line-for-line
+// port of CausticReference.EstimateXyz. Gathers the flattened photon grid — the same ±ceil(r/cell)
+// cell scan (clamped to the grid), normal rejection, and Σ power·XYZ(λ)/(π r²) as PhotonMap — so the
+// result matches the CPU map the CI parity test pins. Photons carry their wavelength as a DeterXYZ row
+// (baked at upload), so XYZ(λ) is DeterXYZ[WlIndex]. Returns 0 when caustics are off (dummy grid).
+float3 TraceCausticEstimate(float3 pos, float3 normal)
+{
+    if (CausticEnabled == 0u)
+        return float3(0.0, 0.0, 0.0);
+
+    float cellSize = CausticCellSize;
+    float radius = CausticRadius;
+    float radiusSq = radius * radius;
+    int span = max(1, (int)ceil(radius / cellSize));
+    int cx = (int)floor(pos.x / cellSize);
+    int cy = (int)floor(pos.y / cellSize);
+    int cz = (int)floor(pos.z / cellSize);
+
+    float3 sum = float3(0.0, 0.0, 0.0);
+    for (int dz = -span; dz <= span; dz++)
+    {
+        int gz = cz + dz - CausticMinCellZ;
+        if (gz < 0 || gz >= (int)CausticDimZ) continue;
+        for (int dy = -span; dy <= span; dy++)
+        {
+            int gy = cy + dy - CausticMinCellY;
+            if (gy < 0 || gy >= (int)CausticDimY) continue;
+            for (int dx = -span; dx <= span; dx++)
+            {
+                int gx = cx + dx - CausticMinCellX;
+                if (gx < 0 || gx >= (int)CausticDimX) continue;
+
+                uint cell = uint(gx) + CausticDimX * (uint(gy) + CausticDimY * uint(gz));
+                uint2 range = CausticCells[cell];
+                uint end = range.x + range.y;
+                for (uint i = range.x; i < end; i++)
+                {
+                    CausticPhoton ph = CausticPhotons[i];
+                    if (dot(ph.Normal, normal) < 0.5) continue;
+                    float3 d = ph.Pos - pos;
+                    if (dot(d, d) > radiusSq) continue;
+                    sum += DeterXYZ[ph.WlIndex].xyz * ph.Power;
+                }
+            }
+        }
+    }
+
+    return sum / (PI * radiusSq);
 }
 
 // Full per-sample corrected XYZ; also returns direct/indirect components, the
@@ -1223,14 +1442,14 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
         if (lightCos > 0.0)
         {
-            bool visible = true;
+            float vis = 1.0;
             if (LightingMode == 2u) // NEE
             {
                 float3 shadowOrigin = hitPoint + hitNormal * 1e-3;
-                visible = !TraceOccluded(shadowOrigin, lightDir, sqrt(lightDistSq) - 2e-3);
+                vis = TraceTransmittance(shadowOrigin, lightDir, sqrt(lightDistSq) - 2e-3, heroIdx);
             }
-            if (visible)
-                directTerm += lightCos / lightDistSq * LightIntensity / max(lightP, 1e-9);
+            if (vis > 0.0)
+                directTerm += vis * (lightCos / lightDistSq * LightIntensity / max(lightP, 1e-9));
         }
 
         xyz = baseXyz * (ambientTerm + directTerm);
@@ -1254,7 +1473,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             float secDirectTerm = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
             uint lightIdx2 = rng % NumLights;
-            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal);
+            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx);
 
             float3 secIncoming = secBaseXyz * (AmbientLevel + secDirectTerm);
 
@@ -1277,7 +1496,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
                 float tertDirectTerm = 0.0;
                 rng = rng * RNG_MUL + RNG_ADD;
                 uint lightIdx3 = rng % NumLights;
-                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal);
+                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal, heroIdx);
 
                 float3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
                 secBounce2Plus = secBaseXyz * tertIncoming;
@@ -1289,6 +1508,18 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             indirect = localBounce1 + localBounce2Plus;
             xyz += indirect;
         }
+    }
+
+    // Caustics (§B4): add the forward photon map's density estimate at this diffuse receiver — the
+    // light→specular→diffuse paths NEE cannot connect. Scaled by the hero albedo/π and strength, added
+    // raw (like `indirect`) so the shared correction below and the resolve's fog composite treat it
+    // identically. Specular hits already returned above; CausticEnabled == 0 → early-out → byte-identical.
+    if (CausticEnabled != 0u)
+    {
+        float causticAlbedo = HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
+        float3 caustic = TraceCausticEstimate(hitPoint, hitNormal) * (causticAlbedo * CausticStrength * (1.0 / PI));
+        xyz += caustic;
+        indirect += caustic;
     }
 
     float correction = DeterministicCorrection;
@@ -1403,14 +1634,17 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         clampDelta = abs(unclamped.x - corrected.x) + abs(unclamped.y - corrected.y) + abs(unclamped.z - corrected.z);
     }
 
-    // Hit mask tags the moving traced objects — rat 2u, bubble 3u (vs 1u static geometry / 0u miss).
-    // A pixel that a mover crosses flips the mask both ways (mover→wall and wall→mover), forcing a
-    // per-pixel accumulation reset, so the mover stays crisp and — crucially — the static scene keeps
-    // converging around it without the whole frame being dropped to motion quality.
-    uint hitMask = ratHit ? 2u : (bubbleHit ? 3u : (hit ? 1u : 0u));
+    // Hit/miss mask: 1u = any surface hit (static geometry AND the moving rat/bubbles alike), 0u = miss.
+    // The rat and bubbles are no longer given a hard per-pixel reset (which made them 1-sample noisy);
+    // instead a mover's pixels are soft-capped at MotionSampleCap — the same budget the whole frame uses
+    // while the camera moves. So a mover accumulates ~cap samples: smooth (no fireflies), with a short
+    // bounded temporal smear (and, once it drifts on, the freed pixel reconverges from ~cap, so any
+    // wall ghost fades in a fraction of a second). The animations are slowed to keep that smear legible.
+    uint hitMask = hit ? 1u : 0u;
+    bool isMover = ratHit || bubbleHit;
     bool restart = reset || (LastHit[ix] != hitMask);
     uint prevCount = restart ? 0u : SampleCount[ix];
-    if (SoftResetFlag != 0u && !restart)
+    if ((SoftResetFlag != 0u || isMover) && !restart)
         prevCount = min(prevCount, MotionSampleCap);
     uint count = min(prevCount + 1u, MaxSampleCount);
     bool clearMean = restart || (prevCount == 0u);

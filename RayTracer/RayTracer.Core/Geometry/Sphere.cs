@@ -25,6 +25,9 @@ public sealed class Sphere(Vector3 center, float radius, MaterialData material) 
     public AABB Bounds => _bounds;
 
     /// <inheritdoc/>
+    public SurfaceKind Surface => Material.Surface;
+
+    /// <inheritdoc/>
     public HitInfo? Intersect(Ray ray)
     {
         // Solve |O + t·D − C|² = R² for the smallest t ≥ tMin (half-b form).

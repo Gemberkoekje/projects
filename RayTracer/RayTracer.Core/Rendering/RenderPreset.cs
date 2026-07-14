@@ -50,7 +50,8 @@ public record RenderPreset(
     CpuThrottle ThrottleCpu = CpuThrottle.Normal,
     SmokeMode SmokeMode = SmokeMode.Biome,
     VolumetricOptions Volumetrics = default,
-    bool IsDebugSmokePreset = false)
+    bool IsDebugSmokePreset = false,
+    CausticOptions Caustics = default)
 {
     // ── Presets ─────────────────────────────────────────────────────
     public static RenderPreset Low => new(

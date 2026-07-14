@@ -22,12 +22,14 @@ internal static class MazeBubbles
     /// <param name="ThicknessNm">Soap-film thickness (nm) — sets the interference band spacing.</param>
     /// <param name="Radius">Base bubble radius (world units) — small, so a stream reads as many bubbles.</param>
     /// <param name="PerEmitter">Bubbles in flight per emitter (the stream length).</param>
-    /// <param name="Lifetime">Seconds for a bubble to rise from the emitter and pop.</param>
+    /// <param name="Lifetime">Seconds for a bubble to rise from the emitter and pop. Long (slow rise):
+    /// bubbles no longer get a per-pixel accumulation reset, so a fast rise would smear them vertically
+    /// in the temporal accumulator — a slow climb keeps each bubble reading as a round bubble.</param>
     /// <param name="RiseHeight">How high the stream climbs (world units).</param>
     /// <param name="Spread">How far the cone fans out horizontally by the top (world units).</param>
     internal sealed record Options(
         float Chance = 0.035f, int Seed = 0, float ThicknessNm = 440f, float Radius = 0.11f,
-        int PerEmitter = 10, float Lifetime = 12.0f, float RiseHeight = 1.6f, float Spread = 0.45f);
+        int PerEmitter = 10, float Lifetime = 24.0f, float RiseHeight = 1.6f, float Spread = 0.45f);
 
     /// <summary>One bubble in flight: its emitter origin plus the deterministic seeds that shape its
     /// arc through the stream. <see cref="Animate"/> turns these + a time into a centre and radius.</summary>
@@ -120,9 +122,10 @@ internal static class MazeBubbles
             float p = Frac(time / opt.Lifetime + b.PhaseOffset);   // 0..1 age along the stream
             float rise = opt.RiseHeight * p;
             float fan = opt.Spread * p;                            // cone widens as it climbs
-            // A slow, gentle wobble — small per-frame sideways motion keeps each pixel covered longer,
-            // so the mover accumulates more samples (fewer fireflies) before it resets.
-            float wob = 0.04f * MathF.Sin(time * 0.6f + b.WobblePhase);
+            // A slow, gentle wobble. Bubbles no longer get a per-pixel accumulation reset, so this
+            // sideways drift smears them within the temporal accumulator — keep the amplitude small
+            // and the frequency low so the smear stays sub-radius and the bubble still reads as round.
+            float wob = 0.015f * MathF.Sin(time * 0.35f + b.WobblePhase);
             var perp = new Vector3(-b.Drift.Z, 0f, b.Drift.X);     // sideways wobble axis
             centers[i] = b.Origin + new Vector3(0f, rise, 0f) + b.Drift * fan + perp * wob;
             radii[i] = opt.Radius * b.RadiusScale * RadiusEnvelope(p);
