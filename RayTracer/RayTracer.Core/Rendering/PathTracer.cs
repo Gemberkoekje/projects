@@ -50,7 +50,12 @@ public partial class JobSystem
         float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
         float thickCoverage = 0.72f + 0.28f * coverage;
         float heightWeight = 0.70f + 0.30f * midHeight;
-        return 0.50f * thickCoverage * heightWeight;
+        // §O height ceiling (mirrors the shader FogProfile): the 0.70 floor otherwise fills all Y and
+        // billows into the open sky. Fade it out from the wall top (2.0 = WALL_HEIGHT) upward so outdoor
+        // fog is a low bank; below the wall top the factor is exactly 1.0, so roofed scenes stay bit-exact.
+        float ct = Math.Clamp((p.Y - 2.0f) / 2.0f, 0f, 1f);
+        float heightCeil = 1.0f - ct * ct * (3.0f - 2.0f * ct);
+        return 0.50f * thickCoverage * heightWeight * heightCeil;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -245,7 +250,11 @@ public partial class JobSystem
         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
         var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction) = _bvh.FindClosest(ray);
         if (!hit)
-            return Vector3.Zero;
+            // §O2/§O3: an escaping reflection/refraction sees the sky (through an open roof), not black —
+            // the recursion multiplies the specular throughput back in on unwind. Sky off → black (unchanged).
+            return Sky is not null && WavelengthLookup.TryGet((int)wavelength, out Vector3 skyXyz)
+                ? skyXyz * Sky.Radiance(dir, wavelength)
+                : Vector3.Zero;
 
         Vector3 radiance;
         if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
@@ -398,12 +407,7 @@ public partial class JobSystem
         float totalW = 0f;
         for (int li = 0; li < nLights; li++)
         {
-            Vector3 toLight = _lights[li].Position - point;
-            float dsq = Vector3.Dot(toLight, toLight);
-            float dist = MathF.Sqrt(dsq);
-            Vector3 ldir = toLight / dist;
-            float cos = Vector3.Dot(normal, ldir);
-            float w = cos > 0f ? 1f / MathF.Max(dsq, 1e-6f) : 0f;
+            float w = _lights[li].SelectionWeight(point, normal);
             weights[li] = w;
             totalW += w;
         }
@@ -425,13 +429,11 @@ public partial class JobSystem
             }
         }
 
-        // §C1: target a sampled point on the (area) light — its centre for a point light (no RNG drawn).
-        Vector3 toSelected = _lights[chosen].SamplePoint(ref rng) - point;
-        float distSq = MathF.Max(Vector3.Dot(toSelected, toSelected), 1e-6f);
-        float d = MathF.Sqrt(distSq);
-        Vector3 lightDir = toSelected / d;
-        float lightCos = Vector3.Dot(normal, lightDir);
-        if (lightCos <= 0f)
+        // §C1/§C2: sample the shadow ray toward the chosen light — a point on an area sphere, or a
+        // parallel direction for a directional sun. geom is cos/d² (point) or cos (sun); no RNG for a
+        // point light, so its hard shadow is byte-identical.
+        float geom = _lights[chosen].SampleShadowRay(point, normal, ref rng, out Vector3 lightDir, out float d);
+        if (geom <= 0f)
             return 0f;
 
         float lightP = weights[chosen] / totalW;
@@ -444,7 +446,9 @@ public partial class JobSystem
                 return 0f;
         }
 
-        return vis * (lightCos / distSq * LightIntensity / MathF.Max(lightP, 1e-9f));
+        // §O9: modulate by the chosen light's blackbody emission at this hero wavelength (0 K = flat white).
+        return vis * (geom * LightIntensity / MathF.Max(lightP, 1e-9f))
+            * BlackbodySpectrum.Relative(wavelength, _lights[chosen].EmissionTempK);
     }
 
     internal void TraceCore(Camera camera, int y, int x)
@@ -507,6 +511,10 @@ public partial class JobSystem
         };
         var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor, heroExtinction) = _bvh.FindClosest(ray);
         Vector3 xyz = Vector3.Zero;
+        // §O2/§O3: a ray that escapes all geometry (through an open roof) sees the sky, not black.
+        // Emissive, so it takes no lighting/fog; the hit branches below overwrite xyz when the ray did hit.
+        if (!hit && Sky is not null && WavelengthLookup.TryGet(heroWavelength, out var skyXyz))
+            xyz = skyXyz * Sky.Radiance(dir, heroWavelength);
         Vector3 directLighting = Vector3.Zero;
         Vector3 indirectLighting = Vector3.Zero;
         Vector3 emissiveLighting = Vector3.Zero;
@@ -546,19 +554,16 @@ public partial class JobSystem
 
                 int nLights = _lights.Length;
 
-                int SelectLight(ref uint rng, Vector3 samplePoint, Vector3 normal, out float outP, out Vector3 outDir, out float outDistSq, out float outCos)
+                // Importance-select a light by weight (§C1/§C2: SelectionWeight is 1/d²·cos for a point
+                // light, cos for a directional sun). Returns the index + selection pdf; the shadow ray
+                // itself is sampled from the chosen light below.
+                int SelectLight(ref uint rng, Vector3 samplePoint, Vector3 normal, out float outP)
                 {
                     Span<float> weights = stackalloc float[nLights];
                     float totalW = 0f;
                     for (int li = 0; li < nLights; li++)
                     {
-                        var light = _lights[li];
-                        Vector3 toLight = light.Position - samplePoint;
-                        float dsq = Vector3.Dot(toLight, toLight);
-                        float dist = MathF.Sqrt(dsq);
-                        Vector3 ldir = toLight / dist;
-                        float cos = Vector3.Dot(normal, ldir);
-                        float w = cos > 0f ? 1f / MathF.Max(dsq, 1e-6f) : 0f;
+                        float w = _lights[li].SelectionWeight(samplePoint, normal);
                         weights[li] = w;
                         totalW += w;
                     }
@@ -574,64 +579,39 @@ public partial class JobSystem
                             acc += weights[li];
                             if (u <= acc)
                             {
-                                var selected = _lights[li];
-                                Vector3 toSelected = selected.Position - samplePoint;
-                                outDistSq = MathF.Max(Vector3.Dot(toSelected, toSelected), 1e-6f);
-                                float dist = MathF.Sqrt(outDistSq);
-                                outDir = toSelected / dist;
-                                outCos = Vector3.Dot(normal, outDir);
                                 outP = weights[li] / totalW;
                                 return li;
                             }
                         }
 
                         int last = nLights - 1;
-                        var lastLight = _lights[last];
-                        Vector3 toLast = lastLight.Position - samplePoint;
-                        outDistSq = MathF.Max(Vector3.Dot(toLast, toLast), 1e-6f);
-                        float lastDist = MathF.Sqrt(outDistSq);
-                        outDir = toLast / lastDist;
-                        outCos = Vector3.Dot(normal, outDir);
                         outP = weights[last] / totalW;
                         return last;
                     }
 
                     int idx = (int)(rng % (uint)nLights);
-                    var fallback = _lights[idx];
-                    Vector3 toFallback = fallback.Position - samplePoint;
-                    outDistSq = MathF.Max(Vector3.Dot(toFallback, toFallback), 1e-6f);
-                    float fallbackDist = MathF.Sqrt(outDistSq);
-                    outDir = toFallback / fallbackDist;
-                    outCos = Vector3.Dot(normal, outDir);
                     outP = 1f / nLights;
                     return idx;
                 }
 
-                float lightP;
-                Vector3 lightDir;
-                float lightDistSq;
-                float lightCos;
-                int chosenLight = SelectLight(ref rngLight, hitPoint, hitNormal, out lightP, out lightDir, out lightDistSq, out lightCos);
+                int chosenLight = SelectLight(ref rngLight, hitPoint, hitNormal, out float lightP);
 
-                // §C1: retarget the shadow ray to a sampled point on the chosen (area) light so the
-                // visibility softens into a penumbra. A point light (radius 0) draws no RNG and this
-                // recomputes the identical centre direction/distance, so its hard shadow is unchanged.
-                Vector3 lightToSample = _lights[chosenLight].SamplePoint(ref rngLight) - hitPoint;
-                lightDistSq = MathF.Max(Vector3.Dot(lightToSample, lightToSample), 1e-6f);
-                float chosenDist = MathF.Sqrt(lightDistSq);
-                lightDir = lightToSample / chosenDist;
-                lightCos = Vector3.Dot(hitNormal, lightDir);
+                // §C1/§C2: sample the shadow ray toward the chosen light (a point on an area sphere, a
+                // parallel direction for a directional sun). geom = cos/d² (point) or cos (sun); a
+                // point light draws no RNG here, so its hard shadow is byte-identical.
+                float geom = _lights[chosenLight].SampleShadowRay(hitPoint, hitNormal, ref rngLight, out Vector3 lightDir, out float chosenDist);
 
-                if (lightCos > 0f)
+                if (geom > 0f)
                 {
                     float vis = 1f;
                     if (Lighting == LightingMode.NEE)
                         vis = ShadowVisibility(
                             hitPoint + hitNormal * 1e-3f, lightDir,
-                            MathF.Sqrt(lightDistSq) - 2e-3f, ray.Wavelength, includeFog: true);
+                            chosenDist - 2e-3f, ray.Wavelength, includeFog: true);
 
                     if (vis > 0f)
-                        directTerm += vis * (lightCos / lightDistSq * LightIntensity / Math.Max(lightP, 1e-9f));
+                        directTerm += vis * (geom * LightIntensity / Math.Max(lightP, 1e-9f))
+                            * BlackbodySpectrum.Relative(ray.Wavelength, _lights[chosenLight].EmissionTempK); // §O9
                 }
             }
 
@@ -721,18 +701,15 @@ public partial class JobSystem
                     {
                         rng = rng * 747796405u + 2891336453u;
                         int lightIdx2 = (int)(rng % (uint)_lights.Length);
-                        Vector3 toLight2 = _lights[lightIdx2].SamplePoint(ref rng) - secHitPoint;
-                        float distSq2 = Vector3.Dot(toLight2, toLight2);
-                        float dist2 = MathF.Sqrt(distSq2);
-                        Vector3 lightDir2 = toLight2 / dist2;
-                        float cosTheta2 = Vector3.Dot(secHitNormal, lightDir2);
-                        if (cosTheta2 > 0f)
+                        float geom2 = _lights[lightIdx2].SampleShadowRay(secHitPoint, secHitNormal, ref rng, out Vector3 lightDir2, out float dist2);
+                        if (geom2 > 0f)
                         {
                             float vis2 = ShadowVisibility(
                                 secHitPoint + secHitNormal * 1e-3f, lightDir2,
                                 dist2 - 2e-3f, secRay.Wavelength, includeFog: false);
                             if (vis2 > 0f)
-                                secDirectTerm += vis2 * (cosTheta2 / distSq2 * LightIntensity * _lights.Length);
+                                secDirectTerm += vis2 * (geom2 * LightIntensity * _lights.Length)
+                                    * BlackbodySpectrum.Relative(secRay.Wavelength, _lights[lightIdx2].EmissionTempK); // §O9
                         }
                     }
 
@@ -780,23 +757,25 @@ public partial class JobSystem
                             {
                                 rng = rng * 747796405u + 2891336453u;
                                 int lightIdx3 = (int)(rng % (uint)_lights.Length);
-                                Vector3 toLight3 = _lights[lightIdx3].SamplePoint(ref rng) - tertHitPoint;
-                                float distSq3 = Vector3.Dot(toLight3, toLight3);
-                                float dist3 = MathF.Sqrt(distSq3);
-                                Vector3 lightDir3 = toLight3 / dist3;
-                                float cosTheta3 = Vector3.Dot(tertHitNormal, lightDir3);
-                                if (cosTheta3 > 0f)
+                                float geom3 = _lights[lightIdx3].SampleShadowRay(tertHitPoint, tertHitNormal, ref rng, out Vector3 lightDir3, out float dist3);
+                                if (geom3 > 0f)
                                 {
                                     float vis3 = ShadowVisibility(
                                         tertHitPoint + tertHitNormal * 1e-3f, lightDir3,
                                         dist3 - 2e-3f, tertRay.Wavelength, includeFog: false);
                                     if (vis3 > 0f)
-                                        tertDirectTerm += vis3 * (cosTheta3 / distSq3 * LightIntensity * _lights.Length);
+                                        tertDirectTerm += vis3 * (geom3 * LightIntensity * _lights.Length)
+                                            * BlackbodySpectrum.Relative(tertRay.Wavelength, _lights[lightIdx3].EmissionTempK); // §O9
                                 }
                             }
 
                             Vector3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
                             secBounce2Plus = secBaseXyz * tertIncoming;
+                        }
+                        else if (Sky is not null && WavelengthLookup.TryGet((int)tertRay.Wavelength, out var tertSkyXyz))
+                        {
+                            // §O7: the second bounce escaped to the open sky — skylight is its incoming radiance.
+                            secBounce2Plus = secBaseXyz * (tertSkyXyz * Sky.Radiance(secSampleDir, tertRay.Wavelength));
                         }
                     }
 
@@ -818,6 +797,17 @@ public partial class JobSystem
                     bounce1 = localBounce1;
                     bounce2plus = localBounce2plus;
                     xyz += indirectLighting;
+                }
+                else if (Sky is not null && WavelengthLookup.TryGet((int)secRay.Wavelength, out var secSkyXyz))
+                {
+                    // §O7: the diffuse bounce escaped to the open sky → skylight lights this surface
+                    // (ambient blue fill outdoors; daylight bleed into a corridor by a boundary opening).
+                    localBounce1 = baseXyz * (secSkyXyz * Sky.Radiance(sampleDir, secRay.Wavelength));
+                    indirectLighting = localBounce1;
+                    bounce0 = localBounce0;
+                    bounce1 = localBounce1;
+                    xyz += indirectLighting;
+                    diffuseCacheState[ix] = 0;
                 }
                 else
                 {
@@ -891,6 +881,18 @@ public partial class JobSystem
             bounce1 *= volume.Transmittance;
             bounce2plus *= volume.Transmittance;
         }
+        else
+        {
+            // §O2/§O3 sky miss: the escaping ray still crossed the fog volume, so in-scatter into it and
+            // attenuate the sky behind it over a full fog column toward a far point along the ray (mirrors
+            // the GPU FogOut miss path). Without this the fog would only appear where rays hit a surface —
+            // it would read as a wash "painted" on geometry rather than a medium filling the scene. Roofed
+            // scenes never miss, so this is a no-op there (goldens unchanged); a no-fog scene marches to a
+            // transmittance of 1 / no in-scatter, also a no-op.
+            Vector3 fogEnd = camera.Position + dir * (MathF.Max(Volumetrics.MaxMarchDistance, 0f) + 1f);
+            VolumetricSample volume = IntegrateVolumetricSegment(camera.Position, fogEnd, dir);
+            xyz = volume.Apply(xyz);
+        }
 
         var correctedXYZ = xyz * WavelengthLookup.DeterministicCorrection;
         var correctedDirect = bounce0 * WavelengthLookup.DeterministicCorrection;
@@ -898,7 +900,10 @@ public partial class JobSystem
         var correctedBounce2Plus = bounce2plus * WavelengthLookup.DeterministicCorrection;
         var correctedEmissive = emissiveLighting * WavelengthLookup.DeterministicCorrection;
 
-        if (SampleClamp > 0f)
+        // Skip the clamp on a primary miss (the emissive sky, §O2/§O3): it is smooth/low-variance, and a
+        // per-channel clamp would chop its high-luminance green wavelengths first, biasing the blue dome
+        // toward pink at low clamp values. (A roofed scene's miss is black, so the clamp was a no-op there.)
+        if (SampleClamp > 0f && hit)
         {
             Vector3 unclamped = correctedXYZ;
             correctedXYZ = Vector3.Clamp(correctedXYZ, Vector3.Zero, _sampleClampVec);

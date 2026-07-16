@@ -23,6 +23,13 @@ public struct MazeCell
 {
     public Wall Walls;
     public bool Visited;
+
+    /// <summary>
+    /// True when this cell is part of the open-air outdoor half of the maze
+    /// (outdoor-area-plan.md §O0): no ceiling, low hedges instead of full walls, grass + water, lit by
+    /// the sun. Default <c>false</c> — an all-indoor maze is the classic roofed stone maze, unchanged.
+    /// </summary>
+    public bool Outdoor;
 }
 
 /// <summary>
@@ -67,6 +74,36 @@ public class Maze
     /// Returns true if the cell at (x, y) has the specified wall flag set.
     /// </summary>
     public bool HasWall(int x, int y, Wall wall) => (_cells[x, y].Walls & wall) != 0;
+
+    /// <summary>Whether the cell at (x, y) is in the outdoor half (outdoor-area-plan.md §O0).</summary>
+    public bool IsOutdoor(int x, int y) => _cells[x, y].Outdoor;
+
+    /// <summary>True if any cell was marked outdoor (fast path: an all-indoor maze skips all §O geometry).</summary>
+    public bool HasOutdoor { get; private set; }
+
+    /// <summary>
+    /// Marks the far <paramref name="outdoorFraction"/> of the maze (the rows furthest from the (0,0)
+    /// start) as the outdoor half — a contiguous band, so the DFS start stays indoor and the far corner
+    /// (the usual goal) is outdoor: the walk escapes the roofed maze into the open (outdoor-area-plan.md
+    /// §O0). <c>0</c> leaves the whole maze indoor (unchanged). Idempotent-ish: recomputes from scratch.
+    /// </summary>
+    public void MarkOutdoorRegion(float outdoorFraction)
+    {
+        outdoorFraction = Math.Clamp(outdoorFraction, 0f, 1f);
+        // First indoor→outdoor row: cells with y at or beyond this are outdoor. Clamped so at least the
+        // start row (y=0) stays indoor even at fraction 1, and the split lands on a cell boundary.
+        int firstOutdoorRow = (int)MathF.Ceiling(Height * (1f - outdoorFraction));
+        firstOutdoorRow = Math.Clamp(firstOutdoorRow, 1, Height);
+
+        HasOutdoor = false;
+        for (int x = 0; x < Width; x++)
+            for (int y = 0; y < Height; y++)
+            {
+                bool outdoor = y >= firstOutdoorRow;
+                _cells[x, y].Outdoor = outdoor;
+                HasOutdoor |= outdoor;
+            }
+    }
 
     /// <summary>
     /// Generates the maze using the iterative recursive-backtracker (DFS)

@@ -45,9 +45,9 @@ public partial class JobSystem
         if (marchLength <= 1e-5f)
             return new VolumetricSample(1f, Vector3.Zero);
 
+        // Full step count regardless of motion — halving it while moving made the fog integral jump when
+        // the camera started/stopped (a flicker). Mirrors the shader IntegrateVolumetric.
         int steps = Math.Max(1, options.MarchSteps);
-        if (isMoving && steps > 1)
-            steps = Math.Max(1, (steps + 1) / 2);
 
         Vector3 dir = segment / rayLength;
         if (rayDirection.LengthSquared() > 1e-10f)
@@ -228,10 +228,23 @@ public partial class JobSystem
         for (int i = 0; i < lights.Length; i++)
         {
             var light = lights[i];
-            Vector3 toLight = light.Position - samplePoint;
-            float distSq = MathF.Max(toLight.LengthSquared(), 1e-6f);
-            float dist = MathF.Sqrt(distSq);
-            Vector3 lightDir = toLight / dist;
+            Vector3 lightDir; float dist; float lightWeight;
+            if (light.Directional) // §C2/§O8: directional sun — parallel, no falloff, dark below the horizon
+            {
+                Vector3 toSun = Vector3.Normalize(-light.Direction);
+                if (toSun.Y <= 0f) continue; // night: a below-horizon sun lights no fog
+                lightDir = toSun;
+                dist = 1e4f;
+                lightWeight = LightIntensity; // parallel rays: full strength, no inverse-square
+            }
+            else
+            {
+                Vector3 toLight = light.Position - samplePoint;
+                float distSq = MathF.Max(toLight.LengthSquared(), 1e-6f);
+                dist = MathF.Sqrt(distSq);
+                lightDir = toLight / dist;
+                lightWeight = LightIntensity / distSq;
+            }
 
             if (bvh is not null)
             {
@@ -247,7 +260,6 @@ public partial class JobSystem
                     continue;
             }
 
-            float lightWeight = LightIntensity / distSq;
             // Fog self-shadow (shadows-and-caustics-plan §A2): thick fog between this sample and
             // the light dims the in-scatter, so shafts fall off with depth into the smoke. Tied to
             // the same shadow-step cadence (bvh non-null) as the geometry occlusion above.

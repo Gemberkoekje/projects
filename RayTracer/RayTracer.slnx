@@ -5,7 +5,7 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/Solution Items/">
-    <File Path="gpu-raytracing-plan.md" />
+    <File Path="plan.md" />
     <File Path="Raytracing.hlsl" />
   </Folder>
   <Project Path=".net.csproj" />

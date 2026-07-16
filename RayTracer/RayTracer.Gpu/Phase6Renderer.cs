@@ -166,6 +166,10 @@ internal sealed class Phase6Renderer : IDisposable
     private const int CellHeadCapacity = 4 * 1024 * 1024;
     private ID3D12Resource _lightBuffer = null!;
     private ID3D12Resource _lightColorBuffer = null!;
+    private ID3D12Resource _lightDirBuffer = null!; // §C2: sun direction + directional flag (t9)
+    // §O2 procedural sky: a small cbuffer (b2) fed by SetSky; off by default (roofed scenes unchanged).
+    private ID3D12Resource _skyConstantBuffer = null!;
+    private SkyConstants _sky; // Enabled == 0 until SetSky is called
     // Decal shading (plan §3): RGB→reflectance basis + the prop atlas. Both are static
     // across maze regenerations (basis is wavelength-derived, atlas is fixed art), so
     // RebuildScene leaves them alone; only device teardown recreates them.
@@ -313,7 +317,7 @@ internal sealed class Phase6Renderer : IDisposable
         public float CausticCellSize;
         public float CausticRadius, CausticStrength;
         public uint ShadowTransmitTriangles; // §A3: glass triangles cast soft shadows (repurposed from CPad0)
-        public float CPad1;
+        public float VolFarFadeStart; // §O: fog density fade start distance (0 = no fade); repurposed from CPad1
     }
 
     // Matches the shader's CausticPhoton (32-byte structured-buffer element): a caustic photon's world
@@ -349,6 +353,15 @@ internal sealed class Phase6Renderer : IDisposable
         public uint CellHeadCapacity, Pad1, Pad2, Pad3;
     }
 
+    // §O3 sky (b2) — matches SkyConstants in the shader.
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SkyConstants
+    {
+        public float SunDirX, SunDirY, SunDirZ, Enabled;
+        public float CosSunRadius, SunRadiance, Strength, RayleighDepth;
+        public float SunTempK, Pad0, Pad1, Pad2;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct ResolveConstants
     {
@@ -366,6 +379,7 @@ internal sealed class Phase6Renderer : IDisposable
         public uint ShowRat, RatLayer;                        // §8
         public float FadeLevel;                               // §9.4 outro fade
         public float ClassicDepthCue;                         // §1.4 classic depth-cue strength (0 = off)
+        public uint ClockEnabled, ClockHour, ClockMinute, ClockPad; // §O8 24h clock under the minimap
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -509,6 +523,9 @@ internal sealed class Phase6Renderer : IDisposable
         _reduceConstantBuffer = _device.CreateCommittedResource(
             new HeapProperties(HeapType.Upload), HeapFlags.None,
             ResourceDescription.Buffer(256), ResourceStates.GenericRead);
+        _skyConstantBuffer = _device.CreateCommittedResource(
+            new HeapProperties(HeapType.Upload), HeapFlags.None,
+            ResourceDescription.Buffer(256), ResourceStates.GenericRead); // §O2
     }
 
     // Everything whose size depends on the render resolution. Split out of one-time
@@ -836,6 +853,67 @@ internal sealed class Phase6Renderer : IDisposable
 
         float[] colorData = _lights.Count > 0 ? _lights.ColorData : new float[4];
         _lightColorBuffer = CreateUploadBuffer<float>(colorData, colorData.Length * sizeof(float));
+
+        // §C2: per-light sun direction + directional flag (all-zero for point lights → point path).
+        float[] dirData = _lights.Count > 0 ? _lights.DirData : new float[4];
+        _lightDirBuffer = CreateUploadBuffer<float>(dirData, dirData.Length * sizeof(float));
+    }
+
+    /// <summary>
+    /// §O2: turns on the procedural sky a ray sees when it escapes through an open roof, matching the
+    /// CPU <see cref="Sky"/>. <paramref name="sunDirection"/> is the sunlight's travel direction (the
+    /// sun disk is toward <c>-sunDirection</c>, so pass the same vector as the directional §C2 light).
+    /// Off until called; roofed scenes are unaffected.
+    /// </summary>
+    public void SetSky(Vector3 sunDirection, float sunAngularRadius = 0.04f, float sunRadiance = 9f,
+        float skyStrength = 0.7f, float rayleighDepth = 0.35f, float sunTempK = 5778f)
+    {
+        Vector3 d = sunDirection.LengthSquared() > 1e-12f ? Vector3.Normalize(sunDirection) : new Vector3(0f, -1f, 0f);
+        _sky = new SkyConstants
+        {
+            SunDirX = d.X, SunDirY = d.Y, SunDirZ = d.Z, Enabled = 1f,
+            CosSunRadius = MathF.Cos(MathF.Max(0f, sunAngularRadius)),
+            SunRadiance = sunRadiance, Strength = skyStrength, RayleighDepth = MathF.Max(0f, rayleighDepth),
+            SunTempK = MathF.Max(1f, sunTempK),
+        };
+    }
+
+    private bool _clockEnabled;
+    private int _clockHour, _clockMinute;
+
+    /// <summary>§O8: sets the 24-hour clock shown under the minimap (from the day/night cycle). Enable with
+    /// the overhead map on; disable (default) hides it. Only the resolve reads it — cheap, no GPU stall.</summary>
+    public void SetClock(bool enabled, int hour, int minute)
+    {
+        _clockEnabled = enabled;
+        _clockHour = hour;
+        _clockMinute = minute;
+    }
+
+    /// <summary>§O8: updates one directional light (the sun) in place — its travel direction, §O9 blackbody
+    /// temperature, and a <paramref name="lightLevel"/> in [0,1] that scales its illumination — as the
+    /// day/night cycle advances, avoiding a full scene rebuild. The level multiplies the light's pristine
+    /// base colour (from <c>PackedLights.ColorData</c>, which this method never mutates) so the sun's direct
+    /// lighting ramps smoothly up/down through dawn/dusk and reaches 0 at the horizon, instead of snapping
+    /// on/off against the below-horizon cutoff. Only the small light dir/colour upload buffers are re-mapped;
+    /// a <see cref="WaitForGpu"/> (like <c>UpdateSpheres</c>) guards the previous frame's in-flight read.
+    /// Pair with <see cref="SetSky"/>.</summary>
+    public void UpdateSunLight(int index, Vector3 direction, float tempK, float lightLevel = 1f)
+    {
+        if (_device is null || index < 0 || index >= _lights.Count) return;
+        WaitForGpu();
+        Vector3 d = direction.LengthSquared() > 1e-12f ? Vector3.Normalize(direction) : new Vector3(0f, -1f, 0f);
+        Span<float> dir = _lightDirBuffer.Map<float>(0, _lights.Count * 4);
+        dir[index * 4 + 0] = d.X; dir[index * 4 + 1] = d.Y; dir[index * 4 + 2] = d.Z; dir[index * 4 + 3] = 1f;
+        _lightDirBuffer.Unmap(0);
+        Span<float> col = _lightColorBuffer.Map<float>(0, _lights.Count * 4);
+        float level = Math.Clamp(lightLevel, 0f, 1f);
+        float[] baseColor = _lights.ColorData; // pristine per-light RGB — UpdateSunLight only writes the GPU buffer
+        col[index * 4 + 0] = baseColor[index * 4 + 0] * level;
+        col[index * 4 + 1] = baseColor[index * 4 + 1] * level;
+        col[index * 4 + 2] = baseColor[index * 4 + 2] * level;
+        col[index * 4 + 3] = tempK; // §O9 emission temperature rides colour .w
+        _lightColorBuffer.Unmap(0);
     }
 
     private void CreateDecalResources()
@@ -907,6 +985,8 @@ internal sealed class Phase6Renderer : IDisposable
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(15, 0), ShaderVisibility.All), // 23: PhotonNext (u15, §B4 gather)
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(16, 0), ShaderVisibility.All), // 24: CellHead (u16, §B4 gather)
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(17, 0), ShaderVisibility.All), // 25: GridParams (u17, §B4 gather)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(9, 0), ShaderVisibility.All),   // 26: LightDirs (t9, §C2)
+            new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(2, 0), ShaderVisibility.All),  // 27: SkyConstants (b2, §O2)
         };
         _traceRootSignature = _device.CreateRootSignature(
             new RootSignatureDescription1(RootSignatureFlags.None, traceParams));
@@ -1420,11 +1500,16 @@ internal sealed class Phase6Renderer : IDisposable
             CausticRadius = _causticRadius,
             CausticStrength = _causticStrength,
             ShadowTransmitTriangles = _shadowTransmitTriangles ? 1u : 0u,
+            VolFarFadeStart = _volumetrics.FarFadeStart,
         };
 
         Span<TraceConstants> dest = _traceConstantBuffer.Map<TraceConstants>(0, 1);
         dest[0] = constants;
         _traceConstantBuffer.Unmap(0);
+
+        Span<SkyConstants> skyDest = _skyConstantBuffer.Map<SkyConstants>(0, 1); // §O2
+        skyDest[0] = _sky;
+        _skyConstantBuffer.Unmap(0);
     }
 
     private void UpdateResolveConstants(bool moving)
@@ -1480,6 +1565,9 @@ internal sealed class Phase6Renderer : IDisposable
             ClassicDepthCue = _classicDepthCue,
             RatLayer = (uint)DecalLayer.Rat,
             FadeLevel = _fadeLevel,
+            ClockEnabled = _clockEnabled && _showOverheadMap ? 1u : 0u, // §O8: shown under the minimap
+            ClockHour = (uint)Math.Clamp(_clockHour, 0, 23),
+            ClockMinute = (uint)Math.Clamp(_clockMinute, 0, 59),
         };
 
         Span<ResolveConstants> dest = _resolveConstantBuffer.Map<ResolveConstants>(0, 1);
@@ -1517,6 +1605,8 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.SetComputeRootUnorderedAccessView(23, _photonNextBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootUnorderedAccessView(24, _cellHeadBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootUnorderedAccessView(25, _gridParamsBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(26, _lightDirBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootConstantBufferView(27, _skyConstantBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);
@@ -1750,6 +1840,7 @@ internal sealed class Phase6Renderer : IDisposable
             _blasScratch?.Dispose();
             _tlas?.Dispose();
             _blas?.Dispose();
+            _lightDirBuffer?.Dispose();
             _lightColorBuffer?.Dispose();
             _lightBuffer?.Dispose();
             _materialReflectanceBuffer?.Dispose();
@@ -1868,6 +1959,7 @@ internal sealed class Phase6Renderer : IDisposable
         _blas?.Dispose();
         _reduceConstantBuffer?.Dispose();
         _resolveConstantBuffer?.Dispose();
+        _skyConstantBuffer?.Dispose();
         _traceConstantBuffer?.Dispose();
         DisposeSizeDependentResources();
         _pixelatePipeline?.Dispose();
@@ -1894,6 +1986,7 @@ internal sealed class Phase6Renderer : IDisposable
         _mazeGridBuffer?.Dispose();
         _decalBuffer?.Dispose();
         _rgbBasisBuffer?.Dispose();
+        _lightDirBuffer?.Dispose();
         _lightColorBuffer?.Dispose();
         _lightBuffer?.Dispose();
         _materialReflectanceBuffer?.Dispose();

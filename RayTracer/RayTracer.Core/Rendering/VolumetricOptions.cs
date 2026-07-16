@@ -40,7 +40,14 @@ public readonly record struct VolumetricOptions(
     /// Costs an extra coarse march per shadow ray, so it is enabled only on the NEE tiers
     /// (High/Ultra); the cheaper tiers leave it off and behave exactly as before.
     /// </summary>
-    bool ShadowTransmittance = false)
+    bool ShadowTransmittance = false,
+    /// <summary>
+    /// World distance from the camera at which the marched fog density starts fading to zero, reaching zero
+    /// at <see cref="MaxMarchDistance"/>. 0 (the default) disables the fade — the march hard-stops at
+    /// MaxMarchDistance exactly as before, so indoor scenes stay bit-exact. Used outdoors (with a longer
+    /// MaxMarchDistance) to hide the camera-relative march cutoff — the "fog sphere" — in the open garden.
+    /// </summary>
+    float FarFadeStart = 0f)
 {
     public static VolumetricOptions FromQuality(VolumetricQuality quality, SmokeMode smokeMode)
     {

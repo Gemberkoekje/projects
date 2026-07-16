@@ -57,6 +57,7 @@ cbuffer ResolveConstants : register(b0)
     float4 CurrCamRot;                                                       // §8 rat projection
     float3 RatPos;       float RatSize;                                      // §8 rat billboard
     uint   ShowRat;      uint  RatLayer; float FadeLevel; float ClassicDepthCue; // §8 rat, §9.4 fade, §1.4 depth cue
+    uint   ClockEnabled; uint  ClockHour; uint ClockMinute; uint _clockPad;      // §O8 24h clock under the minimap
 };
 
 // ── Spatial (box) filter — mirrors JobSystem.ResolveFilteredXYZ ─────────
@@ -289,6 +290,50 @@ float3 ApplyMinimap(float3 col, uint2 pix)
     return lerp(col, mapCol, 0.85);
 }
 
+// §O8: a 24-hour digital clock ("HH:MM") in a panel just below the minimap, driven by the day/night cycle.
+// A compact 3×5 pixel font: FONT[ch*5 + row] is the row's 3-bit pattern (bit0 = left column); glyphs 0-9
+// then colon (index 10). Screen-space overlay, gated by ClockEnabled.
+float3 ApplyClock(float3 col, uint2 pix)
+{
+    if (ClockEnabled == 0u)
+        return col;
+
+    uint mapPx = max(96u, Height / 4u);
+    uint margin = 14u;
+    uint x0 = Width - mapPx - margin;
+    uint stripY0 = margin + mapPx + 6u;      // just under the minimap
+    uint stripH = max(18u, mapPx / 4u);
+    if (pix.x < x0 || pix.x >= x0 + mapPx || pix.y < stripY0 || pix.y >= stripY0 + stripH)
+        return col;
+
+    float3 outc = lerp(col, float3(0.05, 0.05, 0.06), 0.85); // dark panel so digits read on any scene
+
+    const uint COLS = 19u, ROWS = 5u; // 5 glyphs × (3 cols + 1 spacing), minus the trailing spacing
+    uint s = max(1u, min(mapPx / (COLS + 4u), stripH / (ROWS + 2u))); // integer pixel scale, with margins
+    uint textW = COLS * s, textH = ROWS * s;
+    uint tx0 = x0 + (mapPx - textW) / 2u;
+    uint ty0 = stripY0 + (stripH - textH) / 2u;
+    if (pix.x < tx0 || pix.x >= tx0 + textW || pix.y < ty0 || pix.y >= ty0 + textH)
+        return outc;
+
+    uint lx = (pix.x - tx0) / s, ly = (pix.y - ty0) / s;
+    uint charIdx = lx / 4u, colInChar = lx % 4u;
+    if (colInChar >= 3u) return outc; // inter-character spacing column
+
+    uint ch = (charIdx == 0u) ? ClockHour / 10u
+            : (charIdx == 1u) ? ClockHour % 10u
+            : (charIdx == 2u) ? 10u                 // colon
+            : (charIdx == 3u) ? ClockMinute / 10u
+            :                   ClockMinute % 10u;
+
+    static const uint FONT[55] = {
+        7u,5u,5u,5u,7u,  2u,3u,2u,2u,7u,  7u,4u,7u,1u,7u,  7u,4u,7u,4u,7u,  5u,5u,7u,4u,4u,
+        7u,1u,7u,4u,7u,  7u,1u,7u,5u,7u,  7u,4u,2u,2u,2u,  7u,5u,7u,5u,7u,  7u,5u,7u,4u,7u,
+        0u,2u,0u,2u,0u };
+    bool on = ((FONT[ch * 5u + ly] >> colInChar) & 1u) != 0u;
+    return on ? float3(0.95, 0.92, 0.55) : outc; // warm amber digits
+}
+
 [numthreads(8, 8, 1)]
 void CSMain(uint3 tid : SV_DispatchThreadID)
 {
@@ -458,6 +503,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // is already in outColor — fogged, occluded, and reprojected like any surface. No screen-space
     // compositing here.
     outColor = ApplyMinimap(outColor, tid.xy);
+    outColor = ApplyClock(outColor, tid.xy); // §O8 24h clock under the minimap
     outColor *= (1.0 - FadeLevel); // §9.4 outro fade-to-black between mazes
     Output[tid.xy] = float4(saturate(outColor), 1.0);
 }

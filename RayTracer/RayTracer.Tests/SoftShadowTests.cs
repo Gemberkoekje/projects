@@ -26,17 +26,19 @@ public sealed class SoftShadowTests
     }
 
     // The fraction of NEE samples that reach the light unblocked — the accumulated NEE visibility at a
-    // receiver point, computed exactly as the path tracer does: sample a point on the light, trace the
-    // shadow ray to it, and average the BVH transmittance over many samples.
+    // receiver point, computed exactly as the path tracer does: sample the shadow ray toward the light
+    // (a point on an area sphere, or a parallel direction for a sun), trace it, and average the BVH
+    // transmittance over many samples.
     private static float AverageVisibility(BVH bvh, Vector3 point, Vector3 normal, Light light, int samples, uint seed)
     {
         uint rng = seed;
         float sum = 0f;
         for (int i = 0; i < samples; i++)
         {
-            Vector3 toLight = light.SamplePoint(ref rng) - point;
-            float dist = toLight.Length();
-            var ray = new Ray { Origin = point + normal * 1e-3f, Direction = toLight / dist, Wavelength = 550, Intensity = 1f };
+            float geom = light.SampleShadowRay(point, normal, ref rng, out Vector3 dir, out float dist);
+            if (geom <= 0f)
+                continue;
+            var ray = new Ray { Origin = point + normal * 1e-3f, Direction = dir, Wavelength = 550, Intensity = 1f };
             sum += bvh.Transmittance(ray, dist - 2e-3f);
         }
         return sum / samples;
@@ -107,5 +109,58 @@ public sealed class SoftShadowTests
         Assert.AreEqual(0f, vSmall, $"A small area light is still fully occluded here (v={vSmall}).");
         Assert.IsTrue(vLarge > 0.02f && vLarge < 0.98f, $"A large area light casts a penumbra — fractional visibility (v={vLarge}).");
         Assert.IsTrue(vLarge > vSmall, $"A wider light lets more of the receiver see past the occluder (small {vSmall}, large {vLarge}).");
+    }
+
+    // ── C2: directional (sun) light ────────────────────────────────────────
+
+    [TestMethod]
+    public void DirectionalLight_IsParallelWithNoFalloff()
+    {
+        // A sun shining straight down (−Y). Two receivers at very different positions/heights.
+        var sun = new Light { Directional = true, Direction = new Vector3(0f, -1f, 0f), Color = Vector3.One };
+        var normal = Vector3.UnitY;
+        uint rngA = 5u, rngB = 5u;
+
+        float geomA = sun.SampleShadowRay(new Vector3(0f, 0f, 0f), normal, ref rngA, out Vector3 dirA, out float distA);
+        float geomB = sun.SampleShadowRay(new Vector3(50f, 20f, -30f), normal, ref rngB, out Vector3 dirB, out _);
+
+        Assert.AreEqual(new Vector3(0f, 1f, 0f), dirA, "Shadow ray points toward the sun (−Direction).");
+        Assert.AreEqual(dirA, dirB, "A directional light is parallel — same direction everywhere.");
+        Assert.AreEqual(geomA, geomB, 1e-6f, "No 1/d² falloff — the geometry factor is distance-independent.");
+        Assert.AreEqual(1f, geomA, 1e-6f, "Face-on to the sun → cos = 1.");
+        Assert.IsTrue(distA > 100f, "The sun is effectively infinitely far.");
+        Assert.AreEqual(5u, rngA, "A radius-0 sun draws no RNG (hard parallel shadow, byte-identical).");
+    }
+
+    [TestMethod]
+    public void DirectionalLight_CastsParallelShadow()
+    {
+        // Occluder floating above the floor; a sun straight overhead. The floor point directly below is
+        // shadowed; one well to the side (past the parallel shadow) is lit — a parallel shadow.
+        var bvh = new BVH([new Sphere(new Vector3(0f, 4f, 0f), 1f, Diffuse())]);
+        var sun = new Light { Directional = true, Direction = new Vector3(0f, -1f, 0f), Color = Vector3.One };
+        var up = Vector3.UnitY;
+
+        Assert.AreEqual(0f, AverageVisibility(bvh, new Vector3(0f, 0f, 0f), up, sun, 64, 1u), "Directly under the occluder → in the sun's shadow.");
+        Assert.AreEqual(1f, AverageVisibility(bvh, new Vector3(5f, 0f, 0f), up, sun, 64, 1u), "Well to the side → lit by the sun.");
+    }
+
+    [TestMethod]
+    public void SunAngularRadius_SoftensShadowEdge()
+    {
+        // A receiver at the very edge of the occluder's parallel shadow: a pinpoint sun (angular radius
+        // 0) is binary there, but a sun with an angular radius half-sees past the occluder → penumbra.
+        var bvh = new BVH([new Sphere(new Vector3(0f, 4f, 0f), 1f, Diffuse())]);
+        var up = Vector3.UnitY;
+        var edge = new Vector3(1.0f, 0f, 0f); // directly under the occluder's rim
+
+        var sharp = new Light { Directional = true, Direction = new Vector3(0f, -1f, 0f), Color = Vector3.One, Radius = 0f };
+        var soft = new Light { Directional = true, Direction = new Vector3(0f, -1f, 0f), Color = Vector3.One, Radius = 0.25f };
+
+        float vSharp = AverageVisibility(bvh, edge, up, sharp, 4096, 3u);
+        float vSoft = AverageVisibility(bvh, edge, up, soft, 4096, 3u);
+
+        Assert.IsTrue(vSharp == 0f || vSharp == 1f, $"A pinpoint sun casts a hard edge — binary visibility (v={vSharp}).");
+        Assert.IsTrue(vSoft > 0.02f && vSoft < 0.98f, $"An angular sun softens the edge — fractional visibility (v={vSoft}).");
     }
 }

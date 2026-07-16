@@ -59,7 +59,8 @@ public static class MazeGeometryBuilder
         float cellSize = CellSize,
         float wallHeight = WallHeight,
         Func<int, int, bool, bool>? skipWall = null,
-        float wallThickness = 0f)
+        float wallThickness = 0f,
+        MaterialData? grassMaterial = null)
     {
         var tracables = new List<Tracable>();
 
@@ -152,28 +153,63 @@ public static class MazeGeometryBuilder
         float totalX = maze.Width * cs;
         float totalZ = maze.Height * cs;
 
-        tracables.Add(new TracableRectangle(
-            (new Vector3(0, 0, 0),
-             new Vector3(totalX, 0, 0),
-             new Vector3(0, 0, totalZ)),
-            floorMaterial));
-
-        // ── Ceiling (y = wallHeight) ────────────────────────────────
-        var ceilingLoc = (new Vector3(0, wh, 0),
-                          new Vector3(totalX, wh, 0),
-                          new Vector3(0, wh, totalZ));
-        if (ceilingGridMaterial is not null)
+        if (maze.HasOutdoor)
         {
-            // 4 tiles per cell in each direction
-            float tilesAcross = maze.Width * 4f;
-            float tilesDown = maze.Height * 4f;
-            tracables.Add(new CeilingTileRectangle(
-                ceilingLoc, ceilingMaterial, ceilingGridMaterial,
-                tilesAcross, tilesDown));
+            // Per-cell floor so outdoor cells can be grass (outdoor-area-plan.md §O5); indoor keeps stone.
+            for (int gx = 0; gx < maze.Width; gx++)
+                for (int gy = 0; gy < maze.Height; gy++)
+                {
+                    MaterialData mat = maze.IsOutdoor(gx, gy) && grassMaterial is not null ? grassMaterial : floorMaterial;
+                    float x0 = gx * cs, x1 = (gx + 1) * cs, z0 = gy * cs, z1 = (gy + 1) * cs;
+                    tracables.Add(new TracableRectangle(
+                        (new Vector3(x0, 0, z0), new Vector3(x1, 0, z0), new Vector3(x0, 0, z1)), mat));
+                }
         }
         else
         {
-            tracables.Add(new TracableRectangle(ceilingLoc, ceilingMaterial));
+            tracables.Add(new TracableRectangle(
+                (new Vector3(0, 0, 0),
+                 new Vector3(totalX, 0, 0),
+                 new Vector3(0, 0, totalZ)),
+                floorMaterial));
+        }
+
+        // ── Ceiling (y = wallHeight) ────────────────────────────────
+        if (maze.HasOutdoor)
+        {
+            // Open-roof half (outdoor-area-plan.md §O1): emit the ceiling per-cell so outdoor cells are
+            // left open to the sky. 4 tiles/cell keeps the pattern aligned with the classic full ceiling.
+            for (int gx = 0; gx < maze.Width; gx++)
+                for (int gy = 0; gy < maze.Height; gy++)
+                {
+                    if (maze.IsOutdoor(gx, gy))
+                        continue; // no ceiling — rays escape to the sky
+                    float x0 = gx * cs, x1 = (gx + 1) * cs, z0 = gy * cs, z1 = (gy + 1) * cs;
+                    var tileLoc = (new Vector3(x0, wh, z0), new Vector3(x1, wh, z0), new Vector3(x0, wh, z1));
+                    tracables.Add(ceilingGridMaterial is not null
+                        ? new CeilingTileRectangle(tileLoc, ceilingMaterial, ceilingGridMaterial, 4f, 4f)
+                        : new TracableRectangle(tileLoc, ceilingMaterial));
+                }
+        }
+        else
+        {
+            // Classic roofed maze: one ceiling rectangle over the whole grid (unchanged — bit-identical).
+            var ceilingLoc = (new Vector3(0, wh, 0),
+                              new Vector3(totalX, wh, 0),
+                              new Vector3(0, wh, totalZ));
+            if (ceilingGridMaterial is not null)
+            {
+                // 4 tiles per cell in each direction
+                float tilesAcross = maze.Width * 4f;
+                float tilesDown = maze.Height * 4f;
+                tracables.Add(new CeilingTileRectangle(
+                    ceilingLoc, ceilingMaterial, ceilingGridMaterial,
+                    tilesAcross, tilesDown));
+            }
+            else
+            {
+                tracables.Add(new TracableRectangle(ceilingLoc, ceilingMaterial));
+            }
         }
 
         // ── Goal marker (colored floor patch at the exit cell) ──────
@@ -209,7 +245,8 @@ public static class MazeGeometryBuilder
         float wallHeight = WallHeight,
         float lightSpawnChance = 0.4f,
         int biomeSize = 4,
-        int seed = 0)
+        int seed = 0,
+        float emissionTempK = 0f) // §O9: blackbody temp for the maze torches/ceiling lights (0 = flat white)
     {
         var lights = new List<Light>();
         var rng = new Random(seed);
@@ -218,6 +255,12 @@ public static class MazeGeometryBuilder
         {
             for (int gx = 0; gx < maze.Width; gx++)
             {
+                // §O8: outdoor cells are open-air — no wall torches or ceiling lights (there is no ceiling).
+                // They are lit by the sun (day) and the sky (dim at night), so the garden goes dark at night
+                // instead of being lit by point lights that ignore the day/night cycle. Indoor-only mazes
+                // (no outdoor region) skip nothing, so their light placement is unchanged.
+                if (maze.IsOutdoor(gx, gy)) continue;
+
                 // Determine which biome this cell belongs to
                 int biomeX = biomeSize > 0 ? gx / biomeSize : -1;
                 int biomeY = biomeSize > 0 ? gy / biomeSize : -1;
@@ -226,7 +269,7 @@ public static class MazeGeometryBuilder
                 if (biomeSize > 0 && isTorchBiome)
                 {
                     // Place wall torches in this biome region
-                    AddWallTorches(lights, maze, gx, gy, cellSize, wallHeight, rng);
+                    AddWallTorches(lights, maze, gx, gy, cellSize, wallHeight, rng, emissionTempK);
                 }
                 else if (rng.NextSingle() < lightSpawnChance)
                 {
@@ -238,7 +281,8 @@ public static class MazeGeometryBuilder
                             wallHeight - 0.05f,
                             (gy + 0.5f) * cellSize),
                         Color = new Vector3(1f, 1f, 1f),
-                        Ambient = 0f
+                        Ambient = 0f,
+                        EmissionTempK = emissionTempK
                     });
                 }
             }
@@ -258,7 +302,8 @@ public static class MazeGeometryBuilder
         int cellY,
         float cellSize,
         float wallHeight,
-        Random rng)
+        Random rng,
+        float emissionTempK)
     {
         float torchHeight = wallHeight * 0.75f;
 
@@ -274,7 +319,8 @@ public static class MazeGeometryBuilder
             {
                 Position = new Vector3((cellX + 0.5f) * cellSize, torchHeight, z + 0.1f),
                 Color = torchColor,
-                Ambient = 0f
+                Ambient = 0f,
+                EmissionTempK = emissionTempK
             });
         }
 
@@ -286,7 +332,8 @@ public static class MazeGeometryBuilder
             {
                 Position = new Vector3((cellX + 0.5f) * cellSize, torchHeight, z - 0.1f),
                 Color = torchColor,
-                Ambient = 0f
+                Ambient = 0f,
+                EmissionTempK = emissionTempK
             });
         }
 
@@ -298,7 +345,8 @@ public static class MazeGeometryBuilder
             {
                 Position = new Vector3(x + 0.1f, torchHeight, (cellY + 0.5f) * cellSize),
                 Color = torchColor,
-                Ambient = 0f
+                Ambient = 0f,
+                EmissionTempK = emissionTempK
             });
         }
 
@@ -310,7 +358,8 @@ public static class MazeGeometryBuilder
             {
                 Position = new Vector3(x - 0.1f, torchHeight, (cellY + 0.5f) * cellSize),
                 Color = torchColor,
-                Ambient = 0f
+                Ambient = 0f,
+                EmissionTempK = emissionTempK
             });
         }
     }

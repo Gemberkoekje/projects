@@ -52,10 +52,11 @@ struct PrimitiveInfo
 
 RaytracingAccelerationStructure Scene              : register(t0);
 StructuredBuffer<PrimitiveInfo>  Primitives        : register(t1);
-StructuredBuffer<float4>         DeterXYZ           : register(t2); // xyz used
+StructuredBuffer<float4>         DeterXYZ           : register(t2); // white-balanced CIE; xyz used, .w = nm
 StructuredBuffer<float>          MaterialReflectance: register(t3); // [material*50 + index]
-StructuredBuffer<float4>         Lights             : register(t4); // xyz = world position
+StructuredBuffer<float4>         Lights             : register(t4); // xyz = world position, w = radius (§C1)
 StructuredBuffer<float4>         LightColors        : register(t5); // xyz = colour (inscatter)
+StructuredBuffer<float4>         LightDirs          : register(t9); // §C2: xyz = sun travel direction, w = 1 if directional
 StructuredBuffer<float4>         RgbBasis           : register(t6); // [i].xyz = linearRGB→reflectance basis row i (plan §3.1)
 StructuredBuffer<float4>         DecalPixels        : register(t7); // linear RGBA atlas, [layer*S*S + y*S + x]
 
@@ -134,8 +135,57 @@ cbuffer Constants : register(b0)
     // Caustics (§B4): the flattened photon-grid params, matching PhotonMap.BuildGrid / CausticReference.
     uint   CausticEnabled;       int   CausticMinCellX; int CausticMinCellY; int CausticMinCellZ;
     uint   CausticDimX;          uint  CausticDimY; uint CausticDimZ; float CausticCellSize;
-    float  CausticRadius;        float CausticStrength; uint ShadowTransmitTriangles; float _cpad1;
+    float  CausticRadius;        float CausticStrength; uint ShadowTransmitTriangles; float VolFarFadeStart; // §O: 0 = no fade
 };
+
+// §O3 procedural sky (outdoor-area-plan.md) — a separate cbuffer so the Constants layout above is
+// untouched (roofed scenes stay bit-identical). SkyEnabled 0 → a ray that escapes returns black.
+cbuffer SkyConstants : register(b2)
+{
+    float3 SkySunDir;    float SkyEnabled;      // sun travel direction; 1 = sky on
+    float  SkyCosSunRadius; float SkySunRadiance; float SkyStrength; float SkyRayleighDepth;
+    float  SkySunTempK;  float _skyPad0; float _skyPad1; float _skyPad2;
+};
+
+#define SKY_REF_NM      550.0
+#define SKY_AIRMASS_FLR 0.15
+#define SKY_C2_NM_K     1.438777e7   // second radiation constant hc/k (nm·K)
+
+// Planck black-body shape at `wl` for temperature `tempK`, normalised to 1 at SKY_REF_NM (a colour shape
+// factor, not absolute radiance). tempK <= 0 → 1 (flat white). Mirrors BlackbodySpectrum.Relative (§O9);
+// used for the sky's sun and for per-light emission spectra.
+float BlackbodyShape(float wl, float tempK)
+{
+    if (tempK <= 0.0) return 1.0;
+    float r = SKY_REF_NM / wl;
+    float denom    = exp(SKY_C2_NM_K / (wl * tempK)) - 1.0;
+    float denomRef = exp(SKY_C2_NM_K / (SKY_REF_NM * tempK)) - 1.0;
+    return r * r * r * r * r * (denomRef / denom); // (550/λ)^5 · (denomRef/denom)
+}
+
+// The sky's solar shape is just the black-body shape at the sun's temperature.
+float SkySolarShape(float wl) { return BlackbodyShape(wl, SkySunTempK); }
+
+// Spectral sky radiance toward `dir` at `wavelengthNm` (port of Sky.Radiance): a bright sun disk toward
+// −SkySunDir, else a single-scattering Rayleigh dome — 1/λ⁴ scattering saturated through 1−e^(−τ) so it
+// reads blue (not violet) at the zenith and pales toward the horizon (aerial perspective).
+float SkyRadiance(float3 dir, float wavelengthNm)
+{
+    float3 d = normalize(dir);
+    float3 toSun = normalize(-SkySunDir);
+    float cosSun = dot(d, toSun);
+    if (cosSun >= SkyCosSunRadius)
+        return SkySunRadiance;
+
+    float cosZenith = saturate(d.y);
+    float airmass = 1.0 / (cosZenith + SKY_AIRMASS_FLR);
+    float lr = SKY_REF_NM / max(wavelengthNm, 1.0);
+    float betaRel = lr * lr * lr * lr;          // (550/λ)⁴
+    float tau = SkyRayleighDepth * betaRel * airmass;
+    float inscatter = 1.0 - exp(-tau);
+    float phase = 0.75 * (1.0 + cosSun * cosSun); // Rayleigh phase, mean 1 over the sphere
+    return SkyStrength * SkySolarShape(wavelengthNm) * phase * inscatter;
+}
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
 
@@ -686,31 +736,88 @@ float TraceTransmittance(float3 origin, float3 dir, float maxDist, uint heroIdx)
 
 // ── Lighting (mirrors Phase2Reference) ────────────────────────────────
 
-float LightWeight(float3 lightPos, float3 samplePoint, float3 normal)
+// §C1 area-light sampling: the shadow-ray target on a light — its centre for a point light (radius in
+// Lights[i].w == 0; draws NO RNG, so point-light scenes are bit-identical to before) or a uniform
+// point on the light's sphere for an area light, so the accumulated NEE visibility softens into a
+// penumbra. Mirrors Light.SamplePoint (CPU) / Phase2Reference.SampleLightPoint.
+float3 SampleLightPoint(uint lightIdx, inout uint rng)
 {
-    float3 toLight = lightPos - samplePoint;
+    float3 pos = Lights[lightIdx].xyz;
+    float radius = Lights[lightIdx].w;
+    if (radius <= 0.0)
+        return pos;
+
+    rng = rng * RNG_MUL + RNG_ADD;
+    float z = 2.0 * (float(rng) / 4294967296.0) - 1.0;
+    rng = rng * RNG_MUL + RNG_ADD;
+    float phi = 2.0 * PI * (float(rng) / 4294967296.0);
+    float s = sqrt(max(0.0, 1.0 - z * z));
+    return pos + radius * float3(s * cos(phi), s * sin(phi), z);
+}
+
+// §C1/§C2 light geometry (mirrors Light.SelectionWeight / SampleShadowRay). A light is a point light
+// (LightDirs[i].w == 0: position Lights[i].xyz, sphere radius Lights[i].w) or a directional sun
+// (LightDirs[i].w == 1: travel direction LightDirs[i].xyz, and Lights[i].w reused as angular radius).
+
+// Importance weight to pick a light in NEE: a point light's 1/d²·cos, a sun's plain cos (no falloff).
+float LightSelectionWeight(uint i, float3 samplePoint, float3 normal)
+{
+    if (LightDirs[i].w > 0.5)
+    {
+        float c = dot(normal, normalize(-LightDirs[i].xyz));
+        return c > 0.0 ? c : 0.0;
+    }
+    float3 toLight = Lights[i].xyz - samplePoint;
     float dsq = dot(toLight, toLight);
-    float dist = sqrt(dsq);
-    float3 ldir = toLight / dist;
-    float cosv = dot(normal, ldir);
+    float cosv = dot(normal, toLight / sqrt(dsq));
     return cosv > 0.0 ? 1.0 / max(dsq, 1e-6) : 0.0;
 }
 
-void FillLight(float3 lightPos, float3 samplePoint, float3 normal, out float3 outDir, out float outDistSq, out float outCos)
+// A direction within the sun's angular-radius cone (Lights[i].w radians); the axis exactly (no RNG)
+// when the angular radius is 0. Mirrors Light.SampleCone.
+float3 SampleSunDir(uint i, float3 axis, inout uint rng)
 {
-    float3 toLight = lightPos - samplePoint;
-    outDistSq = max(dot(toLight, toLight), 1e-6);
-    float dist = sqrt(outDistSq);
-    outDir = toLight / dist;
-    outCos = dot(normal, outDir);
+    float radius = Lights[i].w;
+    if (radius <= 0.0)
+        return axis;
+    rng = rng * RNG_MUL + RNG_ADD; float u1 = float(rng) / 4294967296.0;
+    rng = rng * RNG_MUL + RNG_ADD; float u2 = float(rng) / 4294967296.0;
+    float cosMax = cos(radius);
+    float cosT = 1.0 - u1 * (1.0 - cosMax);
+    float sinT = sqrt(max(0.0, 1.0 - cosT * cosT));
+    float phi = 2.0 * PI * u2;
+    float3 t = abs(axis.x) > 0.1 ? normalize(float3(axis.y, -axis.x, 0.0)) : normalize(float3(0.0, axis.z, -axis.y));
+    float3 b = cross(axis, t);
+    return normalize(sinT * cos(phi) * t + sinT * sin(phi) * b + cosT * axis);
 }
 
-void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
-                 out float outP, out float3 outDir, out float outDistSq, out float outCos)
+// Samples one shadow ray toward light i; writes dir/dist and returns the geometry factor (cos/d² for
+// a point light, plain cos for a sun — no falloff). Draws RNG only for a soft light (a radius-0 light
+// draws none and reproduces the old hard shadow byte-for-byte).
+float SampleLightShadowRay(uint i, float3 samplePoint, float3 normal, inout uint rng, out float3 dir, out float dist)
+{
+    if (LightDirs[i].w > 0.5)
+    {
+        float3 toSun = normalize(-LightDirs[i].xyz);
+        dist = 1e4; // effectively infinite — any occluder in the scene blocks the sun
+        if (toSun.y <= 0.0) { dir = toSun; return 0.0; } // §O8: sun below the horizon (night) casts no light
+        dir = SampleSunDir(i, toSun, rng);
+        float c = dot(normal, dir);
+        return c > 0.0 ? c : 0.0;
+    }
+    float3 toLight = SampleLightPoint(i, rng) - samplePoint;
+    float distSq = max(dot(toLight, toLight), 1e-6);
+    dist = sqrt(distSq);
+    dir = toLight / dist;
+    float cosv = dot(normal, dir);
+    return cosv > 0.0 ? cosv / distSq : 0.0;
+}
+
+uint SelectLight(inout uint rng, float3 samplePoint, float3 normal, out float outP)
 {
     float totalW = 0.0;
     for (uint li = 0u; li < NumLights; li++)
-        totalW += LightWeight(Lights[li].xyz, samplePoint, normal);
+        totalW += LightSelectionWeight(li, samplePoint, normal);
 
     rng = rng * RNG_MUL + RNG_ADD;
 
@@ -720,34 +827,29 @@ void SelectLight(inout uint rng, float3 samplePoint, float3 normal,
         float acc = 0.0;
         for (uint li = 0u; li < NumLights; li++)
         {
-            float w = LightWeight(Lights[li].xyz, samplePoint, normal);
+            float w = LightSelectionWeight(li, samplePoint, normal);
             acc += w;
             if (u <= acc)
             {
-                FillLight(Lights[li].xyz, samplePoint, normal, outDir, outDistSq, outCos);
                 outP = w / totalW;
-                return;
+                return li;
             }
         }
         uint last = NumLights - 1u;
-        FillLight(Lights[last].xyz, samplePoint, normal, outDir, outDistSq, outCos);
-        outP = LightWeight(Lights[last].xyz, samplePoint, normal) / totalW;
-        return;
+        outP = LightSelectionWeight(last, samplePoint, normal) / totalW;
+        return last;
     }
 
     uint idx = rng % NumLights;
-    FillLight(Lights[idx].xyz, samplePoint, normal, outDir, outDistSq, outCos);
     outP = 1.0 / float(NumLights);
+    return idx;
 }
 
-float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal, uint heroIdx)
+float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal, uint heroIdx, inout uint rng)
 {
-    float3 toLight = Lights[lightIdx].xyz - hitPoint;
-    float distSq = dot(toLight, toLight);
-    float dist = sqrt(distSq);
-    float3 lightDir = toLight / dist;
-    float cosTheta = dot(hitNormal, lightDir);
-    if (cosTheta <= 0.0)
+    float3 lightDir; float dist;
+    float geom = SampleLightShadowRay(lightIdx, hitPoint, hitNormal, rng, lightDir, dist);
+    if (geom <= 0.0)
         return 0.0;
 
     float3 shadowOrigin = hitPoint + hitNormal * 1e-3;
@@ -755,7 +857,9 @@ float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal, uint he
     if (vis <= 0.0)
         return 0.0;
 
-    return vis * (cosTheta / distSq * LightIntensity * float(NumLights));
+    // §O9: modulate by the light's blackbody emission at this hero wavelength (LightColors[i].w = temp K).
+    float emission = BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[lightIdx].w);
+    return vis * (geom * LightIntensity * float(NumLights)) * emission;
 }
 
 // ── Volumetrics (mirrors Phase4Reference / VolumetricIntegration.cs) ────
@@ -795,7 +899,13 @@ float FogProfile(float3 p, float coverage)
     float midHeight = exp(-abs(p.y - 1.0) * 1.35);
     float thickCoverage = 0.72 + 0.28 * coverage;
     float heightWeight = 0.70 + 0.30 * midHeight;
-    return 0.50 * thickCoverage * heightWeight;
+    // §O: this profile keeps a 0.70 floor that otherwise fills all Y. Indoors the roof caps it, but over
+    // the open garden it billows up into the sky like fire smoke. Fade it out between the wall top and a
+    // low ceiling so outdoor fog reads as a ground/garden bank under a clear sky. The fade starts at
+    // WALL_HEIGHT, so the roofed indoor volume (y <= WALL_HEIGHT) multiplies by exactly 1.0 — the goldens
+    // (all roofed scenes) stay bit-exact.
+    float heightCeil = 1.0 - smoothstep(WALL_HEIGHT, WALL_HEIGHT + 2.0, p.y);
+    return 0.50 * thickCoverage * heightWeight * heightCeil;
 }
 
 float GroundProfile(float3 p, float coverage)
@@ -998,10 +1108,23 @@ float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool tra
     float3 lighting = float3(0.0, 0.0, 0.0);
     for (uint i = 0u; i < NumLights; i++)
     {
-        float3 toLight = Lights[i].xyz - samplePoint;
-        float distSq = max(dot(toLight, toLight), 1e-6);
-        float dist = sqrt(distSq);
-        float3 lightDir = toLight / dist;
+        float3 lightDir; float dist; float lightWeight;
+        if (LightDirs[i].w > 0.5) // §C2/§O8: directional sun — parallel (no falloff), dark below the horizon
+        {
+            float3 toSun = normalize(-LightDirs[i].xyz);
+            if (toSun.y <= 0.0) continue; // night: a below-horizon sun lights no fog (was a bogus point at origin)
+            lightDir = toSun;
+            dist = 1e4;
+            lightWeight = LightIntensity; // parallel rays: full strength, no inverse-square (god-rays through fog)
+        }
+        else
+        {
+            float3 toLight = Lights[i].xyz - samplePoint;
+            float distSq = max(dot(toLight, toLight), 1e-6);
+            dist = sqrt(distSq);
+            lightDir = toLight / dist;
+            lightWeight = LightIntensity / distSq;
+        }
 
         if (traceShadow)
         {
@@ -1009,8 +1132,6 @@ float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool tra
             if (TraceOccluded(shadowOrigin, lightDir, dist - 2e-3))
                 continue;
         }
-
-        float lightWeight = LightIntensity / distSq;
         // Dim the in-scatter by the fog optical depth toward this light (§A2), tied to the same
         // shadow-step cadence (traceShadow) as the geometry occlusion above.
         if (VolShadowTransmittance != 0u && traceShadow)
@@ -1044,9 +1165,11 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
     if (marchLength <= 1e-5)
         return;
 
+    // Full march-step count whether the camera is moving or still. Halving the steps while moving (a perf
+    // trick) changed the fog integral, so the fog visibly shifted the instant the camera started/stopped —
+    // a flicker. The frame is unpipelined and fog is a single march per pixel, so full steps while moving
+    // is cheap enough on the target GPU; consistency matters more here. (Goldens render still, so bit-exact.)
     uint steps = max(1u, VolMarchSteps);
-    if (SoftResetFlag != 0u && steps > 1u)
-        steps = max(1u, (steps + 1u) / 2u);
 
     float3 dir = segment / rayLength;
     if (dot(rayDirection, rayDirection) > 1e-10)
@@ -1061,6 +1184,10 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
         float distance = (float(i) + 0.5) * stepLength;
         float3 p = rayOrigin + dir * distance;
         float density = GetDensity(p, VolSmokeMode, time);
+        // §O: fade the fog to nothing over the far end of the march so the camera-relative cutoff doesn't
+        // read as a hard "fog sphere" in the open garden. Off (VolFarFadeStart <= 0) → bit-exact indoors.
+        if (VolFarFadeStart > 0.0)
+            density *= 1.0 - smoothstep(VolFarFadeStart, max(VolMaxMarchDistance, VolFarFadeStart + 1e-3), distance);
         if (density <= 0.0)
             continue;
 
@@ -1098,18 +1225,20 @@ float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng, 
     if (LightingMode != 0u && NumLights > 0u)
     {
         ambient = AmbientLevel;
-        float p; float3 ldir; float distSq; float cosv;
-        SelectLight(rng, pt, normal, p, ldir, distSq, cosv);
-        if (cosv > 0.0)
+        float p;
+        uint chosen = SelectLight(rng, pt, normal, p);
+        float3 ldir; float dist;
+        float geom = SampleLightShadowRay(chosen, pt, normal, rng, ldir, dist);
+        if (geom > 0.0)
         {
             float vis = 1.0;
             if (LightingMode == 2u) // NEE
             {
                 float3 shadowOrigin = pt + normal * 1e-3;
-                vis = TraceTransmittance(shadowOrigin, ldir, sqrt(distSq) - 2e-3, heroIdx);
+                vis = TraceTransmittance(shadowOrigin, ldir, dist - 2e-3, heroIdx);
             }
             if (vis > 0.0)
-                direct = vis * (cosv / distSq * LightIntensity / max(p, 1e-9));
+                direct = vis * (geom * LightIntensity / max(p, 1e-9));
         }
     }
     return refl * (ambient + direct);
@@ -1214,7 +1343,15 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
         bool ratHit = depth > 1u && IntersectRat(origin, dir, sceneT, heroIdx, ratHitPoint, ratRefl);
 
         if (!sceneHit && !ratHit)
-            return accum; // ray escapes; keep the fog it passed through
+        {
+            // Ray escapes. Through an open roof (§O2/§O3) it sees the sky, not black — so mirrors reflect
+            // and glass/crystal refract the sky instead of returning black. Weighted by the specular
+            // throughput so far; DeterministicCorrection is applied by the caller. Sky off → adds nothing
+            // (roofed / golden scenes unchanged). Emissive, so it keeps the fog already accumulated.
+            if (SkyEnabled != 0.0)
+                accum += weight * DeterXYZ[heroIdx].xyz * SkyRadiance(dir, DeterXYZ[heroIdx].w);
+            return accum;
+        }
 
         float3 segEnd = ratHit ? ratHitPoint : hitPoint;
 
@@ -1414,7 +1551,15 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     }
 
     if (!primaryHit)
-        return float3(0.0, 0.0, 0.0);
+    {
+        // §O2/§O3: escaped through the open roof → the sky (emissive), else black. DeterXYZ is the
+        // white-balanced CIE table, so the flat dome integrates to a neutral blue, not a magenta cast.
+        if (SkyEnabled == 0.0)
+            return float3(0.0, 0.0, 0.0);
+        float3 skyXyz = DeterXYZ[heroIdx].xyz * SkyRadiance(primaryDir, DeterXYZ[heroIdx].w) * DeterministicCorrection;
+        correctedDirect = skyXyz;
+        return skyXyz;
+    }
 
     // A moving bubble is tagged so its pixels self-reset (like the rat), so a live stream does not
     // need to force whole-frame motion mode — the static scene keeps converging around it.
@@ -1472,19 +1617,23 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         // Bump-mapped shading normal for brick (plan §6); geometric normal kept elsewhere.
         float3 shadeNormal = (BumpyWalls != 0u && prim.Pattern == 1u)
             ? BrickBumpNormal(prim, hitPoint, hitNormal) : hitNormal;
-        float lightP; float3 lightDir; float lightDistSq; float lightCos;
-        SelectLight(rngLight, hitPoint, shadeNormal, lightP, lightDir, lightDistSq, lightCos);
+        float lightP;
+        uint chosenLight = SelectLight(rngLight, hitPoint, shadeNormal, lightP);
+        // §C1/§C2: sample the shadow ray toward the chosen light — geom is cos/d² (point) or cos (sun).
+        float3 lightDir; float chosenDist;
+        float geom = SampleLightShadowRay(chosenLight, hitPoint, shadeNormal, rngLight, lightDir, chosenDist);
 
-        if (lightCos > 0.0)
+        if (geom > 0.0)
         {
             float vis = 1.0;
             if (LightingMode == 2u) // NEE
             {
                 float3 shadowOrigin = hitPoint + hitNormal * 1e-3;
-                vis = TraceTransmittance(shadowOrigin, lightDir, sqrt(lightDistSq) - 2e-3, heroIdx);
+                vis = TraceTransmittance(shadowOrigin, lightDir, chosenDist - 2e-3, heroIdx);
             }
             if (vis > 0.0)
-                directTerm += vis * (lightCos / lightDistSq * LightIntensity / max(lightP, 1e-9));
+                directTerm += vis * (geom * LightIntensity / max(lightP, 1e-9))
+                    * BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[chosenLight].w); // §O9 emission tint
         }
 
         xyz = baseXyz * (ambientTerm + directTerm);
@@ -1508,7 +1657,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             float secDirectTerm = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
             uint lightIdx2 = rng % NumLights;
-            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx);
+            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx, rng);
 
             float3 secIncoming = secBaseXyz * (AmbientLevel + secDirectTerm);
 
@@ -1531,16 +1680,32 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
                 float tertDirectTerm = 0.0;
                 rng = rng * RNG_MUL + RNG_ADD;
                 uint lightIdx3 = rng % NumLights;
-                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal, heroIdx);
+                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal, heroIdx, rng);
 
                 float3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
                 secBounce2Plus = secBaseXyz * tertIncoming;
+            }
+            else if (SkyEnabled != 0.0)
+            {
+                // §O7: the second bounce escaped to the open sky — skylight is its incoming radiance.
+                float3 tertSky = DeterXYZ[heroIdx].xyz * SkyRadiance(tertDir, DeterXYZ[heroIdx].w);
+                secBounce2Plus = secBaseXyz * tertSky;
             }
 
             bounce0 = baseXyz * directTerm;
             float3 localBounce1 = baseXyz * secIncoming;
             float3 localBounce2Plus = baseXyz * secBounce2Plus;
             indirect = localBounce1 + localBounce2Plus;
+            xyz += indirect;
+        }
+        else if (SkyEnabled != 0.0)
+        {
+            // §O7: the diffuse bounce escaped to the open sky → the sky lights this surface (ambient blue
+            // fill on outdoor cells; daylight bleeding into a corridor just inside a boundary opening).
+            // One-bounce skylight, same baseXyz·incoming form as a bounce off a surface.
+            float3 skyIncoming = DeterXYZ[heroIdx].xyz * SkyRadiance(sampleDir, DeterXYZ[heroIdx].w);
+            bounce0 = baseXyz * directTerm;
+            indirect = baseXyz * skyIncoming;
             xyz += indirect;
         }
     }
@@ -1661,8 +1826,13 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
 
     // Per-sample firefly clamp; also record how much was clamped (mirrors the
     // clampDelta L1 sum in PathTracer.cs) for the Phase 5.2 clamp heatmap + stat.
+    // Skipped on a primary miss: that sample is the emissive sky (§O2/§O3) — smooth and low-variance,
+    // not a firefly — and a per-channel clamp would chop its high-luminance (green) wavelengths first,
+    // biasing the blue dome toward pink ("evening sky") at low clamp values. Clamping it buys no noise
+    // reduction, only colour bias, so the sky renders true at any clamp (including a roofed scene's black
+    // miss, where clamp is a no-op anyway — goldens unchanged).
     float clampDelta = 0.0;
-    if (SampleClamp > 0.0)
+    if (SampleClamp > 0.0 && hit)
     {
         float3 unclamped = corrected;
         corrected = clamp(corrected, float3(0.0, 0.0, 0.0), float3(SampleClamp, SampleClamp, SampleClamp));
@@ -1676,7 +1846,12 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // bounded temporal smear (and, once it drifts on, the freed pixel reconverges from ~cap, so any
     // wall ghost fades in a fraction of a second). The animations are slowed to keep that smear legible.
     uint hitMask = hit ? 1u : 0u;
-    bool isMover = ratHit || bubbleHit;
+    // Only the rat genuinely animates each frame, so cap its pixels to bound its temporal smear. Bubbles
+    // are FROZEN (snapshotted at build/regenerate, §2.6) — capping them as "movers" pinned their spectral
+    // reflect/transmit estimate at ~MotionSampleCap samples, so a hero bubble never converged no matter how
+    // long it baked. Treat frozen bubbles as static geometry so they accumulate the full sample budget;
+    // during camera motion SoftResetFlag still caps every pixel (bubble included), so no specular ghosting.
+    bool isMover = ratHit;
     bool restart = reset || (LastHit[ix] != hitMask);
     uint prevCount = restart ? 0u : SampleCount[ix];
     if ((SoftResetFlag != 0u || isMover) && !restart)
@@ -1720,11 +1895,17 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     NormalOut[ix] = float4(gNormal, hit ? gAlbedo : 0.0);
 
     // Volumetric fog for this pixel's camera segment (see Phase 4). Composited by
-    // the resolve pass onto the converged surface.
+    // the resolve pass onto the converged surface. Fog fills the volume, so a ray that
+    // misses (escapes through the open roof to the sky, §O2/§O3) still crosses the fog and
+    // must in-scatter + attenuate the sky behind it — otherwise the fog reads as a wash
+    // "painted" only where rays land. On a miss there is no surface, so march a full fog
+    // column toward a far point along the ray (IntegrateVolumetric caps the march at
+    // VolMaxMarchDistance, so an endpoint just past it covers the whole column). Roofed
+    // scenes never miss, so their fog — and the goldens — are unchanged.
+    float3 fogEnd = hit ? gHitPoint : CamPos + dir * (max(VolMaxMarchDistance, 0.0) + 1.0);
     float fogT = 1.0;
     float3 fogInscatter = float3(0.0, 0.0, 0.0);
-    if (hit)
-        IntegrateVolumetric(CamPos, gHitPoint, dir, VolTime, fogT, fogInscatter);
+    IntegrateVolumetric(CamPos, fogEnd, dir, VolTime, fogT, fogInscatter);
     FogOut[ix] = float4(fogInscatter * DeterministicCorrection, fogT);
 }
 

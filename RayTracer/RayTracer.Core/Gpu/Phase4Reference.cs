@@ -78,7 +78,12 @@ public static class Phase4Reference
         float midHeight = MathF.Exp(-MathF.Abs(p.Y - 1.0f) * 1.35f);
         float thickCoverage = 0.72f + 0.28f * coverage;
         float heightWeight = 0.70f + 0.30f * midHeight;
-        return 0.50f * thickCoverage * heightWeight;
+        // §O height ceiling (mirrors the shader FogProfile): the 0.70 floor otherwise fills all Y and
+        // billows into the open sky. Fade it out from the wall top (2.0 = WALL_HEIGHT) upward so outdoor
+        // fog is a low bank; below the wall top the factor is exactly 1.0, so roofed scenes stay bit-exact.
+        float ct = Math.Clamp((p.Y - 2.0f) / 2.0f, 0f, 1f);
+        float heightCeil = 1.0f - ct * ct * (3.0f - 2.0f * ct);
+        return 0.50f * thickCoverage * heightWeight * heightCeil;
     }
 
     private static float GroundProfile(Vector3 p, float coverage)
@@ -372,9 +377,9 @@ public static class Phase4Reference
         if (marchLength <= 1e-5f)
             return new VolumetricSample(1f, Vector3.Zero);
 
+        // Full step count regardless of motion (mirrors the shader) — halving while moving made the fog
+        // shift when the camera started/stopped.
         int steps = Math.Max(1, options.MarchSteps);
-        if (isMoving && steps > 1)
-            steps = Math.Max(1, (steps + 1) / 2);
 
         Vector3 dir = segment / rayLength;
         if (rayDirection.LengthSquared() > 1e-10f)

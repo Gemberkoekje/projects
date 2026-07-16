@@ -58,11 +58,15 @@ internal static class Program
         bool causticMaze = args.Contains("--caustic-maze", StringComparer.OrdinalIgnoreCase);
         bool prismCaustic = args.Contains("--prism-caustic", StringComparer.OrdinalIgnoreCase);
         bool bubbleCaustic = args.Contains("--bubble-caustic", StringComparer.OrdinalIgnoreCase);
+        bool softShadowDemo = args.Contains("--soft-shadow-demo", StringComparer.OrdinalIgnoreCase);
+        bool outdoorMaze = args.Contains("--outdoor-maze", StringComparer.OrdinalIgnoreCase);
         bool screensaverSelfTest = args.Contains("--screensaver-selftest", StringComparer.OrdinalIgnoreCase);
         bool screensaverPreviewSelfTest = args.Contains("--screensaver-preview-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase6Regress = args.Contains("--phase6-regress", StringComparer.OrdinalIgnoreCase);
         bool regenSelfTest = args.Contains("--regen-selftest", StringComparer.OrdinalIgnoreCase);
         bool setupSelfTest = args.Contains("--setup-selftest", StringComparer.OrdinalIgnoreCase);
+        bool movieSelfTest = args.Contains("--movie-selftest", StringComparer.OrdinalIgnoreCase);
+        bool movie = args.Contains("--movie", StringComparer.OrdinalIgnoreCase);
         int maxFrames = ParseIntOption(args, "--frames", defaultValue: 0);
         float sampleClamp = ParseFloatOption(args, "--clamp", defaultValue: Phase3FireflyClamp);
         string? savePath = ParseStringOption(args, "--save", defaultValue: null);
@@ -72,9 +76,9 @@ internal static class Program
         bool biomeIndicator = !args.Contains("--no-indicator", StringComparer.OrdinalIgnoreCase);
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
-            || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest
+            || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest || movieSelfTest || movie
             || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo || causticDemo || causticMaze
-            || prismCaustic || bubbleCaustic
+            || prismCaustic || bubbleCaustic || softShadowDemo || outdoorMaze
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
         try
@@ -86,6 +90,8 @@ internal static class Program
             if (screensaverSelfTest) return RunScreensaverSelfTest();
             if (screensaverPreviewSelfTest) return Screensaver.PreviewSelfTest(maxFrames);
             if (setupSelfTest) return RunSetupSelfTest();
+            if (movieSelfTest) return RunMovieSelfTest();
+            if (movie) return RunMovieCli(args);
             if (phase6Regress) return RegressionHarness.Run(
                 update: args.Contains("--update", StringComparer.OrdinalIgnoreCase),
                 dirOverride: ParseStringOption(args, "--dir", null));
@@ -139,6 +145,19 @@ internal static class Program
                     ParseFloatOption(args, "--thickness", 440f),
                     ParseIntOption(args, "--photons", 400000),
                     ParseFloatOption(args, "--strength", 40f));
+            if (softShadowDemo)
+            {
+                bool sun = args.Contains("--sun", StringComparer.OrdinalIgnoreCase);
+                return RunSoftShadowDemo(maxFrames, savePath ?? "soft-shadow.png", sampleClamp,
+                    ParseFloatOption(args, "--radius", sun ? 0.13f : 1.5f), sun);
+            }
+            if (outdoorMaze)
+                return RunOutdoorMazeDemo(maxFrames, savePath ?? "outdoor-maze.png", sampleClamp, mazeSeed,
+                    ParseFloatOption(args, "--fraction", 0.5f), ParseFloatOption(args, "--time", -1f),
+                    smoke: args.Contains("--fog", StringComparer.OrdinalIgnoreCase) ? SmokeMode.AlwaysFog
+                        : args.Contains("--ground", StringComparer.OrdinalIgnoreCase) ? SmokeMode.AlwaysGroundSmoke
+                        : args.Contains("--biome", StringComparer.OrdinalIgnoreCase) ? SmokeMode.Biome : SmokeMode.None,
+                    farFade: !args.Contains("--nofogfar", StringComparer.OrdinalIgnoreCase));
             if (regenSelfTest) return RunRegenSelfTest();
             if (phase6 && savePath is not null)
                 return RunPhase6Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -856,13 +875,19 @@ internal static class Program
         bool biomeIndicator, float fogDrift, Phase5DebugMode debugMode, bool startFullscreen, int mazeSize = 16,
         RenderStyle style = RenderStyle.Enhanced, bool regenerate = false, MazeProps.Options? props = null,
         bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, bool showBuildIn = false,
-        bool showOutro = false, bool classicDepthCue = false, int pixelSize = 1, bool jewelCaustics = false)
+        bool showOutro = false, bool classicDepthCue = false, int pixelSize = 1, bool jewelCaustics = false,
+        bool outdoor = false, VolumetricQuality volumetricQuality = VolumetricQuality.Medium,
+        bool dayNightCycle = true, float dayLengthSeconds = 180f, float stillTime = 1.5f,
+        uint maxSampleCount = 2048, uint motionSampleCap = 12, int filterRadius = 1,
+        bool subPixelJitter = true, float temporalBlendAlpha = 0.1f)
     {
         EnsureAppConfigured();
         // Classic look: unlit fullbright spectral (LightingMode.None) with smoke off —
         // the spectral equivalent of the original screensaver's flat textures (plan §2).
         bool classic = style == RenderStyle.Classic;
         LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
+        // §O: the far half becomes an open-air hedge garden under a Rayleigh sky. Null → all-indoor.
+        OutdoorOptions? outdoorOpts = outdoor ? new OutdoorOptions() : null;
         // Drifting-bubble placement (§2.6) — same options for the initial build and each regeneration.
         static MazeBubbles.Options BubbleOptions(int seed) => new(Chance: 0.05f, Seed: seed);
         // Jewel placement is kept in a variable so the §B4 caustic build below can re-derive the jewels'
@@ -875,9 +900,21 @@ internal static class Program
             jewels: jewelOpts,
             oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
             bubbles: BubbleOptions(mazeSeed),
-            wallThickness: 0.12f);
+            water: outdoor ? new MazeWater.Options(Seed: mazeSeed) : null,
+            outdoor: outdoorOpts,
+            wallThickness: 0.12f,
+            torchTempK: classic ? 0f : 1800f); // §O9: warm torches in the lit Enhanced look
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
-            VolumetricQuality.Medium, classic ? SmokeMode.None : smokeMode);
+            volumetricQuality, classic ? SmokeMode.None : smokeMode);
+        // Occlude the fog against geometry so walls/hedges block torchlight from the medium. The Low/Medium
+        // presets leave this off (ShadowStepInterval 0) for parity/speed, so torch in-scatter reached every
+        // fog sample straight through walls — washing the night scene a uniform warm red. Force it on for the
+        // live app at any non-Off tier (High/Ultra already trace it): the presets themselves are untouched,
+        // so the regression goldens, the parity self-test, and the CPU quality presets all stay bit-exact.
+        // Cheap on the RTX 3070 — a shadow ray every 4th step.
+        if (volumetrics.EnableVolumetrics && volumetrics.ShadowStepInterval == 0)
+            volumetrics = volumetrics with { ShadowStepInterval = 4 };
+        if (outdoor) volumetrics = WithOutdoorFog(volumetrics); // §O: no camera-locked fog sphere in the garden
 
         using var form = new Form
         {
@@ -890,6 +927,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             width, height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: lighting, sampleClamp: sampleClamp,
+            maxSampleCount: maxSampleCount, subPixelJitter: subPixelJitter,
+            motionSampleCap: motionSampleCap, temporalBlendAlpha: temporalBlendAlpha,
+            filterRadius: (uint)Math.Max(0, filterRadius),
             biomeIndicator: biomeIndicator, debugMode: debugMode, bumpyWalls: bumpyWalls,
             showOverheadMap: showOverheadMap, showRat: showRat,
             classicDepthCue: classic && classicDepthCue ? ClassicMode.DepthCueStrength : 0f,
@@ -965,11 +1005,21 @@ internal static class Program
         }
         UpdateCaustics();
 
+        // §O2/§O3: when the maze has an outdoor half, light it with the sun/sky matching the scene's
+        // directional sun (Phase3Scene.Build set SunDirection). Re-applied after each Regenerate. No-op
+        // (sky stays disabled) for an all-indoor maze, so that path is unchanged.
+        void ApplySky()
+        {
+            if (built.SunDirection is Vector3 sunDir)
+                renderer.SetSky(sunDir, built.SunAngularRadius);
+        }
+        ApplySky();
+
         if (startFullscreen) SetFullscreen(true);
         UpdateTitle();
 
         CameraController controller = built.CreateCameraController();
-        controller.StillTime = 1.5f;
+        controller.StillTime = stillTime;
         controller.MoveTime = 0.9f;
         controller.TurnTime = 0.7f;
         // Classic mode widens the FOV toward the original screensaver's feel; the
@@ -991,14 +1041,21 @@ internal static class Program
 
         uint frame = 0;
 
-        // Streaming soap bubbles (§2.6): the maze's only moving geometry. Bubble machines fire
-        // continuously (wall-clock driven), so every frame we advance the streams and refit their
-        // sphere BLAS — a live stream keeps the frame in motion mode. Refreshed on Regenerate (a new
-        // maze has a fresh set of emitters).
+        // Soap bubbles (§2.6): frozen in place rather than streaming, so they converge with the rest of
+        // the frame instead of perpetually smearing/fireflying as moving geometry. We snapshot them once
+        // (a fixed time spreads them along their rise) and leave them static; re-snapshotted on Regenerate
+        // (a new maze has a fresh set of emitters).
+        const float FrozenBubbleTime = 2.0f;
         MazeBubbles.Options bubbleOpts = BubbleOptions(mazeSeed);
         IReadOnlyList<MazeBubbles.Bubble> bubbleList = built.Bubbles;
         var bubbleCenters = new Vector3[bubbleList.Count];
         var bubbleRadii = new float[bubbleList.Count];
+        void FreezeBubbles()
+        {
+            if (bubbleList.Count == 0) return;
+            MazeBubbles.Animate(bubbleList, bubbleOpts, FrozenBubbleTime, bubbleCenters, bubbleRadii);
+            renderer.UpdateSpheres(bubbleCenters, bubbleRadii);
+        }
 
         // Generates a fresh maze and rebuilds the scene in place (shared by the outro and
         // the no-outro instant cut). Resets the build-in clock so the new maze rises.
@@ -1016,7 +1073,10 @@ internal static class Program
                 jewels: jewelOpts,
                 oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: mazeSeed),
                 bubbles: BubbleOptions(mazeSeed),
-                wallThickness: 0.12f);
+                water: outdoor ? new MazeWater.Options(Seed: mazeSeed) : null,
+                outdoor: outdoorOpts,
+                wallThickness: 0.12f,
+                torchTempK: classic ? 0f : 1800f); // §O9
             camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
             controller = built.CreateCameraController();
             controller.StillTime = 1.5f;
@@ -1025,15 +1085,19 @@ internal static class Program
             renderer.RebuildScene(built.Packed, built.Spectral, built.PackedLights, camera);
             if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
             UpdateCaustics(); // fresh jewels → rebuild the caustic grid for the new maze
+            ApplySky();       // fresh maze → re-apply the sun/sky for its outdoor half (no-op if all-indoor)
             if (showRat) ratCtrl = built.CreateRatController(out ratCam);
             // Fresh maze → fresh bubble emitters (count/positions differ); resize the animation buffers.
             bubbleOpts = BubbleOptions(mazeSeed);
             bubbleList = built.Bubbles;
             bubbleCenters = new Vector3[bubbleList.Count];
             bubbleRadii = new float[bubbleList.Count];
+            FreezeBubbles(); // static snapshot for the new maze's emitters
             mazeStartTime = clock.Elapsed.TotalSeconds;
             frame = 0;
         }
+
+        FreezeBubbles(); // initial static snapshot
 
         while (running && form.Created)
         {
@@ -1110,16 +1174,32 @@ internal static class Program
             renderer.SetCamera(camera);
             renderer.SetFogTime((float)(now * fogDrift));
 
-            // Stream the bubbles continuously (§2.6) — a bubble machine keeps firing whether or not the
-            // walker moves. They accumulate with the same per-pixel budget as the rest of the frame (no
-            // special mover reset), rising slowly (MazeBubbles.Options.Lifetime) so their temporal smear
-            // stays sub-radius. Held during the build-in/outro while the geometry is changing/fading.
-            if (bubbleList.Count > 0 && !holdWalker)
+            // §O8: day/night cycle. Advance the sun over screensaver time and update the sky + the sun
+            // light together, throttled (the sun barely moves frame-to-frame, and UpdateSunLight stalls on
+            // the GPU). Only in the lit outdoor maze when the cycle is enabled; the sun light index is -1
+            // otherwise. When the cycle is off, ApplySky()'s static midday sun stands. Accumulation is not
+            // reset — a slow sun just drifts softly through the running mean.
+            if (outdoor && dayNightCycle && built.SunLightIndex >= 0)
             {
-                MazeBubbles.Animate(bubbleList, bubbleOpts, (float)now, bubbleCenters, bubbleRadii);
-                renderer.UpdateSpheres(bubbleCenters, bubbleRadii);
+                double periodSeconds = Math.Max(1.0, dayLengthSeconds); // one full day/night loop
+                double phase = now / periodSeconds;
+                float t = (float)(phase - Math.Floor(phase));
+                // Clock: t=0 (dawn) is 06:00; a full cycle spans 24 h.
+                float hoursF = (t * 24f + 6f) % 24f;
+                renderer.SetClock(true, (int)hoursF, (int)((hoursF - MathF.Floor(hoursF)) * 60f));
+                // Update the sun + sky every frame so the descent — and the fog re-lighting that rides on
+                // it — is smooth instead of stepping in visible ticks every N frames. SetSky only writes a
+                // constant struct (free), and the render loop already fully syncs the GPU each frame
+                // (RenderFrame → WaitForGpu), so UpdateSunLight's guard wait is a no-op here — no extra
+                // stall from doing it per frame.
+                SunState sun = DayNightCycle.At(t);
+                renderer.SetSky(sun.Direction, built.SunAngularRadius, sunRadiance: sun.SunRadiance,
+                    skyStrength: sun.SkyStrength, sunTempK: sun.TempK);
+                renderer.UpdateSunLight(built.SunLightIndex, sun.Direction, sun.TempK, sun.SunLightLevel);
             }
 
+            // Bubbles are frozen (snapshotted at build/Regenerate), so there's no per-frame animation —
+            // they converge with the rest of the still frame instead of streaming (§2.6).
             if (!renderer.RenderFrame(reset: frame == 0 || building, moving: moving))
             {
                 // Device lost (TDR / driver reset) — rebuild and continue (P10/P12).
@@ -1135,6 +1215,10 @@ internal static class Program
             }
             frame++;
             if (frame % 10 == 0) UpdateTitle();
+            // Periodically cache a thumbnail for the config screen's Record-movie preview. Every ~240
+            // frames keeps the readback stall negligible; the frame is settled (not build-in/outro) here.
+            if (frame % 240 == 0 && !building && !outroActive)
+                SavePreview(renderer.ReadbackOutput(), renderer.Width, renderer.Height);
             Application.DoEvents();
 
             if (maxFrames > 0 && frame >= (uint)maxFrames)
@@ -1509,6 +1593,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
+            // a long converge). No-op at the demos' default frame counts (all < 2048).
+            maxSampleCount: (uint)Math.Max(1, frames),
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
@@ -1795,6 +1882,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
+            // a long converge). No-op at the demos' default frame counts (all < 2048).
+            maxSampleCount: (uint)Math.Max(1, frames),
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
@@ -2130,6 +2220,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
+            // a long converge). No-op at the demos' default frame counts (all < 2048).
+            maxSampleCount: (uint)Math.Max(1, frames),
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
@@ -2210,6 +2303,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
+            // a long converge). No-op at the demos' default frame counts (all < 2048).
+            maxSampleCount: (uint)Math.Max(1, frames),
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
@@ -2286,6 +2382,9 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
+            // a long converge). No-op at the demos' default frame counts (all < 2048).
+            maxSampleCount: (uint)Math.Max(1, frames),
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
@@ -2578,6 +2677,153 @@ internal static class Program
         return 0;
     }
 
+    /// <summary>
+    /// §C1 soft shadows: a floating sphere lit by a single spherical <b>area</b> light of the given
+    /// radius casts a penumbra-edged shadow on the floor. Radius 0 is an ideal point light (a razor
+    /// edge, bit-identical to before); a positive radius softens the edge — each NEE sample targets a
+    /// random point on the light (<see cref="Light.SamplePoint"/>), and the accumulation averages them.
+    /// </summary>
+    private static int RunSoftShadowDemo(int frames, string savePath, float sampleClamp, float radius, bool sun)
+    {
+        if (frames <= 0) frames = 400;
+        Console.WriteLine($"RayTracer.Gpu — soft-shadow demo ({frames} frames, {(sun ? $"sun, angular radius {radius} rad" : $"point light, radius {radius}")}) -> {savePath}");
+
+        var floorMat = FlatDiffuse("soft-floor", 0.7f);
+        var occluderMat = FlatDiffuse("soft-occluder", 0.6f);
+        var scene = new List<Tracable>
+        {
+            FloorQuad(0f, -8f, 8f, -3f, 12f, floorMat),
+            WallZ(9f, -8f, 8f, 0f, 6f, floorMat),
+            new Sphere(new Vector3(0f, 1.7f, 4.5f), 0.9f, occluderMat),
+        };
+
+        // §C2: a directional sun (parallel rays, no falloff; radius = angular radius) casts a parallel
+        // shadow; otherwise (§C1) an overhead spherical area light casts a penumbra. Both fall onto open
+        // floor the camera sees; radius 0 → hard edge, positive radius → soft.
+        var lights = sun
+            ? new List<Light> { new() { Directional = true, Direction = new Vector3(0.35f, -1f, -0.15f), Color = Vector3.One, Radius = radius } }
+            : new List<Light> { new() { Position = new Vector3(-1.2f, 6.5f, 4.0f), Color = Vector3.One, Radius = radius } };
+
+        // For the sun, look up toward the horizon so the sky, the sun disk, and the ground shadow all
+        // frame together; for a point light, look down at the shadow on the floor.
+        Vector3 camPos = sun ? new Vector3(3.6f, 1.6f, -1.0f) : new Vector3(4.2f, 3.2f, 0.2f);
+        Vector3 camTarget = sun ? new Vector3(-1.2f, 2.6f, 6.0f) : new Vector3(0.3f, 0.2f, 5.2f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, camTarget, new Vector3(0, 1, 0)),
+            Fov = MathF.PI / 3.2f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        PackedScene packed = GpuScenePacker.Pack(scene);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, packed, spectral, packedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        // §O2: with the sun, turn on the procedural sky so the open top of the box reads as daylight sky
+        // with a sun disk (matching the directional light) rather than black.
+        if (sun)
+            renderer.SetSky(new Vector3(0.35f, -1f, -0.15f), sunAngularRadius: MathF.Max(radius, 0.02f));
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// outdoor-area-plan.md §O0–O2 in the real maze: the near half is the classic roofed stone maze; the
+    /// far half (<paramref name="fraction"/>) is open to the sky, lit by a directional sun with a
+    /// procedural sky in the escaped-ray miss path. An elevated 3/4 view shows the roofed half give way
+    /// to the open half under a blue sky. (Hedges/grass/water are §O4–O6, still to come.)
+    /// </summary>
+    private static int RunOutdoorMazeDemo(int frames, string savePath, float sampleClamp, int mazeSeed, float fraction,
+        float time = -1f, SmokeMode smoke = SmokeMode.None, bool farFade = true)
+    {
+        if (frames <= 0) frames = 400;
+        const int mazeSize = 10;
+        // §O8: --time t (∈[0,1)) samples the day/night cycle for a still (dawn/noon/dusk/night); otherwise
+        // the default midday sun. The cycle drives the sun direction + colour temperature.
+        bool cycle = time >= 0f;
+        SunState state = cycle ? DayNightCycle.At(time) : default;
+        var outdoor = cycle
+            ? new OutdoorOptions(Fraction: fraction, SunDirection: state.Direction, SunTempK: state.TempK)
+            : new OutdoorOptions(Fraction: fraction);
+        Console.WriteLine($"RayTracer.Gpu — outdoor maze ({frames} frames, seed {mazeSeed}, fraction {fraction}, time {time:0.##}) -> {savePath}");
+
+        Phase3Scene built = Phase3Scene.Build(Width, Height, mazeSeed: mazeSeed, mazeSize: mazeSize,
+            lightSeed: LightSeedFrom(mazeSeed), wallThickness: 0.12f, outdoor: outdoor,
+            water: new MazeWater.Options(Seed: mazeSeed), torchTempK: 1800f);
+
+        // Elevated 3/4 view from behind the indoor (near, low-Z) end, looking across the open (far, high-Z)
+        // half. The camera sits high enough to read the roofed-vs-open contrast but pitches only gently
+        // down and toward a target above the ground, so the upper ~half of the frame is open sky (mid
+        // elevation → the §O3 Rayleigh blue, not just the pale horizon band).
+        float extent = mazeSize * built.CellSize;
+        Vector3 camPos = new(extent * 0.5f, extent * 0.62f, -extent * 0.6f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(extent * 0.5f, extent * 0.42f, extent * 1.15f), new Vector3(0, 1, 0)),
+            Fov = MathF.PI / 3f,
+            Aspect = (float)Width / Height,
+            ImgPlaneZ = 1f,
+        };
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, smoke);
+        if (smoke != SmokeMode.None) // match the live outdoor path: fog occlusion + the far-fade (unless disabled for A/B)
+        {
+            if (volumetrics.ShadowStepInterval == 0) volumetrics = volumetrics with { ShadowStepInterval = 4 };
+            if (farFade) volumetrics = WithOutdoorFog(volumetrics);
+        }
+        using var renderer = new Phase6Renderer(
+            Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showOverheadMap: cycle);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(camera);
+        if (built.SunDirection is Vector3 sunDir)
+        {
+            if (cycle) // §O8: sky brightness/radiance/temp from the day/night cycle
+            {
+                renderer.SetSky(sunDir, built.SunAngularRadius, sunRadiance: state.SunRadiance,
+                    skyStrength: state.SkyStrength, sunTempK: state.TempK);
+                if (built.SunLightIndex >= 0) // ramp the direct sun light with the cycle too (match the app)
+                    renderer.UpdateSunLight(built.SunLightIndex, state.Direction, state.TempK, state.SunLightLevel);
+            }
+            else
+                renderer.SetSky(sunDir, built.SunAngularRadius); // §O2 sky, sun matching the directional light
+        }
+        if (cycle) // §O8: show the minimap + the 24h clock under it (t=0 dawn = 06:00, +24h over the cycle)
+        {
+            var (mg, mgw, mgh) = MazeMinimap.Build(built.Maze);
+            renderer.SetMinimap(mg, mgw, mgh);
+            float hoursF = (time * 24f + 6f) % 24f;
+            renderer.SetClock(true, (int)hoursF, (int)((hoursF - MathF.Floor(hoursF)) * 60f));
+        }
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
     // A vertical glass face of the prism: a quad from floor point a to floor point b, raised by height.
     private static void AddPrismFace(List<Tracable> scene, Vector3 a, Vector3 b, float height, MaterialData mat)
         => scene.Add(new TracableRectangle((a, b, a + new Vector3(0, height, 0)), mat));
@@ -2641,6 +2887,9 @@ internal static class Program
 
         // GPU backend: fresh maze each run (like the original, which seeds from the clock).
         int mazeSeed = Random.Shared.Next();
+        // "Record movie" replaces the live window with a headless capture of the same walk → MP4.
+        if (settings.RecordMovie)
+            return RunMovie(settings, mazeSeed);
         return RunPhase6Windowed(
             settings.Width, settings.Height, maxFrames: 0, sampleClamp: settings.SampleClamp,
             smokeMode: settings.SmokeMode, mazeSeed: mazeSeed, biomeIndicator: false,
@@ -2654,7 +2903,848 @@ internal static class Program
             showRat: settings.ShowRat, showBuildIn: settings.MazeBuildInAnim,
             showOutro: settings.MazeOutroAnim, classicDepthCue: settings.ClassicDepthCue,
             pixelSize: settings.RetroPixelation ? ClassicMode.RetroBlockFor(settings.Height) : 1,
-            jewelCaustics: settings.JewelCaustics);
+            jewelCaustics: settings.JewelCaustics,
+            outdoor: settings.OutdoorArea && settings.Style == RenderStyle.Enhanced,
+            volumetricQuality: settings.VolumetricQuality,
+            dayNightCycle: settings.DayNightCycle,
+            dayLengthSeconds: settings.DayLengthSeconds,
+            stillTime: settings.StillTime,
+            maxSampleCount: settings.MaxSampleCount,
+            motionSampleCap: settings.MotionSampleCap,
+            filterRadius: settings.FilterRadius,
+            subPixelJitter: settings.SubPixelJitter,
+            temporalBlendAlpha: settings.TemporalBlendAlpha);
+    }
+
+    /// <summary>
+    /// Movie recording (config screen "Record movie"): drives the same autonomous maze walk
+    /// as the live windowed app (<see cref="RunPhase6Windowed"/>) — build-in intro, walker,
+    /// rat, day/night, regeneration, outro — but entirely off-screen and on a <b>fixed</b>
+    /// <c>1/fps</c> timestep. It skips <see cref="AppSettings.MovieStartSeconds"/> of walk
+    /// (letting the maze rise and the walker settle), then captures
+    /// <see cref="AppSettings.MovieDurationSeconds"/> of footage: each output frame accumulates
+    /// <see cref="AppSettings.MovieSpp"/> converged samples (a mini still-capture, so the movie
+    /// is far cleaner than the live temporal view), read back and written as a numbered PNG.
+    /// The PNGs are then strung into an H.264 MP4 with ffmpeg. If ffmpeg can't be found, the
+    /// frames are kept and the exact encode command is shown so the user can run it themselves.
+    ///
+    /// This is the headless capture core (no UI): it writes numbered PNGs into
+    /// <paramref name="framesDir"/> and calls <paramref name="onFrameSaved"/> after each one —
+    /// returning <c>false</c> stops capture early. <see cref="RunMovie"/> wraps it with a progress
+    /// window and the ffmpeg encode; <see cref="RunMovieSelfTest"/> drives it headless.
+    /// </summary>
+    // Beautiful mode bakes each frame until the mean luma change per pixel between successive convergence
+    // checks drops below this (0-255 sRGB) — i.e. the frame has stopped changing. ~0.35 reads as clean.
+    private const double MovieConvergeThreshold = 0.35;
+
+    // Mean absolute luma difference (0-255) between two RGBA8 frames — the beautiful baker's convergence signal.
+    private static double MeanAbsLumaDiff(byte[] a, byte[] b)
+    {
+        int pixels = a.Length / 4;
+        double sum = 0;
+        for (int i = 0; i < pixels; i++)
+        {
+            int o = i * 4;
+            sum += Math.Abs((0.299 * a[o] + 0.587 * a[o + 1] + 0.114 * a[o + 2])
+                          - (0.299 * b[o] + 0.587 * b[o + 1] + 0.114 * b[o + 2]));
+        }
+        return pixels > 0 ? sum / pixels : 0;
+    }
+
+    // Denoise strength for Beautiful frames (overridable from the --movie CLI for A/B tuning). Sigma is the
+    // luma edge-stop scale in 0-255: grain (small luma steps) is smoothed, true edges (large steps) survive.
+    private static float MovieDenoiseSigma = 14f;
+    private static int MovieDenoiseIters = 4;
+
+    // Edge-stopping à-trous wavelet denoise (the SVGF spatial filter) on an RGBA8 frame. It removes
+    // Monte-Carlo grain while keeping edges: each of a few widening passes averages a 5×5 neighbourhood
+    // weighted by a B3-spline kernel × a luma range term exp(-|ΔY|/sigma), so pixels across a bright/dark
+    // boundary barely contribute. Returns a fresh RGBA8 buffer; alpha passes through. Only the final
+    // Beautiful movie frame is filtered — real-time frames and the golden regressions never reach here.
+    private static byte[] DenoiseEdgeAware(byte[] rgba, int w, int h, float sigmaLum, int iterations)
+    {
+        int n = w * h;
+        if (n == 0 || iterations <= 0) return rgba;
+        float[] r = new float[n], g = new float[n], b = new float[n];
+        for (int i = 0; i < n; i++) { int o = i * 4; r[i] = rgba[o]; g[i] = rgba[o + 1]; b[i] = rgba[o + 2]; }
+        float[] rN = new float[n], gN = new float[n], bN = new float[n], lum = new float[n];
+        float[] k = { 1f / 16, 4f / 16, 6f / 16, 4f / 16, 1f / 16 }; // B3-spline 5-tap, applied as a 5×5 outer product
+        float invSigma = 1f / MathF.Max(1e-3f, sigmaLum);
+
+        for (int it = 0; it < iterations; it++)
+        {
+            int step = 1 << it; // à-trous hole size grows 1,2,4,8… so a few passes cover a wide radius
+            for (int i = 0; i < n; i++) lum[i] = 0.299f * r[i] + 0.587f * g[i] + 0.114f * b[i];
+            float[] rc = r, gc = g, bc = b, lc = lum, ro = rN, go = gN, bo = bN; // stable refs for the closure
+            Parallel.For(0, h, y =>
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    int ci = y * w + x;
+                    float yc = lc[ci];
+                    float wsum = 0f, ar = 0f, ag = 0f, ab = 0f;
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        int sy = y + dy * step;
+                        if (sy < 0 || sy >= h) continue;
+                        float ky = k[dy + 2];
+                        int row = sy * w;
+                        for (int dx = -2; dx <= 2; dx++)
+                        {
+                            int sx = x + dx * step;
+                            if (sx < 0 || sx >= w) continue;
+                            int si = row + sx;
+                            float wq = ky * k[dx + 2] * MathF.Exp(-MathF.Abs(lc[si] - yc) * invSigma);
+                            wsum += wq; ar += wq * rc[si]; ag += wq * gc[si]; ab += wq * bc[si];
+                        }
+                    }
+                    float inv = wsum > 0f ? 1f / wsum : 0f;
+                    ro[ci] = ar * inv; go[ci] = ag * inv; bo[ci] = ab * inv;
+                }
+            });
+            (r, rN) = (rN, r); (g, gN) = (gN, g); (b, bN) = (bN, b);
+        }
+
+        byte[] outp = new byte[rgba.Length];
+        for (int i = 0; i < n; i++)
+        {
+            int o = i * 4;
+            outp[o]     = (byte)Math.Clamp((int)MathF.Round(r[i]), 0, 255);
+            outp[o + 1] = (byte)Math.Clamp((int)MathF.Round(g[i]), 0, 255);
+            outp[o + 2] = (byte)Math.Clamp((int)MathF.Round(b[i]), 0, 255);
+            outp[o + 3] = rgba[o + 3];
+        }
+        return outp;
+    }
+
+    // Per-frame progress handed to the capture callback: counts plus the just-rendered frame (so a live
+    // caller can display it). Rgba is width*height*4, top-down RGBA8, owned by the caller for the call only.
+    private readonly record struct MovieProgress(int FramesSaved, int WalksCompleted, byte[] Rgba, int Width, int Height);
+
+    private static int CaptureMovieFrames(AppSettings settings, int mazeSeed, string framesDir,
+        Func<MovieProgress, bool> onFrameSaved, out int walksCompleted)
+    {
+        int width = settings.Width, height = settings.Height;
+        int fps = Math.Clamp(settings.MovieFps, 5, 60);
+        float dt = 1f / fps;
+        bool beautiful = settings.MovieQuality == MovieQualityMode.Beautiful;
+        bool denoise = beautiful && settings.MovieDenoise; // edge-aware cleanup of the final baked frame
+        float bakeMs = Math.Max(1f, settings.MovieBakeMs);
+        uint maxPasses = Math.Max(1u, settings.MaxSampleCount);
+        bool showFps = settings.MovieShowFps;
+
+        bool walksMode = settings.MovieLengthMode == MovieLengthMode.Walks;
+        int targetWalks = Math.Max(1, settings.MovieWalks);
+        // Duration length: skip a start offset, then cap at duration×fps. Walks length: capture from t=0
+        // (whole walks, build-in included) with a generous safety cap so a stuck walker can't loop forever.
+        float startSeconds = walksMode ? 0f : Math.Max(0f, settings.MovieStartSeconds);
+        float durationSeconds = Math.Max(dt, settings.MovieDurationSeconds);
+        int targetFrames = walksMode ? int.MaxValue : Math.Max(1, (int)MathF.Round(durationSeconds * fps));
+        int walkSafetyFrames = walksMode ? targetWalks * fps * 600 : int.MaxValue; // ≤10 min sim per walk
+        walksCompleted = 0;
+
+        bool classic = settings.Style == RenderStyle.Classic;
+        LightingMode lighting = classic ? LightingMode.None : LightingMode.NEE;
+        bool outdoor = settings.OutdoorArea && !classic;
+        OutdoorOptions? outdoorOpts = outdoor ? new OutdoorOptions() : null;
+        int mazeSize = settings.MazeSize;
+
+        MazeProps.Options? PropsFor(int seed) => (settings.ShowOpenGlLogo || settings.ShowWallSigns)
+            ? new MazeProps.Options(Logo: settings.ShowOpenGlLogo, Signs: settings.ShowWallSigns, Seed: seed)
+            : null;
+        static MazeBubbles.Options BubbleOptions(int seed) => new(Chance: 0.05f, Seed: seed);
+
+        // Jewel options track the current maze seed so the §B4 caustic build re-derives the same jewels.
+        MazeJewels.Options jewelOpts = new(Chance: 0.05f, Seed: mazeSeed);
+        // Full-featured scene build, matching RunPhase6Windowed so the movie looks like the live app.
+        Phase3Scene Build(int seed) => Phase3Scene.Build(width, height, mazeSeed: seed, mazeSize: mazeSize,
+            lightSeed: LightSeedFrom(seed), props: PropsFor(seed),
+            mirrors: new MazeMirrors.Options(Chance: 0.12f, Seed: seed),
+            windows: new MazeWindows.Options(Chance: 0.15f, Seed: seed, StainedChance: 0.5f),
+            jewels: jewelOpts,
+            oilSlicks: new MazeOilSlicks.Options(Chance: 0.06f, Seed: seed),
+            bubbles: BubbleOptions(seed),
+            water: outdoor ? new MazeWater.Options(Seed: seed) : null,
+            outdoor: outdoorOpts,
+            wallThickness: 0.12f,
+            torchTempK: classic ? 0f : 1800f);
+
+        Phase3Scene built = Build(mazeSeed);
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
+            settings.VolumetricQuality, classic ? SmokeMode.None : settings.SmokeMode);
+        // Match the live app: force fog occlusion on at any non-Off tier (Low/Medium omit it by preset).
+        if (volumetrics.EnableVolumetrics && volumetrics.ShadowStepInterval == 0)
+            volumetrics = volumetrics with { ShadowStepInterval = 4 };
+        if (outdoor) volumetrics = WithOutdoorFog(volumetrics); // §O: no camera-locked fog sphere in the garden
+
+        Camera camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
+
+        string lengthDesc = walksMode ? $"{targetWalks} walk(s)" : $"{durationSeconds:0.#}s ({targetFrames} frames)";
+        string qualityDesc = $"{(beautiful ? "beautiful" : "real-time")} ~{bakeMs:0}ms/frame";
+        Console.WriteLine($"RayTracer.Gpu — movie capture: {lengthDesc} @ {fps}fps, {qualityDesc}, " +
+            $"skip {startSeconds:0.#}s, {width}x{height}, style={settings.Style}, seed {mazeSeed}");
+
+        using var renderer = new Phase6Renderer(
+            width, height, built.Packed, built.Spectral, built.PackedLights, camera,
+            volumetrics, lightingMode: lighting, sampleClamp: settings.SampleClamp,
+            maxSampleCount: settings.MaxSampleCount, subPixelJitter: settings.SubPixelJitter,
+            motionSampleCap: settings.MotionSampleCap, temporalBlendAlpha: settings.TemporalBlendAlpha,
+            filterRadius: (uint)Math.Max(0, settings.FilterRadius),
+            biomeIndicator: false, debugMode: settings.StartView, bumpyWalls: settings.BumpyWalls,
+            showOverheadMap: settings.ShowOverheadMap, showRat: settings.ShowRat,
+            classicDepthCue: classic && settings.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
+            pixelSize: classic && settings.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
+        renderer.Initialize(windowHandle: 0);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        if (settings.ShowOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
+
+        void UpdateCaustics()
+        {
+            if (classic || !settings.JewelCaustics) return;
+            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f);
+        }
+        UpdateCaustics();
+
+        void ApplySky()
+        {
+            if (built.SunDirection is Vector3 sunDir)
+                renderer.SetSky(sunDir, built.SunAngularRadius);
+        }
+        ApplySky();
+
+        CameraController controller = built.CreateCameraController();
+        controller.StillTime = settings.StillTime;
+        controller.MoveTime = 0.9f;
+        controller.TurnTime = 0.7f;
+
+        CameraController? ratCtrl = null;
+        Camera ratCam = default!;
+        if (settings.ShowRat) ratCtrl = built.CreateRatController(out ratCam);
+
+        // Frozen soap bubbles (§2.6): snapshot once at a fixed time so they converge with the frame.
+        const float FrozenBubbleTime = 2.0f;
+        MazeBubbles.Options bubbleOpts = BubbleOptions(mazeSeed);
+        IReadOnlyList<MazeBubbles.Bubble> bubbleList = built.Bubbles;
+        var bubbleCenters = new Vector3[bubbleList.Count];
+        var bubbleRadii = new float[bubbleList.Count];
+        void FreezeBubbles()
+        {
+            if (bubbleList.Count == 0) return;
+            MazeBubbles.Animate(bubbleList, bubbleOpts, FrozenBubbleTime, bubbleCenters, bubbleRadii);
+            renderer.UpdateSpheres(bubbleCenters, bubbleRadii);
+        }
+        FreezeBubbles();
+
+        const float BuildInDuration = 1.5f; // §9.3 wall-rise intro length
+        const float OutroDuration = 0.6f;   // §9.4 fade-to-black length
+        float mazeStartT = 0f;
+        bool outroActive = false;
+        float outroStartT = 0f;
+        uint frame = 0;
+
+        // Fresh maze in place (mirrors RunPhase6Windowed.Regenerate), re-derived from a new seed.
+        void Regenerate()
+        {
+            mazeSeed = Random.Shared.Next();
+            jewelOpts = new MazeJewels.Options(Chance: 0.05f, Seed: mazeSeed);
+            built = Build(mazeSeed);
+            camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
+            controller = built.CreateCameraController();
+            controller.StillTime = settings.StillTime;
+            controller.MoveTime = 0.9f;
+            controller.TurnTime = 0.7f;
+            renderer.RebuildScene(built.Packed, built.Spectral, built.PackedLights, camera);
+            if (settings.ShowOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
+            UpdateCaustics();
+            ApplySky();
+            if (settings.ShowRat) ratCtrl = built.CreateRatController(out ratCam);
+            bubbleOpts = BubbleOptions(mazeSeed);
+            bubbleList = built.Bubbles;
+            bubbleCenters = new Vector3[bubbleList.Count];
+            bubbleRadii = new float[bubbleList.Count];
+            FreezeBubbles();
+        }
+
+        int saved = 0;
+        float t = 0f;
+        while (walksMode ? walksCompleted < targetWalks : saved < targetFrames)
+        {
+            if (saved >= walkSafetyFrames) break; // walks-mode runaway guard
+
+            bool capture = t >= startSeconds;
+
+            float buildInT = t - mazeStartT;
+            bool building = settings.MazeBuildInAnim && buildInT < BuildInDuration;
+            bool holdWalker = building || outroActive;
+            controller.Dirty = false;
+            if (!holdWalker) controller.Update(dt, camera);
+            bool moving = controller.Dirty;
+
+            // Walks length always watches for the goal (it's how a walk ends); Duration length only does
+            // so when the user asked for regeneration (otherwise the walker just settles at the goal).
+            bool detectGoal = walksMode || settings.MazeRegenerate;
+            bool atGoal = detectGoal && !building && !moving && frame > 0 &&
+                controller.CurrentCell == (built.Maze.Width - 1, built.Maze.Height - 1);
+            if (atGoal && settings.MazeOutroAnim && !outroActive) { outroActive = true; outroStartT = t; }
+            if (outroActive)
+            {
+                float ot = t - outroStartT;
+                if (capture) renderer.SetFadeLevel(MathF.Min(1f, ot / OutroDuration));
+                if (ot >= OutroDuration)
+                {
+                    outroActive = false;
+                    if (capture) renderer.SetFadeLevel(0f);
+                    if (walksMode && ++walksCompleted >= targetWalks) break; // recorded the final walk's fade
+                    Regenerate();
+                    mazeStartT = t; frame = 0; t += dt;
+                    continue;
+                }
+            }
+            else if (atGoal)
+            {
+                if (walksMode && ++walksCompleted >= targetWalks) break;
+                Regenerate();
+                mazeStartT = t; frame = 0; t += dt;
+                continue;
+            }
+
+            if (ratCtrl is not null && !holdWalker) { ratCtrl.Update(dt, ratCam); renderer.SetRatPosition(ratCam.Position); }
+
+            if (capture)
+            {
+                renderer.SetRevealHeight(building
+                    ? MazeGeometryBuilder.WallHeight * (buildInT / BuildInDuration) : 1e9f);
+                renderer.SetCamera(camera);
+                renderer.SetFogTime(t * settings.FogDrift);
+
+                // §O8 day/night: drive the sun from the simulated clock so the descent is smooth on playback.
+                if (outdoor && settings.DayNightCycle && built.SunLightIndex >= 0)
+                {
+                    float period = Math.Max(1f, settings.DayLengthSeconds);
+                    float ph = t / period;
+                    float tt = ph - MathF.Floor(ph);
+                    float hoursF = (tt * 24f + 6f) % 24f;
+                    renderer.SetClock(true, (int)hoursF, (int)((hoursF - MathF.Floor(hoursF)) * 60f));
+                    SunState sun = DayNightCycle.At(tt);
+                    renderer.SetSky(sun.Direction, built.SunAngularRadius, sunRadiance: sun.SunRadiance,
+                        skyStrength: sun.SkyStrength, sunTempK: sun.TempK);
+                    renderer.UpdateSunLight(built.SunLightIndex, sun.Direction, sun.TempK, sun.SunLightLevel);
+                }
+
+                // Bake this frame independently (accumulation reset each frame, no temporal history → a
+                // walking camera can't ghost and the noise level is uniform frame-to-frame). Real-time uses
+                // a small fixed budget. Beautiful bakes until the frame stops changing — reading it back every
+                // few passes and stopping once the mean luma change per pixel falls below MovieConvergeThreshold
+                // — capped by `bakeMs`. That makes quality consistent across simple vs. heavy views (glass,
+                // caustics, oil): a fixed time otherwise under-converges the hard ones and wastes it on easy ones.
+                var sw = Stopwatch.StartNew();
+                int passes = 0;
+                byte[] rgba;
+                if (!beautiful)
+                {
+                    do { renderer.RenderHeadlessFrame(reset: passes == 0, moving: false); passes++; }
+                    while (sw.Elapsed.TotalMilliseconds < bakeMs && (uint)passes < maxPasses);
+                    rgba = renderer.ReadbackOutput();
+                }
+                else
+                {
+                    const int chunk = 8; // passes between convergence checks
+                    byte[]? prev = null;
+                    rgba = null!; // assigned on the first chunk below (loop always runs once)
+                    while (true)
+                    {
+                        for (int c = 0; c < chunk; c++) { renderer.RenderHeadlessFrame(reset: passes == 0, moving: false); passes++; }
+                        rgba = renderer.ReadbackOutput();
+                        bool converged = prev is not null && MeanAbsLumaDiff(prev, rgba) < MovieConvergeThreshold;
+                        if (converged || sw.Elapsed.TotalMilliseconds >= bakeMs || (uint)passes >= maxPasses)
+                            break;
+                        prev = rgba;
+                    }
+                }
+                sw.Stop();
+
+                // Beautiful frames are static, so the shader's motion-gated box blur never runs on them;
+                // heavy views (Ultra fog + caustics + bumpy + spectral) keep visible grain even after
+                // hundreds of samples. Clean it in software with an edge-stopping à-trous filter so mortar
+                // lines, signs and silhouettes stay crisp. Real-time frames and the goldens never hit this.
+                if (denoise)
+                    rgba = DenoiseEdgeAware(rgba, width, height, MovieDenoiseSigma, MovieDenoiseIters);
+
+                // Honest per-frame render rate: high in real-time, a fraction in beautiful mode. Invariant
+                // culture so the readout is a dot-decimal ("4.0 fps") regardless of the machine's locale.
+                double renderFps = sw.Elapsed.TotalSeconds > 0 ? 1.0 / sw.Elapsed.TotalSeconds : 0;
+                string? overlay = showFps
+                    ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{renderFps:0.0} fps")
+                    : null;
+                SavePng(rgba, width, height, Path.Combine(framesDir, $"frame_{saved:D6}.png"), overlay);
+                saved++;
+                // Refresh the config-screen thumbnail from a representative (non-fading) frame.
+                if (!outroActive && (saved == 1 || saved % 20 == 0))
+                    SavePreview(rgba, width, height);
+                if (!onFrameSaved(new MovieProgress(saved, walksCompleted, rgba, width, height)))
+                    break; // caller cancelled
+            }
+
+            frame++;
+            t += dt;
+        }
+
+        return saved;
+    }
+
+    /// <summary>
+    /// Headless movie generator (<c>--movie</c>): the console-driven twin of the config screen's
+    /// "Record movie", for scripting / one-off renders without the dialog. Reads the same knobs from
+    /// command-line flags, captures via <see cref="CaptureMovieFrames"/>, and encodes with ffmpeg.
+    /// Flags: <c>--seconds</c>/<c>--walks</c> (length), <c>--fps</c>, <c>--realtime</c> (default is a
+    /// beautiful bake), <c>--bake-ms</c>, <c>--start</c>, <c>--width</c>/<c>--height</c>, <c>--classic</c>,
+    /// <c>--no-fps</c> (drop the overlay), <c>--seed</c>, and <c>--save &lt;path.mp4&gt;</c>.
+    /// </summary>
+    private static int RunMovieCli(string[] args)
+    {
+        var settings = new AppSettings
+        {
+            Width = ParseIntOption(args, "--width", 1280),
+            Height = ParseIntOption(args, "--height", 720),
+            MazeSize = ParseIntOption(args, "--maze", 16),
+            Style = args.Contains("--classic", StringComparer.OrdinalIgnoreCase) ? RenderStyle.Classic : RenderStyle.Enhanced,
+            MovieFps = ParseIntOption(args, "--fps", 30),
+            MovieQuality = args.Contains("--realtime", StringComparer.OrdinalIgnoreCase)
+                ? MovieQualityMode.Realtime : MovieQualityMode.Beautiful,
+            MovieBakeMs = ParseFloatOption(args, "--bake-ms", 250f),
+            MovieShowFps = !args.Contains("--no-fps", StringComparer.OrdinalIgnoreCase),
+            MovieStartSeconds = ParseFloatOption(args, "--start", 4f),
+            MovieDurationSeconds = ParseFloatOption(args, "--seconds", 8f),
+            VolumetricQuality = Enum.TryParse(ParseStringOption(args, "--fog-quality", "Medium"), ignoreCase: true, out VolumetricQuality fq)
+                ? fq : VolumetricQuality.Medium,
+            JewelCaustics = args.Contains("--jewel-caustics", StringComparer.OrdinalIgnoreCase),
+            MaxSampleCount = (uint)Math.Max(1, ParseIntOption(args, "--max-samples", 2048)),
+            MovieDenoise = !args.Contains("--no-denoise", StringComparer.OrdinalIgnoreCase),
+        };
+        MovieDenoiseSigma = ParseFloatOption(args, "--denoise-sigma", MovieDenoiseSigma);
+        MovieDenoiseIters = ParseIntOption(args, "--denoise-iters", MovieDenoiseIters);
+        int walks = ParseIntOption(args, "--walks", 0);
+        if (walks > 0) { settings.MovieLengthMode = MovieLengthMode.Walks; settings.MovieWalks = walks; }
+        int mazeSeed = ResolveMazeSeed(args);
+
+        int fps = Math.Clamp(settings.MovieFps, 5, 60);
+        bool walksMode = settings.MovieLengthMode == MovieLengthMode.Walks;
+        int barMax = walksMode ? settings.MovieWalks : MovieFrameCount(settings);
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string framesDir = Path.Combine(Path.GetTempPath(), $"SpectralMaze-frames-{stamp}");
+        Directory.CreateDirectory(framesDir);
+        string outPath = ParseStringOption(args, "--save", null)
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "SpectralMaze",
+                $"SpectralMaze-{stamp}.mp4");
+        Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+
+        var sw = Stopwatch.StartNew();
+        int saved = CaptureMovieFrames(settings, mazeSeed, framesDir, p =>
+        {
+            if (p.FramesSaved == 1 || p.FramesSaved % 20 == 0)
+                Console.WriteLine(walksMode
+                    ? $"  walk {Math.Min(p.WalksCompleted + 1, settings.MovieWalks)}/{settings.MovieWalks}, {p.FramesSaved} frames…"
+                    : $"  frame {p.FramesSaved}/{barMax}…");
+            return true;
+        }, out int walksDone);
+        sw.Stop();
+        Console.WriteLine($"Captured {saved} frame(s), {walksDone} walk(s) in {sw.Elapsed.TotalSeconds:0.#}s.");
+
+        if (saved == 0) { Console.Error.WriteLine("No frames captured — nothing to encode."); TryDeleteDir(framesDir); return 1; }
+
+        string ffArgs = BuildFfmpegArgs(framesDir, fps, outPath);
+        string? ffmpeg = FindFfmpeg();
+        if (ffmpeg is null)
+        {
+            Console.WriteLine($"ffmpeg not found. Frames kept in:\n  {framesDir}\nEncode with:\n  ffmpeg {ffArgs}");
+            return 2;
+        }
+
+        Console.WriteLine($"Encoding {saved} frames with {ffmpeg}…");
+        int exit = EncodeMovie(ffmpeg, ffArgs, out string err);
+        if (exit == 0 && File.Exists(outPath))
+        {
+            TryDeleteDir(framesDir);
+            double mb = new FileInfo(outPath).Length / (1024.0 * 1024.0);
+            Console.WriteLine($"Movie saved: {outPath} ({mb:0.0} MB, {saved} frames @ {fps}fps ≈ {saved / (double)fps:0.#}s)");
+            return 0;
+        }
+
+        Console.Error.WriteLine($"ffmpeg failed (exit {exit}). Frames kept in {framesDir}.\n{err}");
+        return 1;
+    }
+
+    /// <summary>Number of output frames a movie of these settings will produce (duration × fps).</summary>
+    private static int MovieFrameCount(AppSettings settings)
+    {
+        int fps = Math.Clamp(settings.MovieFps, 5, 60);
+        float dt = 1f / fps;
+        float durationSeconds = Math.Max(dt, settings.MovieDurationSeconds);
+        return Math.Max(1, (int)MathF.Round(durationSeconds * fps));
+    }
+
+    /// <summary>
+    /// The interactive "Record movie" entry point launched from the config screen: shows a small
+    /// progress window over <see cref="CaptureMovieFrames"/> (with a Cancel that ends capture early
+    /// but still encodes what was rendered), then strings the PNGs into an MP4 with ffmpeg and saves
+    /// it under <c>Videos\SpectralMaze</c>. If ffmpeg is missing the frames are kept and the exact
+    /// encode command is shown so the user can finish it by hand.
+    /// </summary>
+    private static int RunMovie(AppSettings settings, int mazeSeed)
+    {
+        int fps = Math.Clamp(settings.MovieFps, 5, 60);
+        bool walksMode = settings.MovieLengthMode == MovieLengthMode.Walks;
+        int targetWalks = Math.Max(1, settings.MovieWalks);
+        // The bar tracks walks in Walks length, frames in Duration length.
+        int barMax = walksMode ? targetWalks : MovieFrameCount(settings);
+        string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string framesDir = Path.Combine(Path.GetTempPath(), $"SpectralMaze-frames-{stamp}");
+        Directory.CreateDirectory(framesDir);
+
+        using var progress = new MovieProgressForm(barMax);
+        progress.Show();
+        Application.DoEvents();
+
+        int saved;
+        try
+        {
+            var previewClock = Stopwatch.StartNew();
+            saved = CaptureMovieFrames(settings, mazeSeed, framesDir, p =>
+            {
+                progress.Report(walksMode ? p.WalksCompleted : p.FramesSaved, walksMode
+                    ? $"Walk {Math.Min(p.WalksCompleted + 1, targetWalks)}/{targetWalks} — {p.FramesSaved} frames…"
+                    : $"Rendering frame {p.FramesSaved} / {barMax}…");
+                // Show the frame that was just rendered, throttled to a few updates a second so a fast
+                // real-time capture doesn't spend all its time downscaling for the UI.
+                if (p.FramesSaved == 1 || previewClock.ElapsedMilliseconds >= 350)
+                {
+                    progress.SetPreview(ThumbnailBitmap(p.Rgba, p.Width, p.Height, 356));
+                    previewClock.Restart();
+                }
+                Application.DoEvents();      // keep the window painting + the Cancel button live
+                return !progress.Cancelled;  // false → stop capturing early
+            }, out int walksDone);
+            Console.WriteLine($"Captured {saved} frame(s), {walksDone} walk(s).");
+        }
+        catch (Exception ex)
+        {
+            progress.Close();
+            TryDeleteDir(framesDir);
+            Console.Error.WriteLine("Movie capture failed: " + ex);
+            MessageBox.Show($"Movie capture failed:\n{ex.Message}", "RayTracer.Gpu — movie",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 1;
+        }
+
+        string videosDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "SpectralMaze");
+        Directory.CreateDirectory(videosDir);
+        string outPath = Path.Combine(videosDir, $"SpectralMaze-{stamp}.mp4");
+        string ffArgs = BuildFfmpegArgs(framesDir, fps, outPath);
+
+        if (saved == 0)
+        {
+            progress.Close();
+            TryDeleteDir(framesDir);
+            MessageBox.Show("No frames were captured — nothing to encode.", "RayTracer.Gpu — movie",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return 0;
+        }
+
+        string? ffmpeg = FindFfmpeg();
+        if (ffmpeg is null)
+        {
+            progress.Close();
+            Console.WriteLine($"ffmpeg not found. Frames are in: {framesDir}\nEncode with:\n  ffmpeg {ffArgs}");
+            MessageBox.Show(
+                $"Captured {saved} frame(s), but ffmpeg was not found on your system, so the video " +
+                $"could not be assembled.\n\nThe PNG frames are here:\n{framesDir}\n\n" +
+                $"Install ffmpeg (e.g. `winget install ffmpeg`) and run:\n\nffmpeg {ffArgs}",
+                "RayTracer.Gpu — ffmpeg not found", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            OpenInExplorer(framesDir, select: false);
+            return 0;
+        }
+
+        progress.SetStatus($"Encoding {saved} frames with ffmpeg…");
+        Application.DoEvents();
+        Console.WriteLine($"Encoding with {ffmpeg}\n  {ffArgs}");
+        int exit = EncodeMovie(ffmpeg, ffArgs, out string ffErr);
+        progress.Close();
+
+        if (exit == 0 && File.Exists(outPath))
+        {
+            TryDeleteDir(framesDir); // frames were only scratch for the encode
+            Console.WriteLine($"Movie saved to {outPath}");
+            if (MessageBox.Show($"Movie saved:\n{outPath}\n\nOpen its folder now?",
+                    "RayTracer.Gpu — movie ready", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
+                == DialogResult.Yes)
+                OpenInExplorer(outPath, select: true);
+            return 0;
+        }
+
+        // Encode failed — keep the frames so nothing is lost.
+        Console.Error.WriteLine($"ffmpeg exited {exit}:\n{ffErr}");
+        string errTail = ffErr.Length > 600 ? ffErr[^600..] : ffErr;
+        MessageBox.Show(
+            $"ffmpeg failed (exit {exit}). The {saved} PNG frames were kept here:\n{framesDir}\n\n{errTail}",
+            "RayTracer.Gpu — encode failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        OpenInExplorer(framesDir, select: false);
+        return 1;
+    }
+
+    // The ffmpeg command line: numbered PNGs → H.264 MP4. yuv420p needs even dimensions, so the
+    // scale filter rounds each down to an even number (a no-op for the even resolution presets).
+    private static string BuildFfmpegArgs(string framesDir, int fps, string outPath)
+    {
+        string inputPattern = Path.Combine(framesDir, "frame_%06d.png");
+        return $"-y -framerate {fps} -i \"{inputPattern}\" -c:v libx264 -pix_fmt yuv420p " +
+            $"-crf 18 -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\" \"{outPath}\"";
+    }
+
+    // Runs ffmpeg to completion, capturing stderr (where ffmpeg writes progress + errors). Returns
+    // its exit code, or -1 if the process could not even be started.
+    private static int EncodeMovie(string ffmpeg, string ffArgs, out string stderr)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = ffmpeg,
+                Arguments = ffArgs,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardError = true,
+            };
+            using var proc = Process.Start(psi)!;
+            stderr = proc.StandardError.ReadToEnd();
+            proc.WaitForExit();
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            stderr = ex.Message;
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Headless smoke test of the movie generator (<c>--movie-selftest</c>). Three parts: (A) the FPS
+    /// overlay actually draws (isolated from the GPU); (B) a short Beautiful/Duration clip produces the
+    /// expected PNGs, each a real render, and — if ffmpeg is installed — encodes to a non-empty MP4
+    /// (skipped, not failed, when ffmpeg is absent); (C) Walks length runs a maze to completion and
+    /// terminates on exactly one finished walk. Requires a DXR 1.1 GPU. Cleans up its scratch on the way out.
+    /// </summary>
+    private static int RunMovieSelfTest()
+    {
+        Console.WriteLine("RayTracer.Gpu — movie generator self-test");
+        bool a = MovieSelfTestOverlay();
+        bool b = MovieSelfTestBeautifulDuration();
+        bool c = MovieSelfTestWalks();
+        bool pass = a && b && c;
+        Console.WriteLine($"  overall              : {(pass ? "PASS" : "FAIL")}");
+        return pass ? 0 : 1;
+    }
+
+    // Part A — the burned-in FPS label renders. Drawn onto an all-black frame so only the white text
+    // registers as non-black; without the overlay the same frame stays fully black.
+    private static bool MovieSelfTestOverlay()
+    {
+        int w = 320, h = 180;
+        var black = new byte[w * h * 4];
+        string dir = Path.Combine(Path.GetTempPath(), $"SpectralMaze-ovl-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string with = Path.Combine(dir, "with.png");
+            string without = Path.Combine(dir, "without.png");
+            SavePng(black, w, h, with, "12.3 fps");
+            SavePng(black, w, h, without, null);
+            double covWith = PngStats(with).coverage;
+            double covWithout = PngStats(without).coverage;
+            bool ok = covWith > 0.0 && covWithout < 1e-6;
+            Console.WriteLine($"  [A] overlay: text coverage {covWith:P3} (with) vs {covWithout:P3} (without) [{(ok ? "ok" : "FAIL")}]");
+            return ok;
+        }
+        finally { TryDeleteDir(dir); }
+    }
+
+    // Part B — a short Beautiful (bake-to-budget) Duration clip: correct frame count, real renders, encode.
+    private static bool MovieSelfTestBeautifulDuration()
+    {
+        var s = new AppSettings
+        {
+            Width = 640, Height = 360, Style = RenderStyle.Enhanced, VolumetricQuality = VolumetricQuality.Low,
+            MazeSize = 10, MovieFps = 15,
+            MovieQuality = MovieQualityMode.Beautiful, MovieBakeMs = 60f, MovieShowFps = true,
+            MovieLengthMode = MovieLengthMode.Duration, MovieStartSeconds = 0f, MovieDurationSeconds = 1f,
+            MazeBuildInAnim = false, MazeRegenerate = false, MazeOutroAnim = false,
+            OutdoorArea = false, JewelCaustics = false, ShowRat = true,
+        };
+        int target = MovieFrameCount(s);
+        string dir = Path.Combine(Path.GetTempPath(), $"SpectralMaze-beauty-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            int saved;
+            try { saved = CaptureMovieFrames(s, mazeSeed: 12345, dir, _ => true, out _); }
+            catch (Exception ex) { Console.Error.WriteLine("  [B] capture threw: " + ex); return false; }
+
+            int pngs = Directory.GetFiles(dir, "frame_*.png").Length;
+            bool countOk = saved == target && pngs == saved && saved > 0;
+            (double cov, double luma) = countOk ? PngStats(Path.Combine(dir, $"frame_{saved / 2:D6}.png")) : (0, 0);
+            bool pixOk = cov > 0.5 && luma > 2.0;
+            Console.WriteLine($"  [B] beautiful: frames {saved}/{target}, on disk {pngs}, mid coverage {cov:P0} luma {luma:F0} [{(countOk && pixOk ? "ok" : "FAIL")}]");
+            if (!(countOk && pixOk)) return false;
+
+            string? ffmpeg = FindFfmpeg();
+            if (ffmpeg is null)
+            {
+                Console.WriteLine("  [B] ffmpeg encode: skipped (ffmpeg not installed)");
+                return true; // ffmpeg is an optional external dependency
+            }
+            string outPath = Path.Combine(dir, "out.mp4");
+            int exit = EncodeMovie(ffmpeg, BuildFfmpegArgs(dir, s.MovieFps, outPath), out string err);
+            long bytes = File.Exists(outPath) ? new FileInfo(outPath).Length : 0;
+            bool encOk = exit == 0 && bytes > 0;
+            Console.WriteLine($"  [B] ffmpeg encode: exit {exit}, {bytes} bytes [{(encOk ? "ok" : "FAIL")}]");
+            if (!encOk) Console.Error.WriteLine(err);
+            return encOk;
+        }
+        finally { TryDeleteDir(dir); }
+    }
+
+    // Part C — Walks length: run a small maze to the goal and confirm it stops after exactly one walk.
+    private static bool MovieSelfTestWalks()
+    {
+        var s = new AppSettings
+        {
+            Width = 480, Height = 270, Style = RenderStyle.Enhanced, VolumetricQuality = VolumetricQuality.Off,
+            MazeSize = 8, MovieFps = 15, MovieQuality = MovieQualityMode.Realtime, MovieShowFps = false,
+            MovieLengthMode = MovieLengthMode.Walks, MovieWalks = 1,
+            StillTime = 0.2f, MazeBuildInAnim = false, MazeOutroAnim = false, MazeRegenerate = true,
+            OutdoorArea = false, JewelCaustics = false, ShowRat = false,
+        };
+        string dir = Path.Combine(Path.GetTempPath(), $"SpectralMaze-walks-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            int saved = 0, walks = 0;
+            try { saved = CaptureMovieFrames(s, mazeSeed: 777, dir, _ => true, out walks); }
+            catch (Exception ex) { Console.Error.WriteLine("  [C] capture threw: " + ex); return false; }
+
+            bool ok = walks == 1 && saved > 0;
+            Console.WriteLine($"  [C] walks: completed {walks}/1 in {saved} frames [{(ok ? "ok" : "FAIL")}]");
+            return ok;
+        }
+        finally { TryDeleteDir(dir); }
+    }
+
+    // Locates an ffmpeg executable: $FFMPEG override, then PATH, then the usual Windows install
+    // spots (winget / chocolatey / a manual C:\ffmpeg), then next to our own exe. Null if none.
+    private static string? FindFfmpeg()
+    {
+        const string exe = "ffmpeg.exe";
+        string? env = Environment.GetEnvironmentVariable("FFMPEG");
+        if (!string.IsNullOrWhiteSpace(env))
+        {
+            if (File.Exists(env)) return env;
+            string cand = Path.Combine(env, exe);
+            if (File.Exists(cand)) return cand;
+        }
+        foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(dir)) continue;
+            try { string cand = Path.Combine(dir.Trim(), exe); if (File.Exists(cand)) return cand; }
+            catch { /* malformed PATH entry */ }
+        }
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string commonAppData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        string programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        string[] candidates =
+        [
+            @"C:\ffmpeg\bin\" + exe,
+            Path.Combine(programFiles, "ffmpeg", "bin", exe),
+            Path.Combine(localAppData, "Microsoft", "WinGet", "Links", exe),
+            Path.Combine(commonAppData, "chocolatey", "bin", exe),
+            Path.Combine(AppContext.BaseDirectory, exe),
+        ];
+        foreach (string c in candidates)
+        {
+            try { if (File.Exists(c)) return c; } catch { /* ignore */ }
+        }
+
+        // winget's ffmpeg packages (Gyan.FFmpeg / BtbN.FFmpeg) unpack under WinGet\Packages\…\bin\ffmpeg.exe
+        // and don't always add a PATH shim, so scan that tree as a last resort.
+        try
+        {
+            string wingetPkgs = Path.Combine(localAppData, "Microsoft", "WinGet", "Packages");
+            if (Directory.Exists(wingetPkgs))
+            {
+                foreach (string pkgDir in Directory.EnumerateDirectories(wingetPkgs, "*FFmpeg*"))
+                {
+                    string? hit = Directory.EnumerateFiles(pkgDir, exe, SearchOption.AllDirectories).FirstOrDefault();
+                    if (hit is not null) return hit;
+                }
+            }
+        }
+        catch { /* enumeration is best-effort */ }
+        return null;
+    }
+
+    private static void OpenInExplorer(string path, bool select)
+    {
+        try
+        {
+            var psi = select
+                ? new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }
+                : new ProcessStartInfo(path) { UseShellExecute = true };
+            // Dispose our handle immediately — it just releases the wrapper, the window stays open.
+            Process.Start(psi)?.Dispose();
+        }
+        catch { /* opening a window is best-effort */ }
+    }
+
+    private static void TryDeleteDir(string dir)
+    {
+        try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+        catch { /* best-effort cleanup of scratch frames */ }
+    }
+
+    // Non-black coverage + mean sRGB luma (0-255) of a PNG on disk — used by the movie self-test to
+    // confirm a captured frame is a real render rather than a blank buffer.
+    private static (double coverage, double meanLuma) PngStats(string path)
+    {
+        using var bmp = new System.Drawing.Bitmap(path);
+        var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);
+        System.Drawing.Imaging.BitmapData data = bmp.LockBits(
+            rect, System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+        long nonBlack = 0;
+        double lumaSum = 0;
+        int pixels = bmp.Width * bmp.Height;
+        try
+        {
+            var row = new byte[data.Stride];
+            for (int y = 0; y < bmp.Height; y++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(
+                    System.IntPtr.Add(data.Scan0, y * data.Stride), row, 0, data.Stride);
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    int o = x * 4; // BGRA
+                    byte b = row[o], g = row[o + 1], r = row[o + 2];
+                    if (r > 4 || g > 4 || b > 4) nonBlack++;
+                    lumaSum += 0.299 * r + 0.587 * g + 0.114 * b;
+                }
+            }
+        }
+        finally
+        {
+            bmp.UnlockBits(data);
+        }
+        return ((double)nonBlack / pixels, lumaSum / pixels);
     }
 
     /// <summary>
@@ -2694,9 +3784,32 @@ internal static class Program
             && dlg.Result.MazeBuildInAnim == input.MazeBuildInAnim
             && dlg.Result.MazeRegenerate == input.MazeRegenerate && dlg.Result.MazeOutroAnim == input.MazeOutroAnim;
 
+        // The "Max-quality movie" button should set the GPU + movie controls to the converged beautiful
+        // preset; clicking Start (ApplyResult) reads them back. Verify the key values land.
+        // The Preset dropdown is the only top-level ComboBox (the rest live inside the GPU/CPU panels).
+        var presetCombo = dlg.Controls.OfType<ComboBox>().FirstOrDefault();
+        var startBtn = dlg.Controls.OfType<Button>().FirstOrDefault(b => b.Text == "Start");
+        bool presetOk = false;
+        if (presetCombo is not null && startBtn is not null)
+        {
+            // Button.PerformClick needs a visible control (CanSelect), so show the dialog off-screen briefly.
+            dlg.StartPosition = FormStartPosition.Manual;
+            dlg.Location = new System.Drawing.Point(-4000, -4000);
+            dlg.Show();
+            Application.DoEvents();
+            presetCombo.SelectedIndex = presetCombo.Items.Count - 1; // last row = "Pretty walk — insane" → ApplyPreset
+            startBtn.PerformClick();                                  // ApplyResult → reads controls into Result
+            AppSettings r = dlg.Result;
+            presetOk = r is { Width: 2560, Height: 1440, MaxSampleCount: 4096u, RecordMovie: true, JewelCaustics: true, OutdoorArea: true }
+                && r.VolumetricQuality == VolumetricQuality.Ultra && r.Style == RenderStyle.Enhanced
+                && r.MovieQuality == MovieQualityMode.Beautiful && MathF.Abs(r.MovieBakeMs - 8000f) < 0.5f
+                && !r.MovieShowFps;
+            dlg.Hide();
+        }
         Console.WriteLine($"  [{(builds ? "ok" : "FAIL")}] dialog builds ({dlg.Controls.Count} controls)");
         Console.WriteLine($"  [{(roundTrips ? "ok" : "FAIL")}] Result mirrors incoming settings");
-        bool pass = builds && roundTrips;
+        Console.WriteLine($"  [{(presetOk ? "ok" : "FAIL")}] 'insane' preset → converged 1440p/Ultra/8000ms config");
+        bool pass = builds && roundTrips && presetOk;
         Console.WriteLine($"  overall              : {(pass ? "PASS" : "FAIL")}");
         return pass ? 0 : 1;
     }
@@ -2941,10 +4054,10 @@ internal static class Program
         return ((double)nonBlack / pixels, lumaSum / pixels);
     }
 
-    // Writes a tightly-packed RGBA8 buffer to a PNG (RGBA -> BGRA for GDI+).
-    internal static void SavePng(byte[] rgba, int width, int height, string path)
+    // Builds a GDI+ bitmap from a tightly-packed RGBA8 buffer (RGBA -> BGRA).
+    private static System.Drawing.Bitmap BitmapFromRgba(byte[] rgba, int width, int height)
     {
-        using var bmp = new System.Drawing.Bitmap(
+        var bmp = new System.Drawing.Bitmap(
             width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         var rect = new System.Drawing.Rectangle(0, 0, width, height);
         System.Drawing.Imaging.BitmapData data =
@@ -2971,11 +4084,67 @@ internal static class Program
         {
             bmp.UnlockBits(data);
         }
+        return bmp;
+    }
+
+    // Writes a tightly-packed RGBA8 buffer to a PNG. An optional overlay string is drawn in the
+    // top-left corner (used for the movie generator's render-FPS readout).
+    internal static void SavePng(byte[] rgba, int width, int height, string path, string? overlay = null)
+    {
+        using var bmp = BitmapFromRgba(rgba, width, height);
+        if (!string.IsNullOrEmpty(overlay))
+            DrawCornerLabel(bmp, overlay, height);
 
         string? dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
         bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+    }
+
+    // Downscales an RGBA8 frame to a small bitmap (16:9-ish, keeping aspect). Caller owns/disposes it.
+    private static System.Drawing.Bitmap ThumbnailBitmap(byte[] rgba, int width, int height, int targetWidth)
+    {
+        int th = Math.Max(1, (int)Math.Round(targetWidth * (double)height / width));
+        using var full = BitmapFromRgba(rgba, width, height);
+        var small = new System.Drawing.Bitmap(targetWidth, th);
+        using var g = System.Drawing.Graphics.FromImage(small);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.DrawImage(full, 0, 0, targetWidth, th);
+        return small;
+    }
+
+    // Refreshes the config screen's on-disk preview thumbnail (best-effort). Writes atomically (temp file +
+    // move) so the dialog never reads a half-written image. Never throws — a preview must not disrupt rendering.
+    internal static void SavePreview(byte[] rgba, int width, int height)
+    {
+        try
+        {
+            using var small = ThumbnailBitmap(rgba, width, height, 320);
+            string path = AppSettings.PreviewImagePath;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            string tmp = path + ".tmp";
+            small.Save(tmp, System.Drawing.Imaging.ImageFormat.Png);
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch { /* best-effort */ }
+    }
+
+    // Draws a small label in the top-left with a translucent backing plate, sized to the image height
+    // so it stays legible at any resolution. Used for the movie generator's burned-in FPS readout.
+    private static void DrawCornerLabel(System.Drawing.Bitmap bmp, string text, int height)
+    {
+        using var g = System.Drawing.Graphics.FromImage(bmp);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        float fontPx = Math.Max(11f, height / 45f);
+        using var font = new System.Drawing.Font("Consolas", fontPx,
+            System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Pixel);
+        System.Drawing.SizeF sz = g.MeasureString(text, font);
+        const float margin = 8f, padX = 6f, padY = 3f;
+        using var back = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(150, 0, 0, 0));
+        g.FillRectangle(back, margin, margin, sz.Width + padX * 2, sz.Height + padY * 2);
+        using var fore = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+        g.DrawString(text, font, fore, margin + padX, margin + padY);
     }
 
     // Fraction of non-black pixels and mean sRGB luma (0-255) of an RGBA8 image.
@@ -3046,6 +4215,16 @@ internal static class Program
     // Derive the light seed from the maze seed so a single `--seed` fully
     // determines the scene (maze + light placement) and is reproducible.
     private static int LightSeedFrom(int mazeSeed) => new Random(mazeSeed).Next();
+
+    // §O: the camera-relative fog march (default 16 units ≈ 8 cells) fills the enclosed maze fine, but in
+    // the open-air garden the view runs well past it, so the fog reads as a hard "sphere" locked to the
+    // camera. When the maze has an outdoor half, extend the march to cover the garden, add proportional
+    // steps, and fade the far end to nothing so the cutoff is invisible. Only touched here (outdoor app +
+    // movie); indoor-only mazes, the screensaver, the parity self-tests, and the goldens keep the default.
+    private static VolumetricOptions WithOutdoorFog(VolumetricOptions v)
+        => v.EnableVolumetrics
+            ? v with { MaxMarchDistance = MathF.Max(v.MaxMarchDistance, 40f), MarchSteps = Math.Max(v.MarchSteps, 16), FarFadeStart = 24f }
+            : v;
 
     // Phase 4 smoke-mode selection for the windowed demo. Defaults to biome-banded
     // smoke (the mode Phase 4.2 verifies); `--fog` / `--ground` force a single mode.

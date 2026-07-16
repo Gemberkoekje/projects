@@ -220,6 +220,13 @@ public partial class JobSystem
     public LightingMode Lighting { get; }
 
     /// <summary>
+    /// Optional procedural sky (outdoor-area-plan.md §O2): when set, a ray that escapes all geometry
+    /// (through an open roof) returns this sky's radiance instead of black. Null → the classic black
+    /// background, so roofed scenes are unchanged.
+    /// </summary>
+    public Sky? Sky { get; set; }
+
+    /// <summary>
     /// Controls how many worker threads are spawned and at what OS priority they run.
     /// See <see cref="CpuThrottle"/> for the available levels.
     /// </summary>

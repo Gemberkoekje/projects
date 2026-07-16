@@ -30,7 +30,8 @@ public sealed class SpectralResources
     /// <summary>
     /// CIE XYZ at each hero wavelength, four floats per entry (XYZ + padding) so
     /// it maps onto an HLSL <c>StructuredBuffer&lt;float4&gt;</c>.
-    /// Length is <c>DeterministicCount * 4</c>.
+    /// Length is <c>DeterministicCount * 4</c>. These are the white-balanced CIE weights
+    /// (<c>WavelengthLookup.TryGet</c>), so summing them over the hero cycle is an unbiased tristimulus.
     /// </summary>
     public float[] DeterXYZ { get; }
 

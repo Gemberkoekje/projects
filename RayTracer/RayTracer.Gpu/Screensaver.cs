@@ -244,11 +244,18 @@ internal static class Screensaver
         // Classic look: unlit fullbright spectral, smoke off (plan §2).
         bool classic = s.Style == RenderStyle.Classic;
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(
-            VolumetricQuality.Medium, classic ? SmokeMode.None : s.SmokeMode);
+            s.VolumetricQuality, classic ? SmokeMode.None : s.SmokeMode);
+        // Match RunPhase6Windowed: force fog occlusion on at any non-Off tier (Low/Medium omit it by preset).
+        if (volumetrics.EnableVolumetrics && volumetrics.ShadowStepInterval == 0)
+            volumetrics = volumetrics with { ShadowStepInterval = 4 };
         return new Phase6Renderer(
             width, height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: classic ? LightingMode.None : LightingMode.NEE,
-            sampleClamp: s.SampleClamp, biomeIndicator: false, debugMode: Phase5DebugMode.Beauty,
+            sampleClamp: s.SampleClamp,
+            maxSampleCount: s.MaxSampleCount, subPixelJitter: s.SubPixelJitter,
+            motionSampleCap: s.MotionSampleCap, temporalBlendAlpha: s.TemporalBlendAlpha,
+            filterRadius: (uint)Math.Max(0, s.FilterRadius),
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty,
             bumpyWalls: s.BumpyWalls, showOverheadMap: s.ShowOverheadMap, showRat: s.ShowRat,
             classicDepthCue: classic && s.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
             pixelSize: classic && s.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
