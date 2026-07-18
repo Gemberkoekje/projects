@@ -61,6 +61,12 @@ public partial class JobSystem
         float sigmaScale = GetSigmaScale(options, options.SmokeMode);
         float inscatterScale = options.InscatterStrength / IsotropicPhase;
 
+        // Finding §2: when shadow tracing on a cadence (ShadowStepInterval > 0), the steps between
+        // traces reuse the last *traced* in-scatter visibility instead of adding the light fully
+        // unoccluded. The old "unoccluded on 3 of every 4 steps" washed out fog shadows / god-rays.
+        Vector3 cachedInscatterLight = Vector3.Zero;
+        bool haveCachedInscatter = false;
+
         for (int i = 0; i < steps; i++)
         {
             float distance = (i + 0.5f) * stepLength;
@@ -76,16 +82,33 @@ public partial class JobSystem
             float opticalDepth = sigmaT * stepLength;
             float stepTransmittance = MathF.Exp(-opticalDepth);
             float scatterWeight = transmittance * (1f - stepTransmittance);
-            float phase = EvaluatePhase(dir, p, options, lights);
+            // §9: PhaseAllLights folds the per-light phase into EstimateInscatterLight, so the outer factor
+            // is the neutral isotropic phase; otherwise the single lights[0] phase multiplies the whole sum.
+            float phase = options.PhaseAllLights ? IsotropicPhase : EvaluatePhase(dir, p, options, lights);
 
-            // Only query the BVH shadow ray on steps that fall on the configured
-            // interval (0 = never, 1 = every step, N = every Nth step).
-            bool traceShadow = options.ShadowStepInterval > 0
-                && i % options.ShadowStepInterval == 0;
-            Vector3 localLight = EstimateInscatterLight(
-                p, dir, options, lights, traceShadow ? bvh : null);
+            // Query the BVH shadow ray on steps that fall on the configured interval (0 = never,
+            // 1 = every step, N = every Nth step); reuse the last traced visibility in between.
+            Vector3 localLight;
+            if (options.ShadowStepInterval <= 0)
+            {
+                // No fog shadowing requested (cheap tiers) — unoccluded in-scatter every step, unchanged.
+                localLight = EstimateInscatterLight(p, dir, options, lights, null);
+            }
+            else
+            {
+                bool traceShadow = i % options.ShadowStepInterval == 0;
+                if (traceShadow || !haveCachedInscatter)
+                {
+                    cachedInscatterLight = EstimateInscatterLight(p, dir, options, lights, bvh);
+                    haveCachedInscatter = true;
+                }
+                localLight = cachedInscatterLight;
+            }
 
-            inscatter += localLight * (scatterWeight * inscatterScale * phase);
+            // §9: single-scattering albedo scales how much of the extinction scatters toward the eye
+            // (the rest is absorbed); 1 (default) is the historical non-absorbing smoke, <1 lets thick
+            // smoke darken what is behind it. Transmittance still uses the full extinction.
+            inscatter += localLight * (scatterWeight * inscatterScale * phase * options.SingleScatterAlbedo);
             transmittance *= stepTransmittance;
 
             if (transmittance < options.EarlyOutTransmittance)
@@ -97,7 +120,9 @@ public partial class JobSystem
 
     internal VolumetricSample IntegrateVolumetricSegment(Vector3 rayOrigin, Vector3 hitPoint, Vector3 rayDirection)
     {
-        return IntegrateVolumetricSegment(rayOrigin, hitPoint, rayDirection, Volumetrics, IsMoving, _lights, _bvh);
+        // §9: _fogLights carries the blackbody-tinted colours when FogSpectralLighting is on (else it
+        // aliases _lights). Positions/directions are unchanged, so shadow rays and the phase are unaffected.
+        return IntegrateVolumetricSegment(rayOrigin, hitPoint, rayDirection, Volumetrics, IsMoving, _fogLights, _bvh);
     }
 
     /// <summary>
@@ -266,7 +291,22 @@ public partial class JobSystem
             if (options.ShadowTransmittance && bvh is not null)
                 lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, options);
 
-            lighting += light.Color * lightWeight;
+            // §9: with PhaseAllLights, weight each light's in-scatter by the Henyey–Greenstein phase toward
+            // *that* light (normalised by the isotropic phase, the neutral outer factor), instead of the
+            // single lights[0] phase applied to the whole sum. No anisotropy (g≈0) → 1, so it is a no-op.
+            float phaseFactor = 1f;
+            if (options.PhaseAllLights)
+            {
+                float g = Math.Clamp(options.AnisotropyG, -0.95f, 0.95f);
+                if (MathF.Abs(g) > 1e-4f)
+                {
+                    float cosTheta = Math.Clamp(Vector3.Dot(lightDir, -viewDirection), -1f, 1f);
+                    float denom = 1f + g * g - 2f * g * cosTheta;
+                    phaseFactor = (1f - g * g) / (4f * MathF.PI * MathF.Pow(denom, 1.5f)) / IsotropicPhase;
+                }
+            }
+
+            lighting += light.Color * (lightWeight * phaseFactor);
         }
 
         if (lighting == Vector3.Zero)

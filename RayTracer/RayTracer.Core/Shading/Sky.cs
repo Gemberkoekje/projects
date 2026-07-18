@@ -60,6 +60,7 @@ public sealed class Sky
     private readonly Vector3 _toSun;
     private readonly float _cosSunRadius;
     private readonly float _solarDenomRef; // exp(C2/(ReferenceNm·T)) − 1, precomputed for normalisation
+    private readonly float _solarLumaNorm; // §6 luminance normalisation (1 when no spectral table given)
 
     public Sky(
         Vector3 sunDirection,
@@ -67,7 +68,8 @@ public sealed class Sky
         float sunRadiance = 9f,
         float skyStrength = 0.7f,
         float rayleighDepth = 0.35f,
-        float sunTempK = 5778f)
+        float sunTempK = 5778f,
+        WavelengthLookup? spectral = null)
     {
         SunDirection = sunDirection.LengthSquared() > 1e-12f ? Vector3.Normalize(sunDirection) : new Vector3(0f, -1f, 0f);
         SunAngularRadius = MathF.Max(0f, sunAngularRadius);
@@ -78,15 +80,20 @@ public sealed class Sky
         _toSun = -SunDirection;
         _cosSunRadius = MathF.Cos(SunAngularRadius);
         _solarDenomRef = MathF.Exp(C2NmK / (ReferenceNm * SunTempK)) - 1f;
+        // §6: luma-normalise the solar shape over the hero set so the sun's colour temperature shifts the
+        // daylight hue without changing the dome brightness. Without a spectral table (the historical
+        // constructor) the norm is 1, so the shape stays 550-normalised — existing behaviour unchanged.
+        _solarLumaNorm = spectral?.BlackbodyLumaNorm(SunTempK) ?? 1f;
     }
 
-    /// <summary>Planck black-body spectral shape at <paramref name="wavelengthNm"/>, normalised to 1 at the
-    /// reference wavelength (a plain shape factor, not an absolute radiance).</summary>
+    /// <summary>Planck black-body spectral shape at <paramref name="wavelengthNm"/>, luma-normalised over
+    /// the hero set (§6) when a spectral table was supplied, else normalised to 1 at the reference
+    /// wavelength (a plain shape factor, not an absolute radiance).</summary>
     private float SolarShape(float wavelengthNm)
     {
         float r = ReferenceNm / wavelengthNm;
         float denom = MathF.Exp(C2NmK / (wavelengthNm * SunTempK)) - 1f;
-        return r * r * r * r * r * (_solarDenomRef / denom); // (550/λ)^5 · (denomRef/denom)
+        return r * r * r * r * r * (_solarDenomRef / denom) * _solarLumaNorm; // (550/λ)^5 · (denomRef/denom) · norm
     }
 
     /// <summary>
@@ -100,9 +107,25 @@ public sealed class Sky
         Vector3 d = Vector3.Normalize(dir);
 
         // Sun disk — flat bright value, matching the directional light's direction + angular size.
+        // Only the camera/primary miss and specular reflections see it; a diffuse bounce uses
+        // DomeRadiance so the sun is not double-counted against NEE (finding §5).
         float cosSun = Vector3.Dot(d, _toSun);
         if (cosSun >= _cosSunRadius)
             return SunRadiance;
+
+        return DomeRadiance(d, wavelengthNm);
+    }
+
+    /// <summary>
+    /// Sky radiance for an indirect/bounce lookup: the single-scattering Rayleigh dome <b>without</b> the
+    /// sun disk (realism finding §5). A diffuse surface's sun illumination is already added by next-event
+    /// estimation on the directional sun light, so a BSDF-sampled bounce that happens to point at the sun
+    /// disk must not add it a second time. Identical to <see cref="Radiance"/> away from the disk.
+    /// </summary>
+    public float DomeRadiance(Vector3 dir, float wavelengthNm)
+    {
+        Vector3 d = Vector3.Normalize(dir);
+        float cosSun = Vector3.Dot(d, _toSun);
 
         // Optical depth grows with airmass (toward the horizon) and as 1/λ⁴ (toward the blue).
         float cosZenith = Math.Clamp(d.Y, 0f, 1f);

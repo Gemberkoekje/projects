@@ -62,8 +62,14 @@ public sealed class PhotonMap
     /// <c>Σ power·XYZ(λ) / (π r²)</c>. The per-photon spectral colour comes from
     /// <paramref name="wavelengths"/>, so a dispersed prism caustic renders its rainbow naturally.
     /// Multiply the result by the receiver's albedo/π to turn it into outgoing radiance.
+    /// §8 SpectralAlbedo: pass <paramref name="spectralAlbedo"/> (receiver reflectance at a photon's
+    /// wavelength in nm) to weight each photon by the receiver's albedo at its OWN wavelength inside the
+    /// gather, so a caustic on a coloured floor keeps the floor's spectral tint per bundle instead of the
+    /// whole estimate being multiplied by a single hero-wavelength albedo afterward. <c>null</c> (the
+    /// default) reproduces the historical achromatic gather; the caller then applies the hero albedo.
     /// </summary>
-    public Vector3 EstimateXyz(Vector3 position, Vector3 normal, float radius, WavelengthLookup wavelengths)
+    public Vector3 EstimateXyz(Vector3 position, Vector3 normal, float radius, WavelengthLookup wavelengths,
+        System.Func<int, float>? spectralAlbedo = null)
     {
         System.ArgumentNullException.ThrowIfNull(wavelengths);
         if (_photons.Count == 0 || radius <= 0f)
@@ -94,7 +100,10 @@ public sealed class PhotonMap
                             continue;
 
                         if (wavelengths.TryGet(ph.Wavelength, out Vector3 xyz))
-                            sum += xyz * ph.Power;
+                        {
+                            float albedo = spectralAlbedo?.Invoke(ph.Wavelength) ?? 1f;
+                            sum += xyz * (ph.Power * albedo);
+                        }
                     }
                 }
             }

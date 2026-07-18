@@ -193,12 +193,20 @@ float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHas
     return xyz / float(COMPANION_COUNT);
 }
 
-float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
+// Scalar hero-wavelength reflectance of an indirect-bounce surface — the spectral throughput a
+// bounce propagates (realism finding §1). The CIE weight is applied once, at the primary surface;
+// a bounce must carry this scalar, never a CIE-tinted XYZ, or the curve is applied per bounce
+// (the CIE²/CIE³ bug). IndirectBaseXyz is this × DeterXYZ(hero).
+float IndirectReflHero(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
 {
     uint row; float atten;
     PatternShade(prim, rayDir, hitPoint, row, atten);
-    float refl = MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
-    return DeterXYZ[heroIdx].xyz * refl;
+    return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten;
+}
+
+float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
+{
+    return DeterXYZ[heroIdx].xyz * IndirectReflHero(prim, rayDir, hitPoint, heroIdx);
 }
 
 float3 CosineHemisphere(float3 n, float r1, float r2)
@@ -596,6 +604,10 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
     float sigmaScale = (VolSmokeMode == 3u) ? VolSigmaScaleGround : VolSigmaScaleFog;
     float inscatterScale = VolInscatterStrength / ISOTROPIC_PHASE;
 
+    // Finding §2: reuse the last traced in-scatter visibility on the steps between traces.
+    float3 cachedInscatterLight = float3(0.0, 0.0, 0.0);
+    bool haveCachedInscatter = false;
+
     for (uint i = 0u; i < steps; i++)
     {
         float distance = (float(i) + 0.5) * stepLength;
@@ -613,10 +625,22 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
         float scatterWeight = transmittance * (1.0 - stepTransmittance);
         float phase = VolEvaluatePhase(dir, p);
 
-        bool traceShadow = false;
-        if (VolShadowStepInterval > 0u)
-            traceShadow = (i % VolShadowStepInterval) == 0u;
-        float3 localLight = EstimateInscatterLight(p, dir, traceShadow);
+        // Finding §2: trace shadow on the configured cadence, reuse the last traced value between.
+        float3 localLight;
+        if (VolShadowStepInterval == 0u)
+        {
+            localLight = EstimateInscatterLight(p, dir, false);
+        }
+        else
+        {
+            bool traceShadow = (i % VolShadowStepInterval) == 0u;
+            if (traceShadow || !haveCachedInscatter)
+            {
+                cachedInscatterLight = EstimateInscatterLight(p, dir, true);
+                haveCachedInscatter = true;
+            }
+            localLight = cachedInscatterLight;
+        }
 
         inscatter += localLight * (scatterWeight * inscatterScale * phase);
         transmittance *= stepTransmittance;
@@ -766,9 +790,9 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         rng = rng * RNG_MUL + RNG_ADD;
-        float r1 = (rng & 0xFFFF) / 65536.0;
+        float r1 = (rng >> 16) / 65536.0;
         rng = rng * RNG_MUL + RNG_ADD;
-        float r2 = (rng & 0xFFFF) / 65536.0;
+        float r2 = (rng >> 16) / 65536.0;
 
         float3 sampleDir = CosineHemisphere(hitNormal, r1, r2);
         float3 secOrigin = hitPoint + hitNormal * 1e-3;
@@ -779,20 +803,21 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         {
             PrimitiveInfo secPrim = Primitives[secIndex];
             float3 secHitNormal = FaceNormal(secPrim, sampleDir);
-            float3 secBaseXyz = IndirectBaseXyz(secPrim, sampleDir, secHitPoint, heroIdx);
+            // Finding §1: scalar hero-λ throughput; CIE applied once at the primary surface (baseXyz).
+            float secReflHero = IndirectReflHero(secPrim, sampleDir, secHitPoint, heroIdx);
 
             float secDirectTerm = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
             uint lightIdx2 = rng % NumLights;
             secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal);
 
-            float3 secIncoming = secBaseXyz * (AmbientLevel + secDirectTerm);
+            float secIncoming = secReflHero * (AmbientLevel + secDirectTerm);
 
-            float3 secBounce2Plus = float3(0.0, 0.0, 0.0);
+            float secBounce2Plus = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
-            float r3 = (rng & 0xFFFF) / 65536.0;
+            float r3 = (rng >> 16) / 65536.0;
             rng = rng * RNG_MUL + RNG_ADD;
-            float r4 = (rng & 0xFFFF) / 65536.0;
+            float r4 = (rng >> 16) / 65536.0;
 
             float3 tertDir = CosineHemisphere(secHitNormal, r3, r4);
             float3 tertOrigin = secHitPoint + secHitNormal * 1e-3;
@@ -803,15 +828,15 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             {
                 PrimitiveInfo tertPrim = Primitives[tertIndex];
                 float3 tertHitNormal = FaceNormal(tertPrim, tertDir);
-                float3 tertBaseXyz = IndirectBaseXyz(tertPrim, tertDir, tertHitPoint, heroIdx);
+                float tertReflHero = IndirectReflHero(tertPrim, tertDir, tertHitPoint, heroIdx);
 
                 float tertDirectTerm = 0.0;
                 rng = rng * RNG_MUL + RNG_ADD;
                 uint lightIdx3 = rng % NumLights;
                 tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal);
 
-                float3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
-                secBounce2Plus = secBaseXyz * tertIncoming;
+                float tertIncoming = tertReflHero * (AmbientLevel + tertDirectTerm);
+                secBounce2Plus = secReflHero * tertIncoming;
             }
 
             bounce0 = baseXyz * directTerm;

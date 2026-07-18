@@ -168,6 +168,73 @@ public class GpuPhase2Tests
         Assert.IsTrue(indirectNonZero > 0, "some surface pixels should receive indirect light (bounce path exercised)");
     }
 
+    // ── Colored-light parity (§4/§6): blackbody emission + luma normalization ──
+    // Closes the finding-#3 gap: the white-light NEE test above leaves the per-companion emission a no-op,
+    // so the shader's DirectBaseXyz colored path went unverified. Here warm (1800 K) lights make TraceCore
+    // fold each light's blackbody spectrum per companion wavelength (× the §6 luma norm); Phase2Reference —
+    // the oracle the HLSL is a line-for-line port of — must reproduce it exactly.
+    [TestMethod]
+    public void ShadeSample_MatchesTraceCore_ColoredLights()
+    {
+        var baseScene = BuildScene();
+        Assert.IsTrue(baseScene.Lights.Length > 0, "scene should contain lights");
+        // Warm copies (EmissionTempK is init-only): 1800 K so the blackbody path (§4) + luma norm (§6) fire.
+        var warmLights = baseScene.Lights.Select(l => new Light
+        {
+            Position = l.Position, Color = l.Color, Ambient = l.Ambient,
+            Radius = l.Radius, Directional = l.Directional, Direction = l.Direction,
+            EmissionTempK = 1800f,
+        }).ToArray();
+        var s = baseScene with { Lights = warmLights };
+        float[] temps = warmLights.Select(l => l.EmissionTempK).ToArray();
+
+        var js = BuildGroundTruth(s, LightingMode.NEE, sampleClamp: 0f);
+        var tracer = new BvhSceneTracer(s.Tracables, s.Res.DeterWavelengths[0]);
+
+        int compared = 0, lit = 0, warmTinted = 0;
+        for (uint sampleIdx = 0; sampleIdx < 3; sampleIdx++)
+        {
+            for (int y = 6; y < Height; y += 11)
+            {
+                for (int x = 6; x < Width; x += 11)
+                {
+                    Vector3 dir = PrimaryDir(s.Camera, x, y);
+                    if (!tracer.ClosestHit(s.Camera.Position, dir, out _, out _))
+                        continue;
+
+                    var truth = TraceOneSample(js, s.Camera, x, y, sampleIdx);
+
+                    uint pixelHash = Phase1Reference.Hash2D(x, y);
+                    Vector3 refTotal = Phase2Reference.ShadeSample(
+                        tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
+                        s.Camera.Position, dir, pixelHash, sampleIdx,
+                        out Vector3 refDirect, out Vector3 refIndirect, temps);
+
+                    // Same sample with white lights (no temps) — proves the warm path is non-trivial.
+                    Vector3 refWhite = Phase2Reference.ShadeSample(
+                        tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
+                        s.Camera.Position, dir, pixelHash, sampleIdx, out _, out _);
+
+                    string at = $"px=({x},{y}) s={sampleIdx}";
+                    AssertClose(truth.total, refTotal, $"total {at}");
+                    AssertClose(truth.direct, refDirect, $"direct {at}");
+                    AssertClose(truth.indirect, refIndirect, $"indirect {at}");
+
+                    compared++;
+                    if (refDirect.Y > 1e-4f)
+                    {
+                        lit++;
+                        if ((refTotal - refWhite).Length() > 1e-4f) warmTinted++;
+                    }
+                }
+            }
+        }
+
+        Assert.IsTrue(compared > 50, $"expected many surface comparisons, got {compared}");
+        Assert.IsTrue(lit > 0, "some surface pixels should receive direct light");
+        Assert.IsTrue(warmTinted > 0, "the 1800 K emission must change lit pixels vs. white lights (path exercised, not a no-op)");
+    }
+
     // ── Direct mode (no primary shadow ray) ────────────────────────────
 
     [TestMethod]

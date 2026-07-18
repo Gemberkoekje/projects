@@ -36,7 +36,20 @@ public readonly record struct CausticOptions(
     float GatherRadius = 0.15f,
     float Strength = 1f,
     int MaxBounces = 8,
-    CausticQuality Quality = CausticQuality.Off)
+    CausticQuality Quality = CausticQuality.Off,
+    /// <summary>
+    /// Realism finding §8. When <c>true</c>, a photon's power is weighted by the emitting light's
+    /// intensity and blackbody emission and the solid angle it was fired into, so moving or brightening
+    /// a light changes the caustic physically instead of only via <see cref="Strength"/>. Default
+    /// <c>false</c> keeps the historical flat <c>1/photonsPerLight</c> power.
+    /// </summary>
+    bool PhysicalEnergy = false,
+    /// <summary>
+    /// Realism finding §8. When <c>true</c>, the density estimate weights each photon by the receiver's
+    /// reflectance at that photon's own wavelength, so a coloured floor shows a correctly tinted
+    /// caustic. Default <c>false</c> keeps the historical hero-wavelength albedo composite.
+    /// </summary>
+    bool SpectralAlbedo = false)
 {
     /// <summary>
     /// Maps a quality tier to a photon budget: off on Low/Playable/Medium, modest on High, full on

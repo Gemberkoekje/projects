@@ -94,6 +94,21 @@ public partial class JobSystem
 
     private readonly Light[] _lights;
 
+    /// <summary>
+    /// Per-light luminance normalization for the blackbody emission tint (realism finding §6), parallel
+    /// to <see cref="_lights"/>. Precomputed once so colour temperature changes a light's hue without
+    /// silently re-exposing the scene; 1 for a flat-white (temp 0) light.
+    /// </summary>
+    private readonly float[] _lightEmissionLumaNorm;
+
+    /// <summary>
+    /// The lights used for fog in-scatter (realism finding §9). When
+    /// <see cref="VolumetricOptions.FogSpectralLighting"/> is set these are copies whose colour is tinted
+    /// by each light's blackbody chromaticity, so a warm torch reads warm in the smoke instead of grey
+    /// haze; otherwise this is <see cref="_lights"/> itself (no allocation, identical behaviour).
+    /// </summary>
+    private readonly Light[] _fogLights;
+
     /// <summary>Base ambient illumination applied to every hit point.</summary>
     private const float AmbientLevel = 0.01f;
 
@@ -204,6 +219,19 @@ public partial class JobSystem
     public CausticOptions Caustics { get; }
 
     /// <summary>
+    /// Realism knobs (the adversarial-review "shortcuts"): each selects between a lifelike physical path
+    /// and a cheaper/stylised shortcut. All fields default to the historical behaviour, so an un-set
+    /// <see cref="RealismOptions"/> leaves every render unchanged.
+    /// </summary>
+    public RealismOptions Realism { get; }
+
+    /// <summary>
+    /// The lens and sensor primary rays are generated through (plan §4). Defaults to
+    /// <see cref="LensOptions.Pinhole"/>, which reproduces the historical ray generation exactly.
+    /// </summary>
+    public LensOptions Lens { get; }
+
+    /// <summary>
     /// The caustic photon map, built once after the BVH from the caster bounds (the CPU scene is
     /// static, so a single build is stable and folds cleanly into accumulation). <c>null</c> when
     /// caustics are off, there are no lights, or the scene has no specular casters — in which case the
@@ -239,6 +267,10 @@ public partial class JobSystem
     private readonly float _aspectTanHalfFov;
     private readonly float _invWidth;
     private readonly float _invHeight;
+
+    // §4.1: aperture radius in world units (metres), derived once from the lens + effective Fov. Zero for a
+    // pinhole, which is the signal to skip aperture sampling and leave the RNG stream untouched.
+    private readonly float _lensApertureRadius;
 
     // TAA history and camera state (resolved once per frame on UI thread).
     private readonly Vector3[] _taaHistoryXYZ;
@@ -322,6 +354,9 @@ public partial class JobSystem
 
         MotionSampleCap = effectiveSamplingOptions.MotionSampleCap;
         SubPixelJitter = effectiveSamplingOptions.SubPixelJitter;
+        // Same zero-init trap as RealismOptions below: a `default` LensOptions bypasses the record's defaults
+        // (SensorHeightMm/ApertureScale would be 0), so treat it as "unset" and substitute the pinhole.
+        Lens = effectiveSamplingOptions.Lens == default ? LensOptions.Pinhole : effectiveSamplingOptions.Lens;
 
         FilterRadius = effectiveDenoiseOptions.FilterRadius;
         EdgeAwareFilter = effectiveDenoiseOptions.EdgeAwareFilter;
@@ -338,6 +373,10 @@ public partial class JobSystem
             : effectiveDenoiseOptions.Volumetrics;
         Volumetrics = effectiveVolumetrics.ForSmokeMode(SmokeMode);
         Caustics = effectiveDenoiseOptions.Caustics;
+        // A zero-initialised RealismOptions (the record-struct `default`) bypasses the record's default
+        // values (e.g. ViewDependentAlbedo, BubbleReflectBoost), so treat it as "unset" and substitute the
+        // proper historical defaults — mirrors the VolumetricOptions handling above.
+        Realism = effectiveDenoiseOptions.Realism == default ? RealismOptions.Historical : effectiveDenoiseOptions.Realism;
 
         _sampleClampVec = new Vector3(SampleClamp);
         _irradianceCache = new DiffuseIrradianceCache(DiffuseCacheCellSize, DiffuseCacheMinSamples);
@@ -352,16 +391,46 @@ public partial class JobSystem
         Scene = scene;
         _bvh = new BVH(scene);
         _lights = lights ?? [];
+        _lightEmissionLumaNorm = new float[_lights.Length];
+        for (int i = 0; i < _lights.Length; i++)
+            _lightEmissionLumaNorm[i] = WavelengthLookup.BlackbodyLumaNorm(_lights[i].EmissionTempK);
+
+        // §9: fog in-scatter tinted by each light's blackbody chromaticity (warm torch → warm smoke).
+        // Off, or with no lights, _fogLights aliases _lights so the fog is byte-identical to before.
+        if (Volumetrics.FogSpectralLighting && _lights.Length > 0)
+        {
+            _fogLights = new Light[_lights.Length];
+            for (int i = 0; i < _lights.Length; i++)
+            {
+                Light l = _lights[i];
+                Vector3 tint = WavelengthLookup.BlackbodyChromaXyz(l.EmissionTempK);
+                _fogLights[i] = new Light
+                {
+                    Position = l.Position, Color = l.Color * tint, Ambient = l.Ambient,
+                    Radius = l.Radius, Directional = l.Directional, Direction = l.Direction,
+                    EmissionTempK = l.EmissionTempK,
+                };
+            }
+        }
+        else
+        {
+            _fogLights = _lights;
+        }
+
         _causticMap = BuildCausticMap();
         Camera = camera;
         int byteCount = stride * height;
         DisplayBuffer = new byte[byteCount];
         Stride = stride;
 
-        _tanHalfFov = MathF.Tan(camera.Fov * 0.5f);
+        // §4.1: the lens owns the field of view — a zoom (a set FocalLengthMm) reframes the shot. With no
+        // lens, or a lens that has not been zoomed, EffectiveFov returns camera.Fov unchanged.
+        float effectiveFov = Lens.EffectiveFov(camera.Fov);
+        _tanHalfFov = MathF.Tan(effectiveFov * 0.5f);
         _aspectTanHalfFov = camera.Aspect * _tanHalfFov;
         _invWidth = 1f / width;
         _invHeight = 1f / height;
+        _lensApertureRadius = Lens.ApertureRadiusWorld(effectiveFov);
 
         _taaHistoryXYZ = new Vector3[width * height];
         _taaHistoryHitPoint = new Vector3[width * height];
@@ -434,7 +503,9 @@ public partial class JobSystem
         {
             PhotonTracer.EmitInto(
                 map, _lights, _bvh, bounds, WavelengthLookup,
-                photonsPerCaster, Caustics.MaxBounces, seed);
+                photonsPerCaster, Caustics.MaxBounces, seed,
+                bubbleBoost: Realism.BubbleReflectBoost, // §12
+                physicalEnergy: Caustics.PhysicalEnergy, lightIntensity: LightIntensity); // §8
             seed += 0x9E3779B9u; // decorrelate each caster's photon stream
         }
 

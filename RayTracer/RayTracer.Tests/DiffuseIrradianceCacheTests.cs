@@ -14,12 +14,12 @@ public class DiffuseIrradianceCacheTests
         Vector3 pos = new(1f, 2f, 3f);
         Vector3 normal = Vector3.UnitY;
 
-        cache.Accumulate(pos, normal, new Vector3(1f, 0f, 0f));
+        cache.Accumulate(pos, normal, 1f);
         Assert.IsFalse(cache.TryLookup(pos, normal, out _));
 
-        cache.Accumulate(pos, normal, new Vector3(3f, 0f, 0f));
-        Assert.IsTrue(cache.TryLookup(pos, normal, out Vector3 value));
-        Assert.AreEqual(2f, value.X, 1e-5f);
+        cache.Accumulate(pos, normal, 3f);
+        Assert.IsTrue(cache.TryLookup(pos, normal, out float value));
+        Assert.AreEqual(2f, value, 1e-5f);
     }
 
     [TestMethod]
@@ -29,7 +29,7 @@ public class DiffuseIrradianceCacheTests
         Vector3 pos = new(0.1f, 0.2f, 0.3f);
         Vector3 normal = Vector3.UnitY;
 
-        cache.Accumulate(pos, normal, new Vector3(0.5f));
+        cache.Accumulate(pos, normal, 0.5f);
         Assert.IsTrue(cache.TryLookup(pos, normal, out _));
 
         cache.EvictStale(currentFrame: 1, maxAge: 10);
@@ -44,7 +44,7 @@ public class DiffuseIrradianceCacheTests
     public void Clear_RemovesAllEntriesAndResetsStats()
     {
         var cache = new DiffuseIrradianceCache(0.25f, minSamples: 1);
-        cache.Accumulate(new Vector3(1f), Vector3.UnitY, new Vector3(0.2f));
+        cache.Accumulate(new Vector3(1f), Vector3.UnitY, 0.2f);
         Assert.IsTrue(cache.TryLookup(new Vector3(1f), Vector3.UnitY, out _));
 
         cache.Clear();
@@ -63,7 +63,7 @@ public class DiffuseIrradianceCacheTests
         Parallel.For(0, 2000, i =>
         {
             Vector3 p = new(i % 16, (i / 16) % 16, (i / 256) % 16);
-            cache.Accumulate(p, n, new Vector3(0.1f, 0.2f, 0.3f));
+            cache.Accumulate(p, n, 0.1f);
             _ = cache.TryLookup(p, n, out _);
         });
 
@@ -89,7 +89,7 @@ public class DiffuseIrradianceCacheTests
 
         Vector3 pos = new(1f, 1f, 1f);
         Vector3 normal = Vector3.UnitY;
-        cache.Accumulate(pos, normal, new Vector3(0.2f, 0.3f, 0.4f));
+        cache.Accumulate(pos, normal, 0.2f);
         Assert.IsTrue(cache.TryLookup(pos, normal, out _));
 
         job.SoftResetAccumulation();

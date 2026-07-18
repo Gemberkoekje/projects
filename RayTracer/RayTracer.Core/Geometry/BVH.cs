@@ -173,7 +173,7 @@ public sealed class BVH
     /// (clear), matching <c>!IsOccluded</c> bit-for-bit, so existing renders are
     /// unchanged where no transmissive geometry lies on the shadow ray.
     /// </remarks>
-    public float Transmittance(Ray ray, float maxDist)
+    public float Transmittance(Ray ray, float maxDist, float bubbleBoost = Optics.BubbleReflectBoost)
     {
         Vector3 origin = ray.Origin;
         Vector3 invDir = new(1f / ray.Direction.X, 1f / ray.Direction.Y, 1f / ray.Direction.Z);
@@ -205,7 +205,7 @@ public sealed class BVH
                         switch (h.Surface)
                         {
                             case SurfaceKind.Bubble:
-                                transmittance *= 1f - Optics.BubbleReflectProbability(cos, h.Ior, h.Reflectance);
+                                transmittance *= 1f - Optics.BubbleReflectProbability(cos, h.Ior, h.Reflectance, bubbleBoost); // §12
                                 break;
                             case SurfaceKind.Dielectric:
                                 // 1 − Fresnel (the reflected loss) × Beer–Lambert absorption through

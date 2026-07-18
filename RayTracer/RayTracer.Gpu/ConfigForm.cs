@@ -109,6 +109,25 @@ internal sealed class AppSettings
 
     public SmokeMode SmokeMode { get; set; } = SmokeMode.Biome;
 
+    // ── §4 camera lens ──
+    /// <summary>Which physical camera the frame is shot through (plan §4). <see cref="LensModel.Pinhole"/>
+    /// (default) is the historical camera: everything in focus, no distortion, no vignette.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public LensModel Lens { get; set; } = LensModel.Pinhole;
+
+    /// <summary>§4.2 "portrait mode": give the phone lens a synthetic aperture wide enough to blur its
+    /// background. Ignored unless <see cref="Lens"/> is <see cref="LensModel.Phone"/> — a real phone's
+    /// optics have too much depth of field to defocus anything on their own.</summary>
+    public bool PhonePortrait { get; set; }
+
+    /// <summary>§4.4 zoom: focal length in mm. <c>0</c> (default) keeps the scene's own field of view, so
+    /// selecting a lens does not reframe the shot.</summary>
+    public float LensZoomMm { get; set; }
+
+    /// <summary>§4.4 rack focus: distance in metres to the plane rendered sharp. <c>0</c> = the lens's own
+    /// default.</summary>
+    public float LensFocusDistance { get; set; }
+
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public Phase5DebugMode StartView { get; set; } = Phase5DebugMode.Beauty;
 
@@ -136,6 +155,32 @@ internal sealed class AppSettings
     public int FilterRadius { get; set; } = 1;
     public bool SubPixelJitter { get; set; } = true;
     public float TemporalBlendAlpha { get; set; } = 0.1f;
+
+    // ── Realism knobs (the adversarial-review "shortcuts", findings §7–§14) ──
+    /// <summary>When true (default), the realism knobs below are ignored and the renderer derives them from
+    /// the quality tier exactly as before (Low/Medium historical; High/Ultra opt into the physical paths;
+    /// Classic → historical). Uncheck to drive every knob explicitly from the fields below.</summary>
+    public bool RealismAuto { get; set; } = true;
+
+    // Each field's default is the historical/off baseline, so turning Auto off without touching anything
+    // yields RealismOptions.Historical — the safe pre-realism look.
+    public bool SpecularIndirect { get; set; }                       // §7
+    public bool ViewDependentAlbedo { get; set; } = true;            // §11 (established look → on)
+    public bool AreaLightSolidAngleSampling { get; set; }            // §10
+    public float BubbleReflectBoost { get; set; } = Optics.BubbleReflectBoost; // §12 (45 = stylised)
+    public bool NestedDielectricStack { get; set; }                  // §13
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public ToneMapping ToneMapping { get; set; } = ToneMapping.None; // §14
+    public float Exposure { get; set; } = 1f;                        // §14
+
+    public bool FogSpectralLighting { get; set; }                    // §9
+    public float SingleScatterAlbedo { get; set; } = 1f;             // §9
+    public bool PhaseAllLights { get; set; }                         // §9
+    public bool IndirectFogShadows { get; set; }                     // §9
+
+    public bool CausticPhysicalEnergy { get; set; }                  // §8
+    public bool CausticSpectralAlbedo { get; set; }                  // §8
 
     // ── CPU backend selection ──
     /// <summary>Named CPU quality preset, or "Custom" (then see <see cref="CpuCustom"/>).</summary>
@@ -263,6 +308,29 @@ internal sealed class AppSettings
         }
     }
 
+    /// <summary>
+    /// §4: resolves the lens fields into the <see cref="LensOptions"/> the renderer takes. Pinhole (the
+    /// default) returns <see cref="LensOptions.Pinhole"/>, so an untouched config renders exactly as it
+    /// always has.
+    /// </summary>
+    public LensOptions ResolveLens()
+    {
+        LensOptions lens = Lens switch
+        {
+            LensModel.Phone => PhonePortrait ? LensOptions.PhonePortrait() : LensOptions.FromModel(LensModel.Phone),
+            LensModel.Simple => LensOptions.FromModel(LensModel.Simple),
+            LensModel.Cine => LensOptions.FromModel(LensModel.Cine),
+            _ => LensOptions.Pinhole,
+        };
+
+        if (Lens == LensModel.Pinhole)
+            return lens; // never let a stale zoom/focus reach the historical camera
+
+        if (LensZoomMm > 0f) lens = lens with { FocalLengthMm = LensZoomMm };
+        if (LensFocusDistance > 0f) lens = lens with { FocusDistance = LensFocusDistance };
+        return lens;
+    }
+
     public AppSettings Clone() => new()
     {
         Backend = Backend,
@@ -272,6 +340,10 @@ internal sealed class AppSettings
         OutdoorArea = OutdoorArea,
         Style = Style,
         SmokeMode = SmokeMode,
+        Lens = Lens,
+        PhonePortrait = PhonePortrait,
+        LensZoomMm = LensZoomMm,
+        LensFocusDistance = LensFocusDistance,
         StartView = StartView,
         MazeSize = MazeSize,
         FogDrift = FogDrift,
@@ -285,6 +357,20 @@ internal sealed class AppSettings
         FilterRadius = FilterRadius,
         SubPixelJitter = SubPixelJitter,
         TemporalBlendAlpha = TemporalBlendAlpha,
+        RealismAuto = RealismAuto,
+        SpecularIndirect = SpecularIndirect,
+        ViewDependentAlbedo = ViewDependentAlbedo,
+        AreaLightSolidAngleSampling = AreaLightSolidAngleSampling,
+        BubbleReflectBoost = BubbleReflectBoost,
+        NestedDielectricStack = NestedDielectricStack,
+        ToneMapping = ToneMapping,
+        Exposure = Exposure,
+        FogSpectralLighting = FogSpectralLighting,
+        SingleScatterAlbedo = SingleScatterAlbedo,
+        PhaseAllLights = PhaseAllLights,
+        IndirectFogShadows = IndirectFogShadows,
+        CausticPhysicalEnergy = CausticPhysicalEnergy,
+        CausticSpectralAlbedo = CausticSpectralAlbedo,
         CpuPreset = CpuPreset,
         CpuThrottle = CpuThrottle,
         CpuCustom = CpuCustom.Clone(),
@@ -347,6 +433,15 @@ internal sealed class ConfigForm : Form
         ("Ground smoke", SmokeMode.AlwaysGroundSmoke),
     ];
 
+    // §4 camera lens. Pinhole first — it is the default and the historical camera.
+    private static readonly (string Label, LensModel Model)[] LensOptionsList =
+    [
+        ("Pinhole (everything in focus)", LensModel.Pinhole),
+        ("Mobile phone", LensModel.Phone),
+        ("Simple / old camera", LensModel.Simple),
+        ("Cine (zoom + focus)", LensModel.Cine),
+    ];
+
     private static readonly Phase5DebugMode[] Views =
         (Phase5DebugMode[])Enum.GetValues(typeof(Phase5DebugMode));
 
@@ -389,6 +484,9 @@ internal sealed class ConfigForm : Form
     private static readonly (string label, VolumetricQuality quality)[] VolumetricQualityOptions =
         [("Off", VolumetricQuality.Off), ("Low", VolumetricQuality.Low), ("Medium", VolumetricQuality.Medium), ("High", VolumetricQuality.High), ("Ultra", VolumetricQuality.Ultra)];
 
+    private static readonly (string label, ToneMapping mode)[] ToneMapOptions =
+        [("None (clip)", ToneMapping.None), ("Exposure", ToneMapping.Exposure), ("Reinhard", ToneMapping.Reinhard), ("Filmic (ACES)", ToneMapping.Filmic)];
+
     private static readonly (string label, CpuThrottle value)[] ThrottleOptions =
     [
         ("Normal (all cores)",                                      CpuThrottle.Normal),
@@ -417,6 +515,10 @@ internal sealed class ConfigForm : Form
     private readonly ComboBox _resolution;
     private readonly CheckBox _fullscreen;
     private readonly ComboBox _smoke;
+    private readonly ComboBox _lens;             // §4 camera lens
+    private readonly CheckBox _phonePortrait;    // §4.2 synthetic-aperture portrait mode
+    private readonly NumericUpDown _lensZoom;    // §4.4 focal length (0 = keep the scene's framing)
+    private readonly NumericUpDown _lensFocus;   // §4.4 rack focus (0 = the lens's default)
     private readonly ComboBox _fogQuality;
     private readonly ComboBox _startView;
     private readonly NumericUpDown _mazeSize;
@@ -426,6 +528,9 @@ internal sealed class ConfigForm : Form
     private readonly NumericUpDown _dayLength;
     private readonly NumericUpDown _stillTime;
     private readonly Label _smokeLabel;
+    private readonly Label _lensLabel;
+    private readonly Label _lensZoomLabel;
+    private readonly Label _lensFocusLabel;
     private readonly Label _fogQualityLabel;
     private readonly Label _fogLabel;
     private readonly Label _clampLabel;
@@ -450,6 +555,22 @@ internal sealed class ConfigForm : Form
     private readonly CheckBox _retro;
     private readonly CheckBox _jewelCaustics;
     private readonly CheckBox _outdoor;
+    // Realism group (physical-accuracy knobs, findings §7–§14)
+    private readonly GroupBox _realismBox;
+    private readonly CheckBox _realismAuto;
+    private readonly CheckBox _rSpecularIndirect;
+    private readonly CheckBox _rViewDependentAlbedo;
+    private readonly CheckBox _rAreaLight;
+    private readonly CheckBox _rNestedDielectric;
+    private readonly CheckBox _rFogSpectral;
+    private readonly CheckBox _rPhaseAllLights;
+    private readonly CheckBox _rIndirectFogShadows;
+    private readonly CheckBox _rCausticPhysical;
+    private readonly CheckBox _rCausticSpectral;
+    private readonly ComboBox _rToneMapping;
+    private readonly NumericUpDown _rExposure;
+    private readonly NumericUpDown _rBubbleBoost;
+    private readonly NumericUpDown _rSingleScatter;
     // Movie recording group
     private readonly GroupBox _movieBox;
     private readonly CheckBox _recordMovie;
@@ -551,6 +672,38 @@ internal sealed class ConfigForm : Form
             _smokeLabel = Row("Smoke");
             y += rowH;
 
+            // §4 camera lens. Pinhole (the default) hides the dependent knobs — it has no aperture to focus.
+            _lens = new ComboBox { Left = 168, Top = y, Width = 232, DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (var l in LensOptionsList) _lens.Items.Add(l.Label);
+            _lens.SelectedIndex = Math.Max(0, Array.FindIndex(LensOptionsList, l => l.Model == Result.Lens));
+            _lens.SelectedIndexChanged += (_, _) => SyncLensEnabled();
+            _lensLabel = Row("Camera lens");
+            y += rowH;
+
+            _phonePortrait = new CheckBox
+            {
+                Left = 168, Top = y, Width = 232, Text = "Portrait mode (synthetic blur)",
+                Checked = Result.PhonePortrait,
+            };
+            Row("");
+            y += rowH;
+
+            _lensZoom = new NumericUpDown
+            {
+                Left = 168, Top = y, Width = 90, Minimum = 0m, Maximum = 300m, Increment = 5m,
+                Value = (decimal)Math.Clamp(Result.LensZoomMm, 0f, 300f),
+            };
+            _lensZoomLabel = Row("Zoom (mm, 0 = none)");
+            y += rowH;
+
+            _lensFocus = new NumericUpDown
+            {
+                Left = 168, Top = y, Width = 90, Minimum = 0m, Maximum = 50m, Increment = 0.5m, DecimalPlaces = 1,
+                Value = (decimal)Math.Clamp(Result.LensFocusDistance, 0f, 50f),
+            };
+            _lensFocusLabel = Row("Focus (m, 0 = default)");
+            y += rowH;
+
             _fogQuality = new ComboBox { Left = 168, Top = y, Width = 232, DropDownStyle = ComboBoxStyle.DropDownList };
             foreach (var q in VolumetricQualityOptions) _fogQuality.Items.Add(q.label);
             _fogQuality.SelectedIndex = Math.Max(0, Array.FindIndex(VolumetricQualityOptions, q => q.quality == Result.VolumetricQuality));
@@ -627,8 +780,39 @@ internal sealed class ConfigForm : Form
                 _gpuJitter,
             ]);
 
+            // ── Realism (physical-accuracy knobs, findings §7–§14) ── each selects a lifelike physical path
+            // over a cheaper/stylised shortcut. "Automatic" derives them from the quality tier (the default);
+            // unchecking it enables the individual knobs below.
+            _realismBox = new GroupBox { Left = 12, Top = _gpuAdvanced.Bottom + 8, Width = 388, Height = 236, Text = "Realism (physical accuracy)" };
+            _realismAuto = new CheckBox { Left = 12, Top = 20, Width = 364, Text = "Automatic (match quality tier)", Checked = Result.RealismAuto };
+            _rSpecularIndirect = new CheckBox { Left = 12, Top = 46, Width = 184, Text = "Specular indirect (§7)", Checked = Result.SpecularIndirect };
+            _rViewDependentAlbedo = new CheckBox { Left = 12, Top = 70, Width = 184, Text = "View-dependent albedo (§11)", Checked = Result.ViewDependentAlbedo };
+            _rAreaLight = new CheckBox { Left = 12, Top = 94, Width = 184, Text = "Area-light solid angle (§10)", Checked = Result.AreaLightSolidAngleSampling };
+            _rNestedDielectric = new CheckBox { Left = 12, Top = 118, Width = 184, Text = "Nested dielectric stack (§13)", Checked = Result.NestedDielectricStack };
+            _rFogSpectral = new CheckBox { Left = 12, Top = 142, Width = 184, Text = "Fog spectral lighting (§9)", Checked = Result.FogSpectralLighting };
+            _rPhaseAllLights = new CheckBox { Left = 200, Top = 46, Width = 176, Text = "Phase all lights (§9)", Checked = Result.PhaseAllLights };
+            _rIndirectFogShadows = new CheckBox { Left = 200, Top = 70, Width = 176, Text = "Indirect fog shadows (§9)", Checked = Result.IndirectFogShadows };
+            _rCausticPhysical = new CheckBox { Left = 200, Top = 94, Width = 176, Text = "Caustic physical energy (§8)", Checked = Result.CausticPhysicalEnergy };
+            _rCausticSpectral = new CheckBox { Left = 200, Top = 118, Width = 176, Text = "Caustic spectral albedo (§8)", Checked = Result.CausticSpectralAlbedo };
+
+            _rToneMapping = new ComboBox { Left = 104, Top = 168, Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
+            foreach (var t in ToneMapOptions) _rToneMapping.Items.Add(t.label);
+            _rToneMapping.SelectedIndex = Math.Max(0, Array.FindIndex(ToneMapOptions, t => t.mode == Result.ToneMapping));
+            _rExposure = new NumericUpDown { Left = 300, Top = 167, Width = 76, Minimum = 0.05m, Maximum = 8m, DecimalPlaces = 2, Increment = 0.05m, Value = (decimal)Math.Clamp(Result.Exposure, 0.05f, 8f) };
+            _rBubbleBoost = new NumericUpDown { Left = 104, Top = 199, Width = 76, Minimum = 1m, Maximum = 100m, DecimalPlaces = 0, Increment = 1m, Value = (decimal)Math.Clamp(Result.BubbleReflectBoost, 1f, 100f) };
+            _rSingleScatter = new NumericUpDown { Left = 300, Top = 199, Width = 76, Minimum = 0m, Maximum = 1m, DecimalPlaces = 2, Increment = 0.05m, Value = (decimal)Math.Clamp(Result.SingleScatterAlbedo, 0f, 1f) };
+
+            _realismBox.Controls.AddRange([
+                _realismAuto,
+                _rSpecularIndirect, _rViewDependentAlbedo, _rAreaLight, _rNestedDielectric, _rFogSpectral,
+                _rPhaseAllLights, _rIndirectFogShadows, _rCausticPhysical, _rCausticSpectral,
+                ALbl("Tone map", 12, 171), _rToneMapping, ALbl("Exposure", 232, 171), _rExposure,
+                ALbl("Bubble ×", 12, 203), _rBubbleBoost, ALbl("Scatter α", 232, 203), _rSingleScatter,
+            ]);
+            _realismAuto.CheckedChanged += (_, _) => SyncGpuEnabled();
+
             // ── Record movie (headless walk → MP4 via ffmpeg) ──
-            _movieBox = new GroupBox { Left = 12, Top = _gpuAdvanced.Bottom + 8, Width = 388, Height = 372, Text = "Record movie (ffmpeg)" };
+            _movieBox = new GroupBox { Left = 12, Top = _realismBox.Bottom + 8, Width = 388, Height = 372, Text = "Record movie (ffmpeg)" };
             _recordMovie = new CheckBox { Left = 12, Top = 22, Width = 360, Text = "Record the walk to a video instead of live view", Checked = Result.RecordMovie };
 
             _movieQuality = new ComboBox { Left = 104, Top = 50, Width = 130, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -671,6 +855,10 @@ internal sealed class ConfigForm : Form
                 resLabel, _resolution,
                 fsLabel, _fullscreen,
                 _smokeLabel, _smoke,
+                _lensLabel, _lens,
+                _phonePortrait,
+                _lensZoomLabel, _lensZoom,
+                _lensFocusLabel, _lensFocus,
                 _fogQualityLabel, _fogQuality,
                 viewLabel, _startView,
                 mazeLabel, _mazeSize,
@@ -682,6 +870,7 @@ internal sealed class ConfigForm : Form
                 stillLabel, _stillTime,
                 propsBox,
                 _gpuAdvanced,
+                _realismBox,
                 _movieBox,
             ]);
 
@@ -827,8 +1016,20 @@ internal sealed class ConfigForm : Form
     // Classic is unlit and smoke-free, so the smoke / fog / firefly knobs don't apply — grey them out when
     // Classic is selected; movie knobs are enabled only while recording, and each sub-mode greys out the
     // fields the other mode owns. Called from the option-change handlers and the max-quality preset.
+    // §4: the lens's dependent knobs only mean something for a lens that has an aperture. Portrait mode is
+    // phone-only (it is the phone's specific cheat); zoom/focus are meaningless on a pinhole.
+    private void SyncLensEnabled()
+    {
+        LensModel model = LensOptionsList[Math.Max(0, _lens.SelectedIndex)].Model;
+        bool real = model != LensModel.Pinhole;
+        _phonePortrait.Enabled = model == LensModel.Phone;
+        foreach (Control c in new Control[] { _lensZoom, _lensZoomLabel, _lensFocus, _lensFocusLabel })
+            c.Enabled = real;
+    }
+
     private void SyncGpuEnabled()
     {
+        SyncLensEnabled();
         bool classic = Styles[_style.SelectedIndex].Style == RenderStyle.Classic;
         foreach (Control c in new Control[] { _smoke, _smokeLabel, _fogQuality, _fogQualityLabel, _fogDrift, _fogLabel, _clamp, _clampLabel })
             c.Enabled = !classic;
@@ -841,6 +1042,16 @@ internal sealed class ConfigForm : Form
         bool dayNightAvail = !classic && _outdoor.Checked;
         _dayNight.Enabled = _dayNightLabel.Enabled = dayNightAvail;
         _dayLength.Enabled = _dayLengthLabel.Enabled = dayNightAvail && _dayNight.Checked;
+        // Realism: the individual knobs apply only when Automatic (match-tier) is off.
+        bool manualRealism = !_realismAuto.Checked;
+        foreach (Control c in new Control[]
+        {
+            _rSpecularIndirect, _rViewDependentAlbedo, _rAreaLight, _rNestedDielectric, _rFogSpectral,
+            _rPhaseAllLights, _rIndirectFogShadows, _rCausticPhysical, _rCausticSpectral,
+            _rToneMapping, _rExposure, _rBubbleBoost, _rSingleScatter,
+        })
+            c.Enabled = manualRealism;
+
         bool rec = _recordMovie.Checked;
         bool walks = rec && MovieLengthOptions[Math.Max(0, _movieLength.SelectedIndex)].mode == MovieLengthMode.Walks;
         bool beautiful = rec && MovieQualityOptions[Math.Max(0, _movieQuality.SelectedIndex)].mode == MovieQualityMode.Beautiful;
@@ -954,6 +1165,10 @@ internal sealed class ConfigForm : Form
         Result.Fullscreen = _fullscreen.Checked;
         Result.OutdoorArea = _outdoor.Checked;
         Result.SmokeMode = SmokeOptions[Math.Max(0, _smoke.SelectedIndex)].Mode;
+        Result.Lens = LensOptionsList[Math.Max(0, _lens.SelectedIndex)].Model; // §4
+        Result.PhonePortrait = _phonePortrait.Checked;
+        Result.LensZoomMm = (float)_lensZoom.Value;
+        Result.LensFocusDistance = (float)_lensFocus.Value;
         Result.StartView = (Phase5DebugMode)_startView.SelectedItem!;
         Result.MazeSize = (int)_mazeSize.Value;
         Result.FogDrift = (float)_fogDrift.Value;
@@ -988,6 +1203,22 @@ internal sealed class ConfigForm : Form
         Result.MovieFps = (int)_movieFps.Value;
         Result.MovieShowFps = _movieShowFps.Checked;
         Result.MovieDenoise = _movieDenoise.Checked;
+
+        // Realism knobs (§7–§14).
+        Result.RealismAuto = _realismAuto.Checked;
+        Result.SpecularIndirect = _rSpecularIndirect.Checked;
+        Result.ViewDependentAlbedo = _rViewDependentAlbedo.Checked;
+        Result.AreaLightSolidAngleSampling = _rAreaLight.Checked;
+        Result.NestedDielectricStack = _rNestedDielectric.Checked;
+        Result.FogSpectralLighting = _rFogSpectral.Checked;
+        Result.PhaseAllLights = _rPhaseAllLights.Checked;
+        Result.IndirectFogShadows = _rIndirectFogShadows.Checked;
+        Result.CausticPhysicalEnergy = _rCausticPhysical.Checked;
+        Result.CausticSpectralAlbedo = _rCausticSpectral.Checked;
+        Result.ToneMapping = ToneMapOptions[Math.Max(0, _rToneMapping.SelectedIndex)].mode;
+        Result.Exposure = (float)_rExposure.Value;
+        Result.BubbleReflectBoost = (float)_rBubbleBoost.Value;
+        Result.SingleScatterAlbedo = (float)_rSingleScatter.Value;
 
         // CPU selection.
         Result.CpuThrottle = ThrottleOptions[Safe(_cpuThrottle)].value;

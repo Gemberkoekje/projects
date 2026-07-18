@@ -93,9 +93,81 @@ wavelength-dependent path fallback.
   (sky) and visibly separates under the 1800 K torch (illuminant A).
 
 *(§3.4 physically-correct chromatic aberration is effectively covered by the dispersion
-work; build a dedicated thick-lens CA demo only if specifically wanted.)*
+work; the one place a dedicated thick-lens CA demo would earn its keep is the camera-lens
+work in §4, where it falls out of the lens elements for free.)*
 
-### 4. Optional polish  *(nice-to-have, none blocking)*
+### 4. Camera lens models  *(§4.1–4.4 built; the extras below are open)*
+
+**Shipped.** The camera is no longer a bare pinhole. `RayTracer.Core/Rendering/LensOptions.cs`
+(a record struct alongside `RealismOptions`) carries the sensor + lens; the pure camera-space
+math lives in `RayTracer.Core/Pipeline/LensSampler.cs`, which the CPU (`PathTracer.TraceCore`),
+the GPU reference (`Phase1Reference.PrimaryRayThroughLens`) and the HLSL (`GenerateLensRay` in
+`PathTracePhase6.hlsl`) all share or port from. Selectable in the ConfigForm ("Camera lens" +
+portrait / zoom / focus), via `Phase6Renderer.SetLens`, and headless with
+`--lens <pinhole|phone|portrait|simple|cine> [--zoom mm] [--focus m] [--fstop N]`.
+
+- **4.1 Physical camera core** — focal length + sensor height + f-stop + focus distance, with
+  thin-lens ray gen (sample the aperture, aim at the focus-plane point). `FocalLengthMm = 0`
+  derives the focal length from the scene's `Camera.Fov`, so **switching a lens on does not
+  reframe**; setting it is the zoom and reframes (that is what a zoom is). Units are real: the
+  world is metres, so f/N gives photographic depth of field. Defocus is stochastic, so
+  accumulation/TAA averages it for free (convention 4).
+- **4.2 Phone** — 1/1.7" sensor, f/1.8, mild barrel, vignette. Physically it has near-infinite
+  depth of field at maze distances, so its blurred-background look is a **synthetic** aperture
+  (`LensOptions.PhonePortrait`, the ConfigForm's "Portrait mode").
+- **4.3 Simple / old camera** — f/8, heavy barrel (k1 −0.12, k2 −0.03) and a deep vignette.
+  The most visually distinct from the pinhole.
+- **4.4 Cine** — Super35, f/1.4, 7-blade polygonal iris, cat's-eye edge vignetting, plus zoom
+  and rack focus.
+- **Pinhole is the default and is bit-exact**: it draws **no random numbers** (the lens has its
+  own RNG stream via `LensSampler.SeedFor`, so it cannot perturb the wavelength/specular
+  streams). Pinned by `LensTests` + `GpuLensTests` and verified on the box —
+  `--phase6-selftest` 700/700 and `--phase6-regress` 19/19 bit-exact.
+- *cbuffer note:* the lens fields fit — `TraceConstants` was at 288 of its 512 bytes, now 320.
+
+**Verified on the RTX 3070:** at a fixed seed the old camera visibly bows the ceiling/floor
+lines and darkens the corners; portrait mode softens the far wall; an 85 mm cine zoom reframes
+to a tight view that is blurred at `--focus 1.2` and snaps sharp at `--focus 2.6` (i.e. the
+focus plane is real and at the right distance).
+
+**Deferred / not built:**
+
+- **Depth of field is subtle at the scene's ~60° field of view.** That is honest physics — the
+  implied focal length is ~16–21 mm, so even f/1.4 is a ~6 mm aperture. The cine lens only
+  reads as "cinematic" once zoomed. If more defocus is wanted at wide angles, the lever is
+  `ApertureScale` (synthetic, like the phone's portrait mode), not a physical f-stop.
+- **§4.3's lateral chromatic aberration and corner softness (field curvature)** are not
+  implemented — the old camera currently distorts and vignettes only.
+- **§4.4's focus breathing and the anamorphic mode** are not implemented.
+- **Phone extras:** dirty/smudged front element, rolling shutter.
+- **Other phases:** the lens lives only in `PathTracePhase6.hlsl` (the shipping path). Phases
+  2–5 stay pinhole-only, which keeps their self-tests and goldens untouched.
+
+**Related ideas worth folding in (ordered by payoff, none required):**
+
+- **Spectral sensor response** — the pipeline is spectral-native (convention 3), so a
+  camera's *spectral sensitivity curve* can replace the CIE observer per model (phone CMOS
+  vs. film stock vs. cine sensor). This is the physically-honest way to give each lens a
+  colour character instead of a hard-coded tint, and it's mostly a lookup table swap next to
+  `WavelengthLookup.cs`.
+- **Real white balance** — for the same reason, white balance becomes a genuine chromatic
+  adaptation (von Kries) against the scene illuminant, which pairs directly with the shipped
+  blackbody torch (1800 K) / sun (5500 K) spectra and the day/night switch. It also gives
+  the §3.3 metamerism demo a second axis.
+- **Chromatic aberration for free** — model the lens elements with the existing dispersion
+  IOR and each hero wavelength focuses at a slightly different distance. This is the honest
+  version of the §3.4 note, and it's the *reason* the old-camera preset would get CA without
+  a fake — the cheapest route to the §4.3 gap above.
+- **Exposure triangle** — couple aperture ↔ shutter ↔ ISO so stopping down actually darkens
+  (with a luminance-preserving option, ties into the §O9 normalisation item). Shutter time
+  then gives real motion blur on the walking camera, and ISO gives sensor grain.
+- **Autofocus** — "tap/centre to focus" by probing the existing G-buffer depth at the
+  crosshair, plus a continuous-AF mode that racks focus as the autonomous walk moves. The
+  slideshow camera could rack focus during its long stills.
+- **Lens flare / veiling glare** — ghosts from inter-element reflections and bloom around
+  the torches and the sun disk. Anamorphic streaks fall out of §4.4.
+
+### 5. Optional polish  *(nice-to-have, none blocking)*
 
 - **Classic / props:** real-geometry (non-billboard) rat with motion-aware history (§8.4;
   the billboard reads well). Optional CPU bit-parity references — `DecalReference`,

@@ -9,7 +9,8 @@ public sealed record RenderOptions(
 
 public sealed record SamplingOptions(
     uint MotionSampleCap = 20,
-    bool SubPixelJitter = false);
+    bool SubPixelJitter = false,
+    LensOptions Lens = default);
 
 public sealed record DenoiseOptions(
     int FilterRadius = 1,
@@ -23,7 +24,8 @@ public sealed record DenoiseOptions(
     uint DiffuseCacheMinSamples = 4,
     SmokeMode SmokeMode = SmokeMode.Biome,
     VolumetricOptions Volumetrics = default,
-    CausticOptions Caustics = default);
+    CausticOptions Caustics = default,
+    RealismOptions Realism = default);
 
 public sealed record DebugOptions(
     bool EnableDiagnostics = true);

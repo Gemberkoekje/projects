@@ -58,6 +58,7 @@ cbuffer ResolveConstants : register(b0)
     float3 RatPos;       float RatSize;                                      // §8 rat billboard
     uint   ShowRat;      uint  RatLayer; float FadeLevel; float ClassicDepthCue; // §8 rat, §9.4 fade, §1.4 depth cue
     uint   ClockEnabled; uint  ClockHour; uint ClockMinute; uint _clockPad;      // §O8 24h clock under the minimap
+    uint   ToneMapping;  float Exposure; uint _tonePad0; uint _tonePad1;          // §14 display tone map
 };
 
 // ── Spatial (box) filter — mirrors JobSystem.ResolveFilteredXYZ ─────────
@@ -160,12 +161,42 @@ float LinearToSRGB(float c)
     return 1.055 * pow(c, 1.0 / 2.4) - 0.055;
 }
 
+// §14 tone map: an optional display-space roll-off applied to the linear-sRGB colour before the sRGB
+// transfer. ToneMapping 0 (None) is the historical straight clip (exposure ignored), so the default is a
+// no-op; the others apply an exposure scale then a global roll-off that tames highlight hue-shift.
+// Mirrors the CPU DisplayResolver.ApplyToneMap. Narkowicz ACES for the Filmic mode.
+float AcesFilmic(float x)
+{
+    const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    return saturate(x * (a * x + b) / (x * (c * x + d) + e));
+}
+
+float3 ApplyToneMap(float3 col)
+{
+    if (ToneMapping == 0u) return col;      // None
+    col *= Exposure;
+    if (ToneMapping == 2u) return col / (1.0 + col);                          // Reinhard
+    if (ToneMapping == 3u) return float3(AcesFilmic(col.r), AcesFilmic(col.g), AcesFilmic(col.b)); // Filmic
+    return col;                              // Exposure-only
+}
+
 float3 ResolveToSRGB(float3 xyz)
 {
     float lr = xyz.x * 3.2406 + xyz.y * (-1.5372) + xyz.z * (-0.4986);
     float lg = xyz.x * (-0.9689) + xyz.y * 1.8758 + xyz.z * 0.0415;
     float lb = xyz.x * 0.0557 + xyz.y * (-0.2040) + xyz.z * 1.0570;
     return float3(LinearToSRGB(lr), LinearToSRGB(lg), LinearToSRGB(lb));
+}
+
+// §14: XYZ → linear-sRGB → tone map → sRGB transfer. Used by the Beauty branch only, so the
+// debug AOVs (Direct/Indirect lighting) stay raw. ToneMapping 0 → identical to ResolveToSRGB.
+float3 ResolveToSRGBToneMapped(float3 xyz)
+{
+    float lr = xyz.x * 3.2406 + xyz.y * (-1.5372) + xyz.z * (-0.4986);
+    float lg = xyz.x * (-0.9689) + xyz.y * 1.8758 + xyz.z * 0.0415;
+    float lb = xyz.x * 0.0557 + xyz.y * (-0.2040) + xyz.z * 1.0570;
+    float3 lin = ApplyToneMap(float3(lr, lg, lb));
+    return float3(LinearToSRGB(lin.r), LinearToSRGB(lin.g), LinearToSRGB(lin.b));
 }
 
 // ── Debug palettes (line-for-line port of Phase5Reference) ─────────────
@@ -489,7 +520,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     {
         float4 fog = FogIn[ix];
         float3 withFog = resolved * fog.w + fog.xyz;
-        outColor = ResolveToSRGB(withFog);
+        outColor = ResolveToSRGBToneMapped(withFog); // §14 tone map (None → identical to ResolveToSRGB)
         // §1.4/§2.3 Classic depth cue: a deliberately non-physical, display-space darkening
         // that falls off exponentially with the primary hit distance, so the unlit fullbright
         // corridors fade toward dark down their length like the original screensaver. Opt-in

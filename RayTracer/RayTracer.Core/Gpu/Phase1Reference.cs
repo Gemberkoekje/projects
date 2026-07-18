@@ -88,6 +88,54 @@ public static class Phase1Reference
         return Vector3.Normalize(RotateByQuaternion(rotation, localDir));
     }
 
+    /// <summary>
+    /// Generates the primary ray through a physical lens (plan §4.1), mirroring the lens block of
+    /// <c>TraceCore</c> — the contract <c>PathTracePhase6.hlsl</c>'s <c>GenerateLensRay</c> is a
+    /// line-for-line port of. With <see cref="LensOptions.Pinhole"/> (or any lens whose aperture radius is 0
+    /// and which has no distortion) this reduces exactly to <see cref="PrimaryRayDirection"/> at
+    /// <paramref name="camPos"/>, drawing no randoms — the no-effect-path guarantee.
+    /// </summary>
+    /// <param name="apertureRadius">From <see cref="LensOptions.ApertureRadiusWorld"/>, in world units.</param>
+    /// <param name="vignette">The lens's corner falloff for this pixel; 1 when the lens does not vignette.</param>
+    public static void PrimaryRayThroughLens(
+        int x, int y, uint sampleIdx,
+        Vector3 camPos, Vector4 rotation, float imgPlaneZ,
+        float tanHalfFov, float aspectTanHalfFov,
+        float invWidth, float invHeight,
+        bool subPixelJitter,
+        in LensOptions lens, float apertureRadius,
+        out Vector3 origin, out Vector3 direction, out float vignette)
+    {
+        float jx, jy;
+        if (subPixelJitter)
+        {
+            uint baseHash = Hash2D(x, y);
+            uint seed = baseHash + sampleIdx * 747796405u + 2891336453u;
+            seed = seed * 747796405u + 2891336453u;
+            jx = (seed & 0xFFFF) / 65536f;
+            seed = seed * 747796405u + 2891336453u;
+            jy = (seed & 0xFFFF) / 65536f;
+        }
+        else
+        {
+            jx = 0.5f;
+            jy = 0.5f;
+        }
+
+        float px = (2f * ((x + jx) * invWidth) - 1f) * aspectTanHalfFov;
+        float py = (1f - 2f * ((y + jy) * invHeight)) * tanHalfFov;
+
+        // Shared with TraceCore so the two cannot drift; the lens gets its own RNG stream.
+        uint lensRng = LensSampler.SeedFor(Hash2D(x, y), sampleIdx);
+        LensSampler.GenerateLocalRay(
+            px, py, imgPlaneZ, lens, apertureRadius, ref lensRng,
+            out Vector3 localOrigin, out Vector3 localDir);
+
+        origin = apertureRadius > 0f ? camPos + RotateByQuaternion(rotation, localOrigin) : camPos;
+        direction = Vector3.Normalize(RotateByQuaternion(rotation, localDir));
+        vignette = LensSampler.VignetteFactor(px, py, imgPlaneZ, lens.VignetteStrength);
+    }
+
     /// <summary>Deterministic hero index for this pixel/sample (matches
     /// <c>(pixelHash + sampleIdx) % DeterministicCount</c> computed in 64-bit).</summary>
     public static uint HeroIndex(uint pixelHash, uint sampleIdx, int deterministicCount)
@@ -208,6 +256,65 @@ public static class Phase1Reference
         }
 
         return xyz / CompanionCount;
+    }
+
+    /// <summary>
+    /// Realism finding §6, GPU twin of <see cref="WavelengthLookup.BlackbodyLumaNorm"/>: the CIE-Y-weighted
+    /// mean of the blackbody shape over the hero set, reciprocated, from the baked white-balanced
+    /// <see cref="SpectralResources.DeterXYZ"/>. Mirrors the shader's <c>BlackbodyLumaNorm</c>. 1 for
+    /// <c>tempK ≤ 0</c> (flat white), so an un-tinted light is unchanged.
+    /// </summary>
+    public static float BlackbodyLumaNorm(SpectralResources res, float tempK)
+    {
+        if (tempK <= 0f)
+            return 1f;
+
+        int n = res.DeterministicCount;
+        float weightSum = 0f, lumaSum = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            float y = res.DeterXYZ[i * 4 + 1];
+            weightSum += y;
+            lumaSum += y * BlackbodySpectrum.Relative(res.DeterWavelengths[i], tempK);
+        }
+        float mean = weightSum > 1e-9f ? lumaSum / weightSum : 1f;
+        return mean > 1e-9f ? 1f / mean : 1f;
+    }
+
+    /// <summary>
+    /// Realism finding §4/§6, GPU twin of the shader's <c>DirectBaseXyz</c> and <c>TraceCore</c>'s
+    /// <c>directBaseXyz</c>: <see cref="BaseXyz"/> with each companion's reflectance modulated by the
+    /// chosen light's blackbody emission at <b>that</b> wavelength (× the §6 luma norm), so a coloured
+    /// light's tint correlates with per-wavelength reflectance. Equals <see cref="BaseXyz"/> exactly for a
+    /// flat-white light (<c>tempK ≤ 0</c>, emission ≡ 1), so temp-0 scenes are byte-identical.
+    /// </summary>
+    public static Vector3 DirectBaseXyz(
+        in GpuPrimitive prim, SpectralResources res,
+        Vector3 rayDir, Vector3 hitPoint, uint pixelHash, uint sampleIdx, float tempK)
+    {
+        if (tempK <= 0f)
+            return BaseXyz(prim, res, rayDir, hitPoint, pixelHash, sampleIdx);
+
+        PatternShade(prim, rayDir, hitPoint, out uint row, out float atten);
+
+        int n50 = res.DeterministicCount;
+        uint heroIdx = HeroIndex(pixelHash, sampleIdx, n50);
+        uint stride = (uint)(n50 / CompanionCount);
+        int reflBase = (int)row * n50;
+        bool thinFilm = (SurfaceKind)prim.Surface == SurfaceKind.ThinFilm;
+        float norm = BlackbodyLumaNorm(res, tempK);
+
+        Vector3 xyz = Vector3.Zero;
+        for (uint k = 0; k < CompanionCount; k++)
+        {
+            uint idx = (heroIdx + k * stride) % (uint)n50;
+            float refl = res.MaterialReflectance[reflBase + (int)idx] * atten;
+            if (thinFilm) refl *= ThinFilmFactor(prim, rayDir, hitPoint, res.DeterWavelengths[idx]);
+            var cie = new Vector3(res.DeterXYZ[idx * 4 + 0], res.DeterXYZ[idx * 4 + 1], res.DeterXYZ[idx * 4 + 2]);
+            xyz += cie * (refl * BlackbodySpectrum.Relative(res.DeterWavelengths[idx], tempK));
+        }
+
+        return xyz * norm / CompanionCount;
     }
 
     /// <summary>

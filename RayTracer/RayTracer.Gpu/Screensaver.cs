@@ -248,7 +248,7 @@ internal static class Screensaver
         // Match RunPhase6Windowed: force fog occlusion on at any non-Off tier (Low/Medium omit it by preset).
         if (volumetrics.EnableVolumetrics && volumetrics.ShadowStepInterval == 0)
             volumetrics = volumetrics with { ShadowStepInterval = 4 };
-        return new Phase6Renderer(
+        var renderer = new Phase6Renderer(
             width, height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: classic ? LightingMode.None : LightingMode.NEE,
             sampleClamp: s.SampleClamp,
@@ -259,6 +259,8 @@ internal static class Screensaver
             bumpyWalls: s.BumpyWalls, showOverheadMap: s.ShowOverheadMap, showRat: s.ShowRat,
             classicDepthCue: classic && s.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
             pixelSize: classic && s.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
+        renderer.SetLens(s.ResolveLens()); // §4: /c's lens choice reaches /s and /p
+        return renderer;
     }
 
     // The autonomous maze-walk loop shared by /s and /p (mirrors RunPhase6Windowed's

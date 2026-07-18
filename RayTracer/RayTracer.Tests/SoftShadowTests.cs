@@ -70,6 +70,34 @@ public sealed class SoftShadowTests
         }
     }
 
+    [TestMethod]
+    public void SamplePoint_SolidAngle_OnlyHitsVisibleCap()
+    {
+        // §10: solid-angle sampling draws only the cap the sphere subtends from the shading point, so
+        // every sample faces the shading point (front-facing); the historical whole-sphere mode hits the
+        // self-occluded back hemisphere about half the time, which is what dims/widens the penumbra.
+        var light = new Light { Position = new Vector3(0f, 5f, 0f), Color = Vector3.One, Radius = 1f };
+        Vector3 p = Vector3.Zero;         // shading point below the light, well outside the sphere
+        Vector3 c = light.Position;
+
+        uint rngSolid = 7u, rngWhole = 7u;
+        int wholeBackFacing = 0;
+        for (int i = 0; i < 256; i++)
+        {
+            Vector3 qSolid = light.SamplePoint(p, ref rngSolid, solidAngle: true);
+            Assert.AreEqual(light.Radius, (qSolid - c).Length(), 1e-3f, "Solid-angle sample lies on the sphere.");
+            Assert.IsTrue(Vector3.Dot(Vector3.Normalize(qSolid - c), Vector3.Normalize(p - qSolid)) > -1e-3f,
+                "Every solid-angle sample must be on the visible cap (its surface faces the shading point).");
+
+            Vector3 qWhole = light.SamplePoint(p, ref rngWhole, solidAngle: false);
+            if (Vector3.Dot(Vector3.Normalize(qWhole - c), Vector3.Normalize(p - qWhole)) < 0f)
+                wholeBackFacing++;
+        }
+
+        Assert.IsTrue(wholeBackFacing > 40,
+            $"Whole-sphere sampling should hit the self-occluded back hemisphere often ({wholeBackFacing}/256).");
+    }
+
     // ── Soft shadows through a real occluder ───────────────────────────────
 
     [TestMethod]

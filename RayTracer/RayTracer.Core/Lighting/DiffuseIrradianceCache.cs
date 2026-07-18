@@ -43,7 +43,7 @@ public sealed class DiffuseIrradianceCache
         }
     }
 
-    public bool TryLookup(Vector3 position, Vector3 normal, out Vector3 irradianceXYZ)
+    public bool TryLookup(Vector3 position, Vector3 normal, out float irradiance)
     {
         Interlocked.Increment(ref _lookupCount);
 
@@ -57,18 +57,18 @@ public sealed class DiffuseIrradianceCache
                 {
                     entry.LastUsedFrame = Volatile.Read(ref _currentFrame);
                     state.Entry = entry;
-                    irradianceXYZ = entry.IrradianceXYZ;
+                    irradiance = entry.Irradiance;
                     Interlocked.Increment(ref _hitCount);
                     return true;
                 }
             }
         }
 
-        irradianceXYZ = Vector3.Zero;
+        irradiance = 0f;
         return false;
     }
 
-    public void Accumulate(Vector3 position, Vector3 normal, Vector3 sampleXYZ)
+    public void Accumulate(Vector3 position, Vector3 normal, float sample)
     {
         CellKey key = MakeKey(position, normal);
         CellState state = _entries.GetOrAdd(key, _ => new CellState
@@ -77,7 +77,7 @@ public sealed class DiffuseIrradianceCache
             {
                 Position = position,
                 Normal = Vector3.Normalize(normal),
-                IrradianceXYZ = sampleXYZ,
+                Irradiance = sample,
                 SampleCount = 0,
                 LastUsedFrame = Volatile.Read(ref _currentFrame)
             }
@@ -89,7 +89,7 @@ public sealed class DiffuseIrradianceCache
             uint nextCount = entry.SampleCount + 1;
             entry.Position = Vector3.Lerp(entry.Position, position, 1f / nextCount);
             entry.Normal = Vector3.Normalize(Vector3.Lerp(entry.Normal, Vector3.Normalize(normal), 1f / nextCount));
-            entry.IrradianceXYZ += (sampleXYZ - entry.IrradianceXYZ) / nextCount;
+            entry.Irradiance += (sample - entry.Irradiance) / nextCount;
             entry.SampleCount = nextCount;
             entry.LastUsedFrame = Volatile.Read(ref _currentFrame);
             state.Entry = entry;

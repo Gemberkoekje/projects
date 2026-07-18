@@ -106,6 +106,54 @@ public class WavelengthLookup
     /// <summary>Number of wavelengths in the deterministic cycle.</summary>
     public int DeterministicCount => DeterministicWaveLengths;
 
+    /// <summary>
+    /// Luminance-normalization factor for a blackbody emitter at <paramref name="tempK"/> (realism
+    /// finding §6): the reciprocal of the CIE-Y-weighted mean of <see cref="BlackbodySpectrum.Relative"/>
+    /// over the deterministic hero set (using the same white-balanced CIE table every consumer integrates
+    /// through). Multiplying a light's per-wavelength <c>Relative(λ, T)</c> by this makes the emitter's
+    /// total luminance equal to a flat-white light's, so colour temperature changes <b>hue only</b>, not
+    /// brightness. Returns 1 for <c>tempK ≤ 0</c> (flat white), so an un-tinted light is unchanged.
+    /// </summary>
+    public float BlackbodyLumaNorm(float tempK)
+    {
+        if (tempK <= 0f)
+            return 1f;
+
+        float weightSum = 0f;
+        float lumaSum = 0f;
+        foreach (var wl in _deter)
+        {
+            if (!_lookup.TryGetValue(wl, out var xyz))
+                continue;
+            weightSum += xyz.Y;
+            lumaSum += xyz.Y * BlackbodySpectrum.Relative(wl, tempK);
+        }
+
+        float mean = weightSum > 1e-9f ? lumaSum / weightSum : 1f;
+        return mean > 1e-9f ? 1f / mean : 1f;
+    }
+
+    /// <summary>
+    /// The chromaticity of a blackbody emitter at <paramref name="tempK"/> as a Y-normalized XYZ tint
+    /// (realism finding §9): the hero-set integral of the emission spectrum, scaled so its luminance is 1
+    /// so multiplying a colour by it shifts the <b>hue</b> (warm for a torch, cool for daylight) without
+    /// changing brightness. Returns <see cref="Vector3.One"/> (neutral) for <c>tempK ≤ 0</c>. Because the
+    /// CIE table is white-balanced, a flat spectrum integrates to a neutral grey, so a daylight temperature
+    /// is near-neutral and only a warm/cool source visibly tints.
+    /// </summary>
+    public Vector3 BlackbodyChromaXyz(float tempK)
+    {
+        if (tempK <= 0f)
+            return Vector3.One;
+
+        Vector3 sum = Vector3.Zero;
+        foreach (var wl in _deter)
+            if (_lookup.TryGetValue(wl, out var xyz))
+                sum += xyz * BlackbodySpectrum.Relative(wl, tempK);
+
+        return sum.Y > 1e-6f ? sum / sum.Y : Vector3.One;
+    }
+
     public int GetHeroWavelength(uint pixelid, long samplecount)
     {
         return _deter[(int)((pixelid + samplecount) % DeterministicWaveLengths)];

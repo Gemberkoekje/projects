@@ -100,7 +100,7 @@ RWStructuredBuffer<int>           Bbox          : register(u18); // [minCX,minCY
 cbuffer CausticEmitConstants : register(b1)
 {
     uint  EmitJobCount; uint PhotonCapacity; uint EmitMaxBounces; float EmitCellSize;
-    uint  CellHeadCapacity; uint _emitPad1; uint _emitPad2; uint _emitPad3;
+    uint  CellHeadCapacity; float EmitBubbleBoost; uint EmitPhysicalEnergy; uint _emitPad3; // §12 boost, §8 physical energy
 };
 
 RWStructuredBuffer<float4> Accum            : register(u0); // xyz running mean (total)
@@ -136,6 +136,15 @@ cbuffer Constants : register(b0)
     uint   CausticEnabled;       int   CausticMinCellX; int CausticMinCellY; int CausticMinCellZ;
     uint   CausticDimX;          uint  CausticDimY; uint CausticDimZ; float CausticCellSize;
     float  CausticRadius;        float CausticStrength; uint ShadowTransmitTriangles; float VolFarFadeStart; // §O: 0 = no fade
+    // §7-13 realism knobs (mirror TraceConstants). Each defaults to the historical behaviour.
+    uint   ViewDependentAlbedo;  uint  SpecularIndirect; uint AreaLightSolidAngleSampling; uint FogSpectralLighting;
+    float  BubbleReflectBoost;   float SingleScatterAlbedo; uint PhaseAllLights; uint NestedDielectricStack;
+    uint   IndirectFogShadows;   // §9 fog on indirect-bounce shadow rays
+    uint   CausticSpectralAlbedo; uint _rpad1; uint _rpad2; // §8 per-photon-wavelength receiver reflectance
+    // §4 lens (mirrors TraceConstants). Zoom needs no field: the CPU folds the lens's effective Fov into
+    // TanHalfFov/AspectTanHalfFov above. LensApertureRadius 0 = pinhole ⇒ no aperture sampling, no RNG draw.
+    float  LensApertureRadius;   float LensFocusDistance; float LensBladeRotation; float LensDistortK1;
+    float  LensDistortK2;        float LensVignetteStrength; uint LensBlades; uint LensCatEye;
 };
 
 // §O3 procedural sky (outdoor-area-plan.md) — a separate cbuffer so the Constants layout above is
@@ -163,19 +172,38 @@ float BlackbodyShape(float wl, float tempK)
     return r * r * r * r * r * (denomRef / denom); // (550/λ)^5 · (denomRef/denom)
 }
 
-// The sky's solar shape is just the black-body shape at the sun's temperature.
-float SkySolarShape(float wl) { return BlackbodyShape(wl, SkySunTempK); }
+// Luma-normalization for a blackbody emitter (finding §6): 1 / (CIE-Y-weighted mean of the shape over
+// the hero set), so colour temperature changes hue only, not brightness. Matches the CPU
+// WavelengthLookup.BlackbodyLumaNorm (same white-balanced DeterXYZ). tempK <= 0 → 1 (flat white).
+float BlackbodyLumaNorm(float tempK)
+{
+    if (tempK <= 0.0) return 1.0;
+    float weightSum = 0.0;
+    float lumaSum = 0.0;
+    [loop] for (uint i = 0u; i < DETERMINISTIC_COUNT; i++)
+    {
+        float y = DeterXYZ[i].y;
+        weightSum += y;
+        lumaSum += y * BlackbodyShape(DeterXYZ[i].w, tempK);
+    }
+    float mean = weightSum > 1e-9 ? lumaSum / weightSum : 1.0;
+    return mean > 1e-9 ? 1.0 / mean : 1.0;
+}
+
+// The sky's solar shape is the black-body shape at the sun's temperature, luma-normalized (§6) so a
+// warmer/cooler sun shifts the daylight hue without changing the dome's overall brightness.
+float SkySolarShape(float wl) { return BlackbodyShape(wl, SkySunTempK) * BlackbodyLumaNorm(SkySunTempK); }
 
 // Spectral sky radiance toward `dir` at `wavelengthNm` (port of Sky.Radiance): a bright sun disk toward
 // −SkySunDir, else a single-scattering Rayleigh dome — 1/λ⁴ scattering saturated through 1−e^(−τ) so it
 // reads blue (not violet) at the zenith and pales toward the horizon (aerial perspective).
-float SkyRadiance(float3 dir, float wavelengthNm)
+// Rayleigh dome without the sun disk (realism finding §5): the sky radiance an indirect/bounce lookup
+// must use, because a diffuse surface's sun illumination is already added by NEE on the directional sun.
+float SkyDomeRadiance(float3 dir, float wavelengthNm)
 {
     float3 d = normalize(dir);
     float3 toSun = normalize(-SkySunDir);
     float cosSun = dot(d, toSun);
-    if (cosSun >= SkyCosSunRadius)
-        return SkySunRadiance;
 
     float cosZenith = saturate(d.y);
     float airmass = 1.0 / (cosZenith + SKY_AIRMASS_FLR);
@@ -185,6 +213,16 @@ float SkyRadiance(float3 dir, float wavelengthNm)
     float inscatter = 1.0 - exp(-tau);
     float phase = 0.75 * (1.0 + cosSun * cosSun); // Rayleigh phase, mean 1 over the sphere
     return SkyStrength * SkySolarShape(wavelengthNm) * phase * inscatter;
+}
+
+float SkyRadiance(float3 dir, float wavelengthNm)
+{
+    float3 d = normalize(dir);
+    float3 toSun = normalize(-SkySunDir);
+    float cosSun = dot(d, toSun);
+    if (cosSun >= SkyCosSunRadius)
+        return SkySunRadiance; // camera/primary miss + specular reflections see the sun disk
+    return SkyDomeRadiance(d, wavelengthNm);
 }
 
 // ── Pure math (mirrors Phase1Reference.cs / Phase2Reference.cs) ────────
@@ -299,10 +337,14 @@ void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint r
 
     row = prim.MatPrimary;
     atten = 1.0;
+    // §11: the 0.4 + 0.6·cosθ view-dependent face attenuation is a reciprocity-violating shading hack
+    // that reads as baked-in ambient occlusion. ViewDependentAlbedo (default on, the established look)
+    // keeps it; off gives a constant, view-independent base albedo so real lighting does the shading.
+    float faceAtten = (ViewDependentAlbedo != 0u) ? (0.4 + 0.6 * cosTheta) : 1.0;
     if (prim.Pattern == 1u) // brick
     {
         bool mortar = IsMortar(u, w, prim.P0, prim.P1, prim.P2, prim.P3);
-        atten = 0.4 + 0.6 * cosTheta;
+        atten = faceAtten;
         if (mortar)
         {
             atten *= 0.6;
@@ -316,7 +358,7 @@ void PatternShade(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, out uint r
     }
     else if (prim.Pattern == 2u) // ceiling tile
     {
-        atten = (0.4 + 0.6 * cosTheta) * BevelFactor(u, w, prim.P0, prim.P1, prim.P2);
+        atten = faceAtten * BevelFactor(u, w, prim.P0, prim.P1, prim.P2); // §11
     }
 }
 
@@ -450,6 +492,47 @@ float3 BaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHas
         xyz += DeterXYZ[idx].xyz * refl;
     }
     return xyz / float(COMPANION_COUNT);
+}
+
+// §4: BaseXyz weighted per companion wavelength by the chosen light's blackbody emission spectrum
+// (× the constant §6 luma norm), so a coloured light's tint correlates with each wavelength's
+// reflectance. Identical to BaseXyz for a flat-white light (lightTempK ≤ 0 → shape ≡ 1, norm ≡ 1),
+// so temp-0 scenes are bit-identical. Mirrors the CPU PathTracer.LightEmission fold.
+float3 DirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pixelHash, uint sampleIdx, float lightTempK)
+{
+    float norm = BlackbodyLumaNorm(lightTempK);
+    uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
+    uint stride = DETERMINISTIC_COUNT / COMPANION_COUNT;
+
+    if (prim.Pattern == 3u) // decal
+    {
+        float u, w;
+        DecalUv(prim, hitPoint, u, w);
+        float3 texel = DecalTexel((uint)prim.P0, u, w);
+        float3 dxyz = float3(0.0, 0.0, 0.0);
+        [unroll]
+        for (uint kd = 0u; kd < COMPANION_COUNT; kd++)
+        {
+            uint idx = (heroIdx + kd * stride) % DETERMINISTIC_COUNT;
+            float refl = dot(RgbBasis[idx].xyz, texel);
+            dxyz += DeterXYZ[idx].xyz * refl * BlackbodyShape(DeterXYZ[idx].w, lightTempK);
+        }
+        return dxyz * norm / float(COMPANION_COUNT);
+    }
+
+    uint row; float atten;
+    PatternShade(prim, rayDir, hitPoint, row, atten);
+    uint reflBase = row * DETERMINISTIC_COUNT;
+
+    float3 xyz = float3(0.0, 0.0, 0.0);
+    [unroll]
+    for (uint k = 0u; k < COMPANION_COUNT; k++)
+    {
+        uint idx = (heroIdx + k * stride) % DETERMINISTIC_COUNT;
+        float refl = MaterialReflectance[reflBase + idx] * atten * ThinFilmFactor(prim, rayDir, hitPoint, idx);
+        xyz += DeterXYZ[idx].xyz * refl * BlackbodyShape(DeterXYZ[idx].w, lightTempK);
+    }
+    return xyz * norm / float(COMPANION_COUNT);
 }
 
 float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
@@ -684,7 +767,7 @@ float TraceTransmittance(float3 origin, float3 dir, float maxDist, uint heroIdx)
                 float d = s.CauchyB * grav;
                 float base = MaterialReflectance[s.MatRow * DETERMINISTIC_COUNT + heroIdx];
                 float film = ThinFilmReflectance(cosv, DeterXYZ[heroIdx].w, d, s.Ior);
-                float rReflect = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosv, 1.0, s.Ior)) * base * film;
+                float rReflect = saturate(BubbleReflectBoost * FresnelDielectric(cosv, 1.0, s.Ior)) * base * film; // §12
                 transmittance *= 1.0 - rReflect;
             }
             else if (s.Surface == SURFACE_DIELECTRIC)
@@ -740,12 +823,37 @@ float TraceTransmittance(float3 origin, float3 dir, float maxDist, uint heroIdx)
 // Lights[i].w == 0; draws NO RNG, so point-light scenes are bit-identical to before) or a uniform
 // point on the light's sphere for an area light, so the accumulated NEE visibility softens into a
 // penumbra. Mirrors Light.SamplePoint (CPU) / Phase2Reference.SampleLightPoint.
-float3 SampleLightPoint(uint lightIdx, inout uint rng)
+float3 SampleLightPoint(uint lightIdx, float3 shadingPoint, inout uint rng)
 {
     float3 pos = Lights[lightIdx].xyz;
     float radius = Lights[lightIdx].w;
     if (radius <= 0.0)
         return pos;
+
+    // §10: cone-sample the visible cap (PBRT uniform-cone) instead of the whole sphere, so only the
+    // physically-illuminating front of the light contributes and the near-contact penumbra tightens.
+    // Off, or the shading point inside the sphere → whole-sphere (historical). Mirrors Light.SamplePoint.
+    if (AreaLightSolidAngleSampling != 0u)
+    {
+        float3 toCenter = pos - shadingPoint;
+        float dc2 = dot(toCenter, toCenter);
+        if (dc2 > radius * radius)
+        {
+            float dc = sqrt(dc2);
+            float cosMax = sqrt(max(0.0, 1.0 - radius * radius / dc2));
+            rng = rng * RNG_MUL + RNG_ADD; float u1 = float(rng) / 4294967296.0;
+            rng = rng * RNG_MUL + RNG_ADD; float u2 = float(rng) / 4294967296.0;
+            float cosT = 1.0 - u1 * (1.0 - cosMax);
+            float sinT = sqrt(max(0.0, 1.0 - cosT * cosT));
+            float phiC = 2.0 * PI * u2;
+            float3 w = toCenter / dc;
+            float3 t = abs(w.x) > 0.1 ? normalize(float3(w.y, -w.x, 0.0)) : normalize(float3(0.0, w.z, -w.y));
+            float3 b = cross(w, t);
+            float3 dir = sinT * cos(phiC) * t + sinT * sin(phiC) * b + cosT * w;
+            float ds = dc * cosT - sqrt(max(0.0, radius * radius - dc2 * sinT * sinT));
+            return shadingPoint + ds * dir;
+        }
+    }
 
     rng = rng * RNG_MUL + RNG_ADD;
     float z = 2.0 * (float(rng) / 4294967296.0) - 1.0;
@@ -805,7 +913,7 @@ float SampleLightShadowRay(uint i, float3 samplePoint, float3 normal, inout uint
         float c = dot(normal, dir);
         return c > 0.0 ? c : 0.0;
     }
-    float3 toLight = SampleLightPoint(i, rng) - samplePoint;
+    float3 toLight = SampleLightPoint(i, samplePoint, rng) - samplePoint;
     float distSq = max(dot(toLight, toLight), 1e-6);
     dist = sqrt(distSq);
     dir = toLight / dist;
@@ -857,8 +965,9 @@ float UniformLightTerm(uint lightIdx, float3 hitPoint, float3 hitNormal, uint he
     if (vis <= 0.0)
         return 0.0;
 
-    // §O9: modulate by the light's blackbody emission at this hero wavelength (LightColors[i].w = temp K).
-    float emission = BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[lightIdx].w);
+    // §O9: modulate by the light's blackbody emission at this hero wavelength (LightColors[i].w = temp K),
+    // luma-normalized (§6) so temperature is chromatic-only.
+    float emission = BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[lightIdx].w) * BlackbodyLumaNorm(LightColors[lightIdx].w);
     return vis * (geom * LightIntensity * float(NumLights)) * emission;
 }
 
@@ -1100,6 +1209,18 @@ float InscatterShadowTransmittance(float3 from, float3 lightDir, float dist, flo
     return transmittance;
 }
 
+// §9: fog transmittance along an indirect-bounce shadow ray toward a point light, so thick smoke dims a
+// bounce's direct lighting (the GPU otherwise has no fog on shadow rays). Off / directional / no fog → 1.
+// Marched toward the light centre (the fog term tolerates that approximation), reusing the self-shadow march.
+float IndirectFogShadowFactor(float3 from, uint lightIdx)
+{
+    if (IndirectFogShadows == 0u || LightDirs[lightIdx].w > 0.5)
+        return 1.0;
+    float3 toL = Lights[lightIdx].xyz - from;
+    float dL = max(length(toL), 1e-4);
+    return InscatterShadowTransmittance(from, toL / dL, dL, VolTime);
+}
+
 float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool traceShadow)
 {
     if (NumLights == 0u)
@@ -1137,7 +1258,21 @@ float3 EstimateInscatterLight(float3 samplePoint, float3 viewDirection, bool tra
         if (VolShadowTransmittance != 0u && traceShadow)
             lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, VolTime);
 
-        lighting += LightColors[i].xyz * lightWeight;
+        // §9: with PhaseAllLights, weight each light by the phase toward *it* (normalised by the isotropic
+        // phase, the neutral outer factor); no anisotropy → 1, so a no-op. Mirrors the CPU integrator.
+        float phaseFactor = 1.0;
+        if (PhaseAllLights != 0u)
+        {
+            float g = clamp(VolAnisotropyG, -0.95, 0.95);
+            if (abs(g) > 1e-4)
+            {
+                float cosTheta = clamp(dot(lightDir, -viewDirection), -1.0, 1.0);
+                float denom = 1.0 + g * g - 2.0 * g * cosTheta;
+                phaseFactor = (1.0 - g * g) / (4.0 * PI * pow(denom, 1.5)) / ISOTROPIC_PHASE;
+            }
+        }
+
+        lighting += LightColors[i].xyz * (lightWeight * phaseFactor);
     }
 
     if (all(lighting == float3(0.0, 0.0, 0.0)))
@@ -1179,6 +1314,10 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
     float sigmaScale = (VolSmokeMode == 3u) ? VolSigmaScaleGround : VolSigmaScaleFog;
     float inscatterScale = VolInscatterStrength / ISOTROPIC_PHASE;
 
+    // Finding §2: reuse the last traced in-scatter visibility on the steps between traces.
+    float3 cachedInscatterLight = float3(0.0, 0.0, 0.0);
+    bool haveCachedInscatter = false;
+
     for (uint i = 0u; i < steps; i++)
     {
         float distance = (float(i) + 0.5) * stepLength;
@@ -1198,14 +1337,28 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
         float opticalDepth = sigmaT * stepLength;
         float stepTransmittance = exp(-opticalDepth);
         float scatterWeight = transmittance * (1.0 - stepTransmittance);
-        float phase = VolEvaluatePhase(dir, p);
+        // §9: PhaseAllLights folds the per-light phase into EstimateInscatterLight → neutral outer factor.
+        float phase = (PhaseAllLights != 0u) ? ISOTROPIC_PHASE : VolEvaluatePhase(dir, p);
 
-        bool traceShadow = false;
-        if (VolShadowStepInterval > 0u)
-            traceShadow = (i % VolShadowStepInterval) == 0u;
-        float3 localLight = EstimateInscatterLight(p, dir, traceShadow);
+        // Finding §2: trace shadow on the configured cadence, reuse the last traced value between.
+        float3 localLight;
+        if (VolShadowStepInterval == 0u)
+        {
+            localLight = EstimateInscatterLight(p, dir, false);
+        }
+        else
+        {
+            bool traceShadow = (i % VolShadowStepInterval) == 0u;
+            if (traceShadow || !haveCachedInscatter)
+            {
+                cachedInscatterLight = EstimateInscatterLight(p, dir, true);
+                haveCachedInscatter = true;
+            }
+            localLight = cachedInscatterLight;
+        }
 
-        inscatter += localLight * (scatterWeight * inscatterScale * phase);
+        // §9: single-scattering albedo scales the in-scatter (absorption keeps the rest); 1 = historical.
+        inscatter += localLight * (scatterWeight * inscatterScale * phase * SingleScatterAlbedo);
         transmittance *= stepTransmittance;
 
         if (transmittance < VolEarlyOutTransmittance)
@@ -1218,31 +1371,8 @@ void IntegrateVolumetric(float3 rayOrigin, float3 hitPoint, float3 rayDirection,
 // (and JobSystem's mirror branch). HLSL has no recursion, so the mirror chain is
 // an iterative loop accumulating a reflectance product.
 
-float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng, uint heroIdx)
-{
-    float ambient = 1.0;
-    float direct = 0.0;
-    if (LightingMode != 0u && NumLights > 0u)
-    {
-        ambient = AmbientLevel;
-        float p;
-        uint chosen = SelectLight(rng, pt, normal, p);
-        float3 ldir; float dist;
-        float geom = SampleLightShadowRay(chosen, pt, normal, rng, ldir, dist);
-        if (geom > 0.0)
-        {
-            float vis = 1.0;
-            if (LightingMode == 2u) // NEE
-            {
-                float3 shadowOrigin = pt + normal * 1e-3;
-                vis = TraceTransmittance(shadowOrigin, ldir, dist - 2e-3, heroIdx);
-            }
-            if (vis > 0.0)
-                direct = vis * (geom * LightIntensity / max(p, 1e-9));
-        }
-    }
-    return refl * (ambient + direct);
-}
+// MirrorDiffuseScalar is defined below HeroReflectance (which it now calls for the §7 indirect bounce),
+// since HLSL requires definition-before-use.
 
 // Hero-wavelength scalar reflectance at a hit, including the decal atlas colour
 // (Pattern 3) via the RGB→reflectance basis — so a decal (wall sign / logo) seen in
@@ -1261,6 +1391,71 @@ float HeroReflectance(PrimitiveInfo prim, float3 dir, float3 hitPoint, uint hero
     uint row; float atten;
     PatternShade(prim, dir, hitPoint, row, atten);
     return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten * ThinFilmFactor(prim, dir, hitPoint, heroIdx);
+}
+
+// §7: one cosine-weighted indirect bounce leaving a diffuse surface reached through a specular chain,
+// so a mirror's / glass's world is not conspicuously flatter and darker than the directly-viewed one.
+// Mirrors JobSystem.SpecularIndirectTerm — the same uniform-light one-bounce the primary path uses.
+float SpecularIndirectTerm(float3 pt, float3 normal, inout uint rng, uint heroIdx)
+{
+    rng = rng * RNG_MUL + RNG_ADD; float r1 = (rng >> 16) / 65536.0;
+    rng = rng * RNG_MUL + RNG_ADD; float r2 = (rng >> 16) / 65536.0;
+    float3 sampleDir = CosineHemisphere(normal, r1, r2);
+    float3 secOrigin = pt + normal * 1e-3;
+
+    PrimitiveInfo secPrim; float3 secHitPoint;
+    if (TraceClosest(secOrigin, sampleDir, secPrim, secHitPoint))
+    {
+        float3 secHitNormal = FaceNormal(secPrim, sampleDir);
+        float secRefl = HeroReflectance(secPrim, sampleDir, secHitPoint, heroIdx);
+        rng = rng * RNG_MUL + RNG_ADD;
+        uint lightIdx2 = rng % NumLights;
+        float secDirect = UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx, rng)
+            * IndirectFogShadowFactor(secHitPoint, lightIdx2); // §9
+        return secRefl * (AmbientLevel + secDirect);
+    }
+    if (SkyEnabled != 0.0)
+        return SkyDomeRadiance(sampleDir, DeterXYZ[heroIdx].w); // skylight (no sun disk, §5)
+    return 0.0;
+}
+
+// ── Mirror specular reflection (spectral-effects-plan.md §1.1) ─────────
+// The diffuse terminal of the specular chain: refl × (ambient + direct [+ §7 indirect]). Mirrors
+// Phase2Reference.MirrorDiffuseScalar (which has no §7, so the parity self-test — §7 off — matches).
+float MirrorDiffuseScalar(float refl, float3 pt, float3 normal, inout uint rng, uint heroIdx)
+{
+    float ambient = 1.0;
+    float direct = 0.0;
+    float indirect = 0.0;
+    if (LightingMode != 0u && NumLights > 0u)
+    {
+        ambient = AmbientLevel;
+        float p;
+        uint chosen = SelectLight(rng, pt, normal, p);
+        float3 ldir; float dist;
+        float geom = SampleLightShadowRay(chosen, pt, normal, rng, ldir, dist);
+        if (geom > 0.0)
+        {
+            float vis = 1.0;
+            if (LightingMode == 2u) // NEE
+            {
+                float3 shadowOrigin = pt + normal * 1e-3;
+                vis = TraceTransmittance(shadowOrigin, ldir, dist - 2e-3, heroIdx);
+            }
+            if (vis > 0.0)
+                // §O9 (finding §3): tint by the chosen light's blackbody emission at the hero wavelength,
+                // so a surface seen in a mirror is warmed/cooled by the light exactly as the primary
+                // direct term (and the CPU DirectTermAt) already are. Flat-white lights (temp 0) → ×1.
+                direct = vis * (geom * LightIntensity / max(p, 1e-9))
+                    * BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[chosen].w)
+                    * BlackbodyLumaNorm(LightColors[chosen].w);
+        }
+        // §7: add one indirect bounce (off by default). Draws no RNG when off, so the specular chain's
+        // random stream — and every parity self-test / golden — is byte-identical to before.
+        if (SpecularIndirect != 0u)
+            indirect = SpecularIndirectTerm(pt, normal, rng, heroIdx);
+    }
+    return refl * (ambient + direct + indirect);
 }
 
 // Snell refraction (line-for-line port of Optics.Refract). Returns false on TIR
@@ -1330,6 +1525,12 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
     float3 accum = float3(0.0, 0.0, 0.0);
     bool inGlass = false;
     float mediumSigma = 0.0;        // Beer–Lambert σ of the medium the ray is inside (0 = clear air)
+    // §13 medium stack (NestedDielectricStack): the IOR + absorption σ of each nested dielectric the ray
+    // is inside, so glass-in-glass gets the right IOR pairing (not the inGlass boolean's air pairing) and a
+    // bubble keeps the enclosing glass's σ. Enter/exit is decided by IOR-matching (a hit whose IOR equals
+    // the current medium's = exiting it), which reproduces the boolean exactly for a single object. Only
+    // used when the knob is on; the off path keeps inGlass/mediumSigma byte-identical.
+    float sIor[4]; float sSig[4]; int sTop = 0;
     [loop]
     for (uint depth = 1u; depth <= MAX_SPECULAR_BOUNCES; depth++)
     {
@@ -1390,8 +1591,25 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             // (nm) rides in DeterXYZ[heroIdx].w; CauchyB == 0 leaves n == prim.Ior (non-dispersive).
             float um = DeterXYZ[heroIdx].w * 1e-3;   // hero wavelength in µm
             float n = prim.Ior + prim.CauchyB / (um * um);
-            float iorFrom = inGlass ? n : 1.0;
-            float iorTo   = inGlass ? 1.0 : n;
+            float hitSig = AbsorptionAt(prim.P0, prim.P1, prim.P2, DeterXYZ[heroIdx].w);
+
+            // §13: pick the from/to IOR either from the medium stack (nested-correct) or the inGlass
+            // boolean (legacy, single-level). exiting = leaving the current medium on transmit.
+            float iorFrom, iorTo; bool exiting;
+            if (NestedDielectricStack != 0u)
+            {
+                float curIor = (sTop > 0) ? sIor[sTop - 1] : 1.0;
+                exiting = (sTop > 0) && abs(curIor - n) < 1e-3;
+                iorFrom = curIor;
+                iorTo = exiting ? ((sTop > 1) ? sIor[sTop - 2] : 1.0) : n;
+            }
+            else
+            {
+                exiting = inGlass;
+                iorFrom = inGlass ? n : 1.0;
+                iorTo   = inGlass ? 1.0 : n;
+            }
+
             float cosI = abs(dot(normalize(dir), hitNormal));
             float R = FresnelDielectric(cosI, iorFrom, iorTo);
             float3 refr;
@@ -1407,9 +1625,18 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             {
                 dir = refr;
                 origin = hitPoint - hitNormal * 1e-3;
-                inGlass = !inGlass;
-                // Enter this glass's absorption, or exit to clear air (§2.3).
-                mediumSigma = inGlass ? AbsorptionAt(prim.P0, prim.P1, prim.P2, DeterXYZ[heroIdx].w) : 0.0;
+                if (NestedDielectricStack != 0u)
+                {
+                    if (exiting) { if (sTop > 0) sTop--; }
+                    else if (sTop < 4) { sIor[sTop] = n; sSig[sTop] = hitSig; sTop++; }
+                    mediumSigma = (sTop > 0) ? sSig[sTop - 1] : 0.0; // top of the stack's absorption
+                }
+                else
+                {
+                    inGlass = !inGlass;
+                    // Enter this glass's absorption, or exit to clear air (§2.3).
+                    mediumSigma = inGlass ? hitSig : 0.0;
+                }
             }
             continue;
         }
@@ -1429,7 +1656,7 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             float d = prim.CauchyB * grav;
             float base = MaterialReflectance[prim.MatPrimary * DETERMINISTIC_COUNT + heroIdx];
             float film = ThinFilmReflectance(cosI, DeterXYZ[heroIdx].w, d, filmIor);
-            float rReflect = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosI, 1.0, filmIor)) * base * film;
+            float rReflect = saturate(BubbleReflectBoost * FresnelDielectric(cosI, 1.0, filmIor)) * base * film; // §12
             rng = rng * RNG_MUL + RNG_ADD;
             float u = float(rng) / 4294967296.0;
             if (u < rReflect)
@@ -1458,7 +1685,11 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
 // each cell's photons on a singly-linked list (CellHead → PhotonNext) rather than a sorted range, and
 // the grid origin/dims come from the GPU-built GridParams buffer (no CPU readback). Photons carry
 // their wavelength as a DeterXYZ row, so XYZ(λ) is DeterXYZ[WlIndex]. Returns 0 when caustics are off.
-float3 TraceCausticEstimate(float3 pos, float3 normal)
+// §8 SpectralAlbedo: when CausticSpectralAlbedo is set, each photon is weighted by the receiver's
+// reflectance at the photon's OWN wavelength (HeroReflectance evaluated at ph.WlIndex) instead of the
+// composite multiplying the whole estimate by the hero-wavelength albedo — so a caustic on a red floor
+// keeps the floor's spectral tint per bundle. `prim`/`rayDir` describe the receiver for that lookup.
+float3 TraceCausticEstimate(float3 pos, float3 normal, PrimitiveInfo prim, float3 rayDir)
 {
     if (CausticEnabled == 0u)
         return float3(0.0, 0.0, 0.0);
@@ -1499,7 +1730,12 @@ float3 TraceCausticEstimate(float3 pos, float3 normal)
                     {
                         float3 d = ph.Pos - pos;
                         if (dot(d, d) <= radiusSq)
-                            sum += DeterXYZ[ph.WlIndex].xyz * ph.Power;
+                        {
+                            float albedo = (CausticSpectralAlbedo != 0u)
+                                ? HeroReflectance(prim, rayDir, pos, ph.WlIndex)
+                                : 1.0;
+                            sum += DeterXYZ[ph.WlIndex].xyz * (ph.Power * albedo);
+                        }
                     }
                     idx = PhotonNext[idx];
                 }
@@ -1632,17 +1868,22 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
                 vis = TraceTransmittance(shadowOrigin, lightDir, chosenDist - 2e-3, heroIdx);
             }
             if (vis > 0.0)
-                directTerm += vis * (geom * LightIntensity / max(lightP, 1e-9))
-                    * BlackbodyShape(DeterXYZ[heroIdx].w, LightColors[chosenLight].w); // §O9 emission tint
+                directTerm += vis * (geom * LightIntensity / max(lightP, 1e-9)); // §4: geometry × visibility only
         }
 
-        xyz = baseXyz * (ambientTerm + directTerm);
+        // §4: base reflectance × the chosen light's per-companion emission spectrum (§O9 blackbody × §6
+        // luma norm), so a coloured light's tint correlates with each wavelength's reflectance rather than
+        // being factored out at the hero λ and smeared over the companion mean. Equals baseXyz for a
+        // flat-white light (temp 0), so temp-0 scenes (all parity self-tests) stay bit-identical.
+        float3 directBaseXyz = DirectBaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx, LightColors[chosenLight].w);
+
+        xyz = baseXyz * ambientTerm + directBaseXyz * directTerm;
 
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         rng = rng * RNG_MUL + RNG_ADD;
-        float r1 = (rng & 0xFFFF) / 65536.0;
+        float r1 = (rng >> 16) / 65536.0;
         rng = rng * RNG_MUL + RNG_ADD;
-        float r2 = (rng & 0xFFFF) / 65536.0;
+        float r2 = (rng >> 16) / 65536.0;
 
         float3 sampleDir = CosineHemisphere(hitNormal, r1, r2);
         float3 secOrigin = hitPoint + hitNormal * 1e-3;
@@ -1652,20 +1893,23 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         if (TraceClosest(secOrigin, sampleDir, secPrim, secHitPoint))
         {
             float3 secHitNormal = FaceNormal(secPrim, sampleDir);
-            float3 secBaseXyz = IndirectBaseXyz(secPrim, sampleDir, secHitPoint, heroIdx);
+            // Finding §1: scalar hero-λ throughput; CIE applied once at the primary surface (baseXyz).
+            // HeroReflectance is the decal-aware scalar refl, i.e. IndirectBaseXyz / DeterXYZ(hero).
+            float secReflHero = HeroReflectance(secPrim, sampleDir, secHitPoint, heroIdx);
 
             float secDirectTerm = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
             uint lightIdx2 = rng % NumLights;
-            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx, rng);
+            secDirectTerm += UniformLightTerm(lightIdx2, secHitPoint, secHitNormal, heroIdx, rng)
+                * IndirectFogShadowFactor(secHitPoint, lightIdx2); // §9
 
-            float3 secIncoming = secBaseXyz * (AmbientLevel + secDirectTerm);
+            float secIncoming = secReflHero * (AmbientLevel + secDirectTerm);
 
-            float3 secBounce2Plus = float3(0.0, 0.0, 0.0);
+            float secBounce2Plus = 0.0;
             rng = rng * RNG_MUL + RNG_ADD;
-            float r3 = (rng & 0xFFFF) / 65536.0;
+            float r3 = (rng >> 16) / 65536.0;
             rng = rng * RNG_MUL + RNG_ADD;
-            float r4 = (rng & 0xFFFF) / 65536.0;
+            float r4 = (rng >> 16) / 65536.0;
 
             float3 tertDir = CosineHemisphere(secHitNormal, r3, r4);
             float3 tertOrigin = secHitPoint + secHitNormal * 1e-3;
@@ -1675,24 +1919,26 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             if (TraceClosest(tertOrigin, tertDir, tertPrim, tertHitPoint))
             {
                 float3 tertHitNormal = FaceNormal(tertPrim, tertDir);
-                float3 tertBaseXyz = IndirectBaseXyz(tertPrim, tertDir, tertHitPoint, heroIdx);
+                float tertReflHero = HeroReflectance(tertPrim, tertDir, tertHitPoint, heroIdx);
 
                 float tertDirectTerm = 0.0;
                 rng = rng * RNG_MUL + RNG_ADD;
                 uint lightIdx3 = rng % NumLights;
-                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal, heroIdx, rng);
+                tertDirectTerm += UniformLightTerm(lightIdx3, tertHitPoint, tertHitNormal, heroIdx, rng)
+                    * IndirectFogShadowFactor(tertHitPoint, lightIdx3); // §9
 
-                float3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
-                secBounce2Plus = secBaseXyz * tertIncoming;
+                float tertIncoming = tertReflHero * (AmbientLevel + tertDirectTerm);
+                secBounce2Plus = secReflHero * tertIncoming;
             }
             else if (SkyEnabled != 0.0)
             {
-                // §O7: the second bounce escaped to the open sky — skylight is its incoming radiance.
-                float3 tertSky = DeterXYZ[heroIdx].xyz * SkyRadiance(tertDir, DeterXYZ[heroIdx].w);
-                secBounce2Plus = secBaseXyz * tertSky;
+                // §O7: the second bounce escaped to the open sky — skylight (scalar spectral radiance at
+                // the hero wavelength) is its incoming radiance; the CIE weight rides on baseXyz (§1).
+                // DomeRadiance omits the sun disk (finding §5) — a bounce's sun is NEE's job, not the sky's.
+                secBounce2Plus = secReflHero * SkyDomeRadiance(tertDir, DeterXYZ[heroIdx].w);
             }
 
-            bounce0 = baseXyz * directTerm;
+            bounce0 = directBaseXyz * directTerm;
             float3 localBounce1 = baseXyz * secIncoming;
             float3 localBounce2Plus = baseXyz * secBounce2Plus;
             indirect = localBounce1 + localBounce2Plus;
@@ -1702,10 +1948,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         {
             // §O7: the diffuse bounce escaped to the open sky → the sky lights this surface (ambient blue
             // fill on outdoor cells; daylight bleeding into a corridor just inside a boundary opening).
-            // One-bounce skylight, same baseXyz·incoming form as a bounce off a surface.
-            float3 skyIncoming = DeterXYZ[heroIdx].xyz * SkyRadiance(sampleDir, DeterXYZ[heroIdx].w);
-            bounce0 = baseXyz * directTerm;
-            indirect = baseXyz * skyIncoming;
+            // One-bounce skylight; scalar spectral radiance at the hero wavelength, CIE on baseXyz (§1).
+            // DomeRadiance omits the sun disk (finding §5) — the sun is added by NEE, not this bounce.
+            bounce0 = directBaseXyz * directTerm;
+            indirect = baseXyz * SkyDomeRadiance(sampleDir, DeterXYZ[heroIdx].w);
             xyz += indirect;
         }
     }
@@ -1716,8 +1962,12 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     // identically. Specular hits already returned above; CausticEnabled == 0 → early-out → byte-identical.
     if (CausticEnabled != 0u)
     {
-        float causticAlbedo = HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
-        float3 caustic = TraceCausticEstimate(hitPoint, hitNormal) * (causticAlbedo * CausticStrength * (1.0 / PI));
+        // §8: with spectral albedo the per-photon receiver reflectance is folded inside the gather,
+        // so the composite multiplier drops the hero albedo (else it would be applied twice).
+        float causticAlbedo = (CausticSpectralAlbedo != 0u)
+            ? 1.0
+            : HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
+        float3 caustic = TraceCausticEstimate(hitPoint, hitNormal, prim, primaryDir) * (causticAlbedo * CausticStrength * (1.0 / PI));
         xyz += caustic;
         indirect += caustic;
     }
@@ -1775,6 +2025,124 @@ float3 ApplyBiomeIndicator(float3 xyz, float3 hitPoint)
     return LinRgbToXyz(hue * b);
 }
 
+// ── §4 Lens ───────────────────────────────────────────────────────────
+// A line-for-line port of RayTracer.Core/Pipeline/LensSampler.cs (the CI-testable contract; CI has no GPU).
+// Keep these in lockstep with that file — working convention 1.
+
+// Brown–Conrady radial distortion: r' = r·(1 + k1·r² + k2·r⁴). Negative k1 = barrel, positive = pincushion.
+void LensDistort(inout float px, inout float py, float k1, float k2)
+{
+    float r2 = px * px + py * py;
+    float scale = 1.0 + k1 * r2 + k2 * r2 * r2;
+    px *= scale;
+    py *= scale;
+}
+
+// Samples the aperture: a perfect disc below 3 blades, otherwise the inscribed regular polygon via a
+// triangle fan. Always draws exactly two randoms, so the stream length is independent of blade count.
+void LensSampleAperture(float radius, uint blades, float bladeRotation, inout uint rng,
+                        out float lx, out float ly)
+{
+    rng = rng * RNG_MUL + RNG_ADD; float u1 = float(rng) / 4294967296.0;
+    rng = rng * RNG_MUL + RNG_ADD; float u2 = float(rng) / 4294967296.0;
+
+    if (blades < 3u)
+    {
+        float r = radius * sqrt(u1);
+        float theta = 2.0 * PI * u2;
+        lx = r * cos(theta);
+        ly = r * sin(theta);
+        return;
+    }
+
+    float fan = u1 * float(blades);
+    uint tri = min(uint(fan), blades - 1u);
+    float a = fan - float(tri);
+    float b = u2;
+    if (a + b > 1.0) { a = 1.0 - a; b = 1.0 - b; }
+
+    float step = 2.0 * PI / float(blades);
+    float t0 = bladeRotation + float(tri) * step;
+    float t1 = t0 + step;
+    float v0x = radius * cos(t0), v0y = radius * sin(t0);
+    float v1x = radius * cos(t1), v1y = radius * sin(t1);
+    lx = a * v0x + b * v1x;
+    ly = a * v0y + b * v1y;
+}
+
+// Squashes an off-axis aperture sample along the radial direction into the barrel's "cat's eye" (§4.4).
+// Deterministic (no rejection), so the RNG stream stays pixel-independent and portable.
+void LensApplyCatEye(inout float lx, inout float ly, float fieldX, float fieldY, float fieldRadius)
+{
+    float fieldLen = sqrt(fieldX * fieldX + fieldY * fieldY);
+    if (fieldLen <= 1e-6 || fieldRadius <= 1e-6)
+        return;
+
+    float ux = fieldX / fieldLen;
+    float uy = fieldY / fieldLen;
+    float squash = max(0.25, 1.0 - 0.75 * min(fieldRadius, 1.0));
+
+    float radial = lx * ux + ly * uy;
+    float tanX = lx - radial * ux;
+    float tanY = ly - radial * uy;
+    radial *= squash;
+    lx = tanX + radial * ux;
+    ly = tanY + radial * uy;
+}
+
+// cos⁴θ natural falloff raised to `strength`: 0 = off (exactly 1), 1 = physical, >1 = exaggerated.
+float LensVignetteFactor(float px, float py, float strength)
+{
+    if (strength <= 0.0)
+        return 1.0;
+    float z2 = ImgPlaneZ * ImgPlaneZ;
+    float cos2 = z2 / (px * px + py * py + z2);
+    float cos4 = cos2 * cos2;
+    return (abs(strength - 1.0) < 1e-6) ? cos4 : pow(cos4, strength);
+}
+
+// The primary ray through the lens. Mirrors LensSampler.GenerateLocalRay + the reference's world-space
+// composition. LensApertureRadius 0 with no distortion ⇒ the exact historical pinhole, no randoms drawn.
+void GenerateLensRay(float px, float py, uint pixelHash, uint sampleIdx,
+                     out float3 origin, out float3 dir, out float vignette)
+{
+    float dpx = px;
+    float dpy = py;
+    if (LensDistortK1 != 0.0 || LensDistortK2 != 0.0)
+        LensDistort(dpx, dpy, LensDistortK1, LensDistortK2);
+
+    float3 localDir = float3(dpx, dpy, ImgPlaneZ);
+    vignette = LensVignetteFactor(px, py, LensVignetteStrength);
+
+    if (LensApertureRadius <= 0.0)
+    {
+        origin = CamPos;
+        dir = normalize(RotateByQuaternion(CamRot, localDir));
+        return;
+    }
+
+    // The lens's own RNG stream (LensSampler.SeedFor), so the aperture draw cannot perturb the
+    // wavelength/specular/shadow streams.
+    uint rng = pixelHash + sampleIdx * 2246822519u + 3266489917u;
+    float lx, ly;
+    LensSampleAperture(LensApertureRadius, LensBlades, LensBladeRotation, rng, lx, ly);
+
+    if (LensCatEye != 0u)
+    {
+        float fieldRadius = sqrt(dpx * dpx + dpy * dpy) / max(abs(ImgPlaneZ), 1e-6);
+        LensApplyCatEye(lx, ly, dpx, dpy, fieldRadius);
+    }
+
+    // Thin lens: every point of the aperture images the same focus-plane point, which is what makes that
+    // plane sharp and everything else not.
+    float ft = LensFocusDistance / max(abs(ImgPlaneZ), 1e-6);
+    float3 focusPoint = localDir * ft;
+    float3 localOrigin = float3(lx, ly, 0.0);
+
+    origin = CamPos + RotateByQuaternion(CamRot, localOrigin);
+    dir = normalize(RotateByQuaternion(CamRot, focusPoint - localOrigin));
+}
+
 // ── Kernel ────────────────────────────────────────────────────────────
 
 [numthreads(8, 8, 1)]
@@ -1808,16 +2176,30 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
 
     float px = (2.0 * ((x + jx) * InvWidth) - 1.0) * AspectTanHalfFov;
     float py = (1.0 - 2.0 * ((y + jy) * InvHeight)) * TanHalfFov;
-    float3 localDir = float3(px, py, ImgPlaneZ);
-    float3 dir = normalize(RotateByQuaternion(CamRot, localDir));
 
     uint pixelHash = Hash2D(x, y);
+
+    // §4.1: generate the primary ray through the lens (a port of Phase1Reference.PrimaryRayThroughLens).
+    // With LensApertureRadius 0 and no distortion this is exactly the historical
+    // `normalize(RotateByQuaternion(CamRot, float3(px, py, ImgPlaneZ)))` from CamPos, and draws no randoms.
+    float3 rayOrigin;
+    float3 dir;
+    float vignette;
+    GenerateLensRay(px, py, pixelHash, sampleIdx, rayOrigin, dir, vignette);
 
     bool hit, ratHit, bubbleHit;
     float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
     float gAlbedo;
-    float3 corrected = ShadeSample(CamPos, dir, pixelHash, sampleIdx, hit, ratHit, bubbleHit,
+    float3 corrected = ShadeSample(rayOrigin, dir, pixelHash, sampleIdx, hit, ratHit, bubbleHit,
                                    correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo);
+
+    // §4.1: the lens's natural falloff toward the corners. Exactly 1.0 when the lens does not vignette.
+    if (LensVignetteStrength > 0.0)
+    {
+        corrected *= vignette;
+        correctedDirect *= vignette;
+        correctedIndirect *= vignette;
+    }
 
     // Ceiling biome-category overlay (debug). Oriented normal points down (-Y)
     // on a ceiling hit; gated off (BiomeIndicator=0) for the parity self-test.
@@ -1902,10 +2284,12 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // column toward a far point along the ray (IntegrateVolumetric caps the march at
     // VolMaxMarchDistance, so an endpoint just past it covers the whole column). Roofed
     // scenes never miss, so their fog — and the goldens — are unchanged.
-    float3 fogEnd = hit ? gHitPoint : CamPos + dir * (max(VolMaxMarchDistance, 0.0) + 1.0);
+    // §4.1: marched from the ray's actual origin — the sampled aperture point, not the camera centre.
+    // Identical to CamPos on the pinhole path.
+    float3 fogEnd = hit ? gHitPoint : rayOrigin + dir * (max(VolMaxMarchDistance, 0.0) + 1.0);
     float fogT = 1.0;
     float3 fogInscatter = float3(0.0, 0.0, 0.0);
-    IntegrateVolumetric(CamPos, fogEnd, dir, VolTime, fogT, fogInscatter);
+    IntegrateVolumetric(rayOrigin, fogEnd, dir, VolTime, fogT, fogInscatter);
     FogOut[ix] = float4(fogInscatter * DeterministicCorrection, fogT);
 }
 
@@ -2011,7 +2395,19 @@ void CausticCS(uint3 tid : SV_DispatchThreadID)
 
     uint row = photonIndex % DETERMINISTIC_COUNT;   // matches WavelengthLookup.GetDeterministicWavelength(p)
     float wavelength = DeterXYZ[row].w;
+    // §8: physical photon power — intensity × the caster's subtended solid angle, split across the photons
+    // — so a closer/brighter light changes the caustic physically instead of only through Strength. Off
+    // (EmitPhysicalEnergy == 0) keeps the historical flat 1/N. Point emission only (a collimated beam has
+    // no point source); the white-light equivalent of the CPU PhotonTracer (these jobs carry no temperature).
     float power = 1.0 / max(job.PhotonCount, 1u);
+    if (EmitPhysicalEnergy != 0u && job.Mode != 1u)
+    {
+        float3 center = (bmin + bmax) * 0.5;
+        float r = 0.5 * length(bmax - bmin);
+        float d = max(length(center - float3(job.LX, job.LY, job.LZ)), r + 1e-3);
+        float omega = min(3.14159265 * r * r / (d * d), 6.28318530); // π r²/d², capped at 2π
+        power *= LightIntensity * omega;
+    }
 
     bool inGlass = false;
     float mediumSigma = 0.0;
@@ -2047,7 +2443,7 @@ void CausticCS(uint3 tid : SV_DispatchThreadID)
             float d = prim.CauchyB * grav;
             float baseR = MaterialReflectance[prim.MatPrimary * DETERMINISTIC_COUNT + row];
             float film = ThinFilmReflectance(cosv, wavelength, d, prim.Ior);
-            float reflectProb = saturate(BUBBLE_REFLECT_BOOST * FresnelDielectric(cosv, 1.0, prim.Ior)) * baseR * film;
+            float reflectProb = saturate(EmitBubbleBoost * FresnelDielectric(cosv, 1.0, prim.Ior)) * baseR * film; // §12
             rng = rng * 747796405u + 2891336453u;
             if (rng / 4294967296.0 < reflectProb)
             {

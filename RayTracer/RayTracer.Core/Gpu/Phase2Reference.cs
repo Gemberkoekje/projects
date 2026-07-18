@@ -57,12 +57,25 @@ public static class Phase2Reference
 
     /// <summary>Single-hero-wavelength diffuse albedo XYZ at a hit (no correction),
     /// used for the indirect bounces where only the hero wavelength is carried.</summary>
-    public static Vector3 IndirectBaseXyz(
+    /// <summary>
+    /// Scalar hero-wavelength reflectance of an indirect-bounce surface — the spectral throughput a
+    /// bounce propagates (realism finding §1). The CIE colour-matching weight is applied <b>once</b>, at
+    /// the primary surface; a bounce must carry only this scalar, never a CIE-tinted XYZ, or the curve is
+    /// applied per bounce (the CIE²/CIE³ bug). <see cref="IndirectBaseXyz"/> is this × CIE(hero).
+    /// </summary>
+    public static float IndirectReflHero(
         in GpuPrimitive prim, SpectralResources res, Vector3 rayDir, Vector3 hitPoint, uint heroIdx)
     {
         Phase1Reference.PatternShade(prim, rayDir, hitPoint, out uint row, out float atten);
         float refl = res.MaterialReflectance[(int)row * res.DeterministicCount + (int)heroIdx] * atten;
         refl *= Phase1Reference.ThinFilmFactor(prim, rayDir, hitPoint, res.DeterWavelengths[heroIdx]);
+        return refl;
+    }
+
+    public static Vector3 IndirectBaseXyz(
+        in GpuPrimitive prim, SpectralResources res, Vector3 rayDir, Vector3 hitPoint, uint heroIdx)
+    {
+        float refl = IndirectReflHero(prim, res, rayDir, hitPoint, heroIdx);
         var cie = new Vector3(
             res.DeterXYZ[heroIdx * 4 + 0],
             res.DeterXYZ[heroIdx * 4 + 1],
@@ -180,7 +193,8 @@ public static class Phase2Reference
         uint pixelHash,
         uint sampleIdx,
         out Vector3 correctedDirect,
-        out Vector3 correctedIndirect)
+        out Vector3 correctedIndirect,
+        ReadOnlySpan<float> lightTempsK = default)
     {
         correctedDirect = Vector3.Zero;
         correctedIndirect = Vector3.Zero;
@@ -235,7 +249,7 @@ public static class Phase2Reference
             // ── Direct lighting (NEE) ──────────────────────────────────
             float directTerm = 0f;
             uint rngLight = pixelHash + sampleIdx * RngMul + RngAdd;
-            _ = SelectLight(ref rngLight, lights, hitPoint, hitNormal,
+            int chosenLight = SelectLight(ref rngLight, lights, hitPoint, hitNormal,
                 out float lightP, out Vector3 lightDir, out float lightDistSq, out float lightCos);
 
             if (lightCos > 0f)
@@ -251,14 +265,18 @@ public static class Phase2Reference
                     directTerm += lightCos / lightDistSq * LightIntensity / MathF.Max(lightP, 1e-9f);
             }
 
-            xyz = baseXyz * (ambientTerm + directTerm);
+            // §4/§6: the direct term is pure geometry; the chosen light's emission spectrum is folded per
+            // companion wavelength into directBaseXyz (temp-0 → directBaseXyz == baseXyz, so unchanged).
+            float chosenTemp = ChosenTemp(lightTempsK, chosenLight);
+            Vector3 directBaseXyz = Phase1Reference.DirectBaseXyz(prim, res, primaryDir, hitPoint, pixelHash, sampleIdx, chosenTemp);
+            xyz = baseXyz * ambientTerm + directBaseXyz * directTerm;
 
             // ── Indirect: one bounce + tertiary bounce ─────────────────
             uint rng = pixelHash + sampleIdx * RngMul + RngAdd;
             rng = rng * RngMul + RngAdd;
-            float r1 = (rng & 0xFFFF) / 65536f;
+            float r1 = (rng >> 16) / 65536f;
             rng = rng * RngMul + RngAdd;
-            float r2 = (rng & 0xFFFF) / 65536f;
+            float r2 = (rng >> 16) / 65536f;
 
             Vector3 sampleDir = CosineHemisphere(hitNormal, r1, r2);
             Vector3 secOrigin = hitPoint + hitNormal * 1e-3f;
@@ -267,20 +285,23 @@ public static class Phase2Reference
             {
                 GpuPrimitive secPrim = prims[secIndex];
                 Vector3 secHitNormal = FaceNormal(secPrim, sampleDir);
-                Vector3 secBaseXyz = IndirectBaseXyz(secPrim, res, sampleDir, secHitPoint, heroIdx);
+                // Finding §1: carry scalar hero-λ throughput through the bounce chain and apply the CIE
+                // triple once, at the primary surface (baseXyz). The old XYZ×XYZ products applied the
+                // colour-matching curve twice (bounce 1) or three times (bounce 2+).
+                float secReflHero = IndirectReflHero(secPrim, res, sampleDir, secHitPoint, heroIdx);
 
                 float secDirectTerm = 0f;
                 rng = rng * RngMul + RngAdd;
                 int lightIdx2 = (int)(rng % (uint)lights.Length);
-                secDirectTerm += UniformLightTerm(tracer, lights, lightIdx2, secHitPoint, secHitNormal);
+                secDirectTerm += UniformLightTerm(tracer, lights, lightIdx2, secHitPoint, secHitNormal, res, heroIdx, lightTempsK);
 
-                Vector3 secIncoming = secBaseXyz * (AmbientLevel + secDirectTerm);
+                float secIncoming = secReflHero * (AmbientLevel + secDirectTerm);
 
-                Vector3 secBounce2Plus = Vector3.Zero;
+                float secBounce2Plus = 0f;
                 rng = rng * RngMul + RngAdd;
-                float r3 = (rng & 0xFFFF) / 65536f;
+                float r3 = (rng >> 16) / 65536f;
                 rng = rng * RngMul + RngAdd;
-                float r4 = (rng & 0xFFFF) / 65536f;
+                float r4 = (rng >> 16) / 65536f;
 
                 Vector3 tertDir = CosineHemisphere(secHitNormal, r3, r4);
                 Vector3 tertOrigin = secHitPoint + secHitNormal * 1e-3f;
@@ -289,18 +310,18 @@ public static class Phase2Reference
                 {
                     GpuPrimitive tertPrim = prims[tertIndex];
                     Vector3 tertHitNormal = FaceNormal(tertPrim, tertDir);
-                    Vector3 tertBaseXyz = IndirectBaseXyz(tertPrim, res, tertDir, tertHitPoint, heroIdx);
+                    float tertReflHero = IndirectReflHero(tertPrim, res, tertDir, tertHitPoint, heroIdx);
 
                     float tertDirectTerm = 0f;
                     rng = rng * RngMul + RngAdd;
                     int lightIdx3 = (int)(rng % (uint)lights.Length);
-                    tertDirectTerm += UniformLightTerm(tracer, lights, lightIdx3, tertHitPoint, tertHitNormal);
+                    tertDirectTerm += UniformLightTerm(tracer, lights, lightIdx3, tertHitPoint, tertHitNormal, res, heroIdx, lightTempsK);
 
-                    Vector3 tertIncoming = tertBaseXyz * (AmbientLevel + tertDirectTerm);
-                    secBounce2Plus = secBaseXyz * tertIncoming;
+                    float tertIncoming = tertReflHero * (AmbientLevel + tertDirectTerm);
+                    secBounce2Plus = secReflHero * tertIncoming;
                 }
 
-                bounce0 = baseXyz * directTerm;
+                bounce0 = directBaseXyz * directTerm;
                 Vector3 localBounce1 = baseXyz * secIncoming;
                 Vector3 localBounce2Plus = baseXyz * secBounce2Plus;
                 indirect = localBounce1 + localBounce2Plus;
@@ -460,7 +481,8 @@ public static class Phase2Reference
     /// </summary>
     private static float UniformLightTerm(
         ISceneTracer tracer, ReadOnlySpan<Vector3> lights, int lightIdx,
-        Vector3 hitPoint, Vector3 hitNormal)
+        Vector3 hitPoint, Vector3 hitNormal,
+        SpectralResources res, uint heroIdx, ReadOnlySpan<float> lightTempsK)
     {
         Vector3 toLight = lights[lightIdx] - hitPoint;
         float distSq = Vector3.Dot(toLight, toLight);
@@ -474,6 +496,19 @@ public static class Phase2Reference
         if (tracer.Occluded(shadowOrigin, lightDir, dist - 2e-3f))
             return 0f;
 
-        return cosTheta / distSq * LightIntensity * lights.Length;
+        // §4/§6: the bounce carries the hero wavelength (scalar throughput), so its emission is the
+        // chosen light's blackbody shape at hero × the §6 luma norm — 1 for a flat-white (temp-0) light.
+        float emission = 1f;
+        float tempK = ChosenTemp(lightTempsK, lightIdx);
+        if (tempK > 0f)
+            emission = BlackbodySpectrum.Relative(res.DeterWavelengths[(int)heroIdx], tempK)
+                * Phase1Reference.BlackbodyLumaNorm(res, tempK);
+
+        return cosTheta / distSq * LightIntensity * lights.Length * emission;
     }
+
+    // The chosen light's colour temperature, or 0 (flat white) when no temps were supplied or the index is
+    // out of range — so an empty span reproduces the historical white-light reference exactly.
+    private static float ChosenTemp(ReadOnlySpan<float> lightTempsK, int lightIdx)
+        => lightIdx >= 0 && lightIdx < lightTempsK.Length ? lightTempsK[lightIdx] : 0f;
 }

@@ -234,7 +234,9 @@ public partial class JobSystem
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteColorToBuffer(int y, int x, Vector3 xyz)
         {
-            DisplayResolver.WritePixel(_owner.DisplayBuffer.AsSpan(y * _owner.Stride + x * 4, 4), xyz);
+            DisplayResolver.WritePixel(
+                _owner.DisplayBuffer.AsSpan(y * _owner.Stride + x * 4, 4), xyz,
+                _owner.Realism.ToneMapping, _owner.Realism.Exposure);
         }
     }
 }

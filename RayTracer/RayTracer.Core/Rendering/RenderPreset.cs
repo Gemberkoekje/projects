@@ -51,7 +51,8 @@ public record RenderPreset(
     SmokeMode SmokeMode = SmokeMode.Biome,
     VolumetricOptions Volumetrics = default,
     bool IsDebugSmokePreset = false,
-    CausticOptions Caustics = default)
+    CausticOptions Caustics = default,
+    RealismOptions Realism = default)
 {
     // ── Presets ─────────────────────────────────────────────────────
     public static RenderPreset Low => new(
@@ -61,7 +62,8 @@ public record RenderPreset(
         Lighting: LightingMode.None,
         SampleClamp: 10f,
         SmokeMode: SmokeMode.None,
-        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Off, SmokeMode.None));
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Off, SmokeMode.None),
+        Realism: RealismOptions.FromQuality(RealismQuality.Low));
 
     public static RenderPreset Playable => new(
         "Playable", 320, 240, 1, 150, 8, 32,
@@ -71,7 +73,8 @@ public record RenderPreset(
         CheckerboardMotion: true, TemporalBlendAlpha: 0.08f, SampleClamp: 8f,
         SmokeMode: SmokeMode.Biome,
         Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Low, SmokeMode.Biome)
-            with { MarchSteps = 3, MaxMarchDistance = 10f, InscatterStrength = 0.22f });
+            with { MarchSteps = 3, MaxMarchDistance = 10f, InscatterStrength = 0.22f },
+        Realism: RealismOptions.FromQuality(RealismQuality.Low));
 
     public static RenderPreset Medium => new(
         "Medium", 480, 360, 4, 300, 16, 32,
@@ -80,7 +83,8 @@ public record RenderPreset(
         Lighting: LightingMode.Direct,
         CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
         SmokeMode: SmokeMode.Biome,
-        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.Biome));
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.Biome),
+        Realism: RealismOptions.FromQuality(RealismQuality.Medium));
 
     public static RenderPreset High => new(
         "High", 640, 480, 4, 500, 24, 32,
@@ -89,7 +93,8 @@ public record RenderPreset(
         Lighting: LightingMode.NEE,
         CheckerboardMotion: true, TemporalBlendAlpha: 0.05f, SampleClamp: 0f,
         SmokeMode: SmokeMode.Biome,
-        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.Biome));
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.High, SmokeMode.Biome),
+        Realism: RealismOptions.FromQuality(RealismQuality.High));
 
     public static RenderPreset Ultra => new(
         "Ultra", 800, 600, 8, 800, 32, 32,
@@ -98,7 +103,8 @@ public record RenderPreset(
         Lighting: LightingMode.NEE,
         CheckerboardMotion: true, TemporalBlendAlpha: 0.04f, SampleClamp: 0f,
         SmokeMode: SmokeMode.Biome,
-        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Ultra, SmokeMode.Biome));
+        Volumetrics: VolumetricOptions.FromQuality(VolumetricQuality.Ultra, SmokeMode.Biome),
+        Realism: RealismOptions.FromQuality(RealismQuality.Ultra));
 
     public static RenderPreset FogDebug => new(
         "Fog Debug", 480, 360, 2, 250, 12, 32,

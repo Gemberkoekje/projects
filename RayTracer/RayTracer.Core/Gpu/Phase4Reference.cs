@@ -301,7 +301,20 @@ public static class Phase4Reference
             if (options.ShadowTransmittance && occluder is not null)
                 lightWeight *= InscatterShadowTransmittance(samplePoint, lightDir, dist, options, time);
 
-            lighting += lightColors[i] * lightWeight;
+            // §9: per-light phase (mirrors JobSystem.EstimateInscatterLight); no anisotropy → 1 (no-op).
+            float phaseFactor = 1f;
+            if (options.PhaseAllLights)
+            {
+                float g = Math.Clamp(options.AnisotropyG, -0.95f, 0.95f);
+                if (MathF.Abs(g) > 1e-4f)
+                {
+                    float cosTheta = Math.Clamp(Vector3.Dot(lightDir, -viewDirection), -1f, 1f);
+                    float denom = 1f + g * g - 2f * g * cosTheta;
+                    phaseFactor = (1f - g * g) / (4f * MathF.PI * MathF.Pow(denom, 1.5f)) / IsotropicPhase;
+                }
+            }
+
+            lighting += lightColors[i] * (lightWeight * phaseFactor);
         }
 
         if (lighting == Vector3.Zero)
@@ -392,6 +405,11 @@ public static class Phase4Reference
         float sigmaScale = GetSigmaScale(options, options.SmokeMode);
         float inscatterScale = options.InscatterStrength / IsotropicPhase;
 
+        // Finding §2: reuse the last traced in-scatter visibility on the steps between traces (mirrors
+        // JobSystem.IntegrateVolumetricSegment) instead of adding the light fully unoccluded.
+        Vector3 cachedInscatterLight = Vector3.Zero;
+        bool haveCachedInscatter = false;
+
         for (int i = 0; i < steps; i++)
         {
             float distance = (i + 0.5f) * stepLength;
@@ -407,14 +425,28 @@ public static class Phase4Reference
             float opticalDepth = sigmaT * stepLength;
             float stepTransmittance = MathF.Exp(-opticalDepth);
             float scatterWeight = transmittance * (1f - stepTransmittance);
-            float phase = EvaluatePhase(dir, p, options, lightPositions);
+            // §9: PhaseAllLights folds the per-light phase into EstimateInscatterLight → neutral outer factor.
+            float phase = options.PhaseAllLights ? IsotropicPhase : EvaluatePhase(dir, p, options, lightPositions);
 
-            bool traceShadow = options.ShadowStepInterval > 0
-                && i % options.ShadowStepInterval == 0;
-            Vector3 localLight = EstimateInscatterLight(
-                p, dir, options, lightPositions, lightColors, traceShadow ? occluder : null, time);
+            Vector3 localLight;
+            if (options.ShadowStepInterval <= 0)
+            {
+                localLight = EstimateInscatterLight(p, dir, options, lightPositions, lightColors, null, time);
+            }
+            else
+            {
+                bool traceShadow = i % options.ShadowStepInterval == 0;
+                if (traceShadow || !haveCachedInscatter)
+                {
+                    cachedInscatterLight = EstimateInscatterLight(
+                        p, dir, options, lightPositions, lightColors, occluder, time);
+                    haveCachedInscatter = true;
+                }
+                localLight = cachedInscatterLight;
+            }
 
-            inscatter += localLight * (scatterWeight * inscatterScale * phase);
+            // §9: single-scattering albedo (mirrors JobSystem.IntegrateVolumetricSegment).
+            inscatter += localLight * (scatterWeight * inscatterScale * phase * options.SingleScatterAlbedo);
             transmittance *= stepTransmittance;
 
             if (transmittance < options.EarlyOutTransmittance)

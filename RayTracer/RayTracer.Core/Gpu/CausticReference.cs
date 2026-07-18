@@ -52,8 +52,13 @@ public static class CausticReference
     /// stored normal aligns with the receiver. Scans exactly the cells the map's own estimate does
     /// (<c>±ceil(radius/cellSize)</c> around <c>floor(coord/cellSize)</c>, clamped to the grid), so it
     /// returns the identical value to <see cref="PhotonMap.EstimateXyz"/>.
+    /// §8 SpectralAlbedo: <paramref name="spectralAlbedo"/> mirrors <see cref="PhotonMap.EstimateXyz"/> —
+    /// when non-null each photon is weighted by the receiver reflectance at its own wavelength (nm) so
+    /// the tint is per-bundle; <c>null</c> reproduces the achromatic gather. The HLSL
+    /// <c>TraceCausticEstimate</c> ports this via <c>HeroReflectance(prim, dir, pos, ph.WlIndex)</c>.
     /// </summary>
-    public static Vector3 EstimateXyz(CausticGrid grid, Vector3 position, Vector3 normal, float radius, WavelengthLookup wavelengths)
+    public static Vector3 EstimateXyz(CausticGrid grid, Vector3 position, Vector3 normal, float radius, WavelengthLookup wavelengths,
+        System.Func<int, float>? spectralAlbedo = null)
     {
         System.ArgumentNullException.ThrowIfNull(grid);
         System.ArgumentNullException.ThrowIfNull(wavelengths);
@@ -95,7 +100,10 @@ public static class CausticReference
                         if (Vector3.DistanceSquared(ph.Position, position) > radiusSq)
                             continue;
                         if (wavelengths.TryGet(ph.Wavelength, out Vector3 xyz))
-                            sum += xyz * ph.Power;
+                        {
+                            float albedo = spectralAlbedo?.Invoke(ph.Wavelength) ?? 1f;
+                            sum += xyz * (ph.Power * albedo);
+                        }
                     }
                 }
             }

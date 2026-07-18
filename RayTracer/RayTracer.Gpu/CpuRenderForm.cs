@@ -181,7 +181,8 @@ public class RayForm : Form
                 SampleClamp: preset.SampleClamp,
                 SmokeMode: preset.SmokeMode,
                 Volumetrics: preset.Volumetrics,
-                Caustics: preset.Caustics),
+                Caustics: preset.Caustics,
+                Realism: preset.Realism),
             debugOptions: new DebugOptions());
 
         jobSystem.SetupJobs(CancellationToken.None);

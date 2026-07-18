@@ -171,7 +171,8 @@ internal static class Program
                     reveal: ParseFloatOption(args, "--reveal", -1f),
                     depthCue: ParseFloatOption(args, "--depthcue", 0f),
                     pixelate: ParseIntOption(args, "--pixelate", 1),
-                    fogShadows: args.Contains("--fog-shadows", StringComparer.OrdinalIgnoreCase));
+                    fogShadows: args.Contains("--fog-shadows", StringComparer.OrdinalIgnoreCase),
+                    lens: ParseLensOption(args));
             if (phase5SelfTest) return RunPhase5SelfTest();
             if (phase5 && savePath is not null)
                 return RunPhase5Capture(ParseSmokeMode(args), maxFrames, savePath, sampleClamp, mazeSeed,
@@ -863,6 +864,16 @@ internal static class Program
     // ── Phase 6: productization (resize, device-removed recovery, fullscreen) ──
 
     /// <summary>
+    /// An explicit set of realism knobs from the config screen (Automatic unchecked), overriding the
+    /// per-quality-tier derivation. The <see cref="RealismOptions"/> half carries the shading/display
+    /// knobs; the fog (§9) and caustic (§8) flags are overlaid onto the volumetrics and caustic build.
+    /// </summary>
+    internal sealed record RealismConfig(
+        RealismOptions Realism,
+        bool FogSpectralLighting, float SingleScatterAlbedo, bool PhaseAllLights, bool IndirectFogShadows,
+        bool CausticPhysicalEnergy, bool CausticSpectralAlbedo);
+
+    /// <summary>
     /// Windowed Phase 6 renderer — the GPU backend of the productized default app
     /// (<see cref="RunConfigApp"/>) and the screensaver. Renders the same
     /// autonomous maze walk as Phase 5 (identical shaders / image) on the productized
@@ -879,7 +890,8 @@ internal static class Program
         bool outdoor = false, VolumetricQuality volumetricQuality = VolumetricQuality.Medium,
         bool dayNightCycle = true, float dayLengthSeconds = 180f, float stillTime = 1.5f,
         uint maxSampleCount = 2048, uint motionSampleCap = 12, int filterRadius = 1,
-        bool subPixelJitter = true, float temporalBlendAlpha = 0.1f)
+        bool subPixelJitter = true, float temporalBlendAlpha = 0.1f,
+        RealismConfig? realismConfig = null, LensOptions? lens = null)
     {
         EnsureAppConfigured();
         // Classic look: unlit fullbright spectral (LightingMode.None) with smoke off —
@@ -916,6 +928,16 @@ internal static class Program
             volumetrics = volumetrics with { ShadowStepInterval = 4 };
         if (outdoor) volumetrics = WithOutdoorFog(volumetrics); // §O: no camera-locked fog sphere in the garden
 
+        // Realism knobs (the adversarial-review shortcuts). When the config supplies an explicit set
+        // (Automatic unchecked) use it verbatim and overlay the fog knobs onto the volumetrics; otherwise
+        // derive them from the quality tier — High/Ultra opt into the physical paths (e.g. the filmic tone
+        // map), Low/Medium keep the cheaper shortcuts. Classic (retro screensaver) keeps the historical
+        // look: RealismOptions.Historical (NOT `new RealismOptions()`, whose record-struct zero-init would
+        // wrongly disable ViewDependentAlbedo and zero BubbleReflectBoost — see RealismOptions.Historical).
+        RealismOptions realism = ResolveRealism(
+            realismConfig, classic, volumetricQuality, ref volumetrics,
+            out bool causticPhysicalEnergy, out bool causticSpectralAlbedo);
+
         using var form = new Form
         {
             Text = "RayTracer.Gpu — Spectral Maze",
@@ -933,7 +955,8 @@ internal static class Program
             biomeIndicator: biomeIndicator, debugMode: debugMode, bumpyWalls: bumpyWalls,
             showOverheadMap: showOverheadMap, showRat: showRat,
             classicDepthCue: classic && classicDepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: classic ? pixelSize : 1);
+            pixelSize: classic ? pixelSize : 1, realism: realism);
+        if (lens is not null) renderer.SetLens(lens.Value); // §4: the config screen's camera-lens choice
 
         bool running = true;
         form.FormClosed += (_, _) => running = false;
@@ -1001,7 +1024,8 @@ internal static class Program
         void UpdateCaustics()
         {
             if (classic || !jewelCaustics) return;
-            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f);
+            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f,
+                physicalEnergy: causticPhysicalEnergy, spectralAlbedo: causticSpectralAlbedo); // §8
         }
         UpdateCaustics();
 
@@ -1241,7 +1265,7 @@ internal static class Program
         SmokeMode smokeMode, int frames, string savePath, float sampleClamp, int mazeSeed,
         Phase5DebugMode debugMode, float walkSeconds, RenderStyle style, MazeProps.Options? props = null,
         bool bumpyWalls = false, bool showOverheadMap = false, bool showRat = false, float reveal = -1f,
-        float depthCue = 0f, int pixelate = 1, bool fogShadows = false)
+        float depthCue = 0f, int pixelate = 1, bool fogShadows = false, LensOptions? lens = null)
     {
         if (frames <= 0) frames = 200; // enough samples to converge a clean still
         bool classic = style == RenderStyle.Classic;
@@ -1285,6 +1309,7 @@ internal static class Program
             renderer.SetRatPosition(camera.Position + fwd * 2.6f - new Vector3(0, camera.Position.Y - 0.25f, 0));
         }
         renderer.SetCamera(camera);
+        if (lens is not null) renderer.SetLens(lens.Value); // §4: --lens picks the camera character
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         for (int f = 0; f < frames; f++)
@@ -2913,7 +2938,73 @@ internal static class Program
             motionSampleCap: settings.MotionSampleCap,
             filterRadius: settings.FilterRadius,
             subPixelJitter: settings.SubPixelJitter,
-            temporalBlendAlpha: settings.TemporalBlendAlpha);
+            temporalBlendAlpha: settings.TemporalBlendAlpha,
+            realismConfig: BuildRealismConfig(settings),
+            lens: settings.ResolveLens()); // §4
+    }
+
+    /// <summary>
+    /// Turns the persisted realism knobs into an explicit <see cref="RealismConfig"/>, or <c>null</c> when
+    /// "Automatic" is on (the renderer then derives the knobs from the quality tier, the historical
+    /// behaviour). Uses <see cref="RealismOptions.Historical"/> as the base so the omitted record fields
+    /// take their proper defaults rather than the zero-init trap.
+    /// </summary>
+    private static RealismConfig? BuildRealismConfig(AppSettings s)
+    {
+        if (s.RealismAuto)
+            return null;
+
+        var realism = RealismOptions.Historical with
+        {
+            SpecularIndirect = s.SpecularIndirect,
+            ViewDependentAlbedo = s.ViewDependentAlbedo,
+            AreaLightSolidAngleSampling = s.AreaLightSolidAngleSampling,
+            BubbleReflectBoost = s.BubbleReflectBoost,
+            NestedDielectricStack = s.NestedDielectricStack,
+            ToneMapping = s.ToneMapping,
+            Exposure = s.Exposure,
+        };
+        return new RealismConfig(
+            realism,
+            s.FogSpectralLighting, s.SingleScatterAlbedo, s.PhaseAllLights, s.IndirectFogShadows,
+            s.CausticPhysicalEnergy, s.CausticSpectralAlbedo);
+    }
+
+    /// <summary>
+    /// Resolves the realism knobs for a render. An explicit <paramref name="config"/> (Automatic off)
+    /// wins and overlays its fog knobs onto <paramref name="volumetrics"/>; otherwise the knobs come from
+    /// the quality tier — Classic → <see cref="RealismOptions.Historical"/> (never the zero-init trap),
+    /// Low/Medium historical, High/Ultra the physical paths. Shared by the live window and movie capture.
+    /// </summary>
+    private static RealismOptions ResolveRealism(
+        RealismConfig? config, bool classic, VolumetricQuality tier,
+        ref VolumetricOptions volumetrics, out bool causticPhysicalEnergy, out bool causticSpectralAlbedo)
+    {
+        if (config is not null)
+        {
+            volumetrics = volumetrics with
+            {
+                FogSpectralLighting = config.FogSpectralLighting,
+                SingleScatterAlbedo = config.SingleScatterAlbedo,
+                PhaseAllLights = config.PhaseAllLights,
+                IndirectFogShadows = config.IndirectFogShadows,
+            };
+            causticPhysicalEnergy = config.CausticPhysicalEnergy;
+            causticSpectralAlbedo = config.CausticSpectralAlbedo;
+            return config.Realism;
+        }
+
+        causticPhysicalEnergy = false;
+        causticSpectralAlbedo = false;
+        return classic
+            ? RealismOptions.Historical
+            : RealismOptions.FromQuality(tier switch
+            {
+                VolumetricQuality.Off or VolumetricQuality.Low => RealismQuality.Low,
+                VolumetricQuality.High => RealismQuality.High,
+                VolumetricQuality.Ultra => RealismQuality.Ultra,
+                _ => RealismQuality.Medium,
+            });
     }
 
     /// <summary>
@@ -3078,6 +3169,12 @@ internal static class Program
             volumetrics = volumetrics with { ShadowStepInterval = 4 };
         if (outdoor) volumetrics = WithOutdoorFog(volumetrics); // §O: no camera-locked fog sphere in the garden
 
+        // Apply the same realism resolution as the live window so recorded movies match what the config
+        // screen shows (tier-derived when Automatic; the explicit knobs otherwise).
+        RealismOptions realism = ResolveRealism(
+            BuildRealismConfig(settings), classic, settings.VolumetricQuality, ref volumetrics,
+            out bool causticPhysicalEnergy, out bool causticSpectralAlbedo);
+
         Camera camera = classic ? ClassicMode.WithClassicFov(built.Camera) : built.Camera;
 
         string lengthDesc = walksMode ? $"{targetWalks} walk(s)" : $"{durationSeconds:0.#}s ({targetFrames} frames)";
@@ -3094,7 +3191,8 @@ internal static class Program
             biomeIndicator: false, debugMode: settings.StartView, bumpyWalls: settings.BumpyWalls,
             showOverheadMap: settings.ShowOverheadMap, showRat: settings.ShowRat,
             classicDepthCue: classic && settings.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: classic && settings.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
+            pixelSize: classic && settings.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1,
+            realism: realism);
         renderer.Initialize(windowHandle: 0);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
@@ -3103,7 +3201,8 @@ internal static class Program
         void UpdateCaustics()
         {
             if (classic || !settings.JewelCaustics) return;
-            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f);
+            renderer.BuildCausticsGpu(JewelCausticJobs(built, jewelOpts, totalPhotons: 200_000), 0.10f, 22f,
+                physicalEnergy: causticPhysicalEnergy, spectralAlbedo: causticSpectralAlbedo); // §8
         }
         UpdateCaustics();
 
@@ -3767,6 +3866,12 @@ internal static class Program
             ShowRat = false, ShowOpenGlLogo = false, ShowWallSigns = false, ShowOverheadMap = true,
             BumpyWalls = false, ClassicDepthCue = true, RetroPixelation = true,
             MazeBuildInAnim = false, MazeRegenerate = false, MazeOutroAnim = false,
+            // Realism knobs (§7–§14): distinctive non-default values to prove every control seeds + reads back.
+            RealismAuto = false, SpecularIndirect = true, ViewDependentAlbedo = false,
+            AreaLightSolidAngleSampling = true, BubbleReflectBoost = 12f, NestedDielectricStack = true,
+            ToneMapping = ToneMapping.Reinhard, Exposure = 1.5f,
+            FogSpectralLighting = true, SingleScatterAlbedo = 0.7f, PhaseAllLights = true, IndirectFogShadows = true,
+            CausticPhysicalEnergy = true, CausticSpectralAlbedo = true,
         };
         using var dlg = new ConfigForm(input);
         bool builds = dlg.Controls.Count > 0;
@@ -3790,6 +3895,7 @@ internal static class Program
         var presetCombo = dlg.Controls.OfType<ComboBox>().FirstOrDefault();
         var startBtn = dlg.Controls.OfType<Button>().FirstOrDefault(b => b.Text == "Start");
         bool presetOk = false;
+        bool realismOk = false;
         if (presetCombo is not null && startBtn is not null)
         {
             // Button.PerformClick needs a visible control (CanSelect), so show the dialog off-screen briefly.
@@ -3802,14 +3908,23 @@ internal static class Program
             AppSettings r = dlg.Result;
             presetOk = r is { Width: 2560, Height: 1440, MaxSampleCount: 4096u, RecordMovie: true, JewelCaustics: true, OutdoorArea: true }
                 && r.VolumetricQuality == VolumetricQuality.Ultra && r.Style == RenderStyle.Enhanced
-                && r.MovieQuality == MovieQualityMode.Beautiful && MathF.Abs(r.MovieBakeMs - 8000f) < 0.5f
+                && r.MovieQuality == MovieQualityMode.Beautiful && MathF.Abs(r.MovieBakeMs - 30000f) < 0.5f
                 && !r.MovieShowFps;
+            // Realism controls are untouched by the preset, so ApplyResult must read back the seeded values.
+            realismOk = r is { RealismAuto: false, SpecularIndirect: true, ViewDependentAlbedo: false,
+                    AreaLightSolidAngleSampling: true, NestedDielectricStack: true,
+                    FogSpectralLighting: true, PhaseAllLights: true, IndirectFogShadows: true,
+                    CausticPhysicalEnergy: true, CausticSpectralAlbedo: true }
+                && r.ToneMapping == ToneMapping.Reinhard
+                && MathF.Abs(r.BubbleReflectBoost - 12f) < 0.01f && MathF.Abs(r.Exposure - 1.5f) < 0.01f
+                && MathF.Abs(r.SingleScatterAlbedo - 0.7f) < 0.01f;
             dlg.Hide();
         }
         Console.WriteLine($"  [{(builds ? "ok" : "FAIL")}] dialog builds ({dlg.Controls.Count} controls)");
         Console.WriteLine($"  [{(roundTrips ? "ok" : "FAIL")}] Result mirrors incoming settings");
-        Console.WriteLine($"  [{(presetOk ? "ok" : "FAIL")}] 'insane' preset → converged 1440p/Ultra/8000ms config");
-        bool pass = builds && roundTrips && presetOk;
+        Console.WriteLine($"  [{(presetOk ? "ok" : "FAIL")}] 'insane' preset → converged 1440p/Ultra/30000ms config");
+        Console.WriteLine($"  [{(realismOk ? "ok" : "FAIL")}] realism knobs (§7–§14) seed + round-trip");
+        bool pass = builds && roundTrips && presetOk && realismOk;
         Console.WriteLine($"  overall              : {(pass ? "PASS" : "FAIL")}");
         return pass ? 0 : 1;
     }
@@ -3828,9 +3943,13 @@ internal static class Program
     private static int RunPhase6SelfTest()
     {
         Console.WriteLine("RayTracer.Gpu — Phase 6 headless self-test (productization)");
-        Phase3Scene built = Phase3Scene.Build(Width, Height);
+        // §4/§6: warm (1800 K) torches — matches the live Enhanced look — so the cross-check exercises the
+        // shader's colored-light DirectBaseXyz (per-companion blackbody × luma norm) against the reference,
+        // not just the white-light no-op path. Light temps are fed to Phase2Reference below.
+        Phase3Scene built = Phase3Scene.Build(Width, Height, torchTempK: 1800f);
+        float[] lightTemps = built.Lights.Select(l => l.EmissionTempK).ToArray();
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.Biome);
-        Console.WriteLine($"Lights: {built.PackedLights.Count}, smoke: {volumetrics.SmokeMode}");
+        Console.WriteLine($"Lights: {built.PackedLights.Count} (1800 K), smoke: {volumetrics.SmokeMode}");
 
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
@@ -3871,7 +3990,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, lightTemps);
 
                 VolumetricSample vol = Phase4Reference.IntegrateSegment(
                     built.Camera.Position, hitPoint, dir, volumetrics, isMoving: false,
@@ -4222,8 +4341,14 @@ internal static class Program
     // steps, and fade the far end to nothing so the cutoff is invisible. Only touched here (outdoor app +
     // movie); indoor-only mazes, the screensaver, the parity self-tests, and the goldens keep the default.
     private static VolumetricOptions WithOutdoorFog(VolumetricOptions v)
+        // §O: the outdoor fog is a low, height-limited garden bank (GetDensity fades it above the wall
+        // height). Its only camera-relative boundary is the march-distance cutoff + far-fade shell; when
+        // that shell falls inside the visible garden it reads as a moving ring/band as surfaces pass in and
+        // out of fog range. Push the reach far past typical sightlines (and the fade shell out to the far
+        // end), scaling the step count to keep the same ~2.5 units/step density, so the cutoff is no longer
+        // visible in-frame. Outdoor-only helper — the goldens / parity scenes never call it.
         => v.EnableVolumetrics
-            ? v with { MaxMarchDistance = MathF.Max(v.MaxMarchDistance, 40f), MarchSteps = Math.Max(v.MarchSteps, 16), FarFadeStart = 24f }
+            ? v with { MaxMarchDistance = MathF.Max(v.MaxMarchDistance, 90f), MarchSteps = Math.Max(v.MarchSteps, 36), FarFadeStart = 70f }
             : v;
 
     // Phase 4 smoke-mode selection for the windowed demo. Defaults to biome-banded
@@ -4237,4 +4362,34 @@ internal static class Program
         return SmokeMode.Biome;
     }
 
+    /// <summary>
+    /// §4: <c>--lens &lt;pinhole|phone|portrait|simple|cine&gt;</c> picks the camera character, with
+    /// <c>--focus &lt;m&gt;</c>, <c>--fstop &lt;N&gt;</c> and <c>--zoom &lt;mm&gt;</c> overriding individual
+    /// knobs. Returns <c>null</c> when no lens was asked for, which leaves the renderer on its pinhole
+    /// default and the goldens untouched.
+    /// </summary>
+    private static LensOptions? ParseLensOption(string[] args)
+    {
+        string? name = ParseStringOption(args, "--lens", null);
+        if (name is null)
+            return null;
+
+        LensOptions lens = name.ToLowerInvariant() switch
+        {
+            "pinhole" => LensOptions.Pinhole,
+            "phone" => LensOptions.FromModel(LensModel.Phone),
+            "portrait" => LensOptions.PhonePortrait(),
+            "simple" or "old" => LensOptions.FromModel(LensModel.Simple),
+            "cine" => LensOptions.FromModel(LensModel.Cine),
+            _ => throw new ArgumentException($"unknown --lens '{name}' (pinhole|phone|portrait|simple|cine)"),
+        };
+
+        float focus = ParseFloatOption(args, "--focus", -1f);
+        if (focus > 0f) lens = lens with { FocusDistance = focus };
+        float fstop = ParseFloatOption(args, "--fstop", -1f);
+        if (fstop > 0f) lens = lens with { FStop = fstop };
+        float zoom = ParseFloatOption(args, "--zoom", -1f);
+        if (zoom > 0f) lens = lens with { FocalLengthMm = zoom };
+        return lens;
+    }
 }

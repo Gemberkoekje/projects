@@ -115,8 +115,8 @@ public static class Optics
     /// already modulated by <see cref="ThinFilmReflectance"/> (as folded in
     /// <c>HitInfo.FromMaterial</c>); <paramref name="filmIor"/> is the film's index.
     /// </summary>
-    public static float BubbleReflectProbability(float cosTheta, float filmIor, float tintedReflectance)
-        => Math.Clamp(BubbleReflectBoost * FresnelDielectric(cosTheta, 1f, filmIor), 0f, 1f) * tintedReflectance;
+    public static float BubbleReflectProbability(float cosTheta, float filmIor, float tintedReflectance, float boost = BubbleReflectBoost)
+        => Math.Clamp(boost * FresnelDielectric(cosTheta, 1f, filmIor), 0f, 1f) * tintedReflectance;
 
     /// <summary>
     /// Exact (unpolarized) Fresnel reflectance at a dielectric boundary.

@@ -41,10 +41,13 @@ public static class PhotonTracer
         float gatherRadius,
         int maxBounces = 8,
         uint seed = 1u,
-        int wavelengthOverride = 0)
+        int wavelengthOverride = 0,
+        float bubbleBoost = Optics.BubbleReflectBoost,
+        bool physicalEnergy = false,
+        float lightIntensity = 1.5f)
     {
         var map = new PhotonMap(gatherRadius);
-        EmitInto(map, lights, bvh, targetBounds, wavelengths, photonsPerLight, maxBounces, seed, wavelengthOverride);
+        EmitInto(map, lights, bvh, targetBounds, wavelengths, photonsPerLight, maxBounces, seed, wavelengthOverride, bubbleBoost, physicalEnergy, lightIntensity);
         return map;
     }
 
@@ -63,7 +66,10 @@ public static class PhotonTracer
         int photonsPerLight,
         int maxBounces = 8,
         uint seed = 1u,
-        int wavelengthOverride = 0)
+        int wavelengthOverride = 0,
+        float bubbleBoost = Optics.BubbleReflectBoost,
+        bool physicalEnergy = false,
+        float lightIntensity = 1.5f)
     {
         System.ArgumentNullException.ThrowIfNull(map);
         System.ArgumentNullException.ThrowIfNull(lights);
@@ -75,12 +81,25 @@ public static class PhotonTracer
 
         Vector3 boundsMin = targetBounds.Min;
         Vector3 boundsSize = targetBounds.Max - targetBounds.Min;
-        float power = 1f / photonsPerLight;
+        float basePower = 1f / photonsPerLight;
         uint rng = seed == 0u ? 1u : seed;
 
         for (int li = 0; li < lights.Length; li++)
         {
             Vector3 lightPos = lights[li].Position;
+
+            // §8 physical energy: each photon carries the light's radiant power toward the caster —
+            // intensity × the box's subtended solid angle × its blackbody emission — split across the
+            // photons, so a closer/brighter/warmer light changes the caustic physically instead of only
+            // through Strength. Off (default) keeps the historical flat 1/photonsPerLight.
+            float lightPowerScale = basePower;
+            float emitLumaNorm = 1f;
+            if (physicalEnergy)
+            {
+                emitLumaNorm = wavelengths.BlackbodyLumaNorm(lights[li].EmissionTempK);
+                lightPowerScale = basePower * lightIntensity * TargetSolidAngle(targetBounds, lightPos);
+            }
+
             for (int p = 0; p < photonsPerLight; p++)
             {
                 rng = rng * 747796405u + 2891336453u;
@@ -101,9 +120,26 @@ public static class PhotonTracer
                     ? wavelengthOverride
                     : wavelengths.GetDeterministicWavelength(p);
 
-                TracePhoton(bvh, lightPos, dir, power, wavelength, maxBounces, ref rng, map);
+                float power = physicalEnergy
+                    ? lightPowerScale * BlackbodySpectrum.Relative(wavelength, lights[li].EmissionTempK) * emitLumaNorm
+                    : basePower;
+
+                TracePhoton(bvh, lightPos, dir, power, wavelength, maxBounces, ref rng, map, bubbleBoost);
             }
         }
+    }
+
+    /// <summary>
+    /// Solid angle (steradians) the caster's bounding box subtends from a light at <paramref name="lightPos"/>,
+    /// used to scale a photon's physical power (§8). Approximates the box as a disk of radius = half its
+    /// diagonal at the box centre, <c>Ω ≈ π r² / d²</c>, clamped to ≤ 2π (a light at/inside the box).
+    /// </summary>
+    private static float TargetSolidAngle(AABB bounds, Vector3 lightPos)
+    {
+        Vector3 center = (bounds.Min + bounds.Max) * 0.5f;
+        float r = 0.5f * (bounds.Max - bounds.Min).Length();
+        float d = MathF.Max(Vector3.Distance(center, lightPos), r + 1e-3f);
+        return MathF.Min(MathF.PI * r * r / (d * d), MathF.Tau);
     }
 
     /// <summary>
@@ -114,7 +150,8 @@ public static class PhotonTracer
     /// takes (unbiased in expectation).
     /// </summary>
     private static void TracePhoton(
-        BVH bvh, Vector3 origin, Vector3 dir, float power, int wavelength, int maxBounces, ref uint rng, PhotonMap map)
+        BVH bvh, Vector3 origin, Vector3 dir, float power, int wavelength, int maxBounces, ref uint rng, PhotonMap map,
+        float bubbleBoost = Optics.BubbleReflectBoost)
     {
         bool inGlass = false;
         float mediumSigma = 0f;
@@ -143,7 +180,7 @@ public static class PhotonTracer
             if (surface == SurfaceKind.Bubble)
             {
                 float cos = MathF.Abs(Vector3.Dot(Vector3.Normalize(dir), hitNormal));
-                float reflectProb = Optics.BubbleReflectProbability(cos, ior, reflectance);
+                float reflectProb = Optics.BubbleReflectProbability(cos, ior, reflectance, bubbleBoost); // §12
                 rng = rng * 747796405u + 2891336453u;
                 if (rng / 4294967296f < reflectProb)
                 {

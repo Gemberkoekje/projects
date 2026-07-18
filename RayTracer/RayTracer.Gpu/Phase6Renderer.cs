@@ -65,6 +65,15 @@ internal sealed class Phase6Renderer : IDisposable
     private readonly float _temporalBlendAlpha;
     private readonly uint _filterRadius;
     private readonly VolumetricOptions _volumetrics;
+
+    /// <summary>Realism knobs (the adversarial-review "shortcuts"), mirrored into the trace/resolve
+    /// cbuffers. All fields default to the historical behaviour, so an un-set value is unchanged.</summary>
+    private readonly RealismOptions _realism;
+
+    /// <summary>The lens primary rays are generated through (plan §4), mirrored into the trace cbuffer.
+    /// Mutable rather than readonly: the lens is a user-facing control (model, zoom, focus), so it changes
+    /// between frames. Defaults to <see cref="LensOptions.Pinhole"/> — the historical camera.</summary>
+    private LensOptions _lens = LensOptions.Pinhole;
     private readonly bool _biomeIndicator;
     private readonly bool _bumpyWalls;
 
@@ -137,6 +146,8 @@ internal sealed class Phase6Renderer : IDisposable
     private float _causticCellSize = 1f;
     private float _causticRadius = 1f;
     private float _causticStrength = 1f;
+    private bool _causticPhysicalEnergy; // §8: physical photon power (intensity × solid angle) in the emit pass
+    private bool _causticSpectralAlbedo; // §8: per-photon-wavelength receiver reflectance in the gather
     // §A3: true when the scene carries dielectric triangles (glass windows §1.2 / glass jewels), so
     // TraceTransmittance forces triangles non-opaque and lets glass cast soft Fresnel-dimmed shadows
     // instead of hard black ones. False for glass-free mazes → the shadow ray keeps the pure
@@ -249,7 +260,7 @@ internal sealed class Phase6Renderer : IDisposable
         uint filterRadius = 1, bool biomeIndicator = false,
         Phase5DebugMode debugMode = Phase5DebugMode.Beauty, bool bumpyWalls = false,
         bool showOverheadMap = false, bool showRat = false, float classicDepthCue = 0f,
-        int pixelSize = 1)
+        int pixelSize = 1, RealismOptions? realism = null)
     {
         _width = width;
         _height = height;
@@ -261,6 +272,10 @@ internal sealed class Phase6Renderer : IDisposable
         _sampleClamp = sampleClamp;
         _camera = camera;
         _volumetrics = volumetrics;
+        // A nullable default keeps every existing call site on the historical behaviour: null → the
+        // record's proper defaults (ViewDependentAlbedo, BubbleReflectBoost 45, …), never the zero-init
+        // `default(RealismOptions)` which would wrongly disable them (see RealismOptions.Historical).
+        _realism = realism ?? RealismOptions.Historical;
         _biomeIndicator = biomeIndicator;
         _bumpyWalls = bumpyWalls;
         _showOverheadMap = showOverheadMap;
@@ -318,6 +333,17 @@ internal sealed class Phase6Renderer : IDisposable
         public float CausticRadius, CausticStrength;
         public uint ShadowTransmitTriangles; // §A3: glass triangles cast soft shadows (repurposed from CPad0)
         public float VolFarFadeStart; // §O: fog density fade start distance (0 = no fade); repurposed from CPad1
+        // §7-13 realism knobs (mirror the shader Constants cbuffer; each defaults to historical behaviour).
+        public uint ViewDependentAlbedo, SpecularIndirect, AreaLightSolidAngleSampling, FogSpectralLighting;
+        public float BubbleReflectBoost, SingleScatterAlbedo; public uint PhaseAllLights, NestedDielectricStack;
+        public uint IndirectFogShadows; // §9 fog on indirect-bounce shadow rays
+        public uint CausticSpectralAlbedo; // §8 per-photon-wavelength receiver reflectance in the caustic gather
+        public uint _rpad1, _rpad2;
+        // §4 lens. Zoom needs no field of its own: the CPU already folds the lens's effective Fov into
+        // TanHalfFov/AspectTanHalfFov above. LensApertureRadius 0 = pinhole ⇒ the shader skips aperture
+        // sampling entirely and the frame stays bit-identical.
+        public float LensApertureRadius, LensFocusDistance, LensBladeRotation, LensDistortK1;
+        public float LensDistortK2, LensVignetteStrength; public uint LensBlades, LensCatEye;
     }
 
     // Matches the shader's CausticPhoton (32-byte structured-buffer element): a caustic photon's world
@@ -350,7 +376,10 @@ internal sealed class Phase6Renderer : IDisposable
     {
         public uint EmitJobCount, PhotonCapacity, EmitMaxBounces;
         public float EmitCellSize;
-        public uint CellHeadCapacity, Pad1, Pad2, Pad3;
+        public uint CellHeadCapacity;
+        public float EmitBubbleBoost; // §12 bubble reflect boost (repurposed from Pad1)
+        public uint EmitPhysicalEnergy; // §8 physical photon power (repurposed from Pad2)
+        public uint Pad3;
     }
 
     // §O3 sky (b2) — matches SkyConstants in the shader.
@@ -380,6 +409,7 @@ internal sealed class Phase6Renderer : IDisposable
         public float FadeLevel;                               // §9.4 outro fade
         public float ClassicDepthCue;                         // §1.4 classic depth-cue strength (0 = off)
         public uint ClockEnabled, ClockHour, ClockMinute, ClockPad; // §O8 24h clock under the minimap
+        public uint ToneMapping; public float Exposure; public uint TonePad0, TonePad1; // §14 display tone map
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -513,10 +543,12 @@ internal sealed class Phase6Renderer : IDisposable
             new HeapProperties(HeapType.Readback), HeapFlags.None,
             ResourceDescription.Buffer(8 * sizeof(float)), ResourceStates.CopyDest);
 
-        // Constant buffers must be 256-byte aligned.
+        // Constant buffers must be 256-byte aligned. TraceConstants grew past 256 bytes with the §7-13
+        // realism knobs, so it needs the next 256-aligned size (512) — a 256-byte buffer would drop the
+        // trailing fields (they would read as 0 on the GPU).
         _traceConstantBuffer = _device.CreateCommittedResource(
             new HeapProperties(HeapType.Upload), HeapFlags.None,
-            ResourceDescription.Buffer(256), ResourceStates.GenericRead);
+            ResourceDescription.Buffer(512), ResourceStates.GenericRead);
         _resolveConstantBuffer = _device.CreateCommittedResource(
             new HeapProperties(HeapType.Upload), HeapFlags.None,
             ResourceDescription.Buffer(256), ResourceStates.GenericRead);
@@ -684,12 +716,15 @@ internal sealed class Phase6Renderer : IDisposable
     /// </summary>
     public void BuildCausticsGpu(
         IReadOnlyList<(Vector3 Light, AABB Bounds, int Photons, uint Seed)> jobs,
-        float gatherRadius, float strength, int maxBounces = 8)
+        float gatherRadius, float strength, int maxBounces = 8, bool physicalEnergy = false,
+        bool spectralAlbedo = false)
     {
         ArgumentNullException.ThrowIfNull(jobs);
         _causticCellSize = gatherRadius;
         _causticRadius = gatherRadius;
         _causticStrength = strength;
+        _causticPhysicalEnergy = physicalEnergy; // §8
+        _causticSpectralAlbedo = spectralAlbedo; // §8
         if (_device is null)
             return;
 
@@ -776,6 +811,8 @@ internal sealed class Phase6Renderer : IDisposable
             EmitMaxBounces = (uint)Math.Max(1, maxBounces),
             EmitCellSize = gatherRadius,
             CellHeadCapacity = (uint)CellHeadCapacity,
+            EmitBubbleBoost = _realism.BubbleReflectBoost, // §12
+            EmitPhysicalEnergy = _causticPhysicalEnergy ? 1u : 0u, // §8
         };
         _causticEmitConstantBuffer.Unmap(0);
 
@@ -846,12 +883,44 @@ internal sealed class Phase6Renderer : IDisposable
     }
 
 
+    // §9: the Y-normalized blackbody chromaticity tint at a temperature, from the baked white-balanced
+    // hero table — the GPU twin of WavelengthLookup.BlackbodyChromaXyz, so the CPU/GPU fog tint matches.
+    private Vector3 BlackbodyChromaXyz(float tempK)
+    {
+        if (tempK <= 0f)
+            return Vector3.One;
+
+        int n = _spectral.DeterministicCount;
+        Vector3 sum = Vector3.Zero;
+        for (int i = 0; i < n; i++)
+        {
+            float wl = _spectral.DeterXYZ[i * 4 + 3]; // .w = wavelength nm
+            float r = BlackbodySpectrum.Relative(wl, tempK);
+            sum += new Vector3(_spectral.DeterXYZ[i * 4 + 0], _spectral.DeterXYZ[i * 4 + 1], _spectral.DeterXYZ[i * 4 + 2]) * r;
+        }
+        return sum.Y > 1e-6f ? sum / sum.Y : Vector3.One;
+    }
+
     private void CreateLightResources()
     {
         float[] data = _lights.Count > 0 ? _lights.Data : new float[4];
         _lightBuffer = CreateUploadBuffer<float>(data, data.Length * sizeof(float));
 
         float[] colorData = _lights.Count > 0 ? _lights.ColorData : new float[4];
+        // §9: tint each light's fog in-scatter colour by its blackbody chromaticity so a warm torch reads
+        // warm in the smoke instead of grey haze (LightColors.xyz is the fog inscatter colour; .w = temp K).
+        // A copy keeps the pristine ColorData; off / temp-0 → neutral tint → an identical upload.
+        if (_volumetrics.FogSpectralLighting && _lights.Count > 0)
+        {
+            colorData = (float[])colorData.Clone();
+            for (int i = 0; i < _lights.Count; i++)
+            {
+                Vector3 tint = BlackbodyChromaXyz(colorData[i * 4 + 3]);
+                colorData[i * 4 + 0] *= tint.X;
+                colorData[i * 4 + 1] *= tint.Y;
+                colorData[i * 4 + 2] *= tint.Z;
+            }
+        }
         _lightColorBuffer = CreateUploadBuffer<float>(colorData, colorData.Length * sizeof(float));
 
         // §C2: per-light sun direction + directional flag (all-zero for point lights → point path).
@@ -1438,9 +1507,30 @@ internal sealed class Phase6Renderer : IDisposable
     /// <summary>Sets the fog animation clock (seconds); see Phase 4.</summary>
     public void SetFogTime(float seconds) => _volTime = seconds;
 
+    /// <summary>
+    /// §4: selects the lens primary rays are generated through — the model, and with it the aperture, focus
+    /// distance, zoom, distortion and vignette. Forces an accumulation reset, because changing the lens
+    /// changes what every pixel sees; without it the new lens would blend into the old one's history.
+    /// <para>Pass <see cref="LensOptions.Pinhole"/> to return to the historical camera.</para>
+    /// </summary>
+    public void SetLens(LensOptions lens)
+    {
+        if (_lens == lens)
+            return;
+        _lens = lens;
+        _forceReset = true;
+    }
+
+    /// <summary>§4: the lens currently in use.</summary>
+    public LensOptions Lens => _lens;
+
     private void UpdateTraceConstants(bool reset, bool moving)
     {
-        float tanHalfFov = MathF.Tan(_camera.Fov * 0.5f);
+        // §4.1: the lens owns the field of view — a zoom (a set FocalLengthMm) reframes the shot. With no
+        // lens, or an un-zoomed one, EffectiveFov returns _camera.Fov unchanged, so TanHalfFov is untouched
+        // and the shader's pinhole path stays bit-identical.
+        float effectiveFov = _lens.EffectiveFov(_camera.Fov);
+        float tanHalfFov = MathF.Tan(effectiveFov * 0.5f);
         Quaternion rot = _camera.Rotation;
         var constants = new TraceConstants
         {
@@ -1501,6 +1591,26 @@ internal sealed class Phase6Renderer : IDisposable
             CausticStrength = _causticStrength,
             ShadowTransmitTriangles = _shadowTransmitTriangles ? 1u : 0u,
             VolFarFadeStart = _volumetrics.FarFadeStart,
+            // §7-13 realism knobs.
+            ViewDependentAlbedo = _realism.ViewDependentAlbedo ? 1u : 0u,
+            SpecularIndirect = _realism.SpecularIndirect ? 1u : 0u,
+            AreaLightSolidAngleSampling = _realism.AreaLightSolidAngleSampling ? 1u : 0u,
+            FogSpectralLighting = _volumetrics.FogSpectralLighting ? 1u : 0u,
+            BubbleReflectBoost = _realism.BubbleReflectBoost,
+            SingleScatterAlbedo = _volumetrics.SingleScatterAlbedo,
+            PhaseAllLights = _volumetrics.PhaseAllLights ? 1u : 0u,
+            NestedDielectricStack = _realism.NestedDielectricStack ? 1u : 0u,
+            IndirectFogShadows = _volumetrics.IndirectFogShadows ? 1u : 0u, // §9
+            CausticSpectralAlbedo = _causticSpectralAlbedo ? 1u : 0u, // §8
+            // §4 lens. A pinhole leaves every one of these at 0/1 defaults, which is the shader's no-op path.
+            LensApertureRadius = _lens.ApertureRadiusWorld(effectiveFov),
+            LensFocusDistance = _lens.FocusDistance,
+            LensBladeRotation = _lens.BladeRotation,
+            LensDistortK1 = _lens.HasDistortion ? _lens.DistortionK1 : 0f,
+            LensDistortK2 = _lens.HasDistortion ? _lens.DistortionK2 : 0f,
+            LensVignetteStrength = _lens.HasVignette ? _lens.VignetteStrength : 0f,
+            LensBlades = (uint)Math.Max(0, _lens.ApertureBlades),
+            LensCatEye = _lens.CatEyeVignette ? 1u : 0u,
         };
 
         Span<TraceConstants> dest = _traceConstantBuffer.Map<TraceConstants>(0, 1);
@@ -1568,6 +1678,8 @@ internal sealed class Phase6Renderer : IDisposable
             ClockEnabled = _clockEnabled && _showOverheadMap ? 1u : 0u, // §O8: shown under the minimap
             ClockHour = (uint)Math.Clamp(_clockHour, 0, 23),
             ClockMinute = (uint)Math.Clamp(_clockMinute, 0, 59),
+            ToneMapping = (uint)_realism.ToneMapping, // §14
+            Exposure = _realism.Exposure,
         };
 
         Span<ResolveConstants> dest = _resolveConstantBuffer.Map<ResolveConstants>(0, 1);

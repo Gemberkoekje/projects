@@ -65,7 +65,7 @@ public class Light
     /// (§C1); a directional light with an angular radius samples its disk cone (§C2). A radius-0 light
     /// draws no RNG and reproduces the old hard shadow byte-for-byte.
     /// </summary>
-    public float SampleShadowRay(Vector3 point, Vector3 normal, ref uint rng, out Vector3 dir, out float dist)
+    public float SampleShadowRay(Vector3 point, Vector3 normal, ref uint rng, out Vector3 dir, out float dist, bool solidAngle = false)
     {
         if (Directional)
         {
@@ -77,7 +77,7 @@ public class Light
             return c > 0f ? c : 0f;
         }
 
-        Vector3 toLight = SamplePoint(ref rng) - point;
+        Vector3 toLight = SamplePoint(point, ref rng, solidAngle) - point;
         float distSq = MathF.Max(Vector3.Dot(toLight, toLight), 1e-6f);
         dist = MathF.Sqrt(distSq);
         dir = toLight / dist;
@@ -92,10 +92,31 @@ public class Light
     /// spherical light's surface when the radius is positive, so the accumulated NEE visibility softens
     /// into a penumbra. Advances <paramref name="rng"/> by two draws only for an area light.
     /// </summary>
-    public Vector3 SamplePoint(ref uint rng)
+    public Vector3 SamplePoint(ref uint rng) => SamplePoint(Position, ref rng, false);
+
+    /// <summary>
+    /// The shadow-ray target on this light. The historical mode (<paramref name="solidAngle"/> false)
+    /// samples a uniform point over the <b>whole</b> sphere — including the far, self-occluded hemisphere,
+    /// which widens and dims the penumbra near contact (realism finding §10). When
+    /// <paramref name="solidAngle"/> is set and the shading point is outside the sphere, it instead
+    /// cone-samples the <b>visible cap</b> the sphere subtends from <paramref name="shadingPoint"/>
+    /// (PBRT uniform-cone), so only the physically-illuminating front of the light contributes. The
+    /// caller keeps the same <c>cos/d²</c> geometry factor, so far-field brightness is unchanged and only
+    /// the near-contact penumbra tightens. Radius-0 (point) lights return the centre in both modes.
+    /// </summary>
+    public Vector3 SamplePoint(Vector3 shadingPoint, ref uint rng, bool solidAngle)
     {
         if (Radius <= 0f)
             return Position;
+
+        if (solidAngle)
+        {
+            Vector3 toCenter = Position - shadingPoint;
+            float dc2 = Vector3.Dot(toCenter, toCenter);
+            if (dc2 > Radius * Radius) // shading point outside the sphere → cone-sample the visible cap
+                return SampleVisibleCap(shadingPoint, toCenter, MathF.Sqrt(dc2), ref rng);
+            // Inside/on the sphere: no well-defined cap — fall through to whole-sphere sampling.
+        }
 
         rng = rng * 747796405u + 2891336453u;
         float z = 2f * (rng / 4294967296f) - 1f;
@@ -103,6 +124,35 @@ public class Light
         float phi = 2f * MathF.PI * (rng / 4294967296f);
         float s = MathF.Sqrt(MathF.Max(0f, 1f - z * z));
         return Position + Radius * new Vector3(s * MathF.Cos(phi), s * MathF.Sin(phi), z);
+    }
+
+    // PBRT uniform-cone sampling of the cone the sphere subtends from the shading point (§10): draws a
+    // direction within the cone (half-angle sinθ_max = Radius/dc) and intersects it with the sphere's near
+    // face, so the returned point always lies on the visible cap.
+    private Vector3 SampleVisibleCap(Vector3 shadingPoint, Vector3 toCenter, float dc, ref uint rng)
+    {
+        float sinMaxSq = Radius * Radius / (dc * dc);
+        float cosMax = MathF.Sqrt(MathF.Max(0f, 1f - sinMaxSq));
+
+        rng = rng * 747796405u + 2891336453u;
+        float u1 = rng / 4294967296f;
+        rng = rng * 747796405u + 2891336453u;
+        float u2 = rng / 4294967296f;
+
+        float cosT = 1f - u1 * (1f - cosMax);
+        float sinT = MathF.Sqrt(MathF.Max(0f, 1f - cosT * cosT));
+        float phi = 2f * MathF.PI * u2;
+
+        Vector3 w = toCenter / dc; // unit direction shading point → centre
+        Vector3 t = MathF.Abs(w.X) > 0.1f
+            ? Vector3.Normalize(new Vector3(w.Y, -w.X, 0f))
+            : Vector3.Normalize(new Vector3(0f, w.Z, -w.Y));
+        Vector3 b = Vector3.Cross(w, t);
+        Vector3 dir = sinT * MathF.Cos(phi) * t + sinT * MathF.Sin(phi) * b + cosT * w;
+
+        // Near intersection of the ray (shadingPoint + s·dir) with the sphere (real: sinT ≤ sinθ_max).
+        float ds = dc * cosT - MathF.Sqrt(MathF.Max(0f, Radius * Radius - dc * dc * sinT * sinT));
+        return shadingPoint + ds * dir;
     }
 
     // A direction sampled within a cone of half-angle Radius (radians) around a unit axis, for a soft

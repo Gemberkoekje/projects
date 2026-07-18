@@ -151,6 +151,30 @@ public sealed class CausticsTests
     }
 
     [TestMethod]
+    public void PhysicalEnergy_RespondsToLightDistanceAndIntensity()
+    {
+        // §8: with PhysicalEnergy on, a photon's power scales with the light's intensity and the solid
+        // angle the caster subtends, so a closer or brighter light deposits more caustic energy — the
+        // physical response the historical flat 1/N power (paid over only by Strength) never had.
+        var sphere = new Sphere(new Vector3(0f, 2f, 0f), 1f, GlassMat(cauchyB: 0f));
+        var bvh = new BVH([Floor(), sphere]);
+        Light[] near = [new Light { Position = new Vector3(0f, 4f, 0f), Color = Vector3.One }];
+        Light[] far = [new Light { Position = new Vector3(0f, 8f, 0f), Color = Vector3.One }];
+
+        PhotonMap flat = PhotonTracer.Emit(near, bvh, sphere.Bounds, Wl, 4000, 0.25f); // physicalEnergy off
+        PhotonMap physNear = PhotonTracer.Emit(near, bvh, sphere.Bounds, Wl, 4000, 0.25f, physicalEnergy: true, lightIntensity: 1.5f);
+        PhotonMap physFar = PhotonTracer.Emit(far, bvh, sphere.Bounds, Wl, 4000, 0.25f, physicalEnergy: true, lightIntensity: 1.5f);
+        PhotonMap physBright = PhotonTracer.Emit(near, bvh, sphere.Bounds, Wl, 4000, 0.25f, physicalEnergy: true, lightIntensity: 3.0f);
+
+        Assert.IsTrue(flat.TotalPower > 0f && physNear.TotalPower > 0f, "both should deposit energy");
+        Assert.IsTrue(physNear.TotalPower > physFar.TotalPower,
+            $"a closer light subtends a larger solid angle → more energy (near={physNear.TotalPower}, far={physFar.TotalPower})");
+        // Same position + seed ⇒ same photon paths, so doubling the intensity doubles the deposited power.
+        Assert.AreEqual(2f, physBright.TotalPower / physNear.TotalPower, 1e-3f,
+            "doubling the light intensity doubles the deposited caustic power");
+    }
+
+    [TestMethod]
     public void Emit_DispersiveGlass_ShiftsCausticByWavelength()
     {
         // An off-axis light through a strongly dispersive sphere: blue (higher index) bends more than
@@ -335,6 +359,55 @@ public sealed class CausticsTests
 
         Assert.IsTrue(matched > 0, "at least some probes should land on the caustic (non-zero estimate)");
         Assert.IsTrue(probed > 100, "swept a dense grid of probe points");
+    }
+
+    [TestMethod]
+    public void SpectralAlbedo_TintsPerWavelength_AndKeepsMapGridParity()
+    {
+        // §8: the spectral-albedo weight must be applied identically by the map's own gather and the
+        // GPU-shaped grid gather (the CPU/GPU contract), and a wavelength-selective receiver albedo must
+        // actually change the gathered colour versus the achromatic (null) gather.
+        var sphere = new Sphere(new Vector3(0f, 2f, 0f), 1f, GlassMat(cauchyB: 0.05f));
+        var bvh = new BVH([Floor(), sphere]);
+        Light[] lights = [new Light { Position = new Vector3(1f, 6f, 0f), Color = Vector3.One }];
+
+        const float radius = 0.25f;
+        PhotonMap map = PhotonTracer.Emit(lights, bvh, sphere.Bounds, Wl, photonsPerLight: 6000, gatherRadius: radius);
+        Assert.IsTrue(map.Count > 100, $"need a populated caustic ({map.Count} photons)");
+        CausticGrid grid = map.BuildGrid();
+
+        // A red receiver: reflects long wavelengths, absorbs short ones.
+        System.Func<int, float> redAlbedo = wl => wl >= 560 ? 0.9f : 0.1f;
+
+        bool sawTint = false;
+        for (float x = -4f; x <= 4f; x += 0.5f)
+        {
+            for (float z = -4f; z <= 4f; z += 0.5f)
+            {
+                var p = new Vector3(x, 0f, z);
+                Vector3 mapTint = map.EstimateXyz(p, Vector3.UnitY, radius, Wl, redAlbedo);
+                Vector3 gridTint = CausticReference.EstimateXyz(grid, p, Vector3.UnitY, radius, Wl, redAlbedo);
+                Assert.AreEqual(mapTint.X, gridTint.X, 1e-4f, $"X parity at {p}");
+                Assert.AreEqual(mapTint.Y, gridTint.Y, 1e-4f, $"Y parity at {p}");
+                Assert.AreEqual(mapTint.Z, gridTint.Z, 1e-4f, $"Z parity at {p}");
+
+                Vector3 plain = map.EstimateXyz(p, Vector3.UnitY, radius, Wl);
+                if (plain.Length() > 1e-4f)
+                {
+                    // The red albedo suppresses more than it keeps, so the tinted estimate is dimmer,
+                    // and the surviving energy skews toward X (red) relative to Z (blue).
+                    Assert.IsTrue(mapTint.Length() < plain.Length() + 1e-6f, $"tint cannot brighten at {p}");
+                    if (mapTint.Length() > 1e-4f && plain.Z > 1e-5f)
+                    {
+                        float plainXZ = plain.X / plain.Z;
+                        float tintXZ = mapTint.X / MathF.Max(mapTint.Z, 1e-6f);
+                        if (tintXZ > plainXZ + 1e-3f) sawTint = true;
+                    }
+                }
+            }
+        }
+
+        Assert.IsTrue(sawTint, "a wavelength-selective albedo must shift the caustic's colour balance");
     }
 
     [TestMethod]

@@ -47,7 +47,32 @@ public readonly record struct VolumetricOptions(
     /// MaxMarchDistance exactly as before, so indoor scenes stay bit-exact. Used outdoors (with a longer
     /// MaxMarchDistance) to hide the camera-relative march cutoff — the "fog sphere" — in the open garden.
     /// </summary>
-    float FarFadeStart = 0f)
+    float FarFadeStart = 0f,
+    /// <summary>
+    /// Realism finding §9. When <c>true</c>, in-scatter is evaluated per hero wavelength (the light's
+    /// blackbody emission spectrum × the CIE response) instead of the historical path that adds the
+    /// light's authored RGB colour straight into XYZ accumulation. Makes warm torchlight in fog read
+    /// warm rather than as grey haze. Default <c>false</c> reproduces the RGB behaviour.
+    /// </summary>
+    bool FogSpectralLighting = false,
+    /// <summary>
+    /// Realism finding §9. Single-scattering albedo of the medium in [0,1]: the fraction of the
+    /// extinction that scatters (the rest is absorbed). <c>1</c> (default) is the historical
+    /// non-absorbing smoke; lower values let thick smoke darken what is behind it.
+    /// </summary>
+    float SingleScatterAlbedo = 1f,
+    /// <summary>
+    /// Realism finding §9. When <c>true</c>, the Henyey–Greenstein phase is evaluated per light rather
+    /// than only toward <c>lights[0]</c> while summing every light's contribution. Default <c>false</c>
+    /// reproduces the historical single-light phase.
+    /// </summary>
+    bool PhaseAllLights = false,
+    /// <summary>
+    /// Realism finding §9. When <c>true</c>, indirect-bounce NEE shadow rays also integrate the fog
+    /// optical depth (as the primary-hit shadow rays already do), so smoke correctly dims bounce
+    /// lighting. Default <c>false</c> reproduces the historical fog-free indirect shadow rays.
+    /// </summary>
+    bool IndirectFogShadows = false)
 {
     public static VolumetricOptions FromQuality(VolumetricQuality quality, SmokeMode smokeMode)
     {
@@ -82,6 +107,8 @@ public readonly record struct VolumetricOptions(
                 InscatterStrength: 0.18f,
                 ShadowStepInterval: 4,
                 ShadowTransmittance: true,
+                FogSpectralLighting: true, // §9: warm torchlight reads warm in the smoke
+                IndirectFogShadows: true,  // §9: fog dims bounce lighting too
                 Quality: quality),
             VolumetricQuality.Ultra => new VolumetricOptions(
                 EnableVolumetrics: smokeMode != SmokeMode.None,
@@ -94,6 +121,9 @@ public readonly record struct VolumetricOptions(
                 InscatterStrength: 0.20f,
                 ShadowStepInterval: 1,
                 ShadowTransmittance: true,
+                FogSpectralLighting: true, // §9: warm torchlight reads warm in the smoke
+                IndirectFogShadows: true,  // §9: fog dims bounce lighting too
+                PhaseAllLights: true,      // §9: anisotropic scattering per light (Ultra has AnisotropyG)
                 Quality: quality),
             _ => new VolumetricOptions(
                 EnableVolumetrics: smokeMode != SmokeMode.None,
