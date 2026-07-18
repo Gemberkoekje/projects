@@ -25,9 +25,9 @@ public enum LensModel
 /// does not opt in is bit-for-bit unchanged — the aperture path draws no random numbers when the
 /// aperture radius is zero, which keeps the wavelength/RNG stream (and therefore every golden) identical.
 ///
-/// <para><b>Units.</b> The world is metres (a maze cell is <see cref="MazeGeometryBuilder.CellSize"/> = 2 m
-/// wide, walls 2 m tall), so lens dimensions given in millimetres convert with a factor of 1/1000. This is
-/// what makes the depth of field come out at real photographic magnitudes rather than an arbitrary blur.</para>
+/// <para><b>Units.</b> The world is metres (1 world unit = 1 m), so lens dimensions given in millimetres
+/// convert with a factor of 1/1000. This is what makes the depth of field come out at real photographic
+/// magnitudes rather than an arbitrary blur.</para>
 ///
 /// <para><b>Framing.</b> <see cref="FocalLengthMm"/> = 0 means "keep the <see cref="Camera.Fov"/> the scene
 /// asked for and derive the implied focal length from it" (see <see cref="EffectiveFocalLengthMm"/>). So

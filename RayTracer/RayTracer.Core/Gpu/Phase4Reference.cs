@@ -193,7 +193,7 @@ public static class Phase4Reference
     /// <c>JobSystem.GetDensityBiome</c>).</summary>
     public static float GetDensityBiome(Vector3 p, float time = 0f)
     {
-        float biomeWorldSize = MazeGeometryBuilder.CellSize * BiomeSizeCells;
+        float biomeWorldSize = SceneScale.WorldUnitsPerCell * BiomeSizeCells;
 
         // Centred on biome centres + narrow-band edge blend (mirrors the HLSL /
         // JobSystem): a biome's interior is pure, no half-biome bleed.
