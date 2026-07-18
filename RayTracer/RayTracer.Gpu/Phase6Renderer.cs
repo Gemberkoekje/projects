@@ -184,8 +184,19 @@ internal sealed class Phase6Renderer : IDisposable
     // Decal shading (plan §3): RGB→reflectance basis + the prop atlas. Both are static
     // across maze regenerations (basis is wavelength-derived, atlas is fixed art), so
     // RebuildScene leaves them alone; only device teardown recreates them.
-    // DecalAtlasSize must match PropTextures.Size and the shader's DECAL_SIZE.
+    // DecalAtlasSize must match the host decal-atlas layer size and the shader's DECAL_SIZE.
     private const int DecalAtlasSize = 128;
+    // Layers the decal SRV is sized for; the host atlas (DecalAtlasProvider) must match.
+    private const int DecalLayerCount = 5;
+
+    /// <summary>
+    /// Host hook that supplies the decal atlas pixels (linear RGBA float4 per texel, in
+    /// <c>[layer*S*S + y*S + x]</c> order) for the given layer size. The decal art is host
+    /// content, so the backend never references it directly — the maze app sets this to its
+    /// prop-atlas builder (pinball-plan §7.2). Left unset, <see cref="CreateDecalResources"/>
+    /// binds a neutral zero atlas of the same dimensions, so a scene with no decals is unaffected.
+    /// </summary>
+    public static Func<int, float[]>? DecalAtlasProvider { get; set; }
     private ID3D12Resource _rgbBasisBuffer = null!;
     private ID3D12Resource _decalBuffer = null!;
     // Overhead map (plan §7): maze wall bitmap + dims, set by SetMinimap; rebuilt per maze.
@@ -998,9 +1009,13 @@ internal sealed class Phase6Renderer : IDisposable
         }
         _rgbBasisBuffer = CreateUploadBuffer<float>(basisF4, basisF4.Length * sizeof(float));
 
-        // Prop atlas: linear RGBA (float4 per texel), already in [layer*S*S + y*S + x] order.
-        PropTextures props = PropTextures.Build(DecalAtlasSize);
-        _decalBuffer = CreateUploadBuffer<float>(props.Pixels, props.Pixels.Length * sizeof(float));
+        // Prop atlas: linear RGBA (float4 per texel), in [layer*S*S + y*S + x] order. The art is
+        // host content — the maze app supplies it via DecalAtlasProvider (pinball-plan §7.2), which
+        // keeps the backend free of maze content. A scene with no decals leaves the provider unset
+        // and binds a neutral zero atlas of the same dimensions so the SRV stays valid.
+        float[] decalPixels = DecalAtlasProvider?.Invoke(DecalAtlasSize)
+            ?? new float[DecalLayerCount * DecalAtlasSize * DecalAtlasSize * 4];
+        _decalBuffer = CreateUploadBuffer<float>(decalPixels, decalPixels.Length * sizeof(float));
 
         // Overhead-map grid: a 1-element placeholder until SetMinimap uploads a real maze
         // (the SRV must be bound every frame even when the map is off).
@@ -1629,8 +1644,9 @@ internal sealed class Phase6Renderer : IDisposable
         float varianceNorm = Phase5Reference.VarianceViewNorm(_lastStats.AverageVariance);
 
         // Player's minimap grid cell (odd/odd = cell interior in the 2N+1 wall bitmap).
-        int cellX = (int)MathF.Floor(_camera.Position.X / MazeGeometryBuilder.CellSize);
-        int cellY = (int)MathF.Floor(_camera.Position.Z / MazeGeometryBuilder.CellSize);
+        // World scale is the engine constant, not maze content (pinball-plan §7.1/§7.2).
+        int cellX = (int)MathF.Floor(_camera.Position.X / SceneScale.WorldUnitsPerCell);
+        int cellY = (int)MathF.Floor(_camera.Position.Z / SceneScale.WorldUnitsPerCell);
         uint playerGx = (uint)Math.Clamp(2 * cellX + 1, 0, (int)_mazeGw - 1);
         uint playerGy = (uint)Math.Clamp(2 * cellY + 1, 0, (int)_mazeGh - 1);
 

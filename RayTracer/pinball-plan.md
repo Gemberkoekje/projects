@@ -1082,6 +1082,25 @@ reparameterize** — `--phase6-selftest` 700/700, `--phase6-regress` 19/19
 bit-exact, maze goldens unmoved; the maze runs from `RayTracer.Maze` on the
 extracted backend.
 
+*Status (extraction pass).* **Done:** the three `RayTracer.Core` leaks are broken
+(engine-owned `SceneScale.WorldUnitsPerCell` for world scale; generic
+`ICameraDriver` seam implemented by `CameraController`; `LensOptions` doc
+de-mazed) and the **`RayTracer.Gpu` → backend-library + new `RayTracer.Maze`
+app** split is complete: the maze/screensaver app, all `Maze*`/`ClassicMode`/
+`PropTextures`/`Phase*Scene`/`ConfigForm`/`RegressionHarness` and the 19 goldens
+now live in `RayTracer.Maze` (Exe), `RayTracer.Gpu` is a maze-free `Library`
+(6 renderers + `GpuRayTracer` + `ShaderCompiler` + `MovieProgressForm` + shaders),
+`Phase6Renderer`'s last maze refs are severed (world scale → `SceneScale`; the prop
+decal atlas is now injected by the host via `Phase6Renderer.DecalAtlasProvider`),
+and `InternalsVisibleTo("RayTracer.Maze")` keeps the move byte-for-byte. **Not yet
+done (needs a build box, not the 3070):** the pure-logic maze files
+(`Maze`/`MazeGeometryBuilder`/`MazeNavigator`/`MazeMinimap`/`CameraController`)
+still sit in `RayTracer.Core` because ~18 `RayTracer.Tests` files use them as
+fixtures — relocating them forces a `RayTracer.Tests` re-architecture (it would
+pull the whole WinForms/Vortice app into the CI unit-test build, or needs a new
+net10.0 maze-logic lib), a decision left for the build box. **3070-only:** run
+`--phase6-selftest`/`--phase6-regress` to confirm 700/700 and 19/19 bit-exact.
+
 **P0 — Static table render (no gameplay).**
 Goal: prove the Space Cadet playfield renders and converges as a static spectral
 scene. Deliverable (two of these are weighty sub-milestones, not one bullet): **(i)

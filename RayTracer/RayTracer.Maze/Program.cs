@@ -34,6 +34,12 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // The backend is maze-free (pinball-plan §7.2): hand it this app's prop-atlas
+        // builder so Phase6Renderer's decal SRV gets the same art it used to build
+        // internally. Set before any renderer is constructed; the value is deterministic,
+        // so every golden stays bit-identical.
+        Phase6Renderer.DecalAtlasProvider = static size => PropTextures.Build(size).Pixels;
+
         bool selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
         bool phase1SelfTest = args.Contains("--phase1-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase2SelfTest = args.Contains("--phase2-selftest", StringComparer.OrdinalIgnoreCase);

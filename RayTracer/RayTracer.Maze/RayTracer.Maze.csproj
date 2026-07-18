@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The maze / screensaver application, extracted from RayTracer.Gpu (pinball-plan
+       §7). It consumes the reusable RayTracer.Gpu DXR backend on the exact seam the
+       pinball app will use. Settings mirror the former RayTracer.Gpu executable so the
+       moved code compiles unchanged. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>RayTracer.Gpu</RootNamespace>
+    <AssemblyName>RayTracer.Maze</AssemblyName>
+  </PropertyGroup>
+
+  <!-- The golden regression images under Regression/golden are read from source by
+       RegressionHarness (it walks up to RayTracer.Maze.csproj), not from the build
+       output, so they need no explicit item — default globbing includes them as None. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
+    <ProjectReference Include="..\RayTracer.Gpu\RayTracer.Gpu.csproj" />
+  </ItemGroup>
+
+</Project>

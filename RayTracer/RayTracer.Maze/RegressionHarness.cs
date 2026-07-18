@@ -25,7 +25,7 @@ namespace RayTracer.Gpu;
 ///
 /// <para><c>--phase6-regress</c> compares (fails on any regression or missing golden);
 /// <c>--phase6-regress --update</c> (re-)writes the goldens. Goldens live under
-/// <c>RayTracer.Gpu/Regression/golden</c> by default (override with <c>--dir</c>).
+/// <c>RayTracer.Maze/Regression/golden</c> by default (override with <c>--dir</c>).
 /// It needs a DXR 1.1 GPU, so like the phase self-tests it is a dev-box tool, not CI.</para>
 /// </summary>
 internal static class RegressionHarness
@@ -218,7 +218,7 @@ internal static class RegressionHarness
     private static string DefaultGoldenDir()
     {
         DirectoryInfo? dir = new(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "RayTracer.Gpu.csproj")))
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "RayTracer.Maze.csproj")))
             dir = dir.Parent;
         string root = dir?.FullName ?? AppContext.BaseDirectory;
         return Path.Combine(root, "Regression", "golden");
