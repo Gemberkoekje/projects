@@ -6,9 +6,9 @@ namespace RayTracer;
 /// <see cref="Camera"/> in place each frame and flags <see cref="Dirty"/> whenever the pose
 /// changed so the caller can reset accumulation / TAA history.
 ///
-/// <para>The maze's wall-following walker (<see cref="CameraController"/>, which relocates to
-/// <c>RayTracer.Maze</c> when the assembly split lands) is one implementation; pinball's
-/// fixed / nudge camera is another. Both feed the same accumulate-when-still convergence loop,
+/// <para>The maze's wall-following walker (<c>CameraController</c>, in the extracted
+/// <c>RayTracer.Maze.Core</c> library) is one implementation; pinball's fixed / nudge camera is
+/// another. Both feed the same accumulate-when-still convergence loop,
 /// so the driver contract is exactly "update the camera, tell me if it moved" — nothing about
 /// mazes, cells or headings leaks across it.</para>
 /// </summary>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pure-logic maze content (grid, wall-follower, geometry/minimap builders, the maze
+       camera walker), extracted out of RayTracer.Core so the engine is genuinely maze-free
+       (pinball-plan §7.1). It stays a plain net10.0 library — no WinForms, no GPU — so the
+       net10.0 test project keeps referencing it directly and the engine's own tests can use
+       the maze geometry as fixtures. Mirrors the Pinball.Core / Pinball.App split. Settings
+       match RayTracer.Core so the moved files compile byte-identically. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Maze unit tests + the engine tests that use maze geometry as fixtures. -->
+    <InternalsVisibleTo Include="RayTracer.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
+  </ItemGroup>
+
+</Project>

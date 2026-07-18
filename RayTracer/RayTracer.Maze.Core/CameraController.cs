@@ -8,8 +8,8 @@ namespace RayTracer;
 /// smooth cell-to-cell movement and smooth turns.
 ///
 /// <para>This is the maze's implementation of the engine's <see cref="ICameraDriver"/>
-/// seam (pinball-plan §7.1, Milestone E); it relocates to <c>RayTracer.Maze</c> when the
-/// assembly split lands, while the seam itself stays in the engine.</para>
+/// seam (pinball-plan §7.1, Milestone E); it lives in the extracted <c>RayTracer.Maze.Core</c>
+/// library, while the seam itself stays in the engine.</para>
 /// </summary>
 public class CameraController : ICameraDriver
 {
