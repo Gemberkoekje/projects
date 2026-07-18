@@ -188,6 +188,10 @@ internal sealed class Phase6Renderer : IDisposable
     private const int DecalAtlasSize = 128;
     // Layers the decal SRV is sized for; the host atlas (DecalAtlasProvider) must match.
     private const int DecalLayerCount = 5;
+    // Atlas layer holding the animated rat billboard sprite (plan §8). The rat billboard is
+    // a backend feature (_showRat/_ratPos), so its layer index is part of the renderer's decal
+    // layout contract; it must match the host atlas (the maze app packs the rat at layer 4).
+    private const uint RatDecalLayer = 4;
 
     /// <summary>
     /// Host hook that supplies the decal atlas pixels (linear RGBA float4 per texel, in
@@ -1594,7 +1598,7 @@ internal sealed class Phase6Renderer : IDisposable
             RatPosZ = _ratPos.Z,
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
-            RatLayer = (uint)DecalLayer.Rat,
+            RatLayer = RatDecalLayer,
             VolShadowTransmittance = _volumetrics.ShadowTransmittance ? 1u : 0u,
             CausticEnabled = _causticEnabled ? 1u : 0u,
             // §B4 full-GPU: the grid origin/dims now live in the GridParams buffer (built on the GPU),
@@ -1689,7 +1693,7 @@ internal sealed class Phase6Renderer : IDisposable
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
             ClassicDepthCue = _classicDepthCue,
-            RatLayer = (uint)DecalLayer.Rat,
+            RatLayer = RatDecalLayer,
             FadeLevel = _fadeLevel,
             ClockEnabled = _clockEnabled && _showOverheadMap ? 1u : 0u, // §O8: shown under the minimap
             ClockHour = (uint)Math.Clamp(_clockHour, 0, 23),
