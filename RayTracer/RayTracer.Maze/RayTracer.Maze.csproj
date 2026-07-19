@@ -20,6 +20,18 @@
        RegressionHarness (it walks up to RayTracer.Maze.csproj), not from the build
        output, so they need no explicit item — default globbing includes them as None. -->
 
+  <!-- The DXR backend (RayTracer.Gpu) loads its HLSL at runtime from
+       AppContext.BaseDirectory/Shaders/. The shader sources live in RayTracer.Gpu; link them
+       into THIS executable's output explicitly so they are guaranteed present next to the .exe,
+       rather than relying on transitive content-copy from a referenced library (which build+test
+       CI never exercises, since it does not run the app). -->
+  <ItemGroup>
+    <Content Include="..\RayTracer.Gpu\Shaders\**\*.hlsl"
+             Link="Shaders\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
     <ProjectReference Include="..\RayTracer.Maze.Core\RayTracer.Maze.Core.csproj" />

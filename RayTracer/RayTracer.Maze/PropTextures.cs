@@ -5,14 +5,15 @@ using System.Drawing.Text;
 
 namespace RayTracer.Gpu;
 
-/// <summary>Atlas layer indices for the classic props (plan §3–§5).</summary>
+/// <summary>Atlas layer indices for the classic <b>scene</b> decals (plan §3–§5). The animated
+/// rat billboard is a backend feature and lives at <see cref="Phase6Renderer.RatDecalLayer"/>
+/// (above these), so it is intentionally not a member here — the backend owns that layer index.</summary>
 internal enum DecalLayer
 {
     OpenGlLogo = 0,
     SignExit = 1,
     SignArrow = 2,
     SignSmiley = 3,
-    Rat = 4,
 }
 
 /// <summary>
@@ -37,13 +38,15 @@ internal sealed class PropTextures
 
     public static PropTextures Build(int size = 128)
     {
-        const int layers = 5;
+        // Build against the backend's decal-atlas contract so the layer count and the rat's layer
+        // index can never silently drift from what Phase6Renderer's SRV/shader expect (§7.2).
+        const int layers = Phase6Renderer.DecalLayerCount;
         var pixels = new float[layers * size * size * 4];
         DrawLayer(pixels, size, (int)DecalLayer.OpenGlLogo, g => DrawOpenGlLogo(g, size));
         DrawLayer(pixels, size, (int)DecalLayer.SignExit, g => DrawTextSign(g, size, "EXIT", Color.FromArgb(20, 120, 40), Color.White));
         DrawLayer(pixels, size, (int)DecalLayer.SignArrow, g => DrawArrowSign(g, size));
         DrawLayer(pixels, size, (int)DecalLayer.SignSmiley, g => DrawSmiley(g, size));
-        DrawLayer(pixels, size, (int)DecalLayer.Rat, g => DrawRat(g, size));
+        DrawLayer(pixels, size, (int)Phase6Renderer.RatDecalLayer, g => DrawRat(g, size));
         return new PropTextures(size, layers, pixels);
     }
 

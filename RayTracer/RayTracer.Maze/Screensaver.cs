@@ -258,7 +258,7 @@ internal static class Screensaver
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty,
             bumpyWalls: s.BumpyWalls, showOverheadMap: s.ShowOverheadMap, showRat: s.ShowRat,
             classicDepthCue: classic && s.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: classic && s.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1);
+            pixelSize: classic && s.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1, decalAtlas: MazeDecals.Atlas);
         renderer.SetLens(s.ResolveLens()); // §4: /c's lens choice reaches /s and /p
         return renderer;
     }

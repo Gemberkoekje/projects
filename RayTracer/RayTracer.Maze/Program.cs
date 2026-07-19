@@ -34,12 +34,6 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        // The backend is maze-free (pinball-plan §7.2): hand it this app's prop-atlas
-        // builder so Phase6Renderer's decal SRV gets the same art it used to build
-        // internally. Set before any renderer is constructed; the value is deterministic,
-        // so every golden stays bit-identical.
-        Phase6Renderer.DecalAtlasProvider = static size => PropTextures.Build(size).Pixels;
-
         bool selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
         bool phase1SelfTest = args.Contains("--phase1-selftest", StringComparer.OrdinalIgnoreCase);
         bool phase2SelfTest = args.Contains("--phase2-selftest", StringComparer.OrdinalIgnoreCase);
@@ -961,7 +955,7 @@ internal static class Program
             biomeIndicator: biomeIndicator, debugMode: debugMode, bumpyWalls: bumpyWalls,
             showOverheadMap: showOverheadMap, showRat: showRat,
             classicDepthCue: classic && classicDepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: classic ? pixelSize : 1, realism: realism);
+            pixelSize: classic ? pixelSize : 1, realism: realism, decalAtlas: MazeDecals.Atlas);
         if (lens is not null) renderer.SetLens(lens.Value); // §4: the config screen's camera-lens choice
 
         bool running = true;
@@ -1303,7 +1297,7 @@ internal static class Program
             volumetrics, lightingMode: lighting, sampleClamp: sampleClamp,
             biomeIndicator: false, debugMode: debugMode, bumpyWalls: bumpyWalls,
             showOverheadMap: showOverheadMap, showRat: showRat,
-            classicDepthCue: classic ? depthCue : 0f, pixelSize: pixelate);
+            classicDepthCue: classic ? depthCue : 0f, pixelSize: pixelate, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         if (showOverheadMap) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
         if (reveal >= 0f) renderer.SetRevealHeight(reveal); // §9.3 frozen build-in still
@@ -1392,7 +1386,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: true, motionSampleCap: motionCap);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: true, motionSampleCap: motionCap, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         renderer.SetRatPosition(ratPos);
@@ -1521,7 +1515,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -1627,7 +1621,7 @@ internal static class Program
             // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
             // a long converge). No-op at the demos' default frame counts (all < 2048).
             maxSampleCount: (uint)Math.Max(1, frames),
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -1716,7 +1710,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         renderer.BuildCausticsGpu(JewelCausticJobs(built, jewels, photons), gatherRadius, strength); // §B4 full GPU
@@ -1834,7 +1828,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -1916,7 +1910,7 @@ internal static class Program
             // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
             // a long converge). No-op at the demos' default frame counts (all < 2048).
             maxSampleCount: (uint)Math.Max(1, frames),
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2033,7 +2027,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: showRat);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showRat: showRat, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         if (caustics)
@@ -2142,7 +2136,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2254,7 +2248,7 @@ internal static class Program
             // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
             // a long converge). No-op at the demos' default frame counts (all < 2048).
             maxSampleCount: (uint)Math.Max(1, frames),
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2337,7 +2331,7 @@ internal static class Program
             // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
             // a long converge). No-op at the demos' default frame counts (all < 2048).
             maxSampleCount: (uint)Math.Max(1, frames),
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2416,7 +2410,7 @@ internal static class Program
             // Uncap accumulation so `--frames N` does N real samples (the default 2048 cap otherwise limits
             // a long converge). No-op at the demos' default frame counts (all < 2048).
             maxSampleCount: (uint)Math.Max(1, frames),
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2509,7 +2503,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
 
@@ -2614,7 +2608,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2686,7 +2680,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
@@ -2756,7 +2750,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, packed, spectral, packedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         // §O2: with the sun, turn on the procedural sky so the open top of the box reads as daylight sky
@@ -2822,7 +2816,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
-            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showOverheadMap: cycle);
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, showOverheadMap: cycle, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
         if (built.SunDirection is Vector3 sunDir)
@@ -3198,7 +3192,7 @@ internal static class Program
             showOverheadMap: settings.ShowOverheadMap, showRat: settings.ShowRat,
             classicDepthCue: classic && settings.ClassicDepthCue ? ClassicMode.DepthCueStrength : 0f,
             pixelSize: classic && settings.RetroPixelation ? ClassicMode.RetroBlockFor(height) : 1,
-            realism: realism);
+            realism: realism, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
@@ -3960,7 +3954,7 @@ internal static class Program
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: 0f,
-            maxSampleCount: 1, subPixelJitter: false, debugMode: Phase5DebugMode.Beauty);
+            maxSampleCount: 1, subPixelJitter: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
@@ -4076,7 +4070,7 @@ internal static class Program
             Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.Biome),
             lightingMode: LightingMode.NEE, sampleClamp: 0f,
-            maxSampleCount: 1, subPixelJitter: false, debugMode: Phase5DebugMode.Beauty);
+            maxSampleCount: 1, subPixelJitter: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 

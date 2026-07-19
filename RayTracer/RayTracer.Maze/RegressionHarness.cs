@@ -77,7 +77,7 @@ internal static class RegressionHarness
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: 3f,
-            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty);
+            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetFogTime(0f); // fixed fog phase → reproducible
         Console.WriteLine($"  adapter   : {renderer.AdapterName}");
@@ -138,7 +138,7 @@ internal static class RegressionHarness
             maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty,
             bumpyWalls: v.Bumpy, showOverheadMap: v.Map, showRat: v.Rat,
             classicDepthCue: v.DepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: v.PixelSize);
+            pixelSize: v.PixelSize, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(cam);
         if (v.Map) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
