@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- Reusable DXR 1.1 backend library (pinball-plan §7.2). The maze/screensaver
+         app was lifted out to RayTracer.Maze, which is now the executable. -->
+    <OutputType>Library</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,6 +13,12 @@
     <RootNamespace>RayTracer.Gpu</RootNamespace>
     <AssemblyName>RayTracer.Gpu</AssemblyName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The extracted maze app rides the same internal backend surface it did when
+         it lived here — a pure move (pinball-plan §7.2). -->
+    <InternalsVisibleTo Include="RayTracer.Maze" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="Shaders\RayQuery.hlsl">

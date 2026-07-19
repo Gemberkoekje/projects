@@ -12,6 +12,12 @@
     <!-- Exposes internal TraceCore to the test project so the GPU Phase 2 shading
          replica can be pinned to the actual CPU renderer output. -->
     <InternalsVisibleTo Include="RayTracer.Tests" />
+    <!-- The extracted maze app (pinball-plan §7) rides the same internal engine
+         surface it did when it lived in RayTracer.Gpu — a pure move, no re-scoping. -->
+    <InternalsVisibleTo Include="RayTracer.Maze" />
+    <!-- The extracted maze-logic library rides the same internal engine surface it
+         did when the maze files lived in RayTracer.Core — a pure move (§7.1). -->
+    <InternalsVisibleTo Include="RayTracer.Maze.Core" />
   </ItemGroup>
 
   <ItemGroup>

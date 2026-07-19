@@ -184,8 +184,26 @@ internal sealed class Phase6Renderer : IDisposable
     // Decal shading (plan §3): RGB→reflectance basis + the prop atlas. Both are static
     // across maze regenerations (basis is wavelength-derived, atlas is fixed art), so
     // RebuildScene leaves them alone; only device teardown recreates them.
-    // DecalAtlasSize must match PropTextures.Size and the shader's DECAL_SIZE.
+    // DecalAtlasSize must match the host decal-atlas layer size and the shader's DECAL_SIZE.
     private const int DecalAtlasSize = 128;
+    // The host↔backend decal-atlas contract: the host builds its atlas against these constants
+    // (see PropTextures in RayTracer.Maze), so the layer count / rat layer can't silently drift.
+    // DecalLayerCount = the scene decal layers plus the rat billboard.
+    internal const int DecalLayerCount = 5;
+    // Atlas layer holding the animated rat billboard sprite (plan §8). The rat billboard is a
+    // backend feature (_showRat/_ratPos), so its layer index is backend-owned; the host atlas must
+    // place the rat here. Exposed (not private) so PropTextures builds the rat at this exact layer.
+    internal const uint RatDecalLayer = 4;
+
+    // Host-supplied decal atlas builder (linear RGBA float4 per texel, [layer*S*S + y*S + x] order)
+    // for a given layer size, passed at construction. The art is host content, so the backend never
+    // references it directly (pinball-plan §7.2). A scene with no decals passes EmptyDecalAtlas.
+    private readonly Func<int, float[]> _decalAtlas;
+
+    /// <summary>A neutral all-zero decal atlas of the correct dimensions — the value a scene with
+    /// no props or rat billboard passes for the required <c>decalAtlas</c> constructor argument.</summary>
+    public static float[] EmptyDecalAtlas(int size) => new float[DecalLayerCount * size * size * 4];
+
     private ID3D12Resource _rgbBasisBuffer = null!;
     private ID3D12Resource _decalBuffer = null!;
     // Overhead map (plan §7): maze wall bitmap + dims, set by SetMinimap; rebuilt per maze.
@@ -254,6 +272,9 @@ internal sealed class Phase6Renderer : IDisposable
         int width, int height,
         PackedScene scene, SpectralResources spectral, PackedLights lights, Camera camera,
         VolumetricOptions volumetrics,
+        // Required: the host's decal atlas builder (pinball-plan §7.2). Pass the app's prop-atlas
+        // builder, or Phase6Renderer.EmptyDecalAtlas for a scene with no decals.
+        Func<int, float[]> decalAtlas,
         LightingMode lightingMode = LightingMode.NEE, float sampleClamp = 0f,
         uint maxSampleCount = 2048, bool subPixelJitter = true,
         uint motionSampleCap = 12, float temporalBlendAlpha = 0.1f,
@@ -272,6 +293,8 @@ internal sealed class Phase6Renderer : IDisposable
         _sampleClamp = sampleClamp;
         _camera = camera;
         _volumetrics = volumetrics;
+        ArgumentNullException.ThrowIfNull(decalAtlas);
+        _decalAtlas = decalAtlas;
         // A nullable default keeps every existing call site on the historical behaviour: null → the
         // record's proper defaults (ViewDependentAlbedo, BubbleReflectBoost 45, …), never the zero-init
         // `default(RealismOptions)` which would wrongly disable them (see RealismOptions.Historical).
@@ -998,9 +1021,20 @@ internal sealed class Phase6Renderer : IDisposable
         }
         _rgbBasisBuffer = CreateUploadBuffer<float>(basisF4, basisF4.Length * sizeof(float));
 
-        // Prop atlas: linear RGBA (float4 per texel), already in [layer*S*S + y*S + x] order.
-        PropTextures props = PropTextures.Build(DecalAtlasSize);
-        _decalBuffer = CreateUploadBuffer<float>(props.Pixels, props.Pixels.Length * sizeof(float));
+        // Prop atlas: linear RGBA (float4 per texel), in [layer*S*S + y*S + x] order. The art is
+        // host content supplied via the decalAtlas ctor hook (pinball-plan §7.2), so the backend
+        // never references maze art. Validated against the layout the SRV and shader assume —
+        // exactly DecalLayerCount layers of DecalAtlasSize² RGBA texels — so a bad provider fails
+        // loudly here rather than corrupting the buffer / reading out of bounds on the GPU.
+        float[] decalPixels = _decalAtlas(DecalAtlasSize);
+        int expectedDecalFloats = DecalLayerCount * DecalAtlasSize * DecalAtlasSize * 4;
+        if (decalPixels is null || decalPixels.Length != expectedDecalFloats)
+        {
+            throw new InvalidOperationException(
+                $"decalAtlas must return {expectedDecalFloats} floats ({DecalLayerCount} layers × " +
+                $"{DecalAtlasSize}² RGBA); got {(decalPixels is null ? "null" : decalPixels.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))}.");
+        }
+        _decalBuffer = CreateUploadBuffer<float>(decalPixels, decalPixels.Length * sizeof(float));
 
         // Overhead-map grid: a 1-element placeholder until SetMinimap uploads a real maze
         // (the SRV must be bound every frame even when the map is off).
@@ -1579,7 +1613,7 @@ internal sealed class Phase6Renderer : IDisposable
             RatPosZ = _ratPos.Z,
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
-            RatLayer = (uint)DecalLayer.Rat,
+            RatLayer = RatDecalLayer,
             VolShadowTransmittance = _volumetrics.ShadowTransmittance ? 1u : 0u,
             CausticEnabled = _causticEnabled ? 1u : 0u,
             // §B4 full-GPU: the grid origin/dims now live in the GridParams buffer (built on the GPU),
@@ -1629,8 +1663,9 @@ internal sealed class Phase6Renderer : IDisposable
         float varianceNorm = Phase5Reference.VarianceViewNorm(_lastStats.AverageVariance);
 
         // Player's minimap grid cell (odd/odd = cell interior in the 2N+1 wall bitmap).
-        int cellX = (int)MathF.Floor(_camera.Position.X / MazeGeometryBuilder.CellSize);
-        int cellY = (int)MathF.Floor(_camera.Position.Z / MazeGeometryBuilder.CellSize);
+        // World scale is the engine constant, not maze content (pinball-plan §7.1/§7.2).
+        int cellX = (int)MathF.Floor(_camera.Position.X / SceneScale.WorldUnitsPerCell);
+        int cellY = (int)MathF.Floor(_camera.Position.Z / SceneScale.WorldUnitsPerCell);
         uint playerGx = (uint)Math.Clamp(2 * cellX + 1, 0, (int)_mazeGw - 1);
         uint playerGy = (uint)Math.Clamp(2 * cellY + 1, 0, (int)_mazeGh - 1);
 
@@ -1673,7 +1708,7 @@ internal sealed class Phase6Renderer : IDisposable
             RatSize = 0.7f,
             ShowRat = _showRat ? 1u : 0u,
             ClassicDepthCue = _classicDepthCue,
-            RatLayer = (uint)DecalLayer.Rat,
+            RatLayer = RatDecalLayer,
             FadeLevel = _fadeLevel,
             ClockEnabled = _clockEnabled && _showOverheadMap ? 1u : 0u, // §O8: shown under the minimap
             ClockHour = (uint)Math.Clamp(_clockHour, 0, 23),

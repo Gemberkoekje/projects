@@ -25,7 +25,7 @@ namespace RayTracer.Gpu;
 ///
 /// <para><c>--phase6-regress</c> compares (fails on any regression or missing golden);
 /// <c>--phase6-regress --update</c> (re-)writes the goldens. Goldens live under
-/// <c>RayTracer.Gpu/Regression/golden</c> by default (override with <c>--dir</c>).
+/// <c>RayTracer.Maze/Regression/golden</c> by default (override with <c>--dir</c>).
 /// It needs a DXR 1.1 GPU, so like the phase self-tests it is a dev-box tool, not CI.</para>
 /// </summary>
 internal static class RegressionHarness
@@ -77,7 +77,7 @@ internal static class RegressionHarness
         using var renderer = new Phase6Renderer(
             Width, Height, built.Packed, built.Spectral, built.PackedLights, built.Camera,
             volumetrics, lightingMode: LightingMode.NEE, sampleClamp: 3f,
-            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty);
+            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetFogTime(0f); // fixed fog phase → reproducible
         Console.WriteLine($"  adapter   : {renderer.AdapterName}");
@@ -138,7 +138,7 @@ internal static class RegressionHarness
             maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty,
             bumpyWalls: v.Bumpy, showOverheadMap: v.Map, showRat: v.Rat,
             classicDepthCue: v.DepthCue ? ClassicMode.DepthCueStrength : 0f,
-            pixelSize: v.PixelSize);
+            pixelSize: v.PixelSize, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(cam);
         if (v.Map) { var (g, gw, gh) = MazeMinimap.Build(built.Maze); renderer.SetMinimap(g, gw, gh); }
@@ -218,7 +218,7 @@ internal static class RegressionHarness
     private static string DefaultGoldenDir()
     {
         DirectoryInfo? dir = new(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "RayTracer.Gpu.csproj")))
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "RayTracer.Maze.csproj")))
             dir = dir.Parent;
         string root = dir?.FullName ?? AppContext.BaseDirectory;
         return Path.Combine(root, "Regression", "golden");

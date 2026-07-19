@@ -170,7 +170,7 @@ public partial class JobSystem
     private static float GetDensityBiome(Vector3 p)
     {
         const int biomeSizeCells = 4;
-        float biomeWorldSize = MazeGeometryBuilder.CellSize * biomeSizeCells;
+        float biomeWorldSize = SceneScale.WorldUnitsPerCell * biomeSizeCells;
 
         // Centre the interpolation on biome centres (shift by half a cell) so a
         // biome's interior samples purely itself; the previous origin-aligned blend

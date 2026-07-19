@@ -6,8 +6,12 @@ namespace RayTracer;
 /// Drives a first-person <see cref="Camera"/> through a maze using a
 /// <see cref="MazeNavigator"/>. Holds still between moves and handles
 /// smooth cell-to-cell movement and smooth turns.
+///
+/// <para>This is the maze's implementation of the engine's <see cref="ICameraDriver"/>
+/// seam (pinball-plan §7.1, Milestone E); it lives in the extracted <c>RayTracer.Maze.Core</c>
+/// library, while the seam itself stays in the engine.</para>
 /// </summary>
-public class CameraController
+public class CameraController : ICameraDriver
 {
     private readonly MazeNavigator _nav;
     private readonly float _cellSize;
