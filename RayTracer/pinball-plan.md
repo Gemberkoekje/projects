@@ -1163,6 +1163,46 @@ CCD, §6.1.5), analytic colliders, flippers/bumpers/kickers/spinners
 responders, nudge/tilt, decoupled from the converge loop. Verify: unit tests for
 determinism (fixed seed + input replay → identical trace) and for each responder;
 a playable ball on the P0 table via the P4 pose interface.
+> **P5a — deterministic physics kernel — DONE** (the §6.1.9 critical path). New `Pinball.Core`
+> (net10.0, refs `RayTracer.Core`) + `Pinball.Tests`, both in the solution. `Physics/*`:
+> `Vector3D`/`QuaternionD` (double), `PhysicsConstants` (measured SI) + `PhysicsMaterial`
+> presets (steel/playfield/rubber), 6-DOF `BallState`, colliders `Plane`/`Sphere`/`Capsule`
+> (closed-form closest-feature; `Cylinder`/`Quad`/`Arc`/`Mesh` deferred to P5b table authoring),
+> `Forces` (true-3-D gravity + drag + Magnus), the restitution+Coulomb-friction impulse
+> `ContactSolver` (torque-free normal; 2m/7 tangential; grip↔slide emerges), and `PhysicsWorld`
+> — symplectic Euler at fixed 1&#160;ms, swept-sphere CCD via conservative advancement, speculative
+> resting contacts + Baumgarte, restitution velocity-threshold (resting stability), seeded
+> `DeterministicRandom`. **All eight §6.1.8 closed-form tests pass** (frictionless incline g·sinα·t;
+> energy conservation; rolling 5/7·g·sinα + skid-to-roll 5/7·v₀; Magnus lateral curve; drag terminal
+> ≈70 m/s + negligible at play speed; restitution apex decay e²; CCD no-tunnel at 10 & 20 m/s;
+> bit-identical determinism), 16/16 in `Pinball.Tests`; no regression (RayTracer.Tests 335/335).
+> Broadphase is a linear scan (table is tiny); reusing the float `BVH` via `OverlapSweep` is the
+> documented later optimisation.
+> **P5b — actuators / responders — DONE.** `Cylinder` + `Quad` colliders (posts/bumper bodies; wall
+> panels/slingshot faces), an `IActuator` (advanced once per substep) + `IActiveImpulse` seam, and the
+> full responder set with a closed-form test each: **Flipper** (kinematic torque-limited rotating capsule;
+> surface velocity `u=ω×r` transfers push + spin — the skill mechanic emerges), **Plunger** (Hooke spring
+> launch, ≈ideal `pull·√(k/M)`), **bumper/slingshot** (`ActiveZone` — outward coil impulse above a trigger,
+> passive below; the one place energy is added), **Nudge** (`Δv=J/m`) + **TiltSensor** (leaky-integrator
+> trip). 26/26 in `Pinball.Tests`; no regression (RayTracer.Tests 335/335). Nudge frame-shift is a
+> host-side refinement on the ball impulse.
+> **P5c — colliders / table / playable ball — DONE.** `MeshCollider` (triangle-soup — ramps/plastics,
+> Ericson closest-point) + `ArcCollider` (swept circular arc — curved lane guides). `Table/PinballTable`:
+> the P0 collider set (playfield, perimeter walls, slingshot posts, both flippers) co-registered with the
+> render `PinballTableScene` — positions are its render coordinates × `RenderScale` (= ball 0.36 u → 27 mm)
+> so render and physics are one scale factor apart and cannot drift; the 6.5° incline is carried as tilted
+> gravity on a flat playfield (`PhysicsSettings.GravityOverride`) to match the flat P0 render (identical 3-D
+> dynamics, not a 2-D slope). **The capstone — a playable ball on the P0 table — is proven** by
+> deterministic CPU integration tests: a centre ball rolls down the incline, stays contained (no tunnelling,
+> no NaN) and drains; a flip knocks a descending ball back up-table; the whole sim is bit-reproducible. A
+> minimal `Game/GameState` (balls / score / drain / tilt / game-over lifecycle) rounds out `Game/*`. 35/35 in
+> `Pinball.Tests`; no regression (RayTracer.Tests 335/335). The event-driven scoring (which target/bumper was
+> hit → mission/rank/replay) and the actual GPU render handoff (feeding ball centre + flipper angles through
+> `UpdateSpheres`/`SetDynamicPose` in a live window) are the P6 `Pinball.App` game host.
+
+**P5 — Physics core — DONE** (P5a kernel + P5b responders + P5c table & playable ball; 35/35 closed-form/
+integration tests). Next: **P6** (`Pinball.App` — WinForms game host, fixed-timestep loop, input, and the
+physics→render handoff that makes the ball and flippers actually render on the P0 table).
 
 **P6 — Game host, input, loop (`Pinball.App`).**
 Goal: playable end-to-end. Deliverable: WinForms game window + fixed-timestep loop

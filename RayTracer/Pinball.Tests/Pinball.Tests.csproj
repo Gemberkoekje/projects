@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pinball.Tests (pinball-plan §7.3): physics determinism + closed-form validation (§6.1.8) and,
+       later, scoring / mission-state tests. Plain net10.0 (no GPU, no WinForms) so it runs in hosted CI. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Pinball.Core/Pinball.Core.csproj" />
+    <ProjectReference Include="../RayTracer.Core/RayTracer.csproj" />
+  </ItemGroup>
+
+</Project>

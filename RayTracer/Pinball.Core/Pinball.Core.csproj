@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pinball.Core (pinball-plan §7.3): pure, testable gameplay — Physics/* (§6.1, a deterministic 3-D
+       rigid-body simulation), and later Game/* + Table/* — with no rendering and no WinForms. A plain
+       net10.0 library depending only on RayTracer.Core (so it can reuse BVH/Tracable/AABB), mirroring the
+       RayTracer.Maze.Core / RayTracer.Maze split so the net10.0 Pinball.Tests references it directly.
+       Deterministic, double-precision, seeded — validated by closed-form unit tests (§6.1.8). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Physics determinism + closed-form validation tests. -->
+    <InternalsVisibleTo Include="Pinball.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
+  </ItemGroup>
+
+</Project>
