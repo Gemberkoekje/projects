@@ -156,8 +156,10 @@ internal sealed record PinballTableScene(
         AddRotBox(s, new Vector3(-1.6f, 0.35f, 13.6f), new Vector3(0.4f, 0.32f, 0.03f), 1.5f, chromeRail);
         AddRotBox(s, new Vector3(1.6f, 0.35f, 13.6f), new Vector3(0.4f, 0.32f, 0.03f), -1.5f, chromeRail);
 
-        // The chrome ball, resting in the shooter lane's feed (near the right inlane).
-        s.Add(new Sphere(new Vector3(-2.1f, 0.34f, 5.6f), 0.34f, chrome));
+        // The chrome ball, resting in the shooter lane's feed (near the right inlane). Tagged Dynamic
+        // (pinball-plan §4.1): even standing still in P0/P1 it takes the cheap mover tier — a 1-bounce
+        // mirror of the converged static table + a hard contact shadow — and soft-caps at MotionSampleCap.
+        s.Add(new Sphere(new Vector3(-2.1f, 0.36f, 5.6f), 0.36f, chrome) { Dynamic = true });
 
         // ── Lighting: dim overhead keys + warm backbox + insert cast-lights (the emissive parts supply
         // the glow and the ball's reflection; these give clean coloured illumination on the playfield). ─

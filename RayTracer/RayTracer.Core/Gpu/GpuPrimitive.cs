@@ -77,4 +77,11 @@ public struct GpuPrimitive
     /// wavelength-dependent IOR is <c>Ior + CauchyB / λ_µm²</c> (§2.1); for a thin-film
     /// surface it is the film thickness in nanometres (§2.2). 0 = non-dispersive / no film.</summary>
     public float CauchyB;
+
+    /// <summary>1 = a moving part (flipper / plunger face) → cheap mover shading tier (pinball-plan §4.1);
+    /// 0 = static. Orthogonal to <see cref="Surface"/>.</summary>
+    public uint Dynamic;
+    /// <summary>Padding to a 16-byte multiple (112 bytes); reserved for future per-primitive mover
+    /// fields. Must stay in sync with the HLSL <c>PrimitiveInfo</c>.</summary>
+    public float Pad0, Pad1, Pad2;
 }

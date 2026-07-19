@@ -40,6 +40,10 @@ public class TracableRectangle((Vector3 l1, Vector3 l2, Vector3 l3) Location, Ma
     /// <inheritdoc/>
     public float PatternP3 => 0f;
 
+    /// <summary>Whether this quad is a moving part (flipper / plunger face — pinball-plan §4.1). Satisfies
+    /// both <see cref="Tracable.Dynamic"/> and <see cref="IQuadPrimitive.Dynamic"/>. Default <c>false</c>.</summary>
+    public bool Dynamic { get; init; }
+
     /// <inheritdoc/>
     public override HitInfo? Intersect(Ray ray)
     {

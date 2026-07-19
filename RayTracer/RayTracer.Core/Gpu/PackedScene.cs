@@ -139,6 +139,7 @@ public static class GpuScenePacker
                 Surface = (uint)quad.PrimaryMaterial.Surface,
                 Ior = quad.PrimaryMaterial.CauchyA,
                 CauchyB = cauchyB,
+                Dynamic = quad.Dynamic ? 1u : 0u,
             };
         }
 
@@ -156,6 +157,7 @@ public static class GpuScenePacker
                 Ior = s.Material.CauchyA,
                 CauchyB = sCauchyB,
                 P0 = sp0, P1 = sp1, P2 = sp2,
+                Dynamic = s.Dynamic ? 1u : 0u,
             });
         }
 

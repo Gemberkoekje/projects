@@ -236,6 +236,10 @@ public partial class JobSystem
     /// mirrors or nested glass (spectral-effects-plan.md §1.1–§1.2).
     /// </summary>
     private const int MaxSpecularBounces = 8;
+    /// <summary>Specular-chain depth cap for a moving part (pinball-plan §4.1/§4.4): the chrome ball takes
+    /// a single reflection into the converged static scene, no deep specular recursion. Static hits keep
+    /// <see cref="MaxSpecularBounces"/>, so the no-mover path is unchanged.</summary>
+    private const int MoverSpecularBounces = 1;
 
     /// <summary>
     /// Follows a specular ray through zero or more mirror/dielectric interactions and
@@ -277,7 +281,7 @@ public partial class JobSystem
         public MediumStack Pop() => Depth > 0 ? new(Depth - 1, _i0, _i1, _i2, _i3, _s0, _s1, _s2, _s3) : this;
     }
 
-    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack)
+    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces)
     {
         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
         var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction, emission) = _bvh.FindClosest(ray);
@@ -289,9 +293,9 @@ public partial class JobSystem
                 : Vector3.Zero;
 
         Vector3 radiance;
-        if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
+        if (Optics.IsSpecular(surface) && depth < maxBounces)
         {
-            radiance = SpecularRadiance(surface, reflectance, ior, extinction, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass, mediumSigma, stack);
+            radiance = SpecularRadiance(surface, reflectance, ior, extinction, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass, mediumSigma, stack, maxBounces);
         }
         else
         {
@@ -323,13 +327,13 @@ public partial class JobSystem
     private Vector3 SpecularRadiance(
         SurfaceKind surface, float reflectance, float ior, float hitExtinction,
         Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir,
-        float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack)
+        float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces)
     {
         if (surface == SurfaceKind.Mirror)
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack);
+            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces);
         }
 
         if (surface == SurfaceKind.Bubble)
@@ -350,10 +354,10 @@ public partial class JobSystem
             {
                 Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
                 Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-                return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack);
+                return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces);
             }
             Vector3 throughOrigin = hitPoint + incidentDir * 1e-3f; // straight through the thin shell
-            return TraceSpecularRadiance(throughOrigin, incidentDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack);
+            return TraceSpecularRadiance(throughOrigin, incidentDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces);
         }
 
         // Dielectric glass: reflect vs. refract by Russian roulette on Fresnel. §13: the from/to IOR come
@@ -384,7 +388,7 @@ public partial class JobSystem
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             // Reflection stays in the current medium → its absorption (and the stack) are unchanged.
-            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack);
+            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces);
         }
 
         Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
@@ -405,7 +409,7 @@ public partial class JobSystem
             newMediumSigma = newInGlass ? hitExtinction : 0f;
         }
 
-        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, newInGlass, newMediumSigma, newStack);
+        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, newInGlass, newMediumSigma, newStack, maxBounces);
     }
 
     /// <summary>
@@ -657,6 +661,9 @@ public partial class JobSystem
             Intensity = 1f
         };
         var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor, heroExtinction, heroEmission) = _bvh.FindClosest(ray);
+        // pinball-plan §4.1: a primary hit on a moving part takes the cheap mover tier — a capped specular
+        // chain, or a diffuse hit with no spectral indirect / caustics. Default false → static path unchanged.
+        bool dyn = hit && hitPrimitive is not null && hitPrimitive.Dynamic;
         Vector3 xyz = Vector3.Zero;
         // §O2/§O3: a ray that escapes all geometry (through an open roof) sees the sky, not black.
         // Emissive, so it takes no lighting/fog; the hit branches below overwrite xyz when the ray did hit.
@@ -682,7 +689,8 @@ public partial class JobSystem
             // by the shared volumetric step below.
             xyz = SpecularRadiance(
                 heroSurface, reflectance, heroIor, heroExtinction, hitPoint, hitNormal, dir,
-                heroWavelength, ref specularRng, 0, inGlass: false, mediumSigma: 0f, stack: default);
+                heroWavelength, ref specularRng, 0, inGlass: false, mediumSigma: 0f, stack: default,
+                maxBounces: dyn ? MoverSpecularBounces : MaxSpecularBounces);
 
             // The specular radiance behaves like a direct view of the reflected/refracted
             // surface; book it as bounce-0/direct for the debug decomposition.
@@ -834,6 +842,11 @@ public partial class JobSystem
                 Vector3 localBounce1 = Vector3.Zero;
                 Vector3 localBounce2plus = Vector3.Zero;
 
+                // Cheap mover tier (§4.1): a moving diffuse part takes direct + ambient only — skip the
+                // spectral one-bounce indirect, the sky-dome bounce and (below) the caustic gather. The
+                // static path (!dyn) runs the full integrator, so no-mover output is byte-identical.
+                if (!dyn)
+                {
                 uint rng = pixelHash + (uint)(sampleIdx * 747796405u) + 2891336453u;
                 rng = rng * 747796405u + 2891336453u;
                 float r1 = (rng >> 16) / 65536f;
@@ -990,6 +1003,13 @@ public partial class JobSystem
                 {
                     diffuseCacheState[ix] = 0;
                 }
+                } // end if(!dyn)
+                else
+                {
+                    // Mover: book the direct term as bounce-0; no indirect contribution.
+                    bounce0 = localBounce0;
+                    diffuseCacheState[ix] = 0;
+                }
             }
             else
             {
@@ -1054,7 +1074,7 @@ public partial class JobSystem
             // added before the volumetric step, so fog attenuates it, and before the deterministic
             // correction, so it is normalised spectrally like the direct term. Skipped on specular
             // hero hits (caustics land on diffuse surfaces) and whenever the map is absent.
-            if (_causticMap is not null && !Optics.IsSpecular(heroSurface))
+            if (_causticMap is not null && !Optics.IsSpecular(heroSurface) && !dyn) // movers skip the caustic gather (§4.1)
             {
                 // §8 SpectralAlbedo: when on, weight each photon by the receiver's reflectance at its OWN
                 // wavelength inside the gather (a red floor tints the caustic red per bundle) rather than

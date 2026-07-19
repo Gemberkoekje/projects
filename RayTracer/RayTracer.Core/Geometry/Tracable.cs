@@ -20,6 +20,14 @@ public interface Tracable
     SurfaceKind Surface => SurfaceKind.Diffuse;
 
     /// <summary>
+    /// Whether this primitive is a moving part (the ball, a flipper, the plunger — pinball-plan §4.1).
+    /// A primary hit on a <c>Dynamic</c> primitive takes the cheap mover shading tier (capped specular /
+    /// direct-only, no caustics or spectral indirect) and its pixel is soft-capped as a mover. Default
+    /// <c>false</c> (static geometry), so a scene with no movers renders bit-identically to before.
+    /// </summary>
+    bool Dynamic => false;
+
+    /// <summary>
     /// Intersects <paramref name="ray"/> with this primitive, returning the hit
     /// (geometry, shading, and optical channels) or <c>null</c> if the ray misses.
     /// </summary>

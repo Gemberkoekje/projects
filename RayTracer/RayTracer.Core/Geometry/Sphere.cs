@@ -19,6 +19,10 @@ public sealed class Sphere(Vector3 center, float radius, MaterialData material) 
     /// <summary>Surface material (diffuse, dielectric, thin-film, …).</summary>
     public MaterialData Material { get; } = material;
 
+    /// <summary>Whether this sphere is a moving part (the chrome ball — pinball-plan §4.1). See
+    /// <see cref="Tracable.Dynamic"/>. Default <c>false</c>.</summary>
+    public bool Dynamic { get; init; }
+
     private readonly AABB _bounds = new(center - new Vector3(radius), center + new Vector3(radius));
 
     /// <inheritdoc/>

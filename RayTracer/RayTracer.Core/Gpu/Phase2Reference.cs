@@ -207,6 +207,9 @@ public static class Phase2Reference
 
         int deterCount = res.DeterministicCount;
         uint heroIdx = Phase1Reference.HeroIndex(pixelHash, sampleIdx, deterCount);
+        // pinball-plan §4.1: a primary hit on a moving part takes the cheap mover tier — a capped specular
+        // chain, or a diffuse hit with no spectral indirect. Default 0 → static path unchanged.
+        bool dyn = prim.Dynamic != 0u;
 
         // Specular surface — mirror (§1.1) or dielectric reflect/refract (§1.2).
         // Hero-wavelength sampling; accumulation builds the spectrum. A line-for-line
@@ -219,7 +222,8 @@ public static class Phase2Reference
             uint specularRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
             Vector3 specularXyz = SpecularRadiance(
                 tracer, prims, res, lights, lighting, (SurfaceKind)prim.Surface, specularRefl, IorAtHero(prim, res, heroIdx),
-                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false, mediumSigma: 0f);
+                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, primaryDir, heroIdx, ref specularRng, 0, inGlass: false, mediumSigma: 0f,
+                maxBounces: dyn ? MoverSpecularBounces : MaxSpecularBounces);
 
             float specularCorrection = res.DeterministicCorrection;
             correctedDirect = specularXyz * specularCorrection;
@@ -271,7 +275,9 @@ public static class Phase2Reference
             Vector3 directBaseXyz = Phase1Reference.DirectBaseXyz(prim, res, primaryDir, hitPoint, pixelHash, sampleIdx, chosenTemp);
             xyz = baseXyz * ambientTerm + directBaseXyz * directTerm;
 
-            // ── Indirect: one bounce + tertiary bounce ─────────────────
+            // ── Indirect: one bounce + tertiary bounce (skipped for a mover, §4.1) ──
+            if (!dyn)
+            {
             uint rng = pixelHash + sampleIdx * RngMul + RngAdd;
             rng = rng * RngMul + RngAdd;
             float r1 = (rng >> 16) / 65536f;
@@ -327,6 +333,12 @@ public static class Phase2Reference
                 indirect = localBounce1 + localBounce2Plus;
                 xyz += indirect;
             }
+            } // end if(!dyn)
+            else
+            {
+                // Mover: book the direct term as bounce-0; no indirect (mirrors TraceCore's mover branch).
+                bounce0 = directBaseXyz * directTerm;
+            }
         }
 
         // Emissive surface (pinball-plan §5.3): add its own emitted radiance at the hero wavelength,
@@ -352,6 +364,11 @@ public static class Phase2Reference
     /// <summary>Number of specular bounces followed through mirror/dielectric
     /// surfaces (mirrors <c>JobSystem.MaxSpecularBounces</c>).</summary>
     public const int MaxSpecularBounces = 8;
+
+    /// <summary>Specular-chain depth cap for a moving part (pinball-plan §4.1/§4.4), mirroring
+    /// <c>JobSystem.MoverSpecularBounces</c>: the chrome ball takes one reflection into the converged
+    /// static scene. Static hits keep <see cref="MaxSpecularBounces"/>, so the no-mover path is unchanged.</summary>
+    public const int MoverSpecularBounces = 1;
 
     /// <summary>
     /// The primitive's index of refraction at the hero wavelength — the GPU replica of
@@ -382,7 +399,7 @@ public static class Phase2Reference
     public static Vector3 TraceSpecularRadiance(
         ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
         ReadOnlySpan<Vector3> lights, LightingMode lighting,
-        Vector3 origin, Vector3 dir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma)
+        Vector3 origin, Vector3 dir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma, int maxBounces)
     {
         if (!tracer.ClosestHit(origin, dir, out int idx, out Vector3 hitPoint))
             return Vector3.Zero;
@@ -395,10 +412,10 @@ public static class Phase2Reference
 
         var surface = (SurfaceKind)prim.Surface;
         Vector3 radiance;
-        if (Optics.IsSpecular(surface) && depth < MaxSpecularBounces)
+        if (Optics.IsSpecular(surface) && depth < maxBounces)
         {
             radiance = SpecularRadiance(tracer, prims, res, lights, lighting, surface, refl, IorAtHero(prim, res, heroIdx),
-                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass, mediumSigma);
+                AbsorptionAtHero(prim, res, heroIdx), hitPoint, hitNormal, dir, heroIdx, ref rng, depth, inGlass, mediumSigma, maxBounces);
         }
         else
         {
@@ -427,14 +444,14 @@ public static class Phase2Reference
         ISceneTracer tracer, IReadOnlyList<GpuPrimitive> prims, SpectralResources res,
         ReadOnlySpan<Vector3> lights, LightingMode lighting,
         SurfaceKind surface, float reflectance, float ior, float hitExtinction,
-        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma)
+        Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir, uint heroIdx, ref uint rng, int depth, bool inGlass, float mediumSigma, int maxBounces)
     {
         if (surface == SurfaceKind.Mirror)
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             return reflectance * TraceSpecularRadiance(
-                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma);
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma, maxBounces);
         }
 
         // Dielectric glass: reflect vs. refract by Russian roulette on Fresnel.
@@ -451,14 +468,14 @@ public static class Phase2Reference
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             return TraceSpecularRadiance(
-                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma);
+                tracer, prims, res, lights, lighting, reflectOrigin, reflectDir, heroIdx, ref rng, depth + 1, inGlass, mediumSigma, maxBounces);
         }
 
         Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
         bool newInGlass = !inGlass;
         float newMediumSigma = newInGlass ? hitExtinction : 0f; // enter this glass's absorption, or exit to clear air (§2.3)
         return TraceSpecularRadiance(
-            tracer, prims, res, lights, lighting, refractOrigin, refractDir, heroIdx, ref rng, depth + 1, newInGlass, newMediumSigma);
+            tracer, prims, res, lights, lighting, refractOrigin, refractDir, heroIdx, ref rng, depth + 1, newInGlass, newMediumSigma, maxBounces);
     }
 
     /// <summary><c>reflectance × (ambient + direct)</c> at a diffuse surface reached

@@ -23,6 +23,10 @@
 #define GLASS_SHADOW_INTERFACE_THICKNESS 0.03
 #define BUBBLE_FIREFLY_CLAMP 1.5  // §2.6: per-sample luminance cap on a bubble (tames the reflect/transmit-split fireflies)
 #define MAX_SPECULAR_BOUNCES 8u  // JobSystem.MaxSpecularBounces
+#define MOVER_SPECULAR_BOUNCES 1u // §4.1/§4.4: a moving part's specular chain (the chrome ball reflects
+                                  // the static scene once). The iterative loop below counts the primary
+                                  // hit as depth 1, so the loop cap passed for a mover is this + 1 (the
+                                  // recursive CPU/reference form uses this value directly at the first bounce).
 
 // Volumetric constants (mirror Phase4Reference / JobSystem).
 #define ISOTROPIC_PHASE  0.07957747
@@ -49,6 +53,8 @@ struct PrimitiveInfo
     uint  Surface;        // SurfaceKind of the primary material (0 diffuse, 1 mirror, 2 dielectric)
     float Ior;            // index of refraction (constant / base Cauchy A) for dielectrics
     float CauchyB;        // Cauchy B dispersion coefficient (µm²); IOR = Ior + CauchyB / λ_µm²  (§2.1)
+    uint  Dynamic;        // 1 = moving part → cheap mover shading tier (§4.1); 0 = static
+    float Pad0; float Pad1; float Pad2; // 112-byte stride, matches GpuPrimitive
 };
 
 RaytracingAccelerationStructure Scene              : register(t0);
@@ -68,7 +74,7 @@ struct SphereInfo
 {
     float CX; float CY; float CZ; float Radius;
     uint  MatRow; uint Surface; float Ior; float CauchyB;
-    float P0; float P1; float P2; float Pad;
+    float P0; float P1; float P2; uint Dynamic; // Dynamic: 1 = the moving chrome ball (§4.1)
 };
 StructuredBuffer<SphereInfo> Spheres : register(t8);
 
@@ -586,6 +592,7 @@ PrimitiveInfo SphereToPrim(SphereInfo s, float3 hitPoint)
     p.Ior = s.Ior;
     p.CauchyB = s.CauchyB;
     p.P0 = s.P0; p.P1 = s.P1; p.P2 = s.P2;
+    p.Dynamic = s.Dynamic;
     return p;
 }
 
@@ -1532,7 +1539,7 @@ bool IntersectRat(float3 origin, float3 dir, float maxT, uint heroIdx, out float
 // recursion), tracing from the camera; the camera→primary segment (depth 1) is fogged by
 // FogOut/resolve, so it is skipped here to avoid double-counting.
 // Mirrors JobSystem.TraceSpecularRadiance.
-float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng)
+float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng, uint maxBounces)
 {
     float weight = 1.0;             // Π (transmittance × reflectance) so far
     float3 accum = float3(0.0, 0.0, 0.0);
@@ -1589,7 +1596,7 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
 
         float3 hitNormal = FaceNormal(prim, dir);
 
-        if (prim.Surface == SURFACE_MIRROR && depth < MAX_SPECULAR_BOUNCES)
+        if (prim.Surface == SURFACE_MIRROR && depth < maxBounces)
         {
             weight *= HeroReflectance(prim, dir, hitPoint, heroIdx);
             dir = reflect(dir, hitNormal);
@@ -1597,7 +1604,7 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             continue;
         }
 
-        if (prim.Surface == SURFACE_DIELECTRIC && depth < MAX_SPECULAR_BOUNCES)
+        if (prim.Surface == SURFACE_DIELECTRIC && depth < maxBounces)
         {
             // Dispersion (§2.1): the IOR varies with the hero wavelength (Cauchy n = A + B/λ²),
             // so each accumulated wavelength refracts by a different angle. The hero wavelength
@@ -1654,7 +1661,7 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             continue;
         }
 
-        if (prim.Surface == SURFACE_BUBBLE && depth < MAX_SPECULAR_BOUNCES)
+        if (prim.Surface == SURFACE_BUBBLE && depth < maxBounces)
         {
             // Thin-shell soap bubble (§2.6): the film is microns thin, so the background passes
             // nearly straight through (mostly see-through — real bubbles don't warp like a solid
@@ -1769,7 +1776,8 @@ float3 TraceCausticEstimate(float3 pos, float3 normal, PrimitiveInfo prim, float
 float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sampleIdx,
                    out bool primaryHit, out bool primaryRatHit, out bool primaryBubbleHit,
                    out float3 correctedDirect, out float3 correctedIndirect,
-                   out float3 primaryHitPoint, out float3 primaryNormal, out float primaryAlbedo)
+                   out float3 primaryHitPoint, out float3 primaryNormal, out float primaryAlbedo,
+                   out uint primaryDynamic)
 {
     correctedDirect = float3(0.0, 0.0, 0.0);
     correctedIndirect = float3(0.0, 0.0, 0.0);
@@ -1778,6 +1786,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     primaryAlbedo = 0.0;
     primaryRatHit = false;
     primaryBubbleHit = false;
+    primaryDynamic = 0u;
 
     uint heroIdx = ((pixelHash % DETERMINISTIC_COUNT) + (sampleIdx % DETERMINISTIC_COUNT)) % DETERMINISTIC_COUNT;
 
@@ -1817,6 +1826,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     // A moving bubble is tagged so its pixels self-reset (like the rat), so a live stream does not
     // need to force whole-frame motion mode — the static scene keeps converging around it.
     primaryBubbleHit = (prim.Surface == SURFACE_BUBBLE);
+    // pinball-plan §4.1: a primary hit on a moving part takes the cheap mover tier (capped specular /
+    // no spectral indirect / no caustics) and marks the pixel a mover for the MotionSampleCap soft-cap.
+    bool dyn = (prim.Dynamic != 0u);
+    primaryDynamic = dyn ? 1u : 0u;
 
     float3 hitNormal = FaceNormal(prim, primaryDir);
     primaryHitPoint = hitPoint;
@@ -1830,8 +1843,11 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         primaryAlbedo = HeroReflectance(prim, primaryDir, hitPoint, heroIdx);
 
         uint specRng = pixelHash + sampleIdx * 2654435761u + 1013904223u;
-        // Already CIE-weighted XYZ, with smoke integrated along the reflected segments.
-        float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng) * DeterministicCorrection;
+        // Already CIE-weighted XYZ, with smoke integrated along the reflected segments. A mover caps the
+        // chain to one reflection into the converged static scene (§4.4); the loop counts the primary hit
+        // as depth 1, so the cap is MOVER_SPECULAR_BOUNCES + 1.
+        uint specCap = dyn ? (MOVER_SPECULAR_BOUNCES + 1u) : MAX_SPECULAR_BOUNCES;
+        float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng, specCap) * DeterministicCorrection;
 
         // Soap-bubble firefly clamp (§2.6): the thin-shell reflect/transmit split is high-variance (a
         // rare boosted reflection over a mostly see-through background), so cap each sample's luminance
@@ -1896,6 +1912,10 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
 
         xyz = baseXyz * ambientTerm + directBaseXyz * directTerm;
 
+        // Cheap mover tier (§4.1): a moving diffuse part takes direct + ambient only — skip the spectral
+        // one-bounce indirect, the sky-dome bounce and (below) the caustic gather. Static (!dyn) unchanged.
+        if (!dyn)
+        {
         uint rng = pixelHash + sampleIdx * RNG_MUL + RNG_ADD;
         rng = rng * RNG_MUL + RNG_ADD;
         float r1 = (rng >> 16) / 65536.0;
@@ -1971,13 +1991,19 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             indirect = baseXyz * SkyDomeRadiance(sampleDir, DeterXYZ[heroIdx].w);
             xyz += indirect;
         }
+        } // end if(!dyn)
+        else
+        {
+            // Mover: book the direct term as bounce-0; no indirect (mirrors TraceCore's mover branch).
+            bounce0 = directBaseXyz * directTerm;
+        }
     }
 
     // Caustics (§B4): add the forward photon map's density estimate at this diffuse receiver — the
     // light→specular→diffuse paths NEE cannot connect. Scaled by the hero albedo/π and strength, added
     // raw (like `indirect`) so the shared correction below and the resolve's fog composite treat it
     // identically. Specular hits already returned above; CausticEnabled == 0 → early-out → byte-identical.
-    if (CausticEnabled != 0u)
+    if (CausticEnabled != 0u && !dyn) // movers skip the caustic gather (§4.1)
     {
         // §8: with spectral albedo the per-photon receiver reflectance is folded inside the gather,
         // so the composite multiplier drops the hero albedo (else it would be applied twice).
@@ -2213,8 +2239,9 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     bool hit, ratHit, bubbleHit;
     float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
     float gAlbedo;
+    uint gDynamic;
     float3 corrected = ShadeSample(rayOrigin, dir, pixelHash, sampleIdx, hit, ratHit, bubbleHit,
-                                   correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo);
+                                   correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo, gDynamic);
 
     // §4.1: the lens's natural falloff toward the corners. Exactly 1.0 when the lens does not vignette.
     if (LensVignetteStrength > 0.0)
@@ -2256,7 +2283,9 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // reflect/transmit estimate at ~MotionSampleCap samples, so a hero bubble never converged no matter how
     // long it baked. Treat frozen bubbles as static geometry so they accumulate the full sample budget;
     // during camera motion SoftResetFlag still caps every pixel (bubble included), so no specular ghosting.
-    bool isMover = ratHit;
+    // A moving part (the chrome ball / a flipper) soft-caps at MotionSampleCap like the rat, so the static
+    // scene keeps converging around it and its bounded temporal smear stays short (§4.1/§4.3).
+    bool isMover = ratHit || (gDynamic != 0u);
     bool restart = reset || (LastHit[ix] != hitMask);
     uint prevCount = restart ? 0u : SampleCount[ix];
     if ((SoftResetFlag != 0u || isMover) && !restart)

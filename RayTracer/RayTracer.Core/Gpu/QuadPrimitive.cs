@@ -74,4 +74,8 @@ public interface IQuadPrimitive
 
     /// <summary>Pattern parameter 3 — mortar fraction V (brick), unused otherwise.</summary>
     float PatternP3 { get; }
+
+    /// <summary>Whether this quad is a moving part (pinball-plan §4.1): a primary hit takes the cheap,
+    /// capped, non-spectral mover shading tier. Default <c>false</c> (static geometry).</summary>
+    bool Dynamic => false;
 }

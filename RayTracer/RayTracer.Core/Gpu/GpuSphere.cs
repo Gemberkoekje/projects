@@ -33,6 +33,7 @@ public struct GpuSphere
     public float P1;
     /// <summary>Optical param 2 (dielectric absorption σB) — mirrors <see cref="GpuPrimitive.P2"/>.</summary>
     public float P2;
-    /// <summary>Padding to a 16-byte multiple (48 bytes).</summary>
-    public float Pad;
+    /// <summary>1 = a moving part (the chrome ball) → cheap mover shading tier (pinball-plan §4.1); 0 =
+    /// static. Occupies the former padding slot, keeping the 48-byte (16-aligned) stride.</summary>
+    public uint Dynamic;
 }
