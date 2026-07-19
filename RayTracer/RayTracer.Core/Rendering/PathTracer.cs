@@ -280,7 +280,7 @@ public partial class JobSystem
     private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack)
     {
         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
-        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction, emission) = _bvh.FindClosest(ray);
         if (!hit)
             // §O2/§O3: an escaping reflection/refraction sees the sky (through an open roof), not black —
             // the recursion multiplies the specular throughput back in on unwind. Sky off → black (unchanged).
@@ -295,7 +295,10 @@ public partial class JobSystem
         }
         else
         {
-            float scalar = ShadeDiffuseScalar(reflectance, hitPoint, hitNormal, wavelength, ref rng);
+            // The terminal diffuse hit's radiance, plus any self-emission (a neon insert seen in the
+            // chrome ball / glass dome): emission rides the same hero-λ scalar, so cie*scalar carries the
+            // emitter's colour into the reflection as accumulation builds the spectrum. Non-emissive → +0.
+            float scalar = ShadeDiffuseScalar(reflectance, hitPoint, hitNormal, wavelength, ref rng) + emission;
             radiance = WavelengthLookup.TryGet((int)wavelength, out Vector3 cie) ? cie * scalar : Vector3.Zero;
         }
 
@@ -458,7 +461,7 @@ public partial class JobSystem
         Vector3 sampleDir = Vector3.Normalize(sx * tangent + sy * bitangent + sz * n);
 
         var secRay = new Ray { Origin = point + normal * 1e-3f, Direction = sampleDir, Wavelength = wavelength, Intensity = 1f };
-        var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _, _) = _bvh.FindClosest(secRay);
+        var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _, _, _) = _bvh.FindClosest(secRay);
         if (secHit && secPrimitive is not null)
         {
             float secDirect = 0f;
@@ -653,7 +656,7 @@ public partial class JobSystem
             Wavelength = heroWavelength,
             Intensity = 1f
         };
-        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor, heroExtinction) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, hitPrimitive, heroSurface, heroIor, heroExtinction, heroEmission) = _bvh.FindClosest(ray);
         Vector3 xyz = Vector3.Zero;
         // §O2/§O3: a ray that escapes all geometry (through an open roof) sees the sky, not black.
         // Emissive, so it takes no lighting/fog; the hit branches below overwrite xyz when the ray did hit.
@@ -856,7 +859,7 @@ public partial class JobSystem
                     Intensity = 1f
                 };
 
-                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _, _) = _bvh.FindClosest(secRay);
+                var (secReflectance, secHitPoint, secHitNormal, _, secHit, secPrimitive, _, _, _, _) = _bvh.FindClosest(secRay);
                 if (secHit && secPrimitive is not null)
                 {
                     // Finding §1: carry scalar hero-λ throughput through the bounce chain; the CIE triple
@@ -916,7 +919,7 @@ public partial class JobSystem
                             Intensity = 1f
                         };
 
-                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive, _, _, _) = _bvh.FindClosest(tertRay);
+                        var (tertReflectance, tertHitPoint, tertHitNormal, _, tertHit, tertPrimitive, _, _, _, _) = _bvh.FindClosest(tertRay);
                         if (tertHit && tertPrimitive is not null)
                         {
                             float tertReflHero = tertReflectance;
@@ -1001,6 +1004,17 @@ public partial class JobSystem
         else
         {
             diffuseCacheState[ix] = 0;
+        }
+
+        // Emissive surface (pinball-plan §5.3): add its own emitted radiance at the hero wavelength.
+        // Like the sky's spectral radiance, one hero sample per frame accumulates to the emitter's colour;
+        // it is booked into the emissive AOV and folded into the total before the volumetric/vignette/
+        // correction steps below (so fog attenuates the glow). Non-emissive materials emit 0, so every
+        // existing scene is byte-identical.
+        if (hit && heroEmission > 0f && WavelengthLookup.TryGet(heroWavelength, out var emitXyz))
+        {
+            emissiveLighting = emitXyz * heroEmission;
+            xyz += emissiveLighting;
         }
 
         if (hit != LastHit[ix])

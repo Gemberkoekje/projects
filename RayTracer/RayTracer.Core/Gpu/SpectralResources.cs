@@ -42,6 +42,15 @@ public sealed class SpectralResources
     public float[] MaterialReflectance { get; }
 
     /// <summary>
+    /// Self-emitted radiance per material per hero wavelength, row-major:
+    /// <c>MaterialEmission[material * DeterministicCount + index]</c> — the emissive twin of
+    /// <see cref="MaterialReflectance"/>, baked from <c>MaterialData.GetSpectralEmission</c>. All zero
+    /// for a scene with no <see cref="SurfaceKind.Emissive"/> material, so the no-emission path is
+    /// unchanged (pinball-plan §5.3).
+    /// </summary>
+    public float[] MaterialEmission { get; }
+
+    /// <summary>
     /// Normalisation factor so a perfect diffuse white integrates to luminance
     /// 1 (equals <c>WavelengthLookup.DeterministicCorrection</c>).
     /// </summary>
@@ -53,6 +62,7 @@ public sealed class SpectralResources
         int[] deterWavelengths,
         float[] deterXyz,
         float[] materialReflectance,
+        float[] materialEmission,
         float deterministicCorrection)
     {
         DeterministicCount = deterministicCount;
@@ -60,6 +70,7 @@ public sealed class SpectralResources
         DeterWavelengths = deterWavelengths;
         DeterXYZ = deterXyz;
         MaterialReflectance = materialReflectance;
+        MaterialEmission = materialEmission;
         DeterministicCorrection = deterministicCorrection;
     }
 }
@@ -94,12 +105,16 @@ public static class SpectralResourceBaker
         }
 
         var reflectance = new float[materials.Count * n];
+        var emission = new float[materials.Count * n];
         for (int m = 0; m < materials.Count; m++)
         {
             MaterialData material = materials[m];
             int rowBase = m * n;
             for (int i = 0; i < n; i++)
+            {
                 reflectance[rowBase + i] = material.GetSpectralReflectance(deterWavelengths[i]);
+                emission[rowBase + i] = material.GetSpectralEmission(deterWavelengths[i]);
+            }
         }
 
         return new SpectralResources(
@@ -108,6 +123,7 @@ public static class SpectralResourceBaker
             deterWavelengths,
             deterXyz,
             reflectance,
+            emission,
             wavelengths.DeterministicCorrection);
     }
 }

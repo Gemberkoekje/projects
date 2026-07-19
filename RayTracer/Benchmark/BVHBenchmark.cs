@@ -46,7 +46,7 @@ public class BVHBenchmarks
         for (int i = 0; i < Iterations; i++)
         {
             var ray = _rays[i];
-            var (_, _, _, _, hit, _, _, _, _) = _bvh.FindClosest(ray);
+            var (_, _, _, _, hit, _, _, _, _, _) = _bvh.FindClosest(ray);
             result += hit ? 1 : 0;
         }
 
@@ -66,7 +66,7 @@ public class BVHBenchmarks
 
             while (bounces <= MaxBounces)
             {
-                var (reflectance, hitPoint, hitNormal, roughness, hit, _, _, _, _) = _bvh.FindClosest(ray);
+                var (reflectance, hitPoint, hitNormal, roughness, hit, _, _, _, _, _) = _bvh.FindClosest(ray);
                 if (!hit)
                     break;
 

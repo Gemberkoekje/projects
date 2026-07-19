@@ -52,6 +52,7 @@ internal static class Program
         bool oilDemo = args.Contains("--oil-demo", StringComparer.OrdinalIgnoreCase);
         bool absorptionDemo = args.Contains("--absorption-demo", StringComparer.OrdinalIgnoreCase);
         bool sphereDemo = args.Contains("--sphere-demo", StringComparer.OrdinalIgnoreCase);
+        bool tableDemo = args.Contains("--table-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleDemo = args.Contains("--bubble-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
         bool causticDemo = args.Contains("--caustic-demo", StringComparer.OrdinalIgnoreCase);
@@ -77,7 +78,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest || movieSelfTest || movie
-            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || bubbleDemo || causticDemo || causticMaze
+            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || tableDemo || bubbleDemo || causticDemo || causticMaze
             || prismCaustic || bubbleCaustic || softShadowDemo || outdoorMaze
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
@@ -115,6 +116,8 @@ internal static class Program
                 return RunAbsorptionDemo(maxFrames, savePath ?? "absorption-demo.png", sampleClamp);
             if (sphereDemo)
                 return RunSphereDemo(maxFrames, savePath ?? "sphere-demo.png", sampleClamp);
+            if (tableDemo)
+                return RunTableDemo(maxFrames, savePath ?? "table-demo.png", sampleClamp);
             if (bubbleDemo)
                 return RunBubbleDemo(maxFrames, savePath ?? "bubble-demo.png", sampleClamp,
                     ParseFloatOption(args, "--thickness", 440f));
@@ -2251,6 +2254,40 @@ internal static class Program
             biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
         renderer.Initialize(windowHandle: 0);
         renderer.SetCamera(camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// Space Cadet RT — P0 static-table thin slice (pinball-plan §5.3 / §8 P0). Converges the
+    /// <see cref="PinballTableScene"/> (the single source-of-truth playfield) through the shipping Phase 6
+    /// path and writes a PNG. Shows the new <see cref="SurfaceKind.Emissive"/> neon inserts, a chrome ball
+    /// reflecting them, a dispersive glass gem, a mirror rail, and a thin-film bumper — no gameplay, no
+    /// movers. The scene is fixed and deterministic, so the capture reproduces run-to-run on the same GPU.
+    /// </summary>
+    private static int RunTableDemo(int frames, string savePath, float sampleClamp)
+    {
+        if (frames <= 0) frames = 600; // neon glow + chrome/glass are hero-λ → give it samples to converge
+        Console.WriteLine($"Space Cadet RT — static table (P0 thin slice, {frames} frames) -> {savePath}");
+
+        PinballTableScene table = PinballTableScene.Build(Width, Height);
+        Console.WriteLine($"  quads: {table.Packed.Primitives.Length}, spheres: {table.Packed.Spheres.Count}, lights: {table.PackedLights.Positions.Length}");
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, table.Packed, table.Spectral, table.PackedLights, table.Camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            maxSampleCount: (uint)Math.Max(1, frames),
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(table.Camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
         for (int f = 0; f < frames; f++)

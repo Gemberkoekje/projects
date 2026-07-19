@@ -21,6 +21,9 @@ namespace RayTracer;
 /// <param name="Transmission">Fraction of light transmitted (0 = opaque).</param>
 /// <param name="Ior">Index of refraction resolved at the ray's wavelength (1 = vacuum/air).</param>
 /// <param name="Extinction">Absorption coefficient σ for Beer–Lambert attenuation inside the medium (0 = none).</param>
+/// <param name="Emission">Self-emitted spectral radiance at the ray's wavelength (0 = non-emitting). Added
+/// at a hit so a <see cref="SurfaceKind.Emissive"/> surface glows and is carried into mirror/glass reflections
+/// (pinball-plan §5.3).</param>
 public readonly record struct HitInfo(
     float T,
     Vector3 Location,
@@ -31,7 +34,8 @@ public readonly record struct HitInfo(
     SurfaceKind Surface = SurfaceKind.Diffuse,
     float Transmission = 0f,
     float Ior = 1f,
-    float Extinction = 0f)
+    float Extinction = 0f,
+    float Emission = 0f)
 {
     /// <summary>
     /// Builds a <see cref="HitInfo"/> for a confirmed hit on
@@ -94,6 +98,7 @@ public readonly record struct HitInfo(
             material.Surface,
             material.Transmission,
             material.IorAt(wavelength),
-            material.ExtinctionAt(wavelength));
+            material.ExtinctionAt(wavelength),
+            material.GetSpectralEmission(wavelength));
     }
 }

@@ -220,6 +220,12 @@
       },
       "raytracer": {
         "type": "Project"
+      },
+      "raytracer.maze.core": {
+        "type": "Project",
+        "dependencies": {
+          "RayTracer": "[1.0.0, )"
+        }
       }
     },
     "net10.0/linux-x64": {

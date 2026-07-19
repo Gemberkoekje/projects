@@ -160,7 +160,7 @@ public static class PhotonTracer
         for (int depth = 0; depth < maxBounces; depth++)
         {
             var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
-            var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction) = bvh.FindClosest(ray);
+            var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction, _) = bvh.FindClosest(ray);
             if (!hit)
                 return; // escaped the scene
 

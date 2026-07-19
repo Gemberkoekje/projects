@@ -329,6 +329,20 @@ public static class Phase2Reference
             }
         }
 
+        // Emissive surface (pinball-plan §5.3): add its own emitted radiance at the hero wavelength,
+        // folded into the total before the deterministic correction so it scales like the reflectance
+        // terms — the exact mirror of TraceCore's primary-hit emission block. An emissive material is not
+        // specular, so it reaches here (the specular branch returned above); non-emitting → +0.
+        {
+            Phase1Reference.PatternShade(prim, primaryDir, hitPoint, out uint emRow, out _);
+            float emission = res.MaterialEmission[(int)emRow * deterCount + (int)heroIdx];
+            if (emission > 0f)
+            {
+                var emitCie = new Vector3(res.DeterXYZ[heroIdx * 4 + 0], res.DeterXYZ[heroIdx * 4 + 1], res.DeterXYZ[heroIdx * 4 + 2]);
+                xyz += emitCie * emission;
+            }
+        }
+
         float correction = res.DeterministicCorrection;
         correctedDirect = bounce0 * correction;
         correctedIndirect = indirect * correction;
@@ -389,8 +403,11 @@ public static class Phase2Reference
         else
         {
             // Terminal diffuse hit → CIE-weighted XYZ (the GPU port does not model smoke in
-            // reflections in this replica; the HLSL applies per-segment fog).
-            float scalar = MirrorDiffuseScalar(tracer, lights, lighting, refl, hitPoint, hitNormal, ref rng);
+            // reflections in this replica; the HLSL applies per-segment fog). Emission rides the same
+            // hero-λ scalar (a neon insert seen in the chrome ball / glass dome), matching the CPU
+            // TraceSpecularRadiance terminal; 0 for a non-emitting surface (pinball-plan §5.3).
+            float emission = res.MaterialEmission[(int)row * res.DeterministicCount + (int)heroIdx];
+            float scalar = MirrorDiffuseScalar(tracer, lights, lighting, refl, hitPoint, hitNormal, ref rng) + emission;
             var cie = new Vector3(res.DeterXYZ[heroIdx * 4 + 0], res.DeterXYZ[heroIdx * 4 + 1], res.DeterXYZ[heroIdx * 4 + 2]);
             radiance = cie * scalar;
         }

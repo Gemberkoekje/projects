@@ -15,6 +15,7 @@
 #define SURFACE_MIRROR       1u  // SurfaceKind.Mirror
 #define SURFACE_DIELECTRIC   2u  // SurfaceKind.Dielectric
 #define SURFACE_THINFILM     3u  // SurfaceKind.ThinFilm
+#define SURFACE_EMISSIVE     6u  // SurfaceKind.Emissive (§5.3): self-emitting; shaded diffuse + MaterialEmission
 #define SURFACE_BUBBLE       7u  // SurfaceKind.Bubble
 #define BUBBLE_REFLECT_BOOST 45.0 // §2.6: boosts a bubble's Fresnel so thin-film rings read across it
 // §A: effective glass path (world units) a shadow ray accrues per dielectric interface, so coloured
@@ -54,6 +55,7 @@ RaytracingAccelerationStructure Scene              : register(t0);
 StructuredBuffer<PrimitiveInfo>  Primitives        : register(t1);
 StructuredBuffer<float4>         DeterXYZ           : register(t2); // white-balanced CIE; xyz used, .w = nm
 StructuredBuffer<float>          MaterialReflectance: register(t3); // [material*50 + index]
+StructuredBuffer<float>          MaterialEmission   : register(t10);// [material*50 + index] (§5.3 emissive)
 StructuredBuffer<float4>         Lights             : register(t4); // xyz = world position, w = radius (§C1)
 StructuredBuffer<float4>         LightColors        : register(t5); // xyz = colour (inscatter)
 StructuredBuffer<float4>         LightDirs          : register(t9); // §C2: xyz = sun travel direction, w = 1 if directional
@@ -1393,6 +1395,17 @@ float HeroReflectance(PrimitiveInfo prim, float3 dir, float3 hitPoint, uint hero
     return MaterialReflectance[row * DETERMINISTIC_COUNT + heroIdx] * atten * ThinFilmFactor(prim, dir, hitPoint, heroIdx);
 }
 
+// Self-emitted radiance at the hero wavelength for a hit (§5.3): the emissive twin of HeroReflectance,
+// read raw from the MaterialEmission table by the PatternShade row (no pattern atten — emission is a
+// source, not a reflection). 0 for any non-emitting material, so the no-emission path is unchanged.
+// Mirrors the emission lookup in Phase2Reference.ShadeSample / TraceSpecularRadiance.
+float HeroEmission(PrimitiveInfo prim, float3 dir, float3 hitPoint, uint heroIdx)
+{
+    uint row; float atten;
+    PatternShade(prim, dir, hitPoint, row, atten);
+    return MaterialEmission[row * DETERMINISTIC_COUNT + heroIdx];
+}
+
 // §7: one cosine-weighted indirect bounce leaving a diffuse surface reached through a specular chain,
 // so a mirror's / glass's world is not conspicuously flatter and darker than the directly-viewed one.
 // Mirrors JobSystem.SpecularIndirectTerm — the same uniform-light one-bounce the primary path uses.
@@ -1671,8 +1684,12 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
             continue;
         }
 
-        accum += weight * DeterXYZ[heroIdx].xyz
-            * MirrorDiffuseScalar(HeroReflectance(prim, dir, hitPoint, heroIdx), hitPoint, hitNormal, rng, heroIdx);
+        // Terminal diffuse hit (+ any self-emission: a neon insert seen in the chrome ball / glass dome).
+        // MirrorDiffuseScalar consumes rng first (order preserved); HeroEmission draws none. Matches the
+        // Phase2Reference.TraceSpecularRadiance terminal; +0 for a non-emitting surface (§5.3).
+        float termScalar = MirrorDiffuseScalar(HeroReflectance(prim, dir, hitPoint, heroIdx), hitPoint, hitNormal, rng, heroIdx);
+        termScalar += HeroEmission(prim, dir, hitPoint, heroIdx);
+        accum += weight * DeterXYZ[heroIdx].xyz * termScalar;
         return accum;
     }
     return accum;
@@ -1971,6 +1988,12 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         xyz += caustic;
         indirect += caustic;
     }
+
+    // Emissive surface (§5.3): add its own emitted radiance at the hero wavelength, folded into the total
+    // before the deterministic correction so it scales like the reflectance terms. A specular primary hit
+    // already returned above; a non-emitting surface adds 0, so the no-emission path is byte-identical.
+    // Mirrors the primary-hit emission block in Phase2Reference.ShadeSample / JobSystem.TraceCore.
+    xyz += DeterXYZ[heroIdx].xyz * HeroEmission(prim, primaryDir, hitPoint, heroIdx);
 
     float correction = DeterministicCorrection;
     correctedDirect = bounce0 * correction;

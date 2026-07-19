@@ -41,10 +41,11 @@ public sealed class BVH
     /// surface roughness, whether any hit occurred, the hit primitive
     /// (for companion wavelength evaluation), the surface kind
     /// (so the integrator can branch into wavelength-dependent effects),
-    /// and the index of refraction resolved at the ray's wavelength
-    /// (for dielectric refraction).
+    /// the index of refraction resolved at the ray's wavelength
+    /// (for dielectric refraction), and the surface's self-emitted radiance at
+    /// that wavelength (0 for a non-emitting surface).
     /// </summary>
-    public (float reflectance, Vector3 hitPoint, Vector3 hitNormal, float roughness, bool hit, Tracable? hitPrimitive, SurfaceKind surface, float ior, float extinction) FindClosest(Ray ray)
+    public (float reflectance, Vector3 hitPoint, Vector3 hitNormal, float roughness, bool hit, Tracable? hitPrimitive, SurfaceKind surface, float ior, float extinction, float emission) FindClosest(Ray ray)
     {
         float closestT = float.MaxValue;
         float closestReflectance = 0f;
@@ -54,6 +55,7 @@ public sealed class BVH
         SurfaceKind closestSurface = SurfaceKind.Diffuse;
         float closestIor = 1f;
         float closestExtinction = 0f;
+        float closestEmission = 0f;
         bool anyHit = false;
         Tracable? closestPrimitive = null;
         Vector3 origin = ray.Origin;
@@ -87,6 +89,7 @@ public sealed class BVH
                             closestSurface = h.Surface;
                             closestIor = h.Ior;
                             closestExtinction = h.Extinction;
+                            closestEmission = h.Emission;
                             closestPrimitive = _primitives[i];
                             anyHit = true;
                         }
@@ -105,7 +108,7 @@ public sealed class BVH
             current = stack[--stackPtr];
         }
 
-        return (closestReflectance, closestPoint, closestNormal, closestRoughness, anyHit, closestPrimitive, closestSurface, closestIor, closestExtinction);
+        return (closestReflectance, closestPoint, closestNormal, closestRoughness, anyHit, closestPrimitive, closestSurface, closestIor, closestExtinction, closestEmission);
     }
 
     /// <summary>

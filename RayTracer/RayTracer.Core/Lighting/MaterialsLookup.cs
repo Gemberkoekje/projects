@@ -403,7 +403,25 @@ public class MaterialData
     /// </summary>
     public float FilmContrast { get; }
 
+    /// <summary>
+    /// Self-emitted spectral radiance shape for a <see cref="SurfaceKind.Emissive"/> surface
+    /// (neon insert, wormhole glow, bumper flash — pinball-plan §5.3). Sampled per wavelength by
+    /// <see cref="GetSpectralEmission"/> and scaled by <see cref="EmissionScale"/>. <c>null</c> means
+    /// a non-emitting surface, so every measured/optical material is unchanged (emission ≡ 0).
+    /// </summary>
+    public SpectralData? EmissionSpectrum { get; }
+
+    /// <summary>
+    /// Radiance multiplier for <see cref="EmissionSpectrum"/> (0 = not emitting). A perfectly white,
+    /// flat emission at scale 1 emits roughly the radiance a white diffuse surface returns under full
+    /// ambient, so a glowing insert typically sits in the low single digits.
+    /// </summary>
+    public float EmissionScale { get; }
+
     public bool HasSpectralData => SpectralData != null;
+
+    /// <summary>True when this material emits light (a non-null spectrum with a positive scale).</summary>
+    public bool HasEmission => EmissionSpectrum != null && EmissionScale > 0f;
 
     public MaterialData(
         string id,
@@ -428,7 +446,9 @@ public class MaterialData
         float filmThicknessNm = 0f,
         float filmSpatialAmpNm = 0f,
         float filmContrast = 1f,
-        Vector3 absorptionRgb = default)
+        Vector3 absorptionRgb = default,
+        SpectralData? emissionSpectrum = null,
+        float emissionScale = 0f)
     {
         Id = id;
         Name = name;
@@ -453,6 +473,8 @@ public class MaterialData
         FilmSpatialAmpNm = filmSpatialAmpNm;
         FilmContrast = filmContrast;
         AbsorptionRgb = absorptionRgb;
+        EmissionSpectrum = emissionSpectrum;
+        EmissionScale = emissionScale;
     }
 
     // Convenience property to get the RGB reflectance as a Vector3
@@ -501,4 +523,43 @@ public class MaterialData
         AbsorptionRgb.Y + ExtinctionSigma,
         AbsorptionRgb.Z + ExtinctionSigma,
         wavelength);
+
+    /// <summary>
+    /// Self-emitted spectral radiance at <paramref name="wavelength"/>: the <see cref="EmissionSpectrum"/>
+    /// value scaled by <see cref="EmissionScale"/>, or 0 for a non-emitting material. This is the emissive
+    /// analogue of <see cref="GetSpectralReflectance"/> — the tracer adds it at a hit (accumulation over the
+    /// hero-wavelength cycle builds the emitter's colour, exactly as the sky's spectral radiance does).
+    /// </summary>
+    public float GetSpectralEmission(int wavelength)
+        => EmissionSpectrum is null || EmissionScale <= 0f ? 0f : EmissionSpectrum.GetSceValue(wavelength) * EmissionScale;
+
+    /// <summary>
+    /// Builds a self-emitting material (pinball-plan §5.3 neon/insert/wormhole) whose emission colour is
+    /// <paramref name="rgb"/> at radiance <paramref name="radiance"/>. The emission spectrum is the same
+    /// smooth, overlapping RGB Gaussian bands a coloured diffuse uses, so the glow reads as a clean colour
+    /// through the spectral pipeline. Reflectance is left near-zero (a pure emitter); the surface is tagged
+    /// <see cref="SurfaceKind.Emissive"/> so a mirror/glass reflection carries the emission (the chrome
+    /// ball reflecting neon).
+    /// </summary>
+    public static MaterialData Emissive(string id, Vector3 rgb, float radiance)
+    {
+        const int min = 360, max = 830, step = 5;
+        int count = (max - min) / step + 1;
+        var wavelengths = new int[count];
+        var values = new float[count];
+        for (int i = 0; i < count; i++)
+        {
+            int w = min + i * step;
+            wavelengths[i] = w;
+            // Broad, overlapping RGB bands so the emission reads as a colour without harsh spectral edges
+            // (identical shape to the ColoredDiffuse reflectance bands).
+            float r = MathF.Exp(-MathF.Pow((w - 620f) / 70f, 2f));
+            float g = MathF.Exp(-MathF.Pow((w - 540f) / 60f, 2f));
+            float b = MathF.Exp(-MathF.Pow((w - 460f) / 55f, 2f));
+            values[i] = MathF.Max(0f, rgb.X * r + rgb.Y * g + rgb.Z * b);
+        }
+        var emission = new SpectralData(wavelengths, values, (float[])values.Clone());
+        return new MaterialData(id, id, null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            surface: SurfaceKind.Emissive, emissionSpectrum: emission, emissionScale: radiance);
+    }
 }

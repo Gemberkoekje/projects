@@ -68,7 +68,7 @@ public class BVHTests
             }
 
             // BVH
-            var (bvhReflectance, _, _, _, bvhHit, _, _, _, _) = bvh.FindClosest(ray);
+            var (bvhReflectance, _, _, _, bvhHit, _, _, _, _, _) = bvh.FindClosest(ray);
 
             Assert.AreEqual(linearHit, bvhHit, $"Hit mismatch for direction {dir}");
             if (linearHit)
@@ -126,7 +126,7 @@ public class BVHTests
 
         var bvh = new BVH(scene.ToArray());
         var (linearReflectance, linearT, linearHit) = FindClosestLinear(scene, ray);
-        var (bvhReflectance, bvhPoint, _, _, bvhHit, _, _, _, _) = bvh.FindClosest(ray);
+        var (bvhReflectance, bvhPoint, _, _, bvhHit, _, _, _, _, _) = bvh.FindClosest(ray);
 
         Assert.AreEqual(linearHit, bvhHit);
         if (linearHit)
@@ -158,7 +158,7 @@ public class BVHTests
             Intensity = 1f
         };
 
-        var (_, hitPoint, _, _, hit, hitPrimitive, _, _, _) = bvh.FindClosest(ray);
+        var (_, hitPoint, _, _, hit, hitPrimitive, _, _, _, _) = bvh.FindClosest(ray);
 
         Assert.IsTrue(hit, "BVH should still report a hit in the presence of many zero-volume bounds.");
         Assert.IsInstanceOfType<TracableRectangle>(hitPrimitive);

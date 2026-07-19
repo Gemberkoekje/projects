@@ -138,6 +138,7 @@ internal sealed class Phase6Renderer : IDisposable
     private GpuSphere[] _sphereData = [];
     private ID3D12Resource _deterXyzBuffer = null!;
     private ID3D12Resource _materialReflectanceBuffer = null!;
+    private ID3D12Resource _materialEmissionBuffer = null!;
     // Caustics (shadows-and-caustics-plan §B4): the whole photon map lives on the GPU — the gather
     // reads the photon store + per-cell linked list + grid params the compute passes build, so nothing
     // is uploaded/read back per frame. These scalars stay CPU-known (cbuffer): the gather radius/cell
@@ -695,6 +696,10 @@ internal sealed class Phase6Renderer : IDisposable
         _deterXyzBuffer = CreateUploadBuffer<float>(_spectral.DeterXYZ, _spectral.DeterXYZ.Length * sizeof(float));
         _materialReflectanceBuffer = CreateUploadBuffer<float>(
             _spectral.MaterialReflectance, _spectral.MaterialReflectance.Length * sizeof(float));
+        // Emissive-surface radiance table (pinball-plan §5.3), the emissive twin of MaterialReflectance;
+        // all zero for a scene with no Emissive material, so the trace is unchanged there.
+        _materialEmissionBuffer = CreateUploadBuffer<float>(
+            _spectral.MaterialEmission, _spectral.MaterialEmission.Length * sizeof(float));
     }
 
     /// <summary>
@@ -1090,6 +1095,7 @@ internal sealed class Phase6Renderer : IDisposable
             new RootParameter1(RootParameterType.UnorderedAccessView, new RootDescriptor1(17, 0), ShaderVisibility.All), // 25: GridParams (u17, §B4 gather)
             new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(9, 0), ShaderVisibility.All),   // 26: LightDirs (t9, §C2)
             new RootParameter1(RootParameterType.ConstantBufferView, new RootDescriptor1(2, 0), ShaderVisibility.All),  // 27: SkyConstants (b2, §O2)
+            new RootParameter1(RootParameterType.ShaderResourceView, new RootDescriptor1(10, 0), ShaderVisibility.All), // 28: MaterialEmission (t10, §5.3)
         };
         _traceRootSignature = _device.CreateRootSignature(
             new RootSignatureDescription1(RootSignatureFlags.None, traceParams));
@@ -1754,6 +1760,7 @@ internal sealed class Phase6Renderer : IDisposable
         _commandList.SetComputeRootUnorderedAccessView(25, _gridParamsBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootShaderResourceView(26, _lightDirBuffer.GPUVirtualAddress);
         _commandList.SetComputeRootConstantBufferView(27, _skyConstantBuffer.GPUVirtualAddress);
+        _commandList.SetComputeRootShaderResourceView(28, _materialEmissionBuffer.GPUVirtualAddress);
 
         uint groupsX = (uint)((_width + 7) / 8);
         uint groupsY = (uint)((_height + 7) / 8);
@@ -1991,6 +1998,7 @@ internal sealed class Phase6Renderer : IDisposable
             _lightColorBuffer?.Dispose();
             _lightBuffer?.Dispose();
             _materialReflectanceBuffer?.Dispose();
+            _materialEmissionBuffer?.Dispose();
             _deterXyzBuffer?.Dispose();
             _primitiveBuffer?.Dispose();
             _indexBuffer?.Dispose();
@@ -2137,6 +2145,7 @@ internal sealed class Phase6Renderer : IDisposable
         _lightColorBuffer?.Dispose();
         _lightBuffer?.Dispose();
         _materialReflectanceBuffer?.Dispose();
+        _materialEmissionBuffer?.Dispose();
         _deterXyzBuffer?.Dispose();
         _primitiveBuffer?.Dispose();
         _indexBuffer?.Dispose();
