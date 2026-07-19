@@ -117,7 +117,10 @@ public partial class JobSystem
 
                     _owner._buffers.TaaNextXYZ[ix] = resolved;
                     _owner._buffers.TaaNextHitPoint[ix] = currentHitPoint;
-                    _owner._buffers.TaaNextValid[ix] = currentHit;
+                    // §4.3 mover TAA stencil: a mover pixel marks its history invalid so no stale content
+                    // blends onto it next frame (crisp mover edge). LastDynamicTouched is always false
+                    // without a Dynamic primitive, so a no-mover scene is byte-identical (mirrors ResolvePhase6).
+                    _owner._buffers.TaaNextValid[ix] = currentHit && !_owner._buffers.LastDynamicTouched[ix];
                     _owner._buffers.HistoryWeight[ix] = historyWeight;
                     _owner._buffers.HistoryRejected[ix] = rejectedThisPixel ? (byte)1 : (byte)0;
                     _owner._buffers.DiffReprojectedVsCurrent[ix] = reprojectionDelta;

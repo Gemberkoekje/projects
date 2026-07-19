@@ -465,7 +465,12 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // Next-frame history stores the fog-free surface, so it keeps converging.
     HistoryXyzOut[ix] = float4(resolved, 1.0);
     HistoryHitOut[ix] = float4(currentHitPoint, 1.0);
-    HistoryValidOut[ix] = currentHit ? 1u : 0u;
+    // §4.3 mover TAA stencil: a mover pixel (hit id 2 — the ball, or a static surface reflecting it) marks
+    // its history INVALID so next frame's TAA reprojection never blends its stale content on — a fast mover
+    // keeps a crisp edge instead of smearing over MotionSampleCap frames. Static geometry (id 0/1) is
+    // unchanged, so a scene with no movers is byte-identical.
+    bool isMover = (LastHit[ix] == 2u);
+    HistoryValidOut[ix] = (currentHit && !isMover) ? 1u : 0u;
 
     // Per-pixel temporal signals for the Phase 5.2 reduction (AverageHistoryWeight,
     // RejectedHistoryPercent) — the resolve is where they are decided.
