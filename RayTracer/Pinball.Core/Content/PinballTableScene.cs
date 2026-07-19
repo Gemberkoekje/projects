@@ -1,7 +1,7 @@
 using System.Numerics;
 using RayTracer;
 
-namespace RayTracer.Gpu;
+namespace Pinball.Content;
 
 /// <summary>
 /// Space Cadet RT — the P0 static playfield (pinball-plan §3.3 / §5.3 / §8 P0), the <b>single source of
@@ -21,12 +21,14 @@ namespace RayTracer.Gpu;
 /// mirror rails, and oil-slick thin-film bumper caps. No gameplay and no movers — this is the static half
 /// of the hybrid, the payoff of reusing the converging renderer.</para>
 /// </summary>
-internal sealed record PinballTableScene(
+public sealed record PinballTableScene(
     IReadOnlyList<Tracable> Tracables,
     PackedScene Packed,
     SpectralResources Spectral,
     PackedLights PackedLights,
-    Camera Camera)
+    Camera Camera,
+    Vector3 LeftFlipperPivot,
+    Vector3 RightFlipperPivot)
 {
     // Table extents (world units). Portrait, flipper end near z=0.
     private const float MinX = -5.5f, MaxX = 5.5f, MinZ = 0f, MaxZ = 24f, WallH = 1.3f;
@@ -34,7 +36,13 @@ internal sealed record PinballTableScene(
     /// <summary>Start position of the chrome ball (world space) — the sweep capture moves this sphere.</summary>
     public static readonly Vector3 BallStart = new(-2.1f, 0.36f, 5.6f);
 
-    public static PinballTableScene Build(int width, int height, bool dynamicBall = true)
+    /// <summary>
+    /// Builds the P0 playfield sized for a <paramref name="width"/>×<paramref name="height"/> render.
+    /// <paramref name="dynamicBall"/> tags the chrome ball a mover (the P1 cheap tier / <c>UpdateSpheres</c>);
+    /// <paramref name="dynamicFlippers"/> makes each flipper its own posable mover part (P6, for the game) —
+    /// default off so the static <c>table</c> golden is unaffected.
+    /// </summary>
+    public static PinballTableScene Build(int width, int height, bool dynamicBall = true, bool dynamicFlippers = false)
     {
         var s = new List<Tracable>();
         var lights = new List<Light>();
@@ -89,15 +97,23 @@ internal sealed record PinballTableScene(
         AddPost(s, new Vector3(-3.9f, 0f, 3.6f), 0.12f, 0.7f, rubber);
         AddPost(s, new Vector3(3.9f, 0f, 3.6f), 0.12f, 0.7f, rubber);
         // Two lower red flippers (no upper flipper). Resting angle: tips down-and-out toward the outlanes.
-        AddFlipper(s, new Vector3(-1.5f, 0.22f, 3.4f), new Vector3(-2.7f, 0.22f, 2.5f), 0.28f, flipperRed);
-        AddFlipper(s, new Vector3(1.5f, 0.22f, 3.4f), new Vector3(2.7f, 0.22f, 2.5f), 0.28f, flipperRed);
+        // With dynamicFlippers, each bat is its own posable mover part (group 0 = left, 1 = right — P6); its
+        // cap spheres are dropped since SetDynamicPose moves triangles only.
+        Vector3 leftPivot = new(-1.5f, 0.22f, 3.4f), rightPivot = new(1.5f, 0.22f, 3.4f);
+        AddFlipper(s, leftPivot, new Vector3(-2.7f, 0.22f, 2.5f), 0.28f, flipperRed, dynamicFlippers ? 0 : -1);
+        AddFlipper(s, rightPivot, new Vector3(2.7f, 0.22f, 2.5f), 0.28f, flipperRed, dynamicFlippers ? 1 : -1);
         // Inlane rollover inserts (cyan) just above the flippers.
         s.Add(FloorQuad(0.02f, -2.5f, -1.7f, 4.6f, 5.2f, neonCyan));
         s.Add(FloorQuad(0.02f, 1.7f, 2.5f, 4.6f, 5.2f, neonCyan));
 
-        // Plunger / shooter lane: right channel, divided from the playfield, with the chrome plunger.
-        s.Add(WallX(4.6f, 0f, 15f, 0f, WallH, wall));                           // lane divider wall
-        s.Add(FloorQuad(0.005f, 4.7f, MaxX, 0f, 15f, apron));                   // lane floor
+        // Plunger / shooter lane: right channel, divided from the playfield, with the chrome plunger. The
+        // divider stops at z=12.5 (co-registered with PinballTable) so the top feed can sweep the ball left
+        // into the playfield; a smooth quarter-turn Bézier guide across the lane mouth does the sweeping.
+        s.Add(WallX(4.6f, 5f, 12.5f, 0f, WallH, wall));                         // lane divider wall (z 5→12.5, clears the slingshots)
+        s.Add(FloorQuad(0.005f, 4.7f, MaxX, 0f, 16.8f, apron));                 // lane floor (up under the feed)
+        AddBezierWall(s, Pinball.Physics.LaneFeed.P0.ToVector3(), Pinball.Physics.LaneFeed.P1.ToVector3(),
+            Pinball.Physics.LaneFeed.P2.ToVector3(), Pinball.Physics.LaneFeed.P3.ToVector3(),
+            (float)Pinball.Physics.LaneFeed.WallHeight, Pinball.Physics.LaneFeed.Segments, chromeRail); // feed guide
         AddCyl(s, new Vector3(5.05f, 0f, 1.1f), 0.28f, 0.55f, 14, chrome);      // plunger tip (rest)
         s.Add(new Sphere(new Vector3(5.05f, 0.62f, 1.1f), 0.28f, chrome));
 
@@ -164,6 +180,12 @@ internal sealed record PinballTableScene(
         // mirror of the converged static table + a hard contact shadow — and soft-caps at MotionSampleCap.
         s.Add(new Sphere(BallStart, 0.36f, chrome) { Dynamic = dynamicBall });
 
+        // ── Interior lane walls (right/left orbits, return guides): the Space Cadet wall layout, authored once
+        // in Pinball.Physics.TableWalls and co-registered with the physics BezierWallColliders in PinballTable.
+        foreach (Pinball.Physics.TableWalls.Wall w in Pinball.Physics.TableWalls.All)
+            AddBezierWall(s, w.P0.ToVector3(), w.P1.ToVector3(), w.P2.ToVector3(), w.P3.ToVector3(),
+                (float)Pinball.Physics.TableWalls.WallHeight, w.Segments, chromeRail);
+
         // ── Lighting: dim overhead keys + warm backbox + insert cast-lights (the emissive parts supply
         // the glow and the ball's reflection; these give clean coloured illumination on the playfield). ─
         lights.Add(new Light { Position = new Vector3(0f, 11f, 6f), Color = new Vector3(0.66f, 0.66f, 0.74f) });
@@ -173,6 +195,10 @@ internal sealed record PinballTableScene(
         lights.Add(new Light { Position = new Vector3(-2.6f, 1.4f, 8.5f), Color = new Vector3(0.3f, 0.13f, 0.42f) }); // ramp
         lights.Add(new Light { Position = new Vector3(-3.4f, 1.2f, 10f), Color = new Vector3(0.15f, 0.25f, 0.7f) }); // engines
         lights.Add(new Light { Position = new Vector3(0f, 1.5f, 16f), Color = new Vector3(0.5f, 0.5f, 0.55f) }); // attack bumpers
+        // Shooter-lane fills (over the right channel, x≈5): the lane sat in shadow between the centre keys, so
+        // the launching ball was barely visible. Two soft fills light it from the plunger up to the feed.
+        lights.Add(new Light { Position = new Vector3(5.0f, 3.2f, 6f), Color = new Vector3(0.5f, 0.5f, 0.56f) });
+        lights.Add(new Light { Position = new Vector3(5.0f, 3.2f, 13f), Color = new Vector3(0.48f, 0.48f, 0.54f) });
 
         // ── Camera: the classic Space Cadet view — from behind the flippers, looking up the table ──────
         Vector3 camPos = new(0f, 11.5f, -8.5f);
@@ -188,7 +214,50 @@ internal sealed record PinballTableScene(
         PackedScene packed = GpuScenePacker.Pack(s);
         SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
         PackedLights packedLights = LightPacker.Pack(lights);
-        return new PinballTableScene(s, packed, spectral, packedLights, camera);
+        return new PinballTableScene(s, packed, spectral, packedLights, camera, leftPivot, rightPivot);
+    }
+
+    /// <summary>
+    /// A stripped scene for authoring the wall geometry one piece at a time: just the playfield floor, the
+    /// <see cref="Pinball.Physics.TableWalls"/> walls, and flat overhead fill lighting so the layout is clearly
+    /// visible. No props, no inserts, no perimeter shell — everything that would distract from the walls is
+    /// gone. Used by the <c>--table-topdown</c> view while the boundary is being dialled in.
+    /// </summary>
+    public static PinballTableScene BuildWallsOnly(int width, int height, Pinball.Physics.TableWalls.Wall[]? walls = null,
+        Vector3? ballStart = null, float ballRadius = 0.36f)
+    {
+        var s = new List<Tracable>();
+        var lights = new List<Light>();
+        var playfield = ColoredDiffuse("pf", new Vector3(0.16f, 0.18f, 0.23f)); // darker floor for contrast
+        var rail = ColoredDiffuse("wall", new Vector3(0.80f, 0.82f, 0.88f));    // bright matte walls that pop
+        var chrome = FlatMirror("chrome", 0.95f);                               // the ball
+
+        s.Add(FloorQuad(0f, MinX, MaxX, MinZ, MaxZ, playfield));
+        foreach (Pinball.Physics.TableWalls.Wall w in walls ?? Pinball.Physics.TableWalls.All)
+            AddBezierWall(s, w.P0.ToVector3(), w.P1.ToVector3(), w.P2.ToVector3(), w.P3.ToVector3(),
+                (float)Pinball.Physics.TableWalls.WallHeight, w.Segments, rail);
+        if (ballStart is Vector3 bp)
+            s.Add(new Sphere(new Vector3(bp.X, ballRadius, bp.Z), ballRadius, chrome)); // ball at its start, true size
+
+        // Flat, even overhead fill so the whole floor + walls are legible (the "ambient so we can see").
+        for (int zi = 0; zi < 5; zi++)
+            for (int xi = -1; xi <= 1; xi++)
+                lights.Add(new Light { Position = new Vector3(xi * 3.2f, 9f, 2f + zi * 5f), Color = new Vector3(0.85f, 0.86f, 0.9f) });
+
+        Vector3 camPos = new(0f, 11.5f, -8.5f);
+        var camera = new Camera
+        {
+            Position = camPos,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0f, 12.5f), new Vector3(0f, 1f, 0f)),
+            Fov = MathF.PI / 3.4f,
+            Aspect = (float)width / height,
+            ImgPlaneZ = 1f,
+        };
+        PackedScene packed = GpuScenePacker.Pack(s);
+        SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+        PackedLights packedLights = LightPacker.Pack(lights);
+        Vector3 pivot = new(0f, 0.22f, 3.4f);
+        return new PinballTableScene(s, packed, spectral, packedLights, camera, pivot, pivot);
     }
 
     // ══ Part builders (the single-source-of-truth authoring vocabulary) ══════════════════════════════
@@ -206,6 +275,17 @@ internal sealed record PinballTableScene(
     // A vertical quad in the x = xPlane plane spanning [z0,z1] × [y0,y1].
     private static TracableRectangle WallX(float xPlane, float z0, float z1, float y0, float y1, MaterialData m)
         => new((new Vector3(xPlane, y0, z0), new Vector3(xPlane, y0, z1), new Vector3(xPlane, y1, z0)), m);
+
+    // A smooth curved vertical wall swept along a cubic Bézier (X/Z plane), tessellated into WallHeight-tall
+    // panels via CubicBezier.SweptWall — the render twin of the physics BezierWallCollider, using the same
+    // LaneFeed control points and segment count so the two stay co-registered.
+    private static void AddBezierWall(List<Tracable> s, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3,
+        float height, int segments, MaterialData m)
+    {
+        var curve = new CubicBezier(p0, p1, p2, p3);
+        foreach (TracableRectangle panel in curve.SweptWall(0f, height, segments, m))
+            s.Add(panel);
+    }
 
     // Rotate a point about the world Y axis through the origin.
     private static Vector3 RotY(Vector3 d, float rad)
@@ -262,13 +342,23 @@ internal sealed record PinballTableScene(
         => AddRotBox(s, baseC + new Vector3(0f, h * 0.5f, 0f), new Vector3(w * 0.5f, h * 0.5f, 0.05f), rad, face);
 
     // A flat flipper bat: a top quad between the pivot and tip, rounded by an end sphere at each.
-    private static void AddFlipper(List<Tracable> s, Vector3 pivot, Vector3 tip, float w, MaterialData m)
+    private static void AddFlipper(List<Tracable> s, Vector3 pivot, Vector3 tip, float w, MaterialData m, int dynamicGroup = -1)
     {
         Vector3 dir = Vector3.Normalize(tip - pivot);
         Vector3 perp = new Vector3(-dir.Z, 0f, dir.X) * w;
-        s.Add(Quad(pivot - perp, pivot + perp, tip - perp, m));
-        s.Add(new Sphere(pivot, w, m));
-        s.Add(new Sphere(tip, w * 0.65f, m));
+        (Vector3, Vector3, Vector3) corners = (pivot - perp, pivot + perp, tip - perp);
+        if (dynamicGroup >= 0)
+        {
+            // A posable mover part: a flat (+Y-normal), Plain-material bat rotated about its pivot (§4.2 P6
+            // contract). The round cap spheres are dropped — SetDynamicPose moves the triangle bat only.
+            s.Add(new TracableRectangle(corners, m) { Dynamic = true, DynamicGroup = dynamicGroup });
+        }
+        else
+        {
+            s.Add(new TracableRectangle(corners, m));
+            s.Add(new Sphere(pivot, w, m));
+            s.Add(new Sphere(tip, w * 0.65f, m));
+        }
     }
 
     // An inclined launch ramp at x=<paramref name="x"/> rising from z0 (on the playfield) to z1 (height y1),

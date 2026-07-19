@@ -33,7 +33,6 @@ internal static class RegressionHarness
     private const int Width = 1280;
     private const int Height = 720;
     private const int ConvergeFrames = 32;
-    private const int TableConvergeFrames = 256; // the pinball table's specular/glass need more samples
 
     // Same-GPU determinism means near-identical images; these bounds only absorb
     // FP contraction / wave-order jitter (P4). A real regression blows past them.
@@ -111,15 +110,11 @@ internal static class RegressionHarness
             CompareOrUpdate(img, Path.Combine(classicDir, $"{v.Name}.png"), update, "classic/" + v.Name, ref failures, ref compared);
         }
 
-        // ── Pinball P0 static table: pins the emissive-surface term end-to-end (pinball-plan §5.3 / §8
-        // P0). The neon inserts, the chrome ball reflecting them, and the glass gem all ride the shipping
-        // path, so this golden catches a regression in the new emission code that the maze scenes cannot. ─
-        byte[] tableImg = RenderTableBeauty();
-        CompareOrUpdate(tableImg, Path.Combine(dir, "table.png"), update, "table", ref failures, ref compared);
+        // (The pinball P0 static-table golden moved with the app to Pinball.App's `--table-regress`, §7.3.)
 
         if (update)
         {
-            Console.WriteLine($"  wrote {DebugModes.Length + ClassicVariants.Length + 1} golden image(s). Commit them as the regression baseline.");
+            Console.WriteLine($"  wrote {DebugModes.Length + ClassicVariants.Length} golden image(s). Commit them as the regression baseline.");
             return 0;
         }
 
@@ -158,26 +153,6 @@ internal static class RegressionHarness
         }
 
         for (int f = 0; f < ConvergeFrames; f++)
-            renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
-        return renderer.ReadbackOutput();
-    }
-
-    // Renders the P0 static pinball table's Beauty view converged (pinball-plan §5.3 / §8 P0). Converged
-    // longer than the maze goldens because the mirror ball / dispersive gem / thin-film are hero-λ and
-    // noisier; same-GPU determinism keeps it bit-exact run-to-run so the tight tolerance still holds.
-    private static byte[] RenderTableBeauty()
-    {
-        PinballTableScene table = PinballTableScene.Build(Width, Height);
-        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
-
-        using var renderer = new Phase6Renderer(
-            Width, Height, table.Packed, table.Spectral, table.PackedLights, table.Camera,
-            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: 3f,
-            maxSampleCount: 4096, subPixelJitter: true, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
-        renderer.Initialize(windowHandle: 0);
-        renderer.SetCamera(table.Camera);
-
-        for (int f = 0; f < TableConvergeFrames; f++)
             renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
         return renderer.ReadbackOutput();
     }

@@ -44,6 +44,10 @@ public class TracableRectangle((Vector3 l1, Vector3 l2, Vector3 l3) Location, Ma
     /// both <see cref="Tracable.Dynamic"/> and <see cref="IQuadPrimitive.Dynamic"/>. Default <c>false</c>.</summary>
     public bool Dynamic { get; init; }
 
+    /// <summary>Independently-posable mover group (pinball-plan §4.2 / P6); only meaningful when
+    /// <see cref="Dynamic"/>. Quads with the same group move together under one <c>SetDynamicPose</c>.</summary>
+    public int DynamicGroup { get; init; }
+
     /// <inheritdoc/>
     public override HitInfo? Intersect(Ray ray)
     {

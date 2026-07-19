@@ -1209,6 +1209,41 @@ Goal: playable end-to-end. Deliverable: WinForms game window + fixed-timestep lo
 wired input → physics → renderer; ConfigForm pinball presets/controls; new-game/
 ball-launch/skill-shot. Verify: launch, flip, hit bumpers, drain, next ball; on
 the 3070 at Classic 60 fps.
+> **P6a — the physics→render integration seam — DONE (verified on the 3070).** The hard blocker (the P4
+> review's "one dynamic instance" limit) is gone: the renderer now supports **N independent dynamic mover
+> parts** — the packer groups `Dynamic` quads by `IQuadPrimitive.DynamicGroup` into contiguous
+> `PackedScene.DynamicParts` ranges, and `Phase6Renderer` builds one movable BLAS + TLAS instance per part
+> (each `InstanceID` = its Primitives-row base), with `SetDynamicPose(int part, …)` + `DynamicPartCount`.
+> Byte-identical for 0-part scenes (self-test 700/700, `table` golden max 0); the 1-part flipper-demo is
+> bit-for-bit unchanged. `PinballTableScene` gained `dynamicFlippers` (default off ⇒ golden untouched):
+> each flipper bat becomes its own part (group 0 = left, 1 = right; cap spheres dropped). A headless
+> `--pinball-sim` (in `RayTracer.Maze`, which now refs `Pinball.Core`) runs the deterministic physics
+> `PinballTable` and feeds the renderer each frame — ball centre → `UpdateSpheres`, each flipper angle →
+> `SetDynamicPose` (co-registered by `RenderScale`) — **verified on the 3070**: 2 independent flipper parts,
+> both flip, the ball plays, no D3D12 errors. RayTracer.Tests 336/336 (+ a `DynamicParts` packer test),
+> Pinball.Tests 42/42.
+> **P6b — game loop, input, interactive window — DONE (loop verified on the 3070; window compile-verified).**
+> The orchestrator `Pinball.Game.PinballGame` + `PinballInput` (pure, in `Pinball.Core`) runs the fixed-
+> timestep loop: input → actuators (flippers energise, nudge), `PhysicsWorld.Advance(dt)`, and the serve →
+> play → drain → next-ball → game-over lifecycle (tilt kills ball control). 6 headless deterministic tests
+> (`PinballGameTests`). A headless full playthrough `--pinball-play` drives the orchestrator + renderer with
+> a scripted input timeline — **verified on the 3070**: progressed through all 3 balls to game-over, ball +
+> 2 flippers rendered, no D3D12 errors. The interactive window `--pinball` (`RunPinballWindowed`, on the
+> `RunPhase6Windowed` seam) wires keyboard → `PinballGame` → renderer in real time (Z / · Space launch ·
+> ←→↑ nudge · Esc); compile-verified, runs on a box with a display + the DXR GPU. Pinball.Tests 48/48,
+> RayTracer.Tests 336/336.
+> **P6b-tail — the clean `Pinball.App` project split — DONE.** Pinball no longer rides the maze exe.
+> `PinballTableScene` moved to **`Pinball.Core`** (`namespace Pinball.Content`, public) beside the physics
+> `PinballTable`; a new **`Pinball.App`** exe (net10.0-windows, refs Core + Gpu + Pinball.Core) owns the
+> entry points (`--pinball` window default, `--pinball-sim`/`--pinball-play`/`--table-demo`/`--ball-sweep`/
+> `--flipper-demo`, and `--table-regress` — the table golden's new home) and passes `Phase6Renderer.EmptyDecalAtlas`
+> instead of the maze's atlas. `RayTracer.Maze` is pure maze again: no pinball code, no `Pinball.Core` ref,
+> `RegressionHarness` drops the table golden. Verified: **`dotnet run --project Pinball.App` runs the game**;
+> maze self-test 700/700 + **19 maze goldens bit-exact**; the moved `table` golden is bit-exact under
+> `EmptyDecalAtlas` (no re-bake); RayTracer.Tests 336/336, Pinball.Tests 48/48. (An exhaustive discovery
+> workflow + adversarial critic mapped the coupling first — no dangling refs, goldens provably untouched.)
+> **Remaining (P6b-tail):** on-screen score/ball HUD (currently the title bar), gamepad, ConfigForm pinball
+> presets. Event-driven scoring (contact → target/bumper → mission/rank/replay) is **P7**.
 
 **P7 — Game state, missions, scoring, replay, tilt.**
 Goal: the Space Cadet career. Deliverable: (a) the core progression state machine +

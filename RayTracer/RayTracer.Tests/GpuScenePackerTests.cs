@@ -27,6 +27,9 @@ public class GpuScenePackerTests
     private static TracableRectangle Quad(float x, bool dyn)
         => new((new Vector3(x, 0f, 0f), new Vector3(x, 1f, 0f), new Vector3(x, 0f, 1f)), Mat($"q{x}")) { Dynamic = dyn };
 
+    private static TracableRectangle Quad(float x, int group)
+        => new((new Vector3(x, 0f, 0f), new Vector3(x, 1f, 0f), new Vector3(x, 0f, 1f)), Mat($"q{x}")) { Dynamic = true, DynamicGroup = group };
+
     [TestMethod]
     public void Pack_NoDynamicQuads_StaticCountEqualsQuadCount_AndSceneOrderPreserved()
     {
@@ -72,6 +75,26 @@ public class GpuScenePackerTests
         for (int i = 0; i < ordered.Count; i++)
             Assert.AreEqual(ordered[i].L1.X, packed.Primitives[i].L1X,
                 "OrderQuads[i] must correspond to Primitives[i]");
+    }
+
+    [TestMethod]
+    public void Pack_DynamicGroups_BecomeContiguousDynamicParts()
+    {
+        // static(x=0), dynamic group 1 (x=1), static (x=2), dynamic group 0 (x=3), dynamic group 1 (x=4).
+        // Packed: statics [0,2] first, then dynamics grouped by group → group 0 (x=3), then group 1 (x=1, x=4).
+        var scene = new Tracable[] { Quad(0f, false), Quad(1f, 1), Quad(2f, false), Quad(3f, 0), Quad(4f, 1) };
+        PackedScene packed = GpuScenePacker.Pack(scene);
+
+        Assert.AreEqual(2, packed.StaticQuadCount);
+        Assert.AreEqual(0f, packed.Primitives[0].L1X);
+        Assert.AreEqual(2f, packed.Primitives[1].L1X);
+        Assert.AreEqual(3f, packed.Primitives[2].L1X, "group 0 first");
+        Assert.AreEqual(1f, packed.Primitives[3].L1X, "group 1, authoring order kept (x=1 before x=4)");
+        Assert.AreEqual(4f, packed.Primitives[4].L1X);
+
+        Assert.AreEqual(2, packed.DynamicParts.Count, "two mover parts");
+        Assert.AreEqual((2, 1), packed.DynamicParts[0], "group 0: one quad starting at row 2");
+        Assert.AreEqual((3, 2), packed.DynamicParts[1], "group 1: two quads starting at row 3");
     }
 
     [TestMethod]

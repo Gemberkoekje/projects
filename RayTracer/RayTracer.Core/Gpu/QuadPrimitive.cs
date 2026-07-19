@@ -78,4 +78,12 @@ public interface IQuadPrimitive
     /// <summary>Whether this quad is a moving part (pinball-plan §4.1): a primary hit takes the cheap,
     /// capped, non-spectral mover shading tier. Default <c>false</c> (static geometry).</summary>
     bool Dynamic => false;
+
+    /// <summary>
+    /// Which independently-posable mover this quad belongs to (pinball-plan §4.2 / P6). Only meaningful when
+    /// <see cref="Dynamic"/> is true: quads sharing a group become one rigid part (one dynamic BLAS / TLAS
+    /// instance) that <c>SetDynamicPose(part)</c> moves as a unit — so the left flipper, right flipper and
+    /// plunger get distinct groups and move independently. Default <c>0</c> (a single mover group).
+    /// </summary>
+    int DynamicGroup => 0;
 }

@@ -16,8 +16,10 @@
 
   <ItemGroup>
     <!-- The extracted maze app rides the same internal backend surface it did when
-         it lived here — a pure move (pinball-plan §7.2). -->
+         it lived here — a pure move (pinball-plan §7.2). The pinball app (§7.3) sits on the
+         same internal backend (Phase6Renderer et al.). -->
     <InternalsVisibleTo Include="RayTracer.Maze" />
+    <InternalsVisibleTo Include="Pinball.App" />
   </ItemGroup>
 
   <ItemGroup>

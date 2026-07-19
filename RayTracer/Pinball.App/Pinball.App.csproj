@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Space Cadet RT — the pinball game host (pinball-plan §7.3 / §8 P6). A WinForms app that runs the
+       deterministic Pinball.Core physics on the reusable RayTracer.Gpu DXR backend — the same seam the maze
+       app sits on, which is the proof the Milestone E engine/app split is real. Mirrors RayTracer.Maze's
+       settings so the shared render/entry-point code compiles unchanged. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <RootNamespace>Pinball.App</RootNamespace>
+    <AssemblyName>Pinball.App</AssemblyName>
+  </PropertyGroup>
+
+  <!-- The DXR backend loads its HLSL at runtime from AppContext.BaseDirectory/Shaders/. The shader sources
+       live in RayTracer.Gpu; link them into THIS executable's output so they sit next to the .exe. -->
+  <ItemGroup>
+    <Content Include="..\RayTracer.Gpu\Shaders\**\*.hlsl"
+             Link="Shaders\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RayTracer.Core\RayTracer.csproj" />
+    <ProjectReference Include="..\RayTracer.Gpu\RayTracer.Gpu.csproj" />
+    <ProjectReference Include="..\Pinball.Core\Pinball.Core.csproj" />
+  </ItemGroup>
+
+</Project>

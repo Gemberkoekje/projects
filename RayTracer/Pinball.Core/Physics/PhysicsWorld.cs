@@ -81,13 +81,20 @@ public sealed class PhysicsWorld
     public void Advance(double seconds)
     {
         _accumulator += seconds;
-        int guard = 0;
-        while (_accumulator >= PhysicsConstants.SubstepSeconds && guard++ < 100_000)
+        // Spiral-of-death guard: never try to catch up more than MaxCatchUpSeconds of real time in one call.
+        // A huge dt (a stall, a paused debugger, the first frame) drops the excess rather than grinding
+        // thousands of substeps and hanging; the sim briefly slows instead of freezing.
+        if (_accumulator > MaxCatchUpSeconds)
+            _accumulator = MaxCatchUpSeconds;
+        while (_accumulator >= PhysicsConstants.SubstepSeconds)
         {
             Substep();
             _accumulator -= PhysicsConstants.SubstepSeconds;
         }
     }
+
+    /// <summary>Max real time a single <see cref="Advance"/> will simulate (100 substeps) — the rest is dropped.</summary>
+    private const double MaxCatchUpSeconds = 0.1;
 
     /// <summary>Advances the simulation by exactly one fixed substep <c>h</c> (§6.1.5).</summary>
     public void Substep()

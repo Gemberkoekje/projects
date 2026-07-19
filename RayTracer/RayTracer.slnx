@@ -17,4 +17,5 @@
   <Project Path="RayTracer.Tests/RayTracer.Tests.csproj" />
   <Project Path="Pinball.Core/Pinball.Core.csproj" />
   <Project Path="Pinball.Tests/Pinball.Tests.csproj" />
+  <Project Path="Pinball.App/Pinball.App.csproj" />
 </Solution>

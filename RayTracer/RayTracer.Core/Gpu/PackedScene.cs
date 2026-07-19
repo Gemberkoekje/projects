@@ -42,12 +42,21 @@ public sealed class PackedScene
     /// </summary>
     public int StaticQuadCount { get; }
 
+    /// <summary>
+    /// One <c>(Start, Count)</c> range per independently-posable mover (pinball-plan §4.2 / P6), over the
+    /// appended dynamic quads <c>[StaticQuadCount, QuadCount)</c> — grouped by <see cref="IQuadPrimitive.DynamicGroup"/>.
+    /// The renderer builds one movable triangle BLAS / TLAS instance per range, so the left flipper, right
+    /// flipper and plunger get distinct <c>SetDynamicPose</c> handles. Empty when the scene has no dynamic quads.
+    /// </summary>
+    public IReadOnlyList<(int Start, int Count)> DynamicParts { get; }
+
     /// <summary>Analytic spheres (spectral-effects-plan §0.4), carried on the GPU as
     /// procedural-AABB geometry. Empty for the (common) quad-only scenes.</summary>
     public IReadOnlyList<GpuSphere> Spheres { get; }
 
     internal PackedScene(float[] vertices, uint[] indices, GpuPrimitive[] primitives,
-        IReadOnlyList<MaterialData> materials, IReadOnlyList<GpuSphere> spheres, int staticQuadCount)
+        IReadOnlyList<MaterialData> materials, IReadOnlyList<GpuSphere> spheres, int staticQuadCount,
+        IReadOnlyList<(int Start, int Count)> dynamicParts)
     {
         Vertices = vertices;
         Indices = indices;
@@ -55,6 +64,7 @@ public sealed class PackedScene
         Materials = materials;
         Spheres = spheres;
         StaticQuadCount = staticQuadCount;
+        DynamicParts = dynamicParts;
     }
 }
 
@@ -86,7 +96,9 @@ public static class GpuScenePacker
             if (t is IQuadPrimitive q)
                 (q.Dynamic ? dynamics : statics).Add(q);
         staticQuadCount = statics.Count;
-        statics.AddRange(dynamics);
+        // Dynamic quads grouped by DynamicGroup (OrderBy is a stable sort, so authoring order is kept within
+        // a group) → each mover part is a contiguous Primitives range (§4.2 / P6).
+        statics.AddRange(dynamics.OrderBy(q => q.DynamicGroup));
         return statics;
     }
 
@@ -195,7 +207,18 @@ public static class GpuScenePacker
             });
         }
 
-        return new PackedScene(vertices, indices, primitives, materials, spheres, staticQuadCount);
+        // Split the appended dynamic range into one contiguous part per DynamicGroup (§4.2 / P6).
+        var dynamicParts = new List<(int Start, int Count)>();
+        for (int i = staticQuadCount; i < quads.Count;)
+        {
+            int group = quads[i].DynamicGroup;
+            int start = i;
+            while (i < quads.Count && quads[i].DynamicGroup == group)
+                i++;
+            dynamicParts.Add((start, i - start));
+        }
+
+        return new PackedScene(vertices, indices, primitives, materials, spheres, staticQuadCount, dynamicParts);
     }
 
     private static void WriteVertex(float[] dest, int offset, Vector3 v)

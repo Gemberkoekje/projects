@@ -1,0 +1,36 @@
+{
+  "profiles": {
+    "Space Cadet RT (play)": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    },
+    "Pinball playthrough (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--pinball-play --frames 160 --save pinball-play.png"
+    },
+    "Pinball sim / render handoff (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--pinball-sim --save pinball-sim.png"
+    },
+    "Flipper SetDynamicPose demo (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--flipper-demo --save flipper-demo.png"
+    },
+    "Static table demo (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--table-demo --save table-demo.png"
+    },
+    "Ball sweep (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--ball-sweep --save ball-sweep.png"
+    },
+    "Table golden regression (compare)": {
+      "commandName": "Project",
+      "commandLineArgs": "--table-regress"
+    },
+    "Table golden regression (update)": {
+      "commandName": "Project",
+      "commandLineArgs": "--table-regress --update"
+    }
+  }
+}

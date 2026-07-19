@@ -23,6 +23,14 @@ public sealed class PinballTable
 
     // Render-space extents (from PinballTableScene), used to place the perimeter.
     private const double MinX = -5.5, MaxX = 5.5, MaxZ = 24.0;
+    // Shooter lane on the right (matches PinballTableScene): a divider wall at x=4.6, the plunger at the bottom,
+    // and a curved feed at the top (the LaneFeed Bézier) that sweeps a launched ball left into the playfield.
+    // The divider runs z∈[DividerBottomZ, DividerTopZ]: it stops at the top *below* where the ball meets the feed
+    // (LaneFeed entry z≈14.6) so the turned ball has clear passage left; and it starts *above* the slingshot
+    // posts (z≈3.6) so a ball coming down the right can't wedge in the ball-narrow post↔divider gap (it drains
+    // down the right outlane instead). The launched ball rides straight up (no side drift), so it needs no
+    // divider low down.
+    private const double DividerX = 4.6, LaneX = 5.05, DividerBottomZ = 5.0, DividerTopZ = 12.5, WallH = 1.3;
 
     /// <summary>World-level physics settings (incline as tilted gravity on the flat playfield).</summary>
     public PhysicsSettings Settings { get; }
@@ -34,7 +42,11 @@ public sealed class PinballTable
     public Flipper RightFlipper { get; }
     /// <summary>A ball comes into play centred here (metres) — up-table, ready to roll toward the flippers.</summary>
     public Vector3D BallStart { get; }
-    /// <summary>A ball whose z falls below this (metres) has passed the flippers and drained.</summary>
+    /// <summary>Where a served ball rests against the plunger in the shooter lane (metres).</summary>
+    public Vector3D ShooterLaneStart { get; }
+    /// <summary>Auto-plunge launch speed (m/s, +z up the lane) — enough to reach the top feed and cross into play.</summary>
+    public double LaunchSpeed { get; }
+    /// <summary>A ball whose z falls below this (metres) — IN THE PLAYFIELD, not the shooter lane — has drained.</summary>
     public double DrainZ { get; }
 
     /// <summary>Builds the P0 physics table.</summary>
@@ -67,13 +79,32 @@ public sealed class PinballTable
             new PlaneCollider(new Vector3D(0, 0, MaxZ * RenderScale), -Vector3D.UnitZ, steel),  // back wall
             CylinderCollider.VerticalPost(new Vector3D(-3.9 * RenderScale, 0, 3.6 * RenderScale), postH, postR, rubber), // left slingshot post
             CylinderCollider.VerticalPost(new Vector3D(3.9 * RenderScale, 0, 3.6 * RenderScale), postH, postR, rubber),  // right slingshot post
+            // Shooter-lane divider: a vertical wall at x=4.6 for z∈[DividerBottomZ, DividerTopZ]. See the const
+            // note above — the ball rides straight up the lane so the divider needs neither the bottom (below
+            // the slingshots, where it would wedge a returning ball) nor the very top (which would block the feed).
+            new QuadCollider(new Vector3D(DividerX * RenderScale, 0, DividerBottomZ * RenderScale),
+                new Vector3D(0, 0, (DividerTopZ - DividerBottomZ) * RenderScale), new Vector3D(0, WallH * RenderScale, 0), steel),
+            // Feed at the top of the lane: a smooth quarter-turn Bézier guide (co-registered with the render
+            // wall through LaneFeed) that catches the +z ball and sweeps it left (−x, across the divider line)
+            // and down into the playfield — a curved launch rather than the old flat single-bounce deflector.
+            new BezierWallCollider(LaneFeed.CurveMetres(RenderScale), 0, LaneFeed.WallHeight * RenderScale,
+                LaneFeed.Segments, halfThickness: 0, steel),
             LeftFlipper,
             RightFlipper,
         };
+        // Interior lane walls (right/left orbits, return guides) are authored in TableWalls and drawn by
+        // PinballTableScene. They become physics colliders here — co-registered, one RenderScale apart — once
+        // the layout is locked; wiring them in now conflicts with the tuned shooter-lane feed (the ball path
+        // through the orbits is the "details later" pass). To enable:
+        //   foreach (TableWalls.Wall w in TableWalls.All)
+        //       colliders.Add(new BezierWallCollider(TableWalls.CurveMetres(w, RenderScale), 0,
+        //           TableWalls.WallHeight * RenderScale, w.Segments, halfThickness: 0, steel));
         Colliders = colliders;
 
-        BallStart = PlayfieldPoint(0.0, 6.0);       // centre, above the flippers
-        DrainZ = 1.5 * RenderScale;                 // below the flipper line ⇒ drained
+        BallStart = PlayfieldPoint(0.0, 6.0);       // centre, above the flippers (a mid-play spawn)
+        ShooterLaneStart = PlayfieldPoint(LaneX, 1.2); // resting against the plunger, bottom of the shooter lane
+        LaunchSpeed = 2.5;                          // m/s up the lane — reaches the top feed with speed to spare
+        DrainZ = 1.5 * RenderScale;                 // below the flipper line ⇒ drained (playfield only, see IsDrained)
     }
 
     /// <summary>A point on the playfield at ball-rest height, from render-space X/Z (metres out).</summary>
@@ -83,8 +114,11 @@ public sealed class PinballTable
     /// <summary>A fresh ball at rest at <see cref="BallStart"/>.</summary>
     public BallState NewBall() => BallState.AtRest(BallStart);
 
-    /// <summary>True once the ball has drained (fallen past the flippers).</summary>
-    public bool IsDrained(in BallState ball) => ball.Position.Z < DrainZ;
+    /// <summary>True once the ball has drained: fallen past the flippers IN THE PLAYFIELD. The shooter lane
+    /// (x > the divider) sits at low z too, so a ball waiting to launch there is not a drain — but a ball that
+    /// falls off the bottom of the lane (below the plunger, z &lt; 0) is lost and counts as a drain as well.</summary>
+    public bool IsDrained(in BallState ball) =>
+        (ball.Position.Z < DrainZ && ball.Position.X < DividerX * RenderScale) || ball.Position.Z < 0;
 
     private static Flipper MakeFlipper(double pivotX, double pivotZ, double tipX, double tipZ,
         double endAngle, double tube, PhysicsMaterial material)
