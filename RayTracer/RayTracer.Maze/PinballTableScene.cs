@@ -31,7 +31,10 @@ internal sealed record PinballTableScene(
     // Table extents (world units). Portrait, flipper end near z=0.
     private const float MinX = -5.5f, MaxX = 5.5f, MinZ = 0f, MaxZ = 24f, WallH = 1.3f;
 
-    public static PinballTableScene Build(int width, int height)
+    /// <summary>Start position of the chrome ball (world space) — the sweep capture moves this sphere.</summary>
+    public static readonly Vector3 BallStart = new(-2.1f, 0.36f, 5.6f);
+
+    public static PinballTableScene Build(int width, int height, bool dynamicBall = true)
     {
         var s = new List<Tracable>();
         var lights = new List<Light>();
@@ -159,7 +162,7 @@ internal sealed record PinballTableScene(
         // The chrome ball, resting in the shooter lane's feed (near the right inlane). Tagged Dynamic
         // (pinball-plan §4.1): even standing still in P0/P1 it takes the cheap mover tier — a 1-bounce
         // mirror of the converged static table + a hard contact shadow — and soft-caps at MotionSampleCap.
-        s.Add(new Sphere(new Vector3(-2.1f, 0.36f, 5.6f), 0.36f, chrome) { Dynamic = true });
+        s.Add(new Sphere(BallStart, 0.36f, chrome) { Dynamic = dynamicBall });
 
         // ── Lighting: dim overhead keys + warm backbox + insert cast-lights (the emissive parts supply
         // the glow and the ball's reflection; these give clean coloured illumination on the playfield). ─

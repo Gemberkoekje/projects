@@ -124,34 +124,41 @@ public class GpuMoverParityTests
         var js = BuildGroundTruth(tracables, cam);
         var tracer = new BvhSceneTracer(tracables, res.DeterWavelengths[0]);
 
-        int compared = 0, moverDiff = 0;
+        int compared = 0, moverDiff = 0, touchedCount = 0, reflectedTouch = 0;
         for (int y = 3; y < Height; y += 4)
         {
             for (int x = 3; x < Width; x += 4)
             {
                 Vector3 dir = PrimaryDir(cam, x, y);
-                if (!tracer.ClosestHit(cam.Position, dir, out _, out _))
+                if (!tracer.ClosestHit(cam.Position, dir, out int primIndex, out _))
                     continue;
+                bool primaryDyn = packedDyn.Primitives[primIndex].Dynamic != 0u;
 
                 Vector3 truth = TraceOneSample(js, cam, x, y);
 
                 uint pixelHash = Phase1Reference.Hash2D(x, y);
                 Vector3 refDyn = Phase2Reference.ShadeSample(
                     tracer, packedDyn.Primitives, res, LightPositions, LightingMode.NEE,
-                    cam.Position, dir, pixelHash, 0u, out _, out _);
+                    cam.Position, dir, pixelHash, 0u, out _, out _, out bool touchedDyn);
                 // Same scene, movers left static — the full integrator. Where it differs, the cheap mover
-                // branch actually changed the shading (proves it is exercised).
+                // branch actually changed the shading (proves it is exercised); with no Dynamic primitives
+                // pathTouchedDynamic must be false everywhere.
                 Vector3 refStatic = Phase2Reference.ShadeSample(
                     tracer, packedStatic.Primitives, res, LightPositions, LightingMode.NEE,
-                    cam.Position, dir, pixelHash, 0u, out _, out _);
+                    cam.Position, dir, pixelHash, 0u, out _, out _, out bool touchedStatic);
 
                 AssertClose(truth, refDyn, $"cpu==ref px=({x},{y})");
+                Assert.IsFalse(touchedStatic, $"no Dynamic primitive → pathTouchedDynamic must be false px=({x},{y})");
                 compared++;
                 if ((refDyn - refStatic).Length() > 5e-3f) moverDiff++;
+                if (touchedDyn) touchedCount++;
+                if (touchedDyn && !primaryDyn) reflectedTouch++; // §4.3: a static surface reflecting the mover
             }
         }
 
         Assert.IsTrue(compared > 200, $"expected many surface comparisons, got {compared}");
         Assert.IsTrue(moverDiff > 0, "the cheap mover branch must change shading vs. the static path (branch exercised)");
+        Assert.IsTrue(touchedCount > 0, "pathTouchedDynamic must fire for the mover pixels");
+        Assert.IsTrue(reflectedTouch > 0, "pathTouchedDynamic must fire on a STATIC surface that reflects the mover (§4.3 specular propagation)");
     }
 }

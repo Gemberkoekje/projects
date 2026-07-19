@@ -151,7 +151,7 @@ public class GpuEmissiveParityTests
                     Vector3 refTotal = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
                         s.Camera.Position, dir, pixelHash, sampleIdx,
-                        out Vector3 refDirect, out Vector3 refIndirect);
+                        out Vector3 refDirect, out Vector3 refIndirect, out _);
 
                     string at = $"px=({x},{y}) s={sampleIdx}";
                     AssertClose(truth.total, refTotal, $"total {at}");
@@ -198,7 +198,7 @@ public class GpuEmissiveParityTests
                 var truth = TraceOneSample(js, s.Camera, x, y, 0u);
                 Vector3 refTotal = Phase2Reference.ShadeSample(
                     tracer, s.Packed.Primitives, s.Res, [], LightingMode.NEE,
-                    s.Camera.Position, dir, Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    s.Camera.Position, dir, Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
 
                 AssertClose(truth.total, refTotal, $"total px=({x},{y})");
                 compared++;

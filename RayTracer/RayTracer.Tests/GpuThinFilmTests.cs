@@ -142,7 +142,7 @@ public sealed class GpuThinFilmTests
                     Vector3 refTotal = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, mode,
                         s.Camera.Position, dir, pixelHash, sampleIdx,
-                        out Vector3 refDirect, out _);
+                        out Vector3 refDirect, out _, out _);
 
                     string at = $"px=({x},{y}) s={sampleIdx} mode={mode}";
                     AssertClose(truth.total, refTotal, $"total {at}");

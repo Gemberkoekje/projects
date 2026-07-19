@@ -1539,7 +1539,7 @@ bool IntersectRat(float3 origin, float3 dir, float maxT, uint heroIdx, out float
 // recursion), tracing from the camera; the camera→primary segment (depth 1) is fogged by
 // FogOut/resolve, so it is skipped here to avoid double-counting.
 // Mirrors JobSystem.TraceSpecularRadiance.
-float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng, uint maxBounces)
+float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint rng, uint maxBounces, inout bool touchedDynamic)
 {
     float weight = 1.0;             // Π (transmittance × reflectance) so far
     float3 accum = float3(0.0, 0.0, 0.0);
@@ -1556,6 +1556,7 @@ float3 TraceSpecularRadiance(float3 origin, float3 dir, uint heroIdx, inout uint
     {
         PrimitiveInfo prim; float3 hitPoint;
         bool sceneHit = TraceClosest(origin, dir, prim, hitPoint);
+        if (sceneHit && prim.Dynamic != 0u) touchedDynamic = true; // §4.3: the ball reflected in static specular
         float sceneT = sceneHit ? length(hitPoint - origin) : 1e30;
 
         // The rat is a real object for reflected rays (depth > 1); the primary ray (depth 1) tests
@@ -1777,8 +1778,9 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
                    out bool primaryHit, out bool primaryRatHit, out bool primaryBubbleHit,
                    out float3 correctedDirect, out float3 correctedIndirect,
                    out float3 primaryHitPoint, out float3 primaryNormal, out float primaryAlbedo,
-                   out uint primaryDynamic)
+                   out uint primaryDynamic, out uint primaryTouchedDynamic)
 {
+    primaryTouchedDynamic = 0u;
     correctedDirect = float3(0.0, 0.0, 0.0);
     correctedIndirect = float3(0.0, 0.0, 0.0);
     primaryHitPoint = float3(0.0, 0.0, 0.0);
@@ -1830,6 +1832,9 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     // no spectral indirect / no caustics) and marks the pixel a mover for the MotionSampleCap soft-cap.
     bool dyn = (prim.Dynamic != 0u);
     primaryDynamic = dyn ? 1u : 0u;
+    // §4.3 pathTouchedDynamic: primary hit, or (in the specular chain) the ball reflected/refracted through
+    // a static mirror/glass — so that pixel restarts + soft-caps when the reflection moves.
+    bool touched = dyn;
 
     float3 hitNormal = FaceNormal(prim, primaryDir);
     primaryHitPoint = hitPoint;
@@ -1847,7 +1852,8 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         // chain to one reflection into the converged static scene (§4.4); the loop counts the primary hit
         // as depth 1, so the cap is MOVER_SPECULAR_BOUNCES + 1.
         uint specCap = dyn ? (MOVER_SPECULAR_BOUNCES + 1u) : MAX_SPECULAR_BOUNCES;
-        float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng, specCap) * DeterministicCorrection;
+        float3 specXyz = TraceSpecularRadiance(camPos, primaryDir, heroIdx, specRng, specCap, touched) * DeterministicCorrection;
+        primaryTouchedDynamic = touched ? 1u : 0u;
 
         // Soap-bubble firefly clamp (§2.6): the thin-shell reflect/transmit split is high-variance (a
         // rare boosted reflection over a mostly see-through background), so cap each sample's luminance
@@ -2021,6 +2027,7 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
     // Mirrors the primary-hit emission block in Phase2Reference.ShadeSample / JobSystem.TraceCore.
     xyz += DeterXYZ[heroIdx].xyz * HeroEmission(prim, primaryDir, hitPoint, heroIdx);
 
+    primaryTouchedDynamic = touched ? 1u : 0u; // diffuse primary: touched == dyn (no specular chain here)
     float correction = DeterministicCorrection;
     correctedDirect = bounce0 * correction;
     correctedIndirect = indirect * correction;
@@ -2239,9 +2246,9 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     bool hit, ratHit, bubbleHit;
     float3 correctedDirect, correctedIndirect, gHitPoint, gNormal;
     float gAlbedo;
-    uint gDynamic;
+    uint gDynamic, gTouched;
     float3 corrected = ShadeSample(rayOrigin, dir, pixelHash, sampleIdx, hit, ratHit, bubbleHit,
-                                   correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo, gDynamic);
+                                   correctedDirect, correctedIndirect, gHitPoint, gNormal, gAlbedo, gDynamic, gTouched);
 
     // §4.1: the lens's natural falloff toward the corners. Exactly 1.0 when the lens does not vignette.
     if (LensVignetteStrength > 0.0)
@@ -2277,7 +2284,13 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // while the camera moves. So a mover accumulates ~cap samples: smooth (no fireflies), with a short
     // bounded temporal smear (and, once it drifts on, the freed pixel reconverges from ~cap, so any
     // wall ghost fades in a fraction of a second). The animations are slowed to keep that smear legible.
-    uint hitMask = hit ? 1u : 0u;
+    // §4.3 hit-id restart (the ghost-trail fix): the per-pixel restart key distinguishes a moving part (2)
+    // from static geometry (1) and a miss (0). A 1-bit hit/miss let a fast ball sliding off a pixel blend
+    // the static surface behind it into the ball's stale mean — a ghost trail decaying only over
+    // MotionSampleCap frames. With the id, a ball→static transition changes 2→1 → a clean 1-sample restart,
+    // so the trail vanishes. A no-mover scene only ever writes 0/1 (== the old hit/miss mask), so its
+    // accumulation is byte-identical; the resolve reads LastHit != 0 for hit/miss, so 1 and 2 both count.
+    uint hitId = !hit ? 0u : ((gTouched != 0u) ? 2u : 1u);
     // Only the rat genuinely animates each frame, so cap its pixels to bound its temporal smear. Bubbles
     // are FROZEN (snapshotted at build/regenerate, §2.6) — capping them as "movers" pinned their spectral
     // reflect/transmit estimate at ~MotionSampleCap samples, so a hero bubble never converged no matter how
@@ -2285,8 +2298,8 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     // during camera motion SoftResetFlag still caps every pixel (bubble included), so no specular ghosting.
     // A moving part (the chrome ball / a flipper) soft-caps at MotionSampleCap like the rat, so the static
     // scene keeps converging around it and its bounded temporal smear stays short (§4.1/§4.3).
-    bool isMover = ratHit || (gDynamic != 0u);
-    bool restart = reset || (LastHit[ix] != hitMask);
+    bool isMover = ratHit || (gTouched != 0u);
+    bool restart = reset || (LastHit[ix] != hitId);
     uint prevCount = restart ? 0u : SampleCount[ix];
     if ((SoftResetFlag != 0u || isMover) && !restart)
         prevCount = min(prevCount, MotionSampleCap);
@@ -2307,7 +2320,7 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
     IndirectAccum[ix] = float4(newIndirect, 1.0);
     SampleCount[ix] = count;
     WavelengthCounter[ix] = sampleIdx + 1u;
-    LastHit[ix] = hitMask;
+    LastHit[ix] = hitId;
 
     // Welford variance of luma (mirrors PathTracer.cs: M2 += (ySample - newMean)^2,
     // using the just-updated mean; reset alongside the running mean). The resolve /

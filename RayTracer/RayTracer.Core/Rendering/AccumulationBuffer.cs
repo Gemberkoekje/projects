@@ -20,6 +20,7 @@ public partial class JobSystem
         Array.Clear(_buffers.AccumXYZ);
         Array.Clear(_buffers.SampleCount);
         Array.Clear(_buffers.LastHit);
+        Array.Clear(_buffers.LastDynamicTouched);
         Array.Clear(_buffers.WavelengthCounter);
         Array.Clear(_buffers.HitPointWorld);
         Array.Clear(_buffers.LumaM2);

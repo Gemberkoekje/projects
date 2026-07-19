@@ -14,6 +14,11 @@ internal class RenderBuffers
     public uint[] SampleCount { get; }
     public long[] WavelengthCounter { get; }
     public bool[] LastHit { get; }
+    /// <summary>Whether the pixel's previous sample touched a moving part (pinball-plan §4.3): kept
+    /// alongside <see cref="LastHit"/> so the accumulation restarts when the dynamic-vs-static hit id
+    /// changes (a ball sliding on/off a pixel), not just on a hit/miss flip. Always false for a scene with
+    /// no <c>Dynamic</c> primitives, so the restart stays byte-identical there.</summary>
+    public bool[] LastDynamicTouched { get; }
     public Vector3[] HitPointWorld { get; }
 
     // Luminance variance tracking
@@ -57,6 +62,7 @@ internal class RenderBuffers
         SampleCount = new uint[pixelCount];
         WavelengthCounter = new long[pixelCount];
         LastHit = new bool[pixelCount];
+        LastDynamicTouched = new bool[pixelCount];
         HitPointWorld = new Vector3[pixelCount];
 
         LumaM2 = new float[pixelCount];

@@ -149,7 +149,7 @@ public class GpuPhase2Tests
                     Vector3 refTotal = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
                         s.Camera.Position, dir, pixelHash, sampleIdx,
-                        out Vector3 refDirect, out Vector3 refIndirect);
+                        out Vector3 refDirect, out Vector3 refIndirect, out _);
 
                     string at = $"px=({x},{y}) s={sampleIdx}";
                     AssertClose(truth.total, refTotal, $"total {at}");
@@ -208,12 +208,12 @@ public class GpuPhase2Tests
                     Vector3 refTotal = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
                         s.Camera.Position, dir, pixelHash, sampleIdx,
-                        out Vector3 refDirect, out Vector3 refIndirect, temps);
+                        out Vector3 refDirect, out Vector3 refIndirect, out _, temps);
 
                     // Same sample with white lights (no temps) — proves the warm path is non-trivial.
                     Vector3 refWhite = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
-                        s.Camera.Position, dir, pixelHash, sampleIdx, out _, out _);
+                        s.Camera.Position, dir, pixelHash, sampleIdx, out _, out _, out _);
 
                     string at = $"px=({x},{y}) s={sampleIdx}";
                     AssertClose(truth.total, refTotal, $"total {at}");
@@ -258,7 +258,7 @@ public class GpuPhase2Tests
                 Vector3 refTotal = Phase2Reference.ShadeSample(
                     tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.Direct,
                     s.Camera.Position, dir, Phase1Reference.Hash2D(x, y), 0u,
-                    out Vector3 refDirect, out Vector3 refIndirect);
+                    out Vector3 refDirect, out Vector3 refIndirect, out _);
 
                 string at = $"px=({x},{y})";
                 AssertClose(truth.total, refTotal, $"total {at}");
@@ -295,7 +295,7 @@ public class GpuPhase2Tests
                 Vector3 refTotal = Phase2Reference.ShadeSample(
                     tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.None,
                     s.Camera.Position, dir, pixelHash, 0u,
-                    out Vector3 refDirect, out Vector3 refIndirect);
+                    out Vector3 refDirect, out Vector3 refIndirect, out _);
 
                 // Fullbright: total == direct == Phase 1 ShadeHit; no indirect.
                 Vector3 fullbright = Phase1Reference.ShadeHit(s.Packed.Primitives[quad], s.Res, dir, hitPoint, pixelHash, 0u);
@@ -336,7 +336,7 @@ public class GpuPhase2Tests
 
                 Vector3 refTotal = Phase2Reference.ShadeSample(
                     tracer, s.Packed.Primitives, s.Res, s.LightPositions, LightingMode.NEE,
-                    s.Camera.Position, dir, Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    s.Camera.Position, dir, Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
                 Vector3 refClamped = Vector3.Clamp(refTotal, Vector3.Zero, clampVec);
 
                 AssertClose(truth.total, refClamped, $"clamped total px=({x},{y})");

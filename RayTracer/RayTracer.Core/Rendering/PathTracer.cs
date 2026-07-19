@@ -281,10 +281,13 @@ public partial class JobSystem
         public MediumStack Pop() => Depth > 0 ? new(Depth - 1, _i0, _i1, _i2, _i3, _s0, _s1, _s2, _s3) : this;
     }
 
-    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces)
+    private Vector3 TraceSpecularRadiance(Vector3 origin, Vector3 dir, float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces, ref bool touchedDynamic)
     {
         var ray = new Ray { Origin = origin, Direction = dir, Wavelength = wavelength, Intensity = 1f };
-        var (reflectance, hitPoint, hitNormal, _, hit, _, surface, ior, extinction, emission) = _bvh.FindClosest(ray);
+        var (reflectance, hitPoint, hitNormal, _, hit, hitPrim, surface, ior, extinction, emission) = _bvh.FindClosest(ray);
+        // §4.3: the moving ball reflected/refracted in a static specular surface (chrome rail, glass dome)
+        // marks the pixel a mover, so its ghost is soft-capped + restarts when the reflection moves.
+        if (hit && hitPrim is not null && hitPrim.Dynamic) touchedDynamic = true;
         if (!hit)
             // §O2/§O3: an escaping reflection/refraction sees the sky (through an open roof), not black —
             // the recursion multiplies the specular throughput back in on unwind. Sky off → black (unchanged).
@@ -295,7 +298,7 @@ public partial class JobSystem
         Vector3 radiance;
         if (Optics.IsSpecular(surface) && depth < maxBounces)
         {
-            radiance = SpecularRadiance(surface, reflectance, ior, extinction, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass, mediumSigma, stack, maxBounces);
+            radiance = SpecularRadiance(surface, reflectance, ior, extinction, hitPoint, hitNormal, dir, wavelength, ref rng, depth, inGlass, mediumSigma, stack, maxBounces, ref touchedDynamic);
         }
         else
         {
@@ -327,13 +330,13 @@ public partial class JobSystem
     private Vector3 SpecularRadiance(
         SurfaceKind surface, float reflectance, float ior, float hitExtinction,
         Vector3 hitPoint, Vector3 hitNormal, Vector3 incidentDir,
-        float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces)
+        float wavelength, ref uint rng, int depth, bool inGlass, float mediumSigma, MediumStack stack, int maxBounces, ref bool touchedDynamic)
     {
         if (surface == SurfaceKind.Mirror)
         {
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces);
+            return reflectance * TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces, ref touchedDynamic);
         }
 
         if (surface == SurfaceKind.Bubble)
@@ -354,10 +357,10 @@ public partial class JobSystem
             {
                 Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
                 Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
-                return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces);
+                return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces, ref touchedDynamic);
             }
             Vector3 throughOrigin = hitPoint + incidentDir * 1e-3f; // straight through the thin shell
-            return TraceSpecularRadiance(throughOrigin, incidentDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces);
+            return TraceSpecularRadiance(throughOrigin, incidentDir, wavelength, ref rng, depth + 1, bInGlass, bSigma, stack, maxBounces, ref touchedDynamic);
         }
 
         // Dielectric glass: reflect vs. refract by Russian roulette on Fresnel. §13: the from/to IOR come
@@ -388,7 +391,7 @@ public partial class JobSystem
             Vector3 reflectDir = Vector3.Reflect(incidentDir, hitNormal);
             Vector3 reflectOrigin = hitPoint + hitNormal * 1e-3f;
             // Reflection stays in the current medium → its absorption (and the stack) are unchanged.
-            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces);
+            return TraceSpecularRadiance(reflectOrigin, reflectDir, wavelength, ref rng, depth + 1, inGlass, mediumSigma, stack, maxBounces, ref touchedDynamic);
         }
 
         Vector3 refractOrigin = hitPoint - hitNormal * 1e-3f;
@@ -409,7 +412,7 @@ public partial class JobSystem
             newMediumSigma = newInGlass ? hitExtinction : 0f;
         }
 
-        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, newInGlass, newMediumSigma, newStack, maxBounces);
+        return TraceSpecularRadiance(refractOrigin, refractDir, wavelength, ref rng, depth + 1, newInGlass, newMediumSigma, newStack, maxBounces, ref touchedDynamic);
     }
 
     /// <summary>
@@ -664,6 +667,10 @@ public partial class JobSystem
         // pinball-plan §4.1: a primary hit on a moving part takes the cheap mover tier — a capped specular
         // chain, or a diffuse hit with no spectral indirect / caustics. Default false → static path unchanged.
         bool dyn = hit && hitPrimitive is not null && hitPrimitive.Dynamic;
+        // §4.3 pathTouchedDynamic: true if this sample's path touched a moving part — the primary hit, or
+        // (below) the ball reflected/refracted through a static specular surface. Drives the hit-id restart
+        // + mover soft-cap so the ball's ghost in the chrome rails / glass is bounded, not frozen.
+        bool touched = dyn;
         Vector3 xyz = Vector3.Zero;
         // §O2/§O3: a ray that escapes all geometry (through an open roof) sees the sky, not black.
         // Emissive, so it takes no lighting/fog; the hit branches below overwrite xyz when the ray did hit.
@@ -689,8 +696,8 @@ public partial class JobSystem
             // by the shared volumetric step below.
             xyz = SpecularRadiance(
                 heroSurface, reflectance, heroIor, heroExtinction, hitPoint, hitNormal, dir,
-                heroWavelength, ref specularRng, 0, inGlass: false, mediumSigma: 0f, stack: default,
-                maxBounces: dyn ? MoverSpecularBounces : MaxSpecularBounces);
+                heroWavelength, ref specularRng, 0, false, 0f, default,
+                dyn ? MoverSpecularBounces : MaxSpecularBounces, ref touched);
 
             // The specular radiance behaves like a direct view of the reflected/refracted
             // surface; book it as bounce-0/direct for the debug decomposition.
@@ -1037,7 +1044,12 @@ public partial class JobSystem
             xyz += emissiveLighting;
         }
 
-        if (hit != LastHit[ix])
+        // §4.3 hit-id restart (the ghost-trail fix): restart when the dynamic-vs-static hit id changes, not
+        // just on a hit/miss flip — so a moving part sliding on/off a pixel forces a clean 1-sample restart
+        // instead of blending the static surface behind it into the mover's stale mean. dynHit is always
+        // false without a Dynamic primitive, so a no-mover scene restarts byte-identically to before.
+        bool dynHit = hit && touched;
+        if (hit != LastHit[ix] || dynHit != _buffers.LastDynamicTouched[ix])
         {
             _buffers.AccumXYZ[ix] = Vector3.Zero;
             SampleCount[ix] = 0;
@@ -1056,6 +1068,7 @@ public partial class JobSystem
             emissiveLightingXYZ[ix] = Vector3.Zero;
             diffuseCacheState[ix] = 0;
             LastHit[ix] = hit;
+            _buffers.LastDynamicTouched[ix] = dynHit;
         }
 
         if (hit)

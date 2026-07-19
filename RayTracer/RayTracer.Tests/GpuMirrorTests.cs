@@ -160,7 +160,7 @@ public sealed class GpuMirrorTests
                     Vector3 refTotal = Phase2Reference.ShadeSample(
                         tracer, s.Packed.Primitives, s.Res, s.LightPositions, mode,
                         s.Camera.Position, dir, pixelHash, sampleIdx,
-                        out Vector3 refDirect, out Vector3 refIndirect);
+                        out Vector3 refDirect, out Vector3 refIndirect, out _);
 
                     string at = $"px=({x},{y}) s={sampleIdx} mode={mode}";
                     AssertClose(truth.total, refTotal, $"total {at}");

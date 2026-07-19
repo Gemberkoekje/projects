@@ -53,6 +53,7 @@ internal static class Program
         bool absorptionDemo = args.Contains("--absorption-demo", StringComparer.OrdinalIgnoreCase);
         bool sphereDemo = args.Contains("--sphere-demo", StringComparer.OrdinalIgnoreCase);
         bool tableDemo = args.Contains("--table-demo", StringComparer.OrdinalIgnoreCase);
+        bool ballSweep = args.Contains("--ball-sweep", StringComparer.OrdinalIgnoreCase);
         bool bubbleDemo = args.Contains("--bubble-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
         bool causticDemo = args.Contains("--caustic-demo", StringComparer.OrdinalIgnoreCase);
@@ -78,7 +79,7 @@ internal static class Program
         bool headless = selfTest || phase1SelfTest || phase2SelfTest || phase3SelfTest
             || phase4SelfTest || phase5SelfTest || phase6SelfTest || screensaverSelfTest
             || screensaverPreviewSelfTest || phase6Regress || setupSelfTest || regenSelfTest || movieSelfTest || movie
-            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || tableDemo || bubbleDemo || causticDemo || causticMaze
+            || mirrorDemo || glassDemo || prismDemo || jewelDemo || thinFilmDemo || oilDemo || absorptionDemo || sphereDemo || tableDemo || ballSweep || bubbleDemo || causticDemo || causticMaze
             || prismCaustic || bubbleCaustic || softShadowDemo || outdoorMaze
             || ((phase4 || phase5 || phase6) && savePath is not null);
 
@@ -118,6 +119,9 @@ internal static class Program
                 return RunSphereDemo(maxFrames, savePath ?? "sphere-demo.png", sampleClamp);
             if (tableDemo)
                 return RunTableDemo(maxFrames, savePath ?? "table-demo.png", sampleClamp);
+            if (ballSweep)
+                return RunBallSweep(maxFrames, savePath ?? "ball-sweep.png", sampleClamp,
+                    dynamicBall: !args.Contains("--static-ball", StringComparer.OrdinalIgnoreCase));
             if (bubbleDemo)
                 return RunBubbleDemo(maxFrames, savePath ?? "bubble-demo.png", sampleClamp,
                     ParseFloatOption(args, "--thickness", 440f));
@@ -347,7 +351,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
                 Vector3 expected = Vector3.Clamp(Phase1Reference.ResolveToSRGB(corrected), Vector3.Zero, Vector3.One);
 
                 int o = (y * Width + x) * 4;
@@ -424,7 +428,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
                 Vector3 expected = Vector3.Clamp(Phase1Reference.ResolveToSRGB(corrected), Vector3.Zero, Vector3.One);
 
                 int o = (y * Width + x) * 4;
@@ -532,7 +536,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
 
                 VolumetricSample vol = Phase4Reference.IntegrateSegment(
                     built.Camera.Position, hitPoint, dir, volumetrics, isMoving: false,
@@ -709,7 +713,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _);
 
                 VolumetricSample vol = Phase4Reference.IntegrateSegment(
                     built.Camera.Position, hitPoint, dir, volumetrics, isMoving: false,
@@ -2292,6 +2296,57 @@ internal static class Program
 
         for (int f = 0; f < frames; f++)
             renderer.RenderHeadlessFrame(reset: f == 0, moving: false);
+
+        byte[] rgba = renderer.ReadbackOutput();
+        SavePng(rgba, Width, Height, savePath);
+        Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
+        return 0;
+    }
+
+    /// <summary>
+    /// P2 ghost-trail verification (pinball-plan §4.3): sweeps the chrome ball across the playfield over the
+    /// converge frames while the camera stays fixed, then saves the final accumulated frame. With the
+    /// ball tagged <c>Dynamic</c> (default), the §4.3 hit-id restart clears each pixel the ball vacates, so
+    /// the ball appears cleanly at its end position with no trail. With <c>--static-ball</c> the ball is
+    /// untagged: its pixels never restart on the move, so the swept path smears into a permanent ghost
+    /// trail — the artifact the fix removes.
+    /// </summary>
+    private static int RunBallSweep(int frames, string savePath, float sampleClamp, bool dynamicBall)
+    {
+        if (frames <= 0) frames = 90;
+        Console.WriteLine($"Space Cadet RT — ball sweep ({frames} frames, {(dynamicBall ? "Dynamic ball" : "STATIC ball → trail")}) -> {savePath}");
+
+        PinballTableScene table = PinballTableScene.Build(Width, Height, dynamicBall);
+        int n = table.Packed.Spheres.Count;
+        var centers = new Vector3[n];
+        var radii = new float[n];
+        int ballIdx = -1;
+        for (int i = 0; i < n; i++)
+        {
+            GpuSphere sp = table.Packed.Spheres[i];
+            centers[i] = new Vector3(sp.CX, sp.CY, sp.CZ);
+            radii[i] = sp.Radius;
+            if (Vector3.Distance(centers[i], PinballTableScene.BallStart) < 1e-3f) ballIdx = i;
+        }
+        if (ballIdx < 0) { Console.WriteLine("  ball sphere not found"); return 1; }
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        using var renderer = new Phase6Renderer(
+            Width, Height, table.Packed, table.Spectral, table.PackedLights, table.Camera,
+            volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+            maxSampleCount: (uint)Math.Max(1, frames),
+            biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
+        renderer.Initialize(windowHandle: 0);
+        renderer.SetCamera(table.Camera);
+        Console.WriteLine($"Adapter: {renderer.AdapterName}");
+
+        for (int f = 0; f < frames; f++)
+        {
+            float t = frames > 1 ? f / (float)(frames - 1) : 1f;
+            centers[ballIdx] = PinballTableScene.BallStart + new Vector3(4.2f * t, 0f, 0f); // sweep across +X
+            renderer.UpdateSpheres(centers, radii);
+            renderer.RenderHeadlessFrame(reset: f == 0, moving: false); // camera fixed; only the ball moves
+        }
 
         byte[] rgba = renderer.ReadbackOutput();
         SavePng(rgba, Width, Height, savePath);
@@ -4027,7 +4082,7 @@ internal static class Program
                 Vector3 corrected = Phase2Reference.ShadeSample(
                     tracer, built.Packed.Primitives, built.Spectral, lightPositions,
                     LightingMode.NEE, built.Camera.Position, dir,
-                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, lightTemps);
+                    Phase1Reference.Hash2D(x, y), 0u, out _, out _, out _, lightTemps);
 
                 VolumetricSample vol = Phase4Reference.IntegrateSegment(
                     built.Camera.Position, hitPoint, dir, volumetrics, isMoving: false,
