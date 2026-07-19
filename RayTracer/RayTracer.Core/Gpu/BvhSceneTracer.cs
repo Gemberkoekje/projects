@@ -17,7 +17,7 @@ public sealed class BvhSceneTracer : Phase2Reference.ISceneTracer
     private readonly Dictionary<Tracable, int> _quadIndex;
     private readonly int _wavelength;
 
-    /// <param name="scene">The same scene the packer flattened (quad order preserved).</param>
+    /// <param name="scene">The same scene the packer flattened.</param>
     /// <param name="wavelength">Any valid wavelength; only used to satisfy
     /// <see cref="Ray"/> — geometry and occlusion are wavelength-independent and
     /// the reflectance the BVH computes is discarded (the replica reconstructs it).</param>
@@ -26,16 +26,13 @@ public sealed class BvhSceneTracer : Phase2Reference.ISceneTracer
         System.ArgumentNullException.ThrowIfNull(scene);
 
         _bvh = new BVH(scene);
+        // Map each quad to its PACKED row, not its scene-order position: §4.2 moves Dynamic quads to the
+        // tail of Primitives, so a hit quad's Primitives[] row is its index in GpuScenePacker.OrderQuads,
+        // the single source of truth the packer also uses. Scene order would desync for a mid-scene mover.
         _quadIndex = new Dictionary<Tracable, int>(ReferenceEqualityComparer.Instance);
-        int qi = 0;
-        foreach (Tracable t in scene)
-        {
-            if (t is IQuadPrimitive)
-            {
-                _quadIndex[t] = qi;
-                qi++;
-            }
-        }
+        List<IQuadPrimitive> quads = GpuScenePacker.OrderQuads(scene, out _);
+        for (int qi = 0; qi < quads.Count; qi++)
+            _quadIndex[(Tracable)quads[qi]] = qi;
         _wavelength = wavelength;
     }
 

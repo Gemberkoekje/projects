@@ -647,7 +647,7 @@ bool TraceClosest(float3 origin, float3 dir, out PrimitiveInfo prim, out float3 
     uint status = q.CommittedStatus();
     if (status == COMMITTED_TRIANGLE_HIT)
     {
-        prim = Primitives[q.CommittedPrimitiveIndex() >> 1];
+        prim = Primitives[q.CommittedInstanceID() + (q.CommittedPrimitiveIndex() >> 1)]; // §4.2: InstanceID = the instance's primitive offset (0 for the static BLAS, StaticQuadCount for the dynamic one)
         hitPoint = origin + dir * q.CommittedRayT();
         return true;
     }
@@ -802,7 +802,7 @@ float TraceTransmittance(float3 origin, float3 dir, float maxDist, uint heroIdx)
             // every other triangle is an opaque blocker that commits and, with accept-first-hit, ends
             // the search. A pane is two coincident quads, so a clear window keeps (1 − Fresnel)² and a
             // stained one is additionally tinted toward its transmitted hue — a faint, coloured shadow.
-            PrimitiveInfo p = Primitives[q.CandidatePrimitiveIndex() >> 1];
+            PrimitiveInfo p = Primitives[q.CandidateInstanceID() + (q.CandidatePrimitiveIndex() >> 1)]; // §4.2 dynamic-instance offset
             if (p.Surface == SURFACE_DIELECTRIC)
             {
                 float cosv = abs(dot(ndir, float3(p.NX, p.NY, p.NZ)));
@@ -2385,7 +2385,7 @@ bool TraceClosestNoReveal(float3 origin, float3 dir, out PrimitiveInfo prim, out
     uint status = q.CommittedStatus();
     if (status == COMMITTED_TRIANGLE_HIT)
     {
-        prim = Primitives[q.CommittedPrimitiveIndex() >> 1];
+        prim = Primitives[q.CommittedInstanceID() + (q.CommittedPrimitiveIndex() >> 1)]; // §4.2: InstanceID = the instance's primitive offset (0 for the static BLAS, StaticQuadCount for the dynamic one)
         hitPoint = origin + dir * q.CommittedRayT();
         return true;
     }

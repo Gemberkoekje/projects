@@ -1137,12 +1137,23 @@ Goal: no history smear on movers. Deliverable: `TaaNextValid=false` for mover
 pixels in `ResolvePhase6.hlsl`/`TaaResolver`. Verify: fast mover has crisp edges;
 static half still reaches high effective spp; goldens bit-identical.
 
-**P4 — Rigid mover poses + AS refit without stalls.**
+**P4 — Rigid mover poses + AS refit without stalls. — DONE.**
 Goal: real-time movers at 60 fps. Deliverable: `SetDynamicPose(instance,
 Matrix3x4)` for the dynamic triangle BLAS (flippers/plunger); ball via
 `UpdateSpheres`; **AS refit folded into the trace command list**, extra
 `WaitForGpu` removed. Verify: on the 3070, a scripted animation of ball + flippers
 holds 60 fps at Classic-preset internal resolution.
+> **Done.** The packer splits quads into a static range + an appended `Dynamic`
+> range (`PackedScene.StaticQuadCount`); the renderer builds a separate **dynamic
+> triangle BLAS** from that range as a movable TLAS instance whose `InstanceID` =
+> `StaticQuadCount` (the shader adds `CommittedInstanceID()`/`CandidateInstanceID()`
+> to index the appended `Primitives` rows). `SetDynamicPose(instance, Matrix3x4)`
+> re-uploads the instance transform and the TLAS refit is folded into the trace
+> submission (`RecordMoverRefit`, shared with `UpdateSpheres`). Verified on the 3070
+> via `--flipper-demo`: pose-invariance vs baked ground-truth geometry (max|Δ| 1),
+> visible sweep, clean re-pose round-trip, **425 fps**, no D3D12 validation errors;
+> the no-mover path stays byte-identical (self-test 700/700, regress 20/20 with the
+> `table` golden bit-exact). The AS-refit fold ("no stalls" half) landed earlier.
 
 **P5 — Physics core (`Pinball.Core`) — parallel track, can start alongside P0/P1.**
 Goal: a physically honest ball. Depends only on `RayTracer.Core`'s existing BVH, not

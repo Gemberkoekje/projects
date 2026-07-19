@@ -32,18 +32,29 @@ public sealed class PackedScene
     /// <summary>Number of quads (equals <c>Primitives.Length</c>).</summary>
     public int QuadCount => Primitives.Length;
 
+    /// <summary>
+    /// Number of <b>static</b> quads, which are packed first (indices <c>[0, StaticQuadCount)</c>); any
+    /// <see cref="IQuadPrimitive.Dynamic"/> quads (flippers / plunger — pinball-plan §4.2) are appended
+    /// after them (<c>[StaticQuadCount, QuadCount)</c>). The renderer builds the static triangle BLAS from
+    /// the first range and a separate <i>dynamic</i> triangle BLAS (a movable TLAS instance) from the
+    /// second, so rigid movers can be posed via <c>SetDynamicPose</c>. Equals <see cref="QuadCount"/> for
+    /// a scene with no dynamic quads, so those scenes pack and render exactly as before.
+    /// </summary>
+    public int StaticQuadCount { get; }
+
     /// <summary>Analytic spheres (spectral-effects-plan §0.4), carried on the GPU as
     /// procedural-AABB geometry. Empty for the (common) quad-only scenes.</summary>
     public IReadOnlyList<GpuSphere> Spheres { get; }
 
     internal PackedScene(float[] vertices, uint[] indices, GpuPrimitive[] primitives,
-        IReadOnlyList<MaterialData> materials, IReadOnlyList<GpuSphere> spheres)
+        IReadOnlyList<MaterialData> materials, IReadOnlyList<GpuSphere> spheres, int staticQuadCount)
     {
         Vertices = vertices;
         Indices = indices;
         Primitives = primitives;
         Materials = materials;
         Spheres = spheres;
+        StaticQuadCount = staticQuadCount;
     }
 }
 
@@ -56,15 +67,38 @@ public sealed class PackedScene
 /// </summary>
 public static class GpuScenePacker
 {
+    /// <summary>
+    /// The scene's quads in <b>packed order</b> — static quads first (stable), then every
+    /// <see cref="IQuadPrimitive.Dynamic"/> quad appended (stable), matching the row order of
+    /// <see cref="PackedScene.Primitives"/>. <paramref name="staticQuadCount"/> receives the boundary
+    /// (= <see cref="PackedScene.StaticQuadCount"/>). <b>Any</b> consumer that maps a hit quad back to a
+    /// <see cref="PackedScene.Primitives"/> row (the CPU reference oracle <c>BvhSceneTracer</c>, the headless
+    /// self-test cross-check) MUST index via this order — indexing by raw scene order desyncs the moment a
+    /// <c>Dynamic</c> quad is not already last in the scene, because §4.2 moves it to the tail. Non-quad
+    /// tracables (spheres, etc.) are skipped, exactly as <see cref="Pack"/> does.
+    /// </summary>
+    public static List<IQuadPrimitive> OrderQuads(IReadOnlyList<Tracable> scene, out int staticQuadCount)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
+        var statics = new List<IQuadPrimitive>(scene.Count);
+        var dynamics = new List<IQuadPrimitive>();
+        foreach (Tracable t in scene)
+            if (t is IQuadPrimitive q)
+                (q.Dynamic ? dynamics : statics).Add(q);
+        staticQuadCount = statics.Count;
+        statics.AddRange(dynamics);
+        return statics;
+    }
+
     /// <summary>Packs <paramref name="scene"/> into GPU buffers.</summary>
     public static PackedScene Pack(IReadOnlyList<Tracable> scene)
     {
         ArgumentNullException.ThrowIfNull(scene);
 
-        var quads = new List<IQuadPrimitive>(scene.Count);
-        foreach (Tracable t in scene)
-            if (t is IQuadPrimitive q)
-                quads.Add(q);
+        // Static quads first, then Dynamic quads (flippers/plunger — §4.2), each stable within its group,
+        // so the primitives split cleanly into a static range [0, staticQuadCount) + a dynamic range. The
+        // renderer builds a separate movable BLAS from the dynamic range. No dynamic quads → order unchanged.
+        List<IQuadPrimitive> quads = OrderQuads(scene, out int staticQuadCount);
 
         var materials = new List<MaterialData>();
         var materialIndex = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -161,7 +195,7 @@ public static class GpuScenePacker
             });
         }
 
-        return new PackedScene(vertices, indices, primitives, materials, spheres);
+        return new PackedScene(vertices, indices, primitives, materials, spheres, staticQuadCount);
     }
 
     private static void WriteVertex(float[] dest, int offset, Vector3 v)

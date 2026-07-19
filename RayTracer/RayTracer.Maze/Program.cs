@@ -54,6 +54,7 @@ internal static class Program
         bool sphereDemo = args.Contains("--sphere-demo", StringComparer.OrdinalIgnoreCase);
         bool tableDemo = args.Contains("--table-demo", StringComparer.OrdinalIgnoreCase);
         bool ballSweep = args.Contains("--ball-sweep", StringComparer.OrdinalIgnoreCase);
+        bool flipperDemo = args.Contains("--flipper-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleDemo = args.Contains("--bubble-demo", StringComparer.OrdinalIgnoreCase);
         bool bubbleMazeDemo = args.Contains("--bubble-maze-demo", StringComparer.OrdinalIgnoreCase);
         bool causticDemo = args.Contains("--caustic-demo", StringComparer.OrdinalIgnoreCase);
@@ -122,6 +123,8 @@ internal static class Program
             if (ballSweep)
                 return RunBallSweep(maxFrames, savePath ?? "ball-sweep.png", sampleClamp,
                     dynamicBall: !args.Contains("--static-ball", StringComparer.OrdinalIgnoreCase));
+            if (flipperDemo)
+                return RunFlipperDemo(maxFrames, savePath ?? "flipper-demo.png", sampleClamp);
             if (bubbleDemo)
                 return RunBubbleDemo(maxFrames, savePath ?? "bubble-demo.png", sampleClamp,
                     ParseFloatOption(args, "--thickness", 440f));
@@ -243,7 +246,9 @@ internal static class Program
         double coverage = (double)nonBlack / (Width * Height);
 
         var bvh = new BVH(built.Tracables);
-        var quads = built.Tracables.OfType<IQuadPrimitive>().ToList();
+        // Packed row order (static-first, Dynamic appended — §4.2), the same mapping the packer uses; raw
+        // scene order would index Primitives[] wrong for a mid-scene mover. See GpuScenePacker.OrderQuads.
+        var quads = GpuScenePacker.OrderQuads(built.Tracables, out _);
         float tanHalfFov = MathF.Tan(built.Camera.Fov * 0.5f);
         float aspectTanHalfFov = built.Camera.Aspect * tanHalfFov;
         var rot = new Vector4(
@@ -2340,18 +2345,220 @@ internal static class Program
         renderer.SetCamera(table.Camera);
         Console.WriteLine($"Adapter: {renderer.AdapterName}");
 
+        // Time the mover frame cost (UpdateSpheres refit + trace/resolve), excluding frame 0 (reset/warmup),
+        // so P4's AS-refit fold can be measured against the 16.6 ms (60 fps) budget.
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         for (int f = 0; f < frames; f++)
         {
+            if (f == 1) sw.Restart(); // start timing after the warmup frame
             float t = frames > 1 ? f / (float)(frames - 1) : 1f;
             centers[ballIdx] = PinballTableScene.BallStart + new Vector3(4.2f * t, 0f, 0f); // sweep across +X
             renderer.UpdateSpheres(centers, radii);
             renderer.RenderHeadlessFrame(reset: f == 0, moving: false); // camera fixed; only the ball moves
         }
+        sw.Stop();
+        int timed = Math.Max(1, frames - 1);
+        double msPerFrame = sw.Elapsed.TotalMilliseconds / timed;
+        Console.WriteLine($"  moving frame: {msPerFrame:0.00} ms/frame over {timed} frames -> {1000.0 / msPerFrame:0} fps ({(msPerFrame <= 16.6 ? ">=60fps" : "<60fps")})");
 
         byte[] rgba = renderer.ReadbackOutput();
         SavePng(rgba, Width, Height, savePath);
         Console.WriteLine($"Saved {Width}x{Height} PNG to {savePath}");
         return 0;
+    }
+
+    /// <summary>
+    /// Headless <c>SetDynamicPose</c> demo / self-check (pinball-plan §4.2). A Plain-diffuse rectangular
+    /// "flipper" quad tagged <see cref="IQuadPrimitive.Dynamic"/> rides its own movable TLAS instance (a
+    /// dynamic triangle BLAS). It is converged at three poses and the SetDynamicPose plumbing is asserted,
+    /// then the rotated frame is written as a PNG (plus <c>-identity</c>/<c>-baked</c> siblings). Checks:
+    ///  • the dynamic BLAS + 3rd TLAS instance build and trace with no device-removal;
+    ///  • a pose change moves the mover (identity ≠ rotated), and re-posing back to identity reproduces the
+    ///    first frame (the transform upload + folded TLAS refit are clean and repeatable);
+    ///  • <b>pose-invariance</b> — rotating a flat (+Y-normal, Plain) flipper by the instance transform
+    ///    matches baking that same rotation into its world vertices (an independent scene). This is the real
+    ///    correctness proof: it validates the transform math and the "normal/UV need no transform for a flat
+    ///    Y-rotating mover" design against ground-truth geometry.
+    /// </summary>
+    private static int RunFlipperDemo(int frames, string savePath, float sampleClamp)
+    {
+        if (frames <= 0) frames = 96;
+        const float angleDeg = 35f;
+        float angle = angleDeg * MathF.PI / 180f;
+        var pivot = new Vector3(0f, 1.0f, 4.0f); // the flipper's hinge (its −X end)
+        Console.WriteLine($"Space Cadet RT — SetDynamicPose demo ({frames} frames, flipper {angleDeg:0}°) -> {savePath}");
+
+        // Rotate a point about the world-Y axis through `pivot` (the flat-flipper hinge motion, §4.2).
+        static Vector3 RotYAboutPivot(Vector3 p, Vector3 pivot, float a)
+        {
+            Vector3 d = p - pivot;
+            float c = MathF.Cos(a), s = MathF.Sin(a);
+            return pivot + new Vector3(c * d.X + s * d.Z, d.Y, -s * d.X + c * d.Z);
+        }
+
+        // The same rotation as a DXR 3×4 instance transform (row-major; the 4th column is translation):
+        // p' = R·p + (pivot − R·pivot).
+        static Vortice.Mathematics.Matrix3x4 RotYPoseAboutPivot(Vector3 pivot, float a)
+        {
+            float c = MathF.Cos(a), s = MathF.Sin(a);
+            float tx = pivot.X * (1f - c) - pivot.Z * s;
+            float tz = pivot.X * s + pivot.Z * (1f - c);
+            return new Vortice.Mathematics.Matrix3x4(
+                c, 0f, s, tx,
+                0f, 1f, 0f, 0f,
+                -s, 0f, c, tz);
+        }
+        var identity = new Vortice.Mathematics.Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0);
+
+        // A lit box + one Plain-diffuse rectangular flipper (Dynamic) hovering above the floor. `bakedAngle`
+        // != 0 pre-rotates the flipper's world verts (the pose-invariance ground truth); the dynamic scene
+        // (bakedAngle 0) + a θ instance transform must then match the baked scene at identity.
+        (PackedScene packed, SpectralResources spectral, PackedLights lights, Camera cam) BuildScene(float bakedAngle)
+        {
+            var scene = new List<Tracable>
+            {
+                FloorQuad(0f, -5f, 5f, -1f, 10f, FlatDiffuse("fd-floor", 0.28f)),
+                FloorQuad(6f, -5f, 5f, -1f, 10f, FlatDiffuse("fd-ceil", 0.55f)),
+                WallZ(9.5f, -5f, 5f, 0f, 6f, FlatDiffuse("fd-back", 0.7f)),
+            };
+
+            // The flipper: a horizontal rectangle (long in +X, short in +Z), bright red, Plain diffuse — no
+            // UV dependence and its ±Y normal is invariant under the Y-rotation (§4.2 design assumption).
+            var flipMat = ColoredDiffuse("fd-flip", new Vector3(0.85f, 0.09f, 0.09f));
+            Vector3 a = new(0f, 1.0f, 3.6f), b = new(3.2f, 1.0f, 3.6f), c3 = new(0f, 1.0f, 4.4f);
+            if (bakedAngle != 0f)
+            {
+                a = RotYAboutPivot(a, pivot, bakedAngle);
+                b = RotYAboutPivot(b, pivot, bakedAngle);
+                c3 = RotYAboutPivot(c3, pivot, bakedAngle);
+            }
+            scene.Add(new TracableRectangle((a, b, c3), flipMat) { Dynamic = true });
+
+            var lights = new List<Light>
+            {
+                new() { Position = new Vector3(-1.5f, 5.2f, 3.0f), Color = Vector3.One },
+                new() { Position = new Vector3(1.5f, 5.2f, 5.5f), Color = Vector3.One },
+            };
+            Vector3 camPos = new(1.6f, 5.6f, -1.2f);
+            var camera = new Camera
+            {
+                Position = camPos,
+                Rotation = LookRotation(camPos, new Vector3(1.6f, 0.6f, 4.2f), new Vector3(0, 1, 0)),
+                Fov = MathF.PI / 3f,
+                Aspect = (float)Width / Height,
+                ImgPlaneZ = 1f,
+            };
+            PackedScene packed = GpuScenePacker.Pack(scene);
+            SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
+            PackedLights packedLights = LightPacker.Pack(lights);
+            return (packed, spectral, packedLights, camera);
+        }
+
+        VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
+        Phase6Renderer MakeRenderer((PackedScene packed, SpectralResources spectral, PackedLights lights, Camera cam) s)
+        {
+            var r = new Phase6Renderer(
+                Width, Height, s.packed, s.spectral, s.lights, s.cam,
+                volumetrics, lightingMode: LightingMode.NEE, sampleClamp: sampleClamp,
+                maxSampleCount: (uint)Math.Max(1, frames),
+                biomeIndicator: false, debugMode: Phase5DebugMode.Beauty, decalAtlas: MazeDecals.Atlas);
+            r.Initialize(windowHandle: 0);
+            r.SetCamera(s.cam);
+            return r;
+        }
+        static byte[] Converge(Phase6Renderer r, int frames)
+        {
+            for (int f = 0; f < frames; f++)
+                r.RenderHeadlessFrame(reset: f == 0, moving: false); // camera fixed; only the mover pose changes
+            return (byte[])r.ReadbackOutput().Clone();
+        }
+
+        // ── Dynamic scene: one renderer, three poses (identity → rotated → identity). ──
+        byte[] imgIdentity, imgRotated, imgIdentity2;
+        double msPerFrame;
+        using (var r = MakeRenderer(BuildScene(0f)))
+        {
+            Console.WriteLine($"Adapter: {r.AdapterName}");
+            int di = r.DynamicInstanceIndex;
+            if (di < 0) { Console.WriteLine("  FAIL: scene has no dynamic instance (packer/renderer split)"); return 1; }
+            Console.WriteLine($"  dynamic TLAS instance index: {di}");
+
+            r.SetDynamicPose(di, identity);
+            imgIdentity = Converge(r, frames);
+
+            r.SetDynamicPose(di, RotYPoseAboutPivot(pivot, angle));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            imgRotated = Converge(r, frames);
+            sw.Stop();
+            msPerFrame = sw.Elapsed.TotalMilliseconds / frames;
+
+            r.SetDynamicPose(di, identity); // re-pose back — must reproduce the first frame
+            imgIdentity2 = Converge(r, frames);
+        }
+
+        // ── Ground truth: the flipper baked at θ in its world verts, rendered at identity. ──
+        byte[] imgBaked;
+        using (var r = MakeRenderer(BuildScene(angle)))
+            imgBaked = Converge(r, frames);
+
+        static (int over, int max) Diff(byte[] x, byte[] y, int tol)
+        {
+            int n = Math.Min(x.Length, y.Length), over = 0, max = 0;
+            for (int i = 0; i < n; i++)
+            {
+                int d = Math.Abs(x[i] - y[i]);
+                if (d > max) max = d;
+                if (d > tol) over++;
+            }
+            return (over, max);
+        }
+        static string WithSuffix(string path, string suffix) => System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(path) ?? "",
+            System.IO.Path.GetFileNameWithoutExtension(path) + suffix + System.IO.Path.GetExtension(path));
+
+        // Count strongly red-dominant pixels: the flipper's ColoredDiffuse red vs the grey floor/walls. This
+        // INDEPENDENTLY verifies the InstanceID offset picks the flipper's own Primitives row — a dropped/
+        // wrong offset makes a dynamic hit read Primitives[0] (the grey floor), so the flipper would render
+        // grey and pose-invariance (which compares two dynamic paths) would still pass. This catches that.
+        static int RedPixels(byte[] rgba)
+        {
+            int n = rgba.Length / 4, red = 0;
+            for (int i = 0; i < n; i++)
+            {
+                int o = i * 4, r = rgba[o], g = rgba[o + 1], b = rgba[o + 2];
+                if (r > g + 30 && r > b + 30) red++;
+            }
+            return red;
+        }
+
+        int totalBytes = Width * Height * 4;
+        var (rtOver, rtMax) = Diff(imgIdentity, imgIdentity2, 2);
+        var (moveOver, moveMax) = Diff(imgIdentity, imgRotated, 8);
+        var (invOver, invMax) = Diff(imgRotated, imgBaked, 4);
+        double rtPct = 100.0 * (totalBytes - rtOver) / totalBytes;
+        double invPct = 100.0 * (totalBytes - invOver) / totalBytes;
+        int redId = RedPixels(imgIdentity), redRot = RedPixels(imgRotated);
+
+        SavePng(imgRotated, Width, Height, savePath);
+        SavePng(imgIdentity, Width, Height, WithSuffix(savePath, "-identity"));
+        SavePng(imgBaked, Width, Height, WithSuffix(savePath, "-baked"));
+
+        Console.WriteLine($"  moving frame: {msPerFrame:0.00} ms/frame -> {1000.0 / msPerFrame:0} fps ({(msPerFrame <= 16.6 ? ">=60fps" : "<60fps")})");
+        Console.WriteLine($"  re-pose round-trip (identity vs identity'): {rtPct:0.00}% within 2/255, max|Δ| {rtMax}");
+        Console.WriteLine($"  pose moved (identity vs rotated):           {moveOver} bytes >8/255, max|Δ| {moveMax}");
+        Console.WriteLine($"  pose-invariance (rotated vs baked θ):       {invPct:0.000}% within 4/255, max|Δ| {invMax}");
+        Console.WriteLine($"  flipper shaded (red pixels id/rot):         {redId} / {redRot} (InstanceID offset picks its own material)");
+        Console.WriteLine($"Saved {Width}x{Height} PNGs to {savePath} (+ -identity, -baked)");
+
+        bool moved = moveOver > totalBytes / 200;             // the flipper visibly swept
+        bool reposeClean = rtPct >= 99.0;                     // returning to identity restores the frame
+        bool invariant = invPct >= 99.5 && invMax <= 16;      // transform == baked geometry (ground truth)
+        bool shaded = redId > 3000 && redRot > 3000;          // reads the flipper's own row, not Primitives[0]
+        bool pass = moved && reposeClean && invariant && shaded;
+        Console.WriteLine(pass
+            ? "  overall: PASS (dynamic BLAS + SetDynamicPose verified)"
+            : $"  overall: FAIL (moved={moved} reposeClean={reposeClean} invariant={invariant} shaded={shaded})");
+        return pass ? 0 : 1;
     }
 
     /// <summary>

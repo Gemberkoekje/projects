@@ -263,6 +263,22 @@ internal sealed class Phase6Renderer : IDisposable
     // one BLAS, so the TLAS references both (a second instance) when the scene has spheres.
     private ID3D12Resource _sphereBlas = null!;
     private ID3D12Resource _sphereBlasScratch = null!;
+    // §4.2 (P4): a separate "dynamic triangle BLAS" for rigid movers (flippers/plunger — the scene's
+    // IQuadPrimitive.Dynamic quads, packed after the static ones). It rides its own TLAS instance whose
+    // transform SetDynamicPose writes each frame; the geometry is built once. Null when the scene has no
+    // dynamic quads (then the TLAS is just the static triangle + sphere instances, exactly as before).
+    private ID3D12Resource _dynamicBlas = null!;
+    private ID3D12Resource _dynamicBlasScratch = null!;
+    private int _staticQuadCount;    // static quads = the static triangle BLAS + the dynamic instance's InstanceID offset
+    private int _dynamicQuadCount;   // > 0 ⇒ a dynamic triangle BLAS + a 3rd TLAS instance exist
+    private int _instanceCount = 1;  // TLAS instance count (static [+ sphere] [+ dynamic]); replaces the old hardcoded 2
+    private RaytracingInstanceDescription[] _instances = System.Array.Empty<RaytracingInstanceDescription>(); // CPU-side truth (upload heap is write-only)
+    // §4.6 (P4): set by UpdateSpheres when the ball moved; the per-frame sphere BLAS + TLAS refit is then
+    // recorded into the trace command list (RecordMoverRefit) so a moving frame is one submission / one
+    // fence, not the old three drains. _tlasRefitPending is the pose-only case (SetDynamicPose): the TLAS
+    // rebuilds to pick up the new instance transform, but no BLAS needs refitting.
+    private bool _sphereRefitPending;
+    private bool _tlasRefitPending;
 
     private IDXGISwapChain3? _swapChain;
     private readonly ID3D12Resource[] _backBuffers = new ID3D12Resource[FrameCount];
@@ -1237,9 +1253,14 @@ internal sealed class Phase6Renderer : IDisposable
 
     private void BuildAccelerationStructures()
     {
-        int vertexCount = _scene.Vertices.Length / 3;
-        int indexCount = _scene.Indices.Length;
+        _staticQuadCount = _scene.StaticQuadCount;
+        _dynamicQuadCount = _scene.QuadCount - _staticQuadCount;
+        int totalVertexCount = _scene.Vertices.Length / 3;
+        int staticVertexCount = _staticQuadCount * 4;
+        int staticIndexCount = _staticQuadCount * 6;
 
+        // Static triangle BLAS — the first StaticQuadCount quads (§4.2). Byte-identical to the whole-scene
+        // BLAS when there are no dynamic quads (staticIndexCount == all indices).
         var geometries = new List<RaytracingGeometryDescription>
         {
             new()
@@ -1249,10 +1270,10 @@ internal sealed class Phase6Renderer : IDisposable
                 Triangles = new RaytracingGeometryTrianglesDescription
                 {
                     VertexBuffer = new GpuVirtualAddressAndStride(_vertexBuffer.GPUVirtualAddress, 3 * sizeof(float)),
-                    VertexCount = (uint)vertexCount,
+                    VertexCount = (uint)staticVertexCount,
                     VertexFormat = Format.R32G32B32_Float,
                     IndexBuffer = _indexBuffer.GPUVirtualAddress,
-                    IndexCount = (uint)indexCount,
+                    IndexCount = (uint)staticIndexCount,
                     IndexFormat = Format.R32_UInt,
                     Transform3x4 = 0,
                 },
@@ -1284,22 +1305,70 @@ internal sealed class Phase6Renderer : IDisposable
             _sphereBlas = CreateUavBuffer(sBuild.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
         }
 
+        // A separate DYNAMIC triangle BLAS (§4.2): the remaining (dynamic) quads, built once and moved as a
+        // rigid unit by its TLAS instance transform (SetDynamicPose). Its indices are the appended tail of
+        // the shared index buffer and reference the appended (dynamic) tail of the shared vertex buffer.
+        BuildRaytracingAccelerationStructureInputs dynBlasInputs = default;
+        if (_dynamicQuadCount > 0)
+        {
+            var dynGeometries = new[]
+            {
+                new RaytracingGeometryDescription
+                {
+                    Type = RaytracingGeometryType.Triangles,
+                    Flags = RaytracingGeometryFlags.Opaque,
+                    Triangles = new RaytracingGeometryTrianglesDescription
+                    {
+                        VertexBuffer = new GpuVirtualAddressAndStride(_vertexBuffer.GPUVirtualAddress, 3 * sizeof(float)),
+                        VertexCount = (uint)totalVertexCount, // the dynamic indices reference the appended verts
+                        VertexFormat = Format.R32G32B32_Float,
+                        IndexBuffer = _indexBuffer.GPUVirtualAddress + (ulong)(staticIndexCount * sizeof(uint)),
+                        IndexCount = (uint)(_dynamicQuadCount * 6),
+                        IndexFormat = Format.R32_UInt,
+                        Transform3x4 = 0,
+                    },
+                },
+            };
+            dynBlasInputs = new BuildRaytracingAccelerationStructureInputs
+            {
+                Type = RaytracingAccelerationStructureType.BottomLevel,
+                Layout = ElementsLayout.Array,
+                Flags = RaytracingAccelerationStructureBuildFlags.PreferFastTrace,
+                DescriptorsCount = 1,
+                GeometryDescriptions = dynGeometries,
+            };
+            RaytracingAccelerationStructurePrebuildInfo dBuild =
+                _device.GetRaytracingAccelerationStructurePrebuildInfo(dynBlasInputs);
+            _dynamicBlasScratch = CreateUavBuffer(dBuild.ScratchDataSizeInBytes, ResourceStates.UnorderedAccess);
+            _dynamicBlas = CreateUavBuffer(dBuild.ResultDataMaxSizeInBytes, ResourceStates.RaytracingAccelerationStructure);
+        }
+
         var identity = new Matrix3x4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0);
         var instances = new List<RaytracingInstanceDescription>
         {
-            new() { Transform = identity, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None, AccelerationStructure = _blas.GPUVirtualAddress },
+            new() { Transform = identity, InstanceID = (Vortice.UInt24)0, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None, AccelerationStructure = _blas.GPUVirtualAddress },
         };
         if (_sphereCount > 0)
             instances.Add(new RaytracingInstanceDescription
             {
-                Transform = identity, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None,
+                Transform = identity, InstanceID = (Vortice.UInt24)0, InstanceMask = 0xFF, Flags = RaytracingInstanceFlags.None,
                 AccelerationStructure = _sphereBlas.GPUVirtualAddress,
             });
+        if (_dynamicQuadCount > 0)
+            instances.Add(new RaytracingInstanceDescription
+            {
+                // §4.2: InstanceID = the primitive offset the shader adds to CommittedPrimitiveIndex, so a
+                // dynamic-BLAS hit indexes the appended (dynamic) rows of the shared Primitives buffer.
+                Transform = identity, InstanceID = (Vortice.UInt24)(uint)_staticQuadCount, InstanceMask = 0xFF,
+                Flags = RaytracingInstanceFlags.None, AccelerationStructure = _dynamicBlas.GPUVirtualAddress,
+            });
+        _instances = instances.ToArray();
+        _instanceCount = _instances.Length;
         _instanceBuffer = CreateUploadBuffer(
-            new ReadOnlySpan<RaytracingInstanceDescription>(instances.ToArray()),
-            instances.Count * Unsafe.SizeOf<RaytracingInstanceDescription>());
+            new ReadOnlySpan<RaytracingInstanceDescription>(_instances),
+            _instanceCount * Unsafe.SizeOf<RaytracingInstanceDescription>());
 
-        BuildRaytracingAccelerationStructureInputs tlasInputs = TlasInputs(instances.Count);
+        BuildRaytracingAccelerationStructureInputs tlasInputs = TlasInputs(_instanceCount);
         RaytracingAccelerationStructurePrebuildInfo tlasPrebuild =
             _device.GetRaytracingAccelerationStructurePrebuildInfo(tlasInputs);
 
@@ -1326,6 +1395,17 @@ internal sealed class Phase6Renderer : IDisposable
                 DestinationAccelerationStructureData = _sphereBlas.GPUVirtualAddress,
             });
             _commandList.ResourceBarrierUnorderedAccessView(_sphereBlas);
+        }
+
+        if (_dynamicQuadCount > 0)
+        {
+            _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
+            {
+                Inputs = dynBlasInputs,
+                ScratchAccelerationStructureData = _dynamicBlasScratch.GPUVirtualAddress,
+                DestinationAccelerationStructureData = _dynamicBlas.GPUVirtualAddress,
+            });
+            _commandList.ResourceBarrierUnorderedAccessView(_dynamicBlas);
         }
 
         _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
@@ -1390,8 +1470,12 @@ internal sealed class Phase6Renderer : IDisposable
         if (centers.Length != _sphereCount || radii.Length != _sphereCount)
             throw new ArgumentException($"Expected {_sphereCount} spheres, got {centers.Length}/{radii.Length}.");
 
-        WaitForGpu(); // the previous frame may still be reading the sphere/AABB buffers + BLAS
-
+        // §4.6 (P4): no WaitForGpu / separate submission here. The previous frame's trace has already
+        // drained at its own fence (RenderHeadlessFrame/RenderFrame end with WaitForGpu), so these upload
+        // buffers are not being read by in-flight GPU work when the CPU overwrites them. The BLAS+TLAS refit
+        // is recorded into the trace command list (RecordSphereRefit) instead, so a moving frame is one
+        // submission / one fence, not three. (If frames are ever pipelined without a per-frame wait, the
+        // sphere/AABB upload buffers must be double-buffered.)
         Span<GpuSphere> sphereDst = _sphereBuffer.Map<GpuSphere>(0, _sphereCount);
         Span<float> aabbDst = _aabbBuffer.Map<float>(0, _sphereCount * 6);
         for (int i = 0; i < _sphereCount; i++)
@@ -1406,29 +1490,82 @@ internal sealed class Phase6Renderer : IDisposable
         }
         _sphereBuffer.Unmap(0);
         _aabbBuffer.Unmap(0);
+        _sphereRefitPending = true;
+    }
 
-        // Refit the sphere BLAS (its AABBs moved) then the TLAS (its cached bounds for that instance
-        // are now stale). Both rebuild in place — same addresses/sizes — so the instance buffer and
-        // scratch/result buffers are reused as-is.
-        _allocator.Reset();
-        _commandList.Reset(_allocator, null);
+    // Records the per-frame mover AS refit into the CURRENT command list, ahead of the trace, so it rides
+    // the trace's single submission / fence (§4.6). A sphere move (UpdateSpheres) refits the sphere BLAS; a
+    // rigid pose change (SetDynamicPose) only rewrote an instance transform. Either way the TLAS is rebuilt
+    // in place to pick up the change; the static + dynamic triangle BLASes are untouched (rigid movers move
+    // by their instance transform, not by re-fitting geometry). The TLAS UAV barrier keeps the build→read
+    // hazard covered before the trace reads the TLAS.
+    private void RecordMoverRefit()
+    {
+        if (_sphereRefitPending)
+        {
+            _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
+            {
+                Inputs = SphereBlasInputs(),
+                ScratchAccelerationStructureData = _sphereBlasScratch.GPUVirtualAddress,
+                DestinationAccelerationStructureData = _sphereBlas.GPUVirtualAddress,
+            });
+            _commandList.ResourceBarrierUnorderedAccessView(_sphereBlas);
+        }
         _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
         {
-            Inputs = SphereBlasInputs(),
-            ScratchAccelerationStructureData = _sphereBlasScratch.GPUVirtualAddress,
-            DestinationAccelerationStructureData = _sphereBlas.GPUVirtualAddress,
-        });
-        _commandList.ResourceBarrierUnorderedAccessView(_sphereBlas);
-        _commandList.BuildRaytracingAccelerationStructure(new BuildRaytracingAccelerationStructureDescription
-        {
-            Inputs = TlasInputs(2), // triangle instance + sphere instance
+            Inputs = TlasInputs(_instanceCount),
             ScratchAccelerationStructureData = _tlasScratch.GPUVirtualAddress,
             DestinationAccelerationStructureData = _tlas.GPUVirtualAddress,
         });
         _commandList.ResourceBarrierUnorderedAccessView(_tlas);
-        _commandList.Close();
-        _queue.ExecuteCommandList(_commandList);
-        WaitForGpu();
+    }
+
+    /// <summary>The TLAS instance index of the dynamic triangle mover (flippers/plunger), always the last
+    /// instance; -1 when the scene has no dynamic quads. Pass it to <see cref="SetDynamicPose"/>. Note there
+    /// is only ever <b>one</b> dynamic instance — see the grouping limitation on <see cref="SetDynamicPose"/>.
+    /// </summary>
+    public int DynamicInstanceIndex => _dynamicQuadCount > 0 ? _instanceCount - 1 : -1;
+
+    /// <summary>
+    /// Sets the world-space pose of a dynamic TLAS instance (a rigid mover — §4.2). The transform is applied
+    /// to the instance's baked <i>world-space</i> geometry, so identity leaves the mover exactly where it was
+    /// authored; a pinball flipper rotates about its pivot via <c>T(pivot)·R·T(-pivot)</c>. Instance indices:
+    /// 0 = the static triangle instance, then the sphere instance (if the scene has spheres), then the dynamic
+    /// triangle instance (use <see cref="DynamicInstanceIndex"/>). The new transform is uploaded to the
+    /// instance buffer and the TLAS refit is folded into the next frame's trace submission (RecordMoverRefit).
+    /// <para><b>Correctness contract — read before posing.</b> The shader shades a dynamic hit with the
+    /// <i>authored, un-posed</i> primitive basis (normal + L1/Edge1/Edge2); it does NOT transform the normal
+    /// or recompute UVs by <paramref name="transform"/>. The pose is therefore only correct when it preserves
+    /// them: a <b>flat, single-face, Plain-material</b> quad rotated about an axis <b>parallel to its own
+    /// normal</b> (e.g. a flat +Y-normal flipper under world-Y rotation), plus any translation. A non-planar
+    /// mover (3-D side faces), a rotation about any other axis, or a patterned / specular / dielectric dynamic
+    /// material will mis-shade (stale normal/UV). If the playfield is tilted (§6.1), author the flipper in the
+    /// tilted frame and rotate about the <i>playfield</i> normal — do not fold the tilt into
+    /// <paramref name="transform"/>.</para>
+    /// <para><b>Grouping limitation.</b> The packer lumps <i>every</i> <see cref="IQuadPrimitive.Dynamic"/>
+    /// quad into one dynamic BLAS / one TLAS instance, so all dynamic quads move together under one transform.
+    /// Independently-posed parts (left/right flipper, plunger) need per-part grouping into separate instances
+    /// — a future extension (P6).</para>
+    /// <para><b>Triangles only.</b> Analytic spheres are unaffected by <paramref name="transform"/> (they move
+    /// only via <see cref="UpdateSpheres"/>); build posable movers from triangle quads, not quad + cap spheres,
+    /// or the caps detach when posed.</para>
+    /// </summary>
+    public void SetDynamicPose(int instance, Matrix3x4 transform)
+    {
+        if (_device is null)
+            return;
+        if ((uint)instance >= (uint)_instanceCount)
+            throw new ArgumentOutOfRangeException(nameof(instance), instance,
+                $"Scene has {_instanceCount} TLAS instance(s).");
+
+        // The upload heap is write-only from the CPU's side, so keep _instances as the source of truth and
+        // re-upload the whole (1–3 descriptor) array after patching the one transform.
+        _instances[instance].Transform = transform;
+        Span<RaytracingInstanceDescription> dst =
+            _instanceBuffer.Map<RaytracingInstanceDescription>(0, _instanceCount);
+        _instances.AsSpan().CopyTo(dst);
+        _instanceBuffer.Unmap(0);
+        _tlasRefitPending = true;
     }
 
     private ID3D12Resource CreateUploadBuffer<T>(ReadOnlySpan<T> data, int byteLength) where T : unmanaged
@@ -1838,6 +1975,16 @@ internal sealed class Phase6Renderer : IDisposable
 
     private void RecordTraceResolveReduce()
     {
+        // §4.6 (P4): a moved mover's AS refit rides this same command list, ahead of the trace, so the
+        // whole moving frame is one submission / one fence. No-op when nothing moved (no-mover frames
+        // and the static maze are byte-identical).
+        if (_sphereRefitPending || _tlasRefitPending)
+        {
+            RecordMoverRefit();
+            _sphereRefitPending = false;
+            _tlasRefitPending = false;
+        }
+
         RecordTrace();
 
         _commandList.ResourceBarrierUnorderedAccessView(_accumBuffer);
@@ -1993,6 +2140,13 @@ internal sealed class Phase6Renderer : IDisposable
             _tlasScratch?.Dispose();
             _blasScratch?.Dispose();
             _tlas?.Dispose();
+            // The sphere + dynamic-triangle AS are rebuilt below (their count guards mean a rebuild to a
+            // fewer-instance scene would otherwise skip reassignment and leave a live handle unreleased);
+            // dispose and null them so BuildAccelerationStructures starts clean, matching DisposeGpuResources.
+            _dynamicBlasScratch?.Dispose(); _dynamicBlasScratch = null!;
+            _dynamicBlas?.Dispose(); _dynamicBlas = null!;
+            _sphereBlasScratch?.Dispose(); _sphereBlasScratch = null!;
+            _sphereBlas?.Dispose(); _sphereBlas = null!;
             _blas?.Dispose();
             _lightDirBuffer?.Dispose();
             _lightColorBuffer?.Dispose();
@@ -2111,6 +2265,10 @@ internal sealed class Phase6Renderer : IDisposable
         _tlasScratch?.Dispose();
         _blasScratch?.Dispose();
         _tlas?.Dispose();
+        _dynamicBlasScratch?.Dispose();
+        _dynamicBlas?.Dispose();
+        _sphereBlasScratch?.Dispose();
+        _sphereBlas?.Dispose();
         _blas?.Dispose();
         _reduceConstantBuffer?.Dispose();
         _resolveConstantBuffer?.Dispose();
