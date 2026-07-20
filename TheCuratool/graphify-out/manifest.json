@@ -1,0 +1,532 @@
+{
+  ".net.csproj": {
+    "mtime": 1780330742.8954122,
+    "ast_hash": "3d7c41994c0dc631a55f9022a21ab48a",
+    "semantic_hash": "3d7c41994c0dc631a55f9022a21ab48a"
+  },
+  "NoVortox.json": {
+    "mtime": 1779807294.1805682,
+    "ast_hash": "be6eeb35d718da1bc26fec04d7597fa3",
+    "semantic_hash": "be6eeb35d718da1bc26fec04d7597fa3"
+  },
+  "TheCuratool.slnx": {
+    "mtime": 1780330543.4316437,
+    "ast_hash": "09cab07e060dc1aa0205a0b1c6fda408",
+    "semantic_hash": "09cab07e060dc1aa0205a0b1c6fda408"
+  },
+  "src/TheCuratool.Application/AbilityOption.cs": {
+    "mtime": 1779954643.3009536,
+    "ast_hash": "afdbe6666c19e71981c09a5841475833",
+    "semantic_hash": "afdbe6666c19e71981c09a5841475833"
+  },
+  "src/TheCuratool.Application/Abstractions/Repositories/IGameSessionRepository.cs": {
+    "mtime": 1779897254.3042865,
+    "ast_hash": "efa0e31d88fa252cfccf408f5af195e6",
+    "semantic_hash": "efa0e31d88fa252cfccf408f5af195e6"
+  },
+  "src/TheCuratool.Application/Abstractions/Repositories/IScriptRepository.cs": {
+    "mtime": 1780148078.188279,
+    "ast_hash": "7a1fb123f451e927d3b4f77ddfe8a5bc",
+    "semantic_hash": "7a1fb123f451e927d3b4f77ddfe8a5bc"
+  },
+  "src/TheCuratool.Application/DraftEngine.cs": {
+    "mtime": 1780413022.8187785,
+    "ast_hash": "8742e57f873505195ded9f8ddd474429",
+    "semantic_hash": "8742e57f873505195ded9f8ddd474429"
+  },
+  "src/TheCuratool.Application/DraftMath.cs": {
+    "mtime": 1779954643.302304,
+    "ast_hash": "6418d012c84c6e2dff6bd5db519e1d47",
+    "semantic_hash": "6418d012c84c6e2dff6bd5db519e1d47"
+  },
+  "src/TheCuratool.Application/DraftStateSnapshot.cs": {
+    "mtime": 1779954643.30348,
+    "ast_hash": "8a31f72bf4b8ef90a4115a6cb54ee14e",
+    "semantic_hash": "8a31f72bf4b8ef90a4115a6cb54ee14e"
+  },
+  "src/TheCuratool.Application/GlobalUsings.cs": {
+    "mtime": 1779811457.4577985,
+    "ast_hash": "3ef78311f20593418366890a313f4a9b",
+    "semantic_hash": "3ef78311f20593418366890a313f4a9b"
+  },
+  "src/TheCuratool.Application/MakeupSummary.cs": {
+    "mtime": 1779954643.30348,
+    "ast_hash": "7841c8ef581601d1ffa662cc1b5663d1",
+    "semantic_hash": "7841c8ef581601d1ffa662cc1b5663d1"
+  },
+  "src/TheCuratool.Application/ScriptParseResult.cs": {
+    "mtime": 1779954929.2984478,
+    "ast_hash": "203ec98242e186f4d58ae79c372b6aed",
+    "semantic_hash": "203ec98242e186f4d58ae79c372b6aed"
+  },
+  "src/TheCuratool.Application/ScriptParser.cs": {
+    "mtime": 1779954964.4461744,
+    "ast_hash": "022f234cf8d32d11ba7a5c507cdf726c",
+    "semantic_hash": "022f234cf8d32d11ba7a5c507cdf726c"
+  },
+  "src/TheCuratool.Application/SessionSetupOptions.cs": {
+    "mtime": 1780127432.2500873,
+    "ast_hash": "83c37fb1119e12e2aee84f2159c34a59",
+    "semantic_hash": "83c37fb1119e12e2aee84f2159c34a59"
+  },
+  "src/TheCuratool.Application/SetupCalculationResult.cs": {
+    "mtime": 1779897254.199045,
+    "ast_hash": "49e195396bbc224e5cce5c61191d9712",
+    "semantic_hash": "49e195396bbc224e5cce5c61191d9712"
+  },
+  "src/TheCuratool.Application/SetupCalculator.cs": {
+    "mtime": 1780165762.1493404,
+    "ast_hash": "7c136f577d13ee9111c5c9d70b6d0889",
+    "semantic_hash": "7c136f577d13ee9111c5c9d70b6d0889"
+  },
+  "src/TheCuratool.Application/StoredScript.cs": {
+    "mtime": 1779897254.2603657,
+    "ast_hash": "f600f0755a1bab1378d327c432030533",
+    "semantic_hash": "f600f0755a1bab1378d327c432030533"
+  },
+  "src/TheCuratool.Application/TheCuratool.Application.csproj": {
+    "mtime": 1779804235.9385912,
+    "ast_hash": "19644fe3fd255b48bfda93a8a794df01",
+    "semantic_hash": "19644fe3fd255b48bfda93a8a794df01"
+  },
+  "src/TheCuratool.Domain/AvailabilityContext.cs": {
+    "mtime": 1779897099.4387963,
+    "ast_hash": "c57fb9a7a07ce77b31f0b87005767937",
+    "semantic_hash": "c57fb9a7a07ce77b31f0b87005767937"
+  },
+  "src/TheCuratool.Domain/BlockedIfAnyChosenOfTypeConstraint.cs": {
+    "mtime": 1779897152.3414905,
+    "ast_hash": "c2b1419e2466d332920f8765a76057b7",
+    "semantic_hash": "c2b1419e2466d332920f8765a76057b7"
+  },
+  "src/TheCuratool.Domain/CharacterDatabase.cs": {
+    "mtime": 1780142788.6745718,
+    "ast_hash": "d526aea686e44e975894e6851e1c9fc1",
+    "semantic_hash": "d526aea686e44e975894e6851e1c9fc1"
+  },
+  "src/TheCuratool.Domain/CharacterDefinition.cs": {
+    "mtime": 1779954643.3064797,
+    "ast_hash": "3c50717d62a213318c2eb2f604569070",
+    "semantic_hash": "3c50717d62a213318c2eb2f604569070"
+  },
+  "src/TheCuratool.Domain/CharacterType.cs": {
+    "mtime": 1779897099.2412176,
+    "ast_hash": "732f57daed923926ba2f91b3e8f58e91",
+    "semantic_hash": "732f57daed923926ba2f91b3e8f58e91"
+  },
+  "src/TheCuratool.Domain/DynamicAbilityScope.cs": {
+    "mtime": 1779954643.3064797,
+    "ast_hash": "6d639a2b668790179a9af60aca1b388a",
+    "semantic_hash": "6d639a2b668790179a9af60aca1b388a"
+  },
+  "src/TheCuratool.Domain/GameSession.cs": {
+    "mtime": 1780127432.271868,
+    "ast_hash": "5e71e432318fc5cc3fbc0526e69e8204",
+    "semantic_hash": "5e71e432318fc5cc3fbc0526e69e8204"
+  },
+  "src/TheCuratool.Domain/GameStatus.cs": {
+    "mtime": 1779897099.2739198,
+    "ast_hash": "e08bc9c80c69a25fe3683e74c67d283a",
+    "semantic_hash": "e08bc9c80c69a25fe3683e74c67d283a"
+  },
+  "src/TheCuratool.Domain/GlobalUsings.cs": {
+    "mtime": 1779804220.1190724,
+    "ast_hash": "298dcfa1217a8e364391bee722dbaf10",
+    "semantic_hash": "298dcfa1217a8e364391bee722dbaf10"
+  },
+  "src/TheCuratool.Domain/HiddenFlags.cs": {
+    "mtime": 1779897099.296094,
+    "ast_hash": "3cd2aa9ec8dd85e0ba1c31ed0425bf07",
+    "semantic_hash": "3cd2aa9ec8dd85e0ba1c31ed0425bf07"
+  },
+  "src/TheCuratool.Domain/IAvailabilityConstraint.cs": {
+    "mtime": 1779897099.2161798,
+    "ast_hash": "eae4b30623c00a31686b7ac30d290a13",
+    "semantic_hash": "eae4b30623c00a31686b7ac30d290a13"
+  },
+  "src/TheCuratool.Domain/ISetupRule.cs": {
+    "mtime": 1779897099.1697638,
+    "ast_hash": "1d7809b58a49299520d5d7621283752a",
+    "semantic_hash": "1d7809b58a49299520d5d7621283752a"
+  },
+  "src/TheCuratool.Domain/LoricDatabase.cs": {
+    "mtime": 1779897206.3850105,
+    "ast_hash": "331ddcde78ccbaa675900b6b707a9117",
+    "semantic_hash": "331ddcde78ccbaa675900b6b707a9117"
+  },
+  "src/TheCuratool.Domain/LoricDefinition.cs": {
+    "mtime": 1779897152.3648956,
+    "ast_hash": "2228bbc1c971be9f7fac4d3ba7d1be71",
+    "semantic_hash": "2228bbc1c971be9f7fac4d3ba7d1be71"
+  },
+  "src/TheCuratool.Domain/LoricSetupRule.cs": {
+    "mtime": 1779897152.2440224,
+    "ast_hash": "708ae792e49af775595b843312d6d69e",
+    "semantic_hash": "708ae792e49af775595b843312d6d69e"
+  },
+  "src/TheCuratool.Domain/MarionetteSessionAdjustmentRule.cs": {
+    "mtime": 1779897152.2753294,
+    "ast_hash": "4e00b345702bdaea95f11b37b4951301",
+    "semantic_hash": "4e00b345702bdaea95f11b37b4951301"
+  },
+  "src/TheCuratool.Domain/MinionDeltaSetupRule.cs": {
+    "mtime": 1779954643.3078084,
+    "ast_hash": "e69d2a946a01db4d8909a8fc85bf3d2f",
+    "semantic_hash": "e69d2a946a01db4d8909a8fc85bf3d2f"
+  },
+  "src/TheCuratool.Domain/MinionSwapSetupRule.cs": {
+    "mtime": 1779897152.1077147,
+    "ast_hash": "2ed682fe361e221d144575dc7c7a697c",
+    "semantic_hash": "2ed682fe361e221d144575dc7c7a697c"
+  },
+  "src/TheCuratool.Domain/NoSetupRule.cs": {
+    "mtime": 1779897152.1945057,
+    "ast_hash": "6486b0879b3c53d598487f2b1535fabe",
+    "semantic_hash": "6486b0879b3c53d598487f2b1535fabe"
+  },
+  "src/TheCuratool.Domain/OfferOption.cs": {
+    "mtime": 1780143531.936575,
+    "ast_hash": "3095fce1f3e02de5547e279c77a14452",
+    "semantic_hash": "3095fce1f3e02de5547e279c77a14452"
+  },
+  "src/TheCuratool.Domain/OutsiderDeltaSetupRule.cs": {
+    "mtime": 1779897151.985607,
+    "ast_hash": "956ffa3d124295472f82e31a79d47b88",
+    "semantic_hash": "956ffa3d124295472f82e31a79d47b88"
+  },
+  "src/TheCuratool.Domain/PlayerChoice.cs": {
+    "mtime": 1780127601.138255,
+    "ast_hash": "285b1992378bb529a2b8b3a5ef7762c5",
+    "semantic_hash": "285b1992378bb529a2b8b3a5ef7762c5"
+  },
+  "src/TheCuratool.Domain/PlayerSlot.cs": {
+    "mtime": 1779954643.3078084,
+    "ast_hash": "d489b01a5623ed13f490e48d5d4caa4b",
+    "semantic_hash": "d489b01a5623ed13f490e48d5d4caa4b"
+  },
+  "src/TheCuratool.Domain/RemoveAllMinionsSetupRule.cs": {
+    "mtime": 1780139892.2612288,
+    "ast_hash": "ac5a7a190231d4dfbcb75ed6273a1690",
+    "semantic_hash": "ac5a7a190231d4dfbcb75ed6273a1690"
+  },
+  "src/TheCuratool.Domain/ReplaceDemonOutsiderDisplayRule.cs": {
+    "mtime": 1780096783.702386,
+    "ast_hash": "c74c2a175f5f1c8b43378c95ea741ddd",
+    "semantic_hash": "c74c2a175f5f1c8b43378c95ea741ddd"
+  },
+  "src/TheCuratool.Domain/ReplaceDemonSetupRule.cs": {
+    "mtime": 1779909645.5287976,
+    "ast_hash": "8c2e55394298414bdec7613dd95761b0",
+    "semantic_hash": "8c2e55394298414bdec7613dd95761b0"
+  },
+  "src/TheCuratool.Domain/ReplaceTownsfolkSetupRule.cs": {
+    "mtime": 1780096467.0149536,
+    "ast_hash": "ef18f0fe16eaa0d5abc34a8340d2f1d2",
+    "semantic_hash": "ef18f0fe16eaa0d5abc34a8340d2f1d2"
+  },
+  "src/TheCuratool.Domain/RequiresCharacterSetupRule.cs": {
+    "mtime": 1779911196.686063,
+    "ast_hash": "c12b3e58464f2066bf2ac735e69446ab",
+    "semantic_hash": "c12b3e58464f2066bf2ac735e69446ab"
+  },
+  "src/TheCuratool.Domain/Script.cs": {
+    "mtime": 1779911197.3446827,
+    "ast_hash": "37750620de1b7c94072cbfea4626e7d6",
+    "semantic_hash": "37750620de1b7c94072cbfea4626e7d6"
+  },
+  "src/TheCuratool.Domain/SetupContext.cs": {
+    "mtime": 1780140192.369229,
+    "ast_hash": "f4d38f1f63a3f4539e4b6cfe7d87bf18",
+    "semantic_hash": "f4d38f1f63a3f4539e4b6cfe7d87bf18"
+  },
+  "src/TheCuratool.Domain/SetupCounts.cs": {
+    "mtime": 1779897099.3759468,
+    "ast_hash": "49135983c81fd7f0cdcda3133acd7612",
+    "semantic_hash": "49135983c81fd7f0cdcda3133acd7612"
+  },
+  "src/TheCuratool.Domain/SetupFeasibilityContext.cs": {
+    "mtime": 1780158299.9932082,
+    "ast_hash": "52b816b9a6c815c74104a0df4e62c90a",
+    "semantic_hash": "52b816b9a6c815c74104a0df4e62c90a"
+  },
+  "src/TheCuratool.Domain/StoryTellerChoiceSetupRule.cs": {
+    "mtime": 1779897152.130965,
+    "ast_hash": "68537458d1c471f01c93c6290e0d9eb0",
+    "semantic_hash": "68537458d1c471f01c93c6290e0d9eb0"
+  },
+  "src/TheCuratool.Domain/SwapOutsiderForTownsfolkSetupRule.cs": {
+    "mtime": 1779909784.7928922,
+    "ast_hash": "c443fbb19b7ddd904bb427316a020dbf",
+    "semantic_hash": "c443fbb19b7ddd904bb427316a020dbf"
+  },
+  "src/TheCuratool.Domain/TheCuratool.Domain.csproj": {
+    "mtime": 1779806212.2356493,
+    "ast_hash": "030826782918f75e8416b35f31db04c1",
+    "semantic_hash": "030826782918f75e8416b35f31db04c1"
+  },
+  "src/TheCuratool.Domain/UnconstrainedOutsiderDeltaSetupRule.cs": {
+    "mtime": 1780140202.428744,
+    "ast_hash": "6effcfe58e2488c8d5b80ddce7747d27",
+    "semantic_hash": "6effcfe58e2488c8d5b80ddce7747d27"
+  },
+  "src/TheCuratool.Domain/data/characters.json": {
+    "mtime": 1780166000.0571187,
+    "ast_hash": "1fa7aa63abb5bab701ec48b68b84242c",
+    "semantic_hash": "1fa7aa63abb5bab701ec48b68b84242c"
+  },
+  "src/TheCuratool.Domain/data/lorics.json": {
+    "mtime": 1780096264.556123,
+    "ast_hash": "7fef1bec946be8a49d844b1010bd863f",
+    "semantic_hash": "7fef1bec946be8a49d844b1010bd863f"
+  },
+  "src/TheCuratool.Infrastructure/Data/CuratoolDbContext.cs": {
+    "mtime": 1780127624.6143234,
+    "ast_hash": "b25136c8fb499df1d88fc09d2e50b7c8",
+    "semantic_hash": "b25136c8fb499df1d88fc09d2e50b7c8"
+  },
+  "src/TheCuratool.Infrastructure/Entities/GameSessionEntity.cs": {
+    "mtime": 1780127298.5468845,
+    "ast_hash": "0e93c9981c4f1dec16c93e5bf21a04e5",
+    "semantic_hash": "0e93c9981c4f1dec16c93e5bf21a04e5"
+  },
+  "src/TheCuratool.Infrastructure/Entities/PlayerSlotEntity.cs": {
+    "mtime": 1780127624.580378,
+    "ast_hash": "ceb1b17be3cafaa9b0c16dcb84cdcf54",
+    "semantic_hash": "ceb1b17be3cafaa9b0c16dcb84cdcf54"
+  },
+  "src/TheCuratool.Infrastructure/Entities/ScriptEntity.cs": {
+    "mtime": 1779810843.8170893,
+    "ast_hash": "d36838bd977fe63dd7f46cd8e3c043aa",
+    "semantic_hash": "d36838bd977fe63dd7f46cd8e3c043aa"
+  },
+  "src/TheCuratool.Infrastructure/GlobalUsings.cs": {
+    "mtime": 1779811473.8884254,
+    "ast_hash": "5cdad644a8b51c9847f1c9576ee0462d",
+    "semantic_hash": "5cdad644a8b51c9847f1c9576ee0462d"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20240101000000_InitialCreate.cs": {
+    "mtime": 1780127686.256621,
+    "ast_hash": "21bf17a4df9b4978eacd4b2ec2bd91b6",
+    "semantic_hash": "21bf17a4df9b4978eacd4b2ec2bd91b6"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20240101000001_AddBorrowedAbility.cs": {
+    "mtime": 1779954643.3119414,
+    "ast_hash": "e0d14c51411c6398b9bd1b8749447520",
+    "semantic_hash": "e0d14c51411c6398b9bd1b8749447520"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260529224520_AddSpecialCaseFields2.Designer.cs": {
+    "mtime": 1780094720.6311288,
+    "ast_hash": "ed76861811b134d7e70885d4eb005b8f",
+    "semantic_hash": "ed76861811b134d7e70885d4eb005b8f"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260529224520_AddSpecialCaseFields2.cs": {
+    "mtime": 1780095001.1339858,
+    "ast_hash": "f3f0bc30058519eaaf640d71dfcf2eab",
+    "semantic_hash": "f3f0bc30058519eaaf640d71dfcf2eab"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260529230159_AddSpecialCaseFields4.Designer.cs": {
+    "mtime": 1780127686.2008643,
+    "ast_hash": "640b96e0119f8cd74aee9d426393f998",
+    "semantic_hash": "640b96e0119f8cd74aee9d426393f998"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260529230159_AddSpecialCaseFields4.cs": {
+    "mtime": 1780127686.1749895,
+    "ast_hash": "6bdb4a12543f26302371babb74bb3b47",
+    "semantic_hash": "6bdb4a12543f26302371babb74bb3b47"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260530000000_AddSpecialCaseFields3.Designer.cs": {
+    "mtime": 1780095163.9961414,
+    "ast_hash": "672c336dbba8e4f97b80ac35c70fad75",
+    "semantic_hash": "672c336dbba8e4f97b80ac35c70fad75"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260530000000_AddSpecialCaseFields3.cs": {
+    "mtime": 1780095501.566216,
+    "ast_hash": "10c8a8a62e0d29a5f27adadb72c08614",
+    "semantic_hash": "10c8a8a62e0d29a5f27adadb72c08614"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260530075047_AddUseAtheistOption.Designer.cs": {
+    "mtime": 1780127686.1456485,
+    "ast_hash": "62e849f1fd8f81560fd28b1e57552d9f",
+    "semantic_hash": "62e849f1fd8f81560fd28b1e57552d9f"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/20260530075047_AddUseAtheistOption.cs": {
+    "mtime": 1780127447.364706,
+    "ast_hash": "f1fd9bf1bc849d432fee83bcdf722657",
+    "semantic_hash": "f1fd9bf1bc849d432fee83bcdf722657"
+  },
+  "src/TheCuratool.Infrastructure/Migrations/CuratoolDbContextModelSnapshot.cs": {
+    "mtime": 1780127686.120677,
+    "ast_hash": "298ca39be3fa84fd9b01ce72fdf7e681",
+    "semantic_hash": "298ca39be3fa84fd9b01ce72fdf7e681"
+  },
+  "src/TheCuratool.Infrastructure/Repositories/GameSessionRepository.cs": {
+    "mtime": 1780127624.6439004,
+    "ast_hash": "1ba0c201d3fb236e444cbfebc1228604",
+    "semantic_hash": "1ba0c201d3fb236e444cbfebc1228604"
+  },
+  "src/TheCuratool.Infrastructure/Repositories/ScriptRepository.cs": {
+    "mtime": 1780148078.2333243,
+    "ast_hash": "0769e77b361c36ebc3086f1cd1279722",
+    "semantic_hash": "0769e77b361c36ebc3086f1cd1279722"
+  },
+  "src/TheCuratool.Infrastructure/Repositories/StandardScriptCatalog.cs": {
+    "mtime": 1780100641.1833467,
+    "ast_hash": "09485c26ec31bcb2f8b168984a586881",
+    "semantic_hash": "09485c26ec31bcb2f8b168984a586881"
+  },
+  "src/TheCuratool.Infrastructure/ServiceCollectionExtensions.cs": {
+    "mtime": 1779811181.5412302,
+    "ast_hash": "f726c95a9a9e88286889b8843780335c",
+    "semantic_hash": "f726c95a9a9e88286889b8843780335c"
+  },
+  "src/TheCuratool.Infrastructure/TheCuratool.Infrastructure.csproj": {
+    "mtime": 1779811212.451585,
+    "ast_hash": "0f0179bba8e266ac8df937effaa4996c",
+    "semantic_hash": "0f0179bba8e266ac8df937effaa4996c"
+  },
+  "src/TheCuratool.Web/Api/CuratoolApi.cs": {
+    "mtime": 1780143532.050435,
+    "ast_hash": "dccd6a7b42477d89cc1b77de983b22f3",
+    "semantic_hash": "dccd6a7b42477d89cc1b77de983b22f3"
+  },
+  "src/TheCuratool.Web/Api/CuratoolApiContracts.cs": {
+    "mtime": 1780143531.9996629,
+    "ast_hash": "7929eb4baa8a47492abe4fd47eeb136d",
+    "semantic_hash": "7929eb4baa8a47492abe4fd47eeb136d"
+  },
+  "src/TheCuratool.Web/App.razor": {
+    "mtime": 1780078120.4766717,
+    "ast_hash": "656180107b8fe02e1801bbc669155f89",
+    "semantic_hash": "656180107b8fe02e1801bbc669155f89"
+  },
+  "src/TheCuratool.Web/Components/Layout/MainLayout.razor": {
+    "mtime": 1780165421.8632803,
+    "ast_hash": "46fc6e0a66b8e2e866ab4dd8f17c24bc",
+    "semantic_hash": "46fc6e0a66b8e2e866ab4dd8f17c24bc"
+  },
+  "src/TheCuratool.Web/Components/Pages/Draft.razor": {
+    "mtime": 1780413038.6632736,
+    "ast_hash": "fe287d3616898cad79da4bcee531543c",
+    "semantic_hash": "fe287d3616898cad79da4bcee531543c"
+  },
+  "src/TheCuratool.Web/Components/Pages/Index.razor": {
+    "mtime": 1780078120.4771764,
+    "ast_hash": "ea49a4f22b0c1069363b627b1c7b648e",
+    "semantic_hash": "ea49a4f22b0c1069363b627b1c7b648e"
+  },
+  "src/TheCuratool.Web/Components/Pages/Setup.razor": {
+    "mtime": 1780127675.3131657,
+    "ast_hash": "dcc5f3035c759274aa15ebe523623669",
+    "semantic_hash": "dcc5f3035c759274aa15ebe523623669"
+  },
+  "src/TheCuratool.Web/Components/Pages/Summary.razor": {
+    "mtime": 1780147422.7136722,
+    "ast_hash": "cd027ce942d2bdafc40d60054ca6cb1b",
+    "semantic_hash": "cd027ce942d2bdafc40d60054ca6cb1b"
+  },
+  "src/TheCuratool.Web/Components/_Imports.razor": {
+    "mtime": 1779824104.7860684,
+    "ast_hash": "5aa87071c0f371d92a50fbfa2eb01976",
+    "semantic_hash": "5aa87071c0f371d92a50fbfa2eb01976"
+  },
+  "src/TheCuratool.Web/GlobalUsings.cs": {
+    "mtime": 1779900158.045781,
+    "ast_hash": "91a24c3135c804885ebfd4ed7a7ba4ec",
+    "semantic_hash": "91a24c3135c804885ebfd4ed7a7ba4ec"
+  },
+  "src/TheCuratool.Web/Program.cs": {
+    "mtime": 1780094471.5148609,
+    "ast_hash": "94cd7d8cfee8627682a54906cad2bc2a",
+    "semantic_hash": "94cd7d8cfee8627682a54906cad2bc2a"
+  },
+  "src/TheCuratool.Web/Properties/launchSettings.json": {
+    "mtime": 1780078847.901777,
+    "ast_hash": "8c1ecd86734cd1d1594389dc39ea9bd8",
+    "semantic_hash": "8c1ecd86734cd1d1594389dc39ea9bd8"
+  },
+  "src/TheCuratool.Web/Routes.razor": {
+    "mtime": 1779824419.0128076,
+    "ast_hash": "7719c9b8f9e5a7c084793a71fe28739a",
+    "semantic_hash": "7719c9b8f9e5a7c084793a71fe28739a"
+  },
+  "src/TheCuratool.Web/Services/DraftSessionState.cs": {
+    "mtime": 1780170717.246916,
+    "ast_hash": "e64b4a5aab0f0f4376a45d293135a0ea",
+    "semantic_hash": "e64b4a5aab0f0f4376a45d293135a0ea"
+  },
+  "src/TheCuratool.Web/TheCuratool.Web.csproj": {
+    "mtime": 1780094679.809413,
+    "ast_hash": "808f0c68983a89a4934da09fcdb79ad2",
+    "semantic_hash": "808f0c68983a89a4934da09fcdb79ad2"
+  },
+  "src/TheCuratool.Web/_Imports.razor": {
+    "mtime": 1779824419.0234225,
+    "ast_hash": "30ae472b49816618ae9955269acb7b51",
+    "semantic_hash": "30ae472b49816618ae9955269acb7b51"
+  },
+  "src/TheCuratool.Web/appsettings.Development.json": {
+    "mtime": 1779901942.4884696,
+    "ast_hash": "fbbd8c8b0f34167622eeba8ec207d6fb",
+    "semantic_hash": "fbbd8c8b0f34167622eeba8ec207d6fb"
+  },
+  "src/TheCuratool.Web/appsettings.json": {
+    "mtime": 1779811297.0545425,
+    "ast_hash": "6df71310bd65417a878d732b97894e61",
+    "semantic_hash": "6df71310bd65417a878d732b97894e61"
+  },
+  "tests/TheCuratool.UnitTests/CharacterDatabaseTests.cs": {
+    "mtime": 1780164775.0811672,
+    "ast_hash": "28e948b1d8b68d5c53723cb806930768",
+    "semantic_hash": "28e948b1d8b68d5c53723cb806930768"
+  },
+  "tests/TheCuratool.UnitTests/DraftEngineTests.cs": {
+    "mtime": 1780411969.1981702,
+    "ast_hash": "4e06f92e2a2302d02a51232314c43bea",
+    "semantic_hash": "4e06f92e2a2302d02a51232314c43bea"
+  },
+  "tests/TheCuratool.UnitTests/DraftSessionStateTests.cs": {
+    "mtime": 1780170744.8121648,
+    "ast_hash": "da70293a8caa983107aa1cf72a693e6f",
+    "semantic_hash": "da70293a8caa983107aa1cf72a693e6f"
+  },
+  "tests/TheCuratool.UnitTests/GameSessionPersistenceTests.cs": {
+    "mtime": 1779958228.2407055,
+    "ast_hash": "69a655380b6f2fe7b55259a1c177c4bb",
+    "semantic_hash": "69a655380b6f2fe7b55259a1c177c4bb"
+  },
+  "tests/TheCuratool.UnitTests/GlobalUsings.cs": {
+    "mtime": 1779811507.4564018,
+    "ast_hash": "46cf5997d798984a2a88f5c2b0038ebd",
+    "semantic_hash": "46cf5997d798984a2a88f5c2b0038ebd"
+  },
+  "tests/TheCuratool.UnitTests/Phase8ApiTests.cs": {
+    "mtime": 1779903783.8672574,
+    "ast_hash": "61a5e5387f7a31876170cbfb1571eb2e",
+    "semantic_hash": "61a5e5387f7a31876170cbfb1571eb2e"
+  },
+  "tests/TheCuratool.UnitTests/ScriptParserTests.cs": {
+    "mtime": 1779955061.3109407,
+    "ast_hash": "536337c1d15f7d5d46d80a9338a683c1",
+    "semantic_hash": "536337c1d15f7d5d46d80a9338a683c1"
+  },
+  "tests/TheCuratool.UnitTests/ScriptPersistenceTests.cs": {
+    "mtime": 1779901665.6586,
+    "ast_hash": "15d4f5ea823b405d4c06ebac94dc986a",
+    "semantic_hash": "15d4f5ea823b405d4c06ebac94dc986a"
+  },
+  "tests/TheCuratool.UnitTests/SetupCalculatorDistributionTests.cs": {
+    "mtime": 1780418430.8415976,
+    "ast_hash": "39c4a4eb318132fcaaab9a0782bee815",
+    "semantic_hash": "39c4a4eb318132fcaaab9a0782bee815"
+  },
+  "tests/TheCuratool.UnitTests/SetupCalculatorTests.cs": {
+    "mtime": 1780403315.8783343,
+    "ast_hash": "664f3be26a30e04d98bed15c36a3522f",
+    "semantic_hash": "664f3be26a30e04d98bed15c36a3522f"
+  },
+  "tests/TheCuratool.UnitTests/TheCuratool.UnitTests.csproj": {
+    "mtime": 1779825359.6580007,
+    "ast_hash": "6a1dc544b53fc8f16b2ed4b180ea5a2b",
+    "semantic_hash": "6a1dc544b53fc8f16b2ed4b180ea5a2b"
+  }
+}

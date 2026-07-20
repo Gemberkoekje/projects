@@ -49,6 +49,26 @@ public sealed class PinballTable
     /// <summary>A ball whose z falls below this (metres) — IN THE PLAYFIELD, not the shooter lane — has drained.</summary>
     public double DrainZ { get; }
 
+    // A low-z ball only counts as drained while x &lt; this — keeps a ball waiting in the built-in shooter lane
+    // from draining. The data-driven table passes +∞ so any low ball drains (it fell past the flippers).
+    private readonly double _drainX;
+
+    /// <summary>Builds a table from pre-assembled physics pieces — the data-driven path
+    /// (<c>TableDefinition.BuildPhysicsTable</c>). Keeps this type pure physics: it just holds what it is handed.</summary>
+    public PinballTable(PhysicsSettings settings, List<ICollider> colliders, Flipper leftFlipper, Flipper rightFlipper,
+        Vector3D ballStart, Vector3D shooterLaneStart, double launchSpeed, double drainZ, double drainX)
+    {
+        Settings = settings;
+        Colliders = colliders;
+        LeftFlipper = leftFlipper;
+        RightFlipper = rightFlipper;
+        BallStart = ballStart;
+        ShooterLaneStart = shooterLaneStart;
+        LaunchSpeed = launchSpeed;
+        DrainZ = drainZ;
+        _drainX = drainX;
+    }
+
     /// <summary>Builds the P0 physics table.</summary>
     public PinballTable(ulong seed = 0x5D_EE_CE_5Eul)
     {
@@ -77,6 +97,7 @@ public sealed class PinballTable
             new PlaneCollider(new Vector3D(MinX * RenderScale, 0, 0), Vector3D.UnitX, steel),   // left wall
             new PlaneCollider(new Vector3D(MaxX * RenderScale, 0, 0), -Vector3D.UnitX, steel), // right wall (render MaxX; the shooter-lane divider is deferred with the lane feed)
             new PlaneCollider(new Vector3D(0, 0, MaxZ * RenderScale), -Vector3D.UnitZ, steel),  // back wall
+            new PlaneCollider(new Vector3D(0, WallH * RenderScale, 0), -Vector3D.UnitY, PhysicsMaterial.Playfield), // plexiglass ceiling
             CylinderCollider.VerticalPost(new Vector3D(-3.9 * RenderScale, 0, 3.6 * RenderScale), postH, postR, rubber), // left slingshot post
             CylinderCollider.VerticalPost(new Vector3D(3.9 * RenderScale, 0, 3.6 * RenderScale), postH, postR, rubber),  // right slingshot post
             // Shooter-lane divider: a vertical wall at x=4.6 for z∈[DividerBottomZ, DividerTopZ]. See the const
@@ -105,6 +126,7 @@ public sealed class PinballTable
         ShooterLaneStart = PlayfieldPoint(LaneX, 1.2); // resting against the plunger, bottom of the shooter lane
         LaunchSpeed = 2.5;                          // m/s up the lane — reaches the top feed with speed to spare
         DrainZ = 1.5 * RenderScale;                 // below the flipper line ⇒ drained (playfield only, see IsDrained)
+        _drainX = DividerX * RenderScale;           // spare the shooter lane from the low-z drain
     }
 
     /// <summary>A point on the playfield at ball-rest height, from render-space X/Z (metres out).</summary>
@@ -118,7 +140,7 @@ public sealed class PinballTable
     /// (x > the divider) sits at low z too, so a ball waiting to launch there is not a drain — but a ball that
     /// falls off the bottom of the lane (below the plunger, z &lt; 0) is lost and counts as a drain as well.</summary>
     public bool IsDrained(in BallState ball) =>
-        (ball.Position.Z < DrainZ && ball.Position.X < DividerX * RenderScale) || ball.Position.Z < 0;
+        (ball.Position.Z < DrainZ && ball.Position.X < _drainX) || ball.Position.Z < 0;
 
     private static Flipper MakeFlipper(double pivotX, double pivotZ, double tipX, double tipZ,
         double endAngle, double tube, PhysicsMaterial material)

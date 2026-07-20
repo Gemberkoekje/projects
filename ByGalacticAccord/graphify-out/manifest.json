@@ -1,0 +1,287 @@
+{
+  "ByGalacticAccord.slnx": {
+    "mtime": 1781888975.4136639,
+    "ast_hash": "14d2b255aa3ee838bc7bc545867c7622",
+    "semantic_hash": "14d2b255aa3ee838bc7bc545867c7622"
+  },
+  "src/ByGalacticAccord.Cli/ByGalacticAccord.Cli.csproj": {
+    "mtime": 1781864305.4833307,
+    "ast_hash": "3b5e6252afe3527cf09b0894ac25360b",
+    "semantic_hash": "3b5e6252afe3527cf09b0894ac25360b"
+  },
+  "src/ByGalacticAccord.Cli/Game.cs": {
+    "mtime": 1781888591.0714524,
+    "ast_hash": "94fb93a1a3b511e4f0100e3fe65ae8a0",
+    "semantic_hash": "94fb93a1a3b511e4f0100e3fe65ae8a0"
+  },
+  "src/ByGalacticAccord.Cli/Program.cs": {
+    "mtime": 1781865546.9315288,
+    "ast_hash": "cc826d692bc733fb96bdb6dd1e798100",
+    "semantic_hash": "cc826d692bc733fb96bdb6dd1e798100"
+  },
+  "src/ByGalacticAccord.Cli/Soak.cs": {
+    "mtime": 1781866179.7874372,
+    "ast_hash": "de4d84931e59a3c64a7489e256eef68d",
+    "semantic_hash": "de4d84931e59a3c64a7489e256eef68d"
+  },
+  "src/ByGalacticAccord.Engine/Actors/ActorRole.cs": {
+    "mtime": 1781864562.874755,
+    "ast_hash": "494954018595de7fa528fb02b337da1e",
+    "semantic_hash": "494954018595de7fa528fb02b337da1e"
+  },
+  "src/ByGalacticAccord.Engine/Actors/ActorState.cs": {
+    "mtime": 1781864583.502938,
+    "ast_hash": "63c57c30b67ffa7cfb8c32d6d6df6dd3",
+    "semantic_hash": "63c57c30b67ffa7cfb8c32d6d6df6dd3"
+  },
+  "src/ByGalacticAccord.Engine/Actors/DecisionEngine.cs": {
+    "mtime": 1781866770.1492324,
+    "ast_hash": "c956dedf1414e24ecec065aed4e75c89",
+    "semantic_hash": "c956dedf1414e24ecec065aed4e75c89"
+  },
+  "src/ByGalacticAccord.Engine/Actors/Negotiation.cs": {
+    "mtime": 1781864909.3940823,
+    "ast_hash": "3e0a5edcade8b1ded213152f964ea1d1",
+    "semantic_hash": "3e0a5edcade8b1ded213152f964ea1d1"
+  },
+  "src/ByGalacticAccord.Engine/Actors/PlayerActions.cs": {
+    "mtime": 1781888538.883515,
+    "ast_hash": "0b14ceabde1da198b3dd179fca906889",
+    "semantic_hash": "0b14ceabde1da198b3dd179fca906889"
+  },
+  "src/ByGalacticAccord.Engine/Actors/Profiles.cs": {
+    "mtime": 1781864570.396663,
+    "ast_hash": "f1bff7e70e98f5fc92a2ca655908507a",
+    "semantic_hash": "f1bff7e70e98f5fc92a2ca655908507a"
+  },
+  "src/ByGalacticAccord.Engine/ByGalacticAccord.Engine.csproj": {
+    "mtime": 1781864300.9217508,
+    "ast_hash": "eab85de63310c711b695894535bb5f15",
+    "semantic_hash": "eab85de63310c711b695894535bb5f15"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Cargo.cs": {
+    "mtime": 1781864357.6937642,
+    "ast_hash": "a4ec76586ba23f177e966715b1cc0aa9",
+    "semantic_hash": "a4ec76586ba23f177e966715b1cc0aa9"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Clause.cs": {
+    "mtime": 1781864519.8278897,
+    "ast_hash": "1f95814e39b93f6c2bc9299f6d2d7030",
+    "semantic_hash": "1f95814e39b93f6c2bc9299f6d2d7030"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Contract.cs": {
+    "mtime": 1781866425.1655715,
+    "ast_hash": "03bf689613cc71b1fce58eb0f73f86c6",
+    "semantic_hash": "03bf689613cc71b1fce58eb0f73f86c6"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Credits.cs": {
+    "mtime": 1781864330.603117,
+    "ast_hash": "c93dcd3348f776eed0c46c3b7de15773",
+    "semantic_hash": "c93dcd3348f776eed0c46c3b7de15773"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Goods.cs": {
+    "mtime": 1781864348.340468,
+    "ast_hash": "1e0cb25073d1f14c7ae46af7549ec2eb",
+    "semantic_hash": "1e0cb25073d1f14c7ae46af7549ec2eb"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Ids.cs": {
+    "mtime": 1781864323.6607,
+    "ast_hash": "9cb4d873c0842acd8eb75e981b72519b",
+    "semantic_hash": "9cb4d873c0842acd8eb75e981b72519b"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Location.cs": {
+    "mtime": 1781864421.483025,
+    "ast_hash": "3243aac01ecfcf5ac2a359f3efb12137",
+    "semantic_hash": "3243aac01ecfcf5ac2a359f3efb12137"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Personality.cs": {
+    "mtime": 1781864445.7899027,
+    "ast_hash": "e083600643cc931abc8df42aec3f8869",
+    "semantic_hash": "e083600643cc931abc8df42aec3f8869"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Reputation.cs": {
+    "mtime": 1781864458.4708083,
+    "ast_hash": "227c202afbe5e903f0981a3e020d9f23",
+    "semantic_hash": "227c202afbe5e903f0981a3e020d9f23"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Route.cs": {
+    "mtime": 1781888490.525426,
+    "ast_hash": "4aea9f6b2b1075d61e1f41e1806019e6",
+    "semantic_hash": "4aea9f6b2b1075d61e1f41e1806019e6"
+  },
+  "src/ByGalacticAccord.Engine/Domain/Ship.cs": {
+    "mtime": 1781865214.699744,
+    "ast_hash": "5423988bf7f837c395b00bbe94534e03",
+    "semantic_hash": "5423988bf7f837c395b00bbe94534e03"
+  },
+  "src/ByGalacticAccord.Engine/Domain/ShipType.cs": {
+    "mtime": 1781866394.032666,
+    "ast_hash": "741256566fc45419ec748a836c621c89",
+    "semantic_hash": "741256566fc45419ec748a836c621c89"
+  },
+  "src/ByGalacticAccord.Engine/Economy/InflationMonitor.cs": {
+    "mtime": 1781866532.3677318,
+    "ast_hash": "efefd28fec2d3b6a75cba190af150343",
+    "semantic_hash": "efefd28fec2d3b6a75cba190af150343"
+  },
+  "src/ByGalacticAccord.Engine/Economy/PriceModel.cs": {
+    "mtime": 1781866948.6258636,
+    "ast_hash": "e29cb6e625b2c5b8c398e17c3067aa71",
+    "semantic_hash": "e29cb6e625b2c5b8c398e17c3067aa71"
+  },
+  "src/ByGalacticAccord.Engine/Economy/Visibility.cs": {
+    "mtime": 1781865817.1647136,
+    "ast_hash": "2ca651bcc75f5f10a92baad21819eb1b",
+    "semantic_hash": "2ca651bcc75f5f10a92baad21819eb1b"
+  },
+  "src/ByGalacticAccord.Engine/Events/ControlEvents.cs": {
+    "mtime": 1781865301.20547,
+    "ast_hash": "14d01b792239565b0cc1834fd926b558",
+    "semantic_hash": "14d01b792239565b0cc1834fd926b558"
+  },
+  "src/ByGalacticAccord.Engine/Events/EventQueue.cs": {
+    "mtime": 1781864654.2990367,
+    "ast_hash": "8a99c0204c7e58a382bc8ff01c5a74a4",
+    "semantic_hash": "8a99c0204c7e58a382bc8ff01c5a74a4"
+  },
+  "src/ByGalacticAccord.Engine/Events/ISimEvent.cs": {
+    "mtime": 1781864643.8553963,
+    "ast_hash": "93fa3d934430421a1ccdc89d1785ec4d",
+    "semantic_hash": "93fa3d934430421a1ccdc89d1785ec4d"
+  },
+  "src/ByGalacticAccord.Engine/Events/TransitEvents.cs": {
+    "mtime": 1781866720.3808367,
+    "ast_hash": "c02dc05a2c292cb0e052a6669b720df9",
+    "semantic_hash": "c02dc05a2c292cb0e052a6669b720df9"
+  },
+  "src/ByGalacticAccord.Engine/Random/DeterministicRandom.cs": {
+    "mtime": 1781864607.4854352,
+    "ast_hash": "40a037bcb90440624305bc53f47679e9",
+    "semantic_hash": "40a037bcb90440624305bc53f47679e9"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/EventJournal.cs": {
+    "mtime": 1781864662.3255596,
+    "ast_hash": "5677dd353a2d2265f5baed12220d0635",
+    "semantic_hash": "5677dd353a2d2265f5baed12220d0635"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/IncidentResolver.cs": {
+    "mtime": 1781865115.124514,
+    "ast_hash": "e5607e9e69d73f9a7750c88baa2ccba9",
+    "semantic_hash": "e5607e9e69d73f9a7750c88baa2ccba9"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/Invariants.cs": {
+    "mtime": 1781865378.8756938,
+    "ast_hash": "a158df5662979fc00218bd71a33d6997",
+    "semantic_hash": "a158df5662979fc00218bd71a33d6997"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/RunStop.cs": {
+    "mtime": 1781865391.945722,
+    "ast_hash": "22c37708a1e6b809d0662731276ae6bb",
+    "semantic_hash": "22c37708a1e6b809d0662731276ae6bb"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/Settlement.cs": {
+    "mtime": 1781868025.064337,
+    "ast_hash": "5eae4bdc7e0ee3cfb792792148a84b9a",
+    "semantic_hash": "5eae4bdc7e0ee3cfb792792148a84b9a"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/SimulationConfig.cs": {
+    "mtime": 1781865974.0478756,
+    "ast_hash": "7cb7a014da04c0eb1afe45825bd0a8af",
+    "semantic_hash": "7cb7a014da04c0eb1afe45825bd0a8af"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/SimulationContext.cs": {
+    "mtime": 1781888508.3808045,
+    "ast_hash": "4ff286c7cfe347e20a51f7507ec003d5",
+    "semantic_hash": "4ff286c7cfe347e20a51f7507ec003d5"
+  },
+  "src/ByGalacticAccord.Engine/Simulation/WorldGenerator.cs": {
+    "mtime": 1781866284.0612624,
+    "ast_hash": "d24ed5c6abcb34051a15ff5298080ab0",
+    "semantic_hash": "d24ed5c6abcb34051a15ff5298080ab0"
+  },
+  "src/ByGalacticAccord.Wpf/App.xaml": {
+    "mtime": 1781888737.8265839,
+    "ast_hash": "c6f5acf4e0fa94f82295a1ba1760438f",
+    "semantic_hash": "c6f5acf4e0fa94f82295a1ba1760438f"
+  },
+  "src/ByGalacticAccord.Wpf/App.xaml.cs": {
+    "mtime": 1781888746.1225853,
+    "ast_hash": "db3e002b65cd624493920f81189a1207",
+    "semantic_hash": "db3e002b65cd624493920f81189a1207"
+  },
+  "src/ByGalacticAccord.Wpf/ByGalacticAccord.Wpf.csproj": {
+    "mtime": 1781888659.1160474,
+    "ast_hash": "2e68bb08ed8c413bc7b51dac97d566f3",
+    "semantic_hash": "2e68bb08ed8c413bc7b51dac97d566f3"
+  },
+  "src/ByGalacticAccord.Wpf/MainWindow.xaml": {
+    "mtime": 1781889068.1208625,
+    "ast_hash": "89683e7d3fbcc45c6d6d152794bf0f46",
+    "semantic_hash": "89683e7d3fbcc45c6d6d152794bf0f46"
+  },
+  "src/ByGalacticAccord.Wpf/MainWindow.xaml.cs": {
+    "mtime": 1781889143.4876654,
+    "ast_hash": "3da667976b6b276d83dbdb3352acbe57",
+    "semantic_hash": "3da667976b6b276d83dbdb3352acbe57"
+  },
+  "src/ByGalacticAccord.Wpf/MapLayout.cs": {
+    "mtime": 1781888677.3386319,
+    "ast_hash": "cb51479ae0f2b419af0efd920da0842e",
+    "semantic_hash": "cb51479ae0f2b419af0efd920da0842e"
+  },
+  "src/ByGalacticAccord.Wpf/NegotiationDialog.xaml": {
+    "mtime": 1781888946.889062,
+    "ast_hash": "01d061e6bfd57e5e9e55a88cff016fa3",
+    "semantic_hash": "01d061e6bfd57e5e9e55a88cff016fa3"
+  },
+  "src/ByGalacticAccord.Wpf/NegotiationDialog.xaml.cs": {
+    "mtime": 1781888966.3037393,
+    "ast_hash": "149788eb88ba6e1e16c5f6a911b741e1",
+    "semantic_hash": "149788eb88ba6e1e16c5f6a911b741e1"
+  },
+  "src/ByGalacticAccord.Wpf/ViewModels.cs": {
+    "mtime": 1781888758.1218903,
+    "ast_hash": "eb10a5c8a58469c495b75aae77343d23",
+    "semantic_hash": "eb10a5c8a58469c495b75aae77343d23"
+  },
+  "tests/ByGalacticAccord.Tests/ByGalacticAccord.Tests.csproj": {
+    "mtime": 1781864310.9183874,
+    "ast_hash": "33f001c238087e0bd5d69d1f752a445f",
+    "semantic_hash": "33f001c238087e0bd5d69d1f752a445f"
+  },
+  "tests/ByGalacticAccord.Tests/DeterminismTests.cs": {
+    "mtime": 1781867125.0772126,
+    "ast_hash": "bf7ac4a051821507e538428ee354a559",
+    "semantic_hash": "bf7ac4a051821507e538428ee354a559"
+  },
+  "tests/ByGalacticAccord.Tests/DomainTests.cs": {
+    "mtime": 1781867200.1278777,
+    "ast_hash": "5e7907e1ca06c964c03cad0eab40d8f5",
+    "semantic_hash": "5e7907e1ca06c964c03cad0eab40d8f5"
+  },
+  "tests/ByGalacticAccord.Tests/EconomyTests.cs": {
+    "mtime": 1781867140.152505,
+    "ast_hash": "15a33a4b226c5385b7c6084a3f6c4a6f",
+    "semantic_hash": "15a33a4b226c5385b7c6084a3f6c4a6f"
+  },
+  "tests/ByGalacticAccord.Tests/InvariantTests.cs": {
+    "mtime": 1781867113.4530602,
+    "ast_hash": "4e874d4df926b301efe650ad97010c28",
+    "semantic_hash": "4e874d4df926b301efe650ad97010c28"
+  },
+  "tests/ByGalacticAccord.Tests/NegotiationTests.cs": {
+    "mtime": 1781867158.1531687,
+    "ast_hash": "0179553bf21ec706fbe7f0966e4a46b9",
+    "semantic_hash": "0179553bf21ec706fbe7f0966e4a46b9"
+  },
+  "tests/ByGalacticAccord.Tests/TestWorld.cs": {
+    "mtime": 1781867099.337744,
+    "ast_hash": "39c806ced5c19c40747cc67c5f87e029",
+    "semantic_hash": "39c806ced5c19c40747cc67c5f87e029"
+  },
+  "tests/ByGalacticAccord.Tests/TransitIncidentTests.cs": {
+    "mtime": 1781867213.427308,
+    "ast_hash": "8d56262f9c50add90663ce600fba45e0",
+    "semantic_hash": "8d56262f9c50add90663ce600fba45e0"
+  }
+}

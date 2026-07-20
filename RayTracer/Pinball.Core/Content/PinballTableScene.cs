@@ -218,26 +218,103 @@ public sealed record PinballTableScene(
     }
 
     /// <summary>
-    /// A stripped scene for authoring the wall geometry one piece at a time: just the playfield floor, the
-    /// <see cref="Pinball.Physics.TableWalls"/> walls, and flat overhead fill lighting so the layout is clearly
-    /// visible. No props, no inserts, no perimeter shell — everything that would distract from the walls is
-    /// gone. Used by the <c>--table-topdown</c> view while the boundary is being dialled in.
+    /// The authoring scene behind <c>--table-topdown</c> / the visual editor: the playfield floor plus whatever
+    /// a <see cref="TableDefinition"/> holds — walls, ball, circular bumpers, posts, flippers, slingshots
+    /// (bumper surfaces), targets and light markers — under flat overhead fill so the layout reads clearly. With
+    /// no definition it falls back to the built-in <see cref="Pinball.Physics.TableWalls"/>. Distinct authoring
+    /// colours per element type; render-only (physics is co-registered elsewhere once the layout is locked).
     /// </summary>
-    public static PinballTableScene BuildWallsOnly(int width, int height, Pinball.Physics.TableWalls.Wall[]? walls = null,
-        Vector3? ballStart = null, float ballRadius = 0.36f)
+    public static PinballTableScene BuildWallsOnly(int width, int height, TableDefinition? def = null, bool gameReady = false)
     {
         var s = new List<Tracable>();
         var lights = new List<Light>();
         var playfield = ColoredDiffuse("pf", new Vector3(0.16f, 0.18f, 0.23f)); // darker floor for contrast
         var rail = ColoredDiffuse("wall", new Vector3(0.80f, 0.82f, 0.88f));    // bright matte walls that pop
         var chrome = FlatMirror("chrome", 0.95f);                               // the ball
+        var bumperBody = ColoredDiffuse("bmp", new Vector3(0.55f, 0.57f, 0.62f));
+        var bumperCap = MaterialData.Emissive("bmpcap", new Vector3(1.0f, 0.55f, 0.1f), 1.4f); // glowing amber cap
+        var postMat = ColoredDiffuse("post", new Vector3(0.45f, 0.34f, 0.72f)); // purple posts
+        var flipMat = ColoredDiffuse("flip", new Vector3(0.90f, 0.14f, 0.10f)); // red flippers
+        var slingMat = FlatMirror("sling", 0.70f);                             // chrome slingshots
+        var tgtMat = ColoredDiffuse("tgt", new Vector3(0.85f, 0.86f, 0.90f));   // white targets
+        // In gameReady mode the ball + flippers become movers (Dynamic / DynamicGroup 0=left, 1=right) so the
+        // game host drives them via UpdateSpheres / SetDynamicPose; these pivots feed RotYPose.
+        Vector3 leftPivot = new(-1.5f, 0.22f, 3.4f), rightPivot = new(1.5f, 0.22f, 3.4f);
+        bool leftSet = false, rightSet = false;
 
         s.Add(FloorQuad(0f, MinX, MaxX, MinZ, MaxZ, playfield));
-        foreach (Pinball.Physics.TableWalls.Wall w in walls ?? Pinball.Physics.TableWalls.All)
+        foreach (Pinball.Physics.TableWalls.Wall w in def?.ToWalls() ?? Pinball.Physics.TableWalls.All)
             AddBezierWall(s, w.P0.ToVector3(), w.P1.ToVector3(), w.P2.ToVector3(), w.P3.ToVector3(),
                 (float)Pinball.Physics.TableWalls.WallHeight, w.Segments, rail);
-        if (ballStart is Vector3 bp)
-            s.Add(new Sphere(new Vector3(bp.X, ballRadius, bp.Z), ballRadius, chrome)); // ball at its start, true size
+
+        if (def != null)
+        {
+            if (def.Ball is { Start.Length: >= 2 } b)
+            {
+                float br = MathF.Max(0.02f, (float)b.Radius);
+                s.Add(new Sphere(new Vector3((float)b.Start[0], br, (float)b.Start[1]), br, chrome) { Dynamic = gameReady });
+            }
+            foreach (BumperDef bm in def.Bumpers)
+                if (bm.Pos is { Length: >= 2 })
+                    AddBumper(s, new Vector3((float)bm.Pos[0], 0f, (float)bm.Pos[1]), (float)bm.Radius, (float)bm.Height, bumperBody, bumperCap);
+            foreach (PostDef po in def.Posts)
+                if (po.Pos is { Length: >= 2 })
+                    AddPost(s, new Vector3((float)po.Pos[0], 0f, (float)po.Pos[1]), (float)po.Radius, (float)po.Height, postMat);
+            foreach (FlipperDef fl in def.Flippers)
+                if (fl.Pivot is { Length: >= 2 } && fl.Tip is { Length: >= 2 })
+                {
+                    var piv = new Vector3((float)fl.Pivot[0], 0.22f, (float)fl.Pivot[1]);
+                    var tip = new Vector3((float)fl.Tip[0], 0.22f, (float)fl.Tip[1]);
+                    int group = -1;
+                    if (gameReady)
+                    {
+                        bool right = string.Equals(fl.Side, "right", StringComparison.OrdinalIgnoreCase);
+                        if (right && !rightSet) { group = 1; rightSet = true; rightPivot = piv; }
+                        else if (!right && !leftSet) { group = 0; leftSet = true; leftPivot = piv; }
+                    }
+                    AddFlipper(s, piv, tip, (float)fl.Width, flipMat, group);
+                }
+            // Game mode always needs both flipper mover parts (the physics defaults them too); add defaults for
+            // any the definition omitted, so SetDynamicPose(0/1) always has a part to drive.
+            if (gameReady && !leftSet) { var p = new Vector3(-1.5f, 0.22f, 3.4f); AddFlipper(s, p, new Vector3(-2.7f, 0.22f, 2.5f), 0.28f, flipMat, 0); leftPivot = p; }
+            if (gameReady && !rightSet) { var p = new Vector3(1.5f, 0.22f, 3.4f); AddFlipper(s, p, new Vector3(2.7f, 0.22f, 2.5f), 0.28f, flipMat, 1); rightPivot = p; }
+            foreach (SlingshotDef sl in def.Slingshots)
+                if (sl.From is { Length: >= 2 } && sl.To is { Length: >= 2 })
+                {
+                    float ax = (float)sl.From[0], az = (float)sl.From[1], bx = (float)sl.To[0], bz = (float)sl.To[1];
+                    float len = MathF.Sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az));
+                    float hgt = MathF.Max(0.02f, (float)sl.Height);
+                    AddRotBox(s, new Vector3((ax + bx) * 0.5f, hgt * 0.5f, (az + bz) * 0.5f),
+                        new Vector3(MathF.Max(0.02f, len * 0.5f), hgt * 0.5f, MathF.Max(0.01f, (float)sl.Depth * 0.5f)),
+                        MathF.Atan2(-(bz - az), bx - ax), slingMat);
+                }
+            foreach (TargetDef tg in def.Targets)
+                if (tg.Pos is { Length: >= 2 })
+                    AddTarget(s, new Vector3((float)tg.Pos[0], 0f, (float)tg.Pos[1]), (float)tg.Width, (float)tg.Height, (float)tg.Angle, tgtMat);
+            for (int i = 0; i < def.Lights.Count; i++) // a floor marker at each light's X/Z, tinted by its colour
+            {
+                LightDef li = def.Lights[i];
+                if (li.Pos is not { Length: >= 2 }) continue;
+                Vector3 col = li.Color is { Length: >= 3 }
+                    ? new Vector3((float)li.Color[0], (float)li.Color[1], (float)li.Color[2])
+                    : new Vector3(1f, 0.95f, 0.6f);
+                s.Add(new Sphere(new Vector3((float)li.Pos[0], 0.3f, (float)li.Pos[1]), 0.18f, MaterialData.Emissive($"lit{i}", col, 1.5f)));
+            }
+        }
+
+        if (gameReady) // the plexiglass lid: a near-clear pane at the wall tops + a chrome frame so it reads
+        {
+            float gy = (float)Pinball.Physics.TableWalls.WallHeight;
+            var glass = new MaterialData("plexi", "Plexiglass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+                spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.985f, cauchyA: 1.49f, cauchyB: 0.0f,
+                absorptionRgb: new Vector3(0.01f, 0.01f, 0.02f));
+            s.Add(FloorQuad(gy, MinX, MaxX, MinZ, MaxZ, glass));
+            var frameM = FlatMirror("frame", 0.85f); // chrome glass frame around the outer edge
+            AddRotBox(s, new Vector3(MinX + 0.05f, gy, (MinZ + MaxZ) * 0.5f), new Vector3(0.06f, 0.13f, (MaxZ - MinZ) * 0.5f), 0f, frameM);
+            AddRotBox(s, new Vector3(MaxX - 0.05f, gy, (MinZ + MaxZ) * 0.5f), new Vector3(0.06f, 0.13f, (MaxZ - MinZ) * 0.5f), 0f, frameM);
+            AddRotBox(s, new Vector3(0f, gy, MinZ + 0.05f), new Vector3((MaxX - MinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
+            AddRotBox(s, new Vector3(0f, gy, MaxZ - 0.05f), new Vector3((MaxX - MinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
+        }
 
         // Flat, even overhead fill so the whole floor + walls are legible (the "ambient so we can see").
         for (int zi = 0; zi < 5; zi++)
@@ -256,8 +333,7 @@ public sealed record PinballTableScene(
         PackedScene packed = GpuScenePacker.Pack(s);
         SpectralResources spectral = SpectralResourceBaker.Bake(new WavelengthLookup(), packed.Materials);
         PackedLights packedLights = LightPacker.Pack(lights);
-        Vector3 pivot = new(0f, 0.22f, 3.4f);
-        return new PinballTableScene(s, packed, spectral, packedLights, camera, pivot, pivot);
+        return new PinballTableScene(s, packed, spectral, packedLights, camera, leftPivot, rightPivot);
     }
 
     // ══ Part builders (the single-source-of-truth authoring vocabulary) ══════════════════════════════

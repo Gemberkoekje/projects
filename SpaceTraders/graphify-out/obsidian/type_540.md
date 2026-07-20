@@ -1,0 +1,17 @@
+---
+source_file: "tests/SpaceTraders.Integration.Test/packages.lock.json"
+type: "code"
+community: "Community 266"
+location: "L58"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_266
+---
+
+# type
+
+## Connections
+- [[NSubstitute_5]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_266

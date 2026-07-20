@@ -1,0 +1,87 @@
+---
+source_file: "src/TheCuratool.Application/DraftEngine.cs"
+type: "code"
+community: "Community 0"
+location: "L9"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_0
+---
+
+# DraftEngine
+
+## Connections
+- [[.ApplyAutoAddedRequiredCharacters()]] - `method` [EXTRACTED]
+- [[.ApplyStorytellerAssignedMinionSlots()]] - `method` [EXTRACTED]
+- [[.AreSameOfferSet()]] - `method` [EXTRACTED]
+- [[.AssignDynamicAbility()]] - `method` [EXTRACTED]
+- [[.BuildFeasibilityContext()]] - `method` [EXTRACTED]
+- [[.BuildNormalOfferOptions()]] - `method` [EXTRACTED]
+- [[.BuildSpecialDisguiseOfferOptions()]] - `method` [EXTRACTED]
+- [[.CreateCuratedOffer()]] - `method` [EXTRACTED]
+- [[.CreateCuratedOfferAsync()]] - `references` [EXTRACTED]
+- [[.CreateEngine()]] - `references` [EXTRACTED]
+- [[.CreateSessionAsync()]] - `references` [EXTRACTED]
+- [[.EnsureFinalDemonRequirement()]] - `method` [EXTRACTED]
+- [[.ExecuteMutationAsync()]] - `references` [EXTRACTED]
+- [[.FilterToSelectedTargets()]] - `method` [EXTRACTED]
+- [[.GenerateUnavailableReason()]] - `method` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions()]] - `method` [EXTRACTED]
+- [[.GetAvailableBorrowedAbilityIds()]] - `method` [EXTRACTED]
+- [[.GetAvailableDrunkDisguiseIds()]] - `method` [EXTRACTED]
+- [[.GetAvailableLunaticDisguiseIds()]] - `method` [EXTRACTED]
+- [[.GetBoffinAbilityOptions()]] - `method` [EXTRACTED]
+- [[.GetBorrowedAbilityOfferValidationError()]] - `method` [EXTRACTED]
+- [[.GetConsumedDrunkDisguiseIds()]] - `method` [EXTRACTED]
+- [[.GetCurrentSlot()]] - `method` [EXTRACTED]
+- [[.GetDynamicAbilityOptions()]] - `method` [EXTRACTED]
+- [[.GetLockedPositiveOutsiderDelta()]] - `method` [EXTRACTED]
+- [[.GetMakeupSummary()]] - `method` [EXTRACTED]
+- [[.GetMaxPositiveOutsiderDelta()]] - `method` [EXTRACTED]
+- [[.GetPendingRequiredCharacters()]] - `method` [EXTRACTED]
+- [[.GetPendingRequirements()]] - `method` [EXTRACTED]
+- [[.GetPresentedCharacterId()]] - `method` [EXTRACTED]
+- [[.GetRandomBorrowedAbilityCharacterId()]] - `method` [EXTRACTED]
+- [[.GetRemainingAsync()]] - `references` [EXTRACTED]
+- [[.GetRemainingSeats()]] - `method` [EXTRACTED]
+- [[.GetRemainingValidCharacters()]] - `method` [EXTRACTED]
+- [[.GetSession()]] - `method` [EXTRACTED]
+- [[.GetSessionAsync()]] - `references` [EXTRACTED]
+- [[.GetSuggestionsAsync()]] - `references` [EXTRACTED]
+- [[.Increment()]] - `method` [EXTRACTED]
+- [[.IsAvailableByConstraints()]] - `method` [EXTRACTED]
+- [[.IsHardFeasible()]] - `method` [EXTRACTED]
+- [[.IsLegionEvilFacingOption()]] - `method` [EXTRACTED]
+- [[.IsSetupFeasible()]] - `method` [EXTRACTED]
+- [[.IsSpecialHiddenCharacter()]] - `method` [EXTRACTED]
+- [[.IsSpecialOfferCompatibleWithSelectedTargets()]] - `method` [EXTRACTED]
+- [[.IsSpecialOfferFeasible()]] - `method` [EXTRACTED]
+- [[.NormalizeOfferOptions()]] - `method` [EXTRACTED]
+- [[.NormalizeOfferedIds()]] - `method` [EXTRACTED]
+- [[.OfferOptionEquals()]] - `method` [EXTRACTED]
+- [[.RecordChoice()]] - `method` [EXTRACTED]
+- [[.RecordChoiceAsync()]] - `references` [EXTRACTED]
+- [[.ReplaceSlot()]] - `method` [EXTRACTED]
+- [[.ResolveDef()]] - `method` [EXTRACTED]
+- [[.ResolveEvilSlot()]] - `method` [EXTRACTED]
+- [[.ResolveMinionSlot()]] - `method` [EXTRACTED]
+- [[.ResolveOfferedType()]] - `method` [EXTRACTED]
+- [[.ResolveSession()]] - `method` [EXTRACTED]
+- [[.SatisfiesPairFeasibility()]] - `method` [EXTRACTED]
+- [[.StartSession()]] - `method` [EXTRACTED]
+- [[.SuggestThree()]] - `method` [EXTRACTED]
+- [[.TrackSession()]] - `method` [EXTRACTED]
+- [[.ValidateBorrowedAbilityOffer()]] - `method` [EXTRACTED]
+- [[.ValidateOfferOption()]] - `method` [EXTRACTED]
+- [[.WouldPickKeepAnyTargetReachable()]] - `method` [EXTRACTED]
+- [[CharacterDatabase]] - `references` [EXTRACTED]
+- [[Dictionary]] - `references` [EXTRACTED]
+- [[DraftEngine.cs]] - `contains` [EXTRACTED]
+- [[DraftSessionState_4]] - `references` [EXTRACTED]
+- [[LoricDatabase]] - `references` [EXTRACTED]
+- [[Random]] - `references` [EXTRACTED]
+- [[SetupCalculator]] - `references` [EXTRACTED]
+- [[string]] - `references` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_0

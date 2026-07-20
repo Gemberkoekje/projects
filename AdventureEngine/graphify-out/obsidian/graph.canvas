@@ -1,0 +1,4662 @@
+{
+  "nodes": [
+    {
+      "id": "g0",
+      "type": "group",
+      "label": "Community 0",
+      "x": 0,
+      "y": 0,
+      "width": 1320,
+      "height": 720,
+      "color": "1"
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "type": "file",
+      "file": ".GenerateChapterSummaryAsync().md",
+      "x": 20,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "type": "file",
+      "file": ".RespondAsync().md",
+      "x": 220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "type": "file",
+      "file": ".StreamResponseAsync().md",
+      "x": 420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_action",
+      "type": "file",
+      "file": "Action.md",
+      "x": 620,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:28c0095fa84d4756",
+      "type": "file",
+      "file": "AdventureEngine.Application.Agents.md",
+      "x": 820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "type": "file",
+      "file": "AgentUsage.md",
+      "x": 1020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_agentusage",
+      "type": "file",
+      "file": "AgentUsage.cs.md",
+      "x": 20,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_1.md",
+      "x": 220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_2.md",
+      "x": 420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_cs_dialogue",
+      "type": "file",
+      "file": "Dialogue.md",
+      "x": 620,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_iasyncenumerable",
+      "type": "file",
+      "file": "IAsyncEnumerable.md",
+      "x": 820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "type": "file",
+      "file": "INarratorAgent.md",
+      "x": 1020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent",
+      "type": "file",
+      "file": "INarratorAgent.cs.md",
+      "x": 20,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent",
+      "type": "file",
+      "file": "INpcAgent.md",
+      "x": 220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent",
+      "type": "file",
+      "file": "INpcAgent.cs.md",
+      "x": 420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_cs_ireadonlydictionary",
+      "type": "file",
+      "file": "IReadOnlyDictionary.md",
+      "x": 620,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList.md",
+      "x": 820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList_1.md",
+      "x": 1020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "type": "file",
+      "file": "NarratorContext.md",
+      "x": 20,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext",
+      "type": "file",
+      "file": "NarratorContext.cs.md",
+      "x": 220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_narratorresponse",
+      "type": "file",
+      "file": "NarratorResponse.md",
+      "x": 420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_cs_narratorresponse",
+      "type": "file",
+      "file": "NarratorResponse_1.md",
+      "x": 620,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "type": "file",
+      "file": "NpcContext.md",
+      "x": 820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_npccontext",
+      "type": "file",
+      "file": "NpcContext.cs.md",
+      "x": 1020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_npccontext_cs_npcdefinition",
+      "type": "file",
+      "file": "NpcDefinition.md",
+      "x": 20,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_playerinput",
+      "type": "file",
+      "file": "PlayerInput.md",
+      "x": 220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_cs_playerinput",
+      "type": "file",
+      "file": "PlayerInput_1.md",
+      "x": 420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_summary",
+      "type": "file",
+      "file": "Summary.md",
+      "x": 620,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_task",
+      "type": "file",
+      "file": "Task_1.md",
+      "x": 820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_cs_task",
+      "type": "file",
+      "file": "Task_2.md",
+      "x": 1020,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_usage",
+      "type": "file",
+      "file": "Usage_1.md",
+      "x": 20,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inpcagent_cs_usage",
+      "type": "file",
+      "file": "Usage_2.md",
+      "x": 220,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_inarratoragent_cs_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest_1.md",
+      "x": 420,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_narratorcontext_cs_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest_2.md",
+      "x": 620,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g1",
+      "type": "group",
+      "label": "Community 1",
+      "x": 1400,
+      "y": 0,
+      "width": 1320,
+      "height": 720,
+      "color": "2"
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_bracketedscenemarkerregex",
+      "type": "file",
+      "file": ".BracketedSceneMarkerRegex().md",
+      "x": 1420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_callwithretryasync",
+      "type": "file",
+      "file": ".CallWithRetryAsync().md",
+      "x": 1620,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_collectstreamasync",
+      "type": "file",
+      "file": ".CollectStreamAsync().md",
+      "x": 1820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_createsessionasync",
+      "type": "file",
+      "file": ".CreateSessionAsync()_1.md",
+      "x": 2020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_getplayersessionsasync",
+      "type": "file",
+      "file": ".GetPlayerSessionsAsync()_1.md",
+      "x": 2220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_getsessionasync",
+      "type": "file",
+      "file": ".GetSessionAsync()_1.md",
+      "x": 2420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_istransienterror",
+      "type": "file",
+      "file": ".IsTransientError().md",
+      "x": 1420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_normalizeplayerid",
+      "type": "file",
+      "file": ".NormalizePlayerId().md",
+      "x": 1620,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_parsestatemarkers",
+      "type": "file",
+      "file": ".ParseStateMarkers().md",
+      "x": 1820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_scenemarkerregex",
+      "type": "file",
+      "file": ".SceneMarkerRegex().md",
+      "x": 2020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_streambuffermarkerregex",
+      "type": "file",
+      "file": ".StreamBufferMarkerRegex().md",
+      "x": 2220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_stripinternaldisplayartifacts",
+      "type": "file",
+      "file": ".StripInternalDisplayArtifacts().md",
+      "x": 2420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "type": "file",
+      "file": ".SubmitActionAsync()_1.md",
+      "x": 1420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_8.md",
+      "x": 1620,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_exception",
+      "type": "file",
+      "file": "Exception.md",
+      "x": 1820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_func",
+      "type": "file",
+      "file": "Func.md",
+      "x": 2020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_gamesession",
+      "type": "file",
+      "file": "GameSession_2.md",
+      "x": 2220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice",
+      "type": "file",
+      "file": "GameSessionService.md",
+      "x": 2420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_generatedregex",
+      "type": "file",
+      "file": "GeneratedRegex.md",
+      "x": 1420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_guid",
+      "type": "file",
+      "file": "Guid_2.md",
+      "x": 1620,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_iasyncenumerable",
+      "type": "file",
+      "file": "IAsyncEnumerable_2.md",
+      "x": 1820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_idirectoragent",
+      "type": "file",
+      "file": "IDirectorAgent_1.md",
+      "x": 2020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_idocumentsession",
+      "type": "file",
+      "file": "IDocumentSession.md",
+      "x": 2220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_igamesessionservice",
+      "type": "file",
+      "file": "IGameSessionService_1.md",
+      "x": 2420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_ilogger",
+      "type": "file",
+      "file": "ILogger_2.md",
+      "x": 1420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_inarratoragent",
+      "type": "file",
+      "file": "INarratorAgent_2.md",
+      "x": 1620,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_inpcagent",
+      "type": "file",
+      "file": "INpcAgent_2.md",
+      "x": 1820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList_5.md",
+      "x": 2020,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_regex",
+      "type": "file",
+      "file": "Regex.md",
+      "x": 2220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_task",
+      "type": "file",
+      "file": "Task_8.md",
+      "x": 2420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_int",
+      "type": "file",
+      "file": "int_1.md",
+      "x": 1420,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_nextsceneid",
+      "type": "file",
+      "file": "nextSceneId.md",
+      "x": 1620,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_outcomewon",
+      "type": "file",
+      "file": "outcomeWon.md",
+      "x": 1820,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice_cs_response",
+      "type": "file",
+      "file": "response.md",
+      "x": 2020,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g2",
+      "type": "group",
+      "label": "Community 2",
+      "x": 2800,
+      "y": 0,
+      "width": 1320,
+      "height": 720,
+      "color": "3"
+    },
+    {
+      "id": "n_csharp_namespace:c3a9d97988b1bc07",
+      "type": "file",
+      "file": "AdventureEngine.Application.Sessions.md",
+      "x": 2820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:78cbbd6730138de7",
+      "type": "file",
+      "file": "AdventureEngine.Domain_1.md",
+      "x": 3020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:adfb5802d03ceb57",
+      "type": "file",
+      "file": "AdventureEngine.Domain.Events.md",
+      "x": 3220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:1e5b4406fd064c8c",
+      "type": "file",
+      "file": "AdventureEngine.Tests_1.md",
+      "x": 3420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chaptercompleted",
+      "type": "file",
+      "file": "ChapterCompleted.md",
+      "x": 3620,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "type": "file",
+      "file": "ChapterDefinition.md",
+      "x": 3820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chapterstarted",
+      "type": "file",
+      "file": "ChapterStarted.md",
+      "x": 2820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_datetime",
+      "type": "file",
+      "file": "DateTime.md",
+      "x": 3020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_dictionary",
+      "type": "file",
+      "file": "Dictionary.md",
+      "x": 3220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_gameended",
+      "type": "file",
+      "file": "GameEnded.md",
+      "x": 3420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents",
+      "type": "file",
+      "file": "GameEvents.cs.md",
+      "x": 3620,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "type": "file",
+      "file": "GameSession_1.md",
+      "x": 3820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession",
+      "type": "file",
+      "file": "GameSession.cs.md",
+      "x": 2820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests",
+      "type": "file",
+      "file": "GameSessionTests.cs.md",
+      "x": 3020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_globalusings",
+      "type": "file",
+      "file": "GlobalUsings.cs.md",
+      "x": 3220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_globalusings",
+      "type": "file",
+      "file": "GlobalUsings.cs_2.md",
+      "x": 3420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_cs_guid",
+      "type": "file",
+      "file": "Guid_1.md",
+      "x": 3620,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList_3.md",
+      "x": 3820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_cs_list",
+      "type": "file",
+      "file": "List.md",
+      "x": 2820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests",
+      "type": "file",
+      "file": "ModerationResultParserTests.cs.md",
+      "x": 3020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_cs_narratorresponse",
+      "type": "file",
+      "file": "NarratorResponse_2.md",
+      "x": 3220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "type": "file",
+      "file": "NpcDefinition_1.md",
+      "x": 3420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_npcspoke",
+      "type": "file",
+      "file": "NpcSpoke.md",
+      "x": 3620,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_playeracted",
+      "type": "file",
+      "file": "PlayerActed.md",
+      "x": 3820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_cs_playerinput",
+      "type": "file",
+      "file": "PlayerInput_2.md",
+      "x": 2820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "type": "file",
+      "file": "SceneDefinition.md",
+      "x": 3020,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sceneentered",
+      "type": "file",
+      "file": "SceneEntered.md",
+      "x": 3220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated",
+      "type": "file",
+      "file": "SessionCreated.md",
+      "x": 3420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "type": "file",
+      "file": "SessionStatus.md",
+      "x": 3620,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_sessionstatus",
+      "type": "file",
+      "file": "SessionStatus.cs.md",
+      "x": 3820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_usagerecorded",
+      "type": "file",
+      "file": "UsageRecorded.md",
+      "x": 2820,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest_3.md",
+      "x": 3020,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest.cs.md",
+      "x": 3220,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g3",
+      "type": "group",
+      "label": "Community 3",
+      "x": 4200,
+      "y": 0,
+      "width": 1320,
+      "height": 620,
+      "color": "4"
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildcurrentchapter",
+      "type": "file",
+      "file": ".BuildCurrentChapter().md",
+      "x": 4220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildrecenthistory",
+      "type": "file",
+      "file": ".BuildRecentHistory().md",
+      "x": 4420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildstoryprogress",
+      "type": "file",
+      "file": ".BuildStoryProgress().md",
+      "x": 4620,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildworldanchor",
+      "type": "file",
+      "file": ".BuildWorldAnchor().md",
+      "x": 4820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_generatechaptersummaryasync",
+      "type": "file",
+      "file": ".GenerateChapterSummaryAsync()_1.md",
+      "x": 5020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_streamresponseasync",
+      "type": "file",
+      "file": ".StreamResponseAsync()_1.md",
+      "x": 5220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_action",
+      "type": "file",
+      "file": "Action_1.md",
+      "x": 4220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_agentusage",
+      "type": "file",
+      "file": "AgentUsage_2.md",
+      "x": 4420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_anthropicclient",
+      "type": "file",
+      "file": "AnthropicClient_2.md",
+      "x": 4620,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_6.md",
+      "x": 4820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_chapterdefinition",
+      "type": "file",
+      "file": "ChapterDefinition_1.md",
+      "x": 5020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_iasyncenumerable",
+      "type": "file",
+      "file": "IAsyncEnumerable_1.md",
+      "x": 5220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_inarratoragent",
+      "type": "file",
+      "file": "INarratorAgent_1.md",
+      "x": 4220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_ireadonlydictionary",
+      "type": "file",
+      "file": "IReadOnlyDictionary_1.md",
+      "x": 4420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList_4.md",
+      "x": 4620,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_list",
+      "type": "file",
+      "file": "List_1.md",
+      "x": 4820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent",
+      "type": "file",
+      "file": "NarratorAgent.md",
+      "x": 5020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_narratorcontext",
+      "type": "file",
+      "file": "NarratorContext_1.md",
+      "x": 5220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_narratorresponse",
+      "type": "file",
+      "file": "NarratorResponse_3.md",
+      "x": 4220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_npcdefinition",
+      "type": "file",
+      "file": "NpcDefinition_2.md",
+      "x": 4420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_playerinput",
+      "type": "file",
+      "file": "PlayerInput_3.md",
+      "x": 4620,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_scenedefinition",
+      "type": "file",
+      "file": "SceneDefinition_1.md",
+      "x": 4820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_summary",
+      "type": "file",
+      "file": "Summary_1.md",
+      "x": 5020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_task",
+      "type": "file",
+      "file": "Task_6.md",
+      "x": 5220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_usage",
+      "type": "file",
+      "file": "Usage_5.md",
+      "x": 4220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest_5.md",
+      "x": 4420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_int",
+      "type": "file",
+      "file": "int.md",
+      "x": 4620,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent_cs_string",
+      "type": "file",
+      "file": "string_1.md",
+      "x": 4820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g4",
+      "type": "group",
+      "label": "Community 4",
+      "x": 5600,
+      "y": 0,
+      "width": 1100,
+      "height": 620,
+      "color": "5"
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "type": "file",
+      "file": ".Apply().md",
+      "x": 5620,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_chaptercompleted_advanceschapterandclearshistory",
+      "type": "file",
+      "file": ".Apply_ChapterCompleted_AdvancesChapterAndClearsHistory().md",
+      "x": 5820,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_lost_setsstatusabandoned",
+      "type": "file",
+      "file": ".Apply_GameEnded_Lost_SetsStatusAbandoned().md",
+      "x": 6020,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_won_setsstatuscompleted",
+      "type": "file",
+      "file": ".Apply_GameEnded_Won_SetsStatusCompleted().md",
+      "x": 6220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_addstorecenthistoryandchapterhistory",
+      "type": "file",
+      "file": ".Apply_PlayerActed_AddsToRecentHistoryAndChapterHistory().md",
+      "x": 6420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_slideswindowaftersix",
+      "type": "file",
+      "file": ".Apply_PlayerActed_SlidesWindowAfterSix().md",
+      "x": 5620,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_sceneentered_updatescurrentscene",
+      "type": "file",
+      "file": ".Apply_SceneEntered_UpdatesCurrentScene().md",
+      "x": 5820,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatesallnonstreamingagenttags",
+      "type": "file",
+      "file": ".Apply_UsageRecorded_AccumulatesAllNonStreamingAgentTags().md",
+      "x": 6020,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatestokens",
+      "type": "file",
+      "file": ".Apply_UsageRecorded_AccumulatesTokens().md",
+      "x": 6220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_invokeparsestatemarkers",
+      "type": "file",
+      "file": ".InvokeParseStateMarkers().md",
+      "x": 6420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_makesessioncreated",
+      "type": "file",
+      "file": ".MakeSessionCreated().md",
+      "x": 5620,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_parsestatemarkers_parsessceneandoutcomemarkers",
+      "type": "file",
+      "file": ".ParseStateMarkers_ParsesSceneAndOutcomeMarkers().md",
+      "x": 5820,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_parsestatemarkers_stripsleakeddisplayartifacts",
+      "type": "file",
+      "file": ".ParseStateMarkers_StripsLeakedDisplayArtifacts().md",
+      "x": 6020,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_usagerecorded_deserializeslegacypayloadwithzerocachedefaults",
+      "type": "file",
+      "file": ".UsageRecorded_DeserializesLegacyPayloadWithZeroCacheDefaults().md",
+      "x": 6220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_chaptercompleted",
+      "type": "file",
+      "file": "ChapterCompleted_1.md",
+      "x": 6420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_cs_fact",
+      "type": "file",
+      "file": "Fact.md",
+      "x": 5620,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_gameended",
+      "type": "file",
+      "file": "GameEnded_1.md",
+      "x": 5820,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests",
+      "type": "file",
+      "file": "GameSessionTests.md",
+      "x": 6020,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_playeracted",
+      "type": "file",
+      "file": "PlayerActed_1.md",
+      "x": 6220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sceneentered",
+      "type": "file",
+      "file": "SceneEntered_1.md",
+      "x": 6420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_gamesession_cs_sessioncreated",
+      "type": "file",
+      "file": "SessionCreated_1.md",
+      "x": 5620,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_usagerecorded",
+      "type": "file",
+      "file": "UsageRecorded_1.md",
+      "x": 5820,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_cs_nextsceneid",
+      "type": "file",
+      "file": "nextSceneId_1.md",
+      "x": 6020,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_cs_outcomewon",
+      "type": "file",
+      "file": "outcomeWon_1.md",
+      "x": 6220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_gamesessiontests_cs_response",
+      "type": "file",
+      "file": "response_1.md",
+      "x": 6420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g5",
+      "type": "group",
+      "label": "Community 5",
+      "x": 6780,
+      "y": 0,
+      "width": 1100,
+      "height": 620,
+      "color": "6"
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "type": "file",
+      "file": ".IsSafeAsync().md",
+      "x": 6800,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "type": "file",
+      "file": ".TryParse().md",
+      "x": 7000,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_emptyorgarbagepayload_failsanddefaultstosaferesult",
+      "type": "file",
+      "file": ".TryParse_EmptyOrGarbagePayload_FailsAndDefaultsToSafeResult().md",
+      "x": 7200,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_safepayload_returnssaferesult",
+      "type": "file",
+      "file": ".TryParse_SafePayload_ReturnsSafeResult().md",
+      "x": 7400,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_unsafepayloadwithreason_returnsunsaferesult",
+      "type": "file",
+      "file": ".TryParse_UnsafePayloadWithReason_ReturnsUnsafeResult().md",
+      "x": 7600,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_agentusage",
+      "type": "file",
+      "file": "AgentUsage_1.md",
+      "x": 6800,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_anthropicclient",
+      "type": "file",
+      "file": "AnthropicClient_1.md",
+      "x": 7000,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_5.md",
+      "x": 7200,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests_cs_fact",
+      "type": "file",
+      "file": "Fact_1.md",
+      "x": 7400,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_ilogger",
+      "type": "file",
+      "file": "ILogger_1.md",
+      "x": 7600,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "type": "file",
+      "file": "ModerationAgent.md",
+      "x": 6800,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresponse",
+      "type": "file",
+      "file": "ModerationResponse.md",
+      "x": 7000,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult",
+      "type": "file",
+      "file": "ModerationResult.md",
+      "x": 7200,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_moderationresult",
+      "type": "file",
+      "file": "ModerationResult_1.md",
+      "x": 7400,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresult",
+      "type": "file",
+      "file": "ModerationResult.cs.md",
+      "x": 7600,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser",
+      "type": "file",
+      "file": "ModerationResultParser.md",
+      "x": 6800,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_moderationresultparser",
+      "type": "file",
+      "file": "ModerationResultParser.cs.md",
+      "x": 7000,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests",
+      "type": "file",
+      "file": "ModerationResultParserTests.md",
+      "x": 7200,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_result",
+      "type": "file",
+      "file": "Result.md",
+      "x": 7400,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_task",
+      "type": "file",
+      "file": "Task_5.md",
+      "x": 7600,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_usage",
+      "type": "file",
+      "file": "Usage_4.md",
+      "x": 6800,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g6",
+      "type": "group",
+      "label": "Community 6",
+      "x": 0,
+      "y": 800,
+      "width": 1100,
+      "height": 520,
+      "color": "1"
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_servicecollectionextensions_adventureengine_infrastructure_servicecollectionextensions_addadventureengineinfrastructure",
+      "type": "file",
+      "file": ".AddAdventureEngineInfrastructure().md",
+      "x": 20,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_martenconfiguration_adventureengine_infrastructure_martenconfiguration_configure",
+      "type": "file",
+      "file": ".Configure().md",
+      "x": 220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:d48a699f635e2eee",
+      "type": "file",
+      "file": "AdventureEngine.Infrastructure_1.md",
+      "x": 420,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:58687b24a3ccd031",
+      "type": "file",
+      "file": "AdventureEngine.Infrastructure.Agents.md",
+      "x": 620,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_csharp_namespace:ed8346fca9d64447",
+      "type": "file",
+      "file": "AdventureEngine.Infrastructure.Anthropic.md",
+      "x": 820,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_anthropic_anthropicoptions_adventureengine_infrastructure_anthropic_anthropicoptions",
+      "type": "file",
+      "file": "AnthropicOptions.md",
+      "x": 20,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_anthropic_anthropicoptions",
+      "type": "file",
+      "file": "AnthropicOptions.cs.md",
+      "x": 220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent",
+      "type": "file",
+      "file": "DirectorAgent.cs.md",
+      "x": 420,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_gamesessionservice",
+      "type": "file",
+      "file": "GameSessionService.cs.md",
+      "x": 620,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_iconfiguration",
+      "type": "file",
+      "file": "IConfiguration.md",
+      "x": 820,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_iservicecollection",
+      "type": "file",
+      "file": "IServiceCollection.md",
+      "x": 20,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_martenconfiguration_adventureengine_infrastructure_martenconfiguration",
+      "type": "file",
+      "file": "MartenConfiguration.md",
+      "x": 220,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_martenconfiguration",
+      "type": "file",
+      "file": "MartenConfiguration.cs.md",
+      "x": 420,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_moderationagent",
+      "type": "file",
+      "file": "ModerationAgent.cs.md",
+      "x": 620,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_narratoragent",
+      "type": "file",
+      "file": "NarratorAgent.cs.md",
+      "x": 820,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent",
+      "type": "file",
+      "file": "NpcAgent.cs.md",
+      "x": 20,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_servicecollectionextensions_adventureengine_infrastructure_servicecollectionextensions",
+      "type": "file",
+      "file": "ServiceCollectionExtensions.md",
+      "x": 220,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_servicecollectionextensions",
+      "type": "file",
+      "file": "ServiceCollectionExtensions.cs.md",
+      "x": 420,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_storeoptions",
+      "type": "file",
+      "file": "StoreOptions.md",
+      "x": 620,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_anthropic_anthropicoptions_cs_string",
+      "type": "file",
+      "file": "string_2.md",
+      "x": 820,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g7",
+      "type": "group",
+      "label": "Community 7",
+      "x": 1400,
+      "y": 800,
+      "width": 1100,
+      "height": 520,
+      "color": "2"
+    },
+    {
+      "id": "n_src_adventureengine_application_adventureengine_application",
+      "type": "file",
+      "file": "AdventureEngine.Application.md",
+      "x": 1420,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_adventureengine_domain",
+      "type": "file",
+      "file": "AdventureEngine.Domain.md",
+      "x": 1620,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "type": "file",
+      "file": "AdventureEngine.Infrastructure.md",
+      "x": 1820,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_adventureengine_tests",
+      "type": "file",
+      "file": "AdventureEngine.Tests.md",
+      "x": 2020,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_adventureengine_web",
+      "type": "file",
+      "file": "AdventureEngine.Web.md",
+      "x": 2220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adventureengine",
+      "type": "file",
+      "file": "AdventureEngine.slnx.md",
+      "x": 1420,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_anthropic_sdk",
+      "type": "file",
+      "file": "Anthropic.SDK (5.10.0).md",
+      "x": 1620,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_aspnetcore_healthchecks_npgsql",
+      "type": "file",
+      "file": "AspNetCore.HealthChecks.NpgSql (9.0.0).md",
+      "x": 1820,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_marten",
+      "type": "file",
+      "file": "Marten (8.37.2).md",
+      "x": 2020,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_microsoft_extensions_options_configurationextensions",
+      "type": "file",
+      "file": "Microsoft.Extensions.Options.ConfigurationExtensions (10.0.0).md",
+      "x": 2220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_adventureengine_application_csproj_sdk_microsoft_net_sdk",
+      "type": "file",
+      "file": "Microsoft.NET.Sdk.md",
+      "x": 1420,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_domain_adventureengine_domain_csproj_sdk_microsoft_net_sdk",
+      "type": "file",
+      "file": "Microsoft.NET.Sdk_1.md",
+      "x": 1620,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_adventureengine_infrastructure_csproj_sdk_microsoft_net_sdk",
+      "type": "file",
+      "file": "Microsoft.NET.Sdk_2.md",
+      "x": 1820,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_adventureengine_tests_csproj_sdk_microsoft_net_sdk",
+      "type": "file",
+      "file": "Microsoft.NET.Sdk_3.md",
+      "x": 2020,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sdk_microsoft_net_sdk_web",
+      "type": "file",
+      "file": "Microsoft.NET.Sdk.Web.md",
+      "x": 2220,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_microsoft_net_test_sdk",
+      "type": "file",
+      "file": "Microsoft.NET.Test.Sdk (17.14.1).md",
+      "x": 1420,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_coverlet_collector",
+      "type": "file",
+      "file": "coverlet.collector (6.0.4).md",
+      "x": 1620,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_xunit",
+      "type": "file",
+      "file": "xunit (2.9.3).md",
+      "x": 1820,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_nuget_xunit_runner_visualstudio",
+      "type": "file",
+      "file": "xunit.runner.visualstudio (3.1.4).md",
+      "x": 2020,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g8",
+      "type": "group",
+      "label": "Community 8",
+      "x": 2800,
+      "y": 800,
+      "width": 1100,
+      "height": 520,
+      "color": "3"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_clearnameasync",
+      "type": "file",
+      "file": "ClearNameAsync.md",
+      "x": 2820,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_dataannotationsvalidator",
+      "type": "file",
+      "file": "DataAnnotationsValidator.md",
+      "x": 3020,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_editform",
+      "type": "file",
+      "file": "EditForm.md",
+      "x": 3220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_razor_gamesession",
+      "type": "file",
+      "file": "GameSession_3.md",
+      "x": 3420,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_handlenamekeydownasync",
+      "type": "file",
+      "file": "HandleNameKeyDownAsync.md",
+      "x": 3620,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home",
+      "type": "file",
+      "file": "Home.razor.md",
+      "x": 2820,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_razor_igamesessionservice",
+      "type": "file",
+      "file": "IGameSessionService_2.md",
+      "x": 3020,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_razor_ijsruntime",
+      "type": "file",
+      "file": "IJSRuntime_1.md",
+      "x": 3220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_inputtextarea",
+      "type": "file",
+      "file": "InputTextArea.md",
+      "x": 3420,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_loadpastsessionsasync",
+      "type": "file",
+      "file": "LoadPastSessionsAsync.md",
+      "x": 3620,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_navigationmanager",
+      "type": "file",
+      "file": "NavigationManager.md",
+      "x": 2820,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_onafterrenderasync",
+      "type": "file",
+      "file": "OnAfterRenderAsync_1.md",
+      "x": 3020,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_razor_pagetitle",
+      "type": "file",
+      "file": "PageTitle_1.md",
+      "x": 3220,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_savenameasync",
+      "type": "file",
+      "file": "SaveNameAsync.md",
+      "x": 3420,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_startadventureasync",
+      "type": "file",
+      "file": "StartAdventureAsync.md",
+      "x": 3620,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_home_statusbadgeclass",
+      "type": "file",
+      "file": "StatusBadgeClass.md",
+      "x": 2820,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_validationmessage",
+      "type": "file",
+      "file": "ValidationMessage.md",
+      "x": 3020,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_route",
+      "type": "file",
+      "file": "route.md",
+      "x": 3220,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g9",
+      "type": "group",
+      "label": "Community 9",
+      "x": 4200,
+      "y": 800,
+      "width": 880,
+      "height": 520,
+      "color": "4"
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_schema",
+      "type": "file",
+      "file": "$schema.md",
+      "x": 4220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_environmentvariables_aspnetcore_environment",
+      "type": "file",
+      "file": "ASPNETCORE_ENVIRONMENT.md",
+      "x": 4420,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_http_applicationurl",
+      "type": "file",
+      "file": "applicationUrl.md",
+      "x": 4620,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_https_applicationurl",
+      "type": "file",
+      "file": "applicationUrl_1.md",
+      "x": 4820,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_http_commandname",
+      "type": "file",
+      "file": "commandName.md",
+      "x": 4220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_https_commandname",
+      "type": "file",
+      "file": "commandName_1.md",
+      "x": 4420,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_http_dotnetrunmessages",
+      "type": "file",
+      "file": "dotnetRunMessages.md",
+      "x": 4620,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_https_dotnetrunmessages",
+      "type": "file",
+      "file": "dotnetRunMessages_1.md",
+      "x": 4820,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_http_environmentvariables",
+      "type": "file",
+      "file": "environmentVariables.md",
+      "x": 4220,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_https_environmentvariables",
+      "type": "file",
+      "file": "environmentVariables_1.md",
+      "x": 4420,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_profiles_http",
+      "type": "file",
+      "file": "http.md",
+      "x": 4620,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_profiles_https",
+      "type": "file",
+      "file": "https.md",
+      "x": 4820,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_http_launchbrowser",
+      "type": "file",
+      "file": "launchBrowser.md",
+      "x": 4220,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_https_launchbrowser",
+      "type": "file",
+      "file": "launchBrowser_1.md",
+      "x": 4420,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings",
+      "type": "file",
+      "file": "launchSettings.json.md",
+      "x": 4620,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_properties_launchsettings_profiles",
+      "type": "file",
+      "file": "profiles.md",
+      "x": 4820,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g10",
+      "type": "group",
+      "label": "Community 10",
+      "x": 5600,
+      "y": 800,
+      "width": 880,
+      "height": 520,
+      "color": "5"
+    },
+    {
+      "id": "n_adventureengine_application_sessions",
+      "type": "file",
+      "file": "AdventureEngine.Application.Sessions_1.md",
+      "x": 5620,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adventureengine_domain",
+      "type": "file",
+      "file": "AdventureEngine.Domain_2.md",
+      "x": 5820,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adventureengine_web",
+      "type": "file",
+      "file": "AdventureEngine.Web_1.md",
+      "x": 6020,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adventureengine_web_components",
+      "type": "file",
+      "file": "AdventureEngine.Web.Components.md",
+      "x": 6220,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_adventureengine_web_components_layout",
+      "type": "file",
+      "file": "AdventureEngine.Web.Components.Layout.md",
+      "x": 5620,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_microsoft_aspnetcore_components_forms",
+      "type": "file",
+      "file": "Microsoft.AspNetCore.Components.Forms.md",
+      "x": 5820,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_microsoft_aspnetcore_components_routing",
+      "type": "file",
+      "file": "Microsoft.AspNetCore.Components.Routing.md",
+      "x": 6020,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_microsoft_aspnetcore_components_web",
+      "type": "file",
+      "file": "Microsoft.AspNetCore.Components.Web.md",
+      "x": 6220,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_microsoft_aspnetcore_components_web_virtualization",
+      "type": "file",
+      "file": "Microsoft.AspNetCore.Components.Web.Virtualization.md",
+      "x": 5620,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_imports_razor_microsoft_jsinterop",
+      "type": "file",
+      "file": "Microsoft.JSInterop_1.md",
+      "x": 5820,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_program",
+      "type": "file",
+      "file": "Program.cs.md",
+      "x": 6020,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_system_net_http_json",
+      "type": "file",
+      "file": "System.Net.Http.Json.md",
+      "x": 6220,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_imports",
+      "type": "file",
+      "file": "_Imports.razor.md",
+      "x": 5620,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_static",
+      "type": "file",
+      "file": "static.md",
+      "x": 5820,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g11",
+      "type": "group",
+      "label": "Community 11",
+      "x": 6780,
+      "y": 800,
+      "width": 880,
+      "height": 520,
+      "color": "6"
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "type": "file",
+      "file": ".ExtractJsonPayload().md",
+      "x": 6800,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "type": "file",
+      "file": ".GenerateWorldAsync()_1.md",
+      "x": 7000,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromfencedjson",
+      "type": "file",
+      "file": ".WorldManifest_DeserializesFromFencedJson().md",
+      "x": 7200,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromjson",
+      "type": "file",
+      "file": ".WorldManifest_DeserializesFromJson().md",
+      "x": 7400,
+      "y": 880,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_4.md",
+      "x": 6800,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_worldmanifesttests_cs_fact",
+      "type": "file",
+      "file": "Fact_2.md",
+      "x": 7000,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser",
+      "type": "file",
+      "file": "JsonResponseParser.md",
+      "x": 7200,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_jsonresponseparser",
+      "type": "file",
+      "file": "JsonResponseParser.cs.md",
+      "x": 7400,
+      "y": 960,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_task",
+      "type": "file",
+      "file": "Task_4.md",
+      "x": 6800,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_usage",
+      "type": "file",
+      "file": "Usage_3.md",
+      "x": 7000,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_world",
+      "type": "file",
+      "file": "World_1.md",
+      "x": 7200,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest_4.md",
+      "x": 7400,
+      "y": 1040,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests",
+      "type": "file",
+      "file": "WorldManifestTests.md",
+      "x": 6800,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_tests_adventureengine_tests_worldmanifesttests",
+      "type": "file",
+      "file": "WorldManifestTests.cs.md",
+      "x": 7000,
+      "y": 1120,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g12",
+      "type": "group",
+      "label": "Community 12",
+      "x": 0,
+      "y": 1400,
+      "width": 880,
+      "height": 420,
+      "color": "1"
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "type": "file",
+      "file": ".GenerateWorldAsync().md",
+      "x": 20,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_anthropicclient",
+      "type": "file",
+      "file": "AnthropicClient.md",
+      "x": 220,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken.md",
+      "x": 420,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "type": "file",
+      "file": "DirectorAgent.md",
+      "x": 620,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "type": "file",
+      "file": "IDirectorAgent.md",
+      "x": 20,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent",
+      "type": "file",
+      "file": "IDirectorAgent.cs.md",
+      "x": 220,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_ilogger",
+      "type": "file",
+      "file": "ILogger.md",
+      "x": 420,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_cs_task",
+      "type": "file",
+      "file": "Task.md",
+      "x": 620,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_cs_usage",
+      "type": "file",
+      "file": "Usage.md",
+      "x": 20,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_cs_world",
+      "type": "file",
+      "file": "World.md",
+      "x": 220,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_agents_idirectoragent_cs_worldmanifest",
+      "type": "file",
+      "file": "WorldManifest.md",
+      "x": 420,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_directoragent_cs_string",
+      "type": "file",
+      "file": "string.md",
+      "x": 620,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g13",
+      "type": "group",
+      "label": "Community 13",
+      "x": 1400,
+      "y": 1400,
+      "width": 880,
+      "height": 420,
+      "color": "2"
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "type": "file",
+      "file": ".CreateSessionAsync().md",
+      "x": 1420,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "type": "file",
+      "file": ".GetPlayerSessionsAsync().md",
+      "x": 1620,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "type": "file",
+      "file": ".GetSessionAsync().md",
+      "x": 1820,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "type": "file",
+      "file": ".SubmitActionAsync().md",
+      "x": 2020,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_3.md",
+      "x": 1420,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_cs_gamesession",
+      "type": "file",
+      "file": "GameSession.md",
+      "x": 1620,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "type": "file",
+      "file": "Guid.md",
+      "x": 1820,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "type": "file",
+      "file": "IGameSessionService.md",
+      "x": 2020,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice",
+      "type": "file",
+      "file": "IGameSessionService.cs.md",
+      "x": 1420,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_cs_ireadonlylist",
+      "type": "file",
+      "file": "IReadOnlyList_2.md",
+      "x": 1620,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "type": "file",
+      "file": "Task_3.md",
+      "x": 1820,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g14",
+      "type": "group",
+      "label": "Community 14",
+      "x": 2800,
+      "y": 1400,
+      "width": 880,
+      "height": 420,
+      "color": "3"
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_adventureengine_infrastructure_agents_npcagent_respondasync",
+      "type": "file",
+      "file": ".RespondAsync()_1.md",
+      "x": 2820,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_agentusage",
+      "type": "file",
+      "file": "AgentUsage_3.md",
+      "x": 3020,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_anthropicclient",
+      "type": "file",
+      "file": "AnthropicClient_3.md",
+      "x": 3220,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_cancellationtoken",
+      "type": "file",
+      "file": "CancellationToken_7.md",
+      "x": 3420,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_dialogue",
+      "type": "file",
+      "file": "Dialogue_1.md",
+      "x": 2820,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_inpcagent",
+      "type": "file",
+      "file": "INpcAgent_1.md",
+      "x": 3020,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_adventureengine_infrastructure_agents_npcagent",
+      "type": "file",
+      "file": "NpcAgent.md",
+      "x": 3220,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_npccontext",
+      "type": "file",
+      "file": "NpcContext_1.md",
+      "x": 3420,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_task",
+      "type": "file",
+      "file": "Task_7.md",
+      "x": 2820,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_infrastructure_agents_npcagent_cs_usage",
+      "type": "file",
+      "file": "Usage_6.md",
+      "x": 3020,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g15",
+      "type": "group",
+      "label": "Community 15",
+      "x": 4200,
+      "y": 1400,
+      "width": 660,
+      "height": 420,
+      "color": "4"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_dispose",
+      "type": "file",
+      "file": "Dispose.md",
+      "x": 4220,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_gameterminal",
+      "type": "file",
+      "file": "GameTerminal.md",
+      "x": 4420,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_handlekeydownasync",
+      "type": "file",
+      "file": "HandleKeyDownAsync.md",
+      "x": 4620,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_razor_igamesessionservice",
+      "type": "file",
+      "file": "IGameSessionService_3.md",
+      "x": 4220,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_oninitializedasync",
+      "type": "file",
+      "file": "OnInitializedAsync.md",
+      "x": 4420,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_razor_pagetitle",
+      "type": "file",
+      "file": "PageTitle_2.md",
+      "x": 4620,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play",
+      "type": "file",
+      "file": "Play.razor.md",
+      "x": 4220,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_play_submitactionasync",
+      "type": "file",
+      "file": "SubmitActionAsync.md",
+      "x": 4420,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_route_play_sessionid_guid",
+      "type": "file",
+      "file": "routeplay{SessionIdguid}.md",
+      "x": 4620,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g16",
+      "type": "group",
+      "label": "Community 16",
+      "x": 5600,
+      "y": 1400,
+      "width": 660,
+      "height": 420,
+      "color": "5"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor",
+      "type": "file",
+      "file": "ReconnectModal.razor.js.md",
+      "x": 5620,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_handlereconnectstatechanged",
+      "type": "file",
+      "file": "handleReconnectStateChanged().md",
+      "x": 5820,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_reconnectmodal",
+      "type": "file",
+      "file": "reconnectModal_1.md",
+      "x": 6020,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_resume",
+      "type": "file",
+      "file": "resume().md",
+      "x": 5620,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_resumebutton",
+      "type": "file",
+      "file": "resumeButton.md",
+      "x": 5820,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_retry",
+      "type": "file",
+      "file": "retry().md",
+      "x": 6020,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_retrybutton",
+      "type": "file",
+      "file": "retryButton.md",
+      "x": 5620,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal_razor_retrywhendocumentbecomesvisible",
+      "type": "file",
+      "file": "retryWhenDocumentBecomesVisible().md",
+      "x": 5820,
+      "y": 1640,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g17",
+      "type": "group",
+      "label": "Community 17",
+      "x": 6780,
+      "y": 1400,
+      "width": 660,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_app",
+      "type": "file",
+      "file": "App.razor.md",
+      "x": 6800,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_headoutlet",
+      "type": "file",
+      "file": "HeadOutlet.md",
+      "x": 7000,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_importmap",
+      "type": "file",
+      "file": "ImportMap.md",
+      "x": 7200,
+      "y": 1480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_reconnectmodal",
+      "type": "file",
+      "file": "ReconnectModal.md",
+      "x": 6800,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_resourcepreloader",
+      "type": "file",
+      "file": "ResourcePreloader.md",
+      "x": 7000,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_routes",
+      "type": "file",
+      "file": "Routes.md",
+      "x": 7200,
+      "y": 1560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g18",
+      "type": "group",
+      "label": "Community 18",
+      "x": 0,
+      "y": 1900,
+      "width": 660,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_focusonnavigate",
+      "type": "file",
+      "file": "FocusOnNavigate.md",
+      "x": 20,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_found",
+      "type": "file",
+      "file": "Found.md",
+      "x": 220,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_routeview",
+      "type": "file",
+      "file": "RouteView.md",
+      "x": 420,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_router",
+      "type": "file",
+      "file": "Router.md",
+      "x": 20,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_routes",
+      "type": "file",
+      "file": "Routes.razor.md",
+      "x": 220,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g19",
+      "type": "group",
+      "label": "Community 19",
+      "x": 1400,
+      "y": 1900,
+      "width": 660,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_gameterminal",
+      "type": "file",
+      "file": "GameTerminal.razor.md",
+      "x": 1420,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_gameterminal_razor_ijsruntime",
+      "type": "file",
+      "file": "IJSRuntime.md",
+      "x": 1620,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_microsoft_aspnetcore_components",
+      "type": "file",
+      "file": "Microsoft.AspNetCore.Components.md",
+      "x": 1820,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_gameterminal_razor_microsoft_jsinterop",
+      "type": "file",
+      "file": "Microsoft.JSInterop.md",
+      "x": 1420,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_gameterminal_onafterrenderasync",
+      "type": "file",
+      "file": "OnAfterRenderAsync.md",
+      "x": 1620,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g20",
+      "type": "group",
+      "label": "Community 20",
+      "x": 2800,
+      "y": 1900,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_error",
+      "type": "file",
+      "file": "Error.razor.md",
+      "x": 2820,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_error_oninitialized",
+      "type": "file",
+      "file": "OnInitialized.md",
+      "x": 3020,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_error_razor_pagetitle",
+      "type": "file",
+      "file": "PageTitle.md",
+      "x": 2820,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_system_diagnostics",
+      "type": "file",
+      "file": "System.Diagnostics.md",
+      "x": 3020,
+      "y": 2060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g21",
+      "type": "group",
+      "label": "Community 21",
+      "x": 4200,
+      "y": 1900,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_navlink",
+      "type": "file",
+      "file": "NavLink.md",
+      "x": 4220,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_navmenu",
+      "type": "file",
+      "file": "NavMenu.razor.md",
+      "x": 4420,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g22",
+      "type": "group",
+      "label": "Community 22",
+      "x": 5600,
+      "y": 1900,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_mainlayout",
+      "type": "file",
+      "file": "MainLayout.razor.md",
+      "x": 5620,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_navmenu",
+      "type": "file",
+      "file": "NavMenu.md",
+      "x": 5820,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g23",
+      "type": "group",
+      "label": "Community 23",
+      "x": 6780,
+      "y": 1900,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_src_adventureengine_domain_globalusings",
+      "type": "file",
+      "file": "GlobalUsings.cs_1.md",
+      "x": 6800,
+      "y": 1980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g24",
+      "type": "group",
+      "label": "Community 24",
+      "x": 0,
+      "y": 2380,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_layout_reconnectmodal",
+      "type": "file",
+      "file": "ReconnectModal.razor.md",
+      "x": 20,
+      "y": 2460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g25",
+      "type": "group",
+      "label": "Community 25",
+      "x": 1400,
+      "y": 2380,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_adventureengine_web_components_pages_notfound",
+      "type": "file",
+      "file": "NotFound.razor.md",
+      "x": 1420,
+      "y": 2460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g26",
+      "type": "group",
+      "label": "Community 26",
+      "x": 2800,
+      "y": 2380,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_adventureengine_web_wwwroot_js_gameterminal",
+      "type": "file",
+      "file": "gameTerminal.js.md",
+      "x": 2820,
+      "y": 2460,
+      "width": 180,
+      "height": 60
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_adventureengine_src_adventureengine_application_adventureengine_application",
+      "fromNode": "n_adventureengine",
+      "toNode": "n_src_adventureengine_application_adventureengine_application",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_adventureengine_src_adventureengine_domain_adventureengine_domain",
+      "fromNode": "n_adventureengine",
+      "toNode": "n_src_adventureengine_domain_adventureengine_domain",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_adventureengine_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "fromNode": "n_adventureengine",
+      "toNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_adventureengine_src_adventureengine_web_adventureengine_web",
+      "fromNode": "n_adventureengine",
+      "toNode": "n_src_adventureengine_web_adventureengine_web",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_adventureengine_tests_adventureengine_tests_adventureengine_tests",
+      "fromNode": "n_adventureengine",
+      "toNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_adventureengine_application_src_adventureengine_application_adventureengine_application_csproj_sdk_microsoft_net_sdk",
+      "fromNode": "n_src_adventureengine_application_adventureengine_application",
+      "toNode": "n_src_adventureengine_application_adventureengine_application_csproj_sdk_microsoft_net_sdk",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_adventureengine_application_src_adventureengine_domain_adventureengine_domain",
+      "fromNode": "n_src_adventureengine_application_adventureengine_application",
+      "toNode": "n_src_adventureengine_domain_adventureengine_domain",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_adventureengine_application_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "fromNode": "n_src_adventureengine_application_adventureengine_application",
+      "toNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_adventureengine_application_src_adventureengine_web_adventureengine_web",
+      "fromNode": "n_src_adventureengine_application_adventureengine_application",
+      "toNode": "n_src_adventureengine_web_adventureengine_web",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_adventureengine_application_tests_adventureengine_tests_adventureengine_tests",
+      "fromNode": "n_src_adventureengine_application_adventureengine_application",
+      "toNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_adventureengine_domain_src_adventureengine_domain_adventureengine_domain_csproj_sdk_microsoft_net_sdk",
+      "fromNode": "n_src_adventureengine_domain_adventureengine_domain",
+      "toNode": "n_src_adventureengine_domain_adventureengine_domain_csproj_sdk_microsoft_net_sdk",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_adventureengine_domain_tests_adventureengine_tests_adventureengine_tests",
+      "fromNode": "n_src_adventureengine_domain_adventureengine_domain",
+      "toNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_nuget_anthropic_sdk",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_nuget_anthropic_sdk",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_nuget_marten",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_nuget_marten",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_nuget_microsoft_extensions_options_configurationextensions",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_nuget_microsoft_extensions_options_configurationextensions",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_src_adventureengine_infrastructure_adventureengine_infrastructure_csproj_sdk_microsoft_net_sdk",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure_csproj_sdk_microsoft_net_sdk",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_src_adventureengine_web_adventureengine_web",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_src_adventureengine_web_adventureengine_web",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_adventureengine_infrastructure_tests_adventureengine_tests_adventureengine_tests",
+      "fromNode": "n_src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "toNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_web_adventureengine_web_nuget_aspnetcore_healthchecks_npgsql",
+      "fromNode": "n_src_adventureengine_web_adventureengine_web",
+      "toNode": "n_nuget_aspnetcore_healthchecks_npgsql",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_web_adventureengine_web_sdk_microsoft_net_sdk_web",
+      "fromNode": "n_src_adventureengine_web_adventureengine_web",
+      "toNode": "n_sdk_microsoft_net_sdk_web",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_tests_adventureengine_tests_adventureengine_tests_nuget_coverlet_collector",
+      "fromNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "toNode": "n_nuget_coverlet_collector",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_tests_adventureengine_tests_adventureengine_tests_nuget_microsoft_net_test_sdk",
+      "fromNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "toNode": "n_nuget_microsoft_net_test_sdk",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_tests_adventureengine_tests_adventureengine_tests_nuget_xunit",
+      "fromNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "toNode": "n_nuget_xunit",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_tests_adventureengine_tests_adventureengine_tests_nuget_xunit_runner_visualstudio",
+      "fromNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "toNode": "n_nuget_xunit_runner_visualstudio",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_tests_adventureengine_tests_adventureengine_tests_tests_adventureengine_tests_adventureengine_tests_csproj_sdk_microsoft_net_sdk",
+      "fromNode": "n_tests_adventureengine_tests_adventureengine_tests",
+      "toNode": "n_tests_adventureengine_tests_adventureengine_tests_csproj_sdk_microsoft_net_sdk",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_csharp_namespace:28c0095fa84d4756",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage",
+      "toNode": "n_csharp_namespace:28c0095fa84d4756",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_idirectoragent",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_inarratoragent",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_inpcagent",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_jsonresponseparser",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_jsonresponseparser",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_moderationresult",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_moderationresult",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_moderationresultparser",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_narratorcontext",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_application_agents_npccontext",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_application_agents_npccontext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_infrastructure_agents_directoragent",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_src_adventureengine_infrastructure_globalusings",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_src_adventureengine_infrastructure_globalusings",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_tests_adventureengine_tests_moderationresultparsertests",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_tests_adventureengine_tests_moderationresultparsertests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:28c0095fa84d4756_tests_adventureengine_tests_worldmanifesttests",
+      "fromNode": "n_csharp_namespace:28c0095fa84d4756",
+      "toNode": "n_tests_adventureengine_tests_worldmanifesttests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "fromNode": "n_src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_application_agents_idirectoragent_cs_cancellationtoken",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_cs_cancellationtoken",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_application_agents_idirectoragent_cs_task",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_cs_task",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_application_agents_idirectoragent_cs_usage",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_cs_usage",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_application_agents_idirectoragent_cs_world",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_cs_world",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_application_agents_idirectoragent_cs_worldmanifest",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_application_agents_idirectoragent_cs_worldmanifest",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_createsessionasync",
+      "fromNode": "n_src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_createsessionasync",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync_src_adventureengine_application_agents_inarratoragent_cs_action",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_action",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync_src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync_src_adventureengine_application_agents_inarratoragent_cs_iasyncenumerable",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_iasyncenumerable",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_ireadonlylist",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_ireadonlylist",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_narratorresponse",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_narratorresponse",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_playerinput",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_playerinput",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_summary",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_summary",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_task",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_task",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_usage",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_usage",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_application_agents_inarratoragent_cs_worldmanifest",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_application_agents_inarratoragent_cs_worldmanifest",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_application_agents_inpcagent_cs_cancellationtoken",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_cs_cancellationtoken",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_application_agents_inpcagent_cs_dialogue",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_cs_dialogue",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_application_agents_inpcagent_cs_task",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_cs_task",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_application_agents_inpcagent_cs_usage",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_application_agents_inpcagent_cs_usage",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_jsonresponseparser_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser",
+      "fromNode": "n_src_adventureengine_application_agents_jsonresponseparser",
+      "toNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "fromNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser",
+      "toNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "fromNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "fromNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload_tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromfencedjson",
+      "fromNode": "n_src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "toNode": "n_tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromfencedjson",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresult_src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresult",
+      "toNode": "n_src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresponse",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresponse",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser",
+      "toNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_emptyorgarbagepayload_failsanddefaultstosaferesult",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "toNode": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_emptyorgarbagepayload_failsanddefaultstosaferesult",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_safepayload_returnssaferesult",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "toNode": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_safepayload_returnssaferesult",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_unsafepayloadwithreason_returnsunsaferesult",
+      "fromNode": "n_src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "toNode": "n_tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_unsafepayloadwithreason_returnsunsaferesult",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_cs_ireadonlydictionary",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_cs_ireadonlydictionary",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_cs_ireadonlylist",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_cs_ireadonlylist",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_cs_narratorresponse",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_cs_narratorresponse",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_cs_playerinput",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_cs_playerinput",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext_src_adventureengine_application_agents_narratorcontext_cs_worldmanifest",
+      "fromNode": "n_src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "toNode": "n_src_adventureengine_application_agents_narratorcontext_cs_worldmanifest",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_npccontext_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "fromNode": "n_src_adventureengine_application_agents_npccontext",
+      "toNode": "n_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext_src_adventureengine_application_agents_npccontext_cs_npcdefinition",
+      "fromNode": "n_src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "toNode": "n_src_adventureengine_application_agents_npccontext_cs_npcdefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_globalusings_csharp_namespace:78cbbd6730138de7",
+      "fromNode": "n_src_adventureengine_application_globalusings",
+      "toNode": "n_csharp_namespace:78cbbd6730138de7",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_globalusings_csharp_namespace:adfb5802d03ceb57",
+      "fromNode": "n_src_adventureengine_application_globalusings",
+      "toNode": "n_csharp_namespace:adfb5802d03ceb57",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_csharp_namespace:c3a9d97988b1bc07",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_csharp_namespace:c3a9d97988b1bc07",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:c3a9d97988b1bc07_src_adventureengine_infrastructure_globalusings",
+      "fromNode": "n_csharp_namespace:c3a9d97988b1bc07",
+      "toNode": "n_src_adventureengine_infrastructure_globalusings",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync_src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_task_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_task_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_task_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_task",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_guid_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_guid_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync_src_adventureengine_application_sessions_igamesessionservice_cs_gamesession",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_gamesession",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_cs_gamesession_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_gamesession",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync_src_adventureengine_application_sessions_igamesessionservice_cs_ireadonlylist",
+      "fromNode": "n_src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "toNode": "n_src_adventureengine_application_sessions_igamesessionservice_cs_ireadonlylist",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_csharp_namespace:adfb5802d03ceb57",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_csharp_namespace:adfb5802d03ceb57",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chaptercompleted",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chaptercompleted",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chapterstarted",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chapterstarted",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_gameended",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_gameended",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_npcspoke",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_npcspoke",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_playeracted",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_playeracted",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sceneentered",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sceneentered",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_usagerecorded",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents",
+      "toNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_usagerecorded",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:adfb5802d03ceb57_src_adventureengine_infrastructure_globalusings",
+      "fromNode": "n_csharp_namespace:adfb5802d03ceb57",
+      "toNode": "n_src_adventureengine_infrastructure_globalusings",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:adfb5802d03ceb57_tests_adventureengine_tests_gamesessiontests",
+      "fromNode": "n_csharp_namespace:adfb5802d03ceb57",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_makesessioncreated",
+      "fromNode": "n_src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_makesessioncreated",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_csharp_namespace:78cbbd6730138de7",
+      "fromNode": "n_src_adventureengine_domain_gamesession",
+      "toNode": "n_csharp_namespace:78cbbd6730138de7",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "fromNode": "n_src_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:78cbbd6730138de7_src_adventureengine_domain_sessionstatus",
+      "fromNode": "n_csharp_namespace:78cbbd6730138de7",
+      "toNode": "n_src_adventureengine_domain_sessionstatus",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:78cbbd6730138de7_src_adventureengine_domain_worldmanifest",
+      "fromNode": "n_csharp_namespace:78cbbd6730138de7",
+      "toNode": "n_src_adventureengine_domain_worldmanifest",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:78cbbd6730138de7_src_adventureengine_infrastructure_globalusings",
+      "fromNode": "n_csharp_namespace:78cbbd6730138de7",
+      "toNode": "n_src_adventureengine_infrastructure_globalusings",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:78cbbd6730138de7_tests_adventureengine_tests_gamesessiontests",
+      "fromNode": "n_csharp_namespace:78cbbd6730138de7",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:78cbbd6730138de7_tests_adventureengine_tests_worldmanifesttests",
+      "fromNode": "n_csharp_namespace:78cbbd6730138de7",
+      "toNode": "n_tests_adventureengine_tests_worldmanifesttests",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_datetime",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_datetime",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_dictionary",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_dictionary",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_cs_guid",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_cs_guid",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_cs_list",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_cs_list",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_cs_narratorresponse",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_cs_narratorresponse",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_gamesession_cs_playerinput",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_gamesession_cs_playerinput",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_chaptercompleted",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_chaptercompleted",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_gameended",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_gameended",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_playeracted",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_playeracted",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_sceneentered",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_sceneentered",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_src_adventureengine_domain_gamesession_cs_sessioncreated",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_src_adventureengine_domain_gamesession_cs_sessioncreated",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_usagerecorded",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_usagerecorded",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_chaptercompleted_advanceschapterandclearshistory",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_chaptercompleted_advanceschapterandclearshistory",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_lost_setsstatusabandoned",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_lost_setsstatusabandoned",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_won_setsstatuscompleted",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_won_setsstatuscompleted",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_addstorecenthistoryandchapterhistory",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_addstorecenthistoryandchapterhistory",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_slideswindowaftersix",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_slideswindowaftersix",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_sceneentered_updatescurrentscene",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_sceneentered_updatescurrentscene",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatesallnonstreamingagenttags",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatesallnonstreamingagenttags",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatestokens",
+      "fromNode": "n_src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "toNode": "n_tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatestokens",
+      "label": "calls [INFERRED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_sessionstatus_src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "fromNode": "n_src_adventureengine_domain_sessionstatus",
+      "toNode": "n_src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest_src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_cs_ireadonlylist_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_cs_ireadonlylist_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "fromNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "toNode": "n_src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_csharp_namespace:58687b24a3ccd031",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_csharp_namespace:58687b24a3ccd031",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_csharp_namespace:ed8346fca9d64447",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_csharp_namespace:ed8346fca9d64447",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:58687b24a3ccd031_src_adventureengine_infrastructure_agents_moderationagent",
+      "fromNode": "n_csharp_namespace:58687b24a3ccd031",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:58687b24a3ccd031_src_adventureengine_infrastructure_agents_narratoragent",
+      "fromNode": "n_csharp_namespace:58687b24a3ccd031",
+      "toNode": "n_src_adventureengine_infrastructure_agents_narratoragent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:58687b24a3ccd031_src_adventureengine_infrastructure_agents_npcagent",
+      "fromNode": "n_csharp_namespace:58687b24a3ccd031",
+      "toNode": "n_src_adventureengine_infrastructure_agents_npcagent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:58687b24a3ccd031_src_adventureengine_infrastructure_gamesessionservice",
+      "fromNode": "n_csharp_namespace:58687b24a3ccd031",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_csharp_namespace:58687b24a3ccd031_src_adventureengine_infrastructure_servicecollectionextensions",
+      "fromNode": "n_csharp_namespace:58687b24a3ccd031",
+      "toNode": "n_src_adventureengine_infrastructure_servicecollectionextensions",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_src_adventureengine_infrastructure_agents_directoragent_cs_anthropicclient",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_anthropicclient",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_src_adventureengine_infrastructure_agents_directoragent_cs_ilogger",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_ilogger",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_src_adventureengine_infrastructure_agents_directoragent_cs_string",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_string",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync_src_adventureengine_infrastructure_agents_directoragent_cs_cancellationtoken",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_cancellationtoken",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync_src_adventureengine_infrastructure_agents_directoragent_cs_task",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_task",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync_src_adventureengine_infrastructure_agents_directoragent_cs_usage",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_usage",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync_src_adventureengine_infrastructure_agents_directoragent_cs_world",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_world",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync_src_adventureengine_infrastructure_agents_directoragent_cs_worldmanifest",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "toNode": "n_src_adventureengine_infrastructure_agents_directoragent_cs_worldmanifest",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_csharp_namespace:ed8346fca9d64447",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_csharp_namespace:ed8346fca9d64447",
+      "label": "imports [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "label": "method [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_src_adventureengine_infrastructure_agents_moderationagent_cs_anthropicclient",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_anthropicclient",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_src_adventureengine_infrastructure_agents_moderationagent_cs_ilogger",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_src_adventureengine_infrastructure_agents_moderationagent_cs_ilogger",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "toNode": "n_src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync_result",
+      "fromNode": "n_src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "toNode": "n_result",
+      "label": "references [EXTRACTED]"
+    }
+  ]
+}

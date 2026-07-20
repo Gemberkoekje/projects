@@ -1,0 +1,87 @@
+---
+source_file: "tests/SpaceTraders.Application.Tests/packages.lock.json"
+type: "code"
+community: "Community 18"
+location: "L4"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_18
+---
+
+# net10.0
+
+## Connections
+- [[AsyncFixer_10]] - `contains` [EXTRACTED]
+- [[Castle.Core_5]] - `contains` [EXTRACTED]
+- [[DotNetProjectFile.Analyzers_10]] - `contains` [EXTRACTED]
+- [[FastExpressionCompiler_15]] - `contains` [EXTRACTED]
+- [[FluentAssertions_3]] - `contains` [EXTRACTED]
+- [[Humanizer.Core_15]] - `contains` [EXTRACTED]
+- [[IDisposableAnalyzers_10]] - `contains` [EXTRACTED]
+- [[ImTools_15]] - `contains` [EXTRACTED]
+- [[JasperFx_15]] - `contains` [EXTRACTED]
+- [[JasperFx.Events_11]] - `contains` [EXTRACTED]
+- [[JasperFx.RuntimeCompiler_11]] - `contains` [EXTRACTED]
+- [[JasperFx.SourceGeneration_11]] - `contains` [EXTRACTED]
+- [[Microsoft.AspNetCore.Components.Analyzers_10]] - `contains` [EXTRACTED]
+- [[Microsoft.Bcl.AsyncInterfaces_15]] - `contains` [EXTRACTED]
+- [[Microsoft.Bcl.TimeProvider_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.Analyzers_21]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.CSharp.Scripting_15]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.CSharp.Workspaces_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.NetAnalyzers_10]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.Scripting_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.Scripting.Common_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.VisualBasic_15]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.VisualBasic.Workspaces_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeAnalysis.Workspaces.Common_17]] - `contains` [EXTRACTED]
+- [[Microsoft.CodeCoverage_5]] - `contains` [EXTRACTED]
+- [[Microsoft.EntityFrameworkCore.Abstractions_5]] - `contains` [EXTRACTED]
+- [[Microsoft.EntityFrameworkCore.Analyzers_5]] - `contains` [EXTRACTED]
+- [[Microsoft.EntityFrameworkCore.InMemory_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Caching.Abstractions_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Caching.Memory_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.Abstractions_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.Binder_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.CommandLine_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.EnvironmentVariables_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.FileExtensions_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.Json_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Configuration.UserSecrets_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.DependencyInjection_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.DependencyInjection.Abstractions_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Diagnostics_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Diagnostics.Abstractions_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.FileProviders.Abstractions_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.FileProviders.Physical_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.FileSystemGlobbing_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Hosting_5]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Hosting.Abstractions_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.Abstractions_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.Configuration_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.Console_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.Debug_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.EventLog_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Logging.EventSource_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.ObjectPool_4]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Options_3]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Options.ConfigurationExtensions_4]] - `contains` [EXTRACTED]
+- [[Microsoft.NET.Test.Sdk_3]] - `contains` [EXTRACTED]
+- [[NSubstitute_3]] - `contains` [EXTRACTED]
+- [[NSubstitute.Analyzers.CSharp_3]] - `contains` [EXTRACTED]
+- [[Qowaiv.Analyzers.CSharp_10]] - `contains` [EXTRACTED]
+- [[SerilogAnalyzer_10]] - `contains` [EXTRACTED]
+- [[SonarAnalyzer.CSharp_10]] - `contains` [EXTRACTED]
+- [[StyleCop.Analyzers_10]] - `contains` [EXTRACTED]
+- [[coverlet.collector_3]] - `contains` [EXTRACTED]
+- [[dependencies_168]] - `contains` [EXTRACTED]
+- [[xunit_3]] - `contains` [EXTRACTED]
+- [[xunit.analyzers_7]] - `contains` [EXTRACTED]
+- [[xunit.runner.visualstudio_3]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_18

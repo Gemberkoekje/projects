@@ -1,0 +1,80 @@
+---
+source_file: ""
+type: "code"
+community: "Community 1"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_1
+---
+
+# Fact
+
+## Connections
+- [[.Alchemist_AfterAssignDynamicAbility_ConfirmationFlagClears()]] - `references` [EXTRACTED]
+- [[.Alchemist_Chosen_RequiresStorytellerSetupConfirmation()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Alchemist_AllowsAlreadyChosenMinion()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Alchemist_Baron_TargetCountsReflectPlusTwoOutsiders()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Alchemist_NoRulesChar_CountsUnchangedAndFlagClears()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Boffin_RejectsAlreadyChosenCharacter()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Rejects_UnavailableAbility()]] - `references` [EXTRACTED]
+- [[.AssignDynamicAbility_Rejects_WrongScope()]] - `references` [EXTRACTED]
+- [[.AtheistIsExcludedWhenUseAtheistIsFalse()]] - `references` [EXTRACTED]
+- [[.AtheistIsOfferableWhenUseAtheistIsTrue()]] - `references` [EXTRACTED]
+- [[.ChoirboyAndKing_OnScript_NeitherChosen_BothRemainAvailable()]] - `references` [EXTRACTED]
+- [[.ChoirboyChosen_WhenKingMissing_AddsKingAsOutOfScriptAndIncludesInSummary()]] - `references` [EXTRACTED]
+- [[.ChoirboyChosen_WhenKingOnScript_DoesNotAddOutOfScriptCharacter()]] - `references` [EXTRACTED]
+- [[.CompletingUseAtheistSessionWithoutSoberAtheist_Throws()]] - `references` [EXTRACTED]
+- [[.CreateCuratedOffer_AllowsMultipleDrunkDisguiseOptions()]] - `references` [EXTRACTED]
+- [[.CreateCuratedOffer_RejectsDraftExcludedCharacters()]] - `references` [EXTRACTED]
+- [[.CreateCuratedOffer_RejectsEvilSentinelOutsideLegionMode()]] - `references` [EXTRACTED]
+- [[.EmptySelectedTargetFilter_BehavesLikeNoFilter()]] - `references` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions_BaronGreyedOut_NoOutsidersOnScript()]] - `references` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions_GodfatherGreyedOut_StoryTellerChoiceCannotBeSatisfied()]] - `references` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions_HuntsmanGreyedOut_DamselNotOnScript()]] - `references` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions_IncludesAlreadyChosenMinions()]] - `references` [EXTRACTED]
+- [[.GetAlchemistAbilityOptions_ReturnsOnlyMinionsOnScript()]] - `references` [EXTRACTED]
+- [[.GetBoffinAbilityOptions_HuntsmanGreyedOut_DamselAlreadyChosen()]] - `references` [EXTRACTED]
+- [[.GetBoffinAbilityOptions_HuntsmanGreyedOut_DamselNotOnScript()]] - `references` [EXTRACTED]
+- [[.GetBoffinAbilityOptions_ReturnsOnlyTownsfolkAndOutsidersOnScript()]] - `references` [EXTRACTED]
+- [[.HermitAsDrunkAndRealDrunk_CanCoexistWithDifferentDisguises()]] - `references` [EXTRACTED]
+- [[.Hermit_WithDrunkAndLunaticOnScript_IsNotOfferable()]] - `references` [EXTRACTED]
+- [[.Hermit_WithDrunkOnScript_OfferedAsDrunkHiddenOption()]] - `references` [EXTRACTED]
+- [[.Hermit_WithLunaticOnScript_OfferedAsLunaticHiddenOption()]] - `references` [EXTRACTED]
+- [[.HiddenLunaticAndDrunkFlags_CountAsOutsidersForSetupMath()]] - `references` [EXTRACTED]
+- [[.HuntsmanChosenEarly_LastSeatForcedToDamsel()]] - `references` [EXTRACTED]
+- [[.KazaliAndSummoner_BecomeUnavailableAtExpectedTimes()]] - `references` [EXTRACTED]
+- [[.LegionGame_SuggestThree_CanOfferGoodOrEvilSentinelUntilLegionCountReached()]] - `references` [EXTRACTED]
+- [[.LegionGame_SuggestThree_CanOfferLunaticOrHermitHiddenOptions()]] - `references` [EXTRACTED]
+- [[.LegionGame_SuggestThree_DoesNotContainTwoEvilFacingOptions()]] - `references` [EXTRACTED]
+- [[.LegionMode_EvilSlotsOfferOnlyEvilSentinel()]] - `references` [EXTRACTED]
+- [[.LegionOnScript_WhenLegionModeDisabled_ExcludesLegionFromRemainingPool()]] - `references` [EXTRACTED]
+- [[.LunaticFlaggedDemon_CanCompleteWithoutRealDemon_WhenLilMonstaAllowsZeroDemonsTarget()]] - `references` [EXTRACTED]
+- [[.LunaticFlaggedDemon_StillRequiresRealDemonBeforeCompletion()]] - `references` [EXTRACTED]
+- [[.MakeupSummary_LilMonstaAndImpOnScript_BothDistributionsAvailableBeforePick()]] - `references` [EXTRACTED]
+- [[.MakeupSummary_TargetShrinks_WhenDemonAlternativeEliminated()]] - `references` [EXTRACTED]
+- [[.MakeupSummary_TargetsBroadBeforePicks_NarrowAfterDemonPick()]] - `references` [EXTRACTED]
+- [[.NoVortox_SevenPlayer_DraftCompletesWithoutContradiction()]] - `references` [EXTRACTED]
+- [[.PickingKazali_PreventsMinionDraftsWithoutStorytellerAssignedMinionSlots()]] - `references` [EXTRACTED]
+- [[.PickingLordOfTyphon_AddsExtraStorytellerAssignedMinionSlot()]] - `references` [EXTRACTED]
+- [[.RecordChoice_DrunkDisguiseConsumesShownTownsfolk()]] - `references` [EXTRACTED]
+- [[.RecordChoice_DrunkFlagRequiresTownsfolk()]] - `references` [EXTRACTED]
+- [[.RecordChoice_EvilSentinelCanBeResolvedInLegionMode()]] - `references` [EXTRACTED]
+- [[.RecordChoice_LunaticDisguiseDoesNotConsumeShownDemon()]] - `references` [EXTRACTED]
+- [[.RecordChoice_LunaticFlagRequiresDemon()]] - `references` [EXTRACTED]
+- [[.RecordChoice_RejectsCuratedOfferMismatch()]] - `references` [EXTRACTED]
+- [[.RecordChoice_WithDynamicOffer_PersistsBorrowedAbilityFromOffer()]] - `references` [EXTRACTED]
+- [[.RemainingValidCharacters_ExcludeDrunkLunaticAndMarionette()]] - `references` [EXTRACTED]
+- [[.ResolveEvilSlot_ReplacesSentinelAndUpdatesSummaryGrouping()]] - `references` [EXTRACTED]
+- [[.ResolveMinionSlot_ReplacesUnresolvedStorytellerAssignmentInSummary()]] - `references` [EXTRACTED]
+- [[.SelectedTargetFilter_RestrictsValidCharactersToReachableTargets()]] - `references` [EXTRACTED]
+- [[.SevenPlayer_AfterChoosingImpWithTwoOutsiders_LastSeatIsForcedToBaron()]] - `references` [EXTRACTED]
+- [[.SevenPlayer_TwoSeatsLeftWithTwoOutsiders_RequiresBaronAndImp()]] - `references` [EXTRACTED]
+- [[.SuggestThree_MultipleDraws_CanVaryWithSameSessionState()]] - `references` [EXTRACTED]
+- [[.SuggestThree_VarietyDegradesGracefullyWhenPoolConstrained()]] - `references` [EXTRACTED]
+- [[.SuggestThree_WhenBoffinOffered_IncludesBorrowedAbilityMetadata()]] - `references` [EXTRACTED]
+- [[.SuggestThree_WhenDrunkAlreadyInPlay_DoesNotOfferAnotherDrunkHiddenOption()]] - `references` [EXTRACTED]
+- [[.SuggestThree_WithOutsiderTargetDeselected_DoesNotOfferLunaticHiddenOption()]] - `references` [EXTRACTED]
+- [[.WouldPickKeepAnyTargetReachable_HonoursSelectedTargets()]] - `references` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_1

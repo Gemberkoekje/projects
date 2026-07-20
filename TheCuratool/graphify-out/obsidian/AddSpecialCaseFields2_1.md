@@ -1,0 +1,20 @@
+---
+source_file: "src/TheCuratool.Infrastructure/Migrations/20260529224520_AddSpecialCaseFields2.cs"
+type: "code"
+community: "Community 32"
+location: "L8"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_32
+---
+
+# AddSpecialCaseFields2
+
+## Connections
+- [[.Down()_2]] - `method` [EXTRACTED]
+- [[.Up()_2]] - `method` [EXTRACTED]
+- [[20260529224520_AddSpecialCaseFields2.cs]] - `contains` [EXTRACTED]
+- [[Migration]] - `inherits` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_32

@@ -1,0 +1,17 @@
+---
+source_file: "Benchmark/packages.lock.json"
+type: "code"
+community: "Community 55"
+location: "L157"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_55
+---
+
+# resolved
+
+## Connections
+- [[Microsoft.Extensions.DependencyInjection.Abstractions_2]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_55

@@ -45,7 +45,7 @@ internal static class Program
         if (args.Contains("--pinball-sim", StringComparer.OrdinalIgnoreCase))
             return RunPinballSim(frames, save ?? "pinball-sim.png", sampleClamp);
         if (args.Contains("--pinball-play", StringComparer.OrdinalIgnoreCase))
-            return RunPinballPlay(frames, save ?? "pinball-play.png", sampleClamp);
+            return RunPinballPlay(frames, save ?? "pinball-play.png", sampleClamp, tablePath);
         if (args.Contains("--table-demo", StringComparer.OrdinalIgnoreCase))
             return RunTableDemo(frames, save ?? "table-demo.png", sampleClamp);
         if (args.Contains("--table-topdown", StringComparer.OrdinalIgnoreCase))
@@ -58,7 +58,7 @@ internal static class Program
         if (args.Contains("--table-regress", StringComparer.OrdinalIgnoreCase))
             return TableRegression.Run(args.Contains("--update", StringComparer.OrdinalIgnoreCase));
 
-        return RunPinballWindowed(sampleClamp); // default: the interactive game
+        return RunPinballWindowed(sampleClamp, tablePath); // default: the interactive game
     }
 
     private static float ParseFloat(string[] a, string flag, float def)
@@ -218,6 +218,55 @@ internal static class Program
     /// coordinates (+x right, +z up-table) — matching the real-table reference photos and making it easy to
     /// place walls. Portrait resolution to fit the tall playfield. Not a golden; a scaffold for geometry work.
     /// </summary>
+    /// <summary>Resolves a <c>--table</c> path: used as-is if it exists (absolute or cwd-relative), otherwise
+    /// looked up in the Pinball.App project folder — launch profiles run with an unpredictable working
+    /// directory, and the editor's <c>table.json</c> lives beside the project.</summary>
+    private static string ResolveTablePath(string path)
+    {
+        if (System.IO.File.Exists(path)) return path;
+        var dir = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !System.IO.File.Exists(System.IO.Path.Combine(dir.FullName, "Pinball.App.csproj")))
+            dir = dir.Parent;
+        if (dir is not null)
+        {
+            string candidate = System.IO.Path.Combine(dir.FullName, path);
+            if (System.IO.File.Exists(candidate)) return candidate;
+        }
+        return path; // fall through — Load throws a clear not-found for the original path
+    }
+
+    /// <summary>Builds the game + co-registered render scene, either from a <c>--table</c> JSON (the editor's
+    /// data-driven table) or the built-in P0 table. Returns the scene, the game, and the index of the ball
+    /// sphere in the packed scene (matched by its X/Z start).</summary>
+    private static (PinballTableScene scene, Pinball.Game.PinballGame game, int ballIdx) SetupGame(int w, int h, string? tablePath)
+    {
+        PinballTableScene scene;
+        Pinball.Game.PinballGame game;
+        Vector3 near;
+        if (tablePath != null)
+        {
+            Pinball.Content.TableDefinition def = Pinball.Content.TableDefinition.Load(ResolveTablePath(tablePath));
+            scene = PinballTableScene.BuildWallsOnly(w, h, def, gameReady: true);
+            game = new Pinball.Game.PinballGame(def);
+            near = def.Ball is { Start.Length: >= 2 } b
+                ? new Vector3((float)b.Start[0], 0f, (float)b.Start[1])
+                : new Vector3(PinballTableScene.BallStart.X, 0f, PinballTableScene.BallStart.Z);
+        }
+        else
+        {
+            scene = PinballTableScene.Build(w, h, dynamicBall: true, dynamicFlippers: true);
+            game = new Pinball.Game.PinballGame();
+            near = new Vector3(PinballTableScene.BallStart.X, 0f, PinballTableScene.BallStart.Z);
+        }
+        int ballIdx = -1;
+        for (int i = 0; i < scene.Packed.Spheres.Count; i++)
+        {
+            GpuSphere sp = scene.Packed.Spheres[i];
+            if (Vector3.Distance(new Vector3(sp.CX, 0f, sp.CZ), near) < 0.05f) { ballIdx = i; break; }
+        }
+        return (scene, game, ballIdx);
+    }
+
     /// <summary>Writes the built-in wall set to a JSON table file (seed for the editor / round-trip check).</summary>
     private static int ExportTable(string path)
     {
@@ -234,19 +283,10 @@ internal static class Program
         Console.WriteLine($"Space Cadet RT — top-down geometry view ({frames} frames) -> {savePath}"
             + (tablePath != null ? $"  [table: {tablePath}]" : ""));
 
-        Pinball.Physics.TableWalls.Wall[]? walls = null;
-        Vector3? ballStart = null; float ballRadius = 0.36f;
-        if (tablePath != null)
-        {
-            Pinball.Content.TableDefinition def = Pinball.Content.TableDefinition.Load(tablePath);
-            walls = def.ToWalls();
-            if (def.Ball is { Start.Length: >= 2 } b)
-            {
-                ballStart = new Vector3((float)b.Start[0], 0f, (float)b.Start[1]);
-                ballRadius = Math.Max(0.02f, (float)b.Radius); // clamp: a 0/negative radius would invert the sphere
-            }
-        }
-        PinballTableScene table = PinballTableScene.BuildWallsOnly(topW, topH, walls, ballStart, ballRadius); // walls only, for geometry authoring
+        Pinball.Content.TableDefinition? def = tablePath != null
+            ? Pinball.Content.TableDefinition.Load(ResolveTablePath(tablePath))
+            : null;
+        PinballTableScene table = PinballTableScene.BuildWallsOnly(topW, topH, def); // authoring view: walls + elements
         Vector3 camPos = new(0f, 46f, 12f); // straight above the playfield centre (z 0..24 → centre 12)
         var cam = new Camera
         {
@@ -631,27 +671,25 @@ internal static class Program
     /// exercises the whole lifecycle — serve → play → drain → next ball → game over — rendered on the P0
     /// table. This is what the interactive WinForms host (P6b productization) drives frame-by-frame.
     /// </summary>
-    private static int RunPinballPlay(int frames, string savePath, float sampleClamp)
+    private static int RunPinballPlay(int frames, string savePath, float sampleClamp, string? tablePath = null)
     {
         if (frames <= 0) frames = 160;
-        Console.WriteLine($"Space Cadet RT — headless playthrough ({frames} frames) -> {savePath}");
+        Console.WriteLine($"Space Cadet RT — headless playthrough ({frames} frames) -> {savePath}"
+            + (tablePath != null ? $"  [table: {tablePath}]" : ""));
 
-        PinballTableScene table = PinballTableScene.Build(Width, Height, dynamicBall: true, dynamicFlippers: true);
-        var game = new Pinball.Game.PinballGame();
+        var (table, game, ballIdx) = SetupGame(Width, Height, tablePath);
         game.NewGame();
+        if (ballIdx < 0) { Console.WriteLine("  ball sphere not found"); return 1; }
 
         int n = table.Packed.Spheres.Count;
         var centers = new Vector3[n];
         var radii = new float[n];
-        int ballIdx = -1;
         for (int i = 0; i < n; i++)
         {
             GpuSphere sp = table.Packed.Spheres[i];
             centers[i] = new Vector3(sp.CX, sp.CY, sp.CZ);
             radii[i] = sp.Radius;
-            if (Vector3.Distance(centers[i], PinballTableScene.BallStart) < 1e-3f) ballIdx = i;
         }
-        if (ballIdx < 0) { Console.WriteLine("  ball sphere not found"); return 1; }
 
         VolumetricOptions volumetrics = VolumetricOptions.FromQuality(VolumetricQuality.Medium, SmokeMode.None);
         using var renderer = new Phase6Renderer(
@@ -700,25 +738,22 @@ internal static class Program
     /// flipper, <b>/</b>/RShift = right, <b>Space</b> = launch / new game, <b>← → ↑</b> = nudge (mind the
     /// tilt), <b>Esc</b> = exit. Runs on a machine with a display + the DXR GPU (headless CI only compiles it).
     /// </summary>
-    private static int RunPinballWindowed(float sampleClamp)
+    private static int RunPinballWindowed(float sampleClamp, string? tablePath = null)
     {
         EnsureAppConfigured();
-        PinballTableScene table = PinballTableScene.Build(Width, Height, dynamicBall: true, dynamicFlippers: true);
-        var game = new Pinball.Game.PinballGame();
+        var (table, game, ballIdx) = SetupGame(Width, Height, tablePath);
         game.NewGame();
+        if (ballIdx < 0) { Console.WriteLine("  ball sphere not found"); return 1; }
 
         int n = table.Packed.Spheres.Count;
         var centers = new Vector3[n];
         var radii = new float[n];
-        int ballIdx = -1;
         for (int i = 0; i < n; i++)
         {
             GpuSphere sp = table.Packed.Spheres[i];
             centers[i] = new Vector3(sp.CX, sp.CY, sp.CZ);
             radii[i] = sp.Radius;
-            if (Vector3.Distance(centers[i], PinballTableScene.BallStart) < 1e-3f) ballIdx = i;
         }
-        if (ballIdx < 0) { Console.WriteLine("  ball sphere not found"); return 1; }
 
         using var form = new Form
         {

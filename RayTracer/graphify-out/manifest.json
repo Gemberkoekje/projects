@@ -1,0 +1,1182 @@
+{
+  ".claude/settings.local.json": {
+    "mtime": 1783628443.0861547,
+    "ast_hash": "592eaf6e6b4e01c5e07571c3644dd588",
+    "semantic_hash": "592eaf6e6b4e01c5e07571c3644dd588"
+  },
+  ".net.csproj": {
+    "mtime": 1783665789.8551989,
+    "ast_hash": "5cd89beb607450faede32639f05e4bf6",
+    "semantic_hash": "5cd89beb607450faede32639f05e4bf6"
+  },
+  "Benchmark/BVHBenchmark.cs": {
+    "mtime": 1784449479.7747607,
+    "ast_hash": "e7a43f02ba2a7d0ce9c129a6f237b500",
+    "semantic_hash": "e7a43f02ba2a7d0ce9c129a6f237b500"
+  },
+  "Benchmark/Benchmarks.csproj": {
+    "mtime": 1784448028.8233342,
+    "ast_hash": "d75a8aaba003fd8a1720d4f6ffbcd7d3",
+    "semantic_hash": "d75a8aaba003fd8a1720d4f6ffbcd7d3"
+  },
+  "Benchmark/DebugResolveBenchmark.cs": {
+    "mtime": 1776253754.98351,
+    "ast_hash": "a8fc7f08b74917198273873d14f15e7a",
+    "semantic_hash": "a8fc7f08b74917198273873d14f15e7a"
+  },
+  "Benchmark/Program.cs": {
+    "mtime": 1783665789.8567147,
+    "ast_hash": "c61f057af8ade97650a806affc6fbd37",
+    "semantic_hash": "c61f057af8ade97650a806affc6fbd37"
+  },
+  "Benchmark/SmokeBenchmarks.cs": {
+    "mtime": 1784449483.4374166,
+    "ast_hash": "fcf067f04d07d3550d3dff96e83ac7b3",
+    "semantic_hash": "fcf067f04d07d3550d3dff96e83ac7b3"
+  },
+  "Benchmark/TracableRectangle.cs": {
+    "mtime": 1783665789.8567147,
+    "ast_hash": "f159b4a1d2ba32193d1f3353c1d26a35",
+    "semantic_hash": "f159b4a1d2ba32193d1f3353c1d26a35"
+  },
+  "Benchmark/packages.lock.json": {
+    "mtime": 1784451260.3201356,
+    "ast_hash": "8d0b49251dd1a4d4c211839b651e4f8d",
+    "semantic_hash": "8d0b49251dd1a4d4c211839b651e4f8d"
+  },
+  "Pinball.App/Pinball.App.csproj": {
+    "mtime": 1784481545.440148,
+    "ast_hash": "fc2dff3a9580b1020aa485e9eeb65d06",
+    "semantic_hash": "fc2dff3a9580b1020aa485e9eeb65d06"
+  },
+  "Pinball.App/Program.cs": {
+    "mtime": 1784543699.9642966,
+    "ast_hash": "d4376018ebb3caf7d868f00fe6c2c0cd",
+    "semantic_hash": "d4376018ebb3caf7d868f00fe6c2c0cd"
+  },
+  "Pinball.App/Properties/launchSettings.json": {
+    "mtime": 1784544431.5395875,
+    "ast_hash": "f901a797f4bc08489aef47bfc99b8597",
+    "semantic_hash": "f901a797f4bc08489aef47bfc99b8597"
+  },
+  "Pinball.App/TableRegression.cs": {
+    "mtime": 1784481876.467648,
+    "ast_hash": "7a3c6d579224c33424b9698cc2eca728",
+    "semantic_hash": "7a3c6d579224c33424b9698cc2eca728"
+  },
+  "Pinball.App/packages.lock.json": {
+    "mtime": 1784482067.689765,
+    "ast_hash": "c2a3129a4111c7506dd2a785d8f73b2b",
+    "semantic_hash": "c2a3129a4111c7506dd2a785d8f73b2b"
+  },
+  "Pinball.App/table.json": {
+    "mtime": 1784544794.7111602,
+    "ast_hash": "e3b8e8099533ef3efc896a5b05e8bdc7",
+    "semantic_hash": "e3b8e8099533ef3efc896a5b05e8bdc7"
+  },
+  "Pinball.Core/Content/PinballTableScene.cs": {
+    "mtime": 1784546069.1279821,
+    "ast_hash": "51cd36a2310d98c1e273c5e21c47798a",
+    "semantic_hash": "51cd36a2310d98c1e273c5e21c47798a"
+  },
+  "Pinball.Core/Content/TableDefinition.cs": {
+    "mtime": 1784545514.2876253,
+    "ast_hash": "361f1c106fe452e1591e5a951eb875e7",
+    "semantic_hash": "361f1c106fe452e1591e5a951eb875e7"
+  },
+  "Pinball.Core/Game/GameState.cs": {
+    "mtime": 1784475206.7919803,
+    "ast_hash": "5c15dc882f94ff4862bc6cdfaacb448e",
+    "semantic_hash": "5c15dc882f94ff4862bc6cdfaacb448e"
+  },
+  "Pinball.Core/Game/PinballGame.cs": {
+    "mtime": 1784543561.733297,
+    "ast_hash": "3710d735f665467d8ac2b54b6d9aa012",
+    "semantic_hash": "3710d735f665467d8ac2b54b6d9aa012"
+  },
+  "Pinball.Core/Game/PinballInput.cs": {
+    "mtime": 1784478633.75245,
+    "ast_hash": "d30bae9ca566396ac45b9d6257ec7eb0",
+    "semantic_hash": "d30bae9ca566396ac45b9d6257ec7eb0"
+  },
+  "Pinball.Core/Physics/AabbD.cs": {
+    "mtime": 1784472405.416545,
+    "ast_hash": "35ce9b8d8377d111f61993c3ec81d031",
+    "semantic_hash": "35ce9b8d8377d111f61993c3ec81d031"
+  },
+  "Pinball.Core/Physics/Actuators/Flipper.cs": {
+    "mtime": 1784473889.4544556,
+    "ast_hash": "924e5317cf342e02a11a0ab5b0248e69",
+    "semantic_hash": "924e5317cf342e02a11a0ab5b0248e69"
+  },
+  "Pinball.Core/Physics/Actuators/Plunger.cs": {
+    "mtime": 1784476915.155321,
+    "ast_hash": "4a48039fdde4dd5d2d28ef4b808757ec",
+    "semantic_hash": "4a48039fdde4dd5d2d28ef4b808757ec"
+  },
+  "Pinball.Core/Physics/BallState.cs": {
+    "mtime": 1784472387.0966344,
+    "ast_hash": "f8a9317ff16eb4e84ea0e29f50189acc",
+    "semantic_hash": "f8a9317ff16eb4e84ea0e29f50189acc"
+  },
+  "Pinball.Core/Physics/Colliders/ActiveZone.cs": {
+    "mtime": 1784473865.7749484,
+    "ast_hash": "bea6ca064f6e57052fc115655e2a2077",
+    "semantic_hash": "bea6ca064f6e57052fc115655e2a2077"
+  },
+  "Pinball.Core/Physics/Colliders/ArcCollider.cs": {
+    "mtime": 1784476791.80759,
+    "ast_hash": "69e7ce18c7fd116ece9d64d4f864f5c6",
+    "semantic_hash": "69e7ce18c7fd116ece9d64d4f864f5c6"
+  },
+  "Pinball.Core/Physics/Colliders/BezierWallCollider.cs": {
+    "mtime": 1784485863.447581,
+    "ast_hash": "ec3199039a46b32ea30670810eccae0c",
+    "semantic_hash": "ec3199039a46b32ea30670810eccae0c"
+  },
+  "Pinball.Core/Physics/Colliders/CapsuleCollider.cs": {
+    "mtime": 1784472516.6700208,
+    "ast_hash": "67681d6b87bdd94f9312f341a61e8bce",
+    "semantic_hash": "67681d6b87bdd94f9312f341a61e8bce"
+  },
+  "Pinball.Core/Physics/Colliders/CylinderCollider.cs": {
+    "mtime": 1784473745.7979827,
+    "ast_hash": "5cfc86873119b7868a6667e6b29c3cad",
+    "semantic_hash": "5cfc86873119b7868a6667e6b29c3cad"
+  },
+  "Pinball.Core/Physics/Colliders/ICollider.cs": {
+    "mtime": 1784473722.4616427,
+    "ast_hash": "ede9d6cd077e067e58b4bb98bf9e98fe",
+    "semantic_hash": "ede9d6cd077e067e58b4bb98bf9e98fe"
+  },
+  "Pinball.Core/Physics/Colliders/MeshCollider.cs": {
+    "mtime": 1784476806.8589723,
+    "ast_hash": "4f4ec634ce6e7cf208b9073c1b99781f",
+    "semantic_hash": "4f4ec634ce6e7cf208b9073c1b99781f"
+  },
+  "Pinball.Core/Physics/Colliders/PlaneCollider.cs": {
+    "mtime": 1784472494.459288,
+    "ast_hash": "112bbe027a9f7efe577f2157b5c9e45e",
+    "semantic_hash": "112bbe027a9f7efe577f2157b5c9e45e"
+  },
+  "Pinball.Core/Physics/Colliders/QuadCollider.cs": {
+    "mtime": 1784473760.329307,
+    "ast_hash": "6c7285e71b13d4c9bd800e74c973d596",
+    "semantic_hash": "6c7285e71b13d4c9bd800e74c973d596"
+  },
+  "Pinball.Core/Physics/Colliders/SphereCollider.cs": {
+    "mtime": 1784472502.7489283,
+    "ast_hash": "1978d741f1681dab72006f860b40ce20",
+    "semantic_hash": "1978d741f1681dab72006f860b40ce20"
+  },
+  "Pinball.Core/Physics/Contact.cs": {
+    "mtime": 1784473702.8408706,
+    "ast_hash": "24dd83f3a0cc7b52ed5e08a59fb9c0ca",
+    "semantic_hash": "24dd83f3a0cc7b52ed5e08a59fb9c0ca"
+  },
+  "Pinball.Core/Physics/ContactSolver.cs": {
+    "mtime": 1784473711.3361993,
+    "ast_hash": "535b1f1c906e0ba58bedba4eedd19f9a",
+    "semantic_hash": "535b1f1c906e0ba58bedba4eedd19f9a"
+  },
+  "Pinball.Core/Physics/CubicBezierD.cs": {
+    "mtime": 1784485832.1156077,
+    "ast_hash": "ec973d61356aff1c0cbe23ec491b7c21",
+    "semantic_hash": "ec973d61356aff1c0cbe23ec491b7c21"
+  },
+  "Pinball.Core/Physics/DeterministicRandom.cs": {
+    "mtime": 1784472837.436575,
+    "ast_hash": "c70db7cacb98d6d46576c574701f1396",
+    "semantic_hash": "c70db7cacb98d6d46576c574701f1396"
+  },
+  "Pinball.Core/Physics/Forces.cs": {
+    "mtime": 1784474914.6867628,
+    "ast_hash": "3fac7bafe37beefc2cb63ead00add0f6",
+    "semantic_hash": "3fac7bafe37beefc2cb63ead00add0f6"
+  },
+  "Pinball.Core/Physics/LaneFeed.cs": {
+    "mtime": 1784485907.1527016,
+    "ast_hash": "199c0c641c5e98368beca9a60f478704",
+    "semantic_hash": "199c0c641c5e98368beca9a60f478704"
+  },
+  "Pinball.Core/Physics/PhysicsConstants.cs": {
+    "mtime": 1784472197.9915063,
+    "ast_hash": "cbd3bb8a55acf7821519fc820acb313b",
+    "semantic_hash": "cbd3bb8a55acf7821519fc820acb313b"
+  },
+  "Pinball.Core/Physics/PhysicsMaterial.cs": {
+    "mtime": 1784472214.9500933,
+    "ast_hash": "0837e1df6268c07333589e7973a8902b",
+    "semantic_hash": "0837e1df6268c07333589e7973a8902b"
+  },
+  "Pinball.Core/Physics/PhysicsSettings.cs": {
+    "mtime": 1784474910.4117806,
+    "ast_hash": "5805345e5ff862ef3fb70854cf3bcac9",
+    "semantic_hash": "5805345e5ff862ef3fb70854cf3bcac9"
+  },
+  "Pinball.Core/Physics/PhysicsWorld.cs": {
+    "mtime": 1784479909.1754212,
+    "ast_hash": "0147a4fdeee8e933ace9f2840eb402fc",
+    "semantic_hash": "0147a4fdeee8e933ace9f2840eb402fc"
+  },
+  "Pinball.Core/Physics/QuaternionD.cs": {
+    "mtime": 1784472169.6331108,
+    "ast_hash": "d46aa259aeedb9ca46d0cd32ea23b7e4",
+    "semantic_hash": "d46aa259aeedb9ca46d0cd32ea23b7e4"
+  },
+  "Pinball.Core/Physics/TableWalls.cs": {
+    "mtime": 1784498351.7059424,
+    "ast_hash": "a932d1d96a744d3f415af06a4b6e5595",
+    "semantic_hash": "a932d1d96a744d3f415af06a4b6e5595"
+  },
+  "Pinball.Core/Physics/TiltSensor.cs": {
+    "mtime": 1784473945.6695855,
+    "ast_hash": "dc15f19dd488b710cee49c30dddd7421",
+    "semantic_hash": "dc15f19dd488b710cee49c30dddd7421"
+  },
+  "Pinball.Core/Physics/Vector3D.cs": {
+    "mtime": 1784472149.6305957,
+    "ast_hash": "529f61401c6aa8491e986dcc6a06f5da",
+    "semantic_hash": "529f61401c6aa8491e986dcc6a06f5da"
+  },
+  "Pinball.Core/Pinball.Core.csproj": {
+    "mtime": 1784472114.8679695,
+    "ast_hash": "d2566d18affc402d34c47263f0f8a568",
+    "semantic_hash": "d2566d18affc402d34c47263f0f8a568"
+  },
+  "Pinball.Core/Table/PinballTable.cs": {
+    "mtime": 1784545525.0979037,
+    "ast_hash": "ca0dde05836c8a104b12a287b644c07f",
+    "semantic_hash": "ca0dde05836c8a104b12a287b644c07f"
+  },
+  "Pinball.Core/packages.lock.json": {
+    "mtime": 1784472890.9079874,
+    "ast_hash": "b799b53c25611a5322277b3da030a27d",
+    "semantic_hash": "b799b53c25611a5322277b3da030a27d"
+  },
+  "Pinball.Tests/ActuatorTests.cs": {
+    "mtime": 1784474206.6932962,
+    "ast_hash": "e261bf55077e3b536a3dc6bf0fa218b4",
+    "semantic_hash": "e261bf55077e3b536a3dc6bf0fa218b4"
+  },
+  "Pinball.Tests/BezierColliderTests.cs": {
+    "mtime": 1784486125.3517134,
+    "ast_hash": "cf6e36ff7e14e066fefdfead662f982e",
+    "semantic_hash": "cf6e36ff7e14e066fefdfead662f982e"
+  },
+  "Pinball.Tests/ColliderTests.cs": {
+    "mtime": 1784474109.1403394,
+    "ast_hash": "59da0370ee07a804af7c2d97eb4a6bd0",
+    "semantic_hash": "59da0370ee07a804af7c2d97eb4a6bd0"
+  },
+  "Pinball.Tests/GameStateTests.cs": {
+    "mtime": 1784475216.9867427,
+    "ast_hash": "cdac4abecb40ae95cb56b54b40c77448",
+    "semantic_hash": "cdac4abecb40ae95cb56b54b40c77448"
+  },
+  "Pinball.Tests/MeshArcColliderTests.cs": {
+    "mtime": 1784477201.0679357,
+    "ast_hash": "68f3cecb6cb00ccd54ddb7a0a0fafd8c",
+    "semantic_hash": "68f3cecb6cb00ccd54ddb7a0a0fafd8c"
+  },
+  "Pinball.Tests/PhysicsPrimitivesTests.cs": {
+    "mtime": 1784473269.9918606,
+    "ast_hash": "6c0148147ffc80e24571ad5fd30f961b",
+    "semantic_hash": "6c0148147ffc80e24571ad5fd30f961b"
+  },
+  "Pinball.Tests/PhysicsRobustnessTests.cs": {
+    "mtime": 1784477149.5489285,
+    "ast_hash": "7eb796876e119f1a58594167e7bc44ba",
+    "semantic_hash": "7eb796876e119f1a58594167e7bc44ba"
+  },
+  "Pinball.Tests/PhysicsValidationTests.cs": {
+    "mtime": 1784477050.6424093,
+    "ast_hash": "5d1a0d68e496b90693f1f22866e22769",
+    "semantic_hash": "5d1a0d68e496b90693f1f22866e22769"
+  },
+  "Pinball.Tests/Pinball.Tests.csproj": {
+    "mtime": 1784472119.0000803,
+    "ast_hash": "0b026b95b99b9f1dbbecf73465a6e8f2",
+    "semantic_hash": "0b026b95b99b9f1dbbecf73465a6e8f2"
+  },
+  "Pinball.Tests/PinballGameTests.cs": {
+    "mtime": 1784485122.3960574,
+    "ast_hash": "d98352fd76ea4bba01bfb5d4cc08c9c7",
+    "semantic_hash": "d98352fd76ea4bba01bfb5d4cc08c9c7"
+  },
+  "Pinball.Tests/PinballIntegrationTests.cs": {
+    "mtime": 1784475158.2138863,
+    "ast_hash": "987843e17811659033b437582d95de27",
+    "semantic_hash": "987843e17811659033b437582d95de27"
+  },
+  "Pinball.Tests/packages.lock.json": {
+    "mtime": 1784473209.971007,
+    "ast_hash": "c963293bdf2b94d9b4288a337b8b5eb9",
+    "semantic_hash": "c963293bdf2b94d9b4288a337b8b5eb9"
+  },
+  "RayTracer.Core/DebugViewMode.cs": {
+    "mtime": 1783665789.860234,
+    "ast_hash": "a476a2789f3552d72a449b6e63994c27",
+    "semantic_hash": "a476a2789f3552d72a449b6e63994c27"
+  },
+  "RayTracer.Core/Diagnostics/CpuThrottle.cs": {
+    "mtime": 1775564607.078048,
+    "ast_hash": "7a59158bf3ad894bde4b7148dd7a098f",
+    "semantic_hash": "7a59158bf3ad894bde4b7148dd7a098f"
+  },
+  "RayTracer.Core/Diagnostics/FrameDiagnostics.cs": {
+    "mtime": 1776334361.7171216,
+    "ast_hash": "87eaf2475c8a9ca5568d5aa02cb251ff",
+    "semantic_hash": "87eaf2475c8a9ca5568d5aa02cb251ff"
+  },
+  "RayTracer.Core/Geometry/AABB.cs": {
+    "mtime": 1775548436.8889713,
+    "ast_hash": "64cc8b2abf3117ea15dc3719ce72c89d",
+    "semantic_hash": "64cc8b2abf3117ea15dc3719ce72c89d"
+  },
+  "RayTracer.Core/Geometry/BVH.cs": {
+    "mtime": 1784449375.1625469,
+    "ast_hash": "9ef6c2e5421be4b2386012159b783fa5",
+    "semantic_hash": "9ef6c2e5421be4b2386012159b783fa5"
+  },
+  "RayTracer.Core/Geometry/BrickRectangle.cs": {
+    "mtime": 1783784540.9483058,
+    "ast_hash": "ccad4c361eaf20fbc6009dde5ba62472",
+    "semantic_hash": "ccad4c361eaf20fbc6009dde5ba62472"
+  },
+  "RayTracer.Core/Geometry/CeilingTileRectangle.cs": {
+    "mtime": 1783784530.5515695,
+    "ast_hash": "4a51658ece0f421f3ff52e60b88c357c",
+    "semantic_hash": "4a51658ece0f421f3ff52e60b88c357c"
+  },
+  "RayTracer.Core/Geometry/CubicBezier.cs": {
+    "mtime": 1784485818.8898835,
+    "ast_hash": "ca355940bc9cb0697f0c0fd1f8905e5f",
+    "semantic_hash": "ca355940bc9cb0697f0c0fd1f8905e5f"
+  },
+  "RayTracer.Core/Geometry/DecalRectangle.cs": {
+    "mtime": 1783784526.018597,
+    "ast_hash": "cd5fd6d60b31784f70cc9e762fcff913",
+    "semantic_hash": "cd5fd6d60b31784f70cc9e762fcff913"
+  },
+  "RayTracer.Core/Geometry/HitInfo.cs": {
+    "mtime": 1784449355.0561514,
+    "ast_hash": "349adb9f48a9b7ce1866b2328d7a4e66",
+    "semantic_hash": "349adb9f48a9b7ce1866b2328d7a4e66"
+  },
+  "RayTracer.Core/Geometry/Plane.cs": {
+    "mtime": 1783839613.2033665,
+    "ast_hash": "6f68cf89674ab9b47df11be013bfb0d2",
+    "semantic_hash": "6f68cf89674ab9b47df11be013bfb0d2"
+  },
+  "RayTracer.Core/Geometry/Ray.cs": {
+    "mtime": 1783665789.8622336,
+    "ast_hash": "608817f3709c3d48a25c58248695dc01",
+    "semantic_hash": "608817f3709c3d48a25c58248695dc01"
+  },
+  "RayTracer.Core/Geometry/Sphere.cs": {
+    "mtime": 1784453948.7606344,
+    "ast_hash": "ace9a8f4d16bb7c13232e3a837977f99",
+    "semantic_hash": "ace9a8f4d16bb7c13232e3a837977f99"
+  },
+  "RayTracer.Core/Geometry/Tracable.cs": {
+    "mtime": 1784453942.5177708,
+    "ast_hash": "091004e3070797d6727849ad59d139d1",
+    "semantic_hash": "091004e3070797d6727849ad59d139d1"
+  },
+  "RayTracer.Core/Geometry/TracableRectangle.cs": {
+    "mtime": 1784477521.3814802,
+    "ast_hash": "75b86ccbf72590241b83d6219554e409",
+    "semantic_hash": "75b86ccbf72590241b83d6219554e409"
+  },
+  "RayTracer.Core/Gpu/BvhSceneTracer.cs": {
+    "mtime": 1784470853.1919806,
+    "ast_hash": "86f9c0bf12d40d5cac6602e9b86d7c83",
+    "semantic_hash": "86f9c0bf12d40d5cac6602e9b86d7c83"
+  },
+  "RayTracer.Core/Gpu/CausticReference.cs": {
+    "mtime": 1784209393.52228,
+    "ast_hash": "e4d9129e1e5fbf742aaf76e31ace236c",
+    "semantic_hash": "e4d9129e1e5fbf742aaf76e31ace236c"
+  },
+  "RayTracer.Core/Gpu/GpuLight.cs": {
+    "mtime": 1784053902.679492,
+    "ast_hash": "eec86e00c0349506cd6f6c2b523a499e",
+    "semantic_hash": "eec86e00c0349506cd6f6c2b523a499e"
+  },
+  "RayTracer.Core/Gpu/GpuPrimitive.cs": {
+    "mtime": 1784453971.069772,
+    "ast_hash": "16b8ddd27251ffa7a7bc8dce293de2fe",
+    "semantic_hash": "16b8ddd27251ffa7a7bc8dce293de2fe"
+  },
+  "RayTracer.Core/Gpu/GpuSphere.cs": {
+    "mtime": 1784453961.544398,
+    "ast_hash": "51bab82115097ba4800ca4215b7e70af",
+    "semantic_hash": "51bab82115097ba4800ca4215b7e70af"
+  },
+  "RayTracer.Core/Gpu/PackedScene.cs": {
+    "mtime": 1784477575.3510628,
+    "ast_hash": "27c5cf03683a48c9711ea4a4a860404d",
+    "semantic_hash": "27c5cf03683a48c9711ea4a4a860404d"
+  },
+  "RayTracer.Core/Gpu/Phase1Reference.cs": {
+    "mtime": 1784278775.467067,
+    "ast_hash": "52ec26e918d1fc6cf1ad733da12f9df3",
+    "semantic_hash": "52ec26e918d1fc6cf1ad733da12f9df3"
+  },
+  "RayTracer.Core/Gpu/Phase2Reference.cs": {
+    "mtime": 1784457524.9524038,
+    "ast_hash": "c0ca864341c4f38091a5379bf16a427f",
+    "semantic_hash": "c0ca864341c4f38091a5379bf16a427f"
+  },
+  "RayTracer.Core/Gpu/Phase3Reference.cs": {
+    "mtime": 1783666857.113755,
+    "ast_hash": "2a2ed2e65f47312a49ae81f3627910d4",
+    "semantic_hash": "2a2ed2e65f47312a49ae81f3627910d4"
+  },
+  "RayTracer.Core/Gpu/Phase4Reference.cs": {
+    "mtime": 1784448028.8243349,
+    "ast_hash": "76661faef297f128af23f349a089e3b5",
+    "semantic_hash": "76661faef297f128af23f349a089e3b5"
+  },
+  "RayTracer.Core/Gpu/Phase5Reference.cs": {
+    "mtime": 1783685859.3523817,
+    "ast_hash": "fcb6fd25e29730bade0ae6d2eab22e6c",
+    "semantic_hash": "fcb6fd25e29730bade0ae6d2eab22e6c"
+  },
+  "RayTracer.Core/Gpu/QuadPrimitive.cs": {
+    "mtime": 1784477514.3942485,
+    "ast_hash": "7f8081603ac5c454906db95051c1d75a",
+    "semantic_hash": "7f8081603ac5c454906db95051c1d75a"
+  },
+  "RayTracer.Core/Gpu/RgbToReflectanceBasis.cs": {
+    "mtime": 1783695702.1773558,
+    "ast_hash": "8eb005090357ef8c70853745ad63ecce",
+    "semantic_hash": "8eb005090357ef8c70853745ad63ecce"
+  },
+  "RayTracer.Core/Gpu/SpectralResources.cs": {
+    "mtime": 1784449533.0386121,
+    "ast_hash": "e881748aa17b42e54a71ac1f9165bbf5",
+    "semantic_hash": "e881748aa17b42e54a71ac1f9165bbf5"
+  },
+  "RayTracer.Core/Lighting/DiffuseIrradianceCache.cs": {
+    "mtime": 1784198883.6670449,
+    "ast_hash": "a2ef502e781a5ce9a741627ec7f8cd01",
+    "semantic_hash": "a2ef502e781a5ce9a741627ec7f8cd01"
+  },
+  "RayTracer.Core/Lighting/IrradianceCacheEntry.cs": {
+    "mtime": 1784198869.0768175,
+    "ast_hash": "17ec16b555fc87c417e7e2fc4cccd292",
+    "semantic_hash": "17ec16b555fc87c417e7e2fc4cccd292"
+  },
+  "RayTracer.Core/Lighting/Light.cs": {
+    "mtime": 1784206657.5685673,
+    "ast_hash": "ee2bce8c4247884234e8ee0fe124da28",
+    "semantic_hash": "ee2bce8c4247884234e8ee0fe124da28"
+  },
+  "RayTracer.Core/Lighting/LightCones.cs": {
+    "mtime": 1783665789.8677382,
+    "ast_hash": "674551b01e47f4b9d6cde248087ebd3f",
+    "semantic_hash": "674551b01e47f4b9d6cde248087ebd3f"
+  },
+  "RayTracer.Core/Lighting/LightingMode.cs": {
+    "mtime": 1775548436.9100933,
+    "ast_hash": "69fa9da0413de2346033737c3b7a2521",
+    "semantic_hash": "69fa9da0413de2346033737c3b7a2521"
+  },
+  "RayTracer.Core/Lighting/MaterialsLookup.cs": {
+    "mtime": 1784449338.7735775,
+    "ast_hash": "f936832c89260f7e3333da4ab42b6b0d",
+    "semantic_hash": "f936832c89260f7e3333da4ab42b6b0d"
+  },
+  "RayTracer.Core/Lighting/Photon.cs": {
+    "mtime": 1783839036.0278673,
+    "ast_hash": "0ef22aaef3577d02b5f70164676f910c",
+    "semantic_hash": "0ef22aaef3577d02b5f70164676f910c"
+  },
+  "RayTracer.Core/Lighting/PhotonMap.cs": {
+    "mtime": 1784209372.6934457,
+    "ast_hash": "e86614cb7b5fbd5887769e1578252b9a",
+    "semantic_hash": "e86614cb7b5fbd5887769e1578252b9a"
+  },
+  "RayTracer.Core/Lighting/PhotonTracer.cs": {
+    "mtime": 1784449454.7904596,
+    "ast_hash": "2c921c32f7b037621ca8d1c343c16a62",
+    "semantic_hash": "2c921c32f7b037621ca8d1c343c16a62"
+  },
+  "RayTracer.Core/Optics/Optics.cs": {
+    "mtime": 1784201635.0660775,
+    "ast_hash": "61986aa86da3d3c7532562f1fcd40bac",
+    "semantic_hash": "61986aa86da3d3c7532562f1fcd40bac"
+  },
+  "RayTracer.Core/Optics/SurfaceKind.cs": {
+    "mtime": 1783793528.3976114,
+    "ast_hash": "8f10d3d9c50b4a9f5aedcbfae64b21ea",
+    "semantic_hash": "8f10d3d9c50b4a9f5aedcbfae64b21ea"
+  },
+  "RayTracer.Core/Pipeline/Camera.cs": {
+    "mtime": 1783665789.869749,
+    "ast_hash": "b4ef2441fe16f312c2dac3ae213fe9b2",
+    "semantic_hash": "b4ef2441fe16f312c2dac3ae213fe9b2"
+  },
+  "RayTracer.Core/Pipeline/ICameraDriver.cs": {
+    "mtime": 1784448028.825335,
+    "ast_hash": "3a1d933f3fee81a2ae9c8771ea3f4b00",
+    "semantic_hash": "3a1d933f3fee81a2ae9c8771ea3f4b00"
+  },
+  "RayTracer.Core/Pipeline/LensSampler.cs": {
+    "mtime": 1784278763.8471768,
+    "ast_hash": "41179979459323a9c1ed31a0219e5029",
+    "semantic_hash": "41179979459323a9c1ed31a0219e5029"
+  },
+  "RayTracer.Core/Pipeline/Matrix.cs": {
+    "mtime": 1783665789.8703365,
+    "ast_hash": "56fe7a3692a414b8bce1aa05a2ecd3f1",
+    "semantic_hash": "56fe7a3692a414b8bce1aa05a2ecd3f1"
+  },
+  "RayTracer.Core/RayTracer.csproj": {
+    "mtime": 1784448028.8268418,
+    "ast_hash": "c14f794bb36e2051844815daaf922c95",
+    "semantic_hash": "c14f794bb36e2051844815daaf922c95"
+  },
+  "RayTracer.Core/Rendering/AccumulationBuffer.cs": {
+    "mtime": 1784456152.7912698,
+    "ast_hash": "e98901cb0d1167fe811506e6275adee0",
+    "semantic_hash": "e98901cb0d1167fe811506e6275adee0"
+  },
+  "RayTracer.Core/Rendering/CausticOptions.cs": {
+    "mtime": 1784198507.8821118,
+    "ast_hash": "67b936b5c82b5d8d1e0f44fe6a3472c4",
+    "semantic_hash": "67b936b5c82b5d8d1e0f44fe6a3472c4"
+  },
+  "RayTracer.Core/Rendering/ColorResolve.cs": {
+    "mtime": 1776330940.869638,
+    "ast_hash": "520d14f4fc34fceaedee2b5b485f649b",
+    "semantic_hash": "520d14f4fc34fceaedee2b5b485f649b"
+  },
+  "RayTracer.Core/Rendering/DebugBufferRenderer.cs": {
+    "mtime": 1776334719.8964152,
+    "ast_hash": "28afbf38672db813b176ebd56101c177",
+    "semantic_hash": "28afbf38672db813b176ebd56101c177"
+  },
+  "RayTracer.Core/Rendering/DisplayResolver.cs": {
+    "mtime": 1784201182.0894158,
+    "ast_hash": "aaceaaa2619330f398c114ab82dbe608",
+    "semantic_hash": "aaceaaa2619330f398c114ab82dbe608"
+  },
+  "RayTracer.Core/Rendering/JobSystem.cs": {
+    "mtime": 1784278415.6488504,
+    "ast_hash": "07504a6096a35bb5f2311e8924ccdcf5",
+    "semantic_hash": "07504a6096a35bb5f2311e8924ccdcf5"
+  },
+  "RayTracer.Core/Rendering/JobSystemFactory.cs": {
+    "mtime": 1777290748.9978514,
+    "ast_hash": "90115ca2cc696584c45f645c7dbda6c9",
+    "semantic_hash": "90115ca2cc696584c45f645c7dbda6c9"
+  },
+  "RayTracer.Core/Rendering/JobSystemOptions.cs": {
+    "mtime": 1784278394.1184049,
+    "ast_hash": "ffc4dbea51063c27e9f82d0baf846f58",
+    "semantic_hash": "ffc4dbea51063c27e9f82d0baf846f58"
+  },
+  "RayTracer.Core/Rendering/JobSystemValidation.cs": {
+    "mtime": 1777290748.9400356,
+    "ast_hash": "23d2e9796982fee90045c073939ac136",
+    "semantic_hash": "23d2e9796982fee90045c073939ac136"
+  },
+  "RayTracer.Core/Rendering/LensOptions.cs": {
+    "mtime": 1784448028.8288493,
+    "ast_hash": "1dbbc45fde834a9d810d4938148fcbaa",
+    "semantic_hash": "1dbbc45fde834a9d810d4938148fcbaa"
+  },
+  "RayTracer.Core/Rendering/PathTracer.cs": {
+    "mtime": 1784457399.99609,
+    "ast_hash": "fcd43c1feeb9953a535d28e6e97465f9",
+    "semantic_hash": "fcd43c1feeb9953a535d28e6e97465f9"
+  },
+  "RayTracer.Core/Rendering/PerformanceCalibrator.cs": {
+    "mtime": 1777290476.3857136,
+    "ast_hash": "4ca8f2eb6b40e9b96bc733a891ed4aae",
+    "semantic_hash": "4ca8f2eb6b40e9b96bc733a891ed4aae"
+  },
+  "RayTracer.Core/Rendering/RealismOptions.cs": {
+    "mtime": 1784212364.3321607,
+    "ast_hash": "e77591af34ab0cc37554dbdd0a629014",
+    "semantic_hash": "e77591af34ab0cc37554dbdd0a629014"
+  },
+  "RayTracer.Core/Rendering/RenderBuffers.cs": {
+    "mtime": 1784456120.7254012,
+    "ast_hash": "0affd8e0b19c09b161735e350a5b9af5",
+    "semantic_hash": "0affd8e0b19c09b161735e350a5b9af5"
+  },
+  "RayTracer.Core/Rendering/RenderPreset.cs": {
+    "mtime": 1784198570.9688425,
+    "ast_hash": "99d3318cb679bf288c29eca78c94bb70",
+    "semantic_hash": "99d3318cb679bf288c29eca78c94bb70"
+  },
+  "RayTracer.Core/Rendering/RenderState.cs": {
+    "mtime": 1776252639.2452855,
+    "ast_hash": "2e9263cb7dcfb5da638a894f98e8794b",
+    "semantic_hash": "2e9263cb7dcfb5da638a894f98e8794b"
+  },
+  "RayTracer.Core/Rendering/SceneScale.cs": {
+    "mtime": 1784448028.8298497,
+    "ast_hash": "b34a01e4cf8b82d80f3568c63cfb7443",
+    "semantic_hash": "b34a01e4cf8b82d80f3568c63cfb7443"
+  },
+  "RayTracer.Core/Rendering/SmokeMode.cs": {
+    "mtime": 1777285324.321906,
+    "ast_hash": "84d6b282db672a7d5d017e12908938c9",
+    "semantic_hash": "84d6b282db672a7d5d017e12908938c9"
+  },
+  "RayTracer.Core/Rendering/TaaResolver.cs": {
+    "mtime": 1784465926.662013,
+    "ast_hash": "6aa1d6f5d1dfd35d39773f36e0455fd2",
+    "semantic_hash": "6aa1d6f5d1dfd35d39773f36e0455fd2"
+  },
+  "RayTracer.Core/Rendering/TileScheduler.cs": {
+    "mtime": 1776336274.977201,
+    "ast_hash": "062a6f4dc55f522d6d2232061c79eb99",
+    "semantic_hash": "062a6f4dc55f522d6d2232061c79eb99"
+  },
+  "RayTracer.Core/Rendering/VolumetricIntegration.cs": {
+    "mtime": 1784208708.3012402,
+    "ast_hash": "dd29d91352956b58b12f8e065e45a41e",
+    "semantic_hash": "dd29d91352956b58b12f8e065e45a41e"
+  },
+  "RayTracer.Core/Rendering/VolumetricOptions.cs": {
+    "mtime": 1784208745.6264548,
+    "ast_hash": "3a7fdd38bf896e463f3236397901927c",
+    "semantic_hash": "3a7fdd38bf896e463f3236397901927c"
+  },
+  "RayTracer.Core/Sampling/WavelengthLookup.cs": {
+    "mtime": 1784205574.5267189,
+    "ast_hash": "e8e91b7f257458cb6deefc2fc9decca3",
+    "semantic_hash": "e8e91b7f257458cb6deefc2fc9decca3"
+  },
+  "RayTracer.Core/Shading/DayNightCycle.cs": {
+    "mtime": 1784059339.5983236,
+    "ast_hash": "fd2c0e6be0f3081650bb74637db6630e",
+    "semantic_hash": "fd2c0e6be0f3081650bb74637db6630e"
+  },
+  "RayTracer.Core/Shading/Sky.cs": {
+    "mtime": 1784200436.201712,
+    "ast_hash": "e6236cef5bf5ff5bb7f6f9a26d783b9c",
+    "semantic_hash": "e6236cef5bf5ff5bb7f6f9a26d783b9c"
+  },
+  "RayTracer.Core/Spectral/BlackbodySpectrum.cs": {
+    "mtime": 1784053881.211703,
+    "ast_hash": "84c0c8ad61b93009c9a5de0144922f52",
+    "semantic_hash": "84c0c8ad61b93009c9a5de0144922f52"
+  },
+  "RayTracer.Core/packages.lock.json": {
+    "mtime": 1784483333.7132878,
+    "ast_hash": "f037cfb51bb372dbee6cc3962cd76b22",
+    "semantic_hash": "f037cfb51bb372dbee6cc3962cd76b22"
+  },
+  "RayTracer.Gpu/GpuRayTracer.cs": {
+    "mtime": 1783630255.3957565,
+    "ast_hash": "94bf1c6ebf4fd9a833ad0eb2a1a45e6c",
+    "semantic_hash": "94bf1c6ebf4fd9a833ad0eb2a1a45e6c"
+  },
+  "RayTracer.Gpu/MovieProgressForm.cs": {
+    "mtime": 1784140624.351641,
+    "ast_hash": "037e0eabb670f09aaa280d388abe1867",
+    "semantic_hash": "037e0eabb670f09aaa280d388abe1867"
+  },
+  "RayTracer.Gpu/Phase1Renderer.cs": {
+    "mtime": 1783665789.872342,
+    "ast_hash": "882ac89de1b4008b92e5f64f09750598",
+    "semantic_hash": "882ac89de1b4008b92e5f64f09750598"
+  },
+  "RayTracer.Gpu/Phase2Renderer.cs": {
+    "mtime": 1783665789.8733423,
+    "ast_hash": "403d9430d6969d9c52c5ee612b1e2f3b",
+    "semantic_hash": "403d9430d6969d9c52c5ee612b1e2f3b"
+  },
+  "RayTracer.Gpu/Phase3Renderer.cs": {
+    "mtime": 1783667547.7173977,
+    "ast_hash": "98ac7c3b12d346219d26ef9ab2369d0b",
+    "semantic_hash": "98ac7c3b12d346219d26ef9ab2369d0b"
+  },
+  "RayTracer.Gpu/Phase4Renderer.cs": {
+    "mtime": 1783674392.2528899,
+    "ast_hash": "c5f87483031d75850cb5e5c8e518e20e",
+    "semantic_hash": "c5f87483031d75850cb5e5c8e518e20e"
+  },
+  "RayTracer.Gpu/Phase5Renderer.cs": {
+    "mtime": 1783687000.4685209,
+    "ast_hash": "4df51868915caf2bf3dc7ca9a6509076",
+    "semantic_hash": "4df51868915caf2bf3dc7ca9a6509076"
+  },
+  "RayTracer.Gpu/Phase6Renderer.cs": {
+    "mtime": 1784479887.2671998,
+    "ast_hash": "52d6d2e9d7b9b06bb90b8005beb0fc6c",
+    "semantic_hash": "52d6d2e9d7b9b06bb90b8005beb0fc6c"
+  },
+  "RayTracer.Gpu/RayTracer.Gpu.csproj": {
+    "mtime": 1784481559.4159462,
+    "ast_hash": "f0415567bf93dfc06eb909204123dc15",
+    "semantic_hash": "f0415567bf93dfc06eb909204123dc15"
+  },
+  "RayTracer.Gpu/ShaderCompiler.cs": {
+    "mtime": 1783630151.7688086,
+    "ast_hash": "b47958ec0f30e30c8e3d466ad5607abe",
+    "semantic_hash": "b47958ec0f30e30c8e3d466ad5607abe"
+  },
+  "RayTracer.Gpu/packages.lock.json": {
+    "mtime": 1784483333.7132878,
+    "ast_hash": "51ab9b6041e8e2cf524aff2e4aec58b6",
+    "semantic_hash": "51ab9b6041e8e2cf524aff2e4aec58b6"
+  },
+  "RayTracer.Maze.Core/CameraController.cs": {
+    "mtime": 1784448028.8339484,
+    "ast_hash": "f0925a0fd68e5d895c09491ec3c90b31",
+    "semantic_hash": "f0925a0fd68e5d895c09491ec3c90b31"
+  },
+  "RayTracer.Maze.Core/Maze.cs": {
+    "mtime": 1784448028.8349483,
+    "ast_hash": "7e7c618fea98756d92608ba9311eb680",
+    "semantic_hash": "7e7c618fea98756d92608ba9311eb680"
+  },
+  "RayTracer.Maze.Core/MazeGeometryBuilder.cs": {
+    "mtime": 1784448028.8359509,
+    "ast_hash": "02d26c38a37a866e4b8efff59655f398",
+    "semantic_hash": "02d26c38a37a866e4b8efff59655f398"
+  },
+  "RayTracer.Maze.Core/MazeMinimap.cs": {
+    "mtime": 1784448028.8369486,
+    "ast_hash": "3713544c2811a8e1da1e689540b1dd8c",
+    "semantic_hash": "3713544c2811a8e1da1e689540b1dd8c"
+  },
+  "RayTracer.Maze.Core/MazeNavigator.cs": {
+    "mtime": 1784448028.8369486,
+    "ast_hash": "4608d731001f3e5047d2ffffd2931ee1",
+    "semantic_hash": "4608d731001f3e5047d2ffffd2931ee1"
+  },
+  "RayTracer.Maze.Core/RayTracer.Maze.Core.csproj": {
+    "mtime": 1784448028.838028,
+    "ast_hash": "aeff86ad2d2b8ea4aa73329e664cde8f",
+    "semantic_hash": "aeff86ad2d2b8ea4aa73329e664cde8f"
+  },
+  "RayTracer.Maze.Core/packages.lock.json": {
+    "mtime": 1784483333.7132878,
+    "ast_hash": "b799b53c25611a5322277b3da030a27d",
+    "semantic_hash": "b799b53c25611a5322277b3da030a27d"
+  },
+  "RayTracer.Maze/ClassicMode.cs": {
+    "mtime": 1784448028.8390284,
+    "ast_hash": "db252d5bfaa155a84be99a6bcdb1183b",
+    "semantic_hash": "db252d5bfaa155a84be99a6bcdb1183b"
+  },
+  "RayTracer.Maze/ConfigForm.cs": {
+    "mtime": 1784448028.8400283,
+    "ast_hash": "adade873324bee4cc3c9f79dd1a85f04",
+    "semantic_hash": "adade873324bee4cc3c9f79dd1a85f04"
+  },
+  "RayTracer.Maze/CpuRenderForm.cs": {
+    "mtime": 1784448028.8415332,
+    "ast_hash": "5ce8cfd549afd22be1faa360f90f870b",
+    "semantic_hash": "5ce8cfd549afd22be1faa360f90f870b"
+  },
+  "RayTracer.Maze/MazeBubbles.cs": {
+    "mtime": 1784448028.8425398,
+    "ast_hash": "27955a574a016ca1bd925abbb95d6a2e",
+    "semantic_hash": "27955a574a016ca1bd925abbb95d6a2e"
+  },
+  "RayTracer.Maze/MazeDecals.cs": {
+    "mtime": 1784448028.843542,
+    "ast_hash": "2062853a8b9750f1849f575b780c27c0",
+    "semantic_hash": "2062853a8b9750f1849f575b780c27c0"
+  },
+  "RayTracer.Maze/MazeHedges.cs": {
+    "mtime": 1784448028.8445394,
+    "ast_hash": "35fdb5be8a0c6e0c318e6aeeaa35047f",
+    "semantic_hash": "35fdb5be8a0c6e0c318e6aeeaa35047f"
+  },
+  "RayTracer.Maze/MazeJewels.cs": {
+    "mtime": 1784448028.845539,
+    "ast_hash": "e8a5e6f1b056ae1ca4ce1804ec9f5109",
+    "semantic_hash": "e8a5e6f1b056ae1ca4ce1804ec9f5109"
+  },
+  "RayTracer.Maze/MazeMirrors.cs": {
+    "mtime": 1784448028.845539,
+    "ast_hash": "28cf1567523f0946f66782d20b886615",
+    "semantic_hash": "28cf1567523f0946f66782d20b886615"
+  },
+  "RayTracer.Maze/MazeOilSlicks.cs": {
+    "mtime": 1784448028.8480527,
+    "ast_hash": "009abfb41413f73cc7e5c0180fbb5302",
+    "semantic_hash": "009abfb41413f73cc7e5c0180fbb5302"
+  },
+  "RayTracer.Maze/MazeProps.cs": {
+    "mtime": 1784448028.849054,
+    "ast_hash": "2dea37fd5bbf95c7fa60c450f2061227",
+    "semantic_hash": "2dea37fd5bbf95c7fa60c450f2061227"
+  },
+  "RayTracer.Maze/MazeThreshold.cs": {
+    "mtime": 1784448028.851055,
+    "ast_hash": "a1b7d3d1dbb61952628a73d5517c528f",
+    "semantic_hash": "a1b7d3d1dbb61952628a73d5517c528f"
+  },
+  "RayTracer.Maze/MazeWater.cs": {
+    "mtime": 1784448028.852054,
+    "ast_hash": "e162be0d38ad77eb5a731e7b00e8661a",
+    "semantic_hash": "e162be0d38ad77eb5a731e7b00e8661a"
+  },
+  "RayTracer.Maze/MazeWindows.cs": {
+    "mtime": 1784448028.854567,
+    "ast_hash": "eb2f61f72273b774cf793e62a5b2e180",
+    "semantic_hash": "eb2f61f72273b774cf793e62a5b2e180"
+  },
+  "RayTracer.Maze/Phase1Scene.cs": {
+    "mtime": 1784448028.8565688,
+    "ast_hash": "3f7a699d4721aea551f9193cb38267ca",
+    "semantic_hash": "3f7a699d4721aea551f9193cb38267ca"
+  },
+  "RayTracer.Maze/Phase2Scene.cs": {
+    "mtime": 1784448028.8575828,
+    "ast_hash": "6489382eb5993871b6dbd640bc5d04ff",
+    "semantic_hash": "6489382eb5993871b6dbd640bc5d04ff"
+  },
+  "RayTracer.Maze/Phase3Scene.cs": {
+    "mtime": 1784448028.8585904,
+    "ast_hash": "d0fcc4754e0b72fd286c9914a12244d3",
+    "semantic_hash": "d0fcc4754e0b72fd286c9914a12244d3"
+  },
+  "RayTracer.Maze/Program.cs": {
+    "mtime": 1784483307.178548,
+    "ast_hash": "09f112a50bb6231a2321653a5ea1565d",
+    "semantic_hash": "09f112a50bb6231a2321653a5ea1565d"
+  },
+  "RayTracer.Maze/PropTextures.cs": {
+    "mtime": 1784448028.863103,
+    "ast_hash": "f9fb17a22028a323709d73f07019fa3d",
+    "semantic_hash": "f9fb17a22028a323709d73f07019fa3d"
+  },
+  "RayTracer.Maze/Properties/launchSettings.json": {
+    "mtime": 1784448028.8641095,
+    "ast_hash": "90e482100ffe5115810f9e6c9540c8ed",
+    "semantic_hash": "90e482100ffe5115810f9e6c9540c8ed"
+  },
+  "RayTracer.Maze/RayTracer.Maze.csproj": {
+    "mtime": 1784482048.582808,
+    "ast_hash": "b8fa469f4ebc51bcbe7132a691f0cd6e",
+    "semantic_hash": "b8fa469f4ebc51bcbe7132a691f0cd6e"
+  },
+  "RayTracer.Maze/RegressionHarness.cs": {
+    "mtime": 1784482034.7735693,
+    "ast_hash": "3485d283738dba78e62aadf07d55da90",
+    "semantic_hash": "3485d283738dba78e62aadf07d55da90"
+  },
+  "RayTracer.Maze/Screensaver.cs": {
+    "mtime": 1784448029.057727,
+    "ast_hash": "5a994b8652e3250af6e6021e7135a0fd",
+    "semantic_hash": "5a994b8652e3250af6e6021e7135a0fd"
+  },
+  "RayTracer.Maze/packages.lock.json": {
+    "mtime": 1784483333.715813,
+    "ast_hash": "936161cab499f47653be2f9c61642e8f",
+    "semantic_hash": "936161cab499f47653be2f9c61642e8f"
+  },
+  "RayTracer.Tests/AbsorptionTests.cs": {
+    "mtime": 1783791257.6565714,
+    "ast_hash": "62c3cf66f09dadf8dd07161619b875af",
+    "semantic_hash": "62c3cf66f09dadf8dd07161619b875af"
+  },
+  "RayTracer.Tests/AccumulationConvergenceTests.cs": {
+    "mtime": 1776328228.4015465,
+    "ast_hash": "867dafe5df01176bedb19dc8778e782f",
+    "semantic_hash": "867dafe5df01176bedb19dc8778e782f"
+  },
+  "RayTracer.Tests/AccumulationLifecycleTests.cs": {
+    "mtime": 1776328281.4688175,
+    "ast_hash": "028277e1853a790c60444ab64257a0c0",
+    "semantic_hash": "028277e1853a790c60444ab64257a0c0"
+  },
+  "RayTracer.Tests/AccumulationSpectralTests.cs": {
+    "mtime": 1776328259.1875875,
+    "ast_hash": "e82408b73721e26f17a5457f144be1be",
+    "semantic_hash": "e82408b73721e26f17a5457f144be1be"
+  },
+  "RayTracer.Tests/BVHTests.cs": {
+    "mtime": 1784449471.853593,
+    "ast_hash": "245dd01f99d3472c0ab368ce7182103a",
+    "semantic_hash": "245dd01f99d3472c0ab368ce7182103a"
+  },
+  "RayTracer.Tests/BubbleTests.cs": {
+    "mtime": 1783795922.8546185,
+    "ast_hash": "b18526bb854337810df6e332ca3a534f",
+    "semantic_hash": "b18526bb854337810df6e332ca3a534f"
+  },
+  "RayTracer.Tests/CameraControllerTests.cs": {
+    "mtime": 1783695422.9524784,
+    "ast_hash": "dd8d1f592327d82b96e98ddd94e4eeba",
+    "semantic_hash": "dd8d1f592327d82b96e98ddd94e4eeba"
+  },
+  "RayTracer.Tests/CausticsTests.cs": {
+    "mtime": 1784209576.3330572,
+    "ast_hash": "fadd806488ad421cd32b3fecb78f3300",
+    "semantic_hash": "fadd806488ad421cd32b3fecb78f3300"
+  },
+  "RayTracer.Tests/DebugBuffersTests.cs": {
+    "mtime": 1775548436.9319308,
+    "ast_hash": "17c9a651cbbc077c90edc367b2364dab",
+    "semantic_hash": "17c9a651cbbc077c90edc367b2364dab"
+  },
+  "RayTracer.Tests/DiffuseIrradianceCacheTests.cs": {
+    "mtime": 1784198913.7549467,
+    "ast_hash": "4a500be831db158375789fafca4850b5",
+    "semantic_hash": "4a500be831db158375789fafca4850b5"
+  },
+  "RayTracer.Tests/GiNeutralityTests.cs": {
+    "mtime": 1784211301.0348198,
+    "ast_hash": "473b4e649d862654fa5b4ed48b022edd",
+    "semantic_hash": "473b4e649d862654fa5b4ed48b022edd"
+  },
+  "RayTracer.Tests/GlassRefractionTests.cs": {
+    "mtime": 1783780883.3390827,
+    "ast_hash": "75a887cb7da9ea38e14cd2eda8705b02",
+    "semantic_hash": "75a887cb7da9ea38e14cd2eda8705b02"
+  },
+  "RayTracer.Tests/GpuEmissiveParityTests.cs": {
+    "mtime": 1784457734.3038592,
+    "ast_hash": "69ccbbd04808015204bbf51c04fe72d5",
+    "semantic_hash": "69ccbbd04808015204bbf51c04fe72d5"
+  },
+  "RayTracer.Tests/GpuGlassTests.cs": {
+    "mtime": 1784457622.5591335,
+    "ast_hash": "084b096797c9798d3ad779b972666182",
+    "semantic_hash": "084b096797c9798d3ad779b972666182"
+  },
+  "RayTracer.Tests/GpuLensTests.cs": {
+    "mtime": 1784278812.9579146,
+    "ast_hash": "a1934a8a8e14144c9a0458d275e1ea78",
+    "semantic_hash": "a1934a8a8e14144c9a0458d275e1ea78"
+  },
+  "RayTracer.Tests/GpuMirrorTests.cs": {
+    "mtime": 1784457622.3666036,
+    "ast_hash": "db9ef9479359f3fd1e8aee2687ce8aff",
+    "semantic_hash": "db9ef9479359f3fd1e8aee2687ce8aff"
+  },
+  "RayTracer.Tests/GpuMoverParityTests.cs": {
+    "mtime": 1784457692.642275,
+    "ast_hash": "6abab78eb895f68a2130aef542c3527d",
+    "semantic_hash": "6abab78eb895f68a2130aef542c3527d"
+  },
+  "RayTracer.Tests/GpuPhase1Tests.cs": {
+    "mtime": 1783761972.3788052,
+    "ast_hash": "85bfa05689b9a7b24bc68c4ed2898495",
+    "semantic_hash": "85bfa05689b9a7b24bc68c4ed2898495"
+  },
+  "RayTracer.Tests/GpuPhase2Tests.cs": {
+    "mtime": 1784457742.6890469,
+    "ast_hash": "1268cd86d04db74edac90883c2c08cec",
+    "semantic_hash": "1268cd86d04db74edac90883c2c08cec"
+  },
+  "RayTracer.Tests/GpuPhase3Tests.cs": {
+    "mtime": 1783667078.455411,
+    "ast_hash": "2fba75ffc2a9801beed3e376c4f5abfd",
+    "semantic_hash": "2fba75ffc2a9801beed3e376c4f5abfd"
+  },
+  "RayTracer.Tests/GpuPhase4Tests.cs": {
+    "mtime": 1783674670.34388,
+    "ast_hash": "922a3683b7db43f8efc506f9be750ec4",
+    "semantic_hash": "922a3683b7db43f8efc506f9be750ec4"
+  },
+  "RayTracer.Tests/GpuPhase5Tests.cs": {
+    "mtime": 1783686273.0602787,
+    "ast_hash": "40518dcce678d0dcba1ac204fb3ca6b4",
+    "semantic_hash": "40518dcce678d0dcba1ac204fb3ca6b4"
+  },
+  "RayTracer.Tests/GpuScenePackerTests.cs": {
+    "mtime": 1784478307.5450382,
+    "ast_hash": "a3c26c27d52e009ff9dbf3b4a68f3294",
+    "semantic_hash": "a3c26c27d52e009ff9dbf3b4a68f3294"
+  },
+  "RayTracer.Tests/GpuThinFilmTests.cs": {
+    "mtime": 1784457622.6039853,
+    "ast_hash": "6c6cc8b310af08f6d656776bd86268cf",
+    "semantic_hash": "6c6cc8b310af08f6d656776bd86268cf"
+  },
+  "RayTracer.Tests/JobSystemOptionsValidationTests.cs": {
+    "mtime": 1776334914.598484,
+    "ast_hash": "3767f3cb416f92790d418600090d5f46",
+    "semantic_hash": "3767f3cb416f92790d418600090d5f46"
+  },
+  "RayTracer.Tests/LensTests.cs": {
+    "mtime": 1784278647.286631,
+    "ast_hash": "619e56d23216842b67ceb74568237fc6",
+    "semantic_hash": "619e56d23216842b67ceb74568237fc6"
+  },
+  "RayTracer.Tests/MSTestSettings.cs": {
+    "mtime": 1776266281.83242,
+    "ast_hash": "bfc89cfe2180613f118df070dcbba666",
+    "semantic_hash": "bfc89cfe2180613f118df070dcbba666"
+  },
+  "RayTracer.Tests/MazeGeometryBuilderTests.cs": {
+    "mtime": 1783761980.5921183,
+    "ast_hash": "1daf6d7ae56473d292b15ef26a583760",
+    "semantic_hash": "1daf6d7ae56473d292b15ef26a583760"
+  },
+  "RayTracer.Tests/MazeMinimapTests.cs": {
+    "mtime": 1783700809.502041,
+    "ast_hash": "eb92319b4db418ca895c93465d482c88",
+    "semantic_hash": "eb92319b4db418ca895c93465d482c88"
+  },
+  "RayTracer.Tests/MazeNavigatorTests.cs": {
+    "mtime": 1775548436.9359498,
+    "ast_hash": "f890c3e3876cfa1562df1bbf3669cf85",
+    "semantic_hash": "f890c3e3876cfa1562df1bbf3669cf85"
+  },
+  "RayTracer.Tests/MazeTests.cs": {
+    "mtime": 1775548436.9379592,
+    "ast_hash": "9d8b50b5bdd7ccc433ff1c955b9444d0",
+    "semantic_hash": "9d8b50b5bdd7ccc433ff1c955b9444d0"
+  },
+  "RayTracer.Tests/MirrorReflectionTests.cs": {
+    "mtime": 1783762798.2618198,
+    "ast_hash": "aad465c7b3a5a77ce4823db958c1646f",
+    "semantic_hash": "aad465c7b3a5a77ce4823db958c1646f"
+  },
+  "RayTracer.Tests/PerformanceCalibratorTests.cs": {
+    "mtime": 1783665789.8798602,
+    "ast_hash": "6c894dc0d8e078380f4cdae1ece2f45f",
+    "semantic_hash": "6c894dc0d8e078380f4cdae1ece2f45f"
+  },
+  "RayTracer.Tests/Phase0SmokeTests.cs": {
+    "mtime": 1776251688.0344687,
+    "ast_hash": "c7b414c9fcc7a28b1afae245a47e56b0",
+    "semantic_hash": "c7b414c9fcc7a28b1afae245a47e56b0"
+  },
+  "RayTracer.Tests/Phase4TestingExpansionTests.cs": {
+    "mtime": 1776254949.1320925,
+    "ast_hash": "efb0700b4ef9d15107d8a215709c3973",
+    "semantic_hash": "efb0700b4ef9d15107d8a215709c3973"
+  },
+  "RayTracer.Tests/Phase5PerformanceTests.cs": {
+    "mtime": 1776258135.4605298,
+    "ast_hash": "b9e0eb8e4e9c1ccd9ff0e22d63d9c55d",
+    "semantic_hash": "b9e0eb8e4e9c1ccd9ff0e22d63d9c55d"
+  },
+  "RayTracer.Tests/RayTracer.Tests.csproj": {
+    "mtime": 1784448029.0607283,
+    "ast_hash": "129aab28fca6332d1ec5f0d6d518e937",
+    "semantic_hash": "129aab28fca6332d1ec5f0d6d518e937"
+  },
+  "RayTracer.Tests/RgbToReflectanceBasisTests.cs": {
+    "mtime": 1783695743.2111912,
+    "ast_hash": "9d036f9e17aaf1a5cefef1a5e887ddc2",
+    "semantic_hash": "9d036f9e17aaf1a5cefef1a5e887ddc2"
+  },
+  "RayTracer.Tests/ShadowTransmittanceTests.cs": {
+    "mtime": 1784020096.313212,
+    "ast_hash": "5814f5e931d95508a9977069c2006a36",
+    "semantic_hash": "5814f5e931d95508a9977069c2006a36"
+  },
+  "RayTracer.Tests/SkyTests.cs": {
+    "mtime": 1784042732.000008,
+    "ast_hash": "69be7e49f7a3c1ffbdcc35d7ab514ccf",
+    "semantic_hash": "69be7e49f7a3c1ffbdcc35d7ab514ccf"
+  },
+  "RayTracer.Tests/SoftShadowTests.cs": {
+    "mtime": 1784206807.695404,
+    "ast_hash": "36fb0fad0eb42b4df42f11d061997eb9",
+    "semantic_hash": "36fb0fad0eb42b4df42f11d061997eb9"
+  },
+  "RayTracer.Tests/SpectralColorTests.cs": {
+    "mtime": 1775548436.939469,
+    "ast_hash": "f67f09e4f17757b4a67c771adf6292d5",
+    "semantic_hash": "f67f09e4f17757b4a67c771adf6292d5"
+  },
+  "RayTracer.Tests/SpectralFoundationTests.cs": {
+    "mtime": 1783784970.3018713,
+    "ast_hash": "b9a07c1592ec348210b003788e1e0d28",
+    "semantic_hash": "b9a07c1592ec348210b003788e1e0d28"
+  },
+  "RayTracer.Tests/SphereTests.cs": {
+    "mtime": 1783792412.6313076,
+    "ast_hash": "1d31b44783aeedecfc788c2aaeb653b1",
+    "semantic_hash": "1d31b44783aeedecfc788c2aaeb653b1"
+  },
+  "RayTracer.Tests/ThinFilmTests.cs": {
+    "mtime": 1783784615.6493878,
+    "ast_hash": "694357d1042f998a2e9daa175defe6f1",
+    "semantic_hash": "694357d1042f998a2e9daa175defe6f1"
+  },
+  "RayTracer.Tests/VolumetricRenderingTests.cs": {
+    "mtime": 1783671350.0646417,
+    "ast_hash": "95ddb88aca4dd393db6130cc4fae7e2b",
+    "semantic_hash": "95ddb88aca4dd393db6130cc4fae7e2b"
+  },
+  "RayTracer.Tests/packages.lock.json": {
+    "mtime": 1784448050.0876102,
+    "ast_hash": "dd02f0bb066cbad6f44fae7c8de75278",
+    "semantic_hash": "dd02f0bb066cbad6f44fae7c8de75278"
+  },
+  "RayTracer.slnx": {
+    "mtime": 1784481564.3265364,
+    "ast_hash": "95700500837c81107e83321e5ff26ccb",
+    "semantic_hash": "95700500837c81107e83321e5ff26ccb"
+  },
+  "packages.lock.json": {
+    "mtime": 1776266298.6696124,
+    "ast_hash": "0aaf9ed3debcfc8bdf70c07ae2ce458c",
+    "semantic_hash": "0aaf9ed3debcfc8bdf70c07ae2ce458c"
+  },
+  ".github/copilot-instructions.md": {
+    "mtime": 1777057170.6831095,
+    "ast_hash": "5bf245a9e75afbe3c150311f719ec147",
+    "semantic_hash": "5bf245a9e75afbe3c150311f719ec147"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1776265954.630608,
+    "ast_hash": "ff860c7194aea631dc2b46bf0b4774c3",
+    "semantic_hash": "ff860c7194aea631dc2b46bf0b4774c3"
+  },
+  "ARCHITECTURE.md": {
+    "mtime": 1784195846.5533054,
+    "ast_hash": "fd8f95e46a47a2c9d2284cbd0fa37b6d",
+    "semantic_hash": "fd8f95e46a47a2c9d2284cbd0fa37b6d"
+  },
+  "Benchmark/readme.md": {
+    "mtime": 1783665789.8577194,
+    "ast_hash": "bfb2fc9dbd49fc2a2311e575777f9853",
+    "semantic_hash": "bfb2fc9dbd49fc2a2311e575777f9853"
+  },
+  "CONTRIBUTING.md": {
+    "mtime": 1783758541.1471493,
+    "ast_hash": "b1c7691a4c8df932faaac81b1adec637",
+    "semantic_hash": "b1c7691a4c8df932faaac81b1adec637"
+  },
+  "README.md": {
+    "mtime": 1783758560.2105439,
+    "ast_hash": "76374fd81b2f00cb7a1fcc6ffe8ff1a3",
+    "semantic_hash": "76374fd81b2f00cb7a1fcc6ffe8ff1a3"
+  },
+  "debug-options.md": {
+    "mtime": 1775548436.9515705,
+    "ast_hash": "638b1cdd878cd47104f58fe3d7a338f8",
+    "semantic_hash": "638b1cdd878cd47104f58fe3d7a338f8"
+  },
+  "pinball-plan.md": {
+    "mtime": 1784482234.2235024,
+    "ast_hash": "b2f29d095966f3832fc2003af9598823",
+    "semantic_hash": "b2f29d095966f3832fc2003af9598823"
+  },
+  "plan.md": {
+    "mtime": 1784279574.1527479,
+    "ast_hash": "6b5060a4849554047f7e7727aac62926",
+    "semantic_hash": "6b5060a4849554047f7e7727aac62926"
+  },
+  "tools/table-editor.html": {
+    "mtime": 1784539823.2551765,
+    "ast_hash": "5ad8533bc0d7ea01094563eb72823928",
+    "semantic_hash": "5ad8533bc0d7ea01094563eb72823928"
+  },
+  "warnings.md": {
+    "mtime": 1775548436.9560652,
+    "ast_hash": "840065edac644e28ea7c77f72ae33ee7",
+    "semantic_hash": "840065edac644e28ea7c77f72ae33ee7"
+  }
+}

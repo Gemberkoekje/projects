@@ -1,0 +1,17 @@
+---
+source_file: "RayTracer.Tests/packages.lock.json"
+type: "code"
+community: "Community 115"
+location: "L143"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_115
+---
+
+# resolved
+
+## Connections
+- [[Microsoft.Testing.Platform.MSBuild_3]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_115

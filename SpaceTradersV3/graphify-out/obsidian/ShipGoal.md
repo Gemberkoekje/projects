@@ -1,0 +1,17 @@
+---
+source_file: ""
+type: "code"
+community: "Community 7"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_7
+---
+
+# ShipGoal
+
+## Connections
+- [[.ResolveAsync()]] - `references` [EXTRACTED]
+- [[.ResolveMarketCoverageAsync()]] - `references` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_7

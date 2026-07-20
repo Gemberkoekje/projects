@@ -1,0 +1,19 @@
+---
+source_file: "RayTracer.Gpu/Phase4Renderer.cs"
+type: "code"
+community: "GPU Phase4 Renderer (D3D12)"
+location: "L168"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/GPU_Phase4_Renderer_D3D12
+---
+
+# ResolveConstants
+
+## Connections
+- [[Phase4Renderer.cs]] - `contains` [EXTRACTED]
+- [[float_35]] - `references` [EXTRACTED]
+- [[uint_10]] - `references` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/GPU_Phase4_Renderer_D3D12

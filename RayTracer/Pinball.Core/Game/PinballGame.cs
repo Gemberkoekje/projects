@@ -15,10 +15,17 @@ public sealed class PinballGame
 {
     private readonly PhysicsWorld _world;
 
-    /// <summary>Creates a new game with the given ball count and physics seed.</summary>
+    /// <summary>Creates a new game on the built-in P0 table with the given ball count and physics seed.</summary>
     public PinballGame(int ballsPerGame = 3, ulong seed = 0x5D_EE_CE_5Eul)
+        : this(new PinballTable(seed), ballsPerGame) { }
+
+    /// <summary>Creates a new game on a data-driven table (the editor's <c>table.json</c>).</summary>
+    public PinballGame(Pinball.Content.TableDefinition def, int ballsPerGame = 3, ulong seed = 0x5D_EE_CE_5Eul)
+        : this(def.BuildPhysicsTable(seed), ballsPerGame) { }
+
+    private PinballGame(PinballTable table, int ballsPerGame)
     {
-        Table = new PinballTable(seed);
+        Table = table;
         _world = new PhysicsWorld(Table.Settings, Table.Colliders);
         State = new GameState(ballsPerGame);
         _world.Ball = BallState.AtRest(Table.ShooterLaneStart);

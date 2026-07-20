@@ -1,0 +1,257 @@
+{
+  "AdventureEngine.slnx": {
+    "mtime": 1781375078.3213315,
+    "ast_hash": "3fed1c41105f922aa6ca0553122fd56d",
+    "semantic_hash": "3fed1c41105f922aa6ca0553122fd56d"
+  },
+  "src/AdventureEngine.Application/AdventureEngine.Application.csproj": {
+    "mtime": 1781372268.9385197,
+    "ast_hash": "eadc49c3ccaf0cbd71e7f4f28a00661c",
+    "semantic_hash": "eadc49c3ccaf0cbd71e7f4f28a00661c"
+  },
+  "src/AdventureEngine.Application/Agents/AgentUsage.cs": {
+    "mtime": 1781372268.9385197,
+    "ast_hash": "0118ca2d2ba2edc3c8bd567767e7781f",
+    "semantic_hash": "0118ca2d2ba2edc3c8bd567767e7781f"
+  },
+  "src/AdventureEngine.Application/Agents/IDirectorAgent.cs": {
+    "mtime": 1781372268.9395196,
+    "ast_hash": "f9734f68251ecc7deb92eb3b3cfa471b",
+    "semantic_hash": "f9734f68251ecc7deb92eb3b3cfa471b"
+  },
+  "src/AdventureEngine.Application/Agents/INarratorAgent.cs": {
+    "mtime": 1781372268.9395196,
+    "ast_hash": "1eb319f7608e44422d342249c095fbec",
+    "semantic_hash": "1eb319f7608e44422d342249c095fbec"
+  },
+  "src/AdventureEngine.Application/Agents/INpcAgent.cs": {
+    "mtime": 1781372268.9400237,
+    "ast_hash": "eca71859b6cfc0c69abcd2eed9064cea",
+    "semantic_hash": "eca71859b6cfc0c69abcd2eed9064cea"
+  },
+  "src/AdventureEngine.Application/Agents/JsonResponseParser.cs": {
+    "mtime": 1781372948.6372447,
+    "ast_hash": "9879985d49efd34397ed0904797f225d",
+    "semantic_hash": "9879985d49efd34397ed0904797f225d"
+  },
+  "src/AdventureEngine.Application/Agents/ModerationResult.cs": {
+    "mtime": 1781372268.9400237,
+    "ast_hash": "ee8565cf4c7db41f768968c1f3b5548f",
+    "semantic_hash": "ee8565cf4c7db41f768968c1f3b5548f"
+  },
+  "src/AdventureEngine.Application/Agents/ModerationResultParser.cs": {
+    "mtime": 1781372985.0451074,
+    "ast_hash": "0d56405a0bb24bfba6393c74d0a789be",
+    "semantic_hash": "0d56405a0bb24bfba6393c74d0a789be"
+  },
+  "src/AdventureEngine.Application/Agents/NarratorContext.cs": {
+    "mtime": 1781372268.941028,
+    "ast_hash": "6f4579d21be7fdf383517b30d27d6b44",
+    "semantic_hash": "6f4579d21be7fdf383517b30d27d6b44"
+  },
+  "src/AdventureEngine.Application/Agents/NpcContext.cs": {
+    "mtime": 1781372268.941028,
+    "ast_hash": "a68b3568d62d51f8d85daf23ead05f27",
+    "semantic_hash": "a68b3568d62d51f8d85daf23ead05f27"
+  },
+  "src/AdventureEngine.Application/GlobalUsings.cs": {
+    "mtime": 1781372268.942534,
+    "ast_hash": "fd429ff3617a5190a339e7fbadf974f4",
+    "semantic_hash": "fd429ff3617a5190a339e7fbadf974f4"
+  },
+  "src/AdventureEngine.Application/Sessions/IGameSessionService.cs": {
+    "mtime": 1781372268.942534,
+    "ast_hash": "036cb1bdf3a3273b4ee2d670e3236e06",
+    "semantic_hash": "036cb1bdf3a3273b4ee2d670e3236e06"
+  },
+  "src/AdventureEngine.Domain/AdventureEngine.Domain.csproj": {
+    "mtime": 1781372268.943539,
+    "ast_hash": "be639e4d797a29ec34d63c7b9f5243c9",
+    "semantic_hash": "be639e4d797a29ec34d63c7b9f5243c9"
+  },
+  "src/AdventureEngine.Domain/Events/GameEvents.cs": {
+    "mtime": 1781372268.943539,
+    "ast_hash": "1cba06b93d4a2796e9c7e72a7bf86220",
+    "semantic_hash": "1cba06b93d4a2796e9c7e72a7bf86220"
+  },
+  "src/AdventureEngine.Domain/GameSession.cs": {
+    "mtime": 1781372268.944539,
+    "ast_hash": "25fb1aea1f7d9da9b3be569cc2d00210",
+    "semantic_hash": "25fb1aea1f7d9da9b3be569cc2d00210"
+  },
+  "src/AdventureEngine.Domain/GlobalUsings.cs": {
+    "mtime": 1781372268.944539,
+    "ast_hash": "7f24c3e15cb42eab37ade91b1b51e011",
+    "semantic_hash": "7f24c3e15cb42eab37ade91b1b51e011"
+  },
+  "src/AdventureEngine.Domain/SessionStatus.cs": {
+    "mtime": 1781372268.9455397,
+    "ast_hash": "88dbd201a7045240de7bc6e7f9d07b49",
+    "semantic_hash": "88dbd201a7045240de7bc6e7f9d07b49"
+  },
+  "src/AdventureEngine.Domain/WorldManifest.cs": {
+    "mtime": 1781372268.9455397,
+    "ast_hash": "41776c93d955ff6e69abbb08913959e8",
+    "semantic_hash": "41776c93d955ff6e69abbb08913959e8"
+  },
+  "src/AdventureEngine.Infrastructure/AdventureEngine.Infrastructure.csproj": {
+    "mtime": 1781372268.946541,
+    "ast_hash": "c19980711dca9fca38a63d4acdaf8b5e",
+    "semantic_hash": "c19980711dca9fca38a63d4acdaf8b5e"
+  },
+  "src/AdventureEngine.Infrastructure/Agents/DirectorAgent.cs": {
+    "mtime": 1781373455.1501021,
+    "ast_hash": "4e8f61d2160bb4a13b52d4e15b8c402f",
+    "semantic_hash": "4e8f61d2160bb4a13b52d4e15b8c402f"
+  },
+  "src/AdventureEngine.Infrastructure/Agents/ModerationAgent.cs": {
+    "mtime": 1781372268.947539,
+    "ast_hash": "461d5253ba6b234493b49ad8c53ac4e5",
+    "semantic_hash": "461d5253ba6b234493b49ad8c53ac4e5"
+  },
+  "src/AdventureEngine.Infrastructure/Agents/NarratorAgent.cs": {
+    "mtime": 1781372268.9490995,
+    "ast_hash": "ac175e2c4bf287954b0e7f1e5f509776",
+    "semantic_hash": "ac175e2c4bf287954b0e7f1e5f509776"
+  },
+  "src/AdventureEngine.Infrastructure/Agents/NpcAgent.cs": {
+    "mtime": 1781372268.94961,
+    "ast_hash": "dd1a6c7ac1fa78bfbf7b2426d190590c",
+    "semantic_hash": "dd1a6c7ac1fa78bfbf7b2426d190590c"
+  },
+  "src/AdventureEngine.Infrastructure/Anthropic/AnthropicOptions.cs": {
+    "mtime": 1781372268.950614,
+    "ast_hash": "83978ae19c6f3e8d55f1c900469925e0",
+    "semantic_hash": "83978ae19c6f3e8d55f1c900469925e0"
+  },
+  "src/AdventureEngine.Infrastructure/GameSessionService.cs": {
+    "mtime": 1781527933.503444,
+    "ast_hash": "cf7d6fe3fa432f6ffc6999a62086e6df",
+    "semantic_hash": "cf7d6fe3fa432f6ffc6999a62086e6df"
+  },
+  "src/AdventureEngine.Infrastructure/GlobalUsings.cs": {
+    "mtime": 1781372268.950614,
+    "ast_hash": "bede13f04fe3ee6801030ec208e7d423",
+    "semantic_hash": "bede13f04fe3ee6801030ec208e7d423"
+  },
+  "src/AdventureEngine.Infrastructure/MartenConfiguration.cs": {
+    "mtime": 1781372268.950614,
+    "ast_hash": "5ff7688812b2f4d6febbf3d151c00c91",
+    "semantic_hash": "5ff7688812b2f4d6febbf3d151c00c91"
+  },
+  "src/AdventureEngine.Infrastructure/ServiceCollectionExtensions.cs": {
+    "mtime": 1781372268.9521182,
+    "ast_hash": "8753b692d9b9f7911c6b3f16ab9dba81",
+    "semantic_hash": "8753b692d9b9f7911c6b3f16ab9dba81"
+  },
+  "src/AdventureEngine.Web/AdventureEngine.Web.csproj": {
+    "mtime": 1781372608.2736397,
+    "ast_hash": "d692374f33095008f10e33e611706c2a",
+    "semantic_hash": "d692374f33095008f10e33e611706c2a"
+  },
+  "src/AdventureEngine.Web/Components/App.razor": {
+    "mtime": 1781529712.6101854,
+    "ast_hash": "7d1bf210881abb2b9a7d925f4559d7b6",
+    "semantic_hash": "7d1bf210881abb2b9a7d925f4559d7b6"
+  },
+  "src/AdventureEngine.Web/Components/GameTerminal.razor": {
+    "mtime": 1781375063.0382402,
+    "ast_hash": "1ac4129ee93f6fdf8c1562f366e5653c",
+    "semantic_hash": "1ac4129ee93f6fdf8c1562f366e5653c"
+  },
+  "src/AdventureEngine.Web/Components/Layout/MainLayout.razor": {
+    "mtime": 1781372268.954123,
+    "ast_hash": "75c29fc34d23b44674da8967cc116287",
+    "semantic_hash": "75c29fc34d23b44674da8967cc116287"
+  },
+  "src/AdventureEngine.Web/Components/Layout/NavMenu.razor": {
+    "mtime": 1781372268.9551234,
+    "ast_hash": "eadf6e4809ee4509d48c06aacae4c8b7",
+    "semantic_hash": "eadf6e4809ee4509d48c06aacae4c8b7"
+  },
+  "src/AdventureEngine.Web/Components/Layout/ReconnectModal.razor": {
+    "mtime": 1781372268.9561236,
+    "ast_hash": "2f2378bed0d87a86800610190fd1da17",
+    "semantic_hash": "2f2378bed0d87a86800610190fd1da17"
+  },
+  "src/AdventureEngine.Web/Components/Layout/ReconnectModal.razor.js": {
+    "mtime": 1781372268.9571235,
+    "ast_hash": "bdc7a0873231c569cd31aa85311186a3",
+    "semantic_hash": "bdc7a0873231c569cd31aa85311186a3"
+  },
+  "src/AdventureEngine.Web/Components/Pages/Error.razor": {
+    "mtime": 1781372268.9571235,
+    "ast_hash": "895aa385b310af50d09fd583be83b251",
+    "semantic_hash": "895aa385b310af50d09fd583be83b251"
+  },
+  "src/AdventureEngine.Web/Components/Pages/Home.razor": {
+    "mtime": 1781530190.2149644,
+    "ast_hash": "b814f4431672e02b07d38a57c46671f0",
+    "semantic_hash": "b814f4431672e02b07d38a57c46671f0"
+  },
+  "src/AdventureEngine.Web/Components/Pages/NotFound.razor": {
+    "mtime": 1781372268.958628,
+    "ast_hash": "b43132764687de5710f24e46d3d3f7ff",
+    "semantic_hash": "b43132764687de5710f24e46d3d3f7ff"
+  },
+  "src/AdventureEngine.Web/Components/Pages/Play.razor": {
+    "mtime": 1781530190.2149644,
+    "ast_hash": "b4e63f18528e76f159bff1307b332406",
+    "semantic_hash": "b4e63f18528e76f159bff1307b332406"
+  },
+  "src/AdventureEngine.Web/Components/Routes.razor": {
+    "mtime": 1781372268.958628,
+    "ast_hash": "e7369bc27ad40e65009faaaa1e965d93",
+    "semantic_hash": "e7369bc27ad40e65009faaaa1e965d93"
+  },
+  "src/AdventureEngine.Web/Components/_Imports.razor": {
+    "mtime": 1781372268.958628,
+    "ast_hash": "058cf5c0ce2795bc44fd68cad24b0433",
+    "semantic_hash": "058cf5c0ce2795bc44fd68cad24b0433"
+  },
+  "src/AdventureEngine.Web/Program.cs": {
+    "mtime": 1781530190.213962,
+    "ast_hash": "ddbe760d9c1300425a59b39207534549",
+    "semantic_hash": "ddbe760d9c1300425a59b39207534549"
+  },
+  "src/AdventureEngine.Web/Properties/launchSettings.json": {
+    "mtime": 1781372268.9611452,
+    "ast_hash": "1dbfef84a1c9d78fca096e292fb1d89b",
+    "semantic_hash": "1dbfef84a1c9d78fca096e292fb1d89b"
+  },
+  "src/AdventureEngine.Web/appsettings.Development.json": {
+    "mtime": 1781372268.9611452,
+    "ast_hash": "804b473502a4c415cf75db61c56c32aa",
+    "semantic_hash": "804b473502a4c415cf75db61c56c32aa"
+  },
+  "src/AdventureEngine.Web/appsettings.json": {
+    "mtime": 1781372605.8564894,
+    "ast_hash": "9d66e3afc8059b595f0cebf042c23941",
+    "semantic_hash": "9d66e3afc8059b595f0cebf042c23941"
+  },
+  "src/AdventureEngine.Web/wwwroot/js/gameTerminal.js": {
+    "mtime": 1781375071.3107014,
+    "ast_hash": "bda20a737ff0c1fda4804dc96d978bf5",
+    "semantic_hash": "bda20a737ff0c1fda4804dc96d978bf5"
+  },
+  "tests/AdventureEngine.Tests/AdventureEngine.Tests.csproj": {
+    "mtime": 1781375112.4893749,
+    "ast_hash": "29eec7cd0ec8930e0a078e4bc7f2cc64",
+    "semantic_hash": "29eec7cd0ec8930e0a078e4bc7f2cc64"
+  },
+  "tests/AdventureEngine.Tests/GameSessionTests.cs": {
+    "mtime": 1781375136.3121154,
+    "ast_hash": "e510dc6fbf4df21e932f84afa28412b8",
+    "semantic_hash": "e510dc6fbf4df21e932f84afa28412b8"
+  },
+  "tests/AdventureEngine.Tests/ModerationResultParserTests.cs": {
+    "mtime": 1781372269.0323234,
+    "ast_hash": "3c21c1130d55e2bfc59648a953ef8d01",
+    "semantic_hash": "3c21c1130d55e2bfc59648a953ef8d01"
+  },
+  "tests/AdventureEngine.Tests/WorldManifestTests.cs": {
+    "mtime": 1781372998.2530484,
+    "ast_hash": "3fe705564e05785e7e9eecd8ad9d08bd",
+    "semantic_hash": "3fe705564e05785e7e9eecd8ad9d08bd"
+  }
+}

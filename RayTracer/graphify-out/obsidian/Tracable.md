@@ -1,0 +1,88 @@
+---
+source_file: "RayTracer.Core/Geometry/Tracable.cs"
+type: "code"
+community: "Community 38"
+location: "L9"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_38
+---
+
+# Tracable
+
+## Connections
+- [[.AddBezierWall()]] - `references` [EXTRACTED]
+- [[.AddBrick()]] - `references` [EXTRACTED]
+- [[.AddBumper()]] - `references` [EXTRACTED]
+- [[.AddCyl()]] - `references` [EXTRACTED]
+- [[.AddDoubleSided()]] - `references` [EXTRACTED]
+- [[.AddFlipper()]] - `references` [EXTRACTED]
+- [[.AddFloorLogo()]] - `references` [EXTRACTED]
+- [[.AddFramedMirror()]] - `references` [EXTRACTED]
+- [[.AddGlass()]] - `references` [EXTRACTED]
+- [[.AddJamb()]] - `references` [EXTRACTED]
+- [[.AddPost()]] - `references` [EXTRACTED]
+- [[.AddPrismFace()]] - `references` [EXTRACTED]
+- [[.AddRamp()]] - `references` [EXTRACTED]
+- [[.AddRing()]] - `references` [EXTRACTED]
+- [[.AddRotBox()]] - `references` [EXTRACTED]
+- [[.AddTarget()]] - `references` [EXTRACTED]
+- [[.AddWallSigns()]] - `references` [EXTRACTED]
+- [[.AddWindow()]] - `references` [EXTRACTED]
+- [[.AddWormhole()]] - `references` [EXTRACTED]
+- [[.Box()]] - `references` [EXTRACTED]
+- [[.Build()_1]] - `references` [EXTRACTED]
+- [[.Build()_3]] - `references` [EXTRACTED]
+- [[.Build()_5]] - `references` [EXTRACTED]
+- [[.Build()_6]] - `references` [EXTRACTED]
+- [[.Build()_7]] - `references` [EXTRACTED]
+- [[.Build()_8]] - `references` [EXTRACTED]
+- [[.Build()_9]] - `references` [EXTRACTED]
+- [[.Build()_10]] - `references` [EXTRACTED]
+- [[.Build()_11]] - `references` [EXTRACTED]
+- [[.Build()_12]] - `references` [EXTRACTED]
+- [[.Build()_13]] - `references` [EXTRACTED]
+- [[.BuildGroundTruth()_3]] - `references` [EXTRACTED]
+- [[.BuildJobSystem()]] - `references` [EXTRACTED]
+- [[.BuildJobSystem()_1]] - `references` [EXTRACTED]
+- [[.BuildMaze()]] - `references` [EXTRACTED]
+- [[.BuildMaze()_1]] - `references` [EXTRACTED]
+- [[.BuildScene()_2]] - `references` [EXTRACTED]
+- [[.BuildScene()_3]] - `references` [EXTRACTED]
+- [[.Create()]] - `references` [EXTRACTED]
+- [[.CreateCoreStartupState()]] - `references` [EXTRACTED]
+- [[.CreateCoreStartupState()_1]] - `references` [EXTRACTED]
+- [[.CreateState()]] - `references` [EXTRACTED]
+- [[.CreateState()_1]] - `references` [EXTRACTED]
+- [[.FindClosest()_1]] - `references` [EXTRACTED]
+- [[.FindClosestLinear()]] - `references` [EXTRACTED]
+- [[.Intersect()_6]] - `method` [EXTRACTED]
+- [[.MeasureRaysPerSecondAsync()]] - `references` [EXTRACTED]
+- [[.NeutralBox()]] - `references` [EXTRACTED]
+- [[.OrderQuads()]] - `references` [EXTRACTED]
+- [[.Pack()_1]] - `references` [EXTRACTED]
+- [[.RenderCenter()]] - `references` [EXTRACTED]
+- [[.RenderCenter()_1]] - `references` [EXTRACTED]
+- [[.RenderCenter()_2]] - `references` [EXTRACTED]
+- [[.RenderFloor()]] - `references` [EXTRACTED]
+- [[.Slab()]] - `references` [EXTRACTED]
+- [[.TryFindNearestGlass()]] - `references` [EXTRACTED]
+- [[.TryFindNearestMirror()]] - `references` [EXTRACTED]
+- [[AABB]] - `references` [EXTRACTED]
+- [[BVH]] - `references` [EXTRACTED]
+- [[BrickRectangle]] - `inherits` [EXTRACTED]
+- [[CeilingTileRectangle]] - `inherits` [EXTRACTED]
+- [[DecalRectangle]] - `inherits` [EXTRACTED]
+- [[DegenerateBoundsTracable]] - `inherits` [EXTRACTED]
+- [[JobSystem_4]] - `references` [EXTRACTED]
+- [[Phase1Scene]] - `references` [EXTRACTED]
+- [[Phase2Scene]] - `references` [EXTRACTED]
+- [[Phase3Scene]] - `references` [EXTRACTED]
+- [[Plane]] - `inherits` [EXTRACTED]
+- [[Sphere]] - `inherits` [EXTRACTED]
+- [[SurfaceKind]] - `references` [EXTRACTED]
+- [[Tracable.cs]] - `contains` [EXTRACTED]
+- [[TracableRectangle]] - `inherits` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_38

@@ -1,0 +1,20 @@
+---
+source_file: "tests/SpaceTraders.Infrastructure.Tests/TradeOpportunityRepositoryTests.cs"
+type: "code"
+community: "Community 32"
+location: "L1"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_32
+---
+
+# TradeOpportunityRepositoryTests.cs
+
+## Connections
+- [[SpaceTraders.Application.DTOs]] - `imports` [EXTRACTED]
+- [[SpaceTraders.Infrastructure.Persistence.Repositories]] - `imports` [EXTRACTED]
+- [[SpaceTraders.Infrastructure.Tests_1]] - `contains` [EXTRACTED]
+- [[TradeOpportunityRepositoryTests]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_32

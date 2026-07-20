@@ -1,0 +1,19 @@
+---
+source_file: "tests/SpaceTraders.API.Tests/packages.lock.json"
+type: "code"
+community: "Community 47"
+location: "L542"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_47
+---
+
+# dependencies
+
+## Connections
+- [[Microsoft.Extensions.DependencyInjection.Abstractions]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Diagnostics.Abstractions_2]] - `contains` [EXTRACTED]
+- [[Microsoft.Extensions.Options]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_47

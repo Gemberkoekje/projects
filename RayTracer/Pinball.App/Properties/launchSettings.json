@@ -20,6 +20,18 @@
       "commandName": "Project",
       "commandLineArgs": "--table-demo --save table-demo.png"
     },
+    "Table JSON (top-down walls)": {
+      "commandName": "Project",
+      "commandLineArgs": "--table-topdown --table table.json --save table-topdown.png"
+    },
+    "Play table.json (window)": {
+      "commandName": "Project",
+      "commandLineArgs": "--table table.json"
+    },
+    "Play table.json (headless)": {
+      "commandName": "Project",
+      "commandLineArgs": "--pinball-play --table table.json --frames 1500 --save play.png"
+    },
     "Ball sweep (headless)": {
       "commandName": "Project",
       "commandLineArgs": "--ball-sweep --save ball-sweep.png"

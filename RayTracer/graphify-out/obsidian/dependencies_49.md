@@ -1,0 +1,18 @@
+---
+source_file: "RayTracer.Maze/packages.lock.json"
+type: "code"
+community: "Community 114"
+location: "L102"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_114
+---
+
+# dependencies
+
+## Connections
+- [[RayTracer_15]] - `contains` [EXTRACTED]
+- [[raytracer.maze.core_2]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_114

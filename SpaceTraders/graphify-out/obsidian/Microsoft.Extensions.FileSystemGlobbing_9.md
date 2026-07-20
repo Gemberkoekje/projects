@@ -1,0 +1,18 @@
+---
+source_file: "tests/SpaceTraders.Integration.Test/packages.lock.json"
+type: "code"
+community: "Community 93"
+location: "L435"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Community_93
+---
+
+# Microsoft.Extensions.FileSystemGlobbing
+
+## Connections
+- [[Microsoft.Extensions.FileSystemGlobbing_10]] - `imports` [EXTRACTED]
+- [[dependencies_291]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Community_93

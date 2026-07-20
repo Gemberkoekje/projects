@@ -1,0 +1,2102 @@
+{
+  ".net.csproj": {
+    "mtime": 1777401081.1509354,
+    "ast_hash": "de2c1c2ba2d2c2e711522937d3c187fa",
+    "semantic_hash": "de2c1c2ba2d2c2e711522937d3c187fa"
+  },
+  "SpaceTraders.API/Configuration/SpaceTradersBootstrapOptions.cs": {
+    "mtime": 1777365439.1717398,
+    "ast_hash": "86df9e7dd9cfdc12656160bdc12ca510",
+    "semantic_hash": "86df9e7dd9cfdc12656160bdc12ca510"
+  },
+  "SpaceTraders.API/Dtos/FleetStatusDtos.cs": {
+    "mtime": 1779014803.3574214,
+    "ast_hash": "f35714a436ca5245540e9ce33a609600",
+    "semantic_hash": "f35714a436ca5245540e9ce33a609600"
+  },
+  "SpaceTraders.API/Dtos/FleetStatusMapper.cs": {
+    "mtime": 1779014803.4352024,
+    "ast_hash": "9ee8645f5622ceb390db38ed91660417",
+    "semantic_hash": "9ee8645f5622ceb390db38ed91660417"
+  },
+  "SpaceTraders.API/Endpoints/ControlEndpoints.cs": {
+    "mtime": 1778752873.752625,
+    "ast_hash": "80eeb816c53cf5abf0205c609fd4f001",
+    "semantic_hash": "80eeb816c53cf5abf0205c609fd4f001"
+  },
+  "SpaceTraders.API/Endpoints/FleetStatusEndpoints.cs": {
+    "mtime": 1778767034.432911,
+    "ast_hash": "62264648d0dc8d68d966bd1e749ae081",
+    "semantic_hash": "62264648d0dc8d68d966bd1e749ae081"
+  },
+  "SpaceTraders.API/Endpoints/HealthExtendedEndpoints.cs": {
+    "mtime": 1777642792.6919436,
+    "ast_hash": "2d357123cb6516b0f733de685ee274f7",
+    "semantic_hash": "2d357123cb6516b0f733de685ee274f7"
+  },
+  "SpaceTraders.API/Endpoints/MarketsEndpoints.cs": {
+    "mtime": 1777667502.998559,
+    "ast_hash": "0523a3ae52d4e32eacd3091b123c62cf",
+    "semantic_hash": "0523a3ae52d4e32eacd3091b123c62cf"
+  },
+  "SpaceTraders.API/Endpoints/SettingsEndpoints.cs": {
+    "mtime": 1777642792.697037,
+    "ast_hash": "392cf4b0bd9fc2e465b51c455be35fb5",
+    "semantic_hash": "392cf4b0bd9fc2e465b51c455be35fb5"
+  },
+  "SpaceTraders.API/Endpoints/ShipyardsEndpoints.cs": {
+    "mtime": 1778754811.2533207,
+    "ast_hash": "bac2888b382093a4e9e8ce51b763bf82",
+    "semantic_hash": "bac2888b382093a4e9e8ce51b763bf82"
+  },
+  "SpaceTraders.API/Endpoints/StatusEndpoints.cs": {
+    "mtime": 1778940590.185251,
+    "ast_hash": "d1da9bbde104cbdab9bbce9b9e8298d3",
+    "semantic_hash": "d1da9bbde104cbdab9bbce9b9e8298d3"
+  },
+  "SpaceTraders.API/GlobalUsings.cs": {
+    "mtime": 1777365439.3169315,
+    "ast_hash": "2d7ef3e7bdb396e3398c7a73235bc0a7",
+    "semantic_hash": "2d7ef3e7bdb396e3398c7a73235bc0a7"
+  },
+  "SpaceTraders.API/Hubs/DashboardHub.cs": {
+    "mtime": 1777642792.6982846,
+    "ast_hash": "dd6c40b2afc1d8f55ada667a6ebc1a9a",
+    "semantic_hash": "dd6c40b2afc1d8f55ada667a6ebc1a9a"
+  },
+  "SpaceTraders.API/Hubs/DashboardNotifier.cs": {
+    "mtime": 1777642792.6982846,
+    "ast_hash": "b79a21825760f7974a2af49e1c44dfa6",
+    "semantic_hash": "b79a21825760f7974a2af49e1c44dfa6"
+  },
+  "SpaceTraders.API/Middleware/ApiKeyMiddleware.cs": {
+    "mtime": 1777365439.3549068,
+    "ast_hash": "a4af8562eba2af3deda0e7c290b8273b",
+    "semantic_hash": "a4af8562eba2af3deda0e7c290b8273b"
+  },
+  "SpaceTraders.API/Program.cs": {
+    "mtime": 1778766839.1127646,
+    "ast_hash": "d26997961df28728af64f0830b7edb7b",
+    "semantic_hash": "d26997961df28728af64f0830b7edb7b"
+  },
+  "SpaceTraders.API/Properties/launchSettings.json": {
+    "mtime": 1777365439.4316065,
+    "ast_hash": "ad84b12ed4930e73d51e6ed54c3b6ba1",
+    "semantic_hash": "ad84b12ed4930e73d51e6ed54c3b6ba1"
+  },
+  "SpaceTraders.API/Services/AgentBootstrapService.cs": {
+    "mtime": 1777673801.7609997,
+    "ast_hash": "6f6acb6bb3086224459e2ea0b1cfb174",
+    "semantic_hash": "6f6acb6bb3086224459e2ea0b1cfb174"
+  },
+  "SpaceTraders.API/Services/DeferredStartupHostedService.cs": {
+    "mtime": 1778966113.041245,
+    "ast_hash": "377e37a6e9fbad5fac7db5ebaf17ef55",
+    "semantic_hash": "377e37a6e9fbad5fac7db5ebaf17ef55"
+  },
+  "SpaceTraders.API/Services/PrometheusMetricsService.cs": {
+    "mtime": 1777365439.5088978,
+    "ast_hash": "4b79e72bcfddb15ed2d551b1e8ac55af",
+    "semantic_hash": "4b79e72bcfddb15ed2d551b1e8ac55af"
+  },
+  "SpaceTraders.API/Services/RunLifecycleService.cs": {
+    "mtime": 1777642792.6992836,
+    "ast_hash": "1e5a5e5bd244e84406039882658272f6",
+    "semantic_hash": "1e5a5e5bd244e84406039882658272f6"
+  },
+  "SpaceTraders.API/Services/SettingsSnapshotLogger.cs": {
+    "mtime": 1777365439.5479634,
+    "ast_hash": "8ad291433ea9f31f8373fcea80f3fa77",
+    "semantic_hash": "8ad291433ea9f31f8373fcea80f3fa77"
+  },
+  "SpaceTraders.API/Services/SettingsStartupLoggingService.cs": {
+    "mtime": 1777365439.5862744,
+    "ast_hash": "b69fb9d561d3c4790cc913a60bae7122",
+    "semantic_hash": "b69fb9d561d3c4790cc913a60bae7122"
+  },
+  "SpaceTraders.API/Services/StartupInitializationHealthCheck.cs": {
+    "mtime": 1777672217.544555,
+    "ast_hash": "c0a520e31a50ac5fcfcddbefab682d61",
+    "semantic_hash": "c0a520e31a50ac5fcfcddbefab682d61"
+  },
+  "SpaceTraders.API/Services/StartupInitializationState.cs": {
+    "mtime": 1777668492.8796644,
+    "ast_hash": "9f2fe49e937160fd7cd25c67875749de",
+    "semantic_hash": "9f2fe49e937160fd7cd25c67875749de"
+  },
+  "SpaceTraders.API/Services/StartupRecoveryService.cs": {
+    "mtime": 1777915822.579085,
+    "ast_hash": "7a6455d67e5effd5d89125afc77317f0",
+    "semantic_hash": "7a6455d67e5effd5d89125afc77317f0"
+  },
+  "SpaceTraders.API/Services/StartupSnapshotService.cs": {
+    "mtime": 1777674929.3517025,
+    "ast_hash": "27ebdda9e995d5c994b313cae3491385",
+    "semantic_hash": "27ebdda9e995d5c994b313cae3491385"
+  },
+  "SpaceTraders.API/Services/StartupSyncService.cs": {
+    "mtime": 1778762222.1263232,
+    "ast_hash": "6523af958c1b99f63fa6ac3689f6be15",
+    "semantic_hash": "6523af958c1b99f63fa6ac3689f6be15"
+  },
+  "SpaceTraders.API/SpaceTraders.API.csproj": {
+    "mtime": 1777916146.8907719,
+    "ast_hash": "7ce93fb5e89bc4778f0c7c465b6b11aa",
+    "semantic_hash": "7ce93fb5e89bc4778f0c7c465b6b11aa"
+  },
+  "SpaceTraders.API/appsettings.Development.json": {
+    "mtime": 1777365439.743493,
+    "ast_hash": "f85a827bfe25f58eba7824ed5e489db9",
+    "semantic_hash": "f85a827bfe25f58eba7824ed5e489db9"
+  },
+  "SpaceTraders.API/appsettings.json": {
+    "mtime": 1777642792.701284,
+    "ast_hash": "f831346b26fd69754b7bce2b81ace083",
+    "semantic_hash": "f831346b26fd69754b7bce2b81ace083"
+  },
+  "SpaceTraders.API/packages.lock.json": {
+    "mtime": 1777754048.596453,
+    "ast_hash": "52a4915ba8ffec3acf8bd9653f1b9430",
+    "semantic_hash": "52a4915ba8ffec3acf8bd9653f1b9430"
+  },
+  "SpaceTraders.Analyzers/SpaceTraders.Analyzers.csproj": {
+    "mtime": 1777365883.2495286,
+    "ast_hash": "c5e723fe51bb3e11f1fb4bc375127fa3",
+    "semantic_hash": "c5e723fe51bb3e11f1fb4bc375127fa3"
+  },
+  "SpaceTraders.Analyzers/StateTransitionEventOutsideCommandHandlerAnalyzer.cs": {
+    "mtime": 1777754048.5969572,
+    "ast_hash": "9625170946647a2c92d64ac91bc150a6",
+    "semantic_hash": "9625170946647a2c92d64ac91bc150a6"
+  },
+  "SpaceTraders.Analyzers/packages.lock.json": {
+    "mtime": 1777374746.9851587,
+    "ast_hash": "aefdf1286583dc8bd5b3cd5c0176cde4",
+    "semantic_hash": "aefdf1286583dc8bd5b3cd5c0176cde4"
+  },
+  "SpaceTraders.Application/Automation/ActivityLogPruningService.cs": {
+    "mtime": 1777365444.0878925,
+    "ast_hash": "d825e0a91fb54d43d48b07f518b54c58",
+    "semantic_hash": "d825e0a91fb54d43d48b07f518b54c58"
+  },
+  "SpaceTraders.Application/Automation/ContractMineralPlanState.cs": {
+    "mtime": 1778758558.4757586,
+    "ast_hash": "9d3b87138cf144af17406e510ddc37d9",
+    "semantic_hash": "9d3b87138cf144af17406e510ddc37d9"
+  },
+  "SpaceTraders.Application/Automation/ContractPlanService.cs": {
+    "mtime": 1779015742.858435,
+    "ast_hash": "2ff6967e608429dbe018d11ebca51072",
+    "semantic_hash": "2ff6967e608429dbe018d11ebca51072"
+  },
+  "SpaceTraders.Application/Automation/DataRetentionService.cs": {
+    "mtime": 1777642792.7032852,
+    "ast_hash": "d737ba74e226b50c800624c0d8f9ec5a",
+    "semantic_hash": "d737ba74e226b50c800624c0d8f9ec5a"
+  },
+  "SpaceTraders.Application/Automation/GameLoopService.cs": {
+    "mtime": 1778852806.3638651,
+    "ast_hash": "3402bfe8dcce5ae6b44c02831a904039",
+    "semantic_hash": "3402bfe8dcce5ae6b44c02831a904039"
+  },
+  "SpaceTraders.Application/Automation/LeaderElectionService.cs": {
+    "mtime": 1777365444.203457,
+    "ast_hash": "b6b2273f58fbe2b595997400972542a0",
+    "semantic_hash": "b6b2273f58fbe2b595997400972542a0"
+  },
+  "SpaceTraders.Application/Automation/MarketAutomationPlanState.cs": {
+    "mtime": 1778837215.0315752,
+    "ast_hash": "6b2c70574effc8580a7b886b8065133e",
+    "semantic_hash": "6b2c70574effc8580a7b886b8065133e"
+  },
+  "SpaceTraders.Application/Automation/MarketplaceRoutePlanner.cs": {
+    "mtime": 1777910294.0269759,
+    "ast_hash": "5247aeac01512d7ec93c616f08a30b9c",
+    "semantic_hash": "5247aeac01512d7ec93c616f08a30b9c"
+  },
+  "SpaceTraders.Application/Automation/MiningAutomationService.cs": {
+    "mtime": 1779023001.1337628,
+    "ast_hash": "32daf70e58c31c9c9a06ed3a50a167f8",
+    "semantic_hash": "32daf70e58c31c9c9a06ed3a50a167f8"
+  },
+  "SpaceTraders.Application/Automation/ProbeDeploymentPlanService.cs": {
+    "mtime": 1779013429.087446,
+    "ast_hash": "7ca32eedb910f2bd378e4dccc938989f",
+    "semantic_hash": "7ca32eedb910f2bd378e4dccc938989f"
+  },
+  "SpaceTraders.Application/Automation/ProbeDeploymentPlanState.cs": {
+    "mtime": 1778840301.4977171,
+    "ast_hash": "4fa787ca7309d24c26da0b8afafb1fb2",
+    "semantic_hash": "4fa787ca7309d24c26da0b8afafb1fb2"
+  },
+  "SpaceTraders.Application/Automation/ScoutAllMarketplacesPlanService.cs": {
+    "mtime": 1777976972.510436,
+    "ast_hash": "b9455309240bb14580fa8e3cde79f175",
+    "semantic_hash": "b9455309240bb14580fa8e3cde79f175"
+  },
+  "SpaceTraders.Application/Automation/ScoutAllMarketplacesPlanState.cs": {
+    "mtime": 1778837619.8925972,
+    "ast_hash": "0131c9a7a34f94fec46e595c9e761714",
+    "semantic_hash": "0131c9a7a34f94fec46e595c9e761714"
+  },
+  "SpaceTraders.Application/Automation/ScoutMarketplaceDiscoveryService.cs": {
+    "mtime": 1777910020.6847947,
+    "ast_hash": "779fd350cf8766777d44aaec61be819a",
+    "semantic_hash": "779fd350cf8766777d44aaec61be819a"
+  },
+  "SpaceTraders.Application/Automation/ScoutShipSelectionService.cs": {
+    "mtime": 1777909814.724594,
+    "ast_hash": "b5bd72cd07cda42e87e199b94e65ee8b",
+    "semantic_hash": "b5bd72cd07cda42e87e199b94e65ee8b"
+  },
+  "SpaceTraders.Application/Automation/TradingAutomationService.cs": {
+    "mtime": 1779021787.085256,
+    "ast_hash": "5fb776d6276bdb770aa693be06f4fe98",
+    "semantic_hash": "5fb776d6276bdb770aa693be06f4fe98"
+  },
+  "SpaceTraders.Application/Commands/Contracts/FulfillContractDeliveryCommand.cs": {
+    "mtime": 1778759727.428594,
+    "ast_hash": "413de8781958c4119af550d970a77f96",
+    "semantic_hash": "413de8781958c4119af550d970a77f96"
+  },
+  "SpaceTraders.Application/Commands/Fleet/PurchaseShipCommand.cs": {
+    "mtime": 1779012716.5818799,
+    "ast_hash": "50585ce7afe8121fa37f6206a881f7d9",
+    "semantic_hash": "50585ce7afe8121fa37f6206a881f7d9"
+  },
+  "SpaceTraders.Application/Commands/Ships/DeployProbeCommand.cs": {
+    "mtime": 1778774440.2747428,
+    "ast_hash": "a33f1420c109246174e0ca838f758a45",
+    "semantic_hash": "a33f1420c109246174e0ca838f758a45"
+  },
+  "SpaceTraders.Application/Commands/Ships/MineResourceVolumeCommand.cs": {
+    "mtime": 1779019563.0526342,
+    "ast_hash": "3eb2fb539b62c448d03622d86047f484",
+    "semantic_hash": "3eb2fb539b62c448d03622d86047f484"
+  },
+  "SpaceTraders.Application/Commands/Ships/NavigateToWaypointCommand.cs": {
+    "mtime": 1778835063.2009747,
+    "ast_hash": "4fbacf580fa2dfc539ce1e3f1fd63099",
+    "semantic_hash": "4fbacf580fa2dfc539ce1e3f1fd63099"
+  },
+  "SpaceTraders.Application/Commands/Ships/PatchShipNavCommand.cs": {
+    "mtime": 1778774418.9998915,
+    "ast_hash": "fa7694e444b3ce727cb089c69b170a36",
+    "semantic_hash": "fa7694e444b3ce727cb089c69b170a36"
+  },
+  "SpaceTraders.Application/Commands/Ships/ShipCommandResult.cs": {
+    "mtime": 1777572435.736375,
+    "ast_hash": "438db319ebf6e3239426c43e7c2328bc",
+    "semantic_hash": "438db319ebf6e3239426c43e7c2328bc"
+  },
+  "SpaceTraders.Application/Commands/Ships/ShipStateMismatchPublisher.cs": {
+    "mtime": 1777756458.8586297,
+    "ast_hash": "6d370508d8980c2fd68c8713ff08948c",
+    "semantic_hash": "6d370508d8980c2fd68c8713ff08948c"
+  },
+  "SpaceTraders.Application/Commands/Ships/SubCommands/IDockSubCommand.cs": {
+    "mtime": 1778754183.3478425,
+    "ast_hash": "13b93117bbbe79f84f932274a372b765",
+    "semantic_hash": "13b93117bbbe79f84f932274a372b765"
+  },
+  "SpaceTraders.Application/Commands/Ships/SubCommands/INavigateSubCommand.cs": {
+    "mtime": 1778764326.3593693,
+    "ast_hash": "d2562fce0346a158c2f9d3b16bdcdb8f",
+    "semantic_hash": "d2562fce0346a158c2f9d3b16bdcdb8f"
+  },
+  "SpaceTraders.Application/Commands/Ships/SubCommands/IOrbitSubCommand.cs": {
+    "mtime": 1778854110.4452152,
+    "ast_hash": "1506f021efecfd50b89b63502db08b8b",
+    "semantic_hash": "1506f021efecfd50b89b63502db08b8b"
+  },
+  "SpaceTraders.Application/Commands/Ships/SubCommands/IRefuelSubCommand.cs": {
+    "mtime": 1777922101.1811502,
+    "ast_hash": "97056bf435dba17dd36996c2618cae05",
+    "semantic_hash": "97056bf435dba17dd36996c2618cae05"
+  },
+  "SpaceTraders.Application/DTOs/ApplicationDtos.cs": {
+    "mtime": 1779014803.2381644,
+    "ast_hash": "6c2612aa763f9bafeb36739ff8dca086",
+    "semantic_hash": "6c2612aa763f9bafeb36739ff8dca086"
+  },
+  "SpaceTraders.Application/DependencyInjection.cs": {
+    "mtime": 1779012268.6681108,
+    "ast_hash": "ae8beaa3eb2e8bddd1a20f1c244c0e67",
+    "semantic_hash": "ae8beaa3eb2e8bddd1a20f1c244c0e67"
+  },
+  "SpaceTraders.Application/EventHandlers/AgentCreditsSampleHandler.cs": {
+    "mtime": 1777642792.7204628,
+    "ast_hash": "6918de834b75708002f11e07329bf295",
+    "semantic_hash": "6918de834b75708002f11e07329bf295"
+  },
+  "SpaceTraders.Application/EventHandlers/AlertHandler.cs": {
+    "mtime": 1777482911.950651,
+    "ast_hash": "8c2d5bed6f4978ae76815a77e3c31edc",
+    "semantic_hash": "8c2d5bed6f4978ae76815a77e3c31edc"
+  },
+  "SpaceTraders.Application/EventHandlers/CreditHistoryHandler.cs": {
+    "mtime": 1777365445.1823952,
+    "ast_hash": "5177c4c1a22901db59b3d1af9b6497e3",
+    "semantic_hash": "5177c4c1a22901db59b3d1af9b6497e3"
+  },
+  "SpaceTraders.Application/EventHandlers/LedgerEntryHandler.cs": {
+    "mtime": 1777642792.7204628,
+    "ast_hash": "03d6430ac4a3ae8b7092a8b3f587c815",
+    "semantic_hash": "03d6430ac4a3ae8b7092a8b3f587c815"
+  },
+  "SpaceTraders.Application/EventHandlers/LogActivityHandler.cs": {
+    "mtime": 1777754048.606486,
+    "ast_hash": "f1e325a7fa39eae24a22e16404c02c2d",
+    "semantic_hash": "f1e325a7fa39eae24a22e16404c02c2d"
+  },
+  "SpaceTraders.Application/EventHandlers/MarketPriceSampleHandler.cs": {
+    "mtime": 1777642792.7204628,
+    "ast_hash": "465b908f55d25c1ec9d7b987ead0ca38",
+    "semantic_hash": "465b908f55d25c1ec9d7b987ead0ca38"
+  },
+  "SpaceTraders.Application/EventHandlers/ProbeDeploymentCreditsChangedHandler.cs": {
+    "mtime": 1778840307.7330575,
+    "ast_hash": "6731b820765d763d3285a1aa7501e865",
+    "semantic_hash": "6731b820765d763d3285a1aa7501e865"
+  },
+  "SpaceTraders.Application/EventHandlers/ShipTaskRecordHandler.cs": {
+    "mtime": 1777642792.7204628,
+    "ast_hash": "f0674b99f33602367c5f39d4fb98a64a",
+    "semantic_hash": "f0674b99f33602367c5f39d4fb98a64a"
+  },
+  "SpaceTraders.Application/EventHandlers/WolverineRetryLoggingMiddleware.cs": {
+    "mtime": 1777507131.8916414,
+    "ast_hash": "648f5322370d5a2c04f46da50b21d6eb",
+    "semantic_hash": "648f5322370d5a2c04f46da50b21d6eb"
+  },
+  "SpaceTraders.Application/Events/Handlers/Ships/ShipArrivedEventHandler.cs": {
+    "mtime": 1777922171.2339268,
+    "ast_hash": "90a4c66f27db047db958cb1d43eb819d",
+    "semantic_hash": "90a4c66f27db047db958cb1d43eb819d"
+  },
+  "SpaceTraders.Application/Events/Handlers/Ships/ShipInTransitEventHandler.cs": {
+    "mtime": 1778754183.0452816,
+    "ast_hash": "5592e3e64ed00787a2d5bf7a161dd3c3",
+    "semantic_hash": "5592e3e64ed00787a2d5bf7a161dd3c3"
+  },
+  "SpaceTraders.Application/Events/Handlers/Ships/ShipNavigationCompletedHandler.cs": {
+    "mtime": 1778754183.7298477,
+    "ast_hash": "c5a222439a9b9c56430be0220db2851c",
+    "semantic_hash": "c5a222439a9b9c56430be0220db2851c"
+  },
+  "SpaceTraders.Application/GlobalUsings.cs": {
+    "mtime": 1777365446.3277926,
+    "ast_hash": "99923928bd017acaa4a7914eded609a7",
+    "semantic_hash": "99923928bd017acaa4a7914eded609a7"
+  },
+  "SpaceTraders.Application/Goals/Executors/DeployProbeGoalExecutor.cs": {
+    "mtime": 1778773766.7149465,
+    "ast_hash": "8ab7772583b00d9428ab72fee409e56c",
+    "semantic_hash": "8ab7772583b00d9428ab72fee409e56c"
+  },
+  "SpaceTraders.Application/Goals/Executors/IdleGoalExecutor.cs": {
+    "mtime": 1777754048.6104922,
+    "ast_hash": "082dac77514f25cdfefed3208b1b04b4",
+    "semantic_hash": "082dac77514f25cdfefed3208b1b04b4"
+  },
+  "SpaceTraders.Application/Goals/Executors/MineAndSellGoalExecutor.cs": {
+    "mtime": 1779020113.0137122,
+    "ast_hash": "9771ee945916be2be581d3e0e34840fb",
+    "semantic_hash": "9771ee945916be2be581d3e0e34840fb"
+  },
+  "SpaceTraders.Application/Goals/Executors/ScoutWaypointGoalExecutor.cs": {
+    "mtime": 1777978621.5166974,
+    "ast_hash": "0c16f59815468ebb4a16e27d1c4366d4",
+    "semantic_hash": "0c16f59815468ebb4a16e27d1c4366d4"
+  },
+  "SpaceTraders.Application/Goals/Executors/SurveyWaypointGoalExecutor.cs": {
+    "mtime": 1778864863.9703088,
+    "ast_hash": "6847713d125e8da52b4c1713f315f6d8",
+    "semantic_hash": "6847713d125e8da52b4c1713f315f6d8"
+  },
+  "SpaceTraders.Application/Goals/Executors/TradeBetweenMarketsGoalExecutor.cs": {
+    "mtime": 1778864199.105512,
+    "ast_hash": "a58a7acdba0cb8cce58d8a7f7bc9b27e",
+    "semantic_hash": "a58a7acdba0cb8cce58d8a7f7bc9b27e"
+  },
+  "SpaceTraders.Application/Goals/GoalExecutionResult.cs": {
+    "mtime": 1777754048.6124914,
+    "ast_hash": "980ba4e070c7e03808414fdfddd585a1",
+    "semantic_hash": "980ba4e070c7e03808414fdfddd585a1"
+  },
+  "SpaceTraders.Application/Goals/IShipGoalExecutor.cs": {
+    "mtime": 1777754048.6134918,
+    "ast_hash": "aa10452b1541eed745a89744c6bb0ca0",
+    "semantic_hash": "aa10452b1541eed745a89744c6bb0ca0"
+  },
+  "SpaceTraders.Application/Goals/ShipGoalContext.cs": {
+    "mtime": 1777914425.0959098,
+    "ast_hash": "e43d33499c7ac8c0185b42476c22d239",
+    "semantic_hash": "e43d33499c7ac8c0185b42476c22d239"
+  },
+  "SpaceTraders.Application/Goals/ShipGoalExecutorService.cs": {
+    "mtime": 1778865049.6383195,
+    "ast_hash": "00f6a8a595dab770967097e70babac01",
+    "semantic_hash": "00f6a8a595dab770967097e70babac01"
+  },
+  "SpaceTraders.Application/Interfaces/IActiveRunIdProvider.cs": {
+    "mtime": 1777642792.7204628,
+    "ast_hash": "77f0edb203fb8fddba2f8f178f4528db",
+    "semantic_hash": "77f0edb203fb8fddba2f8f178f4528db"
+  },
+  "SpaceTraders.Application/Interfaces/IAlertNotifier.cs": {
+    "mtime": 1777365446.3685381,
+    "ast_hash": "93b074b1ccddec068f060d2b783102e5",
+    "semantic_hash": "93b074b1ccddec068f060d2b783102e5"
+  },
+  "SpaceTraders.Application/Interfaces/IApiAvailabilityState.cs": {
+    "mtime": 1777365446.4100826,
+    "ast_hash": "f75b1ee0bdb8f638c7ceaf2e4a1540c0",
+    "semantic_hash": "f75b1ee0bdb8f638c7ceaf2e4a1540c0"
+  },
+  "SpaceTraders.Application/Interfaces/IApiEndpointUsageRecorder.cs": {
+    "mtime": 1777667503.001559,
+    "ast_hash": "60da9b0375656473b474882b429583e9",
+    "semantic_hash": "60da9b0375656473b474882b429583e9"
+  },
+  "SpaceTraders.Application/Interfaces/ICreditHistoryService.cs": {
+    "mtime": 1777365446.498803,
+    "ast_hash": "093dd5b2511425048ffaf1281a1157fb",
+    "semantic_hash": "093dd5b2511425048ffaf1281a1157fb"
+  },
+  "SpaceTraders.Application/Interfaces/IDashboardNotifier.cs": {
+    "mtime": 1777642792.7247243,
+    "ast_hash": "ef73747c3d6647a7c7c87304e27028ff",
+    "semantic_hash": "ef73747c3d6647a7c7c87304e27028ff"
+  },
+  "SpaceTraders.Application/Interfaces/IFleetStatusQueryService.cs": {
+    "mtime": 1777754048.6154916,
+    "ast_hash": "645a529fe7d546379e9105f8361e01aa",
+    "semantic_hash": "645a529fe7d546379e9105f8361e01aa"
+  },
+  "SpaceTraders.Application/Interfaces/ILeaderElection.cs": {
+    "mtime": 1777365446.5368536,
+    "ast_hash": "2ae339e2ef1332c4971dcccc6997cc4a",
+    "semantic_hash": "2ae339e2ef1332c4971dcccc6997cc4a"
+  },
+  "SpaceTraders.Application/Interfaces/IRateLimitStatus.cs": {
+    "mtime": 1777365446.5755088,
+    "ast_hash": "612ed52855a7e42639397dcdeafef34d",
+    "semantic_hash": "612ed52855a7e42639397dcdeafef34d"
+  },
+  "SpaceTraders.Application/Interfaces/IRunLifecycleManager.cs": {
+    "mtime": 1777642792.7247243,
+    "ast_hash": "f1d7169b6398e6e556bc83d13adefe5b",
+    "semantic_hash": "f1d7169b6398e6e556bc83d13adefe5b"
+  },
+  "SpaceTraders.Application/Interfaces/IShipCapabilityRegistry.cs": {
+    "mtime": 1778844384.2331426,
+    "ast_hash": "47d4fd7edb6d2e185fc5a582ecdbe2fb",
+    "semantic_hash": "47d4fd7edb6d2e185fc5a582ecdbe2fb"
+  },
+  "SpaceTraders.Application/Interfaces/IShipEventScheduler.cs": {
+    "mtime": 1777754048.6159954,
+    "ast_hash": "a311c5108b828bb2218e8c2f45065bfc",
+    "semantic_hash": "a311c5108b828bb2218e8c2f45065bfc"
+  },
+  "SpaceTraders.Application/Interfaces/ITradeAnalyser.cs": {
+    "mtime": 1777472476.2121873,
+    "ast_hash": "00f715f50e7960a2ed38308b615cd0c9",
+    "semantic_hash": "00f715f50e7960a2ed38308b615cd0c9"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IActivityLogRepository.cs": {
+    "mtime": 1777365446.654826,
+    "ast_hash": "e610d2b36122e007c3b1787e006ac746",
+    "semantic_hash": "e610d2b36122e007c3b1787e006ac746"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IAgentCreditsSampleRepository.cs": {
+    "mtime": 1777642792.7252557,
+    "ast_hash": "a9792746ccd6317b4c511c0ec411a465",
+    "semantic_hash": "a9792746ccd6317b4c511c0ec411a465"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IAgentRepository.cs": {
+    "mtime": 1777365446.6944983,
+    "ast_hash": "d51991c52d97eb901d58553022e5fac4",
+    "semantic_hash": "d51991c52d97eb901d58553022e5fac4"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IConstructionRepository.cs": {
+    "mtime": 1777487147.5909867,
+    "ast_hash": "00994a9af9746064a6bc7f32333a5176",
+    "semantic_hash": "00994a9af9746064a6bc7f32333a5176"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IContractMineralPlanRepository.cs": {
+    "mtime": 1778758564.4904532,
+    "ast_hash": "704cf841493bb7c60095ebf237e8376c",
+    "semantic_hash": "704cf841493bb7c60095ebf237e8376c"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IContractRepository.cs": {
+    "mtime": 1777365446.7336566,
+    "ast_hash": "5def9b1749cf6e0e8820931d68a2ac5b",
+    "semantic_hash": "5def9b1749cf6e0e8820931d68a2ac5b"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IFleetGoalRepository.cs": {
+    "mtime": 1777754048.6165056,
+    "ast_hash": "4ec5dbb2117faf402853b32af4b740ac",
+    "semantic_hash": "4ec5dbb2117faf402853b32af4b740ac"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ILeaderLeaseRepository.cs": {
+    "mtime": 1777365446.7737048,
+    "ast_hash": "90545af30ac33301cfd5a1d4ace76f6b",
+    "semantic_hash": "90545af30ac33301cfd5a1d4ace76f6b"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ILedgerRepository.cs": {
+    "mtime": 1779014803.1608615,
+    "ast_hash": "89c5fc934017a049a78aae5a22545138",
+    "semantic_hash": "89c5fc934017a049a78aae5a22545138"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IMarketPriceSampleRepository.cs": {
+    "mtime": 1777642792.7252557,
+    "ast_hash": "d4103f6ff44ac28b846b44adb785034a",
+    "semantic_hash": "d4103f6ff44ac28b846b44adb785034a"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IMarketRepository.cs": {
+    "mtime": 1777667503.0030675,
+    "ast_hash": "14be7b5abd69c623d1737046f0a80623",
+    "semantic_hash": "14be7b5abd69c623d1737046f0a80623"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IPlanRepository.cs": {
+    "mtime": 1777909477.4037166,
+    "ast_hash": "40ac88cd693522e57f45961549f16190",
+    "semantic_hash": "40ac88cd693522e57f45961549f16190"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IProbeDeploymentPlanRepository.cs": {
+    "mtime": 1778771773.1861782,
+    "ast_hash": "e1751255dda4b3578742acd3b46c35b5",
+    "semantic_hash": "e1751255dda4b3578742acd3b46c35b5"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IRunRepository.cs": {
+    "mtime": 1777642792.7252557,
+    "ast_hash": "b9d47ae7ad568e80fea2b47d9b186429",
+    "semantic_hash": "b9d47ae7ad568e80fea2b47d9b186429"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IScoutPlanRepository.cs": {
+    "mtime": 1777909113.7031002,
+    "ast_hash": "60e02136003e7df82b1440a687ec87f3",
+    "semantic_hash": "60e02136003e7df82b1440a687ec87f3"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ISettingsRepository.cs": {
+    "mtime": 1777667503.0030675,
+    "ast_hash": "3cc59de479dae0673653bc95238b777a",
+    "semantic_hash": "3cc59de479dae0673653bc95238b777a"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipAssignmentRepository.cs": {
+    "mtime": 1777384564.244106,
+    "ast_hash": "08bf094e673570174282a2bbac72c3f4",
+    "semantic_hash": "08bf094e673570174282a2bbac72c3f4"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipGoalHistoryRepository.cs": {
+    "mtime": 1777754048.6165056,
+    "ast_hash": "4840647da07f16c610d7e9a0ef59a51f",
+    "semantic_hash": "4840647da07f16c610d7e9a0ef59a51f"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipGoalRepository.cs": {
+    "mtime": 1778926439.9597127,
+    "ast_hash": "ea0256b143668fc88b3fbc7b1243c61a",
+    "semantic_hash": "ea0256b143668fc88b3fbc7b1243c61a"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipRepository.cs": {
+    "mtime": 1777754048.6165056,
+    "ast_hash": "cbc28e49a27c765b437d5f81e104e8ac",
+    "semantic_hash": "cbc28e49a27c765b437d5f81e104e8ac"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipTaskRecordRepository.cs": {
+    "mtime": 1777667503.0040727,
+    "ast_hash": "af08f6a6678a7f88da3f8fa2428f968b",
+    "semantic_hash": "af08f6a6678a7f88da3f8fa2428f968b"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IShipyardRepository.cs": {
+    "mtime": 1778754841.20364,
+    "ast_hash": "2af37a8e9abe598df38cc88e3ddabbea",
+    "semantic_hash": "2af37a8e9abe598df38cc88e3ddabbea"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ISurveyRepository.cs": {
+    "mtime": 1777476817.2274616,
+    "ast_hash": "b06b6a8aceeab2e1020be832cba7a491",
+    "semantic_hash": "b06b6a8aceeab2e1020be832cba7a491"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ISystemRepository.cs": {
+    "mtime": 1777642792.7279413,
+    "ast_hash": "719fe5d929bf8dcc047a6127c8753f9b",
+    "semantic_hash": "719fe5d929bf8dcc047a6127c8753f9b"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/ITradeOpportunityRepository.cs": {
+    "mtime": 1777365447.0583327,
+    "ast_hash": "4a2711dfc518a9560250d3ddd0a1bd00",
+    "semantic_hash": "4a2711dfc518a9560250d3ddd0a1bd00"
+  },
+  "SpaceTraders.Application/Interfaces/Repositories/IWaypointRepository.cs": {
+    "mtime": 1777667503.0040727,
+    "ast_hash": "82853a454a092501218531247f1fc181",
+    "semantic_hash": "82853a454a092501218531247f1fc181"
+  },
+  "SpaceTraders.Application/Orchestration/BudgetPolicy.cs": {
+    "mtime": 1777800598.5753267,
+    "ast_hash": "075972f2e05dcc001bc064b1453720a7",
+    "semantic_hash": "075972f2e05dcc001bc064b1453720a7"
+  },
+  "SpaceTraders.Application/Orchestration/FleetCapacityEstimator.cs": {
+    "mtime": 1777754048.6180165,
+    "ast_hash": "ebceb3366f3a317e5f1c63e68aab1547",
+    "semantic_hash": "ebceb3366f3a317e5f1c63e68aab1547"
+  },
+  "SpaceTraders.Application/Orchestration/ObservabilityModels.cs": {
+    "mtime": 1777754048.6200223,
+    "ast_hash": "22aa71708735365312a015a861cf0f43",
+    "semantic_hash": "22aa71708735365312a015a861cf0f43"
+  },
+  "SpaceTraders.Application/Orchestration/OrchestrationModels.cs": {
+    "mtime": 1777800580.06597,
+    "ast_hash": "05cb288d9fc4e61325e8c955e65344c2",
+    "semantic_hash": "05cb288d9fc4e61325e8c955e65344c2"
+  },
+  "SpaceTraders.Application/Ports/ApiPortModels.cs": {
+    "mtime": 1778922576.0355217,
+    "ast_hash": "fbdc0bd7592cd0438382e1e0448b557e",
+    "semantic_hash": "fbdc0bd7592cd0438382e1e0448b557e"
+  },
+  "SpaceTraders.Application/Ports/ISpaceTradersPort.cs": {
+    "mtime": 1777489471.9107318,
+    "ast_hash": "1246a13ff4019548bb970211140e69c5",
+    "semantic_hash": "1246a13ff4019548bb970211140e69c5"
+  },
+  "SpaceTraders.Application/Ports/RunPorts.cs": {
+    "mtime": 1777642792.730791,
+    "ast_hash": "d26d2c47fbd99a87fc91d050d6d88414",
+    "semantic_hash": "d26d2c47fbd99a87fc91d050d6d88414"
+  },
+  "SpaceTraders.Application/Queries/QueryHandlers.cs": {
+    "mtime": 1778763009.7052116,
+    "ast_hash": "b3908aac66e593d5a0cafc86b2d5d198",
+    "semantic_hash": "b3908aac66e593d5a0cafc86b2d5d198"
+  },
+  "SpaceTraders.Application/Services/ActiveRunIdProvider.cs": {
+    "mtime": 1777642792.7348473,
+    "ast_hash": "d46ebcbadbbff569dc80f686bb1137d4",
+    "semantic_hash": "d46ebcbadbbff569dc80f686bb1137d4"
+  },
+  "SpaceTraders.Application/Services/CachingFleetStatusQueryService.cs": {
+    "mtime": 1777754048.622022,
+    "ast_hash": "cdb3693391bac2d845a10138e3abf4a4",
+    "semantic_hash": "cdb3693391bac2d845a10138e3abf4a4"
+  },
+  "SpaceTraders.Application/Services/CreditHistoryService.cs": {
+    "mtime": 1777365447.249145,
+    "ast_hash": "c463b04ca83d55b76d2d780befb7d1f4",
+    "semantic_hash": "c463b04ca83d55b76d2d780befb7d1f4"
+  },
+  "SpaceTraders.Application/Services/FleetMaintenancePlanner.cs": {
+    "mtime": 1777480137.747495,
+    "ast_hash": "675fb2e806669d3a6caca71bf93a00f7",
+    "semantic_hash": "675fb2e806669d3a6caca71bf93a00f7"
+  },
+  "SpaceTraders.Application/Services/FleetStatusQueryService.cs": {
+    "mtime": 1779014803.2873375,
+    "ast_hash": "62d7765c08b7f141b7bc8ec995e6ef03",
+    "semantic_hash": "62d7765c08b7f141b7bc8ec995e6ef03"
+  },
+  "SpaceTraders.Application/Services/IShipPurchaseService.cs": {
+    "mtime": 1779012247.4061463,
+    "ast_hash": "8bfbae8f3b5475b9c460ebc0d79c3186",
+    "semantic_hash": "8bfbae8f3b5475b9c460ebc0d79c3186"
+  },
+  "SpaceTraders.Application/Services/IWaypointVisitService.cs": {
+    "mtime": 1777365447.3645177,
+    "ast_hash": "1ad41aca8a3d3e295aaeabe62a7835ba",
+    "semantic_hash": "1ad41aca8a3d3e295aaeabe62a7835ba"
+  },
+  "SpaceTraders.Application/Services/JumpGateCacheService.cs": {
+    "mtime": 1777475800.953488,
+    "ast_hash": "1ba79cb37a5a298781ee811a53e76b43",
+    "semantic_hash": "1ba79cb37a5a298781ee811a53e76b43"
+  },
+  "SpaceTraders.Application/Services/NavigationPlanningService.cs": {
+    "mtime": 1777474191.7265253,
+    "ast_hash": "c7bcb90869347fb4d80503ffd135cb38",
+    "semantic_hash": "c7bcb90869347fb4d80503ffd135cb38"
+  },
+  "SpaceTraders.Application/Services/ShipCapabilityRegistry.cs": {
+    "mtime": 1778844384.2352247,
+    "ast_hash": "e3c0cbbe6923556a4e1c2268f794e1c0",
+    "semantic_hash": "e3c0cbbe6923556a4e1c2268f794e1c0"
+  },
+  "SpaceTraders.Application/Services/ShipPurchaseService.cs": {
+    "mtime": 1779012441.0497236,
+    "ast_hash": "9362037778b2195c9ff7c82d61d5defc",
+    "semantic_hash": "9362037778b2195c9ff7c82d61d5defc"
+  },
+  "SpaceTraders.Application/Services/StubFleetStatusQueryService.cs": {
+    "mtime": 1777754048.6230216,
+    "ast_hash": "f855c7305d55b54fbf3df56f4ee01316",
+    "semantic_hash": "f855c7305d55b54fbf3df56f4ee01316"
+  },
+  "SpaceTraders.Application/Services/WaypointVisitService.cs": {
+    "mtime": 1777365447.5644069,
+    "ast_hash": "2f4037b5a8a5a3a2d8212fbf14b83ba2",
+    "semantic_hash": "2f4037b5a8a5a3a2d8212fbf14b83ba2"
+  },
+  "SpaceTraders.Application/SpaceTraders.Application.csproj": {
+    "mtime": 1778759820.0948014,
+    "ast_hash": "71e3f4ce328ede93ce526e3a8cb4bdba",
+    "semantic_hash": "71e3f4ce328ede93ce526e3a8cb4bdba"
+  },
+  "SpaceTraders.Application/packages.lock.json": {
+    "mtime": 1777374747.0551422,
+    "ast_hash": "bd3d5fd0f3deccdcb35cd2de4e83e5af",
+    "semantic_hash": "bd3d5fd0f3deccdcb35cd2de4e83e5af"
+  },
+  "SpaceTraders.Domain/Aggregates/Agent.cs": {
+    "mtime": 1777365447.774402,
+    "ast_hash": "73f912d4be9942f44ecbc13eb7536289",
+    "semantic_hash": "73f912d4be9942f44ecbc13eb7536289"
+  },
+  "SpaceTraders.Domain/Aggregates/Contract.cs": {
+    "mtime": 1777365447.814612,
+    "ast_hash": "43d501e41a3cda768a50f78d10ce7bdb",
+    "semantic_hash": "43d501e41a3cda768a50f78d10ce7bdb"
+  },
+  "SpaceTraders.Domain/Aggregates/Ship.cs": {
+    "mtime": 1777571659.5804195,
+    "ast_hash": "5d6e95305b179fec4af61daba660b2d6",
+    "semantic_hash": "5d6e95305b179fec4af61daba660b2d6"
+  },
+  "SpaceTraders.Domain/Aggregates/ShipAssignment.cs": {
+    "mtime": 1777365447.8967497,
+    "ast_hash": "1b1a67009f19dbf722d7972bffab8860",
+    "semantic_hash": "1b1a67009f19dbf722d7972bffab8860"
+  },
+  "SpaceTraders.Domain/Common/AggregateRoot.cs": {
+    "mtime": 1777365447.938317,
+    "ast_hash": "3d37b1c830a3509c3744ea2372276c50",
+    "semantic_hash": "3d37b1c830a3509c3744ea2372276c50"
+  },
+  "SpaceTraders.Domain/Enums/AssignmentType.cs": {
+    "mtime": 1777494783.032439,
+    "ast_hash": "cea4c7a2dfc4821f31d537ab003a16f3",
+    "semantic_hash": "cea4c7a2dfc4821f31d537ab003a16f3"
+  },
+  "SpaceTraders.Domain/Enums/ContractType.cs": {
+    "mtime": 1777365448.0225732,
+    "ast_hash": "d56c56c0d1f9dae8e453b79db15265e4",
+    "semantic_hash": "d56c56c0d1f9dae8e453b79db15265e4"
+  },
+  "SpaceTraders.Domain/Enums/FlightMode.cs": {
+    "mtime": 1777365448.0670896,
+    "ast_hash": "186aadab9d9f1d56f24e89a6243b4674",
+    "semantic_hash": "186aadab9d9f1d56f24e89a6243b4674"
+  },
+  "SpaceTraders.Domain/Enums/GoalStatus.cs": {
+    "mtime": 1777754048.6230216,
+    "ast_hash": "8c026a09c084d51689326d81ddc0606e",
+    "semantic_hash": "8c026a09c084d51689326d81ddc0606e"
+  },
+  "SpaceTraders.Domain/Enums/LedgerCategory.cs": {
+    "mtime": 1777642792.7348473,
+    "ast_hash": "d422dc0ac29c044ef112220144c37189",
+    "semantic_hash": "d422dc0ac29c044ef112220144c37189"
+  },
+  "SpaceTraders.Domain/Enums/ShipGoalKind.cs": {
+    "mtime": 1778864659.4196286,
+    "ast_hash": "ec268cf605595067ad14e2f82fa788cd",
+    "semantic_hash": "ec268cf605595067ad14e2f82fa788cd"
+  },
+  "SpaceTraders.Domain/Enums/ShipLocalStatus.cs": {
+    "mtime": 1777571450.5606325,
+    "ast_hash": "970bfdbaff49122819ab62fc12dcd9d1",
+    "semantic_hash": "970bfdbaff49122819ab62fc12dcd9d1"
+  },
+  "SpaceTraders.Domain/Enums/ShipLocalStatusMapper.cs": {
+    "mtime": 1777571492.0896547,
+    "ast_hash": "3046fa3d58189cbac1acb6c1737bf853",
+    "semantic_hash": "3046fa3d58189cbac1acb6c1737bf853"
+  },
+  "SpaceTraders.Domain/Enums/ShipRole.cs": {
+    "mtime": 1777494830.6371007,
+    "ast_hash": "76b4704c69b3ff34fb6fc91738ccf4a2",
+    "semantic_hash": "76b4704c69b3ff34fb6fc91738ccf4a2"
+  },
+  "SpaceTraders.Domain/Enums/ShipType.cs": {
+    "mtime": 1777365448.1848783,
+    "ast_hash": "4406eb14ccdf7302a3648c51776d7fb3",
+    "semantic_hash": "4406eb14ccdf7302a3648c51776d7fb3"
+  },
+  "SpaceTraders.Domain/Events/DomainEvents.cs": {
+    "mtime": 1778765473.6435902,
+    "ast_hash": "0838db4f9d201604d5c4e5698d1bae05",
+    "semantic_hash": "0838db4f9d201604d5c4e5698d1bae05"
+  },
+  "SpaceTraders.Domain/Events/Ships/ConstructionSuppliedEvent.cs": {
+    "mtime": 1777642792.7363284,
+    "ast_hash": "3ed3a43b7c61d12118a7792c0acbcdde",
+    "semantic_hash": "3ed3a43b7c61d12118a7792c0acbcdde"
+  },
+  "SpaceTraders.Domain/Events/Ships/GoalBlockedEvent.cs": {
+    "mtime": 1777754048.624022,
+    "ast_hash": "32b65accd6d55b8f76f6f91a5447b69d",
+    "semantic_hash": "32b65accd6d55b8f76f6f91a5447b69d"
+  },
+  "SpaceTraders.Domain/Events/Ships/GoalCompletedEvent.cs": {
+    "mtime": 1777754048.624022,
+    "ast_hash": "1b6f5f022d5ca72ec6b581634d234b81",
+    "semantic_hash": "1b6f5f022d5ca72ec6b581634d234b81"
+  },
+  "SpaceTraders.Domain/Events/Ships/ShipArrivedEvent.cs": {
+    "mtime": 1777754048.624022,
+    "ast_hash": "ca131bf3903b02f669948d0c7250e073",
+    "semantic_hash": "ca131bf3903b02f669948d0c7250e073"
+  },
+  "SpaceTraders.Domain/Events/Ships/ShipCooldownExpiredEvent.cs": {
+    "mtime": 1777754048.6250224,
+    "ast_hash": "02fcf99641ff96f3aa49e7230dc042ff",
+    "semantic_hash": "02fcf99641ff96f3aa49e7230dc042ff"
+  },
+  "SpaceTraders.Domain/Events/Ships/ShipInTransitEvent.cs": {
+    "mtime": 1777642792.739045,
+    "ast_hash": "e847bf31737a6480745d75790b53d20d",
+    "semantic_hash": "e847bf31737a6480745d75790b53d20d"
+  },
+  "SpaceTraders.Domain/Events/Ships/ShipStateMismatchEvent.cs": {
+    "mtime": 1777642792.739045,
+    "ast_hash": "8ad556e28aa485af1dc18c2a485b10f0",
+    "semantic_hash": "8ad556e28aa485af1dc18c2a485b10f0"
+  },
+  "SpaceTraders.Domain/GlobalUsings.cs": {
+    "mtime": 1777365448.8280735,
+    "ast_hash": "99923928bd017acaa4a7914eded609a7",
+    "semantic_hash": "99923928bd017acaa4a7914eded609a7"
+  },
+  "SpaceTraders.Domain/Goals/ShipGoal.cs": {
+    "mtime": 1778864784.23918,
+    "ast_hash": "614186ea19262539ed8f6a97121b8643",
+    "semantic_hash": "614186ea19262539ed8f6a97121b8643"
+  },
+  "SpaceTraders.Domain/MutableAttribute.cs": {
+    "mtime": 1777365448.8720005,
+    "ast_hash": "559fa1b061fcae938c65f0a99642888a",
+    "semantic_hash": "559fa1b061fcae938c65f0a99642888a"
+  },
+  "SpaceTraders.Domain/SpaceTraders.Domain.csproj": {
+    "mtime": 1777365448.914233,
+    "ast_hash": "cc98a009ae3986109fbc3561ddb03f06",
+    "semantic_hash": "cc98a009ae3986109fbc3561ddb03f06"
+  },
+  "SpaceTraders.Domain/ValueObjects/Cargo.cs": {
+    "mtime": 1777365448.961159,
+    "ast_hash": "9976d78eaed471db1985809af149027c",
+    "semantic_hash": "9976d78eaed471db1985809af149027c"
+  },
+  "SpaceTraders.Domain/ValueObjects/ContractTerms.cs": {
+    "mtime": 1777365449.0011492,
+    "ast_hash": "b6cddb8d324710fa449a178ea8dbadb6",
+    "semantic_hash": "b6cddb8d324710fa449a178ea8dbadb6"
+  },
+  "SpaceTraders.Domain/ValueObjects/Fuel.cs": {
+    "mtime": 1777365449.041401,
+    "ast_hash": "045f7e05e8defd1756d7ec4e7ae152fa",
+    "semantic_hash": "045f7e05e8defd1756d7ec4e7ae152fa"
+  },
+  "SpaceTraders.Domain/ValueObjects/SystemSymbol.cs": {
+    "mtime": 1777365449.0791855,
+    "ast_hash": "b5d771fa7313139df6a5555f3830e152",
+    "semantic_hash": "b5d771fa7313139df6a5555f3830e152"
+  },
+  "SpaceTraders.Domain/ValueObjects/TradeSymbol.cs": {
+    "mtime": 1777365449.1169422,
+    "ast_hash": "e27b6cf66fdccb7ffd4ab836ca377f4f",
+    "semantic_hash": "e27b6cf66fdccb7ffd4ab836ca377f4f"
+  },
+  "SpaceTraders.Domain/ValueObjects/WaypointSymbol.cs": {
+    "mtime": 1777365449.1541255,
+    "ast_hash": "6b65d1aa44fd5ace5187b99ec3839ab0",
+    "semantic_hash": "6b65d1aa44fd5ace5187b99ec3839ab0"
+  },
+  "SpaceTraders.Domain/packages.lock.json": {
+    "mtime": 1777374746.9756353,
+    "ast_hash": "fe2af7515004470df8d57749c8d90224",
+    "semantic_hash": "fe2af7515004470df8d57749c8d90224"
+  },
+  "SpaceTraders.Infrastructure.Persistence/AgentTokenSelection.cs": {
+    "mtime": 1777365449.191672,
+    "ast_hash": "664c9a8083fc65fa820b9ad4404e7231",
+    "semantic_hash": "664c9a8083fc65fa820b9ad4404e7231"
+  },
+  "SpaceTraders.Infrastructure.Persistence/DependencyInjection.cs": {
+    "mtime": 1778966109.9762058,
+    "ast_hash": "6bb5efab51f7c46f8e07145cebe6f0d7",
+    "semantic_hash": "6bb5efab51f7c46f8e07145cebe6f0d7"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ActivityLog.cs": {
+    "mtime": 1777365449.2676275,
+    "ast_hash": "1fb9b3cb5865c460cf332bd91b7f86cc",
+    "semantic_hash": "1fb9b3cb5865c460cf332bd91b7f86cc"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/AgentCreditsSample.cs": {
+    "mtime": 1777642792.7407897,
+    "ast_hash": "6de0343ea569a597cf2524e781486f5b",
+    "semantic_hash": "6de0343ea569a597cf2524e781486f5b"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/AgentSetting.cs": {
+    "mtime": 1777365449.305993,
+    "ast_hash": "82a1054d9150bf459f100ad9c5906195",
+    "semantic_hash": "82a1054d9150bf459f100ad9c5906195"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ApiEndpointUsage.cs": {
+    "mtime": 1777365449.3521247,
+    "ast_hash": "f3b890ac83f1bb92d3d23facb00e8586",
+    "semantic_hash": "f3b890ac83f1bb92d3d23facb00e8586"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedAgent.cs": {
+    "mtime": 1777365449.3938394,
+    "ast_hash": "137f479e0ff4f9001e41b16f950ed5c0",
+    "semantic_hash": "137f479e0ff4f9001e41b16f950ed5c0"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedConstruction.cs": {
+    "mtime": 1777487132.1631067,
+    "ast_hash": "bb3e5359b5b830e93a2f9fc5a3c7f6aa",
+    "semantic_hash": "bb3e5359b5b830e93a2f9fc5a3c7f6aa"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedContract.cs": {
+    "mtime": 1777470220.6903553,
+    "ast_hash": "aa0353464d5f8607c2c2497b1c31de7a",
+    "semantic_hash": "aa0353464d5f8607c2c2497b1c31de7a"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedMarket.cs": {
+    "mtime": 1777365449.4724684,
+    "ast_hash": "0e9d15183dcf207a468237243d832839",
+    "semantic_hash": "0e9d15183dcf207a468237243d832839"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedShip.cs": {
+    "mtime": 1777978091.6938534,
+    "ast_hash": "718ccc282cf79384341825fe94b721e9",
+    "semantic_hash": "718ccc282cf79384341825fe94b721e9"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedShipyard.cs": {
+    "mtime": 1777404549.332865,
+    "ast_hash": "2e0344796aa26306abff0d024022c96a",
+    "semantic_hash": "2e0344796aa26306abff0d024022c96a"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedSurvey.cs": {
+    "mtime": 1777476817.2588396,
+    "ast_hash": "5d9b57128fd00ed666a4d74905b6f05e",
+    "semantic_hash": "5d9b57128fd00ed666a4d74905b6f05e"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedSystem.cs": {
+    "mtime": 1777365449.590538,
+    "ast_hash": "9e89ee06defc252b079ccd8d3a45a245",
+    "semantic_hash": "9e89ee06defc252b079ccd8d3a45a245"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/CachedWaypoint.cs": {
+    "mtime": 1777404271.0510516,
+    "ast_hash": "86399904e0b39179e5b69ee007db73ad",
+    "semantic_hash": "86399904e0b39179e5b69ee007db73ad"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/FleetGoalRecord.cs": {
+    "mtime": 1777754048.627532,
+    "ast_hash": "2c6845b330488115b7a2396646083fe8",
+    "semantic_hash": "2c6845b330488115b7a2396646083fe8"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/LeaderLease.cs": {
+    "mtime": 1777365449.6683936,
+    "ast_hash": "fb11779ad6026645dcba5d0a8f284438",
+    "semantic_hash": "fb11779ad6026645dcba5d0a8f284438"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/LedgerEntry.cs": {
+    "mtime": 1777642792.7407897,
+    "ast_hash": "70b616ae62b1ad411a87ee2cd1a5a8ea",
+    "semantic_hash": "70b616ae62b1ad411a87ee2cd1a5a8ea"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/MarketPriceSample.cs": {
+    "mtime": 1777642792.7407897,
+    "ast_hash": "175e530766c13cd5bc9a6c3b2cdcb703",
+    "semantic_hash": "175e530766c13cd5bc9a6c3b2cdcb703"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/PlanStateRecord.cs": {
+    "mtime": 1777909477.1338773,
+    "ast_hash": "beab43f4aea81aca074efa893694d473",
+    "semantic_hash": "beab43f4aea81aca074efa893694d473"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/Run.cs": {
+    "mtime": 1777642792.7418723,
+    "ast_hash": "c8ce6dd9b0207bcfd072054e992fb873",
+    "semantic_hash": "c8ce6dd9b0207bcfd072054e992fb873"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/RunCreditHighlight.cs": {
+    "mtime": 1777642792.7418723,
+    "ast_hash": "ab1c4a1d14fccb2f5b9ed5fc18acf731",
+    "semantic_hash": "ab1c4a1d14fccb2f5b9ed5fc18acf731"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ScheduledRun.cs": {
+    "mtime": 1777642792.7418723,
+    "ast_hash": "229f93ba9250e2d01370f2474fd0ada4",
+    "semantic_hash": "229f93ba9250e2d01370f2474fd0ada4"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ScheduledShipEvent.cs": {
+    "mtime": 1777754048.627532,
+    "ast_hash": "5458e325ddbf0fc0e979132211e8b8dd",
+    "semantic_hash": "5458e325ddbf0fc0e979132211e8b8dd"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ScoutPlanStateRecord.cs": {
+    "mtime": 1777909113.7324574,
+    "ast_hash": "abea631599392f88f1e1b4cf3ed352cd",
+    "semantic_hash": "abea631599392f88f1e1b4cf3ed352cd"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ShipAssignmentRecord.cs": {
+    "mtime": 1777490170.7390983,
+    "ast_hash": "5e80e791526769f8428884b2048c0622",
+    "semantic_hash": "5e80e791526769f8428884b2048c0622"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ShipGoalHistoryRecord.cs": {
+    "mtime": 1777754048.6285315,
+    "ast_hash": "69a00780cb54e6e77488a1bfa6967200",
+    "semantic_hash": "69a00780cb54e6e77488a1bfa6967200"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/ShipTaskRecord.cs": {
+    "mtime": 1777642792.7418723,
+    "ast_hash": "6e6a2e72c5c8ab470020841bc58c83b2",
+    "semantic_hash": "6e6a2e72c5c8ab470020841bc58c83b2"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/StartupSnapshot.cs": {
+    "mtime": 1777642792.7418723,
+    "ast_hash": "076379d9e3dcf3e6fe61e3fcb82725ba",
+    "semantic_hash": "076379d9e3dcf3e6fe61e3fcb82725ba"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/StoredCredential.cs": {
+    "mtime": 1777365449.7478933,
+    "ast_hash": "5e2771c3eed5d5ad3f608cc1fe5a8546",
+    "semantic_hash": "5e2771c3eed5d5ad3f608cc1fe5a8546"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Entities/TradeOpportunity.cs": {
+    "mtime": 1777472537.579003,
+    "ast_hash": "e818c970c54ea43b840f282f33baed5d",
+    "semantic_hash": "e818c970c54ea43b840f282f33baed5d"
+  },
+  "SpaceTraders.Infrastructure.Persistence/GlobalUsings.cs": {
+    "mtime": 1777571686.831301,
+    "ast_hash": "6ec78769b556204214c4123893afd7be",
+    "semantic_hash": "6ec78769b556204214c4123893afd7be"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ActivityLogRepository.cs": {
+    "mtime": 1777365449.8695557,
+    "ast_hash": "3665dd896c171f5e7de9e3c9888eae6a",
+    "semantic_hash": "3665dd896c171f5e7de9e3c9888eae6a"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/AgentCreditsSampleRepository.cs": {
+    "mtime": 1777976179.3658612,
+    "ast_hash": "41dad003afc6d395ad3e7fe4be8e2296",
+    "semantic_hash": "41dad003afc6d395ad3e7fe4be8e2296"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/AgentRepository.cs": {
+    "mtime": 1777365449.909116,
+    "ast_hash": "c7a6d8acedceb18d5e05580b580f395f",
+    "semantic_hash": "c7a6d8acedceb18d5e05580b580f395f"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ApiEndpointUsageRecorder.cs": {
+    "mtime": 1777667503.0062983,
+    "ast_hash": "63209010543986b616a71a33b2b4c8ca",
+    "semantic_hash": "63209010543986b616a71a33b2b4c8ca"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ConstructionRepository.cs": {
+    "mtime": 1777487168.9641728,
+    "ast_hash": "1f7243f552f6cdd31b4734a68fdb0b29",
+    "semantic_hash": "1f7243f552f6cdd31b4734a68fdb0b29"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ContractMineralPlanRepository.cs": {
+    "mtime": 1778758570.9370947,
+    "ast_hash": "2a32b7123c7c13addbbdf8d875bac56d",
+    "semantic_hash": "2a32b7123c7c13addbbdf8d875bac56d"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ContractRepository.cs": {
+    "mtime": 1777470352.0978205,
+    "ast_hash": "90004ac9780338568a97369965f6fd1f",
+    "semantic_hash": "90004ac9780338568a97369965f6fd1f"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/FleetGoalRepository.cs": {
+    "mtime": 1777754048.6290362,
+    "ast_hash": "b814beecc09038efbb4119fd051fa888",
+    "semantic_hash": "b814beecc09038efbb4119fd051fa888"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/LeaderLeaseRepository.cs": {
+    "mtime": 1777365450.0349772,
+    "ast_hash": "7b65b9383a9ab203a989930e833b5c21",
+    "semantic_hash": "7b65b9383a9ab203a989930e833b5c21"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/LedgerRepository.cs": {
+    "mtime": 1779014803.1968715,
+    "ast_hash": "f7c221cbe490aa52409778c0defe6562",
+    "semantic_hash": "f7c221cbe490aa52409778c0defe6562"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/MarketPriceSampleRepository.cs": {
+    "mtime": 1777669061.6217287,
+    "ast_hash": "ba7d7bd6662cf7fd6784a8bf2b2310a9",
+    "semantic_hash": "ba7d7bd6662cf7fd6784a8bf2b2310a9"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/MarketRepository.cs": {
+    "mtime": 1778756351.3504217,
+    "ast_hash": "a68ac7e0fdda670c317dcd7ba93bdb8d",
+    "semantic_hash": "a68ac7e0fdda670c317dcd7ba93bdb8d"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/PlanRepository.cs": {
+    "mtime": 1777909477.1621313,
+    "ast_hash": "7c930bfe4b116c3e4dc992733d38f395",
+    "semantic_hash": "7c930bfe4b116c3e4dc992733d38f395"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ProbeDeploymentPlanRepository.cs": {
+    "mtime": 1778771781.9550037,
+    "ast_hash": "16f98b7e66505de96d0f7f2c5baf7dc8",
+    "semantic_hash": "16f98b7e66505de96d0f7f2c5baf7dc8"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/RunRepository.cs": {
+    "mtime": 1777642792.7447057,
+    "ast_hash": "f4d2831259853dd036b872d4d6f4c1fd",
+    "semantic_hash": "f4d2831259853dd036b872d4d6f4c1fd"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ScoutPlanRepository.cs": {
+    "mtime": 1777909547.8966396,
+    "ast_hash": "900027ac41d61aee69ad4233cce33d93",
+    "semantic_hash": "900027ac41d61aee69ad4233cce33d93"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/SettingsRepository.cs": {
+    "mtime": 1777667503.0072992,
+    "ast_hash": "f44112b3c9acf12915ebdbfe64493d74",
+    "semantic_hash": "f44112b3c9acf12915ebdbfe64493d74"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipAssignmentRepository.cs": {
+    "mtime": 1778761830.2823546,
+    "ast_hash": "44bb14846b0b6ffcc872e2a62db41b4e",
+    "semantic_hash": "44bb14846b0b6ffcc872e2a62db41b4e"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipGoalHistoryRepository.cs": {
+    "mtime": 1777754048.6290362,
+    "ast_hash": "0ce2b46f5e329af031178f6495a4dcf1",
+    "semantic_hash": "0ce2b46f5e329af031178f6495a4dcf1"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipGoalRepository.cs": {
+    "mtime": 1778926439.9957352,
+    "ast_hash": "69aa7ee65fb824e24683fe32a505e4ec",
+    "semantic_hash": "69aa7ee65fb824e24683fe32a505e4ec"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipRepository.cs": {
+    "mtime": 1778762200.4131615,
+    "ast_hash": "62c6c4fc04e46a1444875174d87f3ed5",
+    "semantic_hash": "62c6c4fc04e46a1444875174d87f3ed5"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipTaskRecordRepository.cs": {
+    "mtime": 1777667503.0082984,
+    "ast_hash": "b174a9adc5882b4a6aa854758d6db8af",
+    "semantic_hash": "b174a9adc5882b4a6aa854758d6db8af"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/ShipyardRepository.cs": {
+    "mtime": 1778761233.129445,
+    "ast_hash": "9cbc376a3d72bdc0d6499feeedd28b3d",
+    "semantic_hash": "9cbc376a3d72bdc0d6499feeedd28b3d"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/SurveyRepository.cs": {
+    "mtime": 1777667917.8693967,
+    "ast_hash": "7d68b10f5c873169b4355640504808ac",
+    "semantic_hash": "7d68b10f5c873169b4355640504808ac"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/SystemRepository.cs": {
+    "mtime": 1777642792.7462125,
+    "ast_hash": "75e14fbd661eefcb2d1f2c89118dac62",
+    "semantic_hash": "75e14fbd661eefcb2d1f2c89118dac62"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/TradeOpportunityRepository.cs": {
+    "mtime": 1777573527.9137857,
+    "ast_hash": "8f0f0ce5a65aaba2a462482b6127cd05",
+    "semantic_hash": "8f0f0ce5a65aaba2a462482b6127cd05"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Repositories/WaypointRepository.cs": {
+    "mtime": 1777667503.0082984,
+    "ast_hash": "03ca20f08f16ac4140caae4f41fcf40c",
+    "semantic_hash": "03ca20f08f16ac4140caae4f41fcf40c"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Scoping/AgentDataScope.cs": {
+    "mtime": 1777365450.3930573,
+    "ast_hash": "60e5135790745ab8870b8f7556f0d4b8",
+    "semantic_hash": "60e5135790745ab8870b8f7556f0d4b8"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Scoping/IAgentDataScope.cs": {
+    "mtime": 1777365450.432225,
+    "ast_hash": "4fdd3d333f141f02f211b8ad9f85f7d5",
+    "semantic_hash": "4fdd3d333f141f02f211b8ad9f85f7d5"
+  },
+  "SpaceTraders.Infrastructure.Persistence/Seed/DefaultSettingsSeed.cs": {
+    "mtime": 1778835142.8740716,
+    "ast_hash": "b4f5604e6c89cdbc9e3a831c47276705",
+    "semantic_hash": "b4f5604e6c89cdbc9e3a831c47276705"
+  },
+  "SpaceTraders.Infrastructure.Persistence/ShipEventScheduler.cs": {
+    "mtime": 1778966175.093035,
+    "ast_hash": "25e1f9732b4750dfd2d8a0f8fe03f010",
+    "semantic_hash": "25e1f9732b4750dfd2d8a0f8fe03f010"
+  },
+  "SpaceTraders.Infrastructure.Persistence/SpaceTraders.Infrastructure.Persistence.csproj": {
+    "mtime": 1777754048.631043,
+    "ast_hash": "52117a5bb597ee22285eafa0178721f3",
+    "semantic_hash": "52117a5bb597ee22285eafa0178721f3"
+  },
+  "SpaceTraders.Infrastructure.Persistence/SpaceTradersDatabaseInitializer.cs": {
+    "mtime": 1777926980.0512805,
+    "ast_hash": "a187f40964e744d842217161ec46361d",
+    "semantic_hash": "a187f40964e744d842217161ec46361d"
+  },
+  "SpaceTraders.Infrastructure.Persistence/SpaceTradersDbContext.cs": {
+    "mtime": 1777909557.8459876,
+    "ast_hash": "a23ce87489e693ddd8a8ec16c6bfb4b7",
+    "semantic_hash": "a23ce87489e693ddd8a8ec16c6bfb4b7"
+  },
+  "SpaceTraders.Infrastructure.Persistence/packages.lock.json": {
+    "mtime": 1777754048.6330414,
+    "ast_hash": "d15d0d6f7ea0b068d608516885da33c8",
+    "semantic_hash": "d15d0d6f7ea0b068d608516885da33c8"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Adapters/SpaceTradersPortAdapter.cs": {
+    "mtime": 1779013710.6092095,
+    "ast_hash": "de6c853966d8137d234b2ae4fed2ae87",
+    "semantic_hash": "de6c853966d8137d234b2ae4fed2ae87"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Availability/ApiAvailabilityState.cs": {
+    "mtime": 1777365450.6695216,
+    "ast_hash": "3d3fdb2e89a86cbe6443105468b76e17",
+    "semantic_hash": "3d3fdb2e89a86cbe6443105468b76e17"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Clients/AgentTokenProvider.cs": {
+    "mtime": 1777365450.7108612,
+    "ast_hash": "604d4a1ebfea37b3e8109839bebd0332",
+    "semantic_hash": "604d4a1ebfea37b3e8109839bebd0332"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Clients/IAgentTokenProvider.cs": {
+    "mtime": 1777365450.7510314,
+    "ast_hash": "a105a466faffa8326e50f2c17bf6777b",
+    "semantic_hash": "a105a466faffa8326e50f2c17bf6777b"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Clients/ISpaceTradersApiClient.cs": {
+    "mtime": 1777489471.9169495,
+    "ast_hash": "7cfcce2777dd9091bfdc035e6fb3ee3f",
+    "semantic_hash": "7cfcce2777dd9091bfdc035e6fb3ee3f"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Clients/SpaceTradersApiClient.cs": {
+    "mtime": 1777489471.9179513,
+    "ast_hash": "155564fe7113cc2c58323800f80fa0fa",
+    "semantic_hash": "155564fe7113cc2c58323800f80fa0fa"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Configuration/SpaceTradersApiOptions.cs": {
+    "mtime": 1777365450.8724666,
+    "ast_hash": "fa36455e1fa1d1b3385de08d0f70c1d6",
+    "semantic_hash": "fa36455e1fa1d1b3385de08d0f70c1d6"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/DependencyInjection.cs": {
+    "mtime": 1777365450.9116502,
+    "ast_hash": "ac1fb8f5ae054df5f4427299618c7eea",
+    "semantic_hash": "ac1fb8f5ae054df5f4427299618c7eea"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Exceptions/SpaceTradersApiException.cs": {
+    "mtime": 1777365450.953902,
+    "ast_hash": "83894206d5e1f1b7e84b505c3d1a074d",
+    "semantic_hash": "83894206d5e1f1b7e84b505c3d1a074d"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/GlobalUsings.cs": {
+    "mtime": 1777365450.9939528,
+    "ast_hash": "14c5beb71bb8166abd5ff7c81924323a",
+    "semantic_hash": "14c5beb71bb8166abd5ff7c81924323a"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Accounts/RegisterRequest.cs": {
+    "mtime": 1777365451.0358052,
+    "ast_hash": "51ef3b2cbe91a9e3b335dbf3d656f4e3",
+    "semantic_hash": "51ef3b2cbe91a9e3b335dbf3d656f4e3"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Accounts/RegisterResponseData.cs": {
+    "mtime": 1777365451.0771995,
+    "ast_hash": "6adc9793e3909eaec32508776d32e89c",
+    "semantic_hash": "6adc9793e3909eaec32508776d32e89c"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Agents/Agent.cs": {
+    "mtime": 1777365451.113898,
+    "ast_hash": "d0374ab3ea42032abb0a4f4a22996c14",
+    "semantic_hash": "d0374ab3ea42032abb0a4f4a22996c14"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Agents/PublicAgent.cs": {
+    "mtime": 1777365451.151003,
+    "ast_hash": "b5df191ba3ae3717bc6647a6fa2809ff",
+    "semantic_hash": "b5df191ba3ae3717bc6647a6fa2809ff"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Common/ApiResponse.cs": {
+    "mtime": 1777365451.191627,
+    "ast_hash": "56033774fa4301cbcc0058420dbfa51f",
+    "semantic_hash": "56033774fa4301cbcc0058420dbfa51f"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Common/Meta.cs": {
+    "mtime": 1777365451.2317288,
+    "ast_hash": "4fa685b66888cbd44905bda9c48277bd",
+    "semantic_hash": "4fa685b66888cbd44905bda9c48277bd"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Common/PagedApiResponse.cs": {
+    "mtime": 1777365451.2732873,
+    "ast_hash": "bf66be5a1f9df8898856b01d2a90de98",
+    "semantic_hash": "bf66be5a1f9df8898856b01d2a90de98"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Contracts/Contract.cs": {
+    "mtime": 1777470092.300991,
+    "ast_hash": "bfd207ba71e15ca8524e98fff42eeeda",
+    "semantic_hash": "bfd207ba71e15ca8524e98fff42eeeda"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Contracts/ContractActionModels.cs": {
+    "mtime": 1777365451.3556032,
+    "ast_hash": "a003762867a72f44fdd07082b7596ae4",
+    "semantic_hash": "a003762867a72f44fdd07082b7596ae4"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Factions/Faction.cs": {
+    "mtime": 1777365451.394642,
+    "ast_hash": "03ca8c34936d7e227b71f540c9ef21f9",
+    "semantic_hash": "03ca8c34936d7e227b71f540c9ef21f9"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Fleet/FleetActionModels.cs": {
+    "mtime": 1777365451.4337072,
+    "ast_hash": "9005aec087b0b07b8d5aa6080659f3f4",
+    "semantic_hash": "9005aec087b0b07b8d5aa6080659f3f4"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Fleet/Phase1ActionModels.cs": {
+    "mtime": 1777401789.473886,
+    "ast_hash": "fa1b8e216522aece48fc1084fd13b1cd",
+    "semantic_hash": "fa1b8e216522aece48fc1084fd13b1cd"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Fleet/Phase7ActionModels.cs": {
+    "mtime": 1777479855.0217862,
+    "ast_hash": "49abdea915751ed5e974b67fc5f1515c",
+    "semantic_hash": "49abdea915751ed5e974b67fc5f1515c"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Fleet/Ship.cs": {
+    "mtime": 1777642792.7474568,
+    "ast_hash": "04d0f652348d63c180d03fa8bebcb34b",
+    "semantic_hash": "04d0f652348d63c180d03fa8bebcb34b"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Markets/Market.cs": {
+    "mtime": 1777365451.514517,
+    "ast_hash": "9b455262c6308f9d7b7582f3550854b5",
+    "semantic_hash": "9b455262c6308f9d7b7582f3550854b5"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Shipyards/Shipyard.cs": {
+    "mtime": 1777642792.7490797,
+    "ast_hash": "d5adaccbcbf9aa932810677ab2c62a59",
+    "semantic_hash": "d5adaccbcbf9aa932810677ab2c62a59"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Status/ServerStatus.cs": {
+    "mtime": 1777498490.1236188,
+    "ast_hash": "7286ce0cdc56a493c7a76311b1891e8c",
+    "semantic_hash": "7286ce0cdc56a493c7a76311b1891e8c"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Systems/ConstructionSite.cs": {
+    "mtime": 1777486654.3564372,
+    "ast_hash": "0a3a142b227a98371ffd77487bd338a6",
+    "semantic_hash": "0a3a142b227a98371ffd77487bd338a6"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Systems/JumpGate.cs": {
+    "mtime": 1777474826.3556414,
+    "ast_hash": "f06975ad90321da758514acf2e737a27",
+    "semantic_hash": "f06975ad90321da758514acf2e737a27"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Systems/SystemInfo.cs": {
+    "mtime": 1777365451.6345553,
+    "ast_hash": "c0d04ddb7f982eb1d033024c80b008e2",
+    "semantic_hash": "c0d04ddb7f982eb1d033024c80b008e2"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Models/Systems/Waypoint.cs": {
+    "mtime": 1777404176.1787858,
+    "ast_hash": "b6e39213da4078e4e4c72bb717521d86",
+    "semantic_hash": "b6e39213da4078e4e4c72bb717521d86"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/Notifications/WebhookAlertNotifier.cs": {
+    "mtime": 1777365451.713619,
+    "ast_hash": "98cd6da39f632216d0f610a196a25000",
+    "semantic_hash": "98cd6da39f632216d0f610a196a25000"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/RateLimiting/RateLimitResponseHandler.cs": {
+    "mtime": 1777365451.7542431,
+    "ast_hash": "f2e2f0760ff8a88dbf04364869a0918a",
+    "semantic_hash": "f2e2f0760ff8a88dbf04364869a0918a"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/RateLimiting/RateLimitStatus.cs": {
+    "mtime": 1777365451.7940073,
+    "ast_hash": "88ac3e4c8b5798f978c52567e11c4393",
+    "semantic_hash": "88ac3e4c8b5798f978c52567e11c4393"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/RateLimiting/RateLimitingHandler.cs": {
+    "mtime": 1778967023.569128,
+    "ast_hash": "d7482a5002f6768ea7f70b808b24f187",
+    "semantic_hash": "d7482a5002f6768ea7f70b808b24f187"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/RateLimiting/RetryHandler.cs": {
+    "mtime": 1777365451.87533,
+    "ast_hash": "b809b93a04f25dfdbc78a1faa4916611",
+    "semantic_hash": "b809b93a04f25dfdbc78a1faa4916611"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/SpaceTraders.Infrastructure.SpaceTradersAPI.csproj": {
+    "mtime": 1777365451.9163718,
+    "ast_hash": "cbf276794a1d0066669163f80d04f8bc",
+    "semantic_hash": "cbf276794a1d0066669163f80d04f8bc"
+  },
+  "SpaceTraders.Infrastructure.SpaceTradersAPI/packages.lock.json": {
+    "mtime": 1777374747.0551422,
+    "ast_hash": "46fb132dac845bc0b9d26b4cf0725d38",
+    "semantic_hash": "46fb132dac845bc0b9d26b4cf0725d38"
+  },
+  "SpaceTraders.WebUI/Properties/launchSettings.json": {
+    "mtime": 1778752239.078329,
+    "ast_hash": "a3da096660496b4d1f63905958b7cda0",
+    "semantic_hash": "a3da096660496b4d1f63905958b7cda0"
+  },
+  "SpaceTraders.WebUI/SpaceTraders.WebUI.csproj": {
+    "mtime": 1778753601.265552,
+    "ast_hash": "a123c4ad608c09c9423f2438f76f04aa",
+    "semantic_hash": "a123c4ad608c09c9423f2438f76f04aa"
+  },
+  "SpaceTraders.WebUI/docker-entrypoint.sh": {
+    "mtime": 1777667476.68279,
+    "ast_hash": "54a0b6ee19c4a27ef486372512d91aa7",
+    "semantic_hash": "54a0b6ee19c4a27ef486372512d91aa7"
+  },
+  "SpaceTraders.WebUI/e2e/orchestration.e2e.ts": {
+    "mtime": 1777754048.6340415,
+    "ast_hash": "176b7499ad2e7c895abc945194a6733b",
+    "semantic_hash": "176b7499ad2e7c895abc945194a6733b"
+  },
+  "SpaceTraders.WebUI/eslint.config.js": {
+    "mtime": 1777642792.7490797,
+    "ast_hash": "75a0286de267d5393020e4439ed72f6a",
+    "semantic_hash": "75a0286de267d5393020e4439ed72f6a"
+  },
+  "SpaceTraders.WebUI/package.json": {
+    "mtime": 1777754048.6365457,
+    "ast_hash": "ccdc6d4df9da525816be6cbc48fad732",
+    "semantic_hash": "ccdc6d4df9da525816be6cbc48fad732"
+  },
+  "SpaceTraders.WebUI/packages.lock.json": {
+    "mtime": 1778752239.8480518,
+    "ast_hash": "fe2af7515004470df8d57749c8d90224",
+    "semantic_hash": "fe2af7515004470df8d57749c8d90224"
+  },
+  "SpaceTraders.WebUI/playwright.config.ts": {
+    "mtime": 1777754048.6365457,
+    "ast_hash": "5d8e5d4fa2dddeac888266a99eb0dfb7",
+    "semantic_hash": "5d8e5d4fa2dddeac888266a99eb0dfb7"
+  },
+  "SpaceTraders.WebUI/public/config.js": {
+    "mtime": 1777643252.158391,
+    "ast_hash": "6f94d5a7f6d13c23bf30ee66bae0f657",
+    "semantic_hash": "6f94d5a7f6d13c23bf30ee66bae0f657"
+  },
+  "SpaceTraders.WebUI/src/App.tsx": {
+    "mtime": 1777642792.7530031,
+    "ast_hash": "0c16da669835d22ae2493b6abddbb9c1",
+    "semantic_hash": "0c16da669835d22ae2493b6abddbb9c1"
+  },
+  "SpaceTraders.WebUI/src/Future/components/ActivityPanel.tsx": {
+    "mtime": 1777754048.6365457,
+    "ast_hash": "97108968f7efbf959cf700062b49cb45",
+    "semantic_hash": "97108968f7efbf959cf700062b49cb45"
+  },
+  "SpaceTraders.WebUI/src/Future/components/AssignmentsPanel.tsx": {
+    "mtime": 1779015082.268353,
+    "ast_hash": "e3abfe4c34f8e003b0a2243560c5ea46",
+    "semantic_hash": "e3abfe4c34f8e003b0a2243560c5ea46"
+  },
+  "SpaceTraders.WebUI/src/Future/components/GoalChainPanel.tsx": {
+    "mtime": 1777754048.6375515,
+    "ast_hash": "9ee4306e4c16cd4d7f2879270c8b3c27",
+    "semantic_hash": "9ee4306e4c16cd4d7f2879270c8b3c27"
+  },
+  "SpaceTraders.WebUI/src/Future/components/MiningOpportunitiesPanel.tsx": {
+    "mtime": 1778838052.0631647,
+    "ast_hash": "fe985a51a4fef8f769a9089b4c2c2957",
+    "semantic_hash": "fe985a51a4fef8f769a9089b4c2c2957"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/ActivityPage.tsx": {
+    "mtime": 1777642792.7628229,
+    "ast_hash": "afc5ebb7c9edd123dc9a0678cfa5ccd5",
+    "semantic_hash": "afc5ebb7c9edd123dc9a0678cfa5ccd5"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/ContractsPage.tsx": {
+    "mtime": 1777667503.0102987,
+    "ast_hash": "59917c8ca49e2913ed74d2547bebb0d5",
+    "semantic_hash": "59917c8ca49e2913ed74d2547bebb0d5"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/FinancePage.tsx": {
+    "mtime": 1777673174.0188189,
+    "ast_hash": "509415e9992a77a78a4e5e7a1cd4299f",
+    "semantic_hash": "509415e9992a77a78a4e5e7a1cd4299f"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/MarketsPage.tsx": {
+    "mtime": 1777667503.0112984,
+    "ast_hash": "3a099fcef6e1687175dd8c675b57ac64",
+    "semantic_hash": "3a099fcef6e1687175dd8c675b57ac64"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/OrchestrationPage.tsx": {
+    "mtime": 1778838067.034427,
+    "ast_hash": "cff95beaae611f5814c65978564f57c1",
+    "semantic_hash": "cff95beaae611f5814c65978564f57c1"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/RunsPage.tsx": {
+    "mtime": 1777667503.013374,
+    "ast_hash": "220f2c966b0c0dfb722d9dede70ec0aa",
+    "semantic_hash": "220f2c966b0c0dfb722d9dede70ec0aa"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/ShipDetailPage.tsx": {
+    "mtime": 1778926613.3033667,
+    "ast_hash": "02b75c32390301550d471cb34b264878",
+    "semantic_hash": "02b75c32390301550d471cb34b264878"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/SystemMapPage.tsx": {
+    "mtime": 1777667503.0138958,
+    "ast_hash": "0a625cd61fe670a8a5671cb7ffaafcf5",
+    "semantic_hash": "0a625cd61fe670a8a5671cb7ffaafcf5"
+  },
+  "SpaceTraders.WebUI/src/Future/pages/UniversePage.tsx": {
+    "mtime": 1777667503.0138958,
+    "ast_hash": "66bbb43ac69245d3673cae68496205f3",
+    "semantic_hash": "66bbb43ac69245d3673cae68496205f3"
+  },
+  "SpaceTraders.WebUI/src/components/layout/AppShell.tsx": {
+    "mtime": 1778762748.5609698,
+    "ast_hash": "2e5120f5af106072423e1d8717ab68ff",
+    "semantic_hash": "2e5120f5af106072423e1d8717ab68ff"
+  },
+  "SpaceTraders.WebUI/src/components/layout/Sidebar.tsx": {
+    "mtime": 1778755761.1427782,
+    "ast_hash": "53681419c1b7382d1b00b309c283ef9c",
+    "semantic_hash": "53681419c1b7382d1b00b309c283ef9c"
+  },
+  "SpaceTraders.WebUI/src/components/layout/TopNav.tsx": {
+    "mtime": 1778753378.6509352,
+    "ast_hash": "9a968ab9a93f3d05f3907b912db51e28",
+    "semantic_hash": "9a968ab9a93f3d05f3907b912db51e28"
+  },
+  "SpaceTraders.WebUI/src/components/ui/LiveUpdatesBanner.tsx": {
+    "mtime": 1778753120.8053546,
+    "ast_hash": "00efed9cc5f2af3946ef888b10f566dd",
+    "semantic_hash": "00efed9cc5f2af3946ef888b10f566dd"
+  },
+  "SpaceTraders.WebUI/src/components/ui/ThemeToggle.tsx": {
+    "mtime": 1777642792.7585242,
+    "ast_hash": "b2b4f84f5d8067e17c1b4ec8fdd57632",
+    "semantic_hash": "b2b4f84f5d8067e17c1b4ec8fdd57632"
+  },
+  "SpaceTraders.WebUI/src/config.ts": {
+    "mtime": 1777643252.1578856,
+    "ast_hash": "96f175cea1fbf03b0825d6e3a56ad52f",
+    "semantic_hash": "96f175cea1fbf03b0825d6e3a56ad52f"
+  },
+  "SpaceTraders.WebUI/src/lib/api-fetch.ts": {
+    "mtime": 1777642792.7596612,
+    "ast_hash": "3047034099ef748cae8b5a53eeabef5d",
+    "semantic_hash": "3047034099ef748cae8b5a53eeabef5d"
+  },
+  "SpaceTraders.WebUI/src/lib/query-client.ts": {
+    "mtime": 1777642792.7596612,
+    "ast_hash": "d93c802addd3c21d70919cc4b6c1d1d6",
+    "semantic_hash": "d93c802addd3c21d70919cc4b6c1d1d6"
+  },
+  "SpaceTraders.WebUI/src/lib/signalr-context.ts": {
+    "mtime": 1778753120.8119314,
+    "ast_hash": "22979ce46ee8565fc9203f45a7c35f45",
+    "semantic_hash": "22979ce46ee8565fc9203f45a7c35f45"
+  },
+  "SpaceTraders.WebUI/src/lib/signalr.tsx": {
+    "mtime": 1778753429.27167,
+    "ast_hash": "c94f2a7e872561c2f558f7c0c390c28d",
+    "semantic_hash": "c94f2a7e872561c2f558f7c0c390c28d"
+  },
+  "SpaceTraders.WebUI/src/lib/theme.tsx": {
+    "mtime": 1777642792.7596612,
+    "ast_hash": "01ac02e2b5a253ff2d54e3724becdbcf",
+    "semantic_hash": "01ac02e2b5a253ff2d54e3724becdbcf"
+  },
+  "SpaceTraders.WebUI/src/lib/utils.ts": {
+    "mtime": 1777642792.7596612,
+    "ast_hash": "f7661958c02b4285cbce48efc6d51a7f",
+    "semantic_hash": "f7661958c02b4285cbce48efc6d51a7f"
+  },
+  "SpaceTraders.WebUI/src/main.tsx": {
+    "mtime": 1777642792.7596612,
+    "ast_hash": "df3369963799e47ef5a77cdca932abf0",
+    "semantic_hash": "df3369963799e47ef5a77cdca932abf0"
+  },
+  "SpaceTraders.WebUI/src/pages/FleetPage.tsx": {
+    "mtime": 1778762789.978243,
+    "ast_hash": "3e223f633873b0ce8bb5ac21fc2a57b5",
+    "semantic_hash": "3e223f633873b0ce8bb5ac21fc2a57b5"
+  },
+  "SpaceTraders.WebUI/src/pages/HealthPage.tsx": {
+    "mtime": 1777642792.7640822,
+    "ast_hash": "f88ef0284bbaef3184e9278095705136",
+    "semantic_hash": "f88ef0284bbaef3184e9278095705136"
+  },
+  "SpaceTraders.WebUI/src/pages/MarketsPage.tsx": {
+    "mtime": 1778769189.9793339,
+    "ast_hash": "47236eee441948b8ecd2dcd31542a2c4",
+    "semantic_hash": "47236eee441948b8ecd2dcd31542a2c4"
+  },
+  "SpaceTraders.WebUI/src/pages/OverviewPage.tsx": {
+    "mtime": 1777916350.1528258,
+    "ast_hash": "7636f39dc2af6849042e0b530a56590d",
+    "semantic_hash": "7636f39dc2af6849042e0b530a56590d"
+  },
+  "SpaceTraders.WebUI/src/pages/SettingsPage.tsx": {
+    "mtime": 1777916342.6471536,
+    "ast_hash": "bcc005826a4ce9bc0ad5731f3e197634",
+    "semantic_hash": "bcc005826a4ce9bc0ad5731f3e197634"
+  },
+  "SpaceTraders.WebUI/src/pages/SnapshotsPage.tsx": {
+    "mtime": 1778755722.8994896,
+    "ast_hash": "9f0ebc9cc58b91240ed6f98cfc69cdb2",
+    "semantic_hash": "9f0ebc9cc58b91240ed6f98cfc69cdb2"
+  },
+  "SpaceTraders.WebUI/src/test/App.test.tsx": {
+    "mtime": 1777916477.651307,
+    "ast_hash": "c7d4d962bcbd03e58a7d16a2b2f44b27",
+    "semantic_hash": "c7d4d962bcbd03e58a7d16a2b2f44b27"
+  },
+  "SpaceTraders.WebUI/src/test/apiFetch.test.ts": {
+    "mtime": 1777642792.7640822,
+    "ast_hash": "511f7ab1c55bc9957b1b1979b08d2d7d",
+    "semantic_hash": "511f7ab1c55bc9957b1b1979b08d2d7d"
+  },
+  "SpaceTraders.WebUI/src/test/config.test.ts": {
+    "mtime": 1777643252.1578856,
+    "ast_hash": "702da6c1d5edcaedd5b950c1545322a2",
+    "semantic_hash": "702da6c1d5edcaedd5b950c1545322a2"
+  },
+  "SpaceTraders.WebUI/src/test/pages.test.tsx": {
+    "mtime": 1779015207.1173058,
+    "ast_hash": "e8ff26db8f6500ae7ab1f916971ececf",
+    "semantic_hash": "e8ff26db8f6500ae7ab1f916971ececf"
+  },
+  "SpaceTraders.WebUI/src/test/setup.ts": {
+    "mtime": 1777642792.7686663,
+    "ast_hash": "a9ae46dae41d902f2c50a39284242a0d",
+    "semantic_hash": "a9ae46dae41d902f2c50a39284242a0d"
+  },
+  "SpaceTraders.WebUI/src/test/signalr.test.tsx": {
+    "mtime": 1778752525.6233602,
+    "ast_hash": "cf1c89d6159b8006ee822cbb84b6af52",
+    "semantic_hash": "cf1c89d6159b8006ee822cbb84b6af52"
+  },
+  "SpaceTraders.WebUI/src/test/theme.test.tsx": {
+    "mtime": 1777642792.7698486,
+    "ast_hash": "7ba312ed75818b45f5a476126f2a90cd",
+    "semantic_hash": "7ba312ed75818b45f5a476126f2a90cd"
+  },
+  "SpaceTraders.WebUI/src/types.ts": {
+    "mtime": 1779014897.7244873,
+    "ast_hash": "2a5fec248a3c291d7325f9278c22a707",
+    "semantic_hash": "2a5fec248a3c291d7325f9278c22a707"
+  },
+  "SpaceTraders.WebUI/tsconfig.app.json": {
+    "mtime": 1777642792.7698486,
+    "ast_hash": "cd00b1c01c00be6a7aae080968c577a3",
+    "semantic_hash": "cd00b1c01c00be6a7aae080968c577a3"
+  },
+  "SpaceTraders.WebUI/tsconfig.json": {
+    "mtime": 1777642792.7698486,
+    "ast_hash": "852c3a5df14a4b43ac28e9554ebedf4a",
+    "semantic_hash": "852c3a5df14a4b43ac28e9554ebedf4a"
+  },
+  "SpaceTraders.WebUI/tsconfig.node.json": {
+    "mtime": 1777642792.7698486,
+    "ast_hash": "1cd4c6b260b0dccbad5bc0a25029f390",
+    "semantic_hash": "1cd4c6b260b0dccbad5bc0a25029f390"
+  },
+  "SpaceTraders.WebUI/vite.config.ts": {
+    "mtime": 1777669402.3554633,
+    "ast_hash": "1f4abb157a3dad0f955bfb10f9eefc91",
+    "semantic_hash": "1f4abb157a3dad0f955bfb10f9eefc91"
+  },
+  "SpaceTraders.slnx": {
+    "mtime": 1778833227.3201296,
+    "ast_hash": "187c614f9b80a39f11a060080f6f1295",
+    "semantic_hash": "187c614f9b80a39f11a060080f6f1295"
+  },
+  "docs/SpaceTraders.Docs.csproj": {
+    "mtime": 1778753601.265552,
+    "ast_hash": "a123c4ad608c09c9423f2438f76f04aa",
+    "semantic_hash": "a123c4ad608c09c9423f2438f76f04aa"
+  },
+  "docs/packages.lock.json": {
+    "mtime": 1778832693.7523394,
+    "ast_hash": "fe2af7515004470df8d57749c8d90224",
+    "semantic_hash": "fe2af7515004470df8d57749c8d90224"
+  },
+  "packages.lock.json": {
+    "mtime": 1777374758.267729,
+    "ast_hash": "19b6c3603813ba9dcfb2b12b301bfa41",
+    "semantic_hash": "19b6c3603813ba9dcfb2b12b301bfa41"
+  },
+  "tests/SpaceTraders.API.Tests/ApiIntegrationTests.cs": {
+    "mtime": 1778839690.8289533,
+    "ast_hash": "f5a6832b19ff1f79dc9fa2290a5d6fcb",
+    "semantic_hash": "f5a6832b19ff1f79dc9fa2290a5d6fcb"
+  },
+  "tests/SpaceTraders.API.Tests/DiValidationTests.cs": {
+    "mtime": 1777642792.7752316,
+    "ast_hash": "b0b5500ce563e45a474d752ffa432ba0",
+    "semantic_hash": "b0b5500ce563e45a474d752ffa432ba0"
+  },
+  "tests/SpaceTraders.API.Tests/GlobalUsings.cs": {
+    "mtime": 1777162663.6557398,
+    "ast_hash": "14c5beb71bb8166abd5ff7c81924323a",
+    "semantic_hash": "14c5beb71bb8166abd5ff7c81924323a"
+  },
+  "tests/SpaceTraders.API.Tests/OutboxReplayIntegrationTests.cs": {
+    "mtime": 1777281763.8217564,
+    "ast_hash": "bfac196d9a7c6e3d799ea5190179766d",
+    "semantic_hash": "bfac196d9a7c6e3d799ea5190179766d"
+  },
+  "tests/SpaceTraders.API.Tests/SandboxIntegrationTests.cs": {
+    "mtime": 1777370412.3747764,
+    "ast_hash": "cb96f8f1e6ca616bab2ae33c4ac1a5b1",
+    "semantic_hash": "cb96f8f1e6ca616bab2ae33c4ac1a5b1"
+  },
+  "tests/SpaceTraders.API.Tests/Services/AgentBootstrapServiceTests.cs": {
+    "mtime": 1777674142.1151302,
+    "ast_hash": "cf93ba4ec8e13d820669fbcc2e5cce7d",
+    "semantic_hash": "cf93ba4ec8e13d820669fbcc2e5cce7d"
+  },
+  "tests/SpaceTraders.API.Tests/Services/RunLifecycleServiceTests.cs": {
+    "mtime": 1777642792.7752316,
+    "ast_hash": "7885d48699913cf0e2b9f91ab8bec4ae",
+    "semantic_hash": "7885d48699913cf0e2b9f91ab8bec4ae"
+  },
+  "tests/SpaceTraders.API.Tests/SpaceTraders.API.Tests.csproj": {
+    "mtime": 1777915868.7631536,
+    "ast_hash": "e46ab5048e2df460ef19b5989bd7614e",
+    "semantic_hash": "e46ab5048e2df460ef19b5989bd7614e"
+  },
+  "tests/SpaceTraders.API.Tests/packages.lock.json": {
+    "mtime": 1777754048.6451375,
+    "ast_hash": "d0fe12703afc10e4780bba8fb8334a78",
+    "semantic_hash": "d0fe12703afc10e4780bba8fb8334a78"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/ContractPlanServiceTests.cs": {
+    "mtime": 1779019118.257299,
+    "ast_hash": "317292b4280f254f5fa4cbc5602c5637",
+    "semantic_hash": "317292b4280f254f5fa4cbc5602c5637"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/DataRetentionServiceTests.cs": {
+    "mtime": 1777642792.7752316,
+    "ast_hash": "482fa841a46099f2ecbf73893a75955a",
+    "semantic_hash": "482fa841a46099f2ecbf73893a75955a"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/GameLoopServiceTests.cs": {
+    "mtime": 1778940304.402429,
+    "ast_hash": "2327189304923e30a0aa9b9adda592d2",
+    "semantic_hash": "2327189304923e30a0aa9b9adda592d2"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/MarketplaceRoutePlannerTests.cs": {
+    "mtime": 1777910312.0142734,
+    "ast_hash": "0fd7d532cbdf16a15627493b61d8488a",
+    "semantic_hash": "0fd7d532cbdf16a15627493b61d8488a"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/MiningAutomationServiceTests.cs": {
+    "mtime": 1779018016.5958357,
+    "ast_hash": "4954ca6c31c6b4d81f4b8e281dba254a",
+    "semantic_hash": "4954ca6c31c6b4d81f4b8e281dba254a"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/ProbeDeploymentPlanServiceTests.cs": {
+    "mtime": 1779013517.8061838,
+    "ast_hash": "8d87f5249ad88fe4eba084201a519d23",
+    "semantic_hash": "8d87f5249ad88fe4eba084201a519d23"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/ScoutAllMarketplacesPlanServiceTests.cs": {
+    "mtime": 1777914731.0912414,
+    "ast_hash": "c73fc27cd3f704775bea22eeefcccade",
+    "semantic_hash": "c73fc27cd3f704775bea22eeefcccade"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/ScoutMarketplaceDiscoveryServiceTests.cs": {
+    "mtime": 1777910021.0338445,
+    "ast_hash": "a5e1546198a613beec0f8fee205f87b5",
+    "semantic_hash": "a5e1546198a613beec0f8fee205f87b5"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/ScoutShipSelectionServiceTests.cs": {
+    "mtime": 1777909792.6894941,
+    "ast_hash": "96658abd1287fab064b3d944b2f16c06",
+    "semantic_hash": "96658abd1287fab064b3d944b2f16c06"
+  },
+  "tests/SpaceTraders.Application.Tests/Automation/TradingAutomationServiceTests.cs": {
+    "mtime": 1779022555.2175393,
+    "ast_hash": "8c6e0db4d92aab6aa423a712f6a82334",
+    "semantic_hash": "8c6e0db4d92aab6aa423a712f6a82334"
+  },
+  "tests/SpaceTraders.Application.Tests/Commands/DeadReckoningTests.cs": {
+    "mtime": 1777156852.330496,
+    "ast_hash": "f40bc70f070cd253abf61a5479a03fbe",
+    "semantic_hash": "f40bc70f070cd253abf61a5479a03fbe"
+  },
+  "tests/SpaceTraders.Application.Tests/Commands/FulfillContractDeliveryHandlerTests.cs": {
+    "mtime": 1778759816.0874496,
+    "ast_hash": "f479bb324da0df9689be497b76822dd0",
+    "semantic_hash": "f479bb324da0df9689be497b76822dd0"
+  },
+  "tests/SpaceTraders.Application.Tests/Commands/MineResourceVolumeHandlerTests.cs": {
+    "mtime": 1778923625.9628386,
+    "ast_hash": "705bf27ff2885b60f613ee8429783030",
+    "semantic_hash": "705bf27ff2885b60f613ee8429783030"
+  },
+  "tests/SpaceTraders.Application.Tests/Commands/PurchaseShipHandlerTests.cs": {
+    "mtime": 1778921480.726365,
+    "ast_hash": "be534e83fcdb02bdd6644904f91bb972",
+    "semantic_hash": "be534e83fcdb02bdd6644904f91bb972"
+  },
+  "tests/SpaceTraders.Application.Tests/Events/Handlers/ChainOfCommandEventHandlerRegistrationTests.cs": {
+    "mtime": 1777642792.7794995,
+    "ast_hash": "ecce93bd26c7c31acc84dfa3818b2960",
+    "semantic_hash": "ecce93bd26c7c31acc84dfa3818b2960"
+  },
+  "tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipInTransitEventHandlerTests.cs": {
+    "mtime": 1778754235.772422,
+    "ast_hash": "7b739c404769ada46756f9ea308aed28",
+    "semantic_hash": "7b739c404769ada46756f9ea308aed28"
+  },
+  "tests/SpaceTraders.Application.Tests/Events/Handlers/Ships/ShipNavigationCompletedHandlerTests.cs": {
+    "mtime": 1778754331.28311,
+    "ast_hash": "abdb025b49a571aac88dcb998a218634",
+    "semantic_hash": "abdb025b49a571aac88dcb998a218634"
+  },
+  "tests/SpaceTraders.Application.Tests/GlobalUsings.cs": {
+    "mtime": 1777146833.5856185,
+    "ast_hash": "69f08f9365f0cf35927b2d1f0e834d4f",
+    "semantic_hash": "69f08f9365f0cf35927b2d1f0e834d4f"
+  },
+  "tests/SpaceTraders.Application.Tests/Goals/IdleGoalExecutorTests.cs": {
+    "mtime": 1777754048.6526475,
+    "ast_hash": "58194b0f99e3b5dd1ec8661293b605fa",
+    "semantic_hash": "58194b0f99e3b5dd1ec8661293b605fa"
+  },
+  "tests/SpaceTraders.Application.Tests/Goals/MineAndSellGoalExecutorTests.cs": {
+    "mtime": 1779020251.364853,
+    "ast_hash": "a1fec0bebef5be0ed141e46d28d177cb",
+    "semantic_hash": "a1fec0bebef5be0ed141e46d28d177cb"
+  },
+  "tests/SpaceTraders.Application.Tests/Goals/ShipGoalExecutorServiceTests.cs": {
+    "mtime": 1778836680.9294322,
+    "ast_hash": "505200f0cd7a6ceeba921a798af5e7d7",
+    "semantic_hash": "505200f0cd7a6ceeba921a798af5e7d7"
+  },
+  "tests/SpaceTraders.Application.Tests/Goals/TradeBetweenMarketsGoalExecutorTests.cs": {
+    "mtime": 1778853732.922953,
+    "ast_hash": "87f77a029a8cafe07bb8aa2bdcdabd21",
+    "semantic_hash": "87f77a029a8cafe07bb8aa2bdcdabd21"
+  },
+  "tests/SpaceTraders.Application.Tests/Orchestration/BudgetPolicyTests.cs": {
+    "mtime": 1777800744.5187614,
+    "ast_hash": "1be8e81301948ed8fcf91a84d96c1d6e",
+    "semantic_hash": "1be8e81301948ed8fcf91a84d96c1d6e"
+  },
+  "tests/SpaceTraders.Application.Tests/Orchestration/FleetCapacityEstimatorTests.cs": {
+    "mtime": 1777754048.6556473,
+    "ast_hash": "986c07287a802dedc96c8bbe17e554e5",
+    "semantic_hash": "986c07287a802dedc96c8bbe17e554e5"
+  },
+  "tests/SpaceTraders.Application.Tests/RateLimiting/RateLimitHandlerTests.cs": {
+    "mtime": 1777158216.2085776,
+    "ast_hash": "671b81dbe9e6141887bd3f2a5ea938a8",
+    "semantic_hash": "671b81dbe9e6141887bd3f2a5ea938a8"
+  },
+  "tests/SpaceTraders.Application.Tests/Services/FleetStatusQueryServiceTests.cs": {
+    "mtime": 1779015357.455887,
+    "ast_hash": "df3036b7934d22ce66400013cd95d52a",
+    "semantic_hash": "df3036b7934d22ce66400013cd95d52a"
+  },
+  "tests/SpaceTraders.Application.Tests/Services/NavigationPlanningServiceTests.cs": {
+    "mtime": 1777475487.169238,
+    "ast_hash": "e535dcffee41afbe4731f7dfd690ece0",
+    "semantic_hash": "e535dcffee41afbe4731f7dfd690ece0"
+  },
+  "tests/SpaceTraders.Application.Tests/Services/ShipCapabilityRegistryTests.cs": {
+    "mtime": 1777754048.6601577,
+    "ast_hash": "ffa1759921df18256f176536bfc6f284",
+    "semantic_hash": "ffa1759921df18256f176536bfc6f284"
+  },
+  "tests/SpaceTraders.Application.Tests/SpaceTraders.Application.Tests.csproj": {
+    "mtime": 1778844384.2382321,
+    "ast_hash": "834074da62aea7e58affcd7abdd2b62c",
+    "semantic_hash": "834074da62aea7e58affcd7abdd2b62c"
+  },
+  "tests/SpaceTraders.Application.Tests/TestDbContextFactory.cs": {
+    "mtime": 1777154170.2668576,
+    "ast_hash": "06b1ebe4ce058f4fa58fd32636bc7f63",
+    "semantic_hash": "06b1ebe4ce058f4fa58fd32636bc7f63"
+  },
+  "tests/SpaceTraders.Application.Tests/packages.lock.json": {
+    "mtime": 1777754048.6611571,
+    "ast_hash": "454105e891bedf620af80880c3efee96",
+    "semantic_hash": "454105e891bedf620af80880c3efee96"
+  },
+  "tests/SpaceTraders.Domain.Tests/Aggregates/AgentTests.cs": {
+    "mtime": 1776891687.6238723,
+    "ast_hash": "342b513e8eeb07d5be787a8714f0adce",
+    "semantic_hash": "342b513e8eeb07d5be787a8714f0adce"
+  },
+  "tests/SpaceTraders.Domain.Tests/Aggregates/ContractTests.cs": {
+    "mtime": 1776891731.813171,
+    "ast_hash": "2764a4872a7fde5a43a4854bc468377a",
+    "semantic_hash": "2764a4872a7fde5a43a4854bc468377a"
+  },
+  "tests/SpaceTraders.Domain.Tests/Aggregates/ShipTests.cs": {
+    "mtime": 1777571659.5819252,
+    "ast_hash": "ce12730adb9b1c952c7e054c9567e797",
+    "semantic_hash": "ce12730adb9b1c952c7e054c9567e797"
+  },
+  "tests/SpaceTraders.Domain.Tests/Enums/ShipLocalStatusMapperTests.cs": {
+    "mtime": 1777571842.4507024,
+    "ast_hash": "154b48f0c2fc604c65f1376333ef8bff",
+    "semantic_hash": "154b48f0c2fc604c65f1376333ef8bff"
+  },
+  "tests/SpaceTraders.Domain.Tests/Events/GoalEventsTests.cs": {
+    "mtime": 1777754048.6611571,
+    "ast_hash": "1eda54cca52d1c1ca026983bbf92894c",
+    "semantic_hash": "1eda54cca52d1c1ca026983bbf92894c"
+  },
+  "tests/SpaceTraders.Domain.Tests/Events/ShipEventsTests.cs": {
+    "mtime": 1777754048.6621568,
+    "ast_hash": "de30d02aaf9712e39807a3d2bedc9c51",
+    "semantic_hash": "de30d02aaf9712e39807a3d2bedc9c51"
+  },
+  "tests/SpaceTraders.Domain.Tests/GlobalUsings.cs": {
+    "mtime": 1777146833.5891275,
+    "ast_hash": "99923928bd017acaa4a7914eded609a7",
+    "semantic_hash": "99923928bd017acaa4a7914eded609a7"
+  },
+  "tests/SpaceTraders.Domain.Tests/Goals/ShipGoalSerializationTests.cs": {
+    "mtime": 1777754048.6621568,
+    "ast_hash": "e1deec4c7a49b234f717cb3d7ce9d310",
+    "semantic_hash": "e1deec4c7a49b234f717cb3d7ce9d310"
+  },
+  "tests/SpaceTraders.Domain.Tests/SpaceTraders.Domain.Tests.csproj": {
+    "mtime": 1777159360.9545224,
+    "ast_hash": "bda43df2e33885d5f6a3f4ea729da3aa",
+    "semantic_hash": "bda43df2e33885d5f6a3f4ea729da3aa"
+  },
+  "tests/SpaceTraders.Domain.Tests/ValueObjects/ValueObjectTests.cs": {
+    "mtime": 1776891751.732234,
+    "ast_hash": "5bedd45db04547d29e4cf29d8f48862d",
+    "semantic_hash": "5bedd45db04547d29e4cf29d8f48862d"
+  },
+  "tests/SpaceTraders.Domain.Tests/packages.lock.json": {
+    "mtime": 1777374746.9886756,
+    "ast_hash": "785c63799cccbba5a53750ab6c5249ec",
+    "semantic_hash": "785c63799cccbba5a53750ab6c5249ec"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/FleetGoalRepositoryTests.cs": {
+    "mtime": 1777754048.6631567,
+    "ast_hash": "59047599dfe31edd54143e3502a26fa8",
+    "semantic_hash": "59047599dfe31edd54143e3502a26fa8"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/GlobalUsings.cs": {
+    "mtime": 1777146833.5901277,
+    "ast_hash": "99923928bd017acaa4a7914eded609a7",
+    "semantic_hash": "99923928bd017acaa4a7914eded609a7"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/IntegrationTestBase.cs": {
+    "mtime": 1777159588.6384604,
+    "ast_hash": "74007b240b98323dd4f2d8df3deabf86",
+    "semantic_hash": "74007b240b98323dd4f2d8df3deabf86"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/MigrationTests.cs": {
+    "mtime": 1777642792.7846274,
+    "ast_hash": "601f746871853dca70b2d31cf106801e",
+    "semantic_hash": "601f746871853dca70b2d31cf106801e"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/Phase2DataModelTests.cs": {
+    "mtime": 1777405760.297048,
+    "ast_hash": "c12c7f981986639db68ed5193d3d1a24",
+    "semantic_hash": "c12c7f981986639db68ed5193d3d1a24"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/PlanRepositoryTests.cs": {
+    "mtime": 1777909591.7140284,
+    "ast_hash": "91b1f46b3d915678fa322b4c06f34234",
+    "semantic_hash": "91b1f46b3d915678fa322b4c06f34234"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ScoutPlanRepositoryTests.cs": {
+    "mtime": 1777909636.6607199,
+    "ast_hash": "ed5f863003e6dde4890b49aeb55f1e51",
+    "semantic_hash": "ed5f863003e6dde4890b49aeb55f1e51"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/SettingsRepositoryTests.cs": {
+    "mtime": 1777146833.5911276,
+    "ast_hash": "9ba2b00da40b0163ea7948d9967fff00",
+    "semantic_hash": "9ba2b00da40b0163ea7948d9967fff00"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ShipAssignmentRepositoryTests.cs": {
+    "mtime": 1778761867.2924747,
+    "ast_hash": "fc25ee32c11153923c5aba38a199c455",
+    "semantic_hash": "fc25ee32c11153923c5aba38a199c455"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ShipGoalHistoryRepositoryTests.cs": {
+    "mtime": 1779014868.9702213,
+    "ast_hash": "ddd731dcad633259cd7ea15f3e38c689",
+    "semantic_hash": "ddd731dcad633259cd7ea15f3e38c689"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ShipGoalRepositoryTests.cs": {
+    "mtime": 1778926492.135201,
+    "ast_hash": "4a6b1477f6702b2b473a648e7ce22cd2",
+    "semantic_hash": "4a6b1477f6702b2b473a648e7ce22cd2"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ShipRepositoryTests.cs": {
+    "mtime": 1778762265.209993,
+    "ast_hash": "367b46bb13bdb8537d6f888f2bc6c0a1",
+    "semantic_hash": "367b46bb13bdb8537d6f888f2bc6c0a1"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/ShipyardRepositoryTests.cs": {
+    "mtime": 1778761242.949446,
+    "ast_hash": "39858cf0e54f738479c4283491071068",
+    "semantic_hash": "39858cf0e54f738479c4283491071068"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/SpaceTraders.Infrastructure.Tests.csproj": {
+    "mtime": 1777159360.9555268,
+    "ast_hash": "77da7d86f9ed35b60dc2bc1ea3592bef",
+    "semantic_hash": "77da7d86f9ed35b60dc2bc1ea3592bef"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/StoredCredentialTests.cs": {
+    "mtime": 1777160015.6359966,
+    "ast_hash": "55e153ae9e7f190b29e0b77218295a14",
+    "semantic_hash": "55e153ae9e7f190b29e0b77218295a14"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/TradeOpportunityRepositoryTests.cs": {
+    "mtime": 1777149713.9105551,
+    "ast_hash": "a7998bde9730dcf0ee17ad4323e793ca",
+    "semantic_hash": "a7998bde9730dcf0ee17ad4323e793ca"
+  },
+  "tests/SpaceTraders.Infrastructure.Tests/packages.lock.json": {
+    "mtime": 1777754048.6641586,
+    "ast_hash": "02cff367dbb2e36237f402449c007b6e",
+    "semantic_hash": "02cff367dbb2e36237f402449c007b6e"
+  },
+  "tests/SpaceTraders.Integration.Test/ContractPlanSnapshotIntegrationTests.cs": {
+    "mtime": 1779023275.8218074,
+    "ast_hash": "c59a23d52ddde8f50e3d654d54d71d58",
+    "semantic_hash": "c59a23d52ddde8f50e3d654d54d71d58"
+  },
+  "tests/SpaceTraders.Integration.Test/SpaceTraders.Integration.Test.csproj": {
+    "mtime": 1778760854.162248,
+    "ast_hash": "4272d5266bd6c227b95b58f39b950a87",
+    "semantic_hash": "4272d5266bd6c227b95b58f39b950a87"
+  },
+  "tests/SpaceTraders.Integration.Test/packages.lock.json": {
+    "mtime": 1777676244.1148489,
+    "ast_hash": "02fc7f547a919cb6847ef1a6a9959832",
+    "semantic_hash": "02fc7f547a919cb6847ef1a6a9959832"
+  },
+  "tests/SpaceTraders.Integration.Test/startup-snapshot-21-20260514-105213.json": {
+    "mtime": 1778756083.317658,
+    "ast_hash": "ccd14e7f828fc65502fe4104427e6777",
+    "semantic_hash": "ccd14e7f828fc65502fe4104427e6777"
+  },
+  "tests/SpaceTraders.Integration.Test/startup-snapshot-6-20260501-223730-initial.json": {
+    "mtime": 1777675346.915009,
+    "ast_hash": "8f838f1df006cf94890193584ce8d8e2",
+    "semantic_hash": "8f838f1df006cf94890193584ce8d8e2"
+  }
+}

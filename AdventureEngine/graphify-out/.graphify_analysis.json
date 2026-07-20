@@ -1,0 +1,576 @@
+{
+  "communities": {
+    "0": [
+      "csharp_namespace:28c0095fa84d4756",
+      "src_adventureengine_application_agents_agentusage",
+      "src_adventureengine_application_agents_agentusage_adventureengine_application_agents_agentusage",
+      "src_adventureengine_application_agents_inarratoragent",
+      "src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent",
+      "src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_generatechaptersummaryasync",
+      "src_adventureengine_application_agents_inarratoragent_adventureengine_application_agents_inarratoragent_streamresponseasync",
+      "src_adventureengine_application_agents_inarratoragent_cs_action",
+      "src_adventureengine_application_agents_inarratoragent_cs_cancellationtoken",
+      "src_adventureengine_application_agents_inarratoragent_cs_iasyncenumerable",
+      "src_adventureengine_application_agents_inarratoragent_cs_ireadonlylist",
+      "src_adventureengine_application_agents_inarratoragent_cs_narratorresponse",
+      "src_adventureengine_application_agents_inarratoragent_cs_playerinput",
+      "src_adventureengine_application_agents_inarratoragent_cs_summary",
+      "src_adventureengine_application_agents_inarratoragent_cs_task",
+      "src_adventureengine_application_agents_inarratoragent_cs_usage",
+      "src_adventureengine_application_agents_inarratoragent_cs_worldmanifest",
+      "src_adventureengine_application_agents_inpcagent",
+      "src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent",
+      "src_adventureengine_application_agents_inpcagent_adventureengine_application_agents_inpcagent_respondasync",
+      "src_adventureengine_application_agents_inpcagent_cs_cancellationtoken",
+      "src_adventureengine_application_agents_inpcagent_cs_dialogue",
+      "src_adventureengine_application_agents_inpcagent_cs_task",
+      "src_adventureengine_application_agents_inpcagent_cs_usage",
+      "src_adventureengine_application_agents_narratorcontext",
+      "src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "src_adventureengine_application_agents_narratorcontext_cs_ireadonlydictionary",
+      "src_adventureengine_application_agents_narratorcontext_cs_ireadonlylist",
+      "src_adventureengine_application_agents_narratorcontext_cs_narratorresponse",
+      "src_adventureengine_application_agents_narratorcontext_cs_playerinput",
+      "src_adventureengine_application_agents_narratorcontext_cs_worldmanifest",
+      "src_adventureengine_application_agents_npccontext",
+      "src_adventureengine_application_agents_npccontext_adventureengine_application_agents_npccontext",
+      "src_adventureengine_application_agents_npccontext_cs_npcdefinition"
+    ],
+    "1": [
+      "exception",
+      "func",
+      "generatedregex",
+      "idocumentsession",
+      "igamesessionservice",
+      "regex",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_bracketedscenemarkerregex",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_callwithretryasync",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_collectstreamasync",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_createsessionasync",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_getplayersessionsasync",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_getsessionasync",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_istransienterror",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_normalizeplayerid",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_parsestatemarkers",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_scenemarkerregex",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_streambuffermarkerregex",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_stripinternaldisplayartifacts",
+      "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice_submitactionasync",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_cancellationtoken",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_gamesession",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_guid",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_iasyncenumerable",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_idirectoragent",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_ilogger",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_inarratoragent",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_inpcagent",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_int",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_ireadonlylist",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_nextsceneid",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_outcomewon",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_response",
+      "src_adventureengine_infrastructure_gamesessionservice_cs_task"
+    ],
+    "2": [
+      "csharp_namespace:1e5b4406fd064c8c",
+      "csharp_namespace:78cbbd6730138de7",
+      "csharp_namespace:adfb5802d03ceb57",
+      "csharp_namespace:c3a9d97988b1bc07",
+      "datetime",
+      "dictionary",
+      "src_adventureengine_application_globalusings",
+      "src_adventureengine_domain_events_gameevents",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chaptercompleted",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_chapterstarted",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_gameended",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_npcspoke",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_playeracted",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sceneentered",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_sessioncreated",
+      "src_adventureengine_domain_events_gameevents_adventureengine_domain_events_usagerecorded",
+      "src_adventureengine_domain_gamesession",
+      "src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "src_adventureengine_domain_gamesession_cs_guid",
+      "src_adventureengine_domain_gamesession_cs_list",
+      "src_adventureengine_domain_gamesession_cs_narratorresponse",
+      "src_adventureengine_domain_gamesession_cs_playerinput",
+      "src_adventureengine_domain_sessionstatus",
+      "src_adventureengine_domain_sessionstatus_adventureengine_domain_sessionstatus",
+      "src_adventureengine_domain_worldmanifest",
+      "src_adventureengine_domain_worldmanifest_adventureengine_domain_chapterdefinition",
+      "src_adventureengine_domain_worldmanifest_adventureengine_domain_npcdefinition",
+      "src_adventureengine_domain_worldmanifest_adventureengine_domain_scenedefinition",
+      "src_adventureengine_domain_worldmanifest_adventureengine_domain_worldmanifest",
+      "src_adventureengine_domain_worldmanifest_cs_ireadonlylist",
+      "src_adventureengine_infrastructure_globalusings",
+      "tests_adventureengine_tests_gamesessiontests",
+      "tests_adventureengine_tests_moderationresultparsertests"
+    ],
+    "3": [
+      "inarratoragent",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildcurrentchapter",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildrecenthistory",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildstoryprogress",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_buildworldanchor",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_generatechaptersummaryasync",
+      "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent_streamresponseasync",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_action",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_agentusage",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_anthropicclient",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_cancellationtoken",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_chapterdefinition",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_iasyncenumerable",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_int",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_ireadonlydictionary",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_ireadonlylist",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_list",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_narratorcontext",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_narratorresponse",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_npcdefinition",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_playerinput",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_scenedefinition",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_string",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_summary",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_task",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_usage",
+      "src_adventureengine_infrastructure_agents_narratoragent_cs_worldmanifest"
+    ],
+    "4": [
+      "chaptercompleted",
+      "gameended",
+      "playeracted",
+      "sceneentered",
+      "src_adventureengine_domain_gamesession_adventureengine_domain_gamesession_apply",
+      "src_adventureengine_domain_gamesession_cs_sessioncreated",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_chaptercompleted_advanceschapterandclearshistory",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_lost_setsstatusabandoned",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_gameended_won_setsstatuscompleted",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_addstorecenthistoryandchapterhistory",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_playeracted_slideswindowaftersix",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_sceneentered_updatescurrentscene",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatesallnonstreamingagenttags",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_apply_usagerecorded_accumulatestokens",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_invokeparsestatemarkers",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_makesessioncreated",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_parsestatemarkers_parsessceneandoutcomemarkers",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_parsestatemarkers_stripsleakeddisplayartifacts",
+      "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests_usagerecorded_deserializeslegacypayloadwithzerocachedefaults",
+      "tests_adventureengine_tests_gamesessiontests_cs_fact",
+      "tests_adventureengine_tests_gamesessiontests_cs_nextsceneid",
+      "tests_adventureengine_tests_gamesessiontests_cs_outcomewon",
+      "tests_adventureengine_tests_gamesessiontests_cs_response",
+      "usagerecorded"
+    ],
+    "5": [
+      "result",
+      "src_adventureengine_application_agents_moderationresult",
+      "src_adventureengine_application_agents_moderationresult_adventureengine_application_agents_moderationresult",
+      "src_adventureengine_application_agents_moderationresultparser",
+      "src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresponse",
+      "src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser",
+      "src_adventureengine_application_agents_moderationresultparser_adventureengine_application_agents_moderationresultparser_tryparse",
+      "src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent",
+      "src_adventureengine_infrastructure_agents_moderationagent_adventureengine_infrastructure_agents_moderationagent_issafeasync",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_agentusage",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_anthropicclient",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_cancellationtoken",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_ilogger",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_moderationresult",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_task",
+      "src_adventureengine_infrastructure_agents_moderationagent_cs_usage",
+      "tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests",
+      "tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_emptyorgarbagepayload_failsanddefaultstosaferesult",
+      "tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_safepayload_returnssaferesult",
+      "tests_adventureengine_tests_moderationresultparsertests_adventureengine_tests_moderationresultparsertests_tryparse_unsafepayloadwithreason_returnsunsaferesult",
+      "tests_adventureengine_tests_moderationresultparsertests_cs_fact"
+    ],
+    "6": [
+      "csharp_namespace:58687b24a3ccd031",
+      "csharp_namespace:d48a699f635e2eee",
+      "csharp_namespace:ed8346fca9d64447",
+      "iconfiguration",
+      "iservicecollection",
+      "src_adventureengine_infrastructure_agents_directoragent",
+      "src_adventureengine_infrastructure_agents_moderationagent",
+      "src_adventureengine_infrastructure_agents_narratoragent",
+      "src_adventureengine_infrastructure_agents_npcagent",
+      "src_adventureengine_infrastructure_anthropic_anthropicoptions",
+      "src_adventureengine_infrastructure_anthropic_anthropicoptions_adventureengine_infrastructure_anthropic_anthropicoptions",
+      "src_adventureengine_infrastructure_anthropic_anthropicoptions_cs_string",
+      "src_adventureengine_infrastructure_gamesessionservice",
+      "src_adventureengine_infrastructure_martenconfiguration",
+      "src_adventureengine_infrastructure_martenconfiguration_adventureengine_infrastructure_martenconfiguration",
+      "src_adventureengine_infrastructure_martenconfiguration_adventureengine_infrastructure_martenconfiguration_configure",
+      "src_adventureengine_infrastructure_servicecollectionextensions",
+      "src_adventureengine_infrastructure_servicecollectionextensions_adventureengine_infrastructure_servicecollectionextensions",
+      "src_adventureengine_infrastructure_servicecollectionextensions_adventureengine_infrastructure_servicecollectionextensions_addadventureengineinfrastructure",
+      "storeoptions"
+    ],
+    "7": [
+      "adventureengine",
+      "nuget_anthropic_sdk",
+      "nuget_aspnetcore_healthchecks_npgsql",
+      "nuget_coverlet_collector",
+      "nuget_marten",
+      "nuget_microsoft_extensions_options_configurationextensions",
+      "nuget_microsoft_net_test_sdk",
+      "nuget_xunit",
+      "nuget_xunit_runner_visualstudio",
+      "sdk_microsoft_net_sdk_web",
+      "src_adventureengine_application_adventureengine_application",
+      "src_adventureengine_application_adventureengine_application_csproj_sdk_microsoft_net_sdk",
+      "src_adventureengine_domain_adventureengine_domain",
+      "src_adventureengine_domain_adventureengine_domain_csproj_sdk_microsoft_net_sdk",
+      "src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "src_adventureengine_infrastructure_adventureengine_infrastructure_csproj_sdk_microsoft_net_sdk",
+      "src_adventureengine_web_adventureengine_web",
+      "tests_adventureengine_tests_adventureengine_tests",
+      "tests_adventureengine_tests_adventureengine_tests_csproj_sdk_microsoft_net_sdk"
+    ],
+    "8": [
+      "dataannotationsvalidator",
+      "editform",
+      "inputtextarea",
+      "navigationmanager",
+      "route",
+      "src_adventureengine_web_components_pages_home",
+      "src_adventureengine_web_components_pages_home_clearnameasync",
+      "src_adventureengine_web_components_pages_home_handlenamekeydownasync",
+      "src_adventureengine_web_components_pages_home_loadpastsessionsasync",
+      "src_adventureengine_web_components_pages_home_onafterrenderasync",
+      "src_adventureengine_web_components_pages_home_razor_gamesession",
+      "src_adventureengine_web_components_pages_home_razor_igamesessionservice",
+      "src_adventureengine_web_components_pages_home_razor_ijsruntime",
+      "src_adventureengine_web_components_pages_home_razor_pagetitle",
+      "src_adventureengine_web_components_pages_home_savenameasync",
+      "src_adventureengine_web_components_pages_home_startadventureasync",
+      "src_adventureengine_web_components_pages_home_statusbadgeclass",
+      "validationmessage"
+    ],
+    "9": [
+      "src_adventureengine_web_properties_launchsettings",
+      "src_adventureengine_web_properties_launchsettings_environmentvariables_aspnetcore_environment",
+      "src_adventureengine_web_properties_launchsettings_http_applicationurl",
+      "src_adventureengine_web_properties_launchsettings_http_commandname",
+      "src_adventureengine_web_properties_launchsettings_http_dotnetrunmessages",
+      "src_adventureengine_web_properties_launchsettings_http_environmentvariables",
+      "src_adventureengine_web_properties_launchsettings_http_launchbrowser",
+      "src_adventureengine_web_properties_launchsettings_https_applicationurl",
+      "src_adventureengine_web_properties_launchsettings_https_commandname",
+      "src_adventureengine_web_properties_launchsettings_https_dotnetrunmessages",
+      "src_adventureengine_web_properties_launchsettings_https_environmentvariables",
+      "src_adventureengine_web_properties_launchsettings_https_launchbrowser",
+      "src_adventureengine_web_properties_launchsettings_profiles",
+      "src_adventureengine_web_properties_launchsettings_profiles_http",
+      "src_adventureengine_web_properties_launchsettings_profiles_https",
+      "src_adventureengine_web_properties_launchsettings_schema"
+    ],
+    "10": [
+      "adventureengine_application_sessions",
+      "adventureengine_domain",
+      "adventureengine_web",
+      "adventureengine_web_components",
+      "adventureengine_web_components_layout",
+      "microsoft_aspnetcore_components_forms",
+      "microsoft_aspnetcore_components_routing",
+      "microsoft_aspnetcore_components_web",
+      "microsoft_aspnetcore_components_web_virtualization",
+      "src_adventureengine_web_components_imports",
+      "src_adventureengine_web_components_imports_razor_microsoft_jsinterop",
+      "src_adventureengine_web_program",
+      "static",
+      "system_net_http_json"
+    ],
+    "11": [
+      "src_adventureengine_application_agents_jsonresponseparser",
+      "src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser",
+      "src_adventureengine_application_agents_jsonresponseparser_adventureengine_application_agents_jsonresponseparser_extractjsonpayload",
+      "src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent_generateworldasync",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_cancellationtoken",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_task",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_usage",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_world",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_worldmanifest",
+      "tests_adventureengine_tests_worldmanifesttests",
+      "tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests",
+      "tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromfencedjson",
+      "tests_adventureengine_tests_worldmanifesttests_adventureengine_tests_worldmanifesttests_worldmanifest_deserializesfromjson",
+      "tests_adventureengine_tests_worldmanifesttests_cs_fact"
+    ],
+    "12": [
+      "src_adventureengine_application_agents_idirectoragent",
+      "src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent",
+      "src_adventureengine_application_agents_idirectoragent_adventureengine_application_agents_idirectoragent_generateworldasync",
+      "src_adventureengine_application_agents_idirectoragent_cs_cancellationtoken",
+      "src_adventureengine_application_agents_idirectoragent_cs_task",
+      "src_adventureengine_application_agents_idirectoragent_cs_usage",
+      "src_adventureengine_application_agents_idirectoragent_cs_world",
+      "src_adventureengine_application_agents_idirectoragent_cs_worldmanifest",
+      "src_adventureengine_infrastructure_agents_directoragent_adventureengine_infrastructure_agents_directoragent",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_anthropicclient",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_ilogger",
+      "src_adventureengine_infrastructure_agents_directoragent_cs_string"
+    ],
+    "13": [
+      "src_adventureengine_application_sessions_igamesessionservice",
+      "src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice",
+      "src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_createsessionasync",
+      "src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getplayersessionsasync",
+      "src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_getsessionasync",
+      "src_adventureengine_application_sessions_igamesessionservice_adventureengine_application_sessions_igamesessionservice_submitactionasync",
+      "src_adventureengine_application_sessions_igamesessionservice_cs_cancellationtoken",
+      "src_adventureengine_application_sessions_igamesessionservice_cs_gamesession",
+      "src_adventureengine_application_sessions_igamesessionservice_cs_guid",
+      "src_adventureengine_application_sessions_igamesessionservice_cs_ireadonlylist",
+      "src_adventureengine_application_sessions_igamesessionservice_cs_task"
+    ],
+    "14": [
+      "inpcagent",
+      "src_adventureengine_infrastructure_agents_npcagent_adventureengine_infrastructure_agents_npcagent",
+      "src_adventureengine_infrastructure_agents_npcagent_adventureengine_infrastructure_agents_npcagent_respondasync",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_agentusage",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_anthropicclient",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_cancellationtoken",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_dialogue",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_npccontext",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_task",
+      "src_adventureengine_infrastructure_agents_npcagent_cs_usage"
+    ],
+    "15": [
+      "gameterminal",
+      "route_play_sessionid_guid",
+      "src_adventureengine_web_components_pages_play",
+      "src_adventureengine_web_components_pages_play_dispose",
+      "src_adventureengine_web_components_pages_play_handlekeydownasync",
+      "src_adventureengine_web_components_pages_play_oninitializedasync",
+      "src_adventureengine_web_components_pages_play_razor_igamesessionservice",
+      "src_adventureengine_web_components_pages_play_razor_pagetitle",
+      "src_adventureengine_web_components_pages_play_submitactionasync"
+    ],
+    "16": [
+      "src_adventureengine_web_components_layout_reconnectmodal_razor",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_handlereconnectstatechanged",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_reconnectmodal",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_resume",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_resumebutton",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_retry",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_retrybutton",
+      "src_adventureengine_web_components_layout_reconnectmodal_razor_retrywhendocumentbecomesvisible"
+    ],
+    "17": [
+      "headoutlet",
+      "importmap",
+      "reconnectmodal",
+      "resourcepreloader",
+      "routes",
+      "src_adventureengine_web_components_app"
+    ],
+    "18": [
+      "focusonnavigate",
+      "found",
+      "router",
+      "routeview",
+      "src_adventureengine_web_components_routes"
+    ],
+    "19": [
+      "microsoft_aspnetcore_components",
+      "src_adventureengine_web_components_gameterminal",
+      "src_adventureengine_web_components_gameterminal_onafterrenderasync",
+      "src_adventureengine_web_components_gameterminal_razor_ijsruntime",
+      "src_adventureengine_web_components_gameterminal_razor_microsoft_jsinterop"
+    ],
+    "20": [
+      "src_adventureengine_web_components_pages_error",
+      "src_adventureengine_web_components_pages_error_oninitialized",
+      "src_adventureengine_web_components_pages_error_razor_pagetitle",
+      "system_diagnostics"
+    ],
+    "21": [
+      "navlink",
+      "src_adventureengine_web_components_layout_navmenu"
+    ],
+    "22": [
+      "navmenu",
+      "src_adventureengine_web_components_layout_mainlayout"
+    ],
+    "23": [
+      "src_adventureengine_domain_globalusings"
+    ],
+    "24": [
+      "src_adventureengine_web_components_layout_reconnectmodal"
+    ],
+    "25": [
+      "src_adventureengine_web_components_pages_notfound"
+    ],
+    "26": [
+      "src_adventureengine_web_wwwroot_js_gameterminal"
+    ]
+  },
+  "cohesion": {
+    "0": 0.06951871657754011,
+    "1": 0.10695187165775401,
+    "2": 0.07765151515151515,
+    "3": 0.10052910052910052,
+    "4": 0.17,
+    "5": 0.11428571428571428,
+    "6": 0.13157894736842105,
+    "7": 0.14619883040935672,
+    "8": 0.1111111111111111,
+    "9": 0.13333333333333333,
+    "10": 0.14285714285714285,
+    "11": 0.15384615384615385,
+    "12": 0.16666666666666666,
+    "13": 0.34545454545454546,
+    "14": 0.2,
+    "15": 0.2222222222222222,
+    "16": 0.32142857142857145,
+    "17": 0.3333333333333333,
+    "18": 0.4,
+    "19": 0.4,
+    "20": 0.5,
+    "21": 1.0,
+    "22": 1.0,
+    "23": 1.0,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0
+  },
+  "gods": [
+    {
+      "id": "src_adventureengine_infrastructure_gamesessionservice_adventureengine_infrastructure_gamesessionservice",
+      "label": "GameSessionService",
+      "degree": 22
+    },
+    {
+      "id": "tests_adventureengine_tests_gamesessiontests_adventureengine_tests_gamesessiontests",
+      "label": "GameSessionTests",
+      "degree": 14
+    },
+    {
+      "id": "csharp_namespace:28c0095fa84d4756",
+      "label": "AdventureEngine.Application.Agents",
+      "degree": 13
+    },
+    {
+      "id": "src_adventureengine_infrastructure_agents_narratoragent_adventureengine_infrastructure_agents_narratoragent",
+      "label": "NarratorAgent",
+      "degree": 11
+    },
+    {
+      "id": "src_adventureengine_domain_gamesession_adventureengine_domain_gamesession",
+      "label": "GameSession",
+      "degree": 10
+    },
+    {
+      "id": "tests_adventureengine_tests_adventureengine_tests",
+      "label": "AdventureEngine.Tests",
+      "degree": 9
+    },
+    {
+      "id": "src_adventureengine_infrastructure_adventureengine_infrastructure",
+      "label": "AdventureEngine.Infrastructure",
+      "degree": 8
+    },
+    {
+      "id": "src_adventureengine_application_agents_narratorcontext_adventureengine_application_agents_narratorcontext",
+      "label": "NarratorContext",
+      "degree": 7
+    },
+    {
+      "id": "csharp_namespace:78cbbd6730138de7",
+      "label": "AdventureEngine.Domain",
+      "degree": 7
+    },
+    {
+      "id": "src_adventureengine_application_adventureengine_application",
+      "label": "AdventureEngine.Application",
+      "degree": 6
+    }
+  ],
+  "surprises": [
+    {
+      "source": "GameSession",
+      "target": "SessionStatus",
+      "source_files": [
+        "src/AdventureEngine.Domain/GameSession.cs",
+        "src/AdventureEngine.Domain/SessionStatus.cs"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "peripheral node `SessionStatus` unexpectedly reaches hub `GameSession`"
+    },
+    {
+      "source": "GameSessionService",
+      "target": "ModerationAgent",
+      "source_files": [
+        "src/AdventureEngine.Infrastructure/GameSessionService.cs",
+        "src/AdventureEngine.Infrastructure/Agents/ModerationAgent.cs"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "DirectorAgent",
+      "target": "IDirectorAgent",
+      "source_files": [
+        "src/AdventureEngine.Infrastructure/Agents/DirectorAgent.cs",
+        "src/AdventureEngine.Application/Agents/IDirectorAgent.cs"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "implements",
+      "why": "cross-file semantic connection"
+    },
+    {
+      "source": "GameSession",
+      "target": "WorldManifest",
+      "source_files": [
+        "src/AdventureEngine.Domain/GameSession.cs",
+        "src/AdventureEngine.Domain/WorldManifest.cs"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "references",
+      "why": "cross-file semantic connection"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `AdventureEngine.Application.Agents` connect `Community 0` to `Community 2`, `Community 5`, `Community 6`, `Community 11`, `Community 12`?",
+      "why": "High betweenness centrality (0.240) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `GameSessionService` connect `Community 1` to `Community 5`, `Community 6`?",
+      "why": "High betweenness centrality (0.124) - this node is a cross-community bridge."
+    },
+    {
+      "type": "isolated_nodes",
+      "question": "What connects `Microsoft.NET.Sdk`, `ModerationResponse`, `Microsoft.NET.Sdk` to the rest of the system?",
+      "why": "87 weakly-connected nodes found - possible documentation gaps or missing edges."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.06951871657754011 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.10695187165775401 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 2` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07765151515151515 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 3` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.10052910052910052 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
