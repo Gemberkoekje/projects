@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!--
+      Version of DotNetProjectFile.Analyzers under test.
+      Override on the command line, e.g.  -p:AnalyzerVersion=1.15.0
+      1.15.0 => builds clean (even with SonarQubeIntegration=true)
+      1.15.1 => BLAZOR101 when SonarQubeIntegration=true
+    -->
+    <AnalyzerVersion Condition="'$(AnalyzerVersion)' == ''">1.15.1</AnalyzerVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DotNetProjectFile.Analyzers" Version="$(AnalyzerVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>
