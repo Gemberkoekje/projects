@@ -1,0 +1,29 @@
+# This repo has core.autocrlf=true, which would otherwise hand build.sh CRLF line
+# endings and break its shebang on Linux/WSL. Pin the endings that matter and
+# mark binary assets so Git never tries to normalize or diff them.
+
+* text=auto
+
+# Scripts: endings are semantic, not cosmetic.
+*.sh   text eol=lf
+*.ps1  text eol=crlf
+
+# Unity serializes these as text (Force Text asset serialization).
+*.unity        text
+*.prefab       text
+*.asset        text
+*.mat          text
+*.meta         text
+*.asmdef       text
+*.inputactions text
+
+# Art and other binaries. .glb files are small enough that Git LFS is not
+# warranted; they just must never be treated as text.
+*.glb  binary
+*.gltf binary
+*.blend binary
+*.fbx  binary
+*.png  binary
+*.jpg  binary
+*.wav  binary
+*.ogg  binary

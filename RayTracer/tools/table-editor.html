@@ -12,14 +12,14 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:radial-gradient(130% 90% at 50% -10%,#131a2b,var(--bg) 62%);color:var(--ink);font-family:var(--sans);line-height:1.5}
-  .wrap{max-width:1180px;margin:0 auto;padding:24px 20px 60px}
+  .wrap{max-width:1260px;margin:0 auto;padding:24px 20px 60px}
   header{border-bottom:1px solid var(--edge);padding-bottom:14px;margin-bottom:18px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
   h1{font-family:var(--mono);font-weight:600;font-size:22px;margin:0;letter-spacing:-.01em}
   .hint{color:var(--dim);font-size:13px}
-  .app{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start}
+  .app{display:grid;grid-template-columns:minmax(440px,600px) minmax(0,1fr);gap:22px;align-items:start}
   @media(max-width:900px){.app{grid-template-columns:1fr}}
   .stage{background:var(--panel);border:1px solid var(--edge);border-radius:14px;padding:10px}
-  canvas{display:block;width:430px;max-width:100%;height:auto;border-radius:8px;background:#0c0f17;touch-action:none;cursor:crosshair}
+  canvas{display:block;width:100%;max-width:100%;height:auto;border-radius:8px;background:#0c0f17;touch-action:none;cursor:crosshair}
   .readout{font-family:var(--mono);font-size:12px;color:var(--dim);padding:8px 4px 2px;display:flex;justify-content:space-between;gap:10px}
   .readout b{color:var(--cyan);font-weight:600}
   .side{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -91,6 +91,10 @@
           <span class="muted">start <b id="ballPos" style="color:#d2dcf0">—</b></span>
           <button id="ghostReset">Ghost → centre</button>
         </div>
+        <div class="row" style="margin-bottom:11px">
+          <button id="ballOrig">Ball → original size</button>
+          <span class="muted" id="ballOrigHint">needs a loaded blueprint</span>
+        </div>
         <div class="gauge"><span>ghost clearance</span><b id="gaugeVal">—</b></div>
         <p class="muted" style="margin-top:9px">Drag the ghost into a gap: <b style="color:var(--red)">red</b> = won't fit, <b style="color:var(--green)">green</b> = clears. Clearance is to the nearest <b>wall</b>.</p>
       </div>
@@ -103,22 +107,38 @@
           <label class="lbl"><input type="checkbox" id="chain" checked> endpoint&nbsp;snap</label>
         </div>
         <div class="row" style="margin-top:11px;gap:10px">
-          <button id="bgBtn">Load reference image</button>
-          <label class="lbl" style="flex:1">opacity <input type="range" id="bgOp" min="0" max="100" value="45" style="flex:1"></label>
+          <button id="bgBlueprint" class="pri">Load blueprint</button>
+          <button id="bgBtn">Load image…</button>
+          <button id="bgClear">Clear</button>
         </div>
+        <div class="row" style="margin-top:9px;gap:12px;align-items:center">
+          <label class="lbl" style="flex:1">opacity <input type="range" id="bgOp" min="0" max="100" value="45" style="flex:1"></label>
+          <label class="lbl" style="flex:1">scale <input type="range" id="bgScale" min="30" max="300" value="100" style="flex:1"></label>
+        </div>
+        <div class="row" style="margin-top:9px;gap:10px;align-items:center">
+          <label class="lbl">nudge&nbsp;x <input type="number" id="bgOffX" value="0" step="0.1" style="width:58px"></label>
+          <label class="lbl">z <input type="number" id="bgOffZ" value="0" step="0.1" style="width:58px"></label>
+          <button id="bgReset">Reset fit</button>
+        </div>
+        <p class="muted" style="margin-top:8px;font-size:11.5px">Blueprint is loaded from <span class="k">DatBlueprint/blueprint.svg</span>. When <span class="k">blueprint.json</span> carries a calibration block, the real table (16×29 <code>.dat</code> units) is auto-scaled onto the playfield and <b>Ball → original size</b> sizes the ball to match; scale/nudge fine-tune. A hand-loaded image (no calibration) just stretches to the playfield.</p>
         <input type="file" id="bgFile" accept="image/*" style="display:none">
       </div>
 
       <div class="card">
         <h2>JSON</h2>
         <div class="row" style="margin-bottom:9px">
-          <button id="exp" class="pri">Refresh ↧</button>
+          <button id="save" class="pri">Save → game ↑</button>
+          <button id="reload">Reload from game ↓</button>
+          <label class="lbl"><input type="checkbox" id="autoSave"> auto-save</label>
+        </div>
+        <div class="row" style="margin-bottom:9px">
+          <button id="exp">Refresh box ↧</button>
           <button id="copy">Copy</button>
-          <button id="dl">Download table.json</button>
+          <button id="dl">Download</button>
           <button id="imp">Load from box ↥</button>
         </div>
         <textarea id="json" spellcheck="false"></textarea>
-        <p class="muted" style="margin-top:8px">Run it: <span class="k">--table-topdown --table table.json</span></p>
+        <p class="muted" style="margin-top:8px"><b>Save → game</b> writes <span class="k">Pinball.App/table.json</span> (needs <span class="k">table-editor-server.py</span>). Run it: <span class="k">--table table.json</span></p>
       </div>
     </div>
   </div>
@@ -128,10 +148,20 @@
 <script>
 (function(){
   "use strict";
-  var FIELD={minX:-5.5,maxX:5.5,minZ:0,maxZ:24};
+  var FIELD={minX:-5.5,maxX:5.5,minZ:0,maxZ:19.94};   // 11×19.94 = the real table's 16:29 aspect at 1 dat = 0.6875 → table fills it AND the 0.3 dat ball = 0.206
   var T={minX:-7.5,maxX:7.5,minZ:-2,maxZ:26,P:12};
   var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
-  var areaW=cv.width-2*T.P, areaH=cv.height-2*T.P;
+  var LOGW=444, LOGH=808;                       // logical drawing space — all coords, sizes & fonts are in these units
+  var areaW=LOGW-2*T.P, areaH=LOGH-2*T.P;
+  // Size the backing buffer to the on-screen size × devicePixelRatio so the plot stays crisp at any
+  // browser zoom, and scale the context so the drawing code keeps working in the fixed LOGW×LOGH space.
+  function setupCanvas(){
+    var dpr=window.devicePixelRatio||1, cssW=cv.clientWidth||LOGW, s=cssW/LOGW*dpr;
+    cv.width=Math.round(LOGW*s); cv.height=Math.round(LOGH*s);
+    ctx.setTransform(s,0,0,s,0,0);
+    draw();
+  }
+  window.addEventListener('resize',setupCanvas);
 
   var table={
     version:1, wallHeight:1.3,
@@ -148,7 +178,7 @@
   };
   var ELEM_COLLS=['bumpers','posts','flippers','slingshots','targets','lights'];
   var ghost={x:0,z:12};
-  var sel=null, drag=null, bg=null, bgOp=0.45;
+  var sel=null, drag=null, bg=null, bgOp=0.45, bgScale=1, bgOffX=0, bgOffZ=0, bgCal=null;
 
   function perU(){ return areaW/(T.maxX-T.minX); }
   function X(x){ return T.P+(x-T.minX)/(T.maxX-T.minX)*areaW; }
@@ -207,8 +237,20 @@
     ctx.lineCap='round'; ctx.lineWidth=t; ctx.strokeStyle='rgba('+rgb+',.5)'; ctx.beginPath(); ctx.moveTo(X(a[0]),Y(a[1])); ctx.lineTo(X(b[0]),Y(b[1])); ctx.stroke(); ctx.lineCap='butt';
     ctx.lineWidth=se?2:1.4; ctx.strokeStyle='rgb('+rgb+')'; ctx.beginPath(); ctx.moveTo(X(a[0]),Y(a[1])); ctx.lineTo(X(b[0]),Y(b[1])); ctx.stroke();
     handle(a[0],a[1],se); handle(b[0],b[1],se); }
-  function bat(pivot,tip,w,rgb,se){ seg(pivot,tip,rgb,se,(w||0.28)*2);
-    var cx=X(pivot[0]),cy=Y(pivot[1]); ctx.beginPath();ctx.arc(cx,cy,3.5,0,7);ctx.fillStyle='rgb('+rgb+')';ctx.fill(); }
+  var FLIP_TAPER=0.5;   // tip radius / pivot radius — the real flipper taper (shared with the game's AddFlipper)
+  // A real flipper silhouette: a tapered stadium — pivot radius Rp (wide, rounded) narrowing to Rt at the tip,
+  // joined by the two external tangents. width = the pivot radius (half-width at the base).
+  function bat(pivot,tip,w,rgb,se){
+    var Rp=(w||0.28), Rt=Rp*FLIP_TAPER;
+    var dx=tip[0]-pivot[0], dz=tip[1]-pivot[1], L=Math.hypot(dx,dz)||1e-6, base=Math.atan2(dz,dx);
+    var th=Math.asin(Math.max(-1,Math.min(1,(Rp-Rt)/L))), aUp=base+Math.PI/2-th, aLo=base-Math.PI/2+th, N=14, i,a;
+    ctx.beginPath();
+    for(i=0;i<=N;i++){ a=aLo-(Math.PI+2*th)*i/N; var px=X(pivot[0]+Math.cos(a)*Rp),py=Y(pivot[1]+Math.sin(a)*Rp); if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    for(i=0;i<=N;i++){ a=aUp-(Math.PI-2*th)*i/N; ctx.lineTo(X(tip[0]+Math.cos(a)*Rt),Y(tip[1]+Math.sin(a)*Rt)); }
+    ctx.closePath();
+    ctx.fillStyle='rgba('+rgb+',.28)'; ctx.fill();
+    ctx.lineWidth=se?2.5:1.6; ctx.strokeStyle=se?'#3fe0ff':'rgb('+rgb+')'; ctx.stroke();
+    handle(pivot[0],pivot[1],se); handle(tip[0],tip[1],se); }
   function drawWall(w,se){ var poly=tess(w),p=w.points;
     if(poly){ ctx.lineWidth=se?3:2; ctx.strokeStyle=se?'#3fe0ff':'rgba(233,236,247,.55)'; ctx.beginPath(); ctx.moveTo(X(poly[0][0]),Y(poly[0][1])); for(var q=1;q<poly.length;q++)ctx.lineTo(X(poly[q][0]),Y(poly[q][1])); ctx.stroke(); }
     if(!p||!p.length) return;
@@ -222,17 +264,34 @@
     for(var i=0;i<8;i++){var a=i/8*Math.PI*2; ctx.moveTo(cx+Math.cos(a)*5,cy+Math.sin(a)*5); ctx.lineTo(cx+Math.cos(a)*10,cy+Math.sin(a)*10);} ctx.strokeStyle=c;ctx.lineWidth=1;ctx.stroke();
     handle(x,z,se); ctx.fillStyle=c;ctx.font='9px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText('light y'+(e.pos[1]||9),cx,cy-12); }
 
+  // Calibrated overlay placement: map .dat units → editor units so the real table (from
+  // blueprint.json's calibration) fits the playfield at true proportions; scale/nudge fine-tune.
+  // Returns null for a raw image (no calibration) → fall back to a plain stretch-to-playfield.
+  function calMap(){ if(!bgCal||!bgCal.table) return null; var t=bgCal.table;
+    var k=Math.min((FIELD.maxX-FIELD.minX)/t.width,(FIELD.maxZ-FIELD.minZ)/t.height)*bgScale;
+    var tcx=(t.minX+t.maxX)/2, tcy=(t.minY+t.maxY)/2, fcx=(FIELD.minX+FIELD.maxX)/2, fcz=(FIELD.minZ+FIELD.maxZ)/2;
+    return { k:k, ex:function(wx){return fcx+(wx-tcx)*k+bgOffX;}, ez:function(wy){return fcz+(wy-tcy)*k+bgOffZ;} }; }
+
   function draw(){
-    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.clearRect(0,0,LOGW,LOGH);
     var fx=X(FIELD.minX),fy=Y(FIELD.maxZ),fw=X(FIELD.maxX)-fx,fh=Y(FIELD.minZ)-fy;
-    if(bg){ ctx.globalAlpha=bgOp; ctx.drawImage(bg,fx,fy,fw,fh); ctx.globalAlpha=1; }
+    if(bg){ var m=calMap();
+      if(m){ var s=bgCal.svg;                                     // calibrated: place at true .dat proportions
+        var left=X(m.ex(s.minX)),right=X(m.ex(s.maxX)),top=Y(m.ez(s.maxY)),bot=Y(m.ez(s.minY));
+        ctx.globalAlpha=bgOp; ctx.drawImage(bg,left,top,right-left,bot-top); ctx.globalAlpha=1; }
+      else { var bw=fw*bgScale, bh=fh*bgScale;                    // raw image: stretch to the playfield, scale about centre
+        var bx=fx+(fw-bw)/2+(X(bgOffX)-X(0)), by=fy+(fh-bh)/2+(Y(bgOffZ)-Y(0));
+        ctx.globalAlpha=bgOp; ctx.drawImage(bg,bx,by,bw,bh); ctx.globalAlpha=1; } }
     ctx.lineWidth=1; ctx.font='10px ui-monospace,monospace';
-    for(var x=Math.ceil(T.minX);x<=Math.floor(T.maxX);x++){ var px=X(x); ctx.strokeStyle=x===0?'rgba(63,224,255,.35)':'rgba(63,224,255,.11)'; ctx.beginPath();ctx.moveTo(px,T.P);ctx.lineTo(px,cv.height-T.P);ctx.stroke(); ctx.fillStyle='rgba(63,224,255,.55)';ctx.textAlign='center';ctx.fillText((x>0?'+':'')+x,px,T.P-3); }
-    for(var z=Math.ceil(T.minZ/2)*2;z<=T.maxZ;z+=2){ var py=Y(z); ctx.strokeStyle='rgba(255,182,72,.11)'; ctx.beginPath();ctx.moveTo(T.P,py);ctx.lineTo(cv.width-T.P,py);ctx.stroke(); ctx.fillStyle='rgba(255,182,72,.5)';ctx.textAlign='left';ctx.fillText('z'+z,T.P-2,py+3); }
+    for(var x=Math.ceil(T.minX);x<=Math.floor(T.maxX);x++){ var px=X(x); ctx.strokeStyle=x===0?'rgba(63,224,255,.35)':'rgba(63,224,255,.11)'; ctx.beginPath();ctx.moveTo(px,T.P);ctx.lineTo(px,LOGH-T.P);ctx.stroke(); ctx.fillStyle='rgba(63,224,255,.55)';ctx.textAlign='center';ctx.fillText((x>0?'+':'')+x,px,T.P-3); }
+    for(var z=Math.ceil(T.minZ/2)*2;z<=T.maxZ;z+=2){ var py=Y(z); ctx.strokeStyle='rgba(255,182,72,.11)'; ctx.beginPath();ctx.moveTo(T.P,py);ctx.lineTo(LOGW-T.P,py);ctx.stroke(); ctx.fillStyle='rgba(255,182,72,.5)';ctx.textAlign='left';ctx.fillText('z'+z,T.P-2,py+3); }
     ctx.fillStyle='rgba(63,224,255,.045)';ctx.fillRect(fx,fy,fw,fh); ctx.lineWidth=1.5;ctx.strokeStyle='rgba(63,224,255,.4)';ctx.strokeRect(fx,fy,fw,fh);
     ctx.fillStyle='rgba(63,224,255,.5)';ctx.textAlign='left';ctx.font='9px ui-monospace,monospace';ctx.fillText('playfield',fx+4,fy+11);
     // elements (walls first, lights last-ish); selection highlighted
     ['walls'].concat(ELEM_COLLS).forEach(function(coll){ var arr=table[coll]||[]; for(var i=0;i<arr.length;i++){ var isSel=sel&&sel.coll===coll&&sel.i===i; SPEC[coll].draw(arr[i],isSel); } });
+    // ring the active handle a click landed on (so cycling between overlapping handles is visible)
+    if(sel&&sel.pt!=null&&table[sel.coll]&&table[sel.coll][sel.i]){ var ap=SPEC[sel.coll].get(table[sel.coll][sel.i],sel.pt);
+      if(ap){ ctx.beginPath();ctx.arc(X(ap[0]),Y(ap[1]),8.5,0,7);ctx.lineWidth=2;ctx.strokeStyle='#3fe0ff';ctx.stroke(); } }
     drawBall(); drawGhost();
   }
   function drawBall(){ var b=table.ball,cx=X(b.start[0]),cy=Y(b.start[1]),r=b.radius*perU(); ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.fillStyle='rgba(210,220,240,.16)';ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='rgba(210,220,240,.85)';ctx.stroke(); ctx.beginPath();ctx.arc(cx,cy,3.5,0,7);ctx.fillStyle='#d2dcf0';ctx.fill(); ctx.fillStyle='rgba(210,220,240,.7)';ctx.textAlign='center';ctx.font='10px ui-monospace,monospace';ctx.fillText('ball',cx,cy-r-4); }
@@ -243,18 +302,29 @@
     var g=document.getElementById('gaugeVal'); g.textContent=(gap<0?'OVERLAP '+(-gap).toFixed(2):gap.toFixed(2)+' clear'); g.style.color=st; }
 
   // ── hit test / drag ──
-  function toCanvas(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}; }
+  function toCanvas(e){ var r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*LOGW/r.width,y:(e.clientY-r.top)*LOGH/r.height}; }
   function inDisc(px,py,x,z){ var dx=X(x)-px,dy=Y(z)-py,r=Math.max(11,table.ball.radius*perU()); return dx*dx+dy*dy<=r*r; }
-  function hitHandle(px,py){
-    var colls=['walls'].concat(ELEM_COLLS);
-    for(var c=colls.length-1;c>=0;c--){ var coll=colls[c],arr=table[coll]||[]; for(var i=arr.length-1;i>=0;i--){ var n=SPEC[coll].ptn(arr[i]); for(var k=0;k<n;k++){ var p=SPEC[coll].get(arr[i],k); if(p&&Math.abs(X(p[0])-px)<9&&Math.abs(Y(p[1])-py)<9) return {coll:coll,i:i,pt:k}; } } }
-    return null;
+  // all handles within the hit radius, topmost-first — lets overlapping handles be cycled
+  var cyclePos=null, cycleIdx=0, dragMoved=false;
+  function hitHandles(px,py){ var out=[]; var colls=['walls'].concat(ELEM_COLLS);
+    for(var c=colls.length-1;c>=0;c--){ var coll=colls[c],arr=table[coll]||[]; for(var i=arr.length-1;i>=0;i--){ var n=SPEC[coll].ptn(arr[i]); for(var k=0;k<n;k++){ var p=SPEC[coll].get(arr[i],k); if(p&&Math.abs(X(p[0])-px)<9&&Math.abs(Y(p[1])-py)<9) out.push({coll:coll,i:i,pt:k}); } } }
+    return out;
   }
   function endpointSnap(coll,i,pt,x,z){ if(!document.getElementById('chain').checked||coll!=='walls') return null; var best=null,bd=0.6;
     for(var wi=0;wi<table.walls.length;wi++){ if(wi===i)continue; var p=table.walls[wi].points; [0,p.length-1].forEach(function(k){ var d=Math.hypot(p[k][0]-x,p[k][1]-z); if(d<bd){bd=d;best=[p[k][0],p[k][1]];} }); }
     return best; }
   cv.addEventListener('pointerdown',function(e){ var c=toCanvas(e);
-    var h=hitHandle(c.x,c.y); if(h){ sel={coll:h.coll,i:h.i}; drag=h; cv.setPointerCapture(e.pointerId); refreshList();refreshProps();draw(); return; }
+    var hits=hitHandles(c.x,c.y);
+    if(hits.length){
+      // clicking the same spot again steps to the next overlapping handle
+      if(cyclePos&&Math.abs(c.x-cyclePos.x)<8&&Math.abs(c.y-cyclePos.y)<8) cycleIdx=(cycleIdx+1)%hits.length; else cycleIdx=0;
+      cyclePos={x:c.x,y:c.y}; dragMoved=false;
+      var h=hits[cycleIdx]; sel={coll:h.coll,i:h.i,pt:h.pt}; drag=h; cv.setPointerCapture(e.pointerId);
+      refreshList();refreshProps();draw();
+      if(hits.length>1) document.getElementById('selinfo').textContent+=' · handle '+(cycleIdx+1)+'/'+hits.length;
+      return;
+    }
+    cyclePos=null;
     if(inDisc(c.x,c.y,ghost.x,ghost.z)){ drag={special:'ghost'}; cv.setPointerCapture(e.pointerId); return; }
     if(inDisc(c.x,c.y,table.ball.start[0],table.ball.start[1])){ drag={special:'ball'}; sel=null; cv.setPointerCapture(e.pointerId); refreshList();refreshProps();draw(); return; }
     sel=null; refreshList();refreshProps();draw();
@@ -266,9 +336,9 @@
     var x=clampX(snapVal(invX(c.x))), z=clampZ(snapVal(invZ(c.y)));
     if(drag.special==='ball'){ table.ball.start=[r2(x),r2(z)]; refreshBall(); draw(); return; }
     var sn=endpointSnap(drag.coll,drag.i,drag.pt,x,z); if(sn){x=sn[0];z=sn[1];}
-    SPEC[drag.coll].set(table[drag.coll][drag.i],drag.pt,r2(x),r2(z)); refreshProps(); draw();
+    SPEC[drag.coll].set(table[drag.coll][drag.i],drag.pt,r2(x),r2(z)); dragMoved=true; refreshProps(); draw();
   });
-  cv.addEventListener('pointerup',function(){ if(drag){ if(drag.special!=='ghost') syncJson(); drag=null; } });
+  cv.addEventListener('pointerup',function(){ if(drag){ if(drag.special!=='ghost') syncJson(); if(dragMoved) cyclePos=null; drag=null; } });
   function clampX(v){ return Math.max(T.minX,Math.min(T.maxX,v)); }
   function clampZ(v){ return Math.max(T.minZ,Math.min(T.maxZ,v)); }
 
@@ -318,8 +388,37 @@
   document.getElementById('ghostReset').onclick=function(){ ghost={x:0,z:12}; draw(); };
   document.getElementById('snapOn').onchange=draw;
   document.getElementById('bgOp').oninput=function(){ bgOp=this.value/100; draw(); };
+  document.getElementById('bgScale').oninput=function(){ bgScale=this.value/100; refreshBallHint(); draw(); };
+  document.getElementById('bgOffX').oninput=function(){ bgOffX=parseFloat(this.value)||0; draw(); };
+  document.getElementById('bgOffZ').oninput=function(){ bgOffZ=parseFloat(this.value)||0; draw(); };
+  document.getElementById('bgReset').onclick=function(){ bgScale=1;bgOffX=0;bgOffZ=0; document.getElementById('bgScale').value=100; document.getElementById('bgOffX').value=0; document.getElementById('bgOffZ').value=0; refreshBallHint(); draw(); };
+  document.getElementById('bgClear').onclick=function(){ bg=null; bgCal=null; refreshBallHint(); draw(); };
   document.getElementById('bgBtn').onclick=function(){ document.getElementById('bgFile').click(); };
-  document.getElementById('bgFile').onchange=function(e){ var f=e.target.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ var im=new Image(); im.onload=function(){bg=im;draw();}; im.src=rd.result; }; rd.readAsDataURL(f); };
+  document.getElementById('bgFile').onchange=function(e){ var f=e.target.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ var im=new Image(); im.onload=function(){bg=im;bgCal=null;refreshBallHint();draw();}; im.src=rd.result; }; rd.readAsDataURL(f); };
+  // Load the DatBlueprint overlay (blueprint.svg + blueprint.json, next to this file). The JSON's
+  // `calibration` block (real table extent + ball radius, in .dat units) lets us place the overlay
+  // at true proportions and size the ball; without it we fall back to a plain stretch-to-playfield.
+  function loadBlueprint(quiet){
+    fetch('DatBlueprint/blueprint.json?'+Date.now(),{cache:'no-store'})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ bgCal=(j&&j.calibration&&j.calibration.table)?j.calibration:null; })
+      .catch(function(){ bgCal=null; })
+      .then(function(){ var im=new Image();
+        im.onload=function(){ bg=im; refreshBallHint(); draw();
+          toast('Loaded blueprint'+(bgCal?' + calibration (table '+Math.round(bgCal.table.width)+'×'+Math.round(bgCal.table.height)+', ball '+bgCal.ballRadius.toFixed(2)+')':'')); };
+        im.onerror=function(){ if(!quiet) toast('DatBlueprint/blueprint.svg not found — run DatBlueprint, or use Load image…'); };
+        im.src='DatBlueprint/blueprint.svg?'+Date.now(); });
+  }
+  document.getElementById('bgBlueprint').onclick=function(){ loadBlueprint(false); };
+  // "Ball → original size": set the ball radius to the .dat ball (0.3) scaled to the overlay.
+  function refreshBallHint(){ var el=document.getElementById('ballOrigHint'); var m=calMap();
+    if(m&&bgCal.ballRadius!=null){ var r=Math.round(bgCal.ballRadius*m.k*1000)/1000;
+      el.textContent='at this fit → '+r+'  ('+bgCal.ballRadius.toFixed(2)+' dat × '+m.k.toFixed(3)+')'; }
+    else el.textContent='needs a loaded blueprint'; }
+  document.getElementById('ballOrig').onclick=function(){ var m=calMap();
+    if(!m||!bgCal||bgCal.ballRadius==null){ toast('Load a blueprint with calibration first'); return; }
+    table.ball.radius=Math.round(bgCal.ballRadius*m.k*1000)/1000; refreshBall(); draw(); syncJson();
+    toast('Ball → original ('+bgCal.ballRadius.toFixed(2)+' dat × '+m.k.toFixed(3)+' = '+table.ball.radius+')'); };
 
   // ── JSON ──
   function normBall(b){ b=b||{}; var s=(Array.isArray(b.start)&&b.start.length>=2&&isFinite(b.start[0])&&isFinite(b.start[1]))?[num(b.start[0],0),num(b.start[1],0)]:[5.05,1.2]; return {start:s,radius:(isFinite(b.radius)&&b.radius>0)?+b.radius:0.36}; }
@@ -336,18 +435,41 @@
         else pos=d.pos.slice();
         n.pos=pos; n.color=(Array.isArray(e.color)&&e.color.length>=3)?[+e.color[0],+e.color[1],+e.color[2]]:null; }
       out.push(n); }); return out; }
-  function syncJson(){ document.getElementById('json').value=JSON.stringify(table,null,2); }
+  var autoSave=false, saveTimer=null;
+  function syncJson(){ document.getElementById('json').value=JSON.stringify(table,null,2); scheduleAutoSave(); }
+  function buildTable(t){ if(!t||!Array.isArray(t.walls))throw new Error('no walls array');
+    var nt={version:t.version||1,wallHeight:num(t.wallHeight,1.3),ball:normBall(t.ball),walls:t.walls.map(normWall).filter(Boolean)};
+    ELEM_COLLS.forEach(function(c){ nt[c]=normArr(c,t[c]); }); return nt; }
+  function applyTable(t){ table=buildTable(t); sel=null; refreshBall();refreshList();refreshProps();syncJson();draw(); }
   document.getElementById('exp').onclick=syncJson;
+
+  // ── live load/save of Pinball.App/table.json (via table-editor-server.py) ──
+  var TABLE_API='/api/table';
+  function loadFromServer(quiet){
+    fetch(TABLE_API,{cache:'no-store'}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(t){ var was=autoSave; autoSave=false; applyTable(t); autoSave=was; toast('Loaded table.json from Pinball.App ('+table.walls.length+' walls)'); })
+      .catch(function(e){ if(!quiet) toast('Reload failed — is table-editor-server.py running? ('+e.message+')'); });
+  }
+  function saveToServer(){
+    var body; try{ body=JSON.stringify(buildTable(JSON.parse(document.getElementById('json').value))); }
+    catch(e){ toast('Fix JSON before saving: '+e.message); return; }
+    fetch(TABLE_API,{method:'PUT',headers:{'Content-Type':'application/json'},body:body})
+      .then(function(r){ return r.json().then(function(j){ if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j; }); })
+      .then(function(j){ toast('Saved → Pinball.App/table.json ('+j.bytes+' bytes)'); })
+      .catch(function(e){ toast('Save failed (run table-editor-server.py?): '+e.message); });
+  }
+  function scheduleAutoSave(){ if(!autoSave) return; clearTimeout(saveTimer); saveTimer=setTimeout(saveToServer,700); }
+  document.getElementById('save').onclick=saveToServer;
+  document.getElementById('reload').onclick=function(){ loadFromServer(false); };
+  document.getElementById('autoSave').onchange=function(){ autoSave=this.checked; if(autoSave) saveToServer(); };
   document.getElementById('copy').onclick=function(){ var t=document.getElementById('json'); t.select(); try{ navigator.clipboard.writeText(t.value).then(function(){toast('Copied JSON');},function(){toast('Select the box and copy');}); }catch(e){toast('Select the box and copy');} };
   document.getElementById('dl').onclick=function(){ var blob=new Blob([document.getElementById('json').value],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='table.json'; a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);},1000); toast('Downloaded table.json'); };
-  document.getElementById('imp').onclick=function(){ try{ var t=JSON.parse(document.getElementById('json').value); if(!t.walls||!Array.isArray(t.walls))throw new Error('no walls array');
-      var nt={version:t.version||1,wallHeight:num(t.wallHeight,1.3),ball:normBall(t.ball),walls:t.walls.map(normWall).filter(Boolean)};
-      ELEM_COLLS.forEach(function(c){ nt[c]=normArr(c,t[c]); });
-      table=nt; sel=null; refreshBall();refreshList();refreshProps();syncJson();draw(); toast('Loaded '+nt.walls.length+' walls + elements');
-    }catch(err){ toast('Bad JSON: '+err.message); } };
+  document.getElementById('imp').onclick=function(){ try{ applyTable(JSON.parse(document.getElementById('json').value)); toast('Loaded '+table.walls.length+' walls + elements'); }catch(err){ toast('Bad JSON: '+err.message); } };
   function toast(m){ var el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); setTimeout(function(){el.classList.remove('show');},1600); }
 
-  refreshBall(); refreshList(); refreshProps(); syncJson(); draw();
+  refreshBall(); refreshList(); refreshProps(); syncJson(); setupCanvas();
+  loadBlueprint(true);     // auto-show the DatBlueprint overlay if it's there; silent if not
+  loadFromServer(true);    // auto-load Pinball.App/table.json if the server is running; silent if not
 })();
 </script>
 

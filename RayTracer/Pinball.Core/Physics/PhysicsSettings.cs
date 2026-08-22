@@ -26,7 +26,8 @@ public readonly record struct PhysicsSettings(
     bool EnableMagnus = true,
     bool EnableRollingResistance = true,
     ulong Seed = 0x5D_EE_CE_5Eul,
-    Vector3D? GravityOverride = null)
+    Vector3D? GravityOverride = null,
+    double BallRadius = PhysicsConstants.BallRadius)
 {
     /// <summary>Realistic defaults at the nominal 6.5° incline with every force term on.</summary>
     public static PhysicsSettings Default => new(PhysicsConstants.DefaultInclineRadians);

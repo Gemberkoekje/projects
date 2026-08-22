@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "3D Pinball (Program Files)": {
+      "commandName": "Project",
+      "workingDirectory": ".",
+      "commandLineArgs": "\"C:\\Program Files (x86)\\Microsoft Games\\Pinball\\PINBALL.DAT\" . --rotate 180"
+    }
+  }
+}

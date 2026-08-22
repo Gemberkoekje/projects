@@ -46,7 +46,9 @@ public sealed class PinballTable
     public Vector3D ShooterLaneStart { get; }
     /// <summary>Auto-plunge launch speed (m/s, +z up the lane) — enough to reach the top feed and cross into play.</summary>
     public double LaunchSpeed { get; }
-    /// <summary>A ball whose z falls below this (metres) — IN THE PLAYFIELD, not the shooter lane — has drained.</summary>
+    /// <summary>A ball whose z falls below this (metres) — IN THE PLAYFIELD, not the shooter lane — has drained.
+    /// Set to the bottom edge of the playfield (0) so the ball is only lost once it has rolled the full length of
+    /// the drain chute and off the bottom, not the moment it slips past the flipper tips.</summary>
     public double DrainZ { get; }
 
     // A low-z ball only counts as drained while x &lt; this — keeps a ball waiting in the built-in shooter lane
@@ -125,7 +127,9 @@ public sealed class PinballTable
         BallStart = PlayfieldPoint(0.0, 6.0);       // centre, above the flippers (a mid-play spawn)
         ShooterLaneStart = PlayfieldPoint(LaneX, 1.2); // resting against the plunger, bottom of the shooter lane
         LaunchSpeed = 2.5;                          // m/s up the lane — reaches the top feed with speed to spare
-        DrainZ = 1.5 * RenderScale;                 // below the flipper line ⇒ drained (playfield only, see IsDrained)
+        DrainZ = 0.0;                               // ball counts as lost only once it has rolled off the bottom
+                                                    // edge (z<0) — i.e. all the way down the drain chute past the
+                                                    // flippers — not the instant it dips below the flipper line.
         _drainX = DividerX * RenderScale;           // spare the shooter lane from the low-z drain
     }
 

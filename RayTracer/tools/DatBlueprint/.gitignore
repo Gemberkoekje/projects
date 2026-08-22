@@ -1,0 +1,4 @@
+# Generated outputs — derived from the game .dat you point the tool at.
+# Never commit these (clean-room posture: no extracted game data in the repo).
+blueprint.svg
+blueprint.json

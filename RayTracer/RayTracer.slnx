@@ -10,12 +10,13 @@
   </Folder>
   <Project Path=".net.csproj" />
   <Project Path="Benchmark/Benchmarks.csproj" />
+  <Project Path="Pinball.App/Pinball.App.csproj" />
+  <Project Path="Pinball.Core/Pinball.Core.csproj" />
+  <Project Path="Pinball.Tests/Pinball.Tests.csproj" />
   <Project Path="RayTracer.Core/RayTracer.csproj" />
   <Project Path="RayTracer.Gpu/RayTracer.Gpu.csproj" />
   <Project Path="RayTracer.Maze.Core/RayTracer.Maze.Core.csproj" />
   <Project Path="RayTracer.Maze/RayTracer.Maze.csproj" />
   <Project Path="RayTracer.Tests/RayTracer.Tests.csproj" />
-  <Project Path="Pinball.Core/Pinball.Core.csproj" />
-  <Project Path="Pinball.Tests/Pinball.Tests.csproj" />
-  <Project Path="Pinball.App/Pinball.App.csproj" />
+  <Project Path="tools/DatBlueprint/DatBlueprint.csproj" />
 </Solution>

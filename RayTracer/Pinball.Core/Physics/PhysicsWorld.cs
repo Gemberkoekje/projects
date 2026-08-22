@@ -138,7 +138,7 @@ public sealed class PhysicsWorld
     private void GatherContacts(Vector3D center)
     {
         _contacts.Clear();
-        double r = PhysicsConstants.BallRadius;
+        double r = _settings.BallRadius;
         for (int i = 0; i < _colliders.Length; i++)
         {
             ContactQuery q = _colliders[i].Query(center, r);
@@ -176,7 +176,7 @@ public sealed class PhysicsWorld
         if (speed < 1e-12)
             return false;
 
-        double r = PhysicsConstants.BallRadius;
+        double r = _settings.BallRadius;
         AabbD swept = AabbD.SweptSphere(p, p + v * maxTime, r).Expanded(CcdSkin);
 
         bool found = false;
@@ -189,7 +189,7 @@ public sealed class PhysicsWorld
             if (col.Query(p, r).Separation < SpeculativeMargin)
                 continue; // already resting/touching — handled by the speculative solver, not CCD
 
-            if (ConservativeToi(col, i, p, v, speed, best, out double candidate, out Contact candidateContact)
+            if (ConservativeToi(col, i, p, v, speed, best, r, out double candidate, out Contact candidateContact)
                 && candidate < best)
             {
                 best = candidate;
@@ -204,9 +204,8 @@ public sealed class PhysicsWorld
     // Conservative advancement (§6.1.5): repeatedly step forward by separation/|v|, which cannot overshoot a
     // contact, until the swept sphere first touches this collider (separation ≤ skin) or runs past maxTime.
     private static bool ConservativeToi(ICollider col, int index, Vector3D p, Vector3D v, double speed,
-        double maxTime, out double toi, out Contact contact)
+        double maxTime, double r, out double toi, out Contact contact)
     {
-        double r = PhysicsConstants.BallRadius;
         double tau = 0;
         for (int i = 0; i < MaxAdvancementIterations; i++)
         {
@@ -243,7 +242,7 @@ public sealed class PhysicsWorld
 
     private void DepenetratePositions()
     {
-        double r = PhysicsConstants.BallRadius;
+        double r = _settings.BallRadius;
         for (int i = 0; i < _colliders.Length; i++)
         {
             ContactQuery q = _colliders[i].Query(_ball.Position, r);

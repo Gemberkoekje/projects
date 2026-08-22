@@ -200,13 +200,14 @@ public sealed record PinballTableScene(
         lights.Add(new Light { Position = new Vector3(5.0f, 3.2f, 6f), Color = new Vector3(0.5f, 0.5f, 0.56f) });
         lights.Add(new Light { Position = new Vector3(5.0f, 3.2f, 13f), Color = new Vector3(0.48f, 0.48f, 0.54f) });
 
-        // ── Camera: the classic Space Cadet view — from behind the flippers, looking up the table ──────
-        Vector3 camPos = new(0f, 11.5f, -8.5f);
+        // ── Camera: the classic Space Cadet view — from behind the flippers, looking up the table. Raised
+        //    high for a steep ¾ angle (~50° down) so we read the playfield near-plan, not edge-on. ──
+        Vector3 camPos = new(0f, 20f, -4f);
         var camera = new Camera
         {
             Position = camPos,
-            Rotation = LookRotation(camPos, new Vector3(0f, 0f, 12.5f), new Vector3(0f, 1f, 0f)),
-            Fov = MathF.PI / 3.4f,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0f, 12f), new Vector3(0f, 1f, 0f)),
+            Fov = MathF.PI / 3.6f,
             Aspect = (float)width / height,
             ImgPlaneZ = 1f,
         };
@@ -242,8 +243,20 @@ public sealed record PinballTableScene(
         Vector3 leftPivot = new(-1.5f, 0.22f, 3.4f), rightPivot = new(1.5f, 0.22f, 3.4f);
         bool leftSet = false, rightSet = false;
 
-        s.Add(FloorQuad(0f, MinX, MaxX, MinZ, MaxZ, playfield));
-        foreach (Pinball.Physics.TableWalls.Wall w in def?.ToWalls() ?? Pinball.Physics.TableWalls.All)
+        // Fit the floor + glass lid to the actual loaded table, not a hardcoded ±5.5×24 box — otherwise bare
+        // floor & glass stick out past the authored playfield (the "bit on the end"). Bounds from the wall points.
+        var tableWalls = def?.ToWalls() ?? Pinball.Physics.TableWalls.All;
+        float exMinX = MinX, exMaxX = MaxX, exMinZ = MinZ, exMaxZ = MaxZ; bool exAny = false;
+        foreach (Pinball.Physics.TableWalls.Wall w in tableWalls)
+            foreach (Vector3 p in new[] { w.P0.ToVector3(), w.P1.ToVector3(), w.P2.ToVector3(), w.P3.ToVector3() })
+            {
+                if (!exAny) { exMinX = exMaxX = p.X; exMinZ = exMaxZ = p.Z; exAny = true; }
+                else { exMinX = MathF.Min(exMinX, p.X); exMaxX = MathF.Max(exMaxX, p.X); exMinZ = MathF.Min(exMinZ, p.Z); exMaxZ = MathF.Max(exMaxZ, p.Z); }
+            }
+        exMinX -= 0.2f; exMaxX += 0.2f; exMinZ = MathF.Min(exMinZ, 0f); exMaxZ += 0.2f;
+
+        s.Add(FloorQuad(0f, exMinX, exMaxX, exMinZ, exMaxZ, playfield));
+        foreach (Pinball.Physics.TableWalls.Wall w in tableWalls)
             AddBezierWall(s, w.P0.ToVector3(), w.P1.ToVector3(), w.P2.ToVector3(), w.P3.ToVector3(),
                 (float)Pinball.Physics.TableWalls.WallHeight, w.Segments, rail);
 
@@ -308,12 +321,13 @@ public sealed record PinballTableScene(
             var glass = new MaterialData("plexi", "Plexiglass", null, null, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
                 spectralData: null, surface: SurfaceKind.Dielectric, transmission: 0.985f, cauchyA: 1.49f, cauchyB: 0.0f,
                 absorptionRgb: new Vector3(0.01f, 0.01f, 0.02f));
-            s.Add(FloorQuad(gy, MinX, MaxX, MinZ, MaxZ, glass));
+            s.Add(FloorQuad(gy, exMinX, exMaxX, exMinZ, exMaxZ, glass));
+            float exCx = (exMinX + exMaxX) * 0.5f, exCz = (exMinZ + exMaxZ) * 0.5f;
             var frameM = FlatMirror("frame", 0.85f); // chrome glass frame around the outer edge
-            AddRotBox(s, new Vector3(MinX + 0.05f, gy, (MinZ + MaxZ) * 0.5f), new Vector3(0.06f, 0.13f, (MaxZ - MinZ) * 0.5f), 0f, frameM);
-            AddRotBox(s, new Vector3(MaxX - 0.05f, gy, (MinZ + MaxZ) * 0.5f), new Vector3(0.06f, 0.13f, (MaxZ - MinZ) * 0.5f), 0f, frameM);
-            AddRotBox(s, new Vector3(0f, gy, MinZ + 0.05f), new Vector3((MaxX - MinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
-            AddRotBox(s, new Vector3(0f, gy, MaxZ - 0.05f), new Vector3((MaxX - MinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
+            AddRotBox(s, new Vector3(exMinX + 0.05f, gy, exCz), new Vector3(0.06f, 0.13f, (exMaxZ - exMinZ) * 0.5f), 0f, frameM);
+            AddRotBox(s, new Vector3(exMaxX - 0.05f, gy, exCz), new Vector3(0.06f, 0.13f, (exMaxZ - exMinZ) * 0.5f), 0f, frameM);
+            AddRotBox(s, new Vector3(exCx, gy, exMinZ + 0.05f), new Vector3((exMaxX - exMinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
+            AddRotBox(s, new Vector3(exCx, gy, exMaxZ - 0.05f), new Vector3((exMaxX - exMinX) * 0.5f, 0.13f, 0.06f), 0f, frameM);
         }
 
         // Flat, even overhead fill so the whole floor + walls are legible (the "ambient so we can see").
@@ -321,12 +335,12 @@ public sealed record PinballTableScene(
             for (int xi = -1; xi <= 1; xi++)
                 lights.Add(new Light { Position = new Vector3(xi * 3.2f, 9f, 2f + zi * 5f), Color = new Vector3(0.85f, 0.86f, 0.9f) });
 
-        Vector3 camPos = new(0f, 11.5f, -8.5f);
+        Vector3 camPos = new(0f, 20f, -4f);   // steep ¾ view (matches Build) so the playfield reads near-plan
         var camera = new Camera
         {
             Position = camPos,
-            Rotation = LookRotation(camPos, new Vector3(0f, 0f, 12.5f), new Vector3(0f, 1f, 0f)),
-            Fov = MathF.PI / 3.4f,
+            Rotation = LookRotation(camPos, new Vector3(0f, 0f, (exMinZ + exMaxZ) * 0.5f), new Vector3(0f, 1f, 0f)),
+            Fov = MathF.PI / 3.6f,
             Aspect = (float)width / height,
             ImgPlaneZ = 1f,
         };
@@ -417,24 +431,28 @@ public sealed record PinballTableScene(
     private static void AddTarget(List<Tracable> s, Vector3 baseC, float w, float h, float rad, MaterialData face)
         => AddRotBox(s, baseC + new Vector3(0f, h * 0.5f, 0f), new Vector3(w * 0.5f, h * 0.5f, 0.05f), rad, face);
 
-    // A flat flipper bat: a top quad between the pivot and tip, rounded by an end sphere at each.
+    /// <summary>Tip radius / pivot radius — the real flipper taper (kept in sync with the editor's <c>FLIP_TAPER</c>).</summary>
+    private const float FlipperTaper = 0.5f;
+
+    // A tapered flipper bat: a strip of flat quads narrowing from half-width w at the pivot to w·Taper at the
+    // tip, plus a rounded pivot cap. In mover mode (dynamicGroup ≥ 0) the whole strip is one posable BLAS group
+    // (all quads share the group, so SetDynamicPose swings them rigidly about the pivot). The pivot cap is a
+    // *static* sphere: the pivot is the rotation centre, so it stays put while the bat swings. A tip cap is only
+    // added in the static path (a mover tip moves, and dynamic spheres are posed separately, not by the bat).
     private static void AddFlipper(List<Tracable> s, Vector3 pivot, Vector3 tip, float w, MaterialData m, int dynamicGroup = -1)
     {
-        Vector3 dir = Vector3.Normalize(tip - pivot);
-        Vector3 perp = new Vector3(-dir.Z, 0f, dir.X) * w;
-        (Vector3, Vector3, Vector3) corners = (pivot - perp, pivot + perp, tip - perp);
-        if (dynamicGroup >= 0)
+        bool dyn = dynamicGroup >= 0;
+        Vector3 perp = new(-Vector3.Normalize(tip - pivot).Z, 0f, Vector3.Normalize(tip - pivot).X);
+        float rt = w * FlipperTaper;
+        const int N = 6;
+        for (int i = 0; i < N; i++)
         {
-            // A posable mover part: a flat (+Y-normal), Plain-material bat rotated about its pivot (§4.2 P6
-            // contract). The round cap spheres are dropped — SetDynamicPose moves the triangle bat only.
-            s.Add(new TracableRectangle(corners, m) { Dynamic = true, DynamicGroup = dynamicGroup });
+            Vector3 c0 = Vector3.Lerp(pivot, tip, i / (float)N), c1 = Vector3.Lerp(pivot, tip, (i + 1) / (float)N);
+            Vector3 p = perp * (w + (rt - w) * ((i + 0.5f) / N)); // uniform per-segment half-width at its midpoint
+            s.Add(new TracableRectangle((c0 - p, c0 + p, c1 - p), m) { Dynamic = dyn, DynamicGroup = dyn ? dynamicGroup : 0 });
         }
-        else
-        {
-            s.Add(new TracableRectangle(corners, m));
-            s.Add(new Sphere(pivot, w, m));
-            s.Add(new Sphere(tip, w * 0.65f, m));
-        }
+        s.Add(new Sphere(pivot, w, m));                            // rounded pivot cap (at the rotation centre)
+        if (!dyn) s.Add(new Sphere(tip, rt, m));                   // rounded tip cap (static bats only)
     }
 
     // An inclined launch ramp at x=<paramref name="x"/> rising from z0 (on the playfield) to z1 (height y1),

@@ -119,11 +119,16 @@ public sealed class TableDefinition
     public PinballTable BuildPhysicsTable(ulong seed = 0x5D_EE_CE_5Eul)
     {
         double rs = PinballTable.RenderScale;
-        double alpha = PhysicsConstants.DefaultInclineRadians, g = PhysicsConstants.Gravity, r = PhysicsConstants.BallRadius;
+        double alpha = PhysicsConstants.DefaultInclineRadians, g = PhysicsConstants.Gravity;
+        // Collision ball radius comes from the table (render units → metres) so it matches the *rendered* ball
+        // (PinballTableScene draws Ball.Radius) — what you see is what collides. Mass/inertia keep the tuned 27 mm
+        // values, so bumper/flipper feel is unchanged; only the geometry (which gaps the ball fits) tracks the table.
+        double r = (Ball is { Radius: > 0 } bd ? bd.Radius : 0.36) * rs;
         PhysicsSettings settings = PhysicsSettings.Default with
         {
             Seed = seed,
             GravityOverride = new Vector3D(0, -g * Math.Cos(alpha), -g * Math.Sin(alpha)),
+            BallRadius = r,
         };
         PhysicsMaterial steel = PhysicsMaterial.Steel, rubber = PhysicsMaterial.Rubber;
 
@@ -166,8 +171,8 @@ public sealed class TableDefinition
                     dir * (t.Width * rs), new Vector3D(0, Math.Max(0.02, t.Height * rs), 0), steel));
             }
 
-        Flipper left = FlipperFor(false, rs) ?? MakeFlipper(-1.5, 3.4, -2.7, 2.5, rs);
-        Flipper right = FlipperFor(true, rs) ?? MakeFlipper(1.5, 3.4, 2.7, 2.5, rs);
+        Flipper left = FlipperFor(false, rs, r) ?? MakeFlipper(-1.5, 3.4, -2.7, 2.5, rs, r);
+        Flipper right = FlipperFor(true, rs, r) ?? MakeFlipper(1.5, 3.4, 2.7, 2.5, rs, r);
         cols.Add(left);
         cols.Add(right);
 
@@ -175,22 +180,23 @@ public sealed class TableDefinition
             ? new Vector3D(Ball.Start[0] * rs, r, Ball.Start[1] * rs)
             : PinballTable.PlayfieldPoint(0, 6);
 
+        // drainZ = 0: the ball is lost only once it has rolled the full drain chute (down between the outlanes,
+        // past the flippers) and off the bottom edge — not the instant it dips below the flipper line.
         return new PinballTable(settings, cols, left, right, ballStart, ballStart,
-            launchSpeed: 2.5, drainZ: 1.5 * rs, drainX: double.MaxValue);
+            launchSpeed: 2.5, drainZ: 0.0, drainX: double.MaxValue);
     }
 
-    private Flipper? FlipperFor(bool right, double rs)
+    private Flipper? FlipperFor(bool right, double rs, double ballR)
     {
         foreach (FlipperDef f in Flippers)
             if (string.Equals(f.Side, "right", StringComparison.OrdinalIgnoreCase) == right
                 && f.Pivot is { Length: >= 2 } && f.Tip is { Length: >= 2 })
-                return MakeFlipper(f.Pivot[0], f.Pivot[1], f.Tip[0], f.Tip[1], rs);
+                return MakeFlipper(f.Pivot[0], f.Pivot[1], f.Tip[0], f.Tip[1], rs, ballR);
         return null;
     }
 
-    private static Flipper MakeFlipper(double px, double pz, double tx, double tz, double rs)
+    private static Flipper MakeFlipper(double px, double pz, double tx, double tz, double rs, double r)
     {
-        double r = PhysicsConstants.BallRadius;
         Vector3D pivot = new(px * rs, r, pz * rs), tip = new(tx * rs, r, tz * rs);
         // Flip UP-table (raise the tip's z) whichever way the bat points: d(tipZ)/dθ at rest = −(tip.x−pivot.x),
         // so the throw is +1.4 when the tip is left of the pivot, −1.4 when it is to the right.
@@ -217,13 +223,16 @@ public sealed class WallDef
     public double? Height { get; set; }
 }
 
-/// <summary>The ball's start position (<c>[x, z]</c>) and radius, in render units. The render ball is 0.36
-/// units (co-registered with the 27&#160;mm physics ball via <c>PinballTable.RenderScale</c>).</summary>
+/// <summary>The ball's start position (<c>[x, z]</c>) and radius, in render units. <see cref="Radius"/> now
+/// drives <b>both</b> the rendered sphere and the physics collision radius (via <c>BuildPhysicsTable</c> →
+/// <c>PhysicsSettings.BallRadius</c>), so what you see is what collides — a table authored for a smaller ball
+/// no longer wedges the (previously fixed 0.36) collision ball. Ball mass/inertia keep the tuned 27&#160;mm
+/// values, so bumper/flipper feel is unchanged.</summary>
 public sealed class BallDef
 {
     /// <summary>Start / rack position as <c>[x, z]</c> (render units).</summary>
     public double[] Start { get; set; } = new[] { 5.05, 1.2 };
-    /// <summary>Ball radius (render units).</summary>
+    /// <summary>Ball radius (render units) — drives the rendered ball and the physics collision radius.</summary>
     public double Radius { get; set; } = 0.36;
 }
 

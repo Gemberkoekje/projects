@@ -22,6 +22,13 @@
 // glass casts a Beer–Lambert-tinted shadow. Must equal Optics.GlassShadowInterfaceThickness (CPU).
 #define GLASS_SHADOW_INTERFACE_THICKNESS 0.03
 #define BUBBLE_FIREFLY_CLAMP 1.5  // §2.6: per-sample luminance cap on a bubble (tames the reflect/transmit-split fireflies)
+#define MOVER_FIREFLY_CLAMP 2.0   // §4.1: per-sample luminance cap on a mover pixel (chrome ball / flippers) — they
+                                  // soft-cap at only MotionSampleCap samples, so a bright specular/NEE outlier would
+                                  // otherwise survive as a firefly. Hue-preserving (scales XYZ), so highlights keep colour.
+#define MOVER_SUPERSAMPLES 4u     // §4.1: extra per-frame sub-samples on a mover pixel. A moving mover restarts +
+                                  // soft-caps, so its mirror reflection of the colourful table is undersampled and
+                                  // noisy; averaging N sub-samples this frame cuts the variance ~√N. Movers are a
+                                  // small screen fraction, so the cost is negligible; static pixels are untouched.
 #define MAX_SPECULAR_BOUNCES 8u  // JobSystem.MaxSpecularBounces
 #define MOVER_SPECULAR_BOUNCES 1u // §4.1/§4.4: a moving part's specular chain (the chrome ball reflects
                                   // the static scene once). The iterative loop below counts the primary
@@ -541,6 +548,33 @@ float3 DirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint pi
         xyz += DeterXYZ[idx].xyz * refl * BlackbodyShape(DeterXYZ[idx].w, lightTempK);
     }
     return xyz * norm / float(COMPANION_COUNT);
+}
+
+// §4.1 full-spectrum (deterministic, noise-free) diffuse colour for MOVERS. The 4-of-50-wavelength Monte-Carlo
+// estimate above crawls with the frame — the eyesore on the flippers. A diffuse mover has no dispersion, so
+// sum ALL DETERMINISTIC_COUNT wavelengths once: its exact converged colour every frame, no spectral noise. These
+// equal the MC estimators in expectation (same reflectance·XYZ mean), so only mover pixels change. Non-decal
+// path only — movers (flippers) carry a solid material, never a decal.
+float3 BaseXyzFull(PrimitiveInfo prim, float3 rayDir, float3 hitPoint)
+{
+    uint row; float atten;
+    PatternShade(prim, rayDir, hitPoint, row, atten);
+    uint reflBase = row * DETERMINISTIC_COUNT;
+    float3 xyz = float3(0.0, 0.0, 0.0);
+    [loop] for (uint idx = 0u; idx < DETERMINISTIC_COUNT; idx++)
+        xyz += DeterXYZ[idx].xyz * (MaterialReflectance[reflBase + idx] * atten * ThinFilmFactor(prim, rayDir, hitPoint, idx));
+    return xyz / float(DETERMINISTIC_COUNT);
+}
+float3 DirectBaseXyzFull(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, float lightTempK)
+{
+    float norm = BlackbodyLumaNorm(lightTempK);
+    uint row; float atten;
+    PatternShade(prim, rayDir, hitPoint, row, atten);
+    uint reflBase = row * DETERMINISTIC_COUNT;
+    float3 xyz = float3(0.0, 0.0, 0.0);
+    [loop] for (uint idx = 0u; idx < DETERMINISTIC_COUNT; idx++)
+        xyz += DeterXYZ[idx].xyz * (MaterialReflectance[reflBase + idx] * atten * ThinFilmFactor(prim, rayDir, hitPoint, idx)) * BlackbodyShape(DeterXYZ[idx].w, lightTempK);
+    return xyz * norm / float(DETERMINISTIC_COUNT);
 }
 
 float3 IndirectBaseXyz(PrimitiveInfo prim, float3 rayDir, float3 hitPoint, uint heroIdx)
@@ -1865,11 +1899,22 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
             if (lum > BUBBLE_FIREFLY_CLAMP)
                 specXyz *= BUBBLE_FIREFLY_CLAMP / lum;
         }
+        // A moving mirror (the chrome ball, §4.1) soft-caps at only MotionSampleCap samples, so its
+        // one-bounce reflection of a small bright emitter survives as a firefly. This branch returns early
+        // (bypassing the frame-end clamp), so tame it here — a hue-preserving luminance cap.
+        else if (dyn)
+        {
+            float lum = max(specXyz.y, 1e-4);
+            if (lum > MOVER_FIREFLY_CLAMP)
+                specXyz *= MOVER_FIREFLY_CLAMP / lum;
+        }
         correctedDirect = specXyz;
         return specXyz;
     }
 
-    float3 baseXyz = BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
+    // Movers take the full-spectrum (noise-free) colour; static geometry keeps the MC estimator (goldens intact).
+    float3 baseXyz = dyn ? BaseXyzFull(prim, primaryDir, hitPoint)
+                         : BaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx);
     primaryAlbedo = baseXyz.y; // base reflectance luminance (Albedo debug view)
 
     bool lit = (LightingMode != 0u) && (NumLights > 0u);
@@ -1914,7 +1959,8 @@ float3 ShadeSample(float3 camPos, float3 primaryDir, uint pixelHash, uint sample
         // luma norm), so a coloured light's tint correlates with each wavelength's reflectance rather than
         // being factored out at the hero λ and smeared over the companion mean. Equals baseXyz for a
         // flat-white light (temp 0), so temp-0 scenes (all parity self-tests) stay bit-identical.
-        float3 directBaseXyz = DirectBaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx, LightColors[chosenLight].w);
+        float3 directBaseXyz = dyn ? DirectBaseXyzFull(prim, primaryDir, hitPoint, LightColors[chosenLight].w)
+                                   : DirectBaseXyz(prim, primaryDir, hitPoint, pixelHash, sampleIdx, LightColors[chosenLight].w);
 
         xyz = baseXyz * ambientTerm + directBaseXyz * directTerm;
 
@@ -2258,6 +2304,32 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         correctedIndirect *= vignette;
     }
 
+    // §4.1 mover supersampling: a moving mover (chrome ball / flippers) restarts + soft-caps, so it gets far
+    // too few temporal samples and its mirror reflection of the colourful table is grainy. Average a few extra
+    // sub-samples THIS frame for mover pixels — cheap (movers are a small screen fraction) and it cuts the
+    // per-frame variance ~√N. Only mover pixels (gTouched) are touched, so static goldens stay bit-identical.
+    if (gTouched != 0u)
+    {
+        float3 sSum = corrected, sSumD = correctedDirect, sSumI = correctedIndirect;
+        for (uint sub = 1u; sub < MOVER_SUPERSAMPLES; sub++)
+        {
+            uint ssIdx = sampleIdx * MOVER_SUPERSAMPLES + sub;
+            uint sseed = pixelHash + ssIdx * RNG_MUL + RNG_ADD; sseed = sseed * RNG_MUL + RNG_ADD;
+            float sjx = (sseed & 0xFFFF) / 65536.0; sseed = sseed * RNG_MUL + RNG_ADD;
+            float sjy = (sseed & 0xFFFF) / 65536.0;
+            float spx = (2.0 * ((x + sjx) * InvWidth) - 1.0) * AspectTanHalfFov;
+            float spy = (1.0 - 2.0 * ((y + sjy) * InvHeight)) * TanHalfFov;
+            float3 sRo, sDir; float sVig;
+            GenerateLensRay(spx, spy, pixelHash, ssIdx, sRo, sDir, sVig);
+            bool sh, sr, sb; float3 sCd, sCi, sHp, sNn; float sAl; uint sDyn, sTc;
+            float3 sC = ShadeSample(sRo, sDir, pixelHash, ssIdx, sh, sr, sb, sCd, sCi, sHp, sNn, sAl, sDyn, sTc);
+            if (LensVignetteStrength > 0.0) { sC *= sVig; sCd *= sVig; sCi *= sVig; }
+            sSum += sC; sSumD += sCd; sSumI += sCi;
+        }
+        float sInv = 1.0 / float(MOVER_SUPERSAMPLES);
+        corrected = sSum * sInv; correctedDirect = sSumD * sInv; correctedIndirect = sSumI * sInv;
+    }
+
     // Ceiling biome-category overlay (debug). Oriented normal points down (-Y)
     // on a ceiling hit; gated off (BiomeIndicator=0) for the parity self-test.
     if (BiomeIndicator != 0u && hit && gNormal.y < -0.5)
@@ -2276,6 +2348,15 @@ void CSMain(uint3 tid : SV_DispatchThreadID)
         float3 unclamped = corrected;
         corrected = clamp(corrected, float3(0.0, 0.0, 0.0), float3(SampleClamp, SampleClamp, SampleClamp));
         clampDelta = abs(unclamped.x - corrected.x) + abs(unclamped.y - corrected.y) + abs(unclamped.z - corrected.z);
+    }
+    // A mover pixel (chrome ball / flipper — gTouched) accumulates only ~MotionSampleCap samples, so one
+    // bright specular reflection or NEE spike survives as a firefly. Cap its luminance (XYZ.y) with a
+    // hue-preserving scale: the reflection colour is kept, only the brightness outlier is tamed.
+    if (hit && gTouched != 0u)
+    {
+        float mlum = max(corrected.y, 1e-4);
+        if (mlum > MOVER_FIREFLY_CLAMP)
+            corrected *= MOVER_FIREFLY_CLAMP / mlum;
     }
 
     // Hit/miss mask: 1u = any surface hit (static geometry AND the moving rat/bubbles alike), 0u = miss.
