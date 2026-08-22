@@ -20,35 +20,40 @@ env:
 jobs:
   test:
     name: Unity EditMode + PlayMode tests
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-        with:
-          lfs: true
 
-      - name: Cache Unity Library
-        uses: actions/cache@v4
+      # Installs the exact Editor version/build-target pinned in
+      # ProjectSettings/ProjectVersion.txt (no docker container involved, so the
+      # license activated below applies to the same Editor that runs the tests).
+      - name: Setup Unity
+        id: unity-setup
+        uses: buildalon/unity-setup@v2
         with:
-          path: ${{ env.UNITY_PROJECT_PATH }}/Library
-          key: Library-IronFlag-${{ hashFiles(format('{0}/Assets/**', env.UNITY_PROJECT_PATH), format('{0}/Packages/**', env.UNITY_PROJECT_PATH), format('{0}/ProjectSettings/**', env.UNITY_PROJECT_PATH)) }}
-          restore-keys: |
-            Library-IronFlag-
+          version-file: ${{ env.UNITY_PROJECT_PATH }}/ProjectSettings/ProjectVersion.txt
+          build-targets: StandaloneWindows64
+          cache-installation: true
 
-      # Unity Personal has no exportable license file - game-ci activates it by
-      # logging into the Unity account with these credentials (same as Unity Hub's
-      # login/logout activation cycle) and releases it again when the job ends.
-      # Requires the repo secrets UNITY_EMAIL/UNITY_PASSWORD to be configured;
-      # without them this job fails at the license-activation step.
-      - name: Run Unity tests (EditMode + PlayMode)
-        uses: game-ci/unity-test-runner@v4
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      # Unity Personal has no exportable license file - it's activated by logging
+      # into the Unity account (same as Unity Hub's login/logout activation cycle).
+      # Requires the repo secrets UNITY_EMAIL/UNITY_PASSWORD to be configured.
+      - name: Activate Unity license
+        uses: buildalon/activate-unity-license@v2
         with:
-          projectPath: ${{ env.UNITY_PROJECT_PATH }}
-          testMode: all
-          artifactsPath: ironflag-test-results
-          checkName: IronFlag Test Results
+          license: personal
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
+
+      - name: Run EditMode tests
+        shell: pwsh
+        run: |
+          & "${{ steps.unity-setup.outputs.unity-editor-path }}" -batchmode -nographics -projectPath "${{ env.UNITY_PROJECT_PATH }}" -runTests -testPlatform EditMode -testResults "${{ github.workspace }}/ironflag-test-results/editmode-results.xml" -logFile -
+
+      - name: Run PlayMode tests
+        shell: pwsh
+        run: |
+          & "${{ steps.unity-setup.outputs.unity-editor-path }}" -batchmode -nographics -projectPath "${{ env.UNITY_PROJECT_PATH }}" -runTests -testPlatform PlayMode -testResults "${{ github.workspace }}/ironflag-test-results/playmode-results.xml" -logFile -
 
       - name: Upload test results
         if: always()
@@ -59,29 +64,30 @@ jobs:
 
   build:
     name: Build (StandaloneWindows64)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: test
     steps:
       - uses: actions/checkout@v5
-        with:
-          lfs: true
 
-      - name: Cache Unity Library
-        uses: actions/cache@v4
+      - name: Setup Unity
+        id: unity-setup
+        uses: buildalon/unity-setup@v2
         with:
-          path: ${{ env.UNITY_PROJECT_PATH }}/Library
-          key: Library-IronFlag-${{ hashFiles(format('{0}/Assets/**', env.UNITY_PROJECT_PATH), format('{0}/Packages/**', env.UNITY_PROJECT_PATH), format('{0}/ProjectSettings/**', env.UNITY_PROJECT_PATH)) }}
-          restore-keys: |
-            Library-IronFlag-
+          version-file: ${{ env.UNITY_PROJECT_PATH }}/ProjectSettings/ProjectVersion.txt
+          build-targets: StandaloneWindows64
+          cache-installation: true
+
+      - name: Activate Unity license
+        uses: buildalon/activate-unity-license@v2
+        with:
+          license: personal
+          username: ${{ secrets.UNITY_EMAIL }}
+          password: ${{ secrets.UNITY_PASSWORD }}
 
       - name: Build project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: ${{ env.UNITY_PROJECT_PATH }}
-          targetPlatform: StandaloneWindows64
+        shell: pwsh
+        run: |
+          & "${{ steps.unity-setup.outputs.unity-editor-path }}" -batchmode -nographics -quit -projectPath "${{ env.UNITY_PROJECT_PATH }}" -buildWindows64Player "${{ github.workspace }}/build/StandaloneWindows64/IronFlag.exe" -logFile -
 
       - name: Upload build
         uses: actions/upload-artifact@v4
