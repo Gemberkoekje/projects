@@ -1,0 +1,519 @@
+{
+    "SchemaVersion": 1,
+    "Name": "Iron Channel",
+    "Description": "The v0.1 map. One island cut in two by an east-west channel, with three ways over it: a causeway in the middle that nobody can take away, and a bridge on each flank that anybody can. Blowing both bridges funnels the whole match through the middle; it can never strand a jeep, which is the one thing that would make a match unwinnable. Bunkers face each other down the centre line at 140 m. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you.",
+    "Bounds": {
+        "HalfExtent": 120.0,
+        "WaterDepth": 0.7,
+        "SeaThickness": 3.0
+    },
+    "Land": [
+        {
+            "Name": "Green shore",
+            "MinX": -82.0,
+            "MaxX": 82.0,
+            "MinZ": -92.0,
+            "MaxZ": -13.0
+        },
+        {
+            "Name": "Brown shore",
+            "MinX": -82.0,
+            "MaxX": 82.0,
+            "MinZ": 13.0,
+            "MaxZ": 92.0
+        },
+        {
+            "Name": "The causeway",
+            "MinX": -8.0,
+            "MaxX": 8.0,
+            "MinZ": -13.0,
+            "MaxZ": 13.0
+        },
+        {
+            "Name": "West bridgehead, green",
+            "MinX": -48.0,
+            "MaxX": -36.0,
+            "MinZ": -13.0,
+            "MaxZ": -6.5
+        },
+        {
+            "Name": "West bridgehead, brown",
+            "MinX": -48.0,
+            "MaxX": -36.0,
+            "MinZ": 6.5,
+            "MaxZ": 13.0
+        },
+        {
+            "Name": "East bridgehead, green",
+            "MinX": 36.0,
+            "MaxX": 48.0,
+            "MinZ": -13.0,
+            "MaxZ": -6.5
+        },
+        {
+            "Name": "East bridgehead, brown",
+            "MinX": 36.0,
+            "MaxX": 48.0,
+            "MinZ": 6.5,
+            "MaxZ": 13.0
+        }
+    ],
+    "Bunkers": [
+        {
+            "Team": "Green",
+            "Position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -70.0
+            },
+            "YawDegrees": 0.0,
+            "SupplyRadius": 12.0,
+            "SupplyRate": 0.25
+        },
+        {
+            "Team": "Brown",
+            "Position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 70.0
+            },
+            "YawDegrees": 180.0,
+            "SupplyRadius": 12.0,
+            "SupplyRate": 0.25
+        }
+    ],
+    "Towers": [
+        {
+            "Team": "Green",
+            "HoldsTheFlag": true,
+            "Position": {
+                "x": -18.0,
+                "y": 0.0,
+                "z": -56.0
+            },
+            "YawDegrees": 0.0
+        },
+        {
+            "Team": "Green",
+            "HoldsTheFlag": false,
+            "Position": {
+                "x": 18.0,
+                "y": 0.0,
+                "z": -56.0
+            },
+            "YawDegrees": 0.0
+        },
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": true,
+            "Position": {
+                "x": 18.0,
+                "y": 0.0,
+                "z": 56.0
+            },
+            "YawDegrees": 180.0
+        },
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": false,
+            "Position": {
+                "x": -18.0,
+                "y": 0.0,
+                "z": 56.0
+            },
+            "YawDegrees": 180.0
+        }
+    ],
+    "Structures": [
+        {
+            "Kind": "Bridge",
+            "Name": "West bridge",
+            "Position": {
+                "x": -42.0,
+                "y": -1.2,
+                "z": 0.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Bridge",
+            "Name": "East bridge",
+            "Position": {
+                "x": 42.0,
+                "y": -1.2,
+                "z": 0.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotFuel",
+            "Name": "Fuel depot (west)",
+            "Position": {
+                "x": -38.0,
+                "y": 0.0,
+                "z": -34.0
+            },
+            "YawDegrees": 20.0,
+            "FuelRate": 0.12,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotFuel",
+            "Name": "Fuel depot (east)",
+            "Position": {
+                "x": 38.0,
+                "y": 0.0,
+                "z": 34.0
+            },
+            "YawDegrees": 200.0,
+            "FuelRate": 0.12,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotAmmo",
+            "Name": "Ammo depot (east)",
+            "Position": {
+                "x": 38.0,
+                "y": 0.0,
+                "z": -34.0
+            },
+            "YawDegrees": -20.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.12,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotAmmo",
+            "Name": "Ammo depot (west)",
+            "Position": {
+                "x": -38.0,
+                "y": 0.0,
+                "z": 34.0
+            },
+            "YawDegrees": 160.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.12,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Bridgehead block (west)",
+            "Position": {
+                "x": -42.0,
+                "y": 0.0,
+                "z": -22.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Bridgehead block (east)",
+            "Position": {
+                "x": 42.0,
+                "y": 0.0,
+                "z": 22.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Name": "Bridgehead shed (east)",
+            "Position": {
+                "x": 42.0,
+                "y": 0.0,
+                "z": -24.0
+            },
+            "YawDegrees": 90.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Name": "Bridgehead shed (west)",
+            "Position": {
+                "x": -42.0,
+                "y": 0.0,
+                "z": 24.0
+            },
+            "YawDegrees": 270.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Causeway block (west)",
+            "Position": {
+                "x": -16.0,
+                "y": 0.0,
+                "z": -30.0
+            },
+            "YawDegrees": 20.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Causeway block (east)",
+            "Position": {
+                "x": 16.0,
+                "y": 0.0,
+                "z": 30.0
+            },
+            "YawDegrees": 200.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Name": "Tower shed (east)",
+            "Position": {
+                "x": 14.0,
+                "y": 0.0,
+                "z": -46.0
+            },
+            "YawDegrees": 290.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Name": "Tower shed (west)",
+            "Position": {
+                "x": -14.0,
+                "y": 0.0,
+                "z": 46.0
+            },
+            "YawDegrees": 110.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -6.0,
+                "y": 0.0,
+                "z": -20.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 6.0,
+                "y": 0.0,
+                "z": 20.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 10.0,
+                "y": 0.0,
+                "z": -16.0
+            },
+            "YawDegrees": 40.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -10.0,
+                "y": 0.0,
+                "z": 16.0
+            },
+            "YawDegrees": 220.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -28.0,
+                "y": 0.0,
+                "z": -40.0
+            },
+            "YawDegrees": 80.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 28.0,
+                "y": 0.0,
+                "z": 40.0
+            },
+            "YawDegrees": 260.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 33.0,
+                "y": 0.0,
+                "z": -38.0
+            },
+            "YawDegrees": 120.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -33.0,
+                "y": 0.0,
+                "z": 38.0
+            },
+            "YawDegrees": 300.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -56.0,
+                "y": 0.0,
+                "z": -30.0
+            },
+            "YawDegrees": 160.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 56.0,
+                "y": 0.0,
+                "z": 30.0
+            },
+            "YawDegrees": 340.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 58.0,
+                "y": 0.0,
+                "z": -52.0
+            },
+            "YawDegrees": 200.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -58.0,
+                "y": 0.0,
+                "z": 52.0
+            },
+            "YawDegrees": 20.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -24.0,
+                "y": 0.0,
+                "z": -68.0
+            },
+            "YawDegrees": 240.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 24.0,
+                "y": 0.0,
+                "z": 68.0
+            },
+            "YawDegrees": 60.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 30.0,
+                "y": 0.0,
+                "z": -66.0
+            },
+            "YawDegrees": 280.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -30.0,
+                "y": 0.0,
+                "z": 66.0
+            },
+            "YawDegrees": 100.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        }
+    ]
+}

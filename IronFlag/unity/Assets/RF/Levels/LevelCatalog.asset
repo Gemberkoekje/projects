@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6aa9b220ff5aed34492b4c8bcebffe86, type: 3}
+  m_Name: LevelCatalog
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Levels.LevelCatalog
+  structures:
+  - Kind: 1
+    Prefab: {fileID: 3886821255300108352, guid: ec04b4d01b69ebf419c5aeccb6dab69c, type: 3}
+  - Kind: 2
+    Prefab: {fileID: 9115388907555084185, guid: 4ab6f1392d7ed484bb98bee9a1b98293, type: 3}
+  - Kind: 3
+    Prefab: {fileID: 2347301578548288178, guid: cc84d8da6cb19c64c9a92fcd4f466ba0, type: 3}
+  - Kind: 4
+    Prefab: {fileID: 2590751924699170121, guid: 2fc70420563f2a9439981b55909b1379, type: 3}
+  - Kind: 5
+    Prefab: {fileID: 6420447529492843604, guid: 58a8a6cb629cb2843b64b0b11a818b3f, type: 3}
+  - Kind: 6
+    Prefab: {fileID: 2731075794887089659, guid: 6cf2310289501ce438b954d82f6de89d, type: 3}
+  bunker: {fileID: 7350495116598894301, guid: 5a8598d1424d6644c9b4c11db0d729a8, type: 3}
+  tower: {fileID: 3393270847052785822, guid: a94e5f60a2f6fd440b8995d5172af954, type: 3}
+  flag: {fileID: 4965343357232036794, guid: aaf184bc273be4147a3b52b937b6fa08, type: 3}
+  ground: {fileID: 2100000, guid: f050833809b15b341938cb479746d1e2, type: 2}
+  water: {fileID: 2100000, guid: 003ec858c293443468553cd5c396ba3b, type: 2}
+  greenTrim: {fileID: 2100000, guid: e160c5d6a7e2e4b4d88fd32ad6613ad9, type: 2}
+  brownTrim: {fileID: 2100000, guid: 525d5602beb90904aa415fe12ccd6989, type: 2}
+  frontLight: {fileID: 2100000, guid: 516a43ab2834b124c8d4d556f63443e6, type: 2}
+  rearLight: {fileID: 2100000, guid: 8129624ef5fe20041bcc51e89b9489f4, type: 2}
