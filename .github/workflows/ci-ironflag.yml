@@ -34,13 +34,14 @@ jobs:
           restore-keys: |
             Library-IronFlag-
 
-      # Requires the repo secrets UNITY_LICENSE (+ UNITY_EMAIL/UNITY_PASSWORD, or a
-      # UNITY_SERIAL, for activation) to be configured. Without a license this job
-      # fails at the license-activation step rather than silently skipping tests.
+      # Unity Personal has no exportable license file - game-ci activates it by
+      # logging into the Unity account with these credentials (same as Unity Hub's
+      # login/logout activation cycle) and releases it again when the job ends.
+      # Requires the repo secrets UNITY_EMAIL/UNITY_PASSWORD to be configured;
+      # without them this job fails at the license-activation step.
       - name: Run Unity tests (EditMode + PlayMode)
         uses: game-ci/unity-test-runner@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
@@ -76,7 +77,6 @@ jobs:
       - name: Build project
         uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
