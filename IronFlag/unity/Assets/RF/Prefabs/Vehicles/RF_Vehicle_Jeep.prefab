@@ -1,0 +1,398 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &650280244273869760
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8302801913972377653}
+  m_Layer: 0
+  m_Name: MuzzlePoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8302801913972377653
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 650280244273869760}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.16, z: 1.95}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7392809817802188897}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1262523723605403632
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3686359414980243847}
+  m_Layer: 0
+  m_Name: Visual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3686359414980243847
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1262523723605403632}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 5729310735770284808}
+  m_Father: {fileID: 1827402782279622972}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &3453111639072497909
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1827402782279622972}
+  - component: {fileID: 8293622706806334007}
+  - component: {fileID: 8395725197896600504}
+  - component: {fileID: 8191538964193929937}
+  - component: {fileID: 7258562239646150978}
+  - component: {fileID: 4794191991421912277}
+  - component: {fileID: 9206126567465729417}
+  - component: {fileID: 3025798546813575242}
+  - component: {fileID: 2355681338034361873}
+  - component: {fileID: 2793559351139064513}
+  m_Layer: 0
+  m_Name: RF_Vehicle_Jeep
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1827402782279622972
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 3686359414980243847}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!54 &8293622706806334007
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  serializedVersion: 5
+  m_Mass: 1200
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 1
+  m_Constraints: 80
+  m_CollisionDetection: 2
+--- !u!114 &8395725197896600504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a13adcb5a0c2d4439998630d17d23b6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Vehicles.GroundVehicle
+  kind: 1
+  tuning:
+    MaxSpeed: 22
+    ReverseFraction: 0.45
+    Acceleration: 26
+    Braking: 34
+    TurnRate: 130
+    PivotTurn: 0
+    SteerReferenceSpeed: 5
+    Mass: 1200
+    TurretTurnRate: 0
+    HitPoints: 50
+    FuelCapacity: 90
+    IdleFuelDraw: 0.15
+--- !u!65 &8191538964193929937
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.8, y: 1.6149999, z: 4}
+  m_Center: {x: 0, y: 0.80749995, z: 0.05000007}
+--- !u!114 &7258562239646150978
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 78a1350d21ac37142a0a476bd8bdbe5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Vehicles.VehicleWheels
+  vehicle: {fileID: 8395725197896600504}
+  wheels:
+  - {fileID: 7879135622257303735}
+  - {fileID: 2395607840206293306}
+  - {fileID: 7565220517992245399}
+  - {fileID: 3666403817749855171}
+  steeredWheels:
+  - {fileID: 7879135622257303735}
+  - {fileID: 2395607840206293306}
+  wheelRadius: 0.38
+  maxSteerAngle: 26
+  steerDamping: 0.08
+--- !u!114 &4794191991421912277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0aac841ac61bc974ea6f664282ebdf57, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Vehicles.VehicleTeamPaint
+  team: 1
+  trimRenderer: {fileID: 1683055646187846557}
+  greenMaterial: {fileID: 2100000, guid: e160c5d6a7e2e4b4d88fd32ad6613ad9, type: 2}
+  brownMaterial: {fileID: 2100000, guid: 525d5602beb90904aa415fe12ccd6989, type: 2}
+--- !u!114 &9206126567465729417
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2d0f7f215f37adb4aa8b284cdf354a1b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Combat.VehicleHealth
+  maxHitPoints: 50
+  wreckExplosion: {fileID: 83958270509870403, guid: 3add27fa784980c4f9e3717d64ff8c75, type: 3}
+  wreckBlastRadius: 2.5
+--- !u!114 &3025798546813575242
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddf5f4f7fc9996645a7ea698a9eefca4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Supply.VehicleSupply
+  fuelCapacity: 90
+  idleFuelDraw: 0.15
+  roundsCarried: 24
+--- !u!114 &2355681338034361873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40bf416517cf3fe49932edca0b7c4121, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Combat.VehicleWeapon
+  vehicle: {fileID: 8395725197896600504}
+  muzzle: {fileID: 8302801913972377653}
+  tuning:
+    Kind: 1
+    Damage: 22
+    SplashRadius: 4
+    MuzzleSpeed: 28
+    ShotInterval: 1
+    Range: 14
+    Drop: 22
+    ElevationDegrees: 11.566198
+    Radius: 0.18
+    ArmingDistance: 0
+    Rounds: 24
+  round: {fileID: 2204419144181431740, guid: 4869f3104f17d0c429d71f9754085dd1, type: 3}
+--- !u!114 &2793559351139064513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3453111639072497909}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 079e5c7845a635046a7b23ac2b850c42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Core.VehicleBay
+  repairSeconds: 4
+  deploySeconds: 1.2
+--- !u!1001 &3031268329339287579
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3686359414980243847}
+    m_Modifications:
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -1017922020295736128, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 8129624ef5fe20041bcc51e89b9489f4, type: 2}
+    - target: {fileID: 1229446355528574422, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 516a43ab2834b124c8d4d556f63443e6, type: 2}
+    - target: {fileID: 4416430677794554758, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: e160c5d6a7e2e4b4d88fd32ad6613ad9, type: 2}
+    - target: {fileID: 5268903159703661617, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      propertyPath: m_Name
+      value: Model
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -3708235866008301446, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8302801913972377653}
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: -4161369568681901532, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+--- !u!23 &1683055646187846557 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4416430677794554758, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &2395607840206293306 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8417277321877393119, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &3666403817749855171 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1797099687664501720, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &5729310735770284808 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -1903998178990781677, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7392809817802188897 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -3708235866008301446, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7565220517992245399 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4822288153388011660, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &7879135622257303735 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5136753838072338604, guid: 25dbdea2ca992fe4f95b37e923274e22, type: 3}
+  m_PrefabInstance: {fileID: 3031268329339287579}
+  m_PrefabAsset: {fileID: 0}
