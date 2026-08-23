@@ -58,9 +58,6 @@ namespace IronFlag.Levels
         /// </remarks>
         public const float StepSize = 2.0f;
 
-        /// <summary>The sides a level has to be playable by.</summary>
-        private static readonly Team[] Playing = { Team.Green, Team.Brown };
-
         /// <summary>The four steps a flood fill takes from a cell.</summary>
         private static readonly Vector2Int[] Neighbours =
         {
@@ -227,7 +224,7 @@ namespace IronFlag.Levels
 
         private static void CheckBunkers(LevelDefinition level, List<string> problems)
         {
-            foreach (Team side in Playing)
+            foreach (Team side in Teams.Playing)
             {
                 LevelBunker bunker = level.BunkerFor(side);
                 if (bunker == null)
@@ -247,7 +244,7 @@ namespace IronFlag.Levels
                 }
             }
 
-            int extra = level.Bunkers.Length - Playing.Length;
+            int extra = level.Bunkers.Length - Teams.Playing.Length;
             if (extra > 0)
             {
                 problems.Add($"The level has {extra} bunker(s) more than it has sides.");
@@ -256,7 +253,7 @@ namespace IronFlag.Levels
 
         private static void CheckTowers(LevelDefinition level, List<string> problems)
         {
-            foreach (Team side in Playing)
+            foreach (Team side in Teams.Playing)
             {
                 List<LevelTower> towers = level.TowersFor(side);
 

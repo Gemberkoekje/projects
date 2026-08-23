@@ -97,7 +97,7 @@ namespace IronFlag.Editor.Gameplay
         /// </remarks>
         private static Camera Overhead(LevelDefinition level)
         {
-            Bounds land = LandBounds(level);
+            Bounds land = level.LandBounds();
             float half = Mathf.Max(land.extents.x, land.extents.z) + Margin;
 
             var host = new GameObject("Overhead");
@@ -113,46 +113,6 @@ namespace IronFlag.Editor.Gameplay
             view.clearFlags = CameraClearFlags.SolidColor;
             view.backgroundColor = Color.black;
             return view;
-        }
-
-        /// <summary>
-        /// Measures the box every piece of land fits inside.
-        /// </summary>
-        /// <param name="level">The level.</param>
-        /// <returns>The land's bounds, or the whole world when a level has no land.</returns>
-        private static Bounds LandBounds(LevelDefinition level)
-        {
-            var box = new Bounds(Vector3.zero, Vector3.zero);
-            bool started = false;
-
-            foreach (LevelLand piece in level.Land)
-            {
-                if (piece == null || !piece.IsDrawn)
-                {
-                    continue;
-                }
-
-                var corner = new Bounds(
-                    piece.Centre, new Vector3(piece.Width, 1.0f, piece.Depth));
-
-                if (started)
-                {
-                    box.Encapsulate(corner);
-                }
-                else
-                {
-                    box = corner;
-                    started = true;
-                }
-            }
-
-            if (!started)
-            {
-                float extent = level.Bounds == null ? 100.0f : level.Bounds.HalfExtent;
-                box = new Bounds(Vector3.zero, new Vector3(extent * 2.0f, 1.0f, extent * 2.0f));
-            }
-
-            return box;
         }
 
         private static GameObject Instantiate(GameObject prefab)

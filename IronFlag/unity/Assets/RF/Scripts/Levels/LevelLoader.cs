@@ -48,6 +48,18 @@ namespace IronFlag.Levels
         /// <summary>Name of the level file this loads.</summary>
         public string LevelName => levelName;
 
+        /// <summary>
+        /// The map <em>this</em> loader has up, or <c>null</c> before it has put one up.
+        /// </summary>
+        /// <remarks>
+        /// Not the same question as <see cref="Current"/>, and the difference matters exactly
+        /// when something has gone wrong. <see cref="Current"/> is the last map anybody built
+        /// and survives a scene change, so a loader whose file will not read leaves it holding
+        /// the map from the scene before - and anything that read it would go on working, on
+        /// the wrong map. This is empty in that case, which is what it should be.
+        /// </remarks>
+        public LevelDefinition Shown { get; private set; }
+
         /// <summary>The prefabs and materials maps are built out of.</summary>
         public LevelCatalog Catalog => catalog;
 
@@ -90,6 +102,12 @@ namespace IronFlag.Levels
         /// Builds a level, replacing whatever map is up.
         /// </summary>
         /// <param name="level">The map to build.</param>
+        /// <param name="announce">
+        /// Whether to log what is wrong with the level. The editor passes <c>false</c>: it
+        /// rebuilds the map on every change and shows the same problems in a panel, so
+        /// logging them would put a thousand copies of a warning somebody is already reading
+        /// between them and the one warning that came from somewhere else.
+        /// </param>
         /// <remarks>
         /// <para>
         /// What a level editor calls after every change. The old map is <em>disabled</em>
@@ -104,20 +122,24 @@ namespace IronFlag.Levels
         /// a tower in the sea is worth looking at; a map that will not load is not.
         /// </para>
         /// </remarks>
-        public void Show(LevelDefinition level)
+        public void Show(LevelDefinition level, bool announce = true)
         {
             transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             transform.localScale = Vector3.one;
 
-            string named = level == null ? "(no level)" : level.Name;
-            foreach (string problem in LevelValidation.Problems(level))
+            if (announce)
             {
-                Debug.LogWarning($"IronFlag: {named} - {problem}");
+                string named = level == null ? "(no level)" : level.Name;
+                foreach (string problem in LevelValidation.Problems(level))
+                {
+                    Debug.LogWarning($"IronFlag: {named} - {problem}");
+                }
             }
 
             Clear();
 
             LevelBuilder.Build(level, catalog).transform.SetParent(transform, false);
+            Shown = level;
             Current = level;
         }
 
@@ -146,16 +168,24 @@ namespace IronFlag.Levels
         /// Loads the map before anything else in the scene has started.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// <c>Awake</c> rather than <c>Start</c>, because the bunkers this builds have to be
         /// on <see cref="IronFlag.Core.TeamBunker.For"/> by the time
         /// <see cref="IronFlag.Players.PlayerVehicleDriver"/> stows its roster in one - and
         /// that happens in <c>Start</c>, for exactly this reason.
+        /// </para>
+        /// <para>
+        /// A map asked for through <see cref="LevelHandoff"/> beats the one baked into the
+        /// scene, which is how the editor's Play button works: it saves, names the map, and
+        /// loads this scene. With nobody having asked, the scene opens the level it was built
+        /// around, exactly as it did before the editor existed.
+        /// </para>
         /// </remarks>
         private void Awake()
         {
             if (Application.isPlaying)
             {
-                Load(levelName);
+                Load(LevelHandoff.LevelOr(levelName));
             }
         }
     }

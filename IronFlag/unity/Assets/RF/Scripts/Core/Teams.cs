@@ -1,7 +1,8 @@
 namespace IronFlag.Core
 {
     /// <summary>
-    /// The one rule that decides whether a shot counts.
+    /// The one rule that decides whether a shot counts, and the roster of sides a match is
+    /// played between.
     /// </summary>
     /// <remarks>
     /// It is a single comparison, and it is worth its own file because two very different
@@ -11,6 +12,18 @@ namespace IronFlag.Core
     /// </remarks>
     public static class Teams
     {
+        /// <summary>The two sides a match is played between, in seat order.</summary>
+        /// <remarks>
+        /// One array rather than three. <see cref="IronFlag.Levels.LevelValidation"/>, the
+        /// sandbox scene generator and the level editor each need exactly this list - which
+        /// sides a level must satisfy, which side sits in which seat, which sides a map can
+        /// be built for - and all three used to write their own copy of the same two
+        /// elements in the same order. A third team would have needed finding and updating
+        /// in three places that happened to agree by coincidence rather than by depending on
+        /// one another.
+        /// </remarks>
+        public static readonly Team[] Playing = { Team.Green, Team.Brown };
+
         /// <summary>
         /// Reports whether one side's fire hurts another's.
         /// </summary>

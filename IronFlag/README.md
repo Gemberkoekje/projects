@@ -10,10 +10,11 @@ the project setup does and why, [M1_NOTES.md](M1_NOTES.md) does the same for the
 the camera, [M2_NOTES.md](M2_NOTES.md) for the split screen and its two players,
 [M3_NOTES.md](M3_NOTES.md) for the weapons and the damage, [M4_NOTES.md](M4_NOTES.md)
 for the bunker you choose from and the fuel and ammunition you leave it with, [M5_NOTES.md](M5_NOTES.md) for the buildings you can knock down,
-[M6_NOTES.md](M6_NOTES.md) for the flag and the match you win with it, and
+[M6_NOTES.md](M6_NOTES.md) for the flag and the match you win with it,
 [M7_NOTES.md](M7_NOTES.md) for the map itself — which is a file you can edit — and
-[TOWER_RULES_NOTES.md](TOWER_RULES_NOTES.md) for why you have to shell a pyramid before you
-can rob it.
+[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md) for the level editor you can edit it in.
+[TOWER_RULES_NOTES.md](TOWER_RULES_NOTES.md) explains why you have to shell a pyramid before
+you can rob it.
 
 ---
 
@@ -38,8 +39,13 @@ IronFlag/
         ├── Input/                      input actions
         ├── Levels/                     the catalog: what a map is built out of
         ├── Scripts/Levels/             the level format, its loader and its rules
+        ├── Scripts/Editing/            the in-game level editor
         ├── Prefabs/ · Scenes/ · Scripts/ · Tests/
 ```
+
+There are two scenes. `Scenes/Sandbox.unity` is the game; `Scenes/LevelEditor.unity` is where
+maps are made. Both are generated, and the editor's **PLAY THIS MAP** button and the game's
+`F1` move between them.
 
 `Assets/StreamingAssets/` sits outside `Assets/RF/` because Unity requires it there. It is
 the one exception to "all project content lives under `Assets/RF/`".
@@ -124,6 +130,28 @@ the sea, no pair of towers close enough to scout in one drive, and above all no 
 crossings can all be destroyed — are checked when it loads and warned about by name. Details in
 [M7_NOTES.md](M7_NOTES.md).
 
+## Making a map
+
+Open `unity/Assets/RF/Scenes/LevelEditor.unity` and press Play. The map is above you, seen
+straight down: **right-drag** to pan, **wheel** to zoom, click anything to select it and drag it
+to move it. Keys `1`–`5` pick the tool — select, land, prop, tower, bunker — and the panel on
+the left is the palette. Hold **shift** to place something on top of what is already there, hold
+**alt** to ignore the grid, `Q`/`E` to turn what is selected, `Del` to remove it, `Ctrl+Z` to
+undo, `Ctrl+S` to save.
+
+The panel on the right is the exact numbers behind whatever is selected — the mouse is for
+roughly where a thing goes and that is for exactly where — and with nothing selected it is the
+map itself: its name, what it is trying to be, and how big the world is. Under it is every rule
+the map is currently breaking, live, in the same words the game logs. **Mirror to the other
+side** copies whatever is selected to the far side of the origin, rotated half a turn and
+handed to the other team, which is how every map in this game is laid out.
+
+Press **PLAY THIS MAP** and you are driving on it; press **F1** in the game and you are back in
+the editor with it still open. Maps you make are saved next to your saves rather than into the
+game, and a map you edit there shadows the shipped one of the same name — so nothing you do can
+damage `iron-channel`, and reverting is deleting one file. Details in
+[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md).
+
 Then there is the reason you are out there. Four identical pyramids stand on the map, two at
 the back of each half, and one of each pair is holding that side's flag - but an intact tower
 looks exactly the same either way, from any distance, forever. **The only way to find out is to
@@ -139,12 +167,12 @@ which is the same place you refuel, and you have won. Get killed on the way and 
 stands where you fell for twelve seconds: anybody's jeep can take it on, and if nobody does it
 goes back to its tower. The numbers are in [M6_NOTES.md](M6_NOTES.md).
 
-The scene and the prefabs are all generated — **Tools > IronFlag > Build Vehicle Sandbox
-Scene**, **Build Vehicle Prefabs**, **Build Combat Prefabs** and **Build Destructible
-Prefabs** — so rebuild them rather than editing them by hand. The flag and its tower come from
-**Build Objective Prefabs**, and **Build Level Catalog** is what tells the running game which
-prefab a level file's `"Bridge"` means. Run that one after changing any generated material, or
-the next render will still show the old colour.
+The scenes and the prefabs are all generated — **Tools > IronFlag > Build Vehicle Sandbox
+Scene**, **Build Level Editor Scene**, **Build Vehicle Prefabs**, **Build Combat Prefabs** and
+**Build Destructible Prefabs** — so rebuild them rather than editing them by hand. The flag and
+its tower come from **Build Objective Prefabs**, and **Build Level Catalog** is what tells the
+running game which prefab a level file's `"Bridge"` means. Run that one after changing any
+generated material, or the next render will still show the old colour.
 
 The map is the exception: it is a file rather than a generator, and the scene only carries a
 baked copy of it so that opening the scene shows something. That copy is thrown away and
@@ -174,9 +202,16 @@ rebuilt from the file on the first frame of play.
   causeway and two destructible bridges, mirrored bases, depots and cover, and water that drowns
   anything that drives into it. Nothing in the codebase knows where anything on the map is any
   more, which is the scaffold the in-game level editor will stand on.
-- **M8 onward**: not started. M8 is the polish pass - per-vehicle audio, a minimap, HUD
-  readability and juice. The minimap now has a data source: a level is a list of rectangles.
-  Ahead of M8 there is also a near-term backlog - locking the helicopter to a fixed altitude,
-  automated turrets, and finishing off destruction (no hitbox once wrecked, everything actually
-  destructible) - kept in
+- **The level editor**: done. See [M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md). Its own scene, every
+  field of a level file editable with a mouse or typed exactly, live validation, undo, and a
+  round trip to the game and back. Not in the design document's milestone plan - it is what M7
+  said should come next once levels became files, and nothing in the format had to change to
+  allow it.
+- **M8 - polish pass**: not started. Per-vehicle audio, a minimap, HUD readability and juice.
+  The minimap has a data source: a level is a list of rectangles.
+- **Not scheduled**: a pass over the map's *ground* - several surfaces, natural coastlines, and
+  handling that depends on what you are driving on - is planned in
+  [SURFACES_PLAN.md](SURFACES_PLAN.md) and not started. There is also a near-term backlog -
+  locking the helicopter to a fixed altitude, automated turrets, and finishing off destruction
+  (no hitbox once wrecked, everything actually destructible) - kept in
   [return-fire-homage-design-doc.md §10](return-fire-homage-design-doc.md#10-near-term-backlog-not-yet-scheduled-to-a-milestone).

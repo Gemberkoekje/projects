@@ -161,6 +161,52 @@ namespace IronFlag.Levels
         }
 
         /// <summary>
+        /// Measures the box every piece of land fits inside.
+        /// </summary>
+        /// <returns>
+        /// The land's bounds on the ground plane, or the whole world when a level has no
+        /// land at all - so a caller framing a camera on it always has something to frame.
+        /// </returns>
+        /// <remarks>
+        /// What both views of a map are framed on: the overhead still and the editor's own
+        /// camera. Framed on the land rather than on <see cref="Bounds"/>, because a level
+        /// with a small island in a big sea should still be a picture of the island.
+        /// </remarks>
+        public Bounds LandBounds()
+        {
+            var box = new Bounds(Vector3.zero, Vector3.zero);
+            bool started = false;
+
+            foreach (LevelLand piece in Land)
+            {
+                if (piece == null || !piece.IsDrawn)
+                {
+                    continue;
+                }
+
+                var corner = new Bounds(piece.Centre, new Vector3(piece.Width, 1.0f, piece.Depth));
+
+                if (started)
+                {
+                    box.Encapsulate(corner);
+                }
+                else
+                {
+                    box = corner;
+                    started = true;
+                }
+            }
+
+            if (!started)
+            {
+                float extent = Bounds == null ? 100.0f : Mathf.Abs(Bounds.HalfExtent);
+                box = new Bounds(Vector3.zero, new Vector3(extent * 2.0f, 1.0f, extent * 2.0f));
+            }
+
+            return box;
+        }
+
+        /// <summary>
         /// Counts the structures of one kind.
         /// </summary>
         /// <param name="kind">Kind to count.</param>

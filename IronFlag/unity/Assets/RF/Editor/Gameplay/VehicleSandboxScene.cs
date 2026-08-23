@@ -9,6 +9,7 @@ using UnityEngine.UI;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Destruction;
+using IronFlag.Editing;
 using IronFlag.Editor.ArtPipeline;
 using IronFlag.Levels;
 using IronFlag.Objective;
@@ -49,7 +50,12 @@ namespace IronFlag.Editor.Gameplay
     public static class VehicleSandboxScene
     {
         /// <summary>Where the generated scene is saved.</summary>
-        public const string ScenePath = "Assets/RF/Scenes/Sandbox.unity";
+        /// <remarks>
+        /// Read off <see cref="LevelScenes"/> rather than written here, because the level
+        /// editor loads this scene <em>by name</em> to play a map in it - and a scene saved
+        /// under one name and loaded under another is a Play button that does nothing.
+        /// </remarks>
+        public static readonly string ScenePath = LevelScenes.GamePath;
 
         /// <summary>Input actions the players are wired up to.</summary>
         public const string ActionsPath = "Assets/RF/Input/IronFlagControls.inputactions";
@@ -103,7 +109,7 @@ namespace IronFlag.Editor.Gameplay
         private const float ParkingDistance = 11.0f;
 
         /// <summary>The sides the two players are on, in seat order.</summary>
-        private static readonly Team[] Sides = { Team.Green, Team.Brown };
+        private static readonly Team[] Sides = Teams.Playing;
 
         /// <summary>
         /// Rebuilds the sandbox scene and saves it.
@@ -801,6 +807,10 @@ namespace IronFlag.Editor.Gameplay
             // here rather than on the map so that loading a level does not silently restart
             // it, and so a level file never has to describe a rule.
             host.AddComponent<Match>();
+
+            // The way back out of a playtest. It switches itself off unless the editor is
+            // what loaded this scene, so a match started normally is exactly what it was.
+            host.AddComponent<PlaytestReturn>();
         }
 
         /// <summary>
