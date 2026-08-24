@@ -58,8 +58,17 @@ namespace IronFlag.Levels
         /// <see cref="LevelFile"/> refuses a file with, and the whole reason for having a
         /// version.
         /// </para>
+        /// <para>
+        /// Version 3 is structures that belong to a side, which is to say automated turrets.
+        /// This one is a <em>prop</em> rather than a colour: a build that has never heard of
+        /// <see cref="StructureKind.Turret"/> drops every emplacement on the map with a
+        /// warning and builds a version of the same battlefield with its defences missing,
+        /// which is not the map anybody authored. Read
+        /// <see cref="LevelStructure.Side"/> alongside this - it is the whole of what
+        /// changed in the format.
+        /// </para>
         /// </remarks>
-        public const int Schema = 2;
+        public const int Schema = 3;
 
         /// <summary>Format version of the file this came from.</summary>
         [Tooltip("Format version of the level file.")]

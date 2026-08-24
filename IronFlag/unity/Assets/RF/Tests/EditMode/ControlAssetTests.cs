@@ -20,8 +20,18 @@ namespace IronFlag.Tests.EditMode
     {
         private static readonly string[] Actions =
         {
-            "Drive", "Aim", "Lift", "Fire", "NextVehicle", "PreviousVehicle", "Deploy",
+            "Drive", "Aim", "Fire", "NextVehicle", "PreviousVehicle", "Deploy",
         };
+
+        /// <summary>
+        /// Actions the asset once had and must not get back.
+        /// </summary>
+        /// <remarks>
+        /// The helicopter flies at a fixed altitude and no pilot has a collective, so a
+        /// binding for one is a key that does nothing - and the asset is edited in a window
+        /// rather than in a diff, which is exactly where a stale action survives a refactor.
+        /// </remarks>
+        private static readonly string[] Retired = { "Lift" };
 
         private static readonly string[] Schemes =
         {
@@ -42,6 +52,20 @@ namespace IronFlag.Tests.EditMode
             foreach (string action in Actions)
             {
                 Assert.That(map.FindAction(action, false), Is.Not.Null, action);
+            }
+        }
+
+        [Test]
+        public void TheVehicleMapHasNothingLeftOverFromTheCollective()
+        {
+            InputActionMap map = VehicleMap();
+
+            foreach (string action in Retired)
+            {
+                Assert.That(
+                    map.FindAction(action, false),
+                    Is.Null,
+                    $"'{action}' is bound to keys that do nothing");
             }
         }
 
@@ -107,7 +131,6 @@ namespace IronFlag.Tests.EditMode
             InputActionMap map = VehicleMap();
             var taken = new HashSet<string>(Paths(map.FindAction("Drive", false)));
             taken.UnionWith(Paths(map.FindAction("Fire", false)));
-            taken.UnionWith(Paths(map.FindAction("Lift", false)));
 
             foreach (string path in Paths(map.FindAction("Deploy", false)))
             {

@@ -311,11 +311,11 @@ namespace IronFlag.Tests.EditMode
                 SurfaceTuning.For(ground),
                 10.0f).Speed;
 
-        private static VehicleInput Forward => new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
+        private static VehicleInput Forward => new VehicleInput(Vector2.up, Vector2.zero);
 
-        private static VehicleInput Backward => new VehicleInput(Vector2.down, Vector2.zero, 0.0f);
+        private static VehicleInput Backward => new VehicleInput(Vector2.down, Vector2.zero);
 
-        private static VehicleInput SteerRight => new VehicleInput(Vector2.right, Vector2.zero, 0.0f);
+        private static VehicleInput SteerRight => new VehicleInput(Vector2.right, Vector2.zero);
 
         /// <summary>
         /// Runs the model for a while at a fixed step, the way the fixed update would.

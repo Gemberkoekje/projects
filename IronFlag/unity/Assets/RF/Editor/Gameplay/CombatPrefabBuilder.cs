@@ -88,12 +88,18 @@ namespace IronFlag.Editor.Gameplay
         /// The weapons that have a round to draw, in roster order.
         /// </summary>
         /// <returns>Every <see cref="WeaponKind"/> except <see cref="WeaponKind.None"/>.</returns>
+        /// <remarks>
+        /// The four the roster carries, plus the automated turret's - a round has to exist
+        /// for every gun that can be built, and the emplacement is the one whose gun belongs
+        /// to no vehicle.
+        /// </remarks>
         public static IEnumerable<WeaponKind> Arsenal()
         {
             yield return WeaponKind.Grenade;
             yield return WeaponKind.Cannon;
             yield return WeaponKind.Rocket;
             yield return WeaponKind.Chaingun;
+            yield return WeaponKind.Autocannon;
         }
 
         /// <summary>

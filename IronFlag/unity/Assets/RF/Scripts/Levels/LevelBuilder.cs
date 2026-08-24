@@ -466,7 +466,8 @@ namespace IronFlag.Levels
         /// How tough each of these is comes out of <see cref="StructureTuning.For"/> rather
         /// than out of the level file: a level places props, it does not rebalance them. The
         /// supply rates are the exception, and they are placement rather than balance - the
-        /// same drum with both rates at zero is scenery.
+        /// same drum with both rates at zero is scenery. So is a turret's side, and for the
+        /// same reason: which emplacement is whose is a fact about this map.
         /// </remarks>
         private static void BuildStructures(
             LevelDefinition level, LevelCatalog catalog, Transform parent, Func<GameObject, GameObject> make)
@@ -498,6 +499,22 @@ namespace IronFlag.Levels
 
                 GameObject instance = PlaceInstance(
                     prefab, placement.Name, group.transform, placement.Position, placement.YawDegrees, make);
+
+                // Only a turret is ever on a side, and being on one is the whole of what
+                // makes it work: the same answer paints it, points its gun and makes it
+                // immune to its owner's fire. A level that gives a side to anything else is
+                // refused by LevelValidation rather than quietly obeyed here.
+                if (placement.NeedsASide)
+                {
+                    Team side = placement.Team;
+                    var shell = instance.GetComponent<Destructible>();
+                    if (shell != null)
+                    {
+                        shell.SetTeam(side);
+                    }
+
+                    Paint(instance, catalog, side);
+                }
 
                 if (placement.Supplies)
                 {

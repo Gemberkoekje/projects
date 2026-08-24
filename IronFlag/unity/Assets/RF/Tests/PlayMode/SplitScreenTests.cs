@@ -265,21 +265,27 @@ namespace IronFlag.Tests.PlayMode
             Assert.That(players[1].ActiveVehicle, Is.SameAs(theirs), "player two left the field too");
         }
 
+        /// <summary>
+        /// The two buttons that used to be the collective now do nothing to a vehicle. A
+        /// helicopter flies at one altitude, and the pair being free is the point rather
+        /// than an oversight - see <c>ControlAssetTests</c>, which is what stops the action
+        /// coming back.
+        /// </summary>
         [UnityTest]
-        public IEnumerator ClimbingAndDescendingAreOneAxis()
+        public IEnumerator TheButtonsThatUsedToBeTheCollectiveDoNothing()
         {
             yield return StartTheGame();
-            PlayerControls controls = players[0].Controls;
-
-            Assert.That(controls.Lift, Is.EqualTo(0.0f), "it is climbing on its own");
+            VehicleController mine = players[0].ActiveVehicle;
 
             Hold(first, Neutral.WithButton(GamepadButton.South));
             yield return null;
-            Assert.That(controls.Lift, Is.GreaterThan(0.9f), "it did not climb");
+            Assert.That(players[0].ActiveVehicle, Is.SameAs(mine), "a free button swapped vehicles");
 
             Hold(first, Neutral.WithButton(GamepadButton.East));
             yield return null;
-            Assert.That(controls.Lift, Is.LessThan(-0.9f), "it did not descend");
+
+            Assert.That(players[0].ActiveVehicle, Is.SameAs(mine), "a free button swapped vehicles");
+            Assert.That(players[0].AtTheBunker, Is.False, "a free button sent the player home");
         }
 
         [UnityTest]

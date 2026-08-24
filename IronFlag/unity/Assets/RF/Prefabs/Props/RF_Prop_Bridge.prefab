@@ -79,6 +79,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Destruction.Destructible
   kind: 4
+  team: 0
   tuning:
     HitPoints: 320
     DamagedAt: 0

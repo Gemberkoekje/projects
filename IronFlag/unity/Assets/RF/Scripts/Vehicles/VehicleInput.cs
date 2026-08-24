@@ -7,11 +7,18 @@ namespace IronFlag.Vehicles
     /// One frame of pilot intent, in a form no vehicle has to know the input device for.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Everything that drives a vehicle - the local player, and later a replay or an
     /// AI - produces one of these per frame and hands it to
     /// <see cref="VehicleController.SetInput"/>. A vehicle that receives
     /// <see cref="Idle"/> coasts to a stop, which is exactly what an abandoned vehicle
     /// should do, so "nobody is driving" needs no separate state.
+    /// </para>
+    /// <para>
+    /// There is no vertical axis on here, because no pilot has one: the helicopter flies
+    /// at a fixed altitude and what moves it off that altitude is its fuel gauge rather
+    /// than its stick. See <see cref="Helicopter.SetPowered"/>.
+    /// </para>
     /// </remarks>
     [Serializable]
     public readonly struct VehicleInput : IEquatable<VehicleInput>
@@ -21,9 +28,8 @@ namespace IronFlag.Vehicles
         /// </summary>
         /// <param name="drive">Steer on X, throttle on Y, each in -1..1.</param>
         /// <param name="aim">World-space XZ direction the weapon should point, or zero.</param>
-        /// <param name="lift">Climb on 1, descend on -1, hold altitude on 0.</param>
-        public VehicleInput(Vector2 drive, Vector2 aim, float lift)
-            : this(drive, aim, lift, false)
+        public VehicleInput(Vector2 drive, Vector2 aim)
+            : this(drive, aim, false)
         {
         }
 
@@ -32,13 +38,11 @@ namespace IronFlag.Vehicles
         /// </summary>
         /// <param name="drive">Steer on X, throttle on Y, each in -1..1.</param>
         /// <param name="aim">World-space XZ direction the weapon should point, or zero.</param>
-        /// <param name="lift">Climb on 1, descend on -1, hold altitude on 0.</param>
         /// <param name="fire">Whether the trigger is held down this frame.</param>
-        public VehicleInput(Vector2 drive, Vector2 aim, float lift, bool fire)
+        public VehicleInput(Vector2 drive, Vector2 aim, bool fire)
         {
             Drive = drive;
             Aim = aim;
-            Lift = lift;
             Fire = fire;
         }
 
@@ -53,9 +57,6 @@ namespace IronFlag.Vehicles
         /// world X and Y to world Z. Zero means "no aim this frame", which recentres a turret.
         /// </summary>
         public Vector2 Aim { get; }
-
-        /// <summary>Vertical intent for aircraft, -1..1. Ground vehicles ignore it.</summary>
-        public float Lift { get; }
 
         /// <summary>
         /// Whether the trigger is held down this frame.
@@ -77,18 +78,15 @@ namespace IronFlag.Vehicles
 
         /// <inheritdoc/>
         public bool Equals(VehicleInput other)
-            => Drive == other.Drive && Aim == other.Aim
-                && Mathf.Approximately(Lift, other.Lift) && Fire == other.Fire;
+            => Drive == other.Drive && Aim == other.Aim && Fire == other.Fire;
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is VehicleInput other && Equals(other);
 
         /// <inheritdoc/>
-        public override int GetHashCode()
-            => (Drive, Aim, Lift, Fire).GetHashCode();
+        public override int GetHashCode() => (Drive, Aim, Fire).GetHashCode();
 
         /// <inheritdoc/>
-        public override string ToString()
-            => $"drive {Drive}, aim {Aim}, lift {Lift:0.##}, fire {Fire}";
+        public override string ToString() => $"drive {Drive}, aim {Aim}, fire {Fire}";
     }
 }

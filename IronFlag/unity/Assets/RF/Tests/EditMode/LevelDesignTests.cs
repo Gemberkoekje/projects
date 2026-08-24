@@ -534,11 +534,23 @@ namespace IronFlag.Tests.EditMode
 
         private bool HasMirror(LevelStructure structure)
         {
+            // A bridge is straight and its deck reads the same from either end, so both of a
+            // pair are drawn at the same yaw on purpose rather than 180 degrees apart - the
+            // one kind here with no facing to be wrong about. Everything else has one: a
+            // turret's rest yaw is where its barrel actually points, so a pair sharing a yaw
+            // instead of opposing it is exactly the authoring mistake this method exists to
+            // catch, not a shape it should tolerate.
+            bool sameFacing = structure.Structure == StructureKind.Bridge;
+
             foreach (LevelStructure other in level.Structures)
             {
                 if (other != structure
                     && other.Structure == structure.Structure
+                    && other.Team == Opposite(structure.Team)
                     && Vector3.Distance(other.Position, Opposite(structure.Position))
+                        < MirrorTolerance
+                    && Mathf.Abs(Mathf.DeltaAngle(
+                        other.YawDegrees, structure.YawDegrees + (sameFacing ? 0.0f : 180.0f)))
                         < MirrorTolerance)
                 {
                     return true;
@@ -546,6 +558,31 @@ namespace IronFlag.Tests.EditMode
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Returns the side facing a given one across the map.
+        /// </summary>
+        /// <param name="side">Side to turn round.</param>
+        /// <returns>The other side, or <see cref="Team.None"/> for nobody.</returns>
+        /// <remarks>
+        /// Nobody's opposite number is nobody, which is what lets the same mirror check
+        /// cover a tree and a turret: a tree is on no side and its twin has to be on no side
+        /// too, and a Green turret's twin has to be Brown. Without this, a map with both
+        /// emplacements on one flank belonging to the same player would look symmetrical to
+        /// every test here and play as a rout.
+        /// </remarks>
+        private static Team Opposite(Team side)
+        {
+            switch (side)
+            {
+                case Team.Green:
+                    return Team.Brown;
+                case Team.Brown:
+                    return Team.Green;
+                default:
+                    return Team.None;
+            }
         }
 
         /// <summary>

@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -229,26 +230,215 @@ namespace IronFlag.Tests.EditMode
         /// Each state carries its own colliders, which is what makes a rubble pile a
         /// different shape from the building that stood there.
         /// </summary>
+        /// <remarks>
+        /// Every kind, not just a building. This is the end-to-end half of "is it really
+        /// destructible": a state model that arrived without geometry is a prop a vehicle
+        /// drives through while it is still standing, and nothing else in the suite would
+        /// notice. Whether the <em>rubble</em> is solid is a separate question with a
+        /// separate answer - it is not, deliberately - and that is
+        /// <c>DestructionTests.RubbleHasNoHitboxLeft</c>'s business, because it is a
+        /// decision made at runtime rather than something missing from the asset.
+        /// </remarks>
         [Test]
         public void EveryStateHasSomethingToBumpInto()
         {
             DestructiblePrefabBuilder.EnsureAssets();
-            GameObject prefab = DestructiblePrefabBuilder.Load(StructureKind.BuildingA);
 
-            foreach (string node in new[]
+            foreach (StructureKind kind in StructureTuning.Roster())
             {
-                Destructible.IntactNodeName,
-                Destructible.DamagedNodeName,
-                Destructible.DestroyedNodeName,
+                GameObject prefab = DestructiblePrefabBuilder.Load(kind);
+                Assert.That(prefab, Is.Not.Null, $"{kind} has no prefab");
+
+                foreach (string node in new[]
+                {
+                    Destructible.IntactNodeName,
+                    Destructible.DamagedNodeName,
+                    Destructible.DestroyedNodeName,
+                })
+                {
+                    Transform state = prefab.transform.Find(node);
+                    if (state == null)
+                    {
+                        // Only the bridge is allowed to be missing one, and which one is
+                        // checked by EveryDestructibleHasAPrefabWithItsStatesAndItsNumbers.
+                        continue;
+                    }
+
+                    Assert.That(
+                        state.GetComponentsInChildren<MeshCollider>(true).Length,
+                        Is.GreaterThan(0),
+                        $"the {kind}'s {node} state can be driven through");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Nothing on the map is destructible in name only. Every kind the enum has is
+        /// either something a level scatters or the objective, both have a full set of
+        /// numbers, and neither can be shrugged off.
+        /// </summary>
+        /// <remarks>
+        /// The audit the design document's backlog asks for, as a test rather than as a
+        /// reading: the enum, the roster, the tuning table and the model inventory each grow
+        /// separately, and a kind that made it into one of the four and not the others is a
+        /// building somewhere that cannot be shot down.
+        /// </remarks>
+        [Test]
+        public void EveryStructureKindIsDestructibleEndToEnd()
+        {
+            foreach (StructureKind kind in Enum.GetValues(typeof(StructureKind)))
+            {
+                if (kind == StructureKind.None)
+                {
+                    continue;
+                }
+
+                bool scattered = Array.IndexOf(StructureTuning.Roster(), kind) >= 0;
+                Assert.That(
+                    scattered || kind == StructureKind.FlagTower,
+                    Is.True,
+                    $"{kind} is a destructible no level can place and no objective builds");
+
+                StructureTuning tuning = StructureTuning.For(kind);
+                Assert.That(
+                    tuning.HitPoints,
+                    Is.GreaterThan(0.0f),
+                    $"{kind} has no pool, so shooting it does nothing for ever");
+                Assert.That(
+                    tuning.DebrisRadius,
+                    Is.GreaterThan(0.0f),
+                    $"{kind} comes apart without making a mess, so nothing reads as a hit");
+                Assert.That(
+                    tuning.StateAt(0.0f, false),
+                    Is.EqualTo(DestructionState.Destroyed),
+                    $"an empty {kind} is not rubble");
+            }
+        }
+
+        /// <summary>
+        /// The turret is the only structure that belongs to a side, and the level format,
+        /// the validator and the mirror tool all turn on that one answer.
+        /// </summary>
+        [Test]
+        public void OnlyTheTurretBelongsToASide()
+        {
+            foreach (StructureKind kind in Enum.GetValues(typeof(StructureKind)))
+            {
+                Assert.That(
+                    StructureTuning.BelongsToASide(kind),
+                    Is.EqualTo(kind == StructureKind.Turret),
+                    $"{kind} disagrees with the rest of the game about whose it is");
+            }
+        }
+
+        /// <summary>
+        /// The emplacement is built with a gun in the states that still have a barrel and
+        /// none in the rubble, and the part that traverses carries no collider.
+        /// </summary>
+        /// <remarks>
+        /// The rubble having no turret node is what makes a wrecked emplacement silent by
+        /// construction rather than by a check; the traversing part having no collider is
+        /// what stops a mesh collider being rebuilt by physics every frame it swings.
+        /// </remarks>
+        [Test]
+        public void TheTurretPrefabCarriesAGunOnEveryStateThatStillHasABarrel()
+        {
+            DestructiblePrefabBuilder.EnsureAssets();
+            GameObject prefab = DestructiblePrefabBuilder.Load(StructureKind.Turret);
+            Assert.That(prefab, Is.Not.Null, "the turret has no prefab");
+
+            var gun = prefab.GetComponent<VehicleWeapon>();
+            Assert.That(gun, Is.Not.Null, "the turret cannot fire");
+            Assert.That(
+                gun.Tuning.Kind,
+                Is.EqualTo(WeaponTuning.Emplacement().Kind),
+                "the turret carries a gun the table does not give it");
+
+            var turret = prefab.GetComponent<AutoTurret>();
+            Assert.That(turret, Is.Not.Null, "the turret has nobody aiming it");
+            Assert.That(turret.TurnRate, Is.GreaterThan(0.0f), "the gun cannot traverse");
+
+            foreach (DestructionState state in new[]
+            {
+                DestructionState.Intact, DestructionState.Damaged,
             })
             {
-                Transform state = prefab.transform.Find(node);
-                Assert.That(state, Is.Not.Null, $"the building has no {node} state");
+                Transform head = Traverse(prefab, state);
+                Assert.That(head, Is.Not.Null, $"the {state} turret has nothing that traverses");
                 Assert.That(
-                    state.GetComponentsInChildren<MeshCollider>(true).Length,
-                    Is.GreaterThan(0),
-                    $"the building's {node} state can be driven through");
+                    Find(head, AutoTurret.MuzzlePointName),
+                    Is.Not.Null,
+                    $"the {state} turret has no firing point; re-run the Blender art pipeline");
+                Assert.That(
+                    head.GetComponentsInChildren<Collider>(true).Length,
+                    Is.Zero,
+                    $"the {state} turret's head carries a collider that moves every frame");
             }
+
+            Assert.That(
+                Traverse(prefab, DestructionState.Destroyed),
+                Is.Null,
+                "the rubble still has a gun on it");
+        }
+
+        /// <summary>
+        /// The emplacement's gun read against the four the roster carries: shorter than the
+        /// tank, so an emplacement can be fought from outside its own reach by the vehicle
+        /// built to; and no blast, so it cannot clear the ground around itself.
+        /// </summary>
+        [Test]
+        public void TheEmplacementIsOutrangedByTheTankAndHasNoBlast()
+        {
+            WeaponTuning gun = WeaponTuning.Emplacement();
+
+            Assert.That(gun.Exists, Is.True, "the emplacement carries nothing");
+            Assert.That(
+                gun.Range,
+                Is.LessThan(WeaponTuning.For(VehicleKind.Tank).Range),
+                "a turret outranges the one vehicle sent to remove it");
+            Assert.That(
+                gun.SplashRadius,
+                Is.EqualTo(0.0f),
+                "a turret that splashes clears the cover a raider needs to reach it");
+            Assert.That(
+                gun.ArmingDistance,
+                Is.EqualTo(0.0f),
+                "a turret cannot defend the ground it is standing on");
+            Assert.That(
+                StructureTuning.For(StructureKind.Turret).HitPoints,
+                Is.LessThan(StructureTuning.For(StructureKind.BuildingA).HitPoints),
+                "an emplacement is harder to remove than the building beside it");
+        }
+
+        /// <summary>
+        /// Returns the traversing part of one of the turret's states, or null.
+        /// </summary>
+        /// <param name="prefab">The turret prefab.</param>
+        /// <param name="state">State to look inside.</param>
+        /// <returns>The turret node, or <c>null</c> when that state has none.</returns>
+        private static Transform Traverse(GameObject prefab, DestructionState state)
+        {
+            Transform model = prefab.transform.Find(Destructible.NodeNameFor(state));
+            return model == null ? null : Find(model, AutoTurret.TurretNodeName);
+        }
+
+        /// <summary>
+        /// Finds a named object anywhere under a root, including switched-off ones.
+        /// </summary>
+        /// <param name="root">Object to search under.</param>
+        /// <param name="name">Name to look for.</param>
+        /// <returns>The transform, or <c>null</c>.</returns>
+        private static Transform Find(Transform root, string name)
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == name)
+                {
+                    return child;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

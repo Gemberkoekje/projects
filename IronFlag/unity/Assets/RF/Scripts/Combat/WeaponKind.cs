@@ -3,13 +3,20 @@ using System;
 namespace IronFlag.Combat
 {
     /// <summary>
-    /// The four weapons of the core roster, one per vehicle.
+    /// The guns in the game: one per vehicle, plus the one nobody drives.
     /// </summary>
     /// <remarks>
-    /// A weapon is a property of the vehicle carrying it rather than something a pilot
-    /// picks, so this enum is parallel to <see cref="IronFlag.Vehicles.VehicleKind"/> and
-    /// <see cref="WeaponTuning.For"/> is the mapping between them. The order matches the
-    /// roster order: the jeep's lobbed grenades first, the helicopter's chaingun last.
+    /// <para>
+    /// A weapon is a property of the mount carrying it rather than something a pilot picks.
+    /// The first four are parallel to <see cref="IronFlag.Vehicles.VehicleKind"/> and
+    /// <see cref="WeaponTuning.For"/> is the mapping between them; they are in roster order,
+    /// the jeep's lobbed grenades first and the helicopter's chaingun last.
+    /// </para>
+    /// <para>
+    /// <see cref="Autocannon"/> is the exception and is deliberately last: it is bolted to
+    /// a building rather than to a vehicle, so it has no roster slot to be parallel to and
+    /// is looked up by <see cref="WeaponTuning.Emplacement"/> instead.
+    /// </para>
     /// </remarks>
     [Serializable]
     public enum WeaponKind
@@ -28,5 +35,8 @@ namespace IronFlag.Combat
 
         /// <summary>The helicopter's chaingun: small rounds, fired faster than anything else.</summary>
         Chaingun = 4,
+
+        /// <summary>The automated turret's gun: the only one with nobody behind it.</summary>
+        Autocannon = 5,
     }
 }

@@ -20,6 +20,17 @@ namespace IronFlag.Destruction
     /// bumps into can never disagree.
     /// </para>
     /// <para>
+    /// <strong>Rubble is not solid.</strong> The destroyed model is shown and its colliders
+    /// are switched off, so a vehicle drives straight over where a building stood. M5 left
+    /// them on and said so - "rubble stops being cover for fire, but not for driving" - on
+    /// the grounds that the alternative was a vehicle driving through visible geometry.
+    /// That was the wrong half to keep. Every destroyed model in the asset spec is a
+    /// knee-high pile a tank would ride over anyway, and a knocked-down building that still
+    /// blocks the road takes the route away from the side that cleared it as much as from
+    /// the side that lost it. Fire and movement now agree: once it is rubble, nothing
+    /// interacts with it.
+    /// </para>
+    /// <para>
     /// It is the second <see cref="IDamageable"/>, after <see cref="VehicleHealth"/>, and
     /// the two are deliberately the same shape: a round asks the same three questions of a
     /// wall as of a tank. What differs is what running out of hit points means - a vehicle
@@ -48,6 +59,10 @@ namespace IronFlag.Destruction
         [SerializeField]
         [Tooltip("Which destructible this is. Stamped by the prefab builder.")]
         private StructureKind kind = StructureKind.None;
+
+        [SerializeField]
+        [Tooltip("Side this belongs to. None for scenery, which is nearly everything.")]
+        private Team team = Team.None;
 
         [SerializeField]
         [Tooltip("The numbers, from StructureTuning.For. Editable while playing.")]
@@ -108,14 +123,24 @@ namespace IronFlag.Destruction
         public bool HasDamagedState => damaged != null;
 
         /// <summary>
-        /// Map furniture belongs to nobody, so everybody's fire counts against it.
+        /// Side this belongs to, which for nearly everything is nobody.
         /// </summary>
         /// <remarks>
-        /// Not a serialized field, because there is no such thing as a green building: a
-        /// side's own ground is the bunker and the bunker is not destructible, and a depot
-        /// both sides want is the entire point of a depot. See <see cref="Teams.IsHostile"/>.
+        /// <para>
+        /// Map furniture belongs to no side, so everybody's fire counts against it: there
+        /// is no such thing as a green building, a side's own ground is the bunker and the
+        /// bunker is not destructible, and a depot both sides want is the entire point of a
+        /// depot. See <see cref="Teams.IsHostile"/>.
+        /// </para>
+        /// <para>
+        /// <see cref="StructureKind.Turret"/> is the one exception, and is why this is a
+        /// field rather than a constant: an emplacement that shoots at the enemy has to know
+        /// which side that is, and the same answer that points its gun is what makes it
+        /// immune to its own side's fire. <see cref="IronFlag.Levels.LevelValidation"/> is
+        /// what stops a level handing a side to anything else.
+        /// </para>
         /// </remarks>
-        public Team Team => Team.None;
+        public Team Team => team;
 
         /// <summary>
         /// Returns the child name one state's model hangs off.
@@ -198,6 +223,19 @@ namespace IronFlag.Destruction
         }
 
         /// <summary>
+        /// Hands this structure to a side.
+        /// </summary>
+        /// <param name="side">Side it belongs to, or <see cref="Team.None"/> for furniture.</param>
+        /// <remarks>
+        /// Separate from <see cref="Configure"/> because the two are decided by different
+        /// people at different times: what a structure <em>is</em> comes off the prefab, and
+        /// whose it is comes out of the level file - see
+        /// <see cref="IronFlag.Levels.LevelStructure.Side"/>. A prefab that carried a side
+        /// would be two prefabs.
+        /// </remarks>
+        public void SetTeam(Team side) => team = side;
+
+        /// <summary>
         /// Puts the structure back up, whole.
         /// </summary>
         /// <remarks>
@@ -262,6 +300,10 @@ namespace IronFlag.Destruction
             Show(damaged, wanted == DestructionState.Damaged);
             Show(destroyed, wanted == DestructionState.Destroyed);
 
+            // Shown but not solid. Switched rather than removed, so a structure put back up
+            // by Restore is solid again without anything having to rebuild its colliders.
+            Solid(destroyed, wanted != DestructionState.Destroyed);
+
             // A depot that has been flattened stops handing anything out. Switched off
             // rather than destroyed, so putting the structure back up puts the depot back.
             foreach (SupplyPoint point in GetComponentsInChildren<SupplyPoint>(true))
@@ -318,6 +360,32 @@ namespace IronFlag.Destruction
             if (model != null && model.activeSelf != visible)
             {
                 model.SetActive(visible);
+            }
+        }
+
+        /// <summary>
+        /// Turns one state's colliders on or off without touching what it looks like.
+        /// </summary>
+        /// <param name="model">The state's child object, or null when it has none.</param>
+        /// <param name="solid">Whether anything should be able to bump into it.</param>
+        /// <remarks>
+        /// Only the rubble is ever asked this, and only ever asked to stop being solid. It
+        /// is written both ways round because <see cref="Restore"/> exists: a structure that
+        /// came back up with its rubble still intangible would be a building nothing could
+        /// hit the second time round, and that is a bug nobody would find by shooting one.
+        /// Inactive children are included, because a state that is switched off has its
+        /// colliders off by virtue of the object rather than by this.
+        /// </remarks>
+        private static void Solid(GameObject model, bool solid)
+        {
+            if (model == null)
+            {
+                return;
+            }
+
+            foreach (Collider part in model.GetComponentsInChildren<Collider>(true))
+            {
+                part.enabled = solid;
             }
         }
     }

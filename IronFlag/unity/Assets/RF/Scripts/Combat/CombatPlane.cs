@@ -45,9 +45,11 @@ namespace IronFlag.Combat
         /// Top of the column a round sweeps, in metres above the ground.
         /// </summary>
         /// <remarks>
-        /// Clear of <see cref="IronFlag.Vehicles.FlightTuning.MaxAltitude"/> plus a rotor,
-        /// so a helicopter cannot climb out of the fight. Nothing in the game is allowed
-        /// above this, which is why it is a constant rather than a measurement.
+        /// Well clear of <see cref="IronFlag.Vehicles.FlightTuning.CruiseAltitude"/> plus a
+        /// rotor, so a helicopter is always inside the column being swept at it. Nothing in
+        /// the game is allowed above this, which is why it is a constant rather than a
+        /// measurement - and since the aircraft lost its collective there is nothing that
+        /// could try.
         /// </remarks>
         public const float Ceiling = 30.0f;
 

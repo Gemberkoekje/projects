@@ -132,8 +132,8 @@ namespace IronFlag.Tests.PlayMode
                 "it did not take off from the pad");
             Assert.That(
                 flyer.Altitude,
-                Is.EqualTo(flyer.Flight.DeployAltitude).Within(1.0f),
-                "it was handed over at roof height, which is where it would have been flown");
+                Is.EqualTo(flyer.Flight.CruiseAltitude).Within(1.0f),
+                "it was handed over at roof height, and with no collective it would stay there");
         }
 
         /// <summary>

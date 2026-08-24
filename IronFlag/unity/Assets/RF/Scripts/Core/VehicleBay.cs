@@ -328,7 +328,9 @@ namespace IronFlag.Core
         /// <para>
         /// The helicopter finishes at its own cruising altitude rather than on the pad it
         /// started from: an aircraft handed to its pilot at roof height would be flown into
-        /// the roof.
+        /// the roof, and with the collective gone the pilot has no way to climb off it.
+        /// The ride out is now the <em>only</em> time a helicopter is ever between the pad
+        /// and its altitude.
         /// </para>
         /// <para>
         /// A ground vehicle finishes half its own length past the lift, because the lift
@@ -342,7 +344,7 @@ namespace IronFlag.Core
         {
             if (controller is Helicopter flyer)
             {
-                return new Vector3(at.x, flyer.Flight.DeployAltitude, at.z);
+                return new Vector3(at.x, flyer.Flight.CruiseAltitude, at.z);
             }
 
             Vector3 outwards = Quaternion.Euler(0.0f, rideYawDegrees, 0.0f) * Vector3.forward;

@@ -266,6 +266,55 @@ namespace IronFlag.Combat
         }
 
         /// <summary>
+        /// Returns the gun an automated turret carries.
+        /// </summary>
+        /// <returns>A new tuning the caller may edit.</returns>
+        /// <remarks>
+        /// <para>
+        /// Its own entry point rather than a row in <see cref="For(VehicleKind)"/>, because
+        /// that table answers "what does this vehicle carry" and there is no vehicle here.
+        /// </para>
+        /// <para>
+        /// Read it against the tank, which is what a player brings to remove one. Twenty
+        /// metres of reach is well inside the tank's thirty-six - sixteen metres of standoff
+        /// the tank and nothing else in the roster has - so an emplacement can be fought from
+        /// outside its own range by the one vehicle equipped to, and is something the jeep
+        /// and the helicopter have to close with instead. Twelve a hit at three a second is
+        /// thirty-six damage a second, which is a full tank's hundred in under three seconds
+        /// and a jeep's fifty in under a second and a half if either stands in the beam the
+        /// whole time. That is deliberately brutal rather than merely "expensive": nothing in
+        /// the roster is meant to sit inside twenty metres of one and trade shots, which is
+        /// the whole reason the tank's own reach clears it by that much. No blast, so it
+        /// hurts exactly what it hits and a turret cannot clear the ground around itself.
+        /// </para>
+        /// <para>
+        /// It carries no <see cref="Rounds"/> that matter, because a turret has no
+        /// <see cref="IronFlag.Supply.VehicleSupply"/> behind it and never runs out. That is
+        /// deliberate: an emplacement that could be emptied by driving past it out of range
+        /// would be a puzzle with one answer, and the thing that stops a turret is shooting
+        /// it.
+        /// </para>
+        /// </remarks>
+        public static WeaponTuning Emplacement()
+            => new WeaponTuning
+            {
+                Kind = WeaponKind.Autocannon,
+                Damage = 12.0f,
+                SplashRadius = 0.0f,
+                MuzzleSpeed = 90.0f,
+                ShotInterval = 0.33f,
+                Range = 20.0f,
+                Drop = 0.0f,
+                ElevationDegrees = 0.0f,
+                Radius = 0.12f,
+                // It fires from about two metres up at things on the ground beside it, so a
+                // column starting at the muzzle is already past anything underneath. Nothing
+                // to arm around, unlike the two guns fired from above the map.
+                ArmingDistance = 0.0f,
+                Rounds = 0,
+            };
+
+        /// <summary>
         /// Builds a weapon that throws its rounds along an arc, angled to reach exactly as
         /// far as it claims to.
         /// </summary>

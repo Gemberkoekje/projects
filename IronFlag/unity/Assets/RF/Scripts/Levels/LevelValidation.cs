@@ -458,6 +458,24 @@ namespace IronFlag.Levels
                     continue;
                 }
 
+                // A turret is the one destructible that belongs to somebody, and it has to:
+                // an emplacement with no side has no enemies and stands there doing nothing,
+                // which looks exactly like one that is working. The check runs both ways,
+                // because a tree with a side is a level saying something the game has no
+                // meaning for - see Destructible.Team.
+                if (structure.NeedsASide && structure.Team == Team.None)
+                {
+                    problems.Add(
+                        $"The turret at {structure.Position} is on no side, so it has nobody "
+                        + "to shoot at. Give it Green or Brown.");
+                }
+                else if (!structure.NeedsASide && structure.Team != Team.None)
+                {
+                    problems.Add(
+                        $"The {structure.Kind} at {structure.Position} is given to "
+                        + $"{structure.Team}, and only a turret can belong to a side.");
+                }
+
                 // A bridge is the one prop meant to be over water. Anything else standing
                 // there is an authoring slip, and would be in the sea on the first frame.
                 bool onLand = level.IsOnLand(structure.Position, ShoreMargin);

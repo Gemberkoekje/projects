@@ -165,6 +165,65 @@ namespace IronFlag.Tests.PlayMode
         }
 
         /// <summary>
+        /// Rubble is not solid. A destroyed structure keeps its model and loses its
+        /// colliders, so a vehicle drives over where it stood - which is the other half of
+        /// opening a firing lane, and the half M5 deliberately left out.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RubbleHasNoHitboxLeft()
+        {
+            Destructible building = CreateStructure(StructureKind.BuildingA, Vector3.zero);
+            yield return null;
+
+            Assert.That(
+                SolidColliders(building),
+                Is.GreaterThan(0),
+                "a standing building is not something a vehicle can bump into");
+
+            building.TakeDamage(building.Tuning.HitPoints, Team.Green);
+            yield return null;
+
+            Assert.That(
+                building.State,
+                Is.EqualTo(DestructionState.Destroyed),
+                "it did not come down at all");
+            Assert.That(
+                Showing(building),
+                Is.EqualTo(Destructible.DestroyedNodeName),
+                "the rubble is not being drawn");
+            Assert.That(
+                SolidColliders(building),
+                Is.Zero,
+                "the rubble still blocks the road it was knocked down to open");
+        }
+
+        /// <summary>
+        /// A structure put back up is solid again. Nothing in the game rebuilds one, but a
+        /// building that came back intangible would be a wall nothing could ever hit again -
+        /// and that is a bug found by shooting the same building twice, which no test would
+        /// think to do.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AStructurePutBackUpIsSolidAgain()
+        {
+            Destructible building = CreateStructure(StructureKind.BuildingA, Vector3.zero);
+            yield return null;
+
+            int standing = SolidColliders(building);
+            building.TakeDamage(building.Tuning.HitPoints, Team.Green);
+            yield return null;
+
+            building.Restore();
+            yield return null;
+
+            Assert.That(building.State, Is.EqualTo(DestructionState.Intact));
+            Assert.That(
+                SolidColliders(building),
+                Is.EqualTo(standing),
+                "the rebuilt building is scenery nothing can touch");
+        }
+
+        /// <summary>
         /// The design document's "destroyable/contestable" depots, in one test: a depot that
         /// has been knocked down stops being somewhere to refuel.
         /// </summary>
@@ -363,6 +422,28 @@ namespace IronFlag.Tests.PlayMode
             }
 
             return live;
+        }
+
+        /// <summary>
+        /// Counts the colliders a structure currently presents to the world.
+        /// </summary>
+        /// <param name="structure">Structure to measure.</param>
+        /// <returns>
+        /// How many enabled colliders sit on objects that are switched on, which is exactly
+        /// the set a vehicle can drive into.
+        /// </returns>
+        private static int SolidColliders(Destructible structure)
+        {
+            int solid = 0;
+            foreach (Collider part in structure.GetComponentsInChildren<Collider>(true))
+            {
+                if (part.enabled && part.gameObject.activeInHierarchy)
+                {
+                    solid++;
+                }
+            }
+
+            return solid;
         }
 
         /// <summary>

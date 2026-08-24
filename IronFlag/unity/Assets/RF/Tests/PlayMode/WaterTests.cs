@@ -93,9 +93,11 @@ namespace IronFlag.Tests.PlayMode
         /// than out of a check on what kind of vehicle it is.
         /// </summary>
         /// <remarks>
-        /// <see cref="FlightTuning.MinAltitude"/> holds it at or above the land, so it is
-        /// never below the line - even hovering over open water at the bottom of its range.
-        /// If that floor were ever lowered, this is where it would be noticed.
+        /// Both altitudes a helicopter can be at are above the line: it flies at
+        /// <see cref="FlightTuning.CruiseAltitude"/>, and one that has run dry settles onto
+        /// <see cref="FlightTuning.GroundedAltitude"/>, which is skids-down at zero. If
+        /// either were ever lowered, this is where it would be noticed - the dry one is the
+        /// dangerous one, because that is the aircraft nobody is flying any more.
         /// </remarks>
         [UnityTest]
         public IEnumerator AHelicopterCanHoverOverTheSea()
@@ -104,10 +106,15 @@ namespace IronFlag.Tests.PlayMode
             VehicleController helicopter = CreateVehicle(
                 VehicleKind.Helicopter, Team.Brown, Vector3.zero);
 
+            FlightTuning flight = ((Helicopter)helicopter).Flight;
             Assert.That(
-                ((Helicopter)helicopter).Flight.MinAltitude,
+                flight.CruiseAltitude,
+                Is.GreaterThan(Drowns),
+                "a helicopter cruises below the water line");
+            Assert.That(
+                flight.GroundedAltitude,
                 Is.GreaterThanOrEqualTo(Drowns),
-                "a helicopter can descend below the water line");
+                "a helicopter that runs dry over water settles below the line and drowns");
 
             yield return null;
             yield return null;

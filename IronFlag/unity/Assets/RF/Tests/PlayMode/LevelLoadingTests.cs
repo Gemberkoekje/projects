@@ -525,7 +525,7 @@ namespace IronFlag.Tests.PlayMode
         /// <returns>The coroutine the framework steps through.</returns>
         private static IEnumerator Accelerate(IReadOnlyList<GroundVehicle> vehicles, float seconds)
         {
-            var forward = new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
+            var forward = new VehicleInput(Vector2.up, Vector2.zero);
             float until = Time.time + seconds;
 
             while (Time.time < until)

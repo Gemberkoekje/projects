@@ -51,10 +51,6 @@ namespace IronFlag.Supply
         [Tooltip("Whether a helicopter can be served here. Only the bunkers can.")]
         private bool servesAircraft = false;
 
-        [SerializeField]
-        [Tooltip("Altitude a helicopter must be at or below to count as landed here.")]
-        private float landingAltitude = 4.5f;
-
         /// <summary>Every supply point currently in the scene, in the order they woke up.</summary>
         private static readonly List<SupplyPoint> Live = new List<SupplyPoint>();
 
@@ -73,9 +69,6 @@ namespace IronFlag.Supply
         /// <summary>Whether a helicopter can be served here.</summary>
         public bool ServesAircraft => servesAircraft;
 
-        /// <summary>Altitude a helicopter must be at or below to count as landed here.</summary>
-        public float LandingAltitude => landingAltitude;
-
         /// <summary>Seconds this point takes to fill a dry tank.</summary>
         public float SecondsToRefuel => fuelRate <= 0.0f ? Mathf.Infinity : 1.0f / fuelRate;
 
@@ -90,7 +83,7 @@ namespace IronFlag.Supply
         /// <param name="fuelPerSecond">Fraction of a full tank put in per second.</param>
         /// <param name="ammoPerSecond">Fraction of a full load put in per second.</param>
         /// <param name="aircraft">Whether a helicopter can be served here.</param>
-        /// <remarks>Called by the sandbox scene builder.</remarks>
+        /// <remarks>Called by the sandbox scene builder and by the level builder.</remarks>
         public void Configure(
             Team side, float servedRadius, float fuelPerSecond, float ammoPerSecond, bool aircraft)
         {
@@ -168,10 +161,19 @@ namespace IronFlag.Supply
         /// <remarks>
         /// <para>
         /// The distance is measured across the map and never through the air, for the same
-        /// reason a shot is - see <see cref="IronFlag.Combat.CombatPlane"/>. Height is used
-        /// for one thing only: a helicopter has to have come down onto the pad, because a
-        /// hovering aircraft taking on fuel from thirty metres up would make the one
-        /// drawback the roster table gives it disappear.
+        /// reason a shot is - see <see cref="IronFlag.Combat.CombatPlane"/>. Height is not
+        /// used at all. It used to be: a helicopter had to have come down onto the pad
+        /// before anything would serve it, which was the whole of what stopped one taking
+        /// on fuel from thirty metres up. That rule died with the collective - a helicopter
+        /// now flies at one altitude and cannot descend to anything - so a height gate here
+        /// would simply mean no aircraft is ever served anywhere.
+        /// </para>
+        /// <para>
+        /// What survives, and is the drawback the design document's roster table actually
+        /// gives the helicopter, is <see cref="ServesAircraft"/>: only a bunker has it, so
+        /// the aircraft is still the one vehicle that cannot rearm at a field depot and
+        /// still has to fly all the way home. It is served hovering over its own bunker
+        /// rather than landed on the pad, which is the only thing it is now able to do.
         /// </para>
         /// <para>
         /// A point with no team serves everybody, including anything on no side at all.
@@ -179,7 +181,7 @@ namespace IronFlag.Supply
         /// </remarks>
         public bool Serves(Vector3 at, Team side, bool aircraft)
         {
-            if (aircraft && (!servesAircraft || at.y > landingAltitude))
+            if (aircraft && !servesAircraft)
             {
                 return false;
             }

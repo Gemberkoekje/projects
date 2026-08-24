@@ -28,6 +28,52 @@ namespace IronFlag.Tests.EditMode
     /// </remarks>
     public sealed class LevelEditingTests
     {
+        /// <summary>
+        /// A mirrored turret is the other side's turret. Copying the side across instead
+        /// would give one player both emplacements on a map that still looked symmetrical,
+        /// which is the worst kind of asymmetry: the invisible kind.
+        /// </summary>
+        [Test]
+        public void MirroringATurretHandsItToTheOtherSide()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(-20.0f, 0.0f, -30.0f), Team.Green);
+            level.Structures[placed].YawDegrees = 40.0f;
+
+            EditSelection copy = LevelEdits.Mirror(
+                level, new EditSelection(EditTarget.Structure, placed));
+
+            Assert.That(copy.Target, Is.EqualTo(EditTarget.Structure));
+            LevelStructure mirrored = level.Structures[copy.Index];
+            Assert.That(mirrored.Team, Is.EqualTo(Team.Brown), "both turrets belong to Green");
+            Assert.That(mirrored.Position.x, Is.EqualTo(20.0f).Within(0.001f));
+            Assert.That(mirrored.Position.z, Is.EqualTo(30.0f).Within(0.001f));
+            Assert.That(mirrored.YawDegrees, Is.EqualTo(220.0f).Within(0.001f));
+        }
+
+        /// <summary>
+        /// And a mirrored tree stays on no side, so the same rule covers both without the
+        /// mirror tool having to know which kinds care.
+        /// </summary>
+        [Test]
+        public void MirroringSceneryLeavesItOnNoSide()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+            int placed = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(-20.0f, 0.0f, -30.0f), Team.Green);
+
+            Assert.That(
+                level.Structures[placed].Team,
+                Is.EqualTo(Team.None),
+                "a tree kept the side the palette had selected");
+
+            EditSelection copy = LevelEdits.Mirror(
+                level, new EditSelection(EditTarget.Structure, placed));
+
+            Assert.That(level.Structures[copy.Index].Team, Is.EqualTo(Team.None));
+        }
+
         [Test]
         public void ANewMapIsPlayableBeforeAnybodyTouchesIt()
         {

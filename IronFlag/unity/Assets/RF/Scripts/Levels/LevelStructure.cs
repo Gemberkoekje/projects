@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using IronFlag.Core;
 using IronFlag.Destruction;
 
 namespace IronFlag.Levels
@@ -21,13 +22,29 @@ namespace IronFlag.Levels
     /// fuel drum is a fuel drum because of where it stands on this map, and the same model
     /// with both rates at zero is scenery.
     /// </para>
+    /// <para>
+    /// <see cref="Side"/> is the other exception and belongs to exactly one kind. An
+    /// automated turret has to know who it is defending, and that is a fact about the map
+    /// rather than about turrets - the same emplacement thirty metres further north is the
+    /// other side's. Everything else on the map belongs to nobody, and
+    /// <see cref="LevelValidation"/> refuses a level that says otherwise in either
+    /// direction: a turret with no side, or a side on a tree.
+    /// </para>
     /// </remarks>
     [Serializable]
     public sealed class LevelStructure
     {
         /// <summary>What it is, by name - a member of <see cref="StructureKind"/>.</summary>
-        [Tooltip("What it is: Tree, BuildingA, BuildingB, Bridge, DepotFuel or DepotAmmo.")]
+        [Tooltip("What it is: Tree, BuildingA, BuildingB, Bridge, DepotFuel, DepotAmmo or Turret.")]
         public string Kind = nameof(StructureKind.Tree);
+
+        /// <summary>Which side it belongs to, by name. Only a turret has one.</summary>
+        /// <remarks>
+        /// Empty, or <c>None</c>, for the scenery both sides can knock down, which is
+        /// everything except <see cref="StructureKind.Turret"/>.
+        /// </remarks>
+        [Tooltip("Which side it belongs to: Green or Brown. Only a turret has one.")]
+        public string Side = nameof(Team.None);
 
         /// <summary>What to call it in the hierarchy. Optional.</summary>
         /// <remarks>
@@ -65,7 +82,13 @@ namespace IronFlag.Levels
         /// <summary>What it is.</summary>
         public StructureKind Structure => LevelNames.ToStructure(Kind);
 
+        /// <summary>Which side it belongs to, or <see cref="Team.None"/> for scenery.</summary>
+        public Team Team => LevelNames.ToTeam(Side);
+
         /// <summary>Whether it hands anything out.</summary>
         public bool Supplies => FuelRate > 0.0f || AmmoRate > 0.0f;
+
+        /// <summary>Whether this kind of structure is one that belongs to a side.</summary>
+        public bool NeedsASide => StructureTuning.BelongsToASide(Structure);
     }
 }

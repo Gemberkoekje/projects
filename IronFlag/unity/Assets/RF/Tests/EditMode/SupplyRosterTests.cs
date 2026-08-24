@@ -253,42 +253,79 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
-        /// Reversing is work and so is descending, and neither is a way of driving for free.
+        /// Reversing is work and steering is not, and neither is a way of driving for free.
         /// </summary>
+        /// <remarks>
+        /// There is no collective to be the other half of this any more. What a helicopter
+        /// pays for holding itself up is its idle draw, which is checked separately by
+        /// <see cref="TheHelicopterPaysForHoveringThroughItsIdleDraw"/>.
+        /// </remarks>
         [Test]
-        public void DemandIsTheLargerOfTheThrottleAndTheCollectiveWhicheverWay()
+        public void DemandIsTheThrottleWhicheverWayItIsPushed()
         {
             Assert.That(
-                VehicleSupply.DemandFrom(new VehicleInput(new Vector2(0.0f, -1.0f), Vector2.zero, 0.0f)),
+                VehicleSupply.DemandFrom(new VehicleInput(new Vector2(0.0f, -1.0f), Vector2.zero)),
                 Is.EqualTo(1.0f).Within(0.0001f),
                 "reversing is free");
             Assert.That(
-                VehicleSupply.DemandFrom(new VehicleInput(Vector2.zero, Vector2.zero, -1.0f)),
-                Is.EqualTo(1.0f).Within(0.0001f),
-                "descending is free");
-            Assert.That(
-                VehicleSupply.DemandFrom(new VehicleInput(new Vector2(1.0f, 0.0f), Vector2.zero, 0.0f)),
+                VehicleSupply.DemandFrom(new VehicleInput(new Vector2(1.0f, 0.0f), Vector2.zero)),
                 Is.EqualTo(0.0f).Within(0.0001f),
                 "steering costs fuel, which would tax the tracked vehicles for turning");
+        }
+
+        /// <summary>
+        /// A helicopter cannot stop holding itself up, so what a hover costs is not a demand
+        /// it could choose to stop making - it is the idle draw, and the aircraft's is well
+        /// over twice everybody else's.
+        /// </summary>
+        /// <remarks>
+        /// This used to fall out of the collective: a hovering pilot was holding an axis, so
+        /// they were charged for it. With the axis gone the charge has to sit somewhere it
+        /// cannot be avoided, and the roster table already put it there.
+        /// </remarks>
+        [Test]
+        public void TheHelicopterPaysForHoveringThroughItsIdleDraw()
+        {
+            float hovering = VehicleTuning.For(VehicleKind.Helicopter).IdleFuelDraw;
+
+            foreach (VehicleKind kind in Roster())
+            {
+                if (kind == VehicleKind.Helicopter)
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    hovering,
+                    Is.GreaterThan(VehicleTuning.For(kind).IdleFuelDraw * 2.0f),
+                    $"standing still costs the helicopter no more than it costs the {kind}");
+            }
+
+            Assert.That(
+                VehicleSupply.DrawFor(0.0f, hovering, 1.0f),
+                Is.GreaterThan(0.5f),
+                "a helicopter that is going nowhere is burning almost nothing");
         }
 
         /// <summary>
         /// A stranded pilot keeps the turret and the trigger, which is the whole of the
         /// design document's "it can still fight in place".
         /// </summary>
+        /// <remarks>
+        /// One rule for all four now. A dry helicopter used to be handed a descent through
+        /// this same call; with no vertical axis on a frame of intent it is told straight
+        /// out instead - see <see cref="Helicopter.SetPowered"/> and
+        /// <c>SupplyTests.AHelicopterThatRunsDrySinksToTheGround</c>.
+        /// </remarks>
         [Test]
         public void ADryVehicleKeepsItsGunAndLosesItsEngine()
         {
-            var asked = new VehicleInput(new Vector2(1.0f, 1.0f), Vector2.right, 1.0f, true);
+            var asked = new VehicleInput(new Vector2(1.0f, 1.0f), Vector2.right, true);
 
-            VehicleInput ground = VehicleSupply.Stranded(asked, false);
-            Assert.That(ground.Drive, Is.EqualTo(Vector2.zero), "it is still driving");
-            Assert.That(ground.Fire, Is.True, "it cannot fight where it stands");
-            Assert.That(ground.Aim, Is.EqualTo(Vector2.right), "its turret froze too");
-            Assert.That(ground.Lift, Is.EqualTo(0.0f));
-
-            VehicleInput air = VehicleSupply.Stranded(asked, true);
-            Assert.That(air.Lift, Is.EqualTo(-1.0f), "a helicopter with no fuel is still hovering");
+            VehicleInput stranded = VehicleSupply.Stranded(asked);
+            Assert.That(stranded.Drive, Is.EqualTo(Vector2.zero), "it is still driving");
+            Assert.That(stranded.Fire, Is.True, "it cannot fight where it stands");
+            Assert.That(stranded.Aim, Is.EqualTo(Vector2.right), "its turret froze too");
         }
 
         private static VehicleKind[] Roster()

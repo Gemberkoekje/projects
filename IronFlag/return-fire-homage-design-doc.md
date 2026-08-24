@@ -127,27 +127,14 @@ Sized to hand off individually as implementation specs (similar to the per-step 
 Real work the project owes, captured here so it survives between sessions. Not sized or
 sequenced yet.
 
-- **Helicopter: lock to a fixed flight altitude; remove manual up/down.** Currently
-  `CurrentInput.Lift` drives `HelicopterMotion.Step`, and the pilot climbs or descends at will.
-  Removing that means the helicopter always flies at one level - which breaks the assumption,
-  baked into the bunker and supply systems, that a vehicle descends onto the pad/depot to be
-  "home": refuelling, rearming and landing to deploy/recall all currently read as the helicopter
-  coming down to a platform height. Whatever a helicopter does instead (hovering within range
-  rather than landing, most likely) has to be decided and threaded through
-  `SupplyPoint.HomeFor`, `TeamBunker`'s helipad logic and `VehicleBay`'s deploy/recall flow, not
-  just `HelicopterMotion`/`FlightTuning`.
-- **Automated turrets that shoot at the enemy team.** A new placeable structure with no pilot:
-  acquires and fires at the nearest hostile vehicle in range, using the existing
-  `VehicleWeapon`/`Projectile`/`Explosion` combat pipeline rather than a parallel one. Needs a
-  new `StructureKind` entry (so a level file can place it like everything else), a
-  targeting/firing component, and new turret model(s) built through the Blender pipeline per
-  `return-fire-homage-asset-spec.md`.
-- **A completely destroyed structure should lose its collider entirely**, not just stop
-  counting as cover. M5 deliberately kept the destroyed-state mesh solid so a vehicle still
-  bumps into rubble (see M5_NOTES.md: "Rubble stops being cover for fire, but not for driving") -
-  this reverses that: once a `Destructible` reaches its destroyed state, nothing should be able
-  to collide with it at all, including a vehicle driving through where it stood.
-- **Audit that every `StructureKind` is actually destructible end-to-end.** Cross-check
-  `StructureTuning.Roster()`, `DestructiblePrefabBuilder` and the asset spec's model inventory
-  against each other and fill in whatever is missing a damaged/destroyed state, tuning entry, or
-  asset.
+**The backlog is currently empty.** Every item it carried was done in M9 — see
+[M9_NOTES.md](M9_NOTES.md) for what each one turned into and what it cost. For the record,
+they were: the helicopter's fixed flight altitude, automated turrets, a destroyed structure
+losing its collider, and the audit that every `StructureKind` really is destructible end to
+end. The first of those was the one with a thread to pull: locking the altitude meant
+deciding what "home" means for an aircraft that can no longer land, and the answer is that a
+helicopter is served hovering over its own bunker — `SupplyPoint.ServesAircraft` is what
+still keeps it out of the field depots, where the height gate used to.
+
+Add the next thing here rather than to a milestone, and read
+[M9_NOTES.md](M9_NOTES.md)'s "What the next phase inherits" before starting it.

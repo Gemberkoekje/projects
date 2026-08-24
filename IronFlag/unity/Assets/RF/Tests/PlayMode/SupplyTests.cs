@@ -54,7 +54,7 @@ namespace IronFlag.Tests.PlayMode
             VehicleSupply idle = CreateVehicle(VehicleKind.Tank, Team.Green, Vector3.zero).Supply;
             Rig driven = CreateVehicle(VehicleKind.Tank, Team.Green, new Vector3(30.0f, 0.0f, 0.0f));
 
-            driven.Controller.SetInput(new VehicleInput(new Vector2(0.0f, 1.0f), Vector2.zero, 0.0f));
+            driven.Controller.SetInput(new VehicleInput(new Vector2(0.0f, 1.0f), Vector2.zero));
             yield return Wait(0.5f);
 
             Assert.That(idle.Fuel, Is.LessThan(idle.FuelCapacity), "an idling engine costs nothing");
@@ -75,7 +75,7 @@ namespace IronFlag.Tests.PlayMode
             int carried = tank.Supply.Rounds;
             tank.Supply.RunDry();
 
-            tank.Controller.SetInput(new VehicleInput(new Vector2(0.0f, 1.0f), Vector2.zero, 0.0f, true));
+            tank.Controller.SetInput(new VehicleInput(new Vector2(0.0f, 1.0f), Vector2.zero, true));
             yield return Wait(0.6f);
 
             Assert.That(tank.Supply.IsStranded, Is.True);
@@ -94,19 +94,27 @@ namespace IronFlag.Tests.PlayMode
         /// A helicopter that runs dry has to come down. Left hovering it would be permanent
         /// cover that nothing on the ground could ever remove.
         /// </summary>
+        /// <remarks>
+        /// The one thing that can move a helicopter off its cruising altitude, now that the
+        /// pilot cannot. Nothing is asked of the controls here because there is nothing to
+        /// ask: the aircraft flies itself, and the empty tank is what changes that.
+        /// </remarks>
         [UnityTest]
         public IEnumerator AHelicopterThatRunsDrySinksToTheGround()
         {
             Rig flyer = CreateHelicopter(Team.Green, new Vector3(0.0f, 12.0f, 0.0f));
             yield return Wait(0.2f);
 
-            float started = ((Helicopter)flyer.Controller).Altitude;
+            var aircraft = (Helicopter)flyer.Controller;
+            float started = aircraft.Altitude;
+            Assert.That(aircraft.IsPowered, Is.True, "it was never flying");
+
             flyer.Supply.RunDry();
-            flyer.Controller.SetInput(new VehicleInput(Vector2.zero, Vector2.zero, 1.0f));
             yield return Wait(1.0f);
 
+            Assert.That(aircraft.IsPowered, Is.False, "nobody told it the engine had stopped");
             Assert.That(
-                ((Helicopter)flyer.Controller).Altitude,
+                aircraft.Altitude,
                 Is.LessThan(started - 1.0f),
                 "it is holding a hover on an empty tank");
         }
@@ -184,16 +192,24 @@ namespace IronFlag.Tests.PlayMode
 
         /// <summary>
         /// The drawback the design document's roster table gives the helicopter: it has to
-        /// go home. A depot it could use in the field would delete that entirely, and a
-        /// depot it could use from the air would delete it twice.
+        /// go home. A depot it could use in the field would delete that entirely.
         /// </summary>
+        /// <remarks>
+        /// Both points are visited at the aircraft's cruising altitude, because that is the
+        /// only height it can be at. What refuses it at the depot is
+        /// <see cref="SupplyPoint.ServesAircraft"/> and nothing else - the height gate that
+        /// used to be the second half of this rule is gone, and had to go: with one altitude
+        /// it would have refused the bunker too.
+        /// </remarks>
         [UnityTest]
         public IEnumerator AHelicopterIsTurnedAwayByAFieldDepotAndServedByItsOwnBunker()
         {
             CreatePoint(Team.None, Vector3.zero, 10.0f, 0.5f, 0.5f, false);
             CreatePoint(Team.Green, new Vector3(60.0f, 0.0f, 0.0f), 12.0f, 0.5f, 0.5f, true);
 
-            Rig flyer = CreateHelicopter(Team.Green, new Vector3(0.0f, 0.5f, 0.0f));
+            Rig flyer = CreateHelicopter(Team.Green, Vector3.zero);
+            float cruise = ((Helicopter)flyer.Controller).Flight.CruiseAltitude;
+            flyer.Controller.Teleport(new Vector3(0.0f, cruise, 0.0f), 0.0f);
             flyer.Supply.RunDry();
             yield return Wait(0.3f);
 
@@ -202,25 +218,77 @@ namespace IronFlag.Tests.PlayMode
                 Is.EqualTo(0.0f),
                 "the helicopter refuelled at a field depot");
 
-            flyer.Controller.Teleport(new Vector3(60.0f, 0.5f, 0.0f), 0.0f);
+            flyer.Controller.Teleport(new Vector3(60.0f, cruise, 0.0f), 0.0f);
             yield return Wait(0.3f);
 
             Assert.That(flyer.Supply.Fuel, Is.GreaterThan(0.0f), "its own bunker turned it away");
         }
 
         /// <summary>
-        /// A helicopter still in the air over its own bunker has not landed on the pad, and
-        /// a hovering aircraft taking on fuel would be the same drawback deleted a third way.
+        /// A helicopter is served hovering over its own bunker, because hovering is the only
+        /// thing it can do.
         /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This test used to say the opposite - that an aircraft had to come down onto the
+        /// pad before anything would serve it - and it was right until the collective was
+        /// taken away. A helicopter now flies at
+        /// <see cref="FlightTuning.CruiseAltitude"/> and cannot descend to anything, so a
+        /// height gate on a supply point does not mean "land first", it means "never". That
+        /// would have cost the aircraft refuelling, rearming and swapping vehicles at once,
+        /// with nothing in the game to say why.
+        /// </para>
+        /// <para>
+        /// The drawback the roster table is protecting survives intact one door along, and
+        /// <see cref="AHelicopterIsTurnedAwayByAFieldDepotAndServedByItsOwnBunker"/> is where
+        /// it is checked: only a bunker serves aircraft at all, so the helicopter is still
+        /// the one vehicle that has to fly all the way home.
+        /// </para>
+        /// </remarks>
         [UnityTest]
-        public IEnumerator AHelicopterHasToComeDownOntoThePadToBeServed()
+        public IEnumerator AHelicopterIsServedHoveringOverItsOwnBunker()
         {
             CreatePoint(Team.Green, Vector3.zero, 12.0f, 0.5f, 0.5f, true);
-            Rig flyer = CreateHelicopter(Team.Green, new Vector3(0.0f, 14.0f, 0.0f));
-            flyer.Supply.RunDry();
-            yield return Wait(0.2f);
+            Rig flyer = CreateHelicopter(Team.Green, Vector3.zero);
+            var aircraft = (Helicopter)flyer.Controller;
+            flyer.Controller.Teleport(new Vector3(0.0f, aircraft.Flight.CruiseAltitude, 0.0f), 0.0f);
 
-            Assert.That(flyer.Supply.Fuel, Is.EqualTo(0.0f), "it refuelled from up in the air");
+            flyer.Supply.RunDry();
+            yield return Wait(0.4f);
+
+            Assert.That(
+                flyer.Supply.Fuel,
+                Is.GreaterThan(0.0f),
+                "its own bunker refused an aircraft that has no way of landing on the pad");
+            Assert.That(
+                flyer.Supply.Serving,
+                Is.Not.Null,
+                "it took on fuel from nowhere");
+        }
+
+        /// <summary>
+        /// And height is not what a bunker is checking. An aircraft that has run dry and
+        /// settled onto the ground over its own pad is served on exactly the same terms as
+        /// one hovering above it - which is what stops the two states of a helicopter being
+        /// two different rules.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator ABunkerServesAnAircraftAtEitherOfTheHeightsItCanBeAt()
+        {
+            CreatePoint(Team.Green, Vector3.zero, 12.0f, 0.5f, 0.5f, true);
+            Rig flyer = CreateHelicopter(Team.Green, Vector3.zero);
+            FlightTuning flight = ((Helicopter)flyer.Controller).Flight;
+
+            foreach (float height in new[] { flight.GroundedAltitude, flight.CruiseAltitude })
+            {
+                flyer.Controller.Teleport(new Vector3(0.0f, height, 0.0f), 0.0f);
+                yield return null;
+
+                Assert.That(
+                    SupplyPoint.HomeFor(new Vector3(0.0f, height, 0.0f), Team.Green, true),
+                    Is.Not.Null,
+                    $"a helicopter at {height} m is not home");
+            }
         }
 
         [UnityTest]

@@ -22,8 +22,11 @@ namespace IronFlag.Supply
     /// design document is explicit that a stranded vehicle can still fight where it stands,
     /// and can self-destruct to get back to the bunker immediately. So this takes the
     /// throttle away and leaves the turret and the trigger alone. A stranded helicopter is
-    /// given a descent instead of a hover, which puts it on the ground where it can be shot
-    /// at rather than parked in the sky for ever.
+    /// also told its engine has died - see <see cref="Helicopter.SetPowered"/> - which
+    /// settles it onto the ground where it can be shot at rather than leaving it parked in
+    /// the sky for ever. That is said here rather than through the pilot's controls because
+    /// the pilot has none: there is no collective to take away, so the only way an aircraft
+    /// can come down is for the thing that owns its fuel to say so.
     /// </para>
     /// <para>
     /// What the vehicle is driving on is part of the bill. Soft ground makes the engine work
@@ -277,28 +280,30 @@ namespace IronFlag.Supply
         /// <param name="input">The frame of intent.</param>
         /// <returns>Demand in 0..1.</returns>
         /// <remarks>
-        /// The larger of the throttle and the collective, so a helicopter climbing costs
-        /// what a helicopter accelerating costs. Steering is deliberately free: a tank
-        /// turning on the spot is not doing the work a tank crossing the map is, and
-        /// charging for it would make the wheeled jeep the cheapest thing to drive badly.
+        /// The throttle, and nothing else. Steering is deliberately free: a tank turning on
+        /// the spot is not doing the work a tank crossing the map is, and charging for it
+        /// would make the wheeled jeep the cheapest thing to drive badly. What a helicopter
+        /// pays for holding itself up is its idle draw rather than a demand - see
+        /// <see cref="VehicleTuning.IdleFuelDraw"/>, which is 0.55 on the aircraft and
+        /// around 0.15 on everything that drives, and is the number that says a hover is
+        /// nearly as much work as crossing the map.
         /// </remarks>
-        public static float DemandFrom(VehicleInput input)
-            => Mathf.Clamp01(Mathf.Max(Mathf.Abs(input.Throttle), Mathf.Abs(input.Lift)));
+        public static float DemandFrom(VehicleInput input) => Mathf.Clamp01(Mathf.Abs(input.Throttle));
 
         /// <summary>
         /// Returns the intent left to a pilot whose tank is empty.
         /// </summary>
         /// <param name="input">What the pilot asked for.</param>
-        /// <param name="aircraft">Whether this is the helicopter.</param>
         /// <returns>The same intent with the engine taken out of it.</returns>
         /// <remarks>
         /// The turret and the trigger survive, because the design document's stranded
-        /// vehicle can still fight where it stands. The collective does not: an aircraft
-        /// with no fuel sinks, which puts a dead helicopter on the ground instead of
-        /// leaving it hanging over the map as permanent cover.
+        /// vehicle can still fight where it stands. An aircraft's descent is not expressed
+        /// here any more - there is no vertical axis on a frame of pilot intent to express
+        /// it with - and is said straight to the aircraft instead by
+        /// <see cref="Helicopter.SetPowered"/>.
         /// </remarks>
-        public static VehicleInput Stranded(VehicleInput input, bool aircraft)
-            => new VehicleInput(Vector2.zero, input.Aim, aircraft ? -1.0f : 0.0f, input.Fire);
+        public static VehicleInput Stranded(VehicleInput input)
+            => new VehicleInput(Vector2.zero, input.Aim, input.Fire);
 
         private void Awake()
         {
@@ -335,7 +340,15 @@ namespace IronFlag.Supply
 
             if (IsStranded)
             {
-                vehicle.SetInput(Stranded(vehicle.CurrentInput, IsAircraft));
+                vehicle.SetInput(Stranded(vehicle.CurrentInput));
+            }
+
+            // Said every frame rather than on the edge, because a helicopter that is
+            // refuelling has to start flying again the moment there is anything in the
+            // tank - and IsAircraft is what caches the reference this reads through.
+            if (IsAircraft)
+            {
+                flyer.SetPowered(!IsStranded);
             }
         }
 

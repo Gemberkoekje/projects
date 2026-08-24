@@ -40,7 +40,6 @@ namespace IronFlag.Players
         private readonly InputActionAsset asset;
         private readonly InputAction drive;
         private readonly InputAction aim;
-        private readonly InputAction lift;
         private readonly InputAction fire;
         private readonly InputAction next;
         private readonly InputAction previous;
@@ -53,7 +52,6 @@ namespace IronFlag.Players
 
             drive = map.FindAction("Drive", false);
             aim = map.FindAction("Aim", false);
-            lift = map.FindAction("Lift", false);
             fire = map.FindAction("Fire", false);
             next = map.FindAction("NextVehicle", false);
             previous = map.FindAction("PreviousVehicle", false);
@@ -72,9 +70,6 @@ namespace IronFlag.Players
         /// <see cref="ControlScheme.Gamepad"/>.
         /// </summary>
         public Vector2 Aim => aim == null ? Vector2.zero : aim.ReadValue<Vector2>();
-
-        /// <summary>Climb on 1, descend on -1, hold altitude on 0.</summary>
-        public float Lift => lift == null ? 0.0f : lift.ReadValue<float>();
 
         /// <summary>
         /// Whether the trigger is being held.

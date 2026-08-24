@@ -479,7 +479,7 @@ namespace IronFlag.Players
             }
 
             vehicle.SetInput(
-                new VehicleInput(controls.Drive, ReadAim(vehicle), controls.Lift, controls.Firing));
+                new VehicleInput(controls.Drive, ReadAim(vehicle), controls.Firing));
         }
 
         /// <summary>

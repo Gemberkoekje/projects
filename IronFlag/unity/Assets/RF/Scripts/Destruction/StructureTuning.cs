@@ -11,9 +11,9 @@ namespace IronFlag.Destruction
     /// <para>
     /// A table in one file, for the same reason as
     /// <see cref="IronFlag.Vehicles.VehicleTuning.For"/> and
-    /// <see cref="IronFlag.Combat.WeaponTuning.For"/>: these six rows are balanced by being
-    /// read against each other and against the four guns, which is something a diff can show
-    /// and six separate assets cannot.
+    /// <see cref="IronFlag.Combat.WeaponTuning.For"/>: these rows are balanced by being
+    /// read against each other and against the guns, which is something a diff can show and
+    /// a folder of separate assets cannot.
     /// </para>
     /// <para>
     /// Hit points are in the same unit as a vehicle's, so the roster table is the scale to
@@ -131,6 +131,20 @@ namespace IronFlag.Destruction
                         DebrisRadius = 4.5f,
                     };
 
+                // Softer than a building and harder than a depot. A turret is a thing
+                // shooting at you while you shoot at it, so the exchange has to be winnable
+                // from a vehicle that is taking fire the whole time: five cannon shells, or
+                // about eleven seconds of chaingun from a helicopter that the turret is
+                // also hitting. Any tougher and the answer is always "bring the tank", which
+                // is one fewer decision rather than one more.
+                case StructureKind.Turret:
+                    return new StructureTuning
+                    {
+                        HitPoints = 170.0f,
+                        DamagedAt = 0.5f,
+                        DebrisRadius = 3.2f,
+                    };
+
                 default:
                     return new StructureTuning();
             }
@@ -145,6 +159,13 @@ namespace IronFlag.Destruction
         /// numbers as everything here, but a level places it as an objective - it needs a
         /// side and a real-or-decoy flag - so it is not something a structure list may hold.
         /// </returns>
+        /// <remarks>
+        /// The turret <em>is</em> on this list even though it also needs a side, because a
+        /// side is all it needs: a level scatters turrets the way it scatters trees, and
+        /// <see cref="LevelStructure.Side"/> carries the one extra word. The tower needs a
+        /// second thing that has no sensible default - which of a side's pyramids is the
+        /// real one - and that is what keeps it off here.
+        /// </remarks>
         public static StructureKind[] Roster()
             => new[]
             {
@@ -154,7 +175,21 @@ namespace IronFlag.Destruction
                 StructureKind.Bridge,
                 StructureKind.DepotFuel,
                 StructureKind.DepotAmmo,
+                StructureKind.Turret,
             };
+
+        /// <summary>
+        /// Reports whether a kind of structure belongs to a side.
+        /// </summary>
+        /// <param name="kind">Structure to look up.</param>
+        /// <returns><c>true</c> for the destructibles a level must give a team.</returns>
+        /// <remarks>
+        /// One place rather than a comparison spelled out in the level file's validator, the
+        /// level builder, the editor's inspector and the mirror tool. There is exactly one
+        /// row for now; the point is that adding a second does not mean finding four
+        /// comparisons that happened to agree.
+        /// </remarks>
+        public static bool BelongsToASide(StructureKind kind) => kind == StructureKind.Turret;
 
         /// <summary>
         /// Returns the state a structure is in at a given share of its pool.

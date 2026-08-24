@@ -97,6 +97,30 @@ namespace IronFlag.Tests.EditMode
             };
 
         /// <summary>
+        /// Returns the baseline's structures plus one turret on a given side.
+        /// </summary>
+        /// <param name="level">The level to extend.</param>
+        /// <param name="side">Side to write into the turret's Side field, by name.</param>
+        /// <returns>A new array; the level is not modified.</returns>
+        /// <remarks>
+        /// Placed well inside the island and away from the depots, so the only thing it can
+        /// be a problem for is the rule under test.
+        /// </remarks>
+        private static LevelStructure[] WithTurret(LevelDefinition level, string side)
+        {
+            var grown = new LevelStructure[level.Structures.Length + 1];
+            level.Structures.CopyTo(grown, 0);
+            grown[grown.Length - 1] = new LevelStructure
+            {
+                Kind = nameof(StructureKind.Turret),
+                Side = side,
+                Position = new Vector3(-20.0f, 0.0f, -20.0f),
+            };
+
+            return grown;
+        }
+
+        /// <summary>
         /// Guards every other test in this class: if the baseline itself is not clean,
         /// nothing built by breaking one thing about it means anything.
         /// </summary>
@@ -104,6 +128,49 @@ namespace IronFlag.Tests.EditMode
         public void TheBaselineLevelHasNoProblems()
         {
             var problems = LevelValidation.Problems(PlayableLevel());
+            Assert.That(problems, Is.Empty, string.Join("; ", problems));
+        }
+
+        /// <summary>
+        /// A turret with nobody to defend is an emplacement that stands there doing nothing,
+        /// which on the map looks exactly like one that is working.
+        /// </summary>
+        [Test]
+        public void ATurretOnNoSideIsRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Structures = WithTurret(level, nameof(Team.None));
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("on no side"));
+        }
+
+        /// <summary>
+        /// And the rule runs the other way: only a turret may belong to anybody. A green
+        /// building is a level saying something the game has no meaning for - and worse, one
+        /// its own side could not shoot down.
+        /// </summary>
+        [Test]
+        public void AnythingElseGivenToASideIsRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            LevelStructure[] added = WithTurret(level, nameof(Team.Green));
+            added[added.Length - 1].Kind = nameof(StructureKind.Tree);
+            level.Structures = added;
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("only a turret"));
+        }
+
+        /// <summary>
+        /// A turret with a side is ordinary scenery as far as every other rule is concerned,
+        /// which is what keeps the two checks above from being a trap.
+        /// </summary>
+        [Test]
+        public void ATurretOnASideIsFine()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Structures = WithTurret(level, nameof(Team.Green));
+
+            var problems = LevelValidation.Problems(level);
             Assert.That(problems, Is.Empty, string.Join("; ", problems));
         }
 

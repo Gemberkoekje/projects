@@ -339,6 +339,15 @@ namespace IronFlag.Editing
                 ? $"{structure.Kind} · RESUPPLIES"
                 : structure.Kind;
 
+            // Only the kinds that have a side get the buttons for one. A tree with a Side
+            // row would be a control that writes a word the level file is then refused for.
+            if (structure.NeedsASide)
+            {
+                title.color = EditorTheme.For(structure.Team);
+                Side(structure.Team, side => Set(
+                    () => structure.Side = side.ToString(), $"Gave the turret to {side}."));
+            }
+
             Row(
                 "Name",
                 structure.Name,

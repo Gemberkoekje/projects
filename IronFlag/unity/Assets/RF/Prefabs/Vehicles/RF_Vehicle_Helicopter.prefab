@@ -96,9 +96,8 @@ MonoBehaviour:
     FuelCapacity: 70
     IdleFuelDraw: 0.55
   flight:
-    DeployAltitude: 10
-    MinAltitude: 0
-    MaxAltitude: 26
+    CruiseAltitude: 10
+    GroundedAltitude: 0
     ClimbRate: 7
     ClimbAcceleration: 14
     MaxPitch: 12

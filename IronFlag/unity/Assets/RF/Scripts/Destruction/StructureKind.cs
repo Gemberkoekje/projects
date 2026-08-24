@@ -50,5 +50,18 @@ namespace IronFlag.Destruction
         /// A flag tower, real or decoy: the one destructible that is also the objective.
         /// </summary>
         FlagTower = 7,
+
+        /// <summary>
+        /// An automated turret: the one destructible that shoots back.
+        /// </summary>
+        /// <remarks>
+        /// Also the one that belongs to a side. Everything else on this list is furniture
+        /// both players can knock down, and a turret that fired on whoever was nearest
+        /// would be a hazard rather than a defence - see
+        /// <see cref="IronFlag.Destruction.AutoTurret"/>, and
+        /// <see cref="IronFlag.Levels.LevelValidation"/>, which refuses a turret with no
+        /// side and refuses a side on anything else.
+        /// </remarks>
+        Turret = 8,
     }
 }

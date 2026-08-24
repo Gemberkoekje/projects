@@ -951,10 +951,15 @@ namespace IronFlag.Editing
                     return;
 
                 case EditTool.Structure:
+                    // The palette's side goes with it. Everything except a turret drops it
+                    // on the way in, so the same click places a tree and a Green turret
+                    // without the palette needing two modes.
                     Place(
                         EditTarget.Structure,
-                        LevelEdits.AddStructure(level, paletteKind, snapped),
-                        $"Placed a {paletteKind}.");
+                        LevelEdits.AddStructure(level, paletteKind, snapped, paletteSide),
+                        StructureTuning.BelongsToASide(paletteKind)
+                            ? $"Placed a {paletteSide} {paletteKind}."
+                            : $"Placed a {paletteKind}.");
                     return;
 
                 case EditTool.Tower:

@@ -303,9 +303,11 @@ namespace IronFlag.Objective
         /// <param name="footprint">The bounds, in world space.</param>
         /// <returns><c>false</c> when this state has nothing solid in it to measure.</returns>
         /// <remarks>
-        /// Only the colliders that are switched on, which is the state currently showing.
-        /// A tower assembled in a test out of empty state nodes has none, and the caller
-        /// falls back to measuring from the flag itself.
+        /// The colliders under whichever state is showing, whether or not they are switched
+        /// on: a collapsed tower has its rubble's colliders disabled so a jeep can drive
+        /// into it, and measuring only enabled ones would make a flattened tower report a
+        /// footprint of nothing and fall back to the flagstaff. A tower assembled in a test
+        /// out of empty state nodes really has none, and that fallback is for it.
         /// </remarks>
         private bool TryFootprint(out Bounds footprint)
         {

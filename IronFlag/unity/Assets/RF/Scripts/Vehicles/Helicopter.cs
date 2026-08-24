@@ -3,8 +3,8 @@ using UnityEngine;
 namespace IronFlag.Vehicles
 {
     /// <summary>
-    /// The one vehicle that ignores the ground: horizontal motion like the others, plus an
-    /// altitude the pilot holds with the collective.
+    /// The one vehicle that ignores the ground: horizontal motion like the others, at a
+    /// fixed altitude nobody chooses.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -12,6 +12,14 @@ namespace IronFlag.Vehicles
     /// rigidbody is flown towards it each fixed step rather than allowed to decide where
     /// the aircraft ends up. That keeps "hover means hover" true even after a collision
     /// nudges the body, and it means the pilot never fights a settling aircraft.
+    /// </para>
+    /// <para>
+    /// The pilot has no collective. Which altitude to sit at was the one decision the
+    /// third axis offered and it has been taken away, so a helicopter is at
+    /// <see cref="FlightTuning.CruiseAltitude"/> whenever its engine is running and on the
+    /// ground when it is not - see <see cref="SetPowered"/>. Everything that used to read
+    /// height off an aircraft to decide something, chiefly whether a bunker will serve it,
+    /// had to stop: at one altitude, a rule about height is a rule about nothing.
     /// </para>
     /// <para>
     /// The visible tilt is applied to a child transform, so the collider stays upright and
@@ -31,6 +39,7 @@ namespace IronFlag.Vehicles
 
         private GroundMotionState motion = GroundMotionState.Still;
         private FlightState flightState = FlightState.Landed;
+        private bool powered = true;
         private Vector2 attitude = Vector2.zero;
         private Vector2 attitudeVelocity = Vector2.zero;
 
@@ -42,6 +51,9 @@ namespace IronFlag.Vehicles
 
         /// <summary>Rate of climb in m/s; negative is descending.</summary>
         public float VerticalSpeed => flightState.VerticalSpeed;
+
+        /// <summary>Whether the engine is running and the aircraft is holding its altitude.</summary>
+        public bool IsPowered => powered;
 
         /// <inheritdoc/>
         public override float ForwardSpeed => motion.Speed;
@@ -56,6 +68,22 @@ namespace IronFlag.Vehicles
             motion = new GroundMotionState(0.0f, yawDegrees);
             flightState = FlightState.Hovering(position.y);
         }
+
+        /// <summary>
+        /// Says whether the engine is still running.
+        /// </summary>
+        /// <param name="running">
+        /// <c>true</c> while there is fuel in the tank; <c>false</c> once there is not.
+        /// </param>
+        /// <remarks>
+        /// The only thing that moves a helicopter off its cruising altitude, and it is not
+        /// the pilot. <see cref="IronFlag.Supply.VehicleSupply"/> is what says so, for the
+        /// same reason it takes a stranded ground vehicle's throttle away: running dry is
+        /// the economy's business, and a helicopter that hung in the sky after it did would
+        /// be permanent cover nobody paid for. An aircraft with no supply component behind
+        /// it is never told anything and simply keeps flying, which is what a test rig is.
+        /// </remarks>
+        public void SetPowered(bool running) => powered = running;
 
         /// <summary>
         /// Sets the flight numbers and the node the cosmetic tilt is applied to.
@@ -76,7 +104,7 @@ namespace IronFlag.Vehicles
         /// <param name="yawDegrees">Heading to face, clockwise from world +Z.</param>
         public void Deploy(Vector3 groundPosition, float yawDegrees)
         {
-            var position = new Vector3(groundPosition.x, flight.DeployAltitude, groundPosition.z);
+            var position = new Vector3(groundPosition.x, flight.CruiseAltitude, groundPosition.z);
             Teleport(position, yawDegrees);
         }
 
@@ -124,7 +152,7 @@ namespace IronFlag.Vehicles
             // Whatever the map says is down there is somebody else's problem, which is the
             // design document's "ignores ground terrain" costing exactly one null.
             motion = GroundVehicleMotion.Step(motion, CurrentInput, Tuning, null, deltaTime);
-            flightState = HelicopterMotion.Step(flightState, CurrentInput.Lift, flight, deltaTime);
+            flightState = HelicopterMotion.Step(flightState, powered, flight, deltaTime);
 
             Body.MoveRotation(motion.Rotation);
 

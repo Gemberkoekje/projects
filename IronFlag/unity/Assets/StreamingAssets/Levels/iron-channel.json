@@ -1,7 +1,7 @@
 {
-    "SchemaVersion": 2,
+    "SchemaVersion": 3,
     "Name": "Iron Channel",
-    "Description": "The v0.1 map. Two islands facing each other across an east-west channel with four ways over it, and not one of them in the middle: the centre is open water, so neither bunker has a straight run at the other and every crossing is a decision about which flank to commit to. Two bridges at x -30 and x +30 span 13 m of narrows each, and anybody can drop them. Two causeways at x -62 and x +62 run out from a headland on each flank and nobody can take them away - which is what stops the match deadlocking once both bridges are gone, at the cost of a drive round that is half as long again. Bunkers face each other down the centre line at 140 m, over water the whole way. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you. Each island is drawn as sand with grass laid over the middle of it, which is why it has a beach nobody drew: what the grass does not cover is beach. The grass falls back at every crossing and reaches furthest toward the water between them, so a straight run at a bridge or a causeway crosses fifteen to thirty metres of soft going - a fifth off a jeep's speed and fifteen per cent more thirst - and the roads are the answer to that. They run from each bunker to its two depots and on to its bridges, and each side has a road out to the causeway on one flank only, its own: the green road goes west and the brown road goes east. So tarmac never runs right round the channel, and reaching the far causeway means leaving it. Asphalt is the one surface whose edges are kept exactly as written, which is what holds each causeway 12 m wide and each bridge's narrows at 13 m: narrow enough to be a crossing, too wide for a jeep at top speed to jump. Every other coastline wanders - a natural surface is pushed about by up to 3 m of seeded noise - so the waterline is a line rather than a ruler. Change the seed and every natural coast on the map moves; change it back and they all return.",
+    "Description": "The v0.1 map. Two islands facing each other across an east-west channel with four ways over it, and not one of them in the middle: the centre is open water, so neither bunker has a straight run at the other and every crossing is a decision about which flank to commit to. Two bridges at x -30 and x +30 span 13 m of narrows each, and anybody can drop them. Two causeways at x -62 and x +62 run out from a headland on each flank and nobody can take them away - which is what stops the match deadlocking once both bridges are gone, at the cost of a drive round that is half as long again. Bunkers face each other down the centre line at 140 m, over water the whole way. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you. Each island is drawn as sand with grass laid over the middle of it, which is why it has a beach nobody drew: what the grass does not cover is beach. The grass falls back at every crossing and reaches furthest toward the water between them, so a straight run at a bridge or a causeway crosses fifteen to thirty metres of soft going - a fifth off a jeep's speed and fifteen per cent more thirst - and the roads are the answer to that. They run from each bunker to its two depots and on to its bridges, and each side has a road out to the causeway on one flank only, its own: the green road goes west and the brown road goes east. So tarmac never runs right round the channel, and reaching the far causeway means leaving it. Asphalt is the one surface whose edges are kept exactly as written, which is what holds each causeway 12 m wide and each bridge's narrows at 13 m: narrow enough to be a crossing, too wide for a jeep at top speed to jump. Every other coastline wanders - a natural surface is pushed about by up to 3 m of seeded noise - so the waterline is a line rather than a ruler. Change the seed and every natural coast on the map moves; change it back and they all return. Each side has two automated turrets, one behind each of its own bridgeheads at x -35 and x +35, set back 24 m from the water. They reach 20 m, which is short of the far bank on purpose: crossing a bridge is still a decision made under fire from the far side, not one refused before it starts, and the turret only speaks once a raider is across. They are the only team-coloured furniture on the map, and like everything else they come in a pair rotated half a turn.",
     "Seed": 1995,
     "Bounds": {
         "HalfExtent": 120.0,
@@ -423,6 +423,7 @@
     "Structures": [
         {
             "Kind": "Bridge",
+            "Side": "None",
             "Name": "West bridge",
             "Position": {
                 "x": -30.0,
@@ -436,6 +437,7 @@
         },
         {
             "Kind": "Bridge",
+            "Side": "None",
             "Name": "East bridge",
             "Position": {
                 "x": 30.0,
@@ -449,6 +451,7 @@
         },
         {
             "Kind": "DepotFuel",
+            "Side": "None",
             "Name": "Fuel depot (west)",
             "Position": {
                 "x": -38.0,
@@ -462,6 +465,7 @@
         },
         {
             "Kind": "DepotAmmo",
+            "Side": "None",
             "Name": "Ammo depot (east)",
             "Position": {
                 "x": 38.0,
@@ -475,6 +479,7 @@
         },
         {
             "Kind": "DepotFuel",
+            "Side": "None",
             "Name": "Fuel depot (east)",
             "Position": {
                 "x": 38.0,
@@ -488,6 +493,7 @@
         },
         {
             "Kind": "DepotAmmo",
+            "Side": "None",
             "Name": "Ammo depot (west)",
             "Position": {
                 "x": -38.0,
@@ -500,7 +506,64 @@
             "SupplyRadius": 7.0
         },
         {
+            "Kind": "Turret",
+            "Side": "Green",
+            "Name": "West bridge turret (green)",
+            "Position": {
+                "x": -35.0,
+                "y": 0.0,
+                "z": -24.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Green",
+            "Name": "East bridge turret (green)",
+            "Position": {
+                "x": 35.0,
+                "y": 0.0,
+                "z": -24.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "East bridge turret (brown)",
+            "Position": {
+                "x": 35.0,
+                "y": 0.0,
+                "z": 24.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "West bridge turret (brown)",
+            "Position": {
+                "x": -35.0,
+                "y": 0.0,
+                "z": 24.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
             "Kind": "BuildingA",
+            "Side": "None",
             "Name": "Bridgehead block (west)",
             "Position": {
                 "x": -24.0,
@@ -514,6 +577,7 @@
         },
         {
             "Kind": "BuildingB",
+            "Side": "None",
             "Name": "Bridgehead shed (east)",
             "Position": {
                 "x": 22.0,
@@ -527,6 +591,7 @@
         },
         {
             "Kind": "BuildingA",
+            "Side": "None",
             "Name": "Causeway block (west)",
             "Position": {
                 "x": -54.0,
@@ -540,6 +605,7 @@
         },
         {
             "Kind": "BuildingB",
+            "Side": "None",
             "Name": "Tower shed (east)",
             "Position": {
                 "x": 10.0,
@@ -553,6 +619,7 @@
         },
         {
             "Kind": "BuildingA",
+            "Side": "None",
             "Name": "Bridgehead block (east)",
             "Position": {
                 "x": 24.0,
@@ -566,6 +633,7 @@
         },
         {
             "Kind": "BuildingB",
+            "Side": "None",
             "Name": "Bridgehead shed (west)",
             "Position": {
                 "x": -22.0,
@@ -579,6 +647,7 @@
         },
         {
             "Kind": "BuildingA",
+            "Side": "None",
             "Name": "Causeway block (east)",
             "Position": {
                 "x": 54.0,
@@ -592,6 +661,7 @@
         },
         {
             "Kind": "BuildingB",
+            "Side": "None",
             "Name": "Tower shed (west)",
             "Position": {
                 "x": -10.0,
@@ -605,6 +675,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -71.0,
@@ -618,6 +689,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -69.0,
@@ -631,6 +703,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -55.0,
@@ -644,6 +717,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -51.0,
@@ -657,6 +731,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -45.0,
@@ -670,6 +745,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -22.0,
@@ -683,6 +759,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -11.0,
@@ -696,6 +773,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 7.0,
@@ -709,6 +787,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 43.0,
@@ -722,6 +801,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 52.0,
@@ -735,6 +815,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 68.0,
@@ -748,6 +829,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -52.0,
@@ -761,6 +843,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -31.0,
@@ -774,6 +857,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -12.0,
@@ -787,6 +871,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 20.0,
@@ -800,6 +885,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 41.0,
@@ -813,6 +899,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 58.0,
@@ -826,6 +913,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 9.0,
@@ -839,6 +927,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 71.0,
@@ -852,6 +941,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 69.0,
@@ -865,6 +955,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 55.0,
@@ -878,6 +969,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 51.0,
@@ -891,6 +983,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 45.0,
@@ -904,6 +997,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 22.0,
@@ -917,6 +1011,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 11.0,
@@ -930,6 +1025,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -7.0,
@@ -943,6 +1039,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -43.0,
@@ -956,6 +1053,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -52.0,
@@ -969,6 +1067,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -68.0,
@@ -982,6 +1081,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 52.0,
@@ -995,6 +1095,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 31.0,
@@ -1008,6 +1109,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": 12.0,
@@ -1021,6 +1123,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -20.0,
@@ -1034,6 +1137,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -41.0,
@@ -1047,6 +1151,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -58.0,
@@ -1060,6 +1165,7 @@
         },
         {
             "Kind": "Tree",
+            "Side": "None",
             "Name": "",
             "Position": {
                 "x": -9.0,

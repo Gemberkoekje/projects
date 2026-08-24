@@ -44,7 +44,7 @@ namespace IronFlag.Vehicles
         /// <example>
         /// <code>
         /// GroundMotionState state = GroundMotionState.Still;
-        /// var forward = new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
+        /// var forward = new VehicleInput(Vector2.up, Vector2.zero);
         /// state = GroundVehicleMotion.Step(
         ///     state, forward, VehicleTuning.For(VehicleKind.Jeep),
         ///     SurfaceTuning.For(SurfaceKind.Sand), 0.02f);

@@ -242,7 +242,7 @@ namespace IronFlag.Tests.PlayMode
         }
 
         /// <summary>Full throttle, straight ahead.</summary>
-        private static VehicleInput Ahead => new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
+        private static VehicleInput Ahead => new VehicleInput(Vector2.up, Vector2.zero);
 
         /// <summary>
         /// Builds the three-strip map and puts it up, so the vehicles have something to read.

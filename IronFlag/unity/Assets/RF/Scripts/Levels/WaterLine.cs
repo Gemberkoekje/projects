@@ -17,10 +17,12 @@ namespace IronFlag.Levels
     /// bridge cost a route and nothing else.
     /// </para>
     /// <para>
-    /// The helicopter never drowns, and does not have to be excluded to manage it:
-    /// <see cref="FlightTuning.MinAltitude"/> holds it at or above the land, so it is never
-    /// below the line. That is the design document's "ignores ground terrain", falling out
-    /// of a rule about height rather than out of a check on a vehicle type.
+    /// The helicopter never drowns, and does not have to be excluded to manage it: it
+    /// flies at <see cref="FlightTuning.CruiseAltitude"/>, and even one that has run dry
+    /// settles onto <see cref="FlightTuning.GroundedAltitude"/>, which is skids-down at
+    /// zero and still above the line. That is the design document's "ignores ground
+    /// terrain", falling out of a rule about height rather than out of a check on a
+    /// vehicle type.
     /// </para>
     /// <para>
     /// Like <see cref="IronFlag.Objective.Flag"/>, this walks

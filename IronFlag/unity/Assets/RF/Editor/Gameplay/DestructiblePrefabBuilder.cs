@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using IronFlag.Combat;
 using IronFlag.Destruction;
 using IronFlag.Editor.ArtPipeline;
 
@@ -37,6 +38,24 @@ namespace IronFlag.Editor.Gameplay
 
         /// <summary>Folder the state models are imported into.</summary>
         public const string ModelFolder = "Assets/RF/Art/Models";
+
+        /// <summary>Name of the dark barrel-mouth object the Blender pipeline exports.</summary>
+        public const string MuzzleName = "Muzzle";
+
+        /// <summary>
+        /// Degrees per second an automated turret traverses at.
+        /// </summary>
+        /// <remarks>
+        /// Faster than the tank's 65 and the ASV's 45, because an emplacement has nothing
+        /// else to do and a gun that can be walked around at a stroll is not a defence. The
+        /// number that matters is where it stops working: a jeep at its 22 m/s sweeps 80
+        /// degrees a second at sixteen metres out, so inside that a fast vehicle circling
+        /// can stay ahead of the barrel and outside it cannot. The turret reaches twenty,
+        /// so the ring where circling beats it sits comfortably inside its own range - and
+        /// the tank's answer is the other one, standing off at thirty-six and shelling it
+        /// from outside.
+        /// </remarks>
+        public const float TurretTraverseRate = 80.0f;
 
         /// <summary>
         /// Rebuilds every destructible prefab.
@@ -186,7 +205,130 @@ namespace IronFlag.Editor.Gameplay
                 destroyed,
                 CombatPrefabBuilder.LoadDebris());
 
+            if (kind == StructureKind.Turret)
+            {
+                AddGun(root);
+            }
+
             return root;
+        }
+
+        /// <summary>
+        /// Bolts a gun onto the one destructible that shoots back.
+        /// </summary>
+        /// <param name="root">The assembled turret prefab.</param>
+        /// <remarks>
+        /// <para>
+        /// The gun and the targeting sit on the root, and the <em>barrel</em> lives inside
+        /// each state model - so this puts a firing point in every state that has a turret
+        /// to hang one off, and <see cref="AutoTurret"/> picks whichever is showing. The
+        /// destroyed model has no turret on purpose, so it silently gets none.
+        /// </para>
+        /// <para>
+        /// Which side a turret is on is not decided here. One prefab serves both, and the
+        /// level file is what hands it over - see
+        /// <see cref="IronFlag.Levels.LevelBuilder"/>.
+        /// </para>
+        /// </remarks>
+        private static void AddGun(GameObject root)
+        {
+            foreach (Transform turret in TurretsIn(root))
+            {
+                // The head traverses every frame. A mesh collider that moves is a static
+                // collider Unity rebuilds each time it does, and the base underneath is
+                // already the thing a vehicle bumps into and a round's column crosses - so
+                // the moving part carries no collider at all.
+                foreach (Collider part in turret.GetComponentsInChildren<Collider>(true))
+                {
+                    Object.DestroyImmediate(part);
+                }
+
+                Transform muzzle = FindIn(turret, MuzzleName);
+                if (muzzle == null)
+                {
+                    Debug.LogWarning(
+                        $"IronFlag: {root.name} has a {AutoTurret.TurretNodeName} with no "
+                        + $"{MuzzleName} in it; that state will not be able to fire.");
+                    continue;
+                }
+
+                var point = new GameObject(AutoTurret.MuzzlePointName);
+                point.transform.SetParent(muzzle, false);
+                point.transform.SetPositionAndRotation(MuzzleTip(muzzle), Quaternion.identity);
+            }
+
+            WeaponTuning weapon = WeaponTuning.Emplacement();
+            VehicleWeapon gun = root.AddComponent<VehicleWeapon>();
+            gun.Configure(null, null, weapon, CombatPrefabBuilder.LoadProjectile(weapon.Kind));
+
+            // The muzzle is deliberately left null: AutoTurret points the gun at whichever
+            // state's barrel is showing the first time it runs, and would have to undo an
+            // answer given here anyway.
+            root.AddComponent<AutoTurret>().Configure(gun, TurretTraverseRate);
+        }
+
+        /// <summary>
+        /// Returns the traversing part of every state model that has one.
+        /// </summary>
+        /// <param name="root">The assembled prefab.</param>
+        /// <returns>One transform per state with a turret in it, in state order.</returns>
+        private static IEnumerable<Transform> TurretsIn(GameObject root)
+        {
+            foreach (DestructionState state in
+                new[] { DestructionState.Intact, DestructionState.Damaged, DestructionState.Destroyed })
+            {
+                Transform model = FindIn(root.transform, NodeNameFor(state));
+                Transform turret = model == null ? null : FindIn(model, AutoTurret.TurretNodeName);
+                if (turret != null)
+                {
+                    yield return turret;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the world-space point at the business end of a muzzle.
+        /// </summary>
+        /// <param name="muzzle">The muzzle object exported with the model.</param>
+        /// <returns>
+        /// The front face of the muzzle geometry, or the muzzle's origin when it has
+        /// nothing to render.
+        /// </returns>
+        /// <remarks>
+        /// The same measurement <see cref="VehiclePrefabBuilder"/> makes, and for the same
+        /// reason: every asset is built facing +Z, so "the front" is the far end of the
+        /// bounds along Z, and a round spawned at the middle of the muzzle would start
+        /// inside the barrel it just came out of.
+        /// </remarks>
+        private static Vector3 MuzzleTip(Transform muzzle)
+        {
+            Renderer mouth = muzzle.GetComponentInChildren<Renderer>(true);
+            if (mouth == null)
+            {
+                return muzzle.position;
+            }
+
+            Bounds bounds = mouth.bounds;
+            return bounds.center + (Vector3.forward * bounds.extents.z);
+        }
+
+        /// <summary>
+        /// Finds a named object anywhere under a root, including switched-off ones.
+        /// </summary>
+        /// <param name="root">Object to search under.</param>
+        /// <param name="name">Name to look for.</param>
+        /// <returns>The transform, or <c>null</c>.</returns>
+        private static Transform FindIn(Transform root, string name)
+        {
+            foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (child.name == name)
+                {
+                    return child;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -277,6 +419,7 @@ namespace IronFlag.Editor.Gameplay
             => kind == StructureKind.DepotFuel
                 || kind == StructureKind.DepotAmmo
                 || kind == StructureKind.FlagTower
+                || kind == StructureKind.Turret
                 ? "Structure"
                 : "Prop";
 

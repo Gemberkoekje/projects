@@ -43,7 +43,7 @@ namespace IronFlag.Tests.PlayMode
             CreateGround();
             GroundVehicle jeep = CreateGroundVehicle(VehicleKind.Jeep, Vector3.zero);
 
-            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero, 0.0f), 1.5f);
+            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero), 1.5f);
 
             Assert.That(jeep.transform.position.z, Is.GreaterThan(10.0f), "the jeep did not move");
             Assert.That(Mathf.Abs(jeep.transform.position.x), Is.LessThan(0.5f), "it wandered sideways");
@@ -56,7 +56,7 @@ namespace IronFlag.Tests.PlayMode
             CreateGround();
             GroundVehicle jeep = CreateGroundVehicle(VehicleKind.Jeep, Vector3.zero);
 
-            yield return Drive(jeep, new VehicleInput(Vector2.right, Vector2.zero, 0.0f), 1.0f);
+            yield return Drive(jeep, new VehicleInput(Vector2.right, Vector2.zero), 1.0f);
 
             Assert.That(Mathf.DeltaAngle(0.0f, jeep.transform.eulerAngles.y), Is.EqualTo(0.0f).Within(0.5f));
         }
@@ -68,7 +68,7 @@ namespace IronFlag.Tests.PlayMode
             GroundVehicle tank = CreateGroundVehicle(VehicleKind.Tank, Vector3.zero);
             Vector3 start = tank.transform.position;
 
-            yield return Drive(tank, new VehicleInput(Vector2.right, Vector2.zero, 0.0f), 1.0f);
+            yield return Drive(tank, new VehicleInput(Vector2.right, Vector2.zero), 1.0f);
 
             float turned = Mathf.DeltaAngle(0.0f, tank.transform.eulerAngles.y);
             Assert.That(turned, Is.GreaterThan(40.0f), "the tank barely moved its hull");
@@ -84,28 +84,67 @@ namespace IronFlag.Tests.PlayMode
             CreateGround();
             GroundVehicle jeep = CreateGroundVehicle(VehicleKind.Jeep, Vector3.zero);
 
-            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero, 0.0f), 1.0f);
+            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero), 1.0f);
             jeep.ReleaseControls();
             yield return Wait(2.0f);
 
             Assert.That(jeep.ForwardSpeed, Is.EqualTo(0.0f).Within(0.01f));
         }
 
+        /// <summary>
+        /// Put down anywhere, the helicopter flies itself to the one altitude it has and
+        /// stays there. Nobody asks it to: there is no collective, so the climb is the
+        /// aircraft closing the gap between where it was left and where it belongs.
+        /// </summary>
         [UnityTest]
-        public IEnumerator TheHelicopterClimbsAndThenHoldsItsAltitude()
+        public IEnumerator TheHelicopterClimbsToItsCruisingAltitudeAndHoldsIt()
         {
             CreateGround();
             Helicopter helicopter = CreateHelicopter(new Vector3(0.0f, 4.0f, 0.0f));
+            float cruise = helicopter.Flight.CruiseAltitude;
 
-            yield return Drive(helicopter, new VehicleInput(Vector2.zero, Vector2.zero, 1.0f), 1.0f);
-            float climbed = helicopter.transform.position.y;
+            yield return Drive(helicopter, VehicleInput.Idle, 2.0f);
 
-            helicopter.ReleaseControls();
-            yield return Wait(1.5f);
+            Assert.That(
+                helicopter.Altitude,
+                Is.EqualTo(cruise).Within(0.05f),
+                "it did not settle on its cruising altitude");
+            Assert.That(
+                helicopter.VerticalSpeed,
+                Is.EqualTo(0.0f).Within(0.01f),
+                "it arrived still climbing, which is a bounce waiting to happen");
+            Assert.That(helicopter.transform.position.y, Is.EqualTo(cruise).Within(0.2f));
 
-            Assert.That(climbed, Is.GreaterThan(8.0f), "the helicopter did not climb");
-            Assert.That(helicopter.transform.position.y, Is.EqualTo(helicopter.Altitude).Within(0.1f));
-            Assert.That(helicopter.transform.position.y, Is.GreaterThan(climbed - 0.5f), "it sank");
+            yield return Wait(1.0f);
+
+            Assert.That(
+                helicopter.transform.position.y,
+                Is.EqualTo(cruise).Within(0.2f),
+                "it drifted off the altitude it is supposed to be locked to");
+        }
+
+        /// <summary>
+        /// Shoved down out of the sky, it comes back up on its own. The altitude model is
+        /// authoritative and the rigidbody is flown towards it, which is what keeps a
+        /// collision from permanently changing where a helicopter lives.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheHelicopterReturnsToItsAltitudeAfterBeingShoved()
+        {
+            CreateGround();
+            Helicopter helicopter = CreateHelicopter(new Vector3(0.0f, 10.0f, 0.0f));
+            float cruise = helicopter.Flight.CruiseAltitude;
+            yield return Wait(0.5f);
+
+            helicopter.Teleport(new Vector3(0.0f, 3.0f, 0.0f), 0.0f);
+            Assert.That(helicopter.Altitude, Is.EqualTo(3.0f).Within(0.01f), "the shove did nothing");
+
+            yield return Wait(2.0f);
+
+            Assert.That(
+                helicopter.Altitude,
+                Is.EqualTo(cruise).Within(0.05f),
+                "it stayed where it was pushed");
         }
 
         [UnityTest]
@@ -114,7 +153,7 @@ namespace IronFlag.Tests.PlayMode
             CreateGround();
             Helicopter helicopter = CreateHelicopter(new Vector3(0.0f, 10.0f, 0.0f));
 
-            yield return Drive(helicopter, new VehicleInput(Vector2.up, Vector2.zero, 0.0f), 1.5f);
+            yield return Drive(helicopter, new VehicleInput(Vector2.up, Vector2.zero), 1.5f);
 
             Assert.That(helicopter.transform.position.z, Is.GreaterThan(8.0f), "it did not fly forwards");
             Assert.That(helicopter.transform.position.y, Is.EqualTo(10.0f).Within(0.2f), "it did not stay level");
@@ -144,7 +183,7 @@ namespace IronFlag.Tests.PlayMode
             TopDownCameraRig rig = CreateCameraRig();
             rig.SetTarget(jeep, true);
 
-            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero, 0.0f), 2.0f);
+            yield return Drive(jeep, new VehicleInput(Vector2.up, Vector2.zero), 2.0f);
 
             float behind = jeep.transform.position.z - rig.transform.position.z;
             Assert.That(jeep.transform.position.z, Is.GreaterThan(10.0f), "the jeep never left the line");

@@ -136,7 +136,7 @@ namespace IronFlag.Tests.EditMode
                 "the jeep is 1.6 m tall and has to be shootable");
             Assert.That(
                 CombatPlane.Ceiling,
-                Is.GreaterThan(new FlightTuning().MaxAltitude + 3.0f),
+                Is.GreaterThan(new FlightTuning().CruiseAltitude + 3.0f),
                 "the helicopter can climb out of the fight");
         }
 

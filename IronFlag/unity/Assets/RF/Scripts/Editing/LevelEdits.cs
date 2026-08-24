@@ -137,8 +137,10 @@ namespace IronFlag.Editing
                 },
                 Structures = new[]
                 {
-                    NewStructure(StructureKind.DepotFuel, new Vector3(-StarterDepot, 0.0f, 0.0f)),
-                    NewStructure(StructureKind.DepotAmmo, new Vector3(StarterDepot, 0.0f, 0.0f)),
+                    NewStructure(
+                        StructureKind.DepotFuel, new Vector3(-StarterDepot, 0.0f, 0.0f), Team.None),
+                    NewStructure(
+                        StructureKind.DepotAmmo, new Vector3(StarterDepot, 0.0f, 0.0f), Team.None),
                 },
             };
 
@@ -282,14 +284,37 @@ namespace IronFlag.Editing
         /// <param name="kind">What to place.</param>
         /// <param name="at">Where, on the ground plane; its height is replaced.</param>
         /// <returns>Its index, or -1 when there is no such kind.</returns>
+        /// <remarks>
+        /// Places it on no side, which is right for everything except a turret. The overload
+        /// taking a side is what the editor's palette calls, because the palette already has
+        /// one selected for the towers and bunkers.
+        /// </remarks>
         public static int AddStructure(LevelDefinition level, StructureKind kind, Vector3 at)
+            => AddStructure(level, kind, at, Team.None);
+
+        /// <summary>
+        /// Puts a destructible on the map, on a side.
+        /// </summary>
+        /// <param name="level">The level to add to.</param>
+        /// <param name="kind">What to place.</param>
+        /// <param name="at">Where, on the ground plane; its height is replaced.</param>
+        /// <param name="side">Side it belongs to; ignored by everything but a turret.</param>
+        /// <returns>Its index, or -1 when there is no such kind.</returns>
+        /// <remarks>
+        /// The side is dropped rather than refused for a kind that cannot have one, so that
+        /// a palette with a side always selected can place a tree without the editor having
+        /// to know which kinds care. What a level file may actually say is
+        /// <see cref="LevelValidation"/>'s business, and it refuses both mistakes.
+        /// </remarks>
+        public static int AddStructure(
+            LevelDefinition level, StructureKind kind, Vector3 at, Team side)
         {
             if (level == null || kind == StructureKind.None || kind == StructureKind.FlagTower)
             {
                 return -1;
             }
 
-            level.Structures = Append(level.Structures, NewStructure(kind, at));
+            level.Structures = Append(level.Structures, NewStructure(kind, at, side));
             return level.Structures.Length - 1;
         }
 
@@ -693,8 +718,14 @@ namespace IronFlag.Editing
 
                 case EditTarget.Structure:
                     LevelStructure structure = level.Structures[selection.Index];
+
+                    // A mirrored turret is the *other* side's turret, exactly as a mirrored
+                    // tower is the other side's tower. Copying the side across instead would
+                    // give one player both emplacements on a map that still looked
+                    // symmetrical, which is the worst kind of asymmetry: invisible.
                     int placed = AddStructure(
-                        level, structure.Structure, Turned(structure.Position));
+                        level, structure.Structure, Turned(structure.Position),
+                        Opposite(structure.Team));
                     if (placed < 0)
                     {
                         return EditSelection.Nothing;
@@ -779,11 +810,13 @@ namespace IronFlag.Editing
         /// </summary>
         /// <param name="kind">What it is.</param>
         /// <param name="at">Where it goes; its height is replaced.</param>
+        /// <param name="side">Side it belongs to; kept only by the kinds that have one.</param>
         /// <returns>The structure.</returns>
-        private static LevelStructure NewStructure(StructureKind kind, Vector3 at)
+        private static LevelStructure NewStructure(StructureKind kind, Vector3 at, Team side)
             => new LevelStructure
             {
                 Kind = kind.ToString(),
+                Side = (StructureTuning.BelongsToASide(kind) ? side : Team.None).ToString(),
                 Name = string.Empty,
                 Position = new Vector3(at.x, RestingHeight(kind), at.z),
                 YawDegrees = 0.0f,
