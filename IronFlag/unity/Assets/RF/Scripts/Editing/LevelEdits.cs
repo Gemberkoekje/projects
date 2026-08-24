@@ -682,9 +682,14 @@ namespace IronFlag.Editing
                         new Vector3(-piece.MinX, 0.0f, -piece.MinZ),
                         new Vector3(-piece.MaxX, 0.0f, -piece.MaxZ),
                         piece.Name);
-                    return drawn < 0
-                        ? EditSelection.Nothing
-                        : new EditSelection(EditTarget.Land, drawn);
+                    if (drawn < 0)
+                    {
+                        return EditSelection.Nothing;
+                    }
+
+                    level.Land[drawn].Surface = piece.Surface;
+                    level.Land[drawn].Shape = piece.Shape;
+                    return new EditSelection(EditTarget.Land, drawn);
 
                 case EditTarget.Structure:
                     LevelStructure structure = level.Structures[selection.Index];

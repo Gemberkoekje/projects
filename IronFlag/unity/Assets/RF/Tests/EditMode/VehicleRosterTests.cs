@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using UnityEngine;
+using IronFlag.Levels;
 using IronFlag.Vehicles;
 
 namespace IronFlag.Tests.EditMode
@@ -44,6 +45,57 @@ namespace IronFlag.Tests.EditMode
             Assert.That(tank, Is.GreaterThan(VehicleTuning.For(VehicleKind.Asv).Mass));
             Assert.That(tank, Is.GreaterThan(VehicleTuning.For(VehicleKind.Jeep).Mass));
             Assert.That(tank, Is.GreaterThan(VehicleTuning.For(VehicleKind.Helicopter).Mass));
+        }
+
+        /// <summary>
+        /// The ground matters most to the vehicle with the least of it under each tyre, and
+        /// not at all to the one that is not on it.
+        /// </summary>
+        /// <remarks>
+        /// The same ordering <see cref="VehicleTuning.PivotTurn"/> draws, said as a scale
+        /// rather than as a flag: wheels are at the mercy of what they are on, tracks much
+        /// less so, and a rotor not at all. A retune that put the tank above the jeep here
+        /// would make a beach a reason to take the heaviest thing in the game across it.
+        /// </remarks>
+        [Test]
+        public void TheGroundMattersMostToTheThingOnFourTyres()
+        {
+            float jeep = VehicleTuning.For(VehicleKind.Jeep).SurfaceSensitivity;
+            float asv = VehicleTuning.For(VehicleKind.Asv).SurfaceSensitivity;
+            float tank = VehicleTuning.For(VehicleKind.Tank).SurfaceSensitivity;
+            float air = VehicleTuning.For(VehicleKind.Helicopter).SurfaceSensitivity;
+
+            Assert.That(jeep, Is.EqualTo(1.0f).Within(0.0001f), "the jeep is the anchor of the column");
+            Assert.That(jeep, Is.GreaterThan(asv));
+            Assert.That(asv, Is.GreaterThan(tank));
+            Assert.That(tank, Is.GreaterThan(0.0f), "the tank is unmoved by every surface there is");
+            Assert.That(air, Is.EqualTo(0.0f).Within(0.0001f), "the helicopter feels the ground");
+        }
+
+        /// <summary>
+        /// A road is worth taking in every vehicle that can take one, and a beach costs
+        /// something in every vehicle that has to cross one.
+        /// </summary>
+        /// <remarks>
+        /// Read the two tables against each other rather than either alone: a grip figure
+        /// that no vehicle is sensitive to, or a roster of vehicles that all ignore the
+        /// ground, would leave both tables looking perfectly sensible and the map flat.
+        /// </remarks>
+        [Test]
+        public void EveryVehicleThatDrivesIsQuickerOnARoadThanOnABeach()
+        {
+            SurfaceTuning road = SurfaceTuning.For(SurfaceKind.Asphalt);
+            SurfaceTuning beach = SurfaceTuning.For(SurfaceKind.Sand);
+
+            foreach (VehicleKind kind in new[] { VehicleKind.Jeep, VehicleKind.Tank, VehicleKind.Asv })
+            {
+                VehicleTuning tuning = VehicleTuning.For(kind);
+
+                Assert.That(
+                    GroundVehicleMotion.Traction(tuning, road),
+                    Is.GreaterThan(GroundVehicleMotion.Traction(tuning, beach)),
+                    $"a {kind} crosses a beach as fast as it takes a road");
+            }
         }
 
         [Test]
@@ -99,6 +151,7 @@ namespace IronFlag.Tests.EditMode
                 Assert.That(tuning.ReverseSpeed, Is.GreaterThan(0.0f), kind.ToString());
                 Assert.That(tuning.TurnRate, Is.GreaterThan(0.0f), kind.ToString());
                 Assert.That(tuning.Mass, Is.GreaterThan(0.0f), kind.ToString());
+                Assert.That(tuning.SurfaceSensitivity, Is.InRange(0.0f, 1.0f), kind.ToString());
             }
         }
 
@@ -110,6 +163,10 @@ namespace IronFlag.Tests.EditMode
             Assert.That(none, Is.Not.Null);
             Assert.That(none.MaxSpeed, Is.GreaterThan(0.0f));
             Assert.That(none.TurretTurnRate, Is.EqualTo(0.0f));
+            Assert.That(
+                none.SurfaceSensitivity,
+                Is.EqualTo(0.0f),
+                "a vehicle nobody has tuned should drive the same everywhere");
         }
 
         [Test]

@@ -91,8 +91,26 @@ namespace IronFlag.Editor.Gameplay
                 ObjectivePrefabBuilder.LoadTower(),
                 ObjectivePrefabBuilder.LoadFlag());
 
+            var surfaces = new List<LevelSurfaceMaterial>();
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                // Only the ground gets a bank. The waters have no coastline of their own -
+                // the coast is the land's edge - so those rows are right to be short, and
+                // the catalog knows not to complain about them.
+                bool ground = !SurfaceTuning.For(kind).Drowns;
+
+                surfaces.Add(new LevelSurfaceMaterial
+                {
+                    Kind = kind,
+                    Material = GeneratedMaterials.Load(GeneratedMaterials.SurfaceMaterial(kind)),
+                    Bank = ground
+                        ? GeneratedMaterials.Load(GeneratedMaterials.BankMaterial(kind))
+                        : null,
+                });
+            }
+
             catalog.ConfigureMaterials(
-                GeneratedMaterials.Load(GeneratedMaterials.Ground),
+                surfaces,
                 GeneratedMaterials.Load(GeneratedMaterials.Water),
                 GeneratedMaterials.Load(GeneratedMaterials.Green),
                 GeneratedMaterials.Load(GeneratedMaterials.Brown),

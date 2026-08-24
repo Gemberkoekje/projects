@@ -48,11 +48,12 @@ namespace IronFlag.Levels
         [Tooltip("The flag prefab, one per side.")]
         private GameObject flag;
 
-        [Header("Materials")]
+        [Header("Surfaces")]
         [SerializeField]
-        [Tooltip("Material the land wears.")]
-        private Material ground;
+        [Tooltip("One row per surface a level may paint the ground with.")]
+        private List<LevelSurfaceMaterial> surfaces = new List<LevelSurfaceMaterial>();
 
+        [Header("Materials")]
         [SerializeField]
         [Tooltip("Material the sea wears.")]
         private Material water;
@@ -82,10 +83,13 @@ namespace IronFlag.Levels
         /// <summary>The flag prefab.</summary>
         public GameObject Flag => flag;
 
-        /// <summary>Material the land wears.</summary>
-        public Material Ground => ground;
-
         /// <summary>Material the sea wears.</summary>
+        /// <remarks>
+        /// The sea is still one slab, so it is still handed one material rather than being
+        /// drawn out of the surface rows. It is the same asset as
+        /// <see cref="SurfaceKind.DeepWater"/>, so the two cannot drift apart, and the shelf
+        /// is what splits this in two.
+        /// </remarks>
         public Material Water => water;
 
         /// <summary>Material worn by headlight geometry.</summary>
@@ -117,21 +121,21 @@ namespace IronFlag.Levels
         /// <summary>
         /// Points the catalog at the materials a map is painted with.
         /// </summary>
-        /// <param name="groundMaterial">Material the land wears.</param>
+        /// <param name="surfaceRows">One row per surface a level may name.</param>
         /// <param name="waterMaterial">Material the sea wears.</param>
         /// <param name="green">Team accent worn by the green side.</param>
         /// <param name="brown">Team accent worn by the brown side.</param>
         /// <param name="front">Material worn by headlight geometry.</param>
         /// <param name="rear">Material worn by tail-light geometry.</param>
         public void ConfigureMaterials(
-            Material groundMaterial,
+            List<LevelSurfaceMaterial> surfaceRows,
             Material waterMaterial,
             Material green,
             Material brown,
             Material front,
             Material rear)
         {
-            ground = groundMaterial;
+            surfaces = surfaceRows == null ? new List<LevelSurfaceMaterial>() : surfaceRows;
             water = waterMaterial;
             greenTrim = green;
             brownTrim = brown;
@@ -151,6 +155,55 @@ namespace IronFlag.Levels
                 if (row != null && row.Kind == kind)
                 {
                     return row.Prefab;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the material one surface is painted with.
+        /// </summary>
+        /// <param name="kind">Surface to look up.</param>
+        /// <returns>The material, or <c>null</c> when the catalog has no row for it.</returns>
+        /// <remarks>
+        /// The reason surfaces need a catalog row at all: a built player has no asset
+        /// database, so the map cannot look a material up by path the way the editor tools
+        /// do. A missing row paints that piece of land in URP's default white, which is
+        /// loud on purpose - and <see cref="Problems"/> names it before the map is built.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// Material paint = catalog.MaterialFor(piece.Ground);
+        /// </code>
+        /// </example>
+        public Material MaterialFor(SurfaceKind kind) => RowFor(kind)?.Material;
+
+        /// <summary>
+        /// Returns the material the bank below one surface is painted with.
+        /// </summary>
+        /// <param name="kind">Surface to look up.</param>
+        /// <returns>The material, or <c>null</c> when the catalog has no row for it.</returns>
+        /// <remarks>
+        /// The drop from the land to the water is the only relief the map has, so it is the
+        /// one place a surface is seen from the side, and it is drawn in that surface's own
+        /// colour taken down a step rather than in a colour of its own. See
+        /// <see cref="SurfaceTuning.BankShade"/>.
+        /// </remarks>
+        public Material BankFor(SurfaceKind kind) => RowFor(kind)?.Bank;
+
+        /// <summary>
+        /// Returns the catalog's row for one surface.
+        /// </summary>
+        /// <param name="kind">Surface to look up.</param>
+        /// <returns>The row, or <c>null</c> when the catalog has none for it.</returns>
+        private LevelSurfaceMaterial RowFor(SurfaceKind kind)
+        {
+            foreach (LevelSurfaceMaterial row in surfaces)
+            {
+                if (row != null && row.Kind == kind)
+                {
+                    return row;
                 }
             }
 
@@ -206,9 +259,30 @@ namespace IronFlag.Levels
                 problems.Add("The catalog has no flag prefab: there would be nothing to win.");
             }
 
-            if (ground == null || water == null)
+            if (water == null)
             {
-                problems.Add("The catalog is missing the ground or water material.");
+                problems.Add("The catalog is missing the water material.");
+            }
+
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                if (MaterialFor(kind) == null)
+                {
+                    problems.Add($"The catalog has no material for {kind}, so any land "
+                        + "painted with it would come out white.");
+                }
+            }
+
+            // Only the ground gets a bank. The two waters have no coastline of their own to
+            // hang one from - the coast is the land's edge - so a row without one is a row
+            // that is right rather than a row that is short.
+            foreach (SurfaceKind kind in SurfaceTuning.Stack(false))
+            {
+                if (BankFor(kind) == null)
+                {
+                    problems.Add($"The catalog has no bank material for {kind}, so the drop "
+                        + "to the water below it would come out white.");
+                }
             }
 
             if (greenTrim == null || brownTrim == null)

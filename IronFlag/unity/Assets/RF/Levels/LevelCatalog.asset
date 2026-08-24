@@ -28,7 +28,22 @@ MonoBehaviour:
   bunker: {fileID: 7350495116598894301, guid: 5a8598d1424d6644c9b4c11db0d729a8, type: 3}
   tower: {fileID: 3393270847052785822, guid: a94e5f60a2f6fd440b8995d5172af954, type: 3}
   flag: {fileID: 4965343357232036794, guid: aaf184bc273be4147a3b52b937b6fa08, type: 3}
-  ground: {fileID: 2100000, guid: f050833809b15b341938cb479746d1e2, type: 2}
+  surfaces:
+  - Kind: 1
+    Material: {fileID: 2100000, guid: 9e9c7f529598b1c48a67d527e359e7ed, type: 2}
+    Bank: {fileID: 2100000, guid: 7789cfec56f8d9f4fb413b08d9da788a, type: 2}
+  - Kind: 2
+    Material: {fileID: 2100000, guid: d9d8ec51ab0ead1478d7914e8ffd6645, type: 2}
+    Bank: {fileID: 2100000, guid: f72f65652f4fcbe4c935860fe8a3fb51, type: 2}
+  - Kind: 3
+    Material: {fileID: 2100000, guid: 7c9fcdc99361913488925316e1371127, type: 2}
+    Bank: {fileID: 2100000, guid: f61e37c02a6e0924497531c7e10b0a1e, type: 2}
+  - Kind: 4
+    Material: {fileID: 2100000, guid: 1fd36135e0fca114a977b31336777e6c, type: 2}
+    Bank: {fileID: 0}
+  - Kind: 5
+    Material: {fileID: 2100000, guid: 003ec858c293443468553cd5c396ba3b, type: 2}
+    Bank: {fileID: 0}
   water: {fileID: 2100000, guid: 003ec858c293443468553cd5c396ba3b, type: 2}
   greenTrim: {fileID: 2100000, guid: e160c5d6a7e2e4b4d88fd32ad6613ad9, type: 2}
   brownTrim: {fileID: 2100000, guid: 525d5602beb90904aa415fe12ccd6989, type: 2}

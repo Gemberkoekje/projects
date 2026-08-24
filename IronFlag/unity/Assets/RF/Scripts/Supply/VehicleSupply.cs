@@ -26,6 +26,13 @@ namespace IronFlag.Supply
     /// at rather than parked in the sky for ever.
     /// </para>
     /// <para>
+    /// What the vehicle is driving on is part of the bill. Soft ground makes the engine work
+    /// harder for the same speed - see <see cref="IronFlag.Levels.SurfaceTuning.FuelDraw"/> -
+    /// so a beach costs range as well as time. Every vehicle pays that in full, unlike grip,
+    /// which is weighed per vehicle: see <see cref="VehicleTuning.SurfaceSensitivity"/> for
+    /// why the two are different questions.
+    /// </para>
+    /// <para>
     /// A vehicle with no supply component never runs out of anything, which is what a
     /// vehicle assembled in a test is. A rig should not need an economy bolted to it before
     /// it can drive across a room or fire a shot.
@@ -60,6 +67,7 @@ namespace IronFlag.Supply
         private int roundsCarried = 30;
 
         private VehicleController vehicle;
+        private GroundVehicle driver;
         private Helicopter flyer;
         private VehicleHealth health;
         private VehicleTeamPaint paint;
@@ -120,6 +128,16 @@ namespace IronFlag.Supply
         /// <summary>Which side this vehicle is on, for deciding whose bunker will serve it.</summary>
         public Team Team => paint == null ? Team.None : paint.Team;
 
+        /// <summary>What the ground under this vehicle multiplies the engine's demand by.</summary>
+        /// <remarks>
+        /// One for anything that is not on the ground, which is the helicopter and anything
+        /// assembled without a <see cref="GroundVehicle"/> on it. Nothing here asks what kind
+        /// of vehicle this is: the thing that samples the map is the thing that drives on it,
+        /// so an aircraft has no surface to be charged for and does not have to be excluded
+        /// from being charged.
+        /// </remarks>
+        public float GroundDraw => driver == null ? 1.0f : driver.Underfoot.FuelDraw;
+
         /// <summary>
         /// Sets the size of both pools and fills them.
         /// </summary>
@@ -162,11 +180,24 @@ namespace IronFlag.Supply
         /// <remarks>
         /// Public so the burn can be checked without a vehicle to drive. The pool never
         /// goes below zero: a tank that owed fuel would take longer to refill the longer it
-        /// had been empty.
+        /// had been empty. This is the burn on ground that costs nothing extra; the running
+        /// vehicle uses the overload and hands in what it is driving on.
         /// </remarks>
-        public void Burn(float demand, float seconds)
+        public void Burn(float demand, float seconds) => Burn(demand, 1.0f, seconds);
+
+        /// <summary>
+        /// Burns fuel for a stretch of running over ground of a given thirst.
+        /// </summary>
+        /// <param name="demand">How hard the vehicle is working, 0..1.</param>
+        /// <param name="surfaceDraw">
+        /// What the ground multiplies the working part of the draw by; one for ground that
+        /// costs nothing extra. From <see cref="IronFlag.Levels.SurfaceTuning.FuelDraw"/>.
+        /// </param>
+        /// <param name="seconds">How long it worked for.</param>
+        public void Burn(float demand, float surfaceDraw, float seconds)
             => fuel = Mathf.Max(
-                0.0f, Fuel - (DrawFor(demand, idleFuelDraw) * Mathf.Max(0.0f, seconds)));
+                0.0f,
+                Fuel - (DrawFor(demand, idleFuelDraw, surfaceDraw) * Mathf.Max(0.0f, seconds)));
 
         /// <summary>
         /// Takes one round out of the box, if there is one.
@@ -207,9 +238,37 @@ namespace IronFlag.Supply
         /// paragraph it would take to explain it.
         /// </remarks>
         public static float DrawFor(float demand, float idleDraw)
+            => DrawFor(demand, idleDraw, 1.0f);
+
+        /// <summary>
+        /// Returns the fuel drawn per second at a given level of demand over given ground.
+        /// </summary>
+        /// <param name="demand">How hard the vehicle is working, 0..1.</param>
+        /// <param name="idleDraw">Draw while doing nothing, as a fraction of the full draw.</param>
+        /// <param name="surfaceDraw">
+        /// What the ground multiplies the working part of the draw by. One is ground that
+        /// costs nothing extra; sand is more and a road is less.
+        /// </param>
+        /// <returns>Fuel per second, where one is the flat-out figure on ordinary ground.</returns>
+        /// <remarks>
+        /// <para>
+        /// The ground scales the <em>working</em> half of the line and not the idle half,
+        /// which is the difference between a true statement and a tidy one. An engine turning
+        /// over is doing the same work whatever it is parked on, and charging a vehicle extra
+        /// for standing still on a beach would also quietly retune every depot, because a
+        /// refuelling rate is read against the draw it is racing.
+        /// </para>
+        /// <para>
+        /// Scaling the demand instead would be worse than untidy: demand is clamped into
+        /// 0..1, so a thirstier surface would cost nothing at all at full throttle - which is
+        /// exactly where it should cost the most.
+        /// </para>
+        /// </remarks>
+        public static float DrawFor(float demand, float idleDraw, float surfaceDraw)
         {
             float idle = Mathf.Clamp01(idleDraw);
-            return idle + ((1.0f - idle) * Mathf.Clamp01(demand));
+            float working = Mathf.Clamp01(demand) * Mathf.Max(0.0f, surfaceDraw);
+            return idle + ((1.0f - idle) * working);
         }
 
         /// <summary>
@@ -244,6 +303,7 @@ namespace IronFlag.Supply
         private void Awake()
         {
             vehicle = GetComponent<VehicleController>();
+            driver = vehicle as GroundVehicle;
             health = GetComponent<VehicleHealth>();
             paint = GetComponent<VehicleTeamPaint>();
 
@@ -271,7 +331,7 @@ namespace IronFlag.Supply
                 return;
             }
 
-            Burn(DemandFrom(vehicle.CurrentInput), seconds);
+            Burn(DemandFrom(vehicle.CurrentInput), GroundDraw, seconds);
 
             if (IsStranded)
             {

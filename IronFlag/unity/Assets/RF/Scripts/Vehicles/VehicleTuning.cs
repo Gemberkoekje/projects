@@ -59,6 +59,37 @@ namespace IronFlag.Vehicles
         [Tooltip("Speed at which a wheeled vehicle steers at its full turn rate, in m/s.")]
         public float SteerReferenceSpeed = 5.0f;
 
+        /// <summary>How much of the ground's grip this vehicle actually feels.</summary>
+        /// <remarks>
+        /// <para>
+        /// The ground under a vehicle multiplies its top speed, its acceleration and its
+        /// turn rate - see <see cref="IronFlag.Levels.SurfaceTuning.Grip"/> - and this is how
+        /// much of that multiplication reaches this particular vehicle. One is at the mercy
+        /// of what it is driving on; zero ignores it entirely. Anything between is a straight
+        /// line towards the surface's figure, which is
+        /// <see cref="GroundVehicleMotion.Traction"/>.
+        /// </para>
+        /// <para>
+        /// One column rather than a surface-by-vehicle matrix: four numbers instead of
+        /// twenty, and it says something true - the wheeled jeep is at the mercy of what it
+        /// is driving on and the tracked tank is not. That is the same distinction
+        /// <see cref="PivotTurn"/> already draws, and it is the project's habit: the
+        /// helicopter is unmoved by the ground because of a number about how much terrain it
+        /// feels, not because of a check on its type.
+        /// </para>
+        /// <para>
+        /// It weighs <em>grip</em> and nothing else. A surface's thirst - see
+        /// <see cref="IronFlag.Levels.SurfaceTuning.FuelDraw"/> - is paid in full by
+        /// everything that drives on it, because the two are different claims: grip is about
+        /// how a vehicle puts its power down, which is what tracks are for, and thirst is
+        /// about how much power the ground demands, which soft sand demands of a tank as
+        /// readily as of a jeep.
+        /// </para>
+        /// </remarks>
+        [Range(0.0f, 1.0f)]
+        [Tooltip("How much of the ground's grip this vehicle feels. 1 is at its mercy, 0 ignores it.")]
+        public float SurfaceSensitivity = 0.0f;
+
         /// <summary>Rigidbody mass, which decides who wins a collision.</summary>
         [Tooltip("Rigidbody mass in kg. The relative values are what matter, not the absolute ones.")]
         public float Mass = 2000.0f;
@@ -157,6 +188,14 @@ namespace IronFlag.Vehicles
                         TurnRate = 130.0f,
                         PivotTurn = false,
                         SteerReferenceSpeed = 5.0f,
+
+                        // The anchor of the column, and the only one at its top. Four
+                        // narrow tyres are all the jeep has, so a fifth off the grip is a
+                        // fifth off the jeep: it is the vehicle a beach genuinely punishes
+                        // and the one a road genuinely rewards, which is what makes the
+                        // fastest line across the map a decision rather than a straight
+                        // line.
+                        SurfaceSensitivity = 1.0f,
                         Mass = 1200.0f,
                         TurretTurnRate = 0.0f,
                         HitPoints = 50.0f,
@@ -178,6 +217,14 @@ namespace IronFlag.Vehicles
                         TurnRate = 75.0f,
                         PivotTurn = true,
                         SteerReferenceSpeed = 1.0f,
+
+                        // Lowest of the three that drive. Tracks spread six tonnes over
+                        // enough ground that soft going is an inconvenience rather than a
+                        // problem, so the tank crosses a beach at a twentieth off its speed
+                        // where the jeep loses a fifth. It still pays the sand's thirst in
+                        // full - see SurfaceSensitivity - so the beach costs it range
+                        // rather than time.
+                        SurfaceSensitivity = 0.25f,
                         Mass = 6000.0f,
                         TurretTurnRate = 65.0f,
                         HitPoints = 100.0f,
@@ -195,6 +242,12 @@ namespace IronFlag.Vehicles
                         TurnRate = 60.0f,
                         PivotTurn = true,
                         SteerReferenceSpeed = 1.0f,
+
+                        // Between the two, and nearer the tank. The ASV is tracked as well,
+                        // but it is two-thirds of the tank's weight on a narrower footprint,
+                        // so it feels the ground about twice as much as the tank does and
+                        // less than half as much as the jeep.
+                        SurfaceSensitivity = 0.45f,
                         Mass = 4000.0f,
                         TurretTurnRate = 45.0f,
                         HitPoints = 140.0f,
@@ -218,6 +271,14 @@ namespace IronFlag.Vehicles
                         TurnRate = 110.0f,
                         PivotTurn = true,
                         SteerReferenceSpeed = 1.0f,
+
+                        // Zero, which is the design document's "ignores ground terrain"
+                        // written as a number rather than as a check on a type. Nothing
+                        // samples the ground under an aircraft in the first place - see
+                        // Helicopter.FixedUpdate - so this is the belt to that pair of
+                        // braces: a helicopter handed a surface by mistake would still fly
+                        // exactly as it flies over the sea.
+                        SurfaceSensitivity = 0.0f,
                         Mass = 1800.0f,
                         TurretTurnRate = 0.0f,
                         HitPoints = 40.0f,

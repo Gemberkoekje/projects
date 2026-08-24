@@ -40,6 +40,32 @@ namespace IronFlag.Levels
         public static Team ToTeam(string name) => Parse(name, Team.None);
 
         /// <summary>
+        /// Reads a surface name.
+        /// </summary>
+        /// <param name="name">Name as written in the level file, e.g. <c>Asphalt</c>.</param>
+        /// <returns>The surface, or <see cref="SurfaceKind.None"/> when unrecognised.</returns>
+        /// <remarks>
+        /// Answers with the empty member like everything else here, so that a caller can
+        /// tell a name nobody recognises from a name that means grass. What a piece of land
+        /// does with that answer is <see cref="LevelLand.Ground"/>, which cannot afford to
+        /// have no surface at all.
+        /// </remarks>
+        public static SurfaceKind ToSurface(string name) => Parse(name, SurfaceKind.None);
+
+        /// <summary>
+        /// Reads a land shape name.
+        /// </summary>
+        /// <param name="name">Name as written in the level file, e.g. <c>Ellipse</c>.</param>
+        /// <returns>The shape, or <see cref="LandShape.None"/> when unrecognised.</returns>
+        /// <remarks>
+        /// The empty member again, for the same reason as <see cref="ToSurface"/>: a caller
+        /// can tell a word nobody knows from the word "Rectangle". What a piece of land does
+        /// with that answer is <see cref="LevelLand.Form"/>, which has to be cut to
+        /// something.
+        /// </remarks>
+        public static LandShape ToShape(string name) => Parse(name, LandShape.None);
+
+        /// <summary>
         /// Reads one enum member by name, case-insensitively.
         /// </summary>
         /// <typeparam name="T">Any enum.</typeparam>

@@ -43,11 +43,23 @@ namespace IronFlag.Levels
     {
         /// <summary>The format version this code writes and understands.</summary>
         /// <remarks>
+        /// <para>
         /// Bumped when a change would make an older file mean something different. A file
         /// from the future is refused rather than half-read, because a level that loads with
         /// its water missing is worse than one that does not load.
+        /// </para>
+        /// <para>
+        /// Version 2 is coastlines that move. Surfaces alone did not earn a bump - a build
+        /// that had never heard of them lost two colours and still built the same map - but
+        /// a map authored against a displaced coast and cut to a shape does not survive
+        /// being read by a build that draws every rectangle as a box: the coastline is in
+        /// the wrong place, an ellipse comes out square, and a bridgehead measured against
+        /// one of those could stand in the sea. That is exactly the sentence
+        /// <see cref="LevelFile"/> refuses a file with, and the whole reason for having a
+        /// version.
+        /// </para>
         /// </remarks>
-        public const int Schema = 1;
+        public const int Schema = 2;
 
         /// <summary>Format version of the file this came from.</summary>
         [Tooltip("Format version of the level file.")]
@@ -66,6 +78,27 @@ namespace IronFlag.Levels
         [Tooltip("What the map is trying to be. The level file has no other room for comments.")]
         public string Description = string.Empty;
 
+        /// <summary>Which coastline this map gets out of the infinity of them.</summary>
+        /// <remarks>
+        /// <para>
+        /// A level file draws its land as boxes and ellipses; where the water's edge
+        /// actually runs is those shapes with a wobble added, and this is the number that
+        /// picks the wobble. Two maps with two seeds get two coastlines. One map keeps its
+        /// coastline forever, which is not a nicety: the map baked into a scene and the map
+        /// the loader builds from the file are compared prop for prop, and anything drawn
+        /// from <see cref="UnityEngine.Random"/> would make those two different maps on
+        /// alternate Tuesdays. See <see cref="SurfaceNoise"/>.
+        /// </para>
+        /// <para>
+        /// Zero is a seed like any other rather than "no wobble". A map that wants a coast
+        /// with no wobble in it says so by drawing it out of surfaces whose
+        /// <see cref="SurfaceTuning.NaturalEdge"/> is false, which is a statement about what
+        /// the ground is rather than a switch.
+        /// </para>
+        /// </remarks>
+        [Tooltip("Which coastline this map gets. Two seeds are two coastlines; one seed is one, forever.")]
+        public int Seed;
+
         /// <summary>How far the world goes, and where the sea sits in it.</summary>
         public LevelBounds Bounds = new LevelBounds();
 
@@ -80,6 +113,43 @@ namespace IronFlag.Levels
 
         /// <summary>Everything that can be shot down.</summary>
         public LevelStructure[] Structures = Array.Empty<LevelStructure>();
+
+        /// <summary>The map rasterised: what is actually at each square metre of it.</summary>
+        [NonSerialized]
+        private SurfaceField field;
+
+        /// <summary>
+        /// The map as it is really made, rather than as it was drawn.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A level file lists the rectangles somebody drew. This is what those come out as
+        /// once the derived parts of the map - the beach, the shelf - have been worked out,
+        /// and it is what everything that asks a question <em>about</em> the map should ask.
+        /// See <see cref="SurfaceField"/> for why there is one of these rather than three
+        /// different answers.
+        /// </para>
+        /// <para>
+        /// Built when it is first wanted and rebuilt whenever the land has changed under it,
+        /// which is checked rather than announced: the level editor moves a coastline by
+        /// writing to <see cref="Land"/> and has no way to tell anybody it has, and a field
+        /// that went stale would put a bunker on a shore that is no longer there. Not part
+        /// of the file - it is derived from it, and writing it out would be writing the same
+        /// map twice.
+        /// </para>
+        /// </remarks>
+        public SurfaceField Field
+        {
+            get
+            {
+                if (field == null || !field.Describes(this))
+                {
+                    field = SurfaceField.Build(this);
+                }
+
+                return field;
+            }
+        }
 
         /// <summary>
         /// Returns one side's bunker.
@@ -139,26 +209,23 @@ namespace IronFlag.Levels
         /// </summary>
         /// <param name="at">Point to test; its height is ignored.</param>
         /// <param name="margin">Metres of clearance demanded from every coastline.</param>
-        /// <returns><c>true</c> when some land rectangle covers it with room to spare.</returns>
+        /// <returns><c>true</c> when the point is that far inside the coastline.</returns>
         /// <remarks>
-        /// The margin is not optional in practice. Land rectangles overlap on purpose - a
-        /// headland is a second rectangle laid over the shore - so a point can be well
-        /// inland and still sit exactly on the edge of the rectangle it happens to be tested
-        /// against. Asking each rectangle for clearance and taking the best answer is what
-        /// makes an overlap read as one landmass rather than as a seam.
+        /// <para>
+        /// Measured against <see cref="Field"/> rather than against the rectangles, and the
+        /// difference is not cosmetic. Rectangles meet and overlap on purpose - a headland
+        /// is a second rectangle laid over the shore, a bridgehead is a strip of road built
+        /// onto the end of one - and asking each of them separately means a point a metre
+        /// inside a seam is within a margin of an edge of <em>both</em> and is refused by
+        /// both, though it is thirty metres from any water. The realised coast has no seams
+        /// in it, so there is nothing there to refuse.
+        /// </para>
+        /// <para>
+        /// The margin is not optional in practice. Something whose centre is exactly on a
+        /// coastline is technically on land and is half in the sea.
+        /// </para>
         /// </remarks>
-        public bool IsOnLand(Vector3 at, float margin)
-        {
-            foreach (LevelLand piece in Land)
-            {
-                if (piece != null && piece.IsDrawn && piece.Contains(at, margin))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
+        public bool IsOnLand(Vector3 at, float margin) => Field.IsLand(at, margin);
 
         /// <summary>
         /// Measures the box every piece of land fits inside.

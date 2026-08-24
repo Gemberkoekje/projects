@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using IronFlag.Core;
+using IronFlag.Levels;
 
 namespace IronFlag.Editor.ArtPipeline
 {
@@ -29,10 +31,29 @@ namespace IronFlag.Editor.ArtPipeline
         public const string Folder = "Assets/RF/Art/Materials";
 
         /// <summary>Asset name of the ground material.</summary>
+        /// <remarks>
+        /// No longer worn by anything on a map: land is painted per surface now, out of
+        /// <see cref="SurfaceTuning"/>. It stays because the art preview stands its models
+        /// on it, and because it is a neutral grey that a new model wants to be photographed
+        /// against rather than a colour a level has an opinion about.
+        /// </remarks>
         public const string Ground = "RF_Ground";
 
         /// <summary>Name of the material the sea wears.</summary>
+        /// <remarks>
+        /// Also the surface material for <see cref="SurfaceKind.DeepWater"/>, which is why
+        /// it is not called <c>RF_Surface_DeepWater</c>: the sea already wears this asset,
+        /// its colour is already a measured result, and a second dark blue generated beside
+        /// it would be one more thing that could drift. Its colour now comes out of the
+        /// surface table like every other surface.
+        /// </remarks>
         public const string Water = "RF_Water";
+
+        /// <summary>Prefix on the generated material for each ground surface.</summary>
+        public const string SurfacePrefix = "RF_Surface_";
+
+        /// <summary>Prefix of the generated bank materials, one per ground surface.</summary>
+        public const string BankPrefix = "RF_Bank_";
 
         /// <summary>Asset name of the green team material.</summary>
         public const string Green = "RF_Team_Green";
@@ -67,14 +88,6 @@ namespace IronFlag.Editor.ArtPipeline
         private static readonly Color TeamGreenColor = new Color(0.24f, 0.49f, 0.23f);
         private static readonly Color TeamBrownColor = new Color(0.54f, 0.35f, 0.17f);
         private static readonly Color GroundColor = new Color(0.17f, 0.18f, 0.17f);
-        /// <summary>
-        /// Deliberately much darker than the ground rather than merely bluer. The first
-        /// water this map had was the same brightness as the land and only a different hue,
-        /// and from thirty-four metres up in half a screen the coastline all but vanished -
-        /// on a map where driving over one costs a vehicle. Contrast in value, not in hue,
-        /// is what a player reads at speed.
-        /// </summary>
-        private static readonly Color WaterColor = new Color(0.035f, 0.075f, 0.135f);
         private static readonly Color FrontLightColor = new Color(0.95f, 0.92f, 0.82f);
         private static readonly Color RearLightColor = new Color(0.62f, 0.09f, 0.07f);
         private static readonly Color TracerColor = new Color(1.00f, 0.72f, 0.30f);
@@ -255,22 +268,49 @@ namespace IronFlag.Editor.ArtPipeline
         }
 
         /// <summary>
+        /// Returns the asset name of the material one surface is painted with.
+        /// </summary>
+        /// <param name="kind">Surface to name.</param>
+        /// <returns>The asset name, for <see cref="Load"/> and <see cref="PathOf"/>.</returns>
+        /// <remarks>
+        /// <see cref="SurfaceKind.DeepWater"/> is the sea, which already had a material and
+        /// keeps it. Every other surface is named after itself, so a new row in the table is
+        /// a new asset nobody has to name.
+        /// </remarks>
+        public static string SurfaceMaterial(SurfaceKind kind)
+            => kind == SurfaceKind.DeepWater ? Water : $"{SurfacePrefix}{kind}";
+
+        /// <summary>
+        /// Returns the asset name of the material the bank below one surface is painted
+        /// with.
+        /// </summary>
+        /// <param name="kind">Surface to name.</param>
+        /// <returns>The asset name, for <see cref="Load"/> and <see cref="PathOf"/>.</returns>
+        /// <remarks>
+        /// Only the ground has one. The drop from the land to the water is the one place a
+        /// surface is seen from the side, and what it is painted is that surface's own
+        /// colour taken down a step - see <see cref="SurfaceTuning.BankShade"/> - so this is
+        /// a second asset per surface rather than a second row in the table.
+        /// </remarks>
+        public static string BankMaterial(SurfaceKind kind) => $"{BankPrefix}{kind}";
+
+        /// <summary>
         /// The materials this class generates, with the colors each one carries.
         /// </summary>
         /// <returns>Asset name, base color and emission color for each material.</returns>
-        private static (string Name, Color Color, Color Emission, float Smoothness)[] MaterialSet()
+        /// <remarks>
+        /// The ground surfaces are read out of <see cref="SurfaceTuning"/> rather than
+        /// listed here, so that adding a surface is one enum member and one row of that
+        /// table - and so that the colour a level is painted and the colour a level is
+        /// balanced around are the same number. Everything else is a material Unity has to
+        /// supply because a baked vertex colour cannot express it, and those are still
+        /// listed by hand because there is no table for them to fall out of.
+        /// </remarks>
+        private static List<(string Name, Color Color, Color Emission, float Smoothness)> MaterialSet()
         {
-            return new[]
+            var set = new List<(string Name, Color Color, Color Emission, float Smoothness)>
             {
                 (Ground, GroundColor, Color.black, DefaultSmoothness),
-
-                // Matte, which is the one material here that is deliberately unphysical.
-                // Water is glossier than dirt, and a gloss highlight under a sun at 52
-                // degrees is what made the first sea on this map read *lighter* than the
-                // land it is meant to contrast with. The map has to say where the bank is
-                // before it says what the surface is made of.
-                (Water, WaterColor, Color.black, 0.0f),
-
                 (Green, TeamGreenColor, Color.black, DefaultSmoothness),
                 (Brown, TeamBrownColor, Color.black, DefaultSmoothness),
                 (FrontLight, FrontLightColor, FrontLightEmission, DefaultSmoothness),
@@ -279,6 +319,23 @@ namespace IronFlag.Editor.ArtPipeline
                 (Blast, BlastColor, BlastEmission, DefaultSmoothness),
                 (Debris, DebrisColor, Color.black, DefaultSmoothness),
             };
+
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                SurfaceTuning surface = SurfaceTuning.For(kind);
+                set.Add((SurfaceMaterial(kind), surface.Colour, Color.black, surface.Smoothness));
+            }
+
+            // And a bank for every surface that is ground, painted the same colour taken
+            // down a step. Derived rather than listed, so that repainting a surface repaints
+            // its coastline with it and the map cannot grow a colour the ramp does not have.
+            foreach (SurfaceKind kind in SurfaceTuning.Stack(false))
+            {
+                SurfaceTuning surface = SurfaceTuning.For(kind);
+                set.Add((BankMaterial(kind), surface.Bank, Color.black, surface.Smoothness));
+            }
+
+            return set;
         }
 
         /// <summary>

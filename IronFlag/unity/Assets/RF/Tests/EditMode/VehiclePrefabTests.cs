@@ -80,6 +80,10 @@ namespace IronFlag.Tests.EditMode
                 Assert.That(actual.Braking, Is.EqualTo(expected.Braking).Within(0.001f), kind.ToString());
                 Assert.That(actual.TurnRate, Is.EqualTo(expected.TurnRate).Within(0.001f), kind.ToString());
                 Assert.That(actual.PivotTurn, Is.EqualTo(expected.PivotTurn), kind.ToString());
+                Assert.That(
+                    actual.SurfaceSensitivity,
+                    Is.EqualTo(expected.SurfaceSensitivity).Within(0.001f),
+                    kind.ToString());
             }
         }
 

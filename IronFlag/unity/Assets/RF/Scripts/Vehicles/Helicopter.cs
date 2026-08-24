@@ -119,7 +119,11 @@ namespace IronFlag.Vehicles
             float deltaTime = Time.fixedDeltaTime;
 
             motion = motion.WithSpeed(GroundVehicleMotion.SpeedAfterObstruction(motion.Speed, Body.linearVelocity));
-            motion = GroundVehicleMotion.Step(motion, CurrentInput, Tuning, deltaTime);
+
+            // No surface, because there is nothing under an aircraft that it is standing on.
+            // Whatever the map says is down there is somebody else's problem, which is the
+            // design document's "ignores ground terrain" costing exactly one null.
+            motion = GroundVehicleMotion.Step(motion, CurrentInput, Tuning, null, deltaTime);
             flightState = HelicopterMotion.Step(flightState, CurrentInput.Lift, flight, deltaTime);
 
             Body.MoveRotation(motion.Rotation);

@@ -12,7 +12,8 @@ the camera, [M2_NOTES.md](M2_NOTES.md) for the split screen and its two players,
 for the bunker you choose from and the fuel and ammunition you leave it with, [M5_NOTES.md](M5_NOTES.md) for the buildings you can knock down,
 [M6_NOTES.md](M6_NOTES.md) for the flag and the match you win with it,
 [M7_NOTES.md](M7_NOTES.md) for the map itself — which is a file you can edit — and
-[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md) for the level editor you can edit it in.
+[M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md) for the level editor you can edit it in, and
+[SURFACES_NOTES.md](SURFACES_NOTES.md) for what the ground is made of.
 [TOWER_RULES_NOTES.md](TOWER_RULES_NOTES.md) explains why you have to shell a pyramid before
 you can rob it.
 
@@ -116,11 +117,15 @@ be destroyed at all - the flag towers can, and have to be. The numbers are in
 [M5_NOTES.md](M5_NOTES.md).
 
 The map is one island cut in two by a channel, with the two bunkers facing each other down its
-centre line a hundred and forty metres apart. There are three ways across: a **causeway** in
-the middle that nobody can destroy, and a **bridge** on each flank that anybody can — so
-dropping both funnels the whole match through one sixteen-metre chokepoint without ever making
-it unwinnable. **Drive off a bank and you drown**, which costs exactly what being shot costs.
-The helicopter is the one thing that can ignore all of it.
+centre line a hundred and forty metres apart — over water, because the middle of the channel is
+open. There are four ways across and not one of them is the short way: a **bridge** on each
+side of the middle, spanning thirteen metres of narrows, which anybody can drop; and a
+**causeway** further out on each flank, twelve metres wide, crossing the full channel, which
+nobody can take away. So getting home is a decision about which flank to commit to, and
+dropping both bridges makes the match a great deal longer without ever making it unwinnable.
+**Drive off a bank and you drown**, which costs exactly what being shot costs - including off
+the pale shelf that rims every coast, which is shallow to look at and no shallower than the
+rest. The helicopter is the one thing that can ignore all of it.
 
 **The map is a file**: `unity/Assets/StreamingAssets/Levels/iron-channel.json`. Edit it, press
 Play, and you are on the changed map — no menu item and no recompile, because the scene reloads
@@ -198,10 +203,10 @@ rebuilt from the file on the first frame of play.
   only one of them real, a flag that hides until somebody scouts it, a jeep-only pickup rule,
   a dropped flag on a twelve-second clock, and a match that ends when one reaches a bunker.
 - **M7 - greybox map**: done. See [M7_NOTES.md](M7_NOTES.md). The v0.1 map exists, and it is an
-  **external level file** rather than code: an island split by a channel, one indestructible
-  causeway and two destructible bridges, mirrored bases, depots and cover, and water that drowns
-  anything that drives into it. Nothing in the codebase knows where anything on the map is any
-  more, which is the scaffold the in-game level editor will stand on.
+  **external level file** rather than code: an island split by a channel, crossings both
+  destructible and not, mirrored bases, depots and cover, and water that drowns anything that
+  drives into it. Nothing in the codebase knows where anything on the map is any more, which is
+  the scaffold the in-game level editor will stand on.
 - **The level editor**: done. See [M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md). Its own scene, every
   field of a level file editable with a mouse or typed exactly, live validation, undo, and a
   round trip to the game and back. Not in the design document's milestone plan - it is what M7
@@ -209,9 +214,26 @@ rebuilt from the file on the first frame of play.
   allow it.
 - **M8 - polish pass**: not started. Per-vehicle audio, a minimap, HUD readability and juice.
   The minimap has a data source: a level is a list of rectangles.
-- **Not scheduled**: a pass over the map's *ground* - several surfaces, natural coastlines, and
-  handling that depends on what you are driving on - is planned in
-  [SURFACES_PLAN.md](SURFACES_PLAN.md) and not started. There is also a near-term backlog -
+- **Surfaces**: done, all five phases. See [SURFACES_NOTES.md](SURFACES_NOTES.md). The map is
+  made of more than one thing: a level file names a surface per piece of land, one table
+  says what each surface is, and the crossings are grey roads through green country instead of
+  grey ground on grey ground. It is also an island rather than two rectangles in a pond - the
+  map is rasterised into a field of surfaces, and every coastline derives four metres of beach
+  inside it and five metres of pale shelf outside it, neither of them drawn by hand. The
+  coast is no longer a rectangle: the island is one shape cut out of that field, every natural
+  coast wanders by up to three metres of seeded noise, every asphalt edge is exactly where the
+  file wrote it, and the drop to the water is a bank rather than the side of a box. And the
+  ground is no longer only a colour: a vehicle asks the field what it is standing on and gets
+  slower, thirstier and less nimble for it, weighted by how much of the ground each vehicle
+  feels - four seconds from rest carries a jeep 84 m along a road and 63 m along a beach, and
+  a tank barely notices the difference. And the map was repainted to suit all that: two islands
+  cut out of ellipses, each drawn as sand with grass laid over the middle so the beach is
+  simply where the grass runs out, and a road network per side out to its depots and its
+  crossings. A third of the land is sand now rather than a thirteenth, it lies across the line
+  a driver cutting the corner at a crossing would take, and the road is the way round it - so
+  the surface table finally decides a route instead of only a colour. The plan the whole pass
+  was built against is [SURFACES_PLAN.md](SURFACES_PLAN.md).
+- **Not scheduled**: a near-term backlog -
   locking the helicopter to a fixed altitude, automated turrets, and finishing off destruction
   (no hitbox once wrecked, everything actually destructible) - kept in
   [return-fire-homage-design-doc.md §10](return-fire-homage-design-doc.md#10-near-term-backlog-not-yet-scheduled-to-a-milestone).

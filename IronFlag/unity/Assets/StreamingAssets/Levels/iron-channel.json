@@ -1,7 +1,8 @@
 {
-    "SchemaVersion": 1,
+    "SchemaVersion": 2,
     "Name": "Iron Channel",
-    "Description": "The v0.1 map. One island cut in two by an east-west channel, with three ways over it: a causeway in the middle that nobody can take away, and a bridge on each flank that anybody can. Blowing both bridges funnels the whole match through the middle; it can never strand a jeep, which is the one thing that would make a match unwinnable. Bunkers face each other down the centre line at 140 m. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you.",
+    "Description": "The v0.1 map. Two islands facing each other across an east-west channel with four ways over it, and not one of them in the middle: the centre is open water, so neither bunker has a straight run at the other and every crossing is a decision about which flank to commit to. Two bridges at x -30 and x +30 span 13 m of narrows each, and anybody can drop them. Two causeways at x -62 and x +62 run out from a headland on each flank and nobody can take them away - which is what stops the match deadlocking once both bridges are gone, at the cost of a drive round that is half as long again. Bunkers face each other down the centre line at 140 m, over water the whole way. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you. Each island is drawn as sand with grass laid over the middle of it, which is why it has a beach nobody drew: what the grass does not cover is beach. The grass falls back at every crossing and reaches furthest toward the water between them, so a straight run at a bridge or a causeway crosses fifteen to thirty metres of soft going - a fifth off a jeep's speed and fifteen per cent more thirst - and the roads are the answer to that. They run from each bunker to its two depots and on to its bridges, and each side has a road out to the causeway on one flank only, its own: the green road goes west and the brown road goes east. So tarmac never runs right round the channel, and reaching the far causeway means leaving it. Asphalt is the one surface whose edges are kept exactly as written, which is what holds each causeway 12 m wide and each bridge's narrows at 13 m: narrow enough to be a crossing, too wide for a jeep at top speed to jump. Every other coastline wanders - a natural surface is pushed about by up to 3 m of seeded noise - so the waterline is a line rather than a ruler. Change the seed and every natural coast on the map moves; change it back and they all return.",
+    "Seed": 1995,
     "Bounds": {
         "HalfExtent": 120.0,
         "WaterDepth": 0.7,
@@ -9,53 +10,348 @@
     },
     "Land": [
         {
-            "Name": "Green shore",
-            "MinX": -82.0,
-            "MaxX": 82.0,
-            "MinZ": -92.0,
-            "MaxZ": -13.0
+            "Name": "South shore (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -76.0,
+            "MaxX": 76.0,
+            "MinZ": -98.0,
+            "MaxZ": -14.0
         },
         {
-            "Name": "Brown shore",
+            "Name": "West headland (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
             "MinX": -82.0,
-            "MaxX": 82.0,
-            "MinZ": 13.0,
-            "MaxZ": 92.0
+            "MaxX": -42.0,
+            "MinZ": -56.0,
+            "MaxZ": -11.0
         },
         {
-            "Name": "The causeway",
-            "MinX": -8.0,
-            "MaxX": 8.0,
-            "MinZ": -13.0,
-            "MaxZ": 13.0
+            "Name": "East headland (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 42.0,
+            "MaxX": 82.0,
+            "MinZ": -56.0,
+            "MaxZ": -11.0
+        },
+        {
+            "Name": "North shore (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -76.0,
+            "MaxX": 76.0,
+            "MinZ": 14.0,
+            "MaxZ": 98.0
+        },
+        {
+            "Name": "East headland (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 42.0,
+            "MaxX": 82.0,
+            "MinZ": 11.0,
+            "MaxZ": 56.0
+        },
+        {
+            "Name": "West headland (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -82.0,
+            "MaxX": -42.0,
+            "MinZ": 11.0,
+            "MaxZ": 56.0
+        },
+        {
+            "Name": "South downs (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -70.0,
+            "MaxX": 70.0,
+            "MinZ": -94.0,
+            "MaxZ": -25.0
+        },
+        {
+            "Name": "West meadow (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -78.0,
+            "MaxX": -54.0,
+            "MinZ": -38.0,
+            "MaxZ": -24.0
+        },
+        {
+            "Name": "East meadow (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": 52.0,
+            "MaxX": 76.0,
+            "MinZ": -40.0,
+            "MaxZ": -26.0
+        },
+        {
+            "Name": "Middle green (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -24.0,
+            "MaxX": 16.0,
+            "MinZ": -46.0,
+            "MaxZ": -19.0
+        },
+        {
+            "Name": "East green (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": 40.0,
+            "MaxX": 58.0,
+            "MinZ": -44.0,
+            "MaxZ": -28.0
+        },
+        {
+            "Name": "North downs (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -70.0,
+            "MaxX": 70.0,
+            "MinZ": 25.0,
+            "MaxZ": 94.0
+        },
+        {
+            "Name": "East meadow (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": 54.0,
+            "MaxX": 78.0,
+            "MinZ": 24.0,
+            "MaxZ": 38.0
+        },
+        {
+            "Name": "West meadow (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -76.0,
+            "MaxX": -52.0,
+            "MinZ": 26.0,
+            "MaxZ": 40.0
+        },
+        {
+            "Name": "Middle green (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -16.0,
+            "MaxX": 24.0,
+            "MinZ": 19.0,
+            "MaxZ": 46.0
+        },
+        {
+            "Name": "West green (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -58.0,
+            "MaxX": -40.0,
+            "MinZ": 28.0,
+            "MaxZ": 44.0
+        },
+        {
+            "Name": "West flat (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -46.0,
+            "MaxX": -12.0,
+            "MinZ": -54.0,
+            "MaxZ": -28.0
+        },
+        {
+            "Name": "East flat (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 12.0,
+            "MaxX": 46.0,
+            "MinZ": -52.0,
+            "MaxZ": -28.0
+        },
+        {
+            "Name": "West scuff (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -60.0,
+            "MaxX": -46.0,
+            "MinZ": -68.0,
+            "MaxZ": -60.0
+        },
+        {
+            "Name": "East scuff (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 14.0,
+            "MaxX": 30.0,
+            "MinZ": -78.0,
+            "MaxZ": -70.0
+        },
+        {
+            "Name": "East flat (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 12.0,
+            "MaxX": 46.0,
+            "MinZ": 28.0,
+            "MaxZ": 54.0
+        },
+        {
+            "Name": "West flat (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -46.0,
+            "MaxX": -12.0,
+            "MinZ": 28.0,
+            "MaxZ": 52.0
+        },
+        {
+            "Name": "East scuff (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 46.0,
+            "MaxX": 60.0,
+            "MinZ": 60.0,
+            "MaxZ": 68.0
+        },
+        {
+            "Name": "West scuff (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -30.0,
+            "MaxX": -14.0,
+            "MinZ": 70.0,
+            "MaxZ": 78.0
+        },
+        {
+            "Name": "West causeway",
+            "Surface": "Asphalt",
+            "MinX": -68.0,
+            "MaxX": -56.0,
+            "MinZ": -15.0,
+            "MaxZ": 15.0
+        },
+        {
+            "Name": "East causeway",
+            "Surface": "Asphalt",
+            "MinX": 56.0,
+            "MaxX": 68.0,
+            "MinZ": -15.0,
+            "MaxZ": 15.0
         },
         {
             "Name": "West bridgehead, green",
-            "MinX": -48.0,
-            "MaxX": -36.0,
-            "MinZ": -13.0,
-            "MaxZ": -6.5
-        },
-        {
-            "Name": "West bridgehead, brown",
-            "MinX": -48.0,
-            "MaxX": -36.0,
-            "MinZ": 6.5,
-            "MaxZ": 13.0
-        },
-        {
-            "Name": "East bridgehead, green",
-            "MinX": 36.0,
-            "MaxX": 48.0,
-            "MinZ": -13.0,
+            "Surface": "Asphalt",
+            "MinX": -36.0,
+            "MaxX": -24.0,
+            "MinZ": -20.0,
             "MaxZ": -6.5
         },
         {
             "Name": "East bridgehead, brown",
-            "MinX": 36.0,
-            "MaxX": 48.0,
+            "Surface": "Asphalt",
+            "MinX": 24.0,
+            "MaxX": 36.0,
             "MinZ": 6.5,
-            "MaxZ": 13.0
+            "MaxZ": 20.0
+        },
+        {
+            "Name": "East bridgehead, green",
+            "Surface": "Asphalt",
+            "MinX": 24.0,
+            "MaxX": 36.0,
+            "MinZ": -20.0,
+            "MaxZ": -6.5
+        },
+        {
+            "Name": "West bridgehead, brown",
+            "Surface": "Asphalt",
+            "MinX": -36.0,
+            "MaxX": -24.0,
+            "MinZ": 6.5,
+            "MaxZ": 20.0
+        },
+        {
+            "Name": "Bunker road (green)",
+            "Surface": "Asphalt",
+            "MinX": -2.5,
+            "MaxX": 2.5,
+            "MinZ": -58.0,
+            "MaxZ": -31.5
+        },
+        {
+            "Name": "Depot road (green)",
+            "Surface": "Asphalt",
+            "MinX": -64.5,
+            "MaxX": 40.5,
+            "MinZ": -36.5,
+            "MaxZ": -31.5
+        },
+        {
+            "Name": "West causeway road (green)",
+            "Surface": "Asphalt",
+            "MinX": -64.5,
+            "MaxX": -59.5,
+            "MinZ": -36.5,
+            "MaxZ": -15.0
+        },
+        {
+            "Name": "West bridge road (green)",
+            "Surface": "Asphalt",
+            "MinX": -32.5,
+            "MaxX": -27.5,
+            "MinZ": -36.5,
+            "MaxZ": -18.0
+        },
+        {
+            "Name": "East bridge road (green)",
+            "Surface": "Asphalt",
+            "MinX": 27.5,
+            "MaxX": 32.5,
+            "MinZ": -36.5,
+            "MaxZ": -18.0
+        },
+        {
+            "Name": "Bunker road (brown)",
+            "Surface": "Asphalt",
+            "MinX": -2.5,
+            "MaxX": 2.5,
+            "MinZ": 31.5,
+            "MaxZ": 58.0
+        },
+        {
+            "Name": "Depot road (brown)",
+            "Surface": "Asphalt",
+            "MinX": -40.5,
+            "MaxX": 64.5,
+            "MinZ": 31.5,
+            "MaxZ": 36.5
+        },
+        {
+            "Name": "East causeway road (brown)",
+            "Surface": "Asphalt",
+            "MinX": 59.5,
+            "MaxX": 64.5,
+            "MinZ": 15.0,
+            "MaxZ": 36.5
+        },
+        {
+            "Name": "East bridge road (brown)",
+            "Surface": "Asphalt",
+            "MinX": 27.5,
+            "MaxX": 32.5,
+            "MinZ": 18.0,
+            "MaxZ": 36.5
+        },
+        {
+            "Name": "West bridge road (brown)",
+            "Surface": "Asphalt",
+            "MinX": -32.5,
+            "MaxX": -27.5,
+            "MinZ": 18.0,
+            "MaxZ": 36.5
         }
     ],
     "Bunkers": [
@@ -73,7 +369,7 @@
         {
             "Team": "Brown",
             "Position": {
-                "x": 0.0,
+                "x": -0.0,
                 "y": 0.0,
                 "z": 70.0
             },
@@ -129,7 +425,7 @@
             "Kind": "Bridge",
             "Name": "West bridge",
             "Position": {
-                "x": -42.0,
+                "x": -30.0,
                 "y": -1.2,
                 "z": 0.0
             },
@@ -142,7 +438,7 @@
             "Kind": "Bridge",
             "Name": "East bridge",
             "Position": {
-                "x": 42.0,
+                "x": 30.0,
                 "y": -1.2,
                 "z": 0.0
             },
@@ -165,19 +461,6 @@
             "SupplyRadius": 7.0
         },
         {
-            "Kind": "DepotFuel",
-            "Name": "Fuel depot (east)",
-            "Position": {
-                "x": 38.0,
-                "y": 0.0,
-                "z": 34.0
-            },
-            "YawDegrees": 200.0,
-            "FuelRate": 0.12,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
             "Kind": "DepotAmmo",
             "Name": "Ammo depot (east)",
             "Position": {
@@ -188,6 +471,19 @@
             "YawDegrees": -20.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.12,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotFuel",
+            "Name": "Fuel depot (east)",
+            "Position": {
+                "x": 38.0,
+                "y": 0.0,
+                "z": 34.0
+            },
+            "YawDegrees": 200.0,
+            "FuelRate": 0.12,
+            "AmmoRate": 0.0,
             "SupplyRadius": 7.0
         },
         {
@@ -207,24 +503,11 @@
             "Kind": "BuildingA",
             "Name": "Bridgehead block (west)",
             "Position": {
-                "x": -42.0,
+                "x": -24.0,
                 "y": 0.0,
-                "z": -22.0
+                "z": -27.0
             },
             "YawDegrees": 0.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "BuildingA",
-            "Name": "Bridgehead block (east)",
-            "Position": {
-                "x": 42.0,
-                "y": 0.0,
-                "z": 22.0
-            },
-            "YawDegrees": 180.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
             "SupplyRadius": 7.0
@@ -233,24 +516,11 @@
             "Kind": "BuildingB",
             "Name": "Bridgehead shed (east)",
             "Position": {
-                "x": 42.0,
+                "x": 22.0,
                 "y": 0.0,
-                "z": -24.0
+                "z": -27.0
             },
             "YawDegrees": 90.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "BuildingB",
-            "Name": "Bridgehead shed (west)",
-            "Position": {
-                "x": -42.0,
-                "y": 0.0,
-                "z": 24.0
-            },
-            "YawDegrees": 270.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
             "SupplyRadius": 7.0
@@ -259,24 +529,11 @@
             "Kind": "BuildingA",
             "Name": "Causeway block (west)",
             "Position": {
-                "x": -16.0,
+                "x": -54.0,
                 "y": 0.0,
-                "z": -30.0
+                "z": -28.0
             },
             "YawDegrees": 20.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "BuildingA",
-            "Name": "Causeway block (east)",
-            "Position": {
-                "x": 16.0,
-                "y": 0.0,
-                "z": 30.0
-            },
-            "YawDegrees": 200.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
             "SupplyRadius": 7.0
@@ -285,11 +542,50 @@
             "Kind": "BuildingB",
             "Name": "Tower shed (east)",
             "Position": {
-                "x": 14.0,
+                "x": 10.0,
                 "y": 0.0,
-                "z": -46.0
+                "z": -37.0
             },
             "YawDegrees": 290.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Bridgehead block (east)",
+            "Position": {
+                "x": 24.0,
+                "y": 0.0,
+                "z": 27.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Name": "Bridgehead shed (west)",
+            "Position": {
+                "x": -22.0,
+                "y": 0.0,
+                "z": 27.0
+            },
+            "YawDegrees": 270.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Name": "Causeway block (east)",
+            "Position": {
+                "x": 54.0,
+                "y": 0.0,
+                "z": 28.0
+            },
+            "YawDegrees": 200.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
             "SupplyRadius": 7.0
@@ -298,9 +594,9 @@
             "Kind": "BuildingB",
             "Name": "Tower shed (west)",
             "Position": {
-                "x": -14.0,
+                "x": -10.0,
                 "y": 0.0,
-                "z": 46.0
+                "z": 37.0
             },
             "YawDegrees": 110.0,
             "FuelRate": 0.0,
@@ -311,9 +607,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": -6.0,
+                "x": -71.0,
                 "y": 0.0,
-                "z": -20.0
+                "z": -28.0
             },
             "YawDegrees": 0.0,
             "FuelRate": 0.0,
@@ -324,22 +620,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": 6.0,
+                "x": -69.0,
                 "y": 0.0,
-                "z": 20.0
-            },
-            "YawDegrees": 180.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": 10.0,
-                "y": 0.0,
-                "z": -16.0
+                "z": -35.0
             },
             "YawDegrees": 40.0,
             "FuelRate": 0.0,
@@ -350,22 +633,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": -10.0,
+                "x": -55.0,
                 "y": 0.0,
-                "z": 16.0
-            },
-            "YawDegrees": 220.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": -28.0,
-                "y": 0.0,
-                "z": -40.0
+                "z": -26.0
             },
             "YawDegrees": 80.0,
             "FuelRate": 0.0,
@@ -376,22 +646,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": 28.0,
+                "x": -51.0,
                 "y": 0.0,
-                "z": 40.0
-            },
-            "YawDegrees": 260.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": 33.0,
-                "y": 0.0,
-                "z": -38.0
+                "z": -27.0
             },
             "YawDegrees": 120.0,
             "FuelRate": 0.0,
@@ -402,22 +659,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": -33.0,
+                "x": -45.0,
                 "y": 0.0,
-                "z": 38.0
-            },
-            "YawDegrees": 300.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": -56.0,
-                "y": 0.0,
-                "z": -30.0
+                "z": -29.0
             },
             "YawDegrees": 160.0,
             "FuelRate": 0.0,
@@ -428,22 +672,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": 56.0,
+                "x": -22.0,
                 "y": 0.0,
-                "z": 30.0
-            },
-            "YawDegrees": 340.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": 58.0,
-                "y": 0.0,
-                "z": -52.0
+                "z": -25.0
             },
             "YawDegrees": 200.0,
             "FuelRate": 0.0,
@@ -454,22 +685,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": -58.0,
+                "x": -11.0,
                 "y": 0.0,
-                "z": 52.0
-            },
-            "YawDegrees": 20.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": -24.0,
-                "y": 0.0,
-                "z": -68.0
+                "z": -21.0
             },
             "YawDegrees": 240.0,
             "FuelRate": 0.0,
@@ -480,22 +698,9 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": 24.0,
+                "x": 7.0,
                 "y": 0.0,
-                "z": 68.0
-            },
-            "YawDegrees": 60.0,
-            "FuelRate": 0.0,
-            "AmmoRate": 0.0,
-            "SupplyRadius": 7.0
-        },
-        {
-            "Kind": "Tree",
-            "Name": "",
-            "Position": {
-                "x": 30.0,
-                "y": 0.0,
-                "z": -66.0
+                "z": -23.0
             },
             "YawDegrees": 280.0,
             "FuelRate": 0.0,
@@ -506,11 +711,362 @@
             "Kind": "Tree",
             "Name": "",
             "Position": {
-                "x": -30.0,
+                "x": 43.0,
                 "y": 0.0,
-                "z": 66.0
+                "z": -29.0
+            },
+            "YawDegrees": 320.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 52.0,
+                "y": 0.0,
+                "z": -21.0
+            },
+            "YawDegrees": 20.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 68.0,
+                "y": 0.0,
+                "z": -34.0
+            },
+            "YawDegrees": 60.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -52.0,
+                "y": 0.0,
+                "z": -58.0
             },
             "YawDegrees": 100.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -31.0,
+                "y": 0.0,
+                "z": -72.0
+            },
+            "YawDegrees": 140.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -12.0,
+                "y": 0.0,
+                "z": -84.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 20.0,
+                "y": 0.0,
+                "z": -80.0
+            },
+            "YawDegrees": 220.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 41.0,
+                "y": 0.0,
+                "z": -63.0
+            },
+            "YawDegrees": 260.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 58.0,
+                "y": 0.0,
+                "z": -48.0
+            },
+            "YawDegrees": 300.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 9.0,
+                "y": 0.0,
+                "z": -48.0
+            },
+            "YawDegrees": 340.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 71.0,
+                "y": 0.0,
+                "z": 28.0
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 69.0,
+                "y": 0.0,
+                "z": 35.0
+            },
+            "YawDegrees": 220.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 55.0,
+                "y": 0.0,
+                "z": 26.0
+            },
+            "YawDegrees": 260.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 51.0,
+                "y": 0.0,
+                "z": 27.0
+            },
+            "YawDegrees": 300.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 45.0,
+                "y": 0.0,
+                "z": 29.0
+            },
+            "YawDegrees": 340.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 22.0,
+                "y": 0.0,
+                "z": 25.0
+            },
+            "YawDegrees": 20.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 11.0,
+                "y": 0.0,
+                "z": 21.0
+            },
+            "YawDegrees": 60.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -7.0,
+                "y": 0.0,
+                "z": 23.0
+            },
+            "YawDegrees": 100.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -43.0,
+                "y": 0.0,
+                "z": 29.0
+            },
+            "YawDegrees": 140.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -52.0,
+                "y": 0.0,
+                "z": 21.0
+            },
+            "YawDegrees": 200.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -68.0,
+                "y": 0.0,
+                "z": 34.0
+            },
+            "YawDegrees": 240.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 52.0,
+                "y": 0.0,
+                "z": 58.0
+            },
+            "YawDegrees": 280.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 31.0,
+                "y": 0.0,
+                "z": 72.0
+            },
+            "YawDegrees": 320.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": 12.0,
+                "y": 0.0,
+                "z": 84.0
+            },
+            "YawDegrees": 0.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -20.0,
+                "y": 0.0,
+                "z": 80.0
+            },
+            "YawDegrees": 40.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -41.0,
+                "y": 0.0,
+                "z": 63.0
+            },
+            "YawDegrees": 80.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -58.0,
+                "y": 0.0,
+                "z": 48.0
+            },
+            "YawDegrees": 120.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Name": "",
+            "Position": {
+                "x": -9.0,
+                "y": 0.0,
+                "z": 48.0
+            },
+            "YawDegrees": 160.0,
             "FuelRate": 0.0,
             "AmmoRate": 0.0,
             "SupplyRadius": 7.0

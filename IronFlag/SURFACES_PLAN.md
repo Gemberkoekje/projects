@@ -1,6 +1,9 @@
 # Plan — surfaces, and coastlines that look like coastlines
 
-**Status: proposed, not started.** This is a plan for a pass over the map's *ground*: what
+**Status: finished. All five phases shipped.** What actually landed, the decisions taken along
+the way and the gotchas found are in [SURFACES_NOTES.md](SURFACES_NOTES.md); this file is left
+as written, so the plan and the outcome can be read against each other. This is a
+plan for a pass over the map's *ground*: what
 it is made of, what that does to a vehicle driving on it, and what the edge of an island
 looks like. It changes the level format, the level builder, the ground-vehicle motion model
 and the generated materials. It changes no balance number that is not new, and it moves no

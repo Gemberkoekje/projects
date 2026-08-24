@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using IronFlag.Levels;
 
 namespace IronFlag.Vehicles
 {
@@ -18,6 +19,12 @@ namespace IronFlag.Vehicles
     /// The helicopter uses this too, for its horizontal motion; only the vertical axis is
     /// its own, in <see cref="HelicopterMotion"/>.
     /// </para>
+    /// <para>
+    /// What a vehicle is standing on is handed in rather than looked up, for the same
+    /// reason: a <see cref="SurfaceTuning"/> is a row of a table, so the model can be driven
+    /// across a beach in an edit-mode test with no map, no field and no scene. Sampling the
+    /// ground is <see cref="GroundVehicle"/>'s job, and the helicopter simply never does it.
+    /// </para>
     /// </remarks>
     public static class GroundVehicleMotion
     {
@@ -27,6 +34,10 @@ namespace IronFlag.Vehicles
         /// <param name="state">Current heading and speed.</param>
         /// <param name="input">This frame's pilot intent; only <see cref="VehicleInput.Drive"/> is read.</param>
         /// <param name="tuning">Handling numbers for this vehicle.</param>
+        /// <param name="surface">
+        /// The ground it is standing on, or <c>null</c> for nothing in particular - which is
+        /// what an aircraft is over and what a test rig with no map is on.
+        /// </param>
         /// <param name="deltaTime">Length of the step in seconds. Zero or less is a no-op.</param>
         /// <returns>The state at the end of the step.</returns>
         /// <exception cref="ArgumentNullException"><paramref name="tuning"/> is null.</exception>
@@ -34,11 +45,17 @@ namespace IronFlag.Vehicles
         /// <code>
         /// GroundMotionState state = GroundMotionState.Still;
         /// var forward = new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
-        /// state = GroundVehicleMotion.Step(state, forward, VehicleTuning.For(VehicleKind.Jeep), 0.02f);
+        /// state = GroundVehicleMotion.Step(
+        ///     state, forward, VehicleTuning.For(VehicleKind.Jeep),
+        ///     SurfaceTuning.For(SurfaceKind.Sand), 0.02f);
         /// </code>
         /// </example>
         public static GroundMotionState Step(
-            GroundMotionState state, VehicleInput input, VehicleTuning tuning, float deltaTime)
+            GroundMotionState state,
+            VehicleInput input,
+            VehicleTuning tuning,
+            SurfaceTuning surface,
+            float deltaTime)
         {
             if (tuning == null)
             {
@@ -50,9 +67,50 @@ namespace IronFlag.Vehicles
                 return state;
             }
 
-            float speed = StepSpeed(state.Speed, input.Throttle, tuning, deltaTime);
-            float yaw = StepYaw(state.YawDegrees, speed, input.Steer, tuning, deltaTime);
+            float speed = StepSpeed(state.Speed, input.Throttle, tuning, surface, deltaTime);
+            float yaw = StepYaw(state.YawDegrees, speed, input.Steer, tuning, surface, deltaTime);
             return new GroundMotionState(speed, yaw);
+        }
+
+        /// <summary>
+        /// Returns how much of the ground's grip this vehicle is actually getting.
+        /// </summary>
+        /// <param name="tuning">Handling numbers for this vehicle.</param>
+        /// <param name="surface">The ground it is standing on, or <c>null</c> for none.</param>
+        /// <returns>
+        /// What to multiply the vehicle's top speed, acceleration and turn rate by. One on
+        /// ground that neither helps nor hinders, and one for anything standing on nothing.
+        /// </returns>
+        /// <exception cref="ArgumentNullException"><paramref name="tuning"/> is null.</exception>
+        /// <remarks>
+        /// <para>
+        /// A straight line from "this vehicle does not notice the ground" to "this vehicle
+        /// gets exactly what the ground offers", walked by
+        /// <see cref="VehicleTuning.SurfaceSensitivity"/>. So a jeep on sand loses the whole
+        /// fifth the table charges and a tank on the same sand loses a twentieth, out of one
+        /// column rather than a surface-by-vehicle matrix.
+        /// </para>
+        /// <para>
+        /// Grip is the only thing weighed this way. Braking is deliberately not scaled at
+        /// all - soft ground that also took the brakes away would make a beach a death trap
+        /// rather than a slow lane - and a surface's thirst is weighed by nothing, per
+        /// <see cref="VehicleTuning.SurfaceSensitivity"/>.
+        /// </para>
+        /// </remarks>
+        public static float Traction(VehicleTuning tuning, SurfaceTuning surface)
+        {
+            if (tuning == null)
+            {
+                throw new ArgumentNullException(nameof(tuning));
+            }
+
+            if (surface == null)
+            {
+                return 1.0f;
+            }
+
+            return Mathf.Lerp(
+                1.0f, Mathf.Max(0.0f, surface.Grip), Mathf.Clamp01(tuning.SurfaceSensitivity));
         }
 
         /// <summary>
@@ -61,22 +119,34 @@ namespace IronFlag.Vehicles
         /// <param name="speed">Current speed along the heading.</param>
         /// <param name="throttle">Throttle in -1..1; negative reverses.</param>
         /// <param name="tuning">Handling numbers for this vehicle.</param>
+        /// <param name="surface">The ground it is standing on, or <c>null</c> for none.</param>
         /// <param name="deltaTime">Length of the step in seconds.</param>
         /// <returns>The speed at the end of the step.</returns>
         /// <remarks>
+        /// <para>
         /// Coasting brakes rather than drifting: releasing the throttle uses
         /// <see cref="VehicleTuning.Braking"/>, because a vehicle that keeps rolling for
         /// ten seconds is unpleasant to place precisely at a depot or a flag tower.
+        /// </para>
+        /// <para>
+        /// The ground scales what the throttle is asking for and how quickly it gets there,
+        /// and never the brakes. Driving off a road onto sand therefore needs no special
+        /// case: the target drops below the speed the vehicle already has, which is the
+        /// definition of slowing down, so it sheds the difference at its own braking rate
+        /// and settles at what the sand allows.
+        /// </para>
         /// </remarks>
-        public static float StepSpeed(float speed, float throttle, VehicleTuning tuning, float deltaTime)
+        public static float StepSpeed(
+            float speed, float throttle, VehicleTuning tuning, SurfaceTuning surface, float deltaTime)
         {
             throttle = Mathf.Clamp(throttle, -1.0f, 1.0f);
-            float target = throttle >= 0.0f
+            float traction = Traction(tuning, surface);
+            float target = traction * (throttle >= 0.0f
                 ? throttle * tuning.MaxSpeed
-                : throttle * tuning.ReverseSpeed;
+                : throttle * tuning.ReverseSpeed);
 
             bool slowing = Mathf.Abs(target) < Mathf.Abs(speed) || (target * speed) < 0.0f;
-            float rate = slowing ? tuning.Braking : tuning.Acceleration;
+            float rate = slowing ? tuning.Braking : tuning.Acceleration * traction;
             return Mathf.MoveTowards(speed, target, rate * deltaTime);
         }
 
@@ -87,20 +157,29 @@ namespace IronFlag.Vehicles
         /// <param name="speed">Speed the steering acts at.</param>
         /// <param name="steer">Steering in -1..1; positive turns right.</param>
         /// <param name="tuning">Handling numbers for this vehicle.</param>
+        /// <param name="surface">The ground it is standing on, or <c>null</c> for none.</param>
         /// <param name="deltaTime">Length of the step in seconds.</param>
         /// <returns>The heading at the end of the step, wrapped into 0..360.</returns>
         /// <remarks>
         /// A wheeled vehicle turns only as well as it is rolling, and its steering reverses
         /// when it backs up, exactly as a car's does. A tracked or airborne one turns at its
-        /// full rate from a standstill.
+        /// full rate from a standstill. The ground scales the rate and not the authority:
+        /// how much of its turn a vehicle has earned is a fact about how fast it is going,
+        /// and soft going has already made it slower.
         /// </remarks>
         public static float StepYaw(
-            float yawDegrees, float speed, float steer, VehicleTuning tuning, float deltaTime)
+            float yawDegrees,
+            float speed,
+            float steer,
+            VehicleTuning tuning,
+            SurfaceTuning surface,
+            float deltaTime)
         {
             steer = Mathf.Clamp(steer, -1.0f, 1.0f);
             float authority = SteeringAuthority(speed, tuning);
             float direction = tuning.PivotTurn ? 1.0f : Mathf.Sign(speed);
-            float delta = steer * direction * authority * tuning.TurnRate * deltaTime;
+            float rate = tuning.TurnRate * Traction(tuning, surface);
+            float delta = steer * direction * authority * rate * deltaTime;
             return Mathf.Repeat(yawDegrees + delta, 360.0f);
         }
 

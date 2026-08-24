@@ -108,9 +108,17 @@ namespace IronFlag.Levels
         /// least one crossing nobody can take away.
         /// </para>
         /// <para>
-        /// A flood fill over <see cref="StepSize"/> cells rather than anything cleverer:
-        /// land is rectangles, the map is a couple of hundred metres across, and the answer
-        /// is wanted once at load rather than once a frame.
+        /// A flood fill over <see cref="StepSize"/> cells rather than anything cleverer: the
+        /// map is a couple of hundred metres across and the answer is wanted once at load
+        /// rather than once a frame. It has a grid of its own, coarser than
+        /// <see cref="SurfaceField"/>'s, because the two are measuring different things -
+        /// this one is asking what a tank can get through, and half the width of the
+        /// narrowest thing worth driving through is the right step for that.
+        /// </para>
+        /// <para>
+        /// What is under each step is the field's answer rather than the rectangles', so
+        /// that a coastline the level file did not draw - one derived, or in a later phase
+        /// displaced - cannot cut the map in two behind validation's back.
         /// </para>
         /// </remarks>
         public static bool IsConnected(LevelDefinition level, Vector3 from, Vector3 to)
@@ -120,13 +128,14 @@ namespace IronFlag.Levels
                 return false;
             }
 
+            SurfaceField field = level.Field;
             float extent = Mathf.Abs(level.Bounds.HalfExtent);
             int cells = Mathf.Max(1, Mathf.CeilToInt(extent * 2.0f / StepSize));
 
             Vector2Int start = ToCell(from, extent, cells);
             Vector2Int goal = ToCell(to, extent, cells);
 
-            if (!IsWalkable(level, start, extent, cells) || !IsWalkable(level, goal, extent, cells))
+            if (!IsWalkable(field, start, extent, cells) || !IsWalkable(field, goal, extent, cells))
             {
                 return false;
             }
@@ -157,7 +166,7 @@ namespace IronFlag.Levels
                         continue;
                     }
 
-                    if (IsWalkable(level, next, extent, cells))
+                    if (IsWalkable(field, next, extent, cells))
                     {
                         queue.Enqueue(next);
                     }
@@ -214,12 +223,94 @@ namespace IronFlag.Levels
                     continue;
                 }
 
-                if (Mathf.Abs(piece.MinX) > extent || Mathf.Abs(piece.MaxX) > extent
-                    || Mathf.Abs(piece.MinZ) > extent || Mathf.Abs(piece.MaxZ) > extent)
+                // A natural coast is drawn where the file says and then wanders, so the
+                // room it needs is its own edge plus everything the wobble can add to it.
+                // A built one is exactly where it was put and needs none.
+                float room = SurfaceTuning.For(piece.Ground).NaturalEdge ? SurfaceNoise.Amplitude : 0.0f;
+
+                if (Mathf.Abs(piece.MinX) + room > extent || Mathf.Abs(piece.MaxX) + room > extent
+                    || Mathf.Abs(piece.MinZ) + room > extent || Mathf.Abs(piece.MaxZ) + room > extent)
                 {
                     problems.Add($"Land '{piece.Name}' runs off the edge of the world.");
                 }
+
+                CheckSurface(piece, problems);
+                CheckShape(piece, problems);
             }
+        }
+
+        /// <summary>
+        /// Checks that a piece of land is made of something the game has heard of.
+        /// </summary>
+        /// <param name="piece">The rectangle to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// <para>
+        /// <see cref="LevelLand.Ground"/> answers <see cref="SurfaceKind.Grass"/> for a name
+        /// nobody recognises, because a piece of land has to be made of something. That is
+        /// the right behaviour and it is also silent, so this is where a typo gets said out
+        /// loud - naming the word that was not understood, which is the only clue worth
+        /// having when a road came out green.
+        /// </para>
+        /// <para>
+        /// An empty name is not a typo. It is a rectangle written before surfaces existed,
+        /// or one an editor left alone, and it means grass.
+        /// </para>
+        /// <para>
+        /// Painting a piece of <em>land</em> with one of the two waters is a different
+        /// mistake and a worse one. It reads as a lake and it is not one: drowning is
+        /// decided by how low a vehicle is rather than by what it is standing on, so the
+        /// rectangle would be a stretch of sea you drive across without getting wet, while
+        /// <see cref="SurfaceField"/> - which does go by the surface - counts it as a hole
+        /// in the island and may cut the map in two through it. The palette an editor offers
+        /// is the surfaces that do not drown you, which is the same question asked early.
+        /// </para>
+        /// </remarks>
+        private static void CheckSurface(LevelLand piece, List<string> problems)
+        {
+            if (SurfaceTuning.For(piece.Ground).Drowns)
+            {
+                problems.Add(
+                    $"Land '{piece.Name}' is made of '{piece.Surface}', which is water. "
+                    + "Nothing can stand on it, and it leaves a hole in the island.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(piece.Surface)
+                || LevelNames.ToSurface(piece.Surface) != SurfaceKind.None)
+            {
+                return;
+            }
+
+            problems.Add(
+                $"Land '{piece.Name}' is made of '{piece.Surface}', which is not a surface "
+                + "this game has. It will be grass.");
+        }
+
+        /// <summary>
+        /// Checks that a piece of land is cut to a shape the game has heard of.
+        /// </summary>
+        /// <param name="piece">The piece to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// The same arrangement as <see cref="CheckSurface"/> and for the same reason.
+        /// <see cref="LevelLand.Form"/> answers <see cref="LandShape.Rectangle"/> for a word
+        /// nobody knows, because a piece of land has to be some shape; this is where the
+        /// word that was not understood gets said out loud, which is the only clue worth
+        /// having when an island came out square. An empty name is not a typo - it is a
+        /// rectangle written before shapes existed.
+        /// </remarks>
+        private static void CheckShape(LevelLand piece, List<string> problems)
+        {
+            if (string.IsNullOrWhiteSpace(piece.Shape)
+                || LevelNames.ToShape(piece.Shape) != LandShape.None)
+            {
+                return;
+            }
+
+            problems.Add(
+                $"Land '{piece.Name}' is cut to '{piece.Shape}', which is not a shape this "
+                + "game has. It will be a rectangle.");
         }
 
         private static void CheckBunkers(LevelDefinition level, List<string> problems)
@@ -421,7 +512,7 @@ namespace IronFlag.Levels
             return new Vector2Int(x, z);
         }
 
-        private static bool IsWalkable(LevelDefinition level, Vector2Int cell, float extent, int cells)
+        private static bool IsWalkable(SurfaceField field, Vector2Int cell, float extent, int cells)
         {
             if (cell.x < 0 || cell.y < 0 || cell.x >= cells || cell.y >= cells)
             {
@@ -433,7 +524,7 @@ namespace IronFlag.Levels
                 0.0f,
                 ((cell.y + 0.5f) * StepSize) - extent);
 
-            return level.IsOnLand(at, 0.0f);
+            return field.IsLand(at);
         }
 
         private static int Key(Vector2Int cell, int cells) => (cell.y * cells) + cell.x;

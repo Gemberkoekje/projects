@@ -89,6 +89,7 @@ MonoBehaviour:
     TurnRate: 75
     PivotTurn: 1
     SteerReferenceSpeed: 1
+    SurfaceSensitivity: 0.25
     Mass: 6000
     TurretTurnRate: 65
     HitPoints: 100

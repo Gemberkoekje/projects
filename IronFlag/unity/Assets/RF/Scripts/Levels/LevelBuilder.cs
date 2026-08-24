@@ -50,6 +50,12 @@ namespace IronFlag.Levels
         /// <summary>Name of the object the land rectangles hang off.</summary>
         private const string LandName = "Land";
 
+        /// <summary>Name of the object the derived shelf hangs off.</summary>
+        private const string CoastName = "Coast";
+
+        /// <summary>Name of the one collider the whole island is driven on.</summary>
+        private const string GroundName = "Ground";
+
         /// <summary>Name of the object the bunkers hang off.</summary>
         private const string BunkerName = "Bunkers";
 
@@ -58,6 +64,20 @@ namespace IronFlag.Levels
 
         /// <summary>Name of the object the destructibles hang off.</summary>
         private const string SceneryName = "Scenery";
+
+        /// <summary>
+        /// How far each sheet of the map is drawn above the one below it, in metres.
+        /// </summary>
+        /// <remarks>
+        /// A surface is not a piece of ground; it is a colour laid over the top of one, and
+        /// the map is a stack of those - see <see cref="SurfaceTuning.Layer"/>. Two
+        /// centimetres is enough to settle which of two sheets the depth buffer draws from
+        /// two hundred metres up, small enough that a vehicle resting on the island's own
+        /// collider does not visibly sink into the road it is standing on, and far enough
+        /// below <see cref="IronFlag.Combat.CombatPlane.Floor"/> that no round ever meets
+        /// one.
+        /// </remarks>
+        private const float CoastLift = 0.02f;
 
         /// <summary>
         /// Builds a whole map, and hands back the object it hangs off.
@@ -103,6 +123,7 @@ namespace IronFlag.Levels
 
             BuildSea(level, catalog, root.transform);
             BuildLand(level, catalog, root.transform);
+            BuildCoast(level, catalog, root.transform);
             BuildBunkers(level, catalog, root.transform, make);
             BuildObjective(level, catalog, root.transform, make);
             BuildStructures(level, catalog, root.transform, make);
@@ -117,9 +138,17 @@ namespace IronFlag.Levels
         /// <param name="catalog">What to paint it with.</param>
         /// <param name="parent">Object to hang it off.</param>
         /// <remarks>
+        /// <para>
         /// A slab rather than a surface, so it has a top to land on and an edge at the
         /// horizon. It keeps its collider: nothing should ever fall past the sea, and a
         /// wreck thrown into it by a blast has to come to rest somewhere.
+        /// </para>
+        /// <para>
+        /// The whole slab is the open sea, and the shelf is laid over it by
+        /// <see cref="BuildCoast"/>. That way the sea is one collider and one drowning rule
+        /// however many colours it is drawn in, which is what keeps a shelf from being a
+        /// thing a vehicle could be standing on.
+        /// </para>
         /// </remarks>
         private static void BuildSea(LevelDefinition level, LevelCatalog catalog, Transform parent)
         {
@@ -139,17 +168,34 @@ namespace IronFlag.Levels
         }
 
         /// <summary>
-        /// Raises every rectangle of dry land out of the sea.
+        /// Cuts the island out of the field and raises it out of the sea.
         /// </summary>
         /// <param name="level">The map being built.</param>
         /// <param name="catalog">What to paint it with.</param>
         /// <param name="parent">Object to hang it off.</param>
         /// <remarks>
-        /// Each rectangle is one box whose top face is exactly <c>y = 0</c>, which is the
-        /// plane the whole game is played on: <see cref="IronFlag.Combat.CombatPlane"/>
-        /// resolves rounds against it and every vehicle drives on it. The rest of the box is
-        /// the bank, and a vehicle that leaves the top of one is in the sea by the time it
-        /// reaches the bottom.
+        /// <para>
+        /// Nothing here is drawn per rectangle any more, and that is the point of the phase:
+        /// the land is one shape cut from <see cref="SurfaceField"/>, so the coastline the
+        /// game measures against and the coastline you can see are the same line and cannot
+        /// come apart. A rectangle in a level file is now a thing that <em>describes</em> the
+        /// island rather than a thing that is built.
+        /// </para>
+        /// <para>
+        /// One flat sheet per surface, stacked in <see cref="SurfaceTuning.Layer"/> order
+        /// with each drawn a couple of centimetres over the last, so the lowest is the whole
+        /// island and every other is a patch over it. Their tops are all at <c>y = 0</c> to
+        /// within that: <see cref="IronFlag.Combat.CombatPlane"/> resolves every round on
+        /// that plane, and these are paint rather than ground.
+        /// </para>
+        /// <para>
+        /// The ground itself is one non-convex <see cref="MeshCollider"/> over the lowest
+        /// sheet, which is the whole island, and it is deliberately the top face only. A
+        /// collider per sheet would leave a vehicle resting on a two-centimetre step wherever
+        /// a road met a field, and giving the bank one would turn the coastline into a wall -
+        /// which would stop a vehicle driving into the sea, and driving into the sea is one
+        /// of the things this game is about.
+        /// </para>
         /// </remarks>
         private static void BuildLand(LevelDefinition level, LevelCatalog catalog, Transform parent)
         {
@@ -158,23 +204,110 @@ namespace IronFlag.Levels
                 return;
             }
 
+            SurfaceField field = level.Field;
             float thickness = level.Bounds == null ? 1.0f : level.Bounds.LandThickness;
             var group = new GameObject(LandName);
             group.transform.SetParent(parent, false);
 
-            foreach (LevelLand piece in level.Land)
+            Mesh island = null;
+            int rank = 0;
+
+            foreach (SurfaceKind kind in SurfaceTuning.Stack(false))
             {
-                if (piece == null || !piece.IsDrawn)
+                if (!field.Covers(kind))
                 {
-                    Debug.LogWarning("IronFlag: a piece of land has no area and was not built.");
                     continue;
                 }
 
-                string name = string.IsNullOrWhiteSpace(piece.Name) ? LandName : piece.Name;
-                GameObject slab = Slab(name, piece.Width, thickness, piece.Depth, catalog.Ground);
-                slab.transform.SetParent(group.transform, false);
-                slab.transform.localPosition = new Vector3(
-                    piece.Centre.x, -thickness * 0.5f, piece.Centre.z);
+                Mesh sheet = SurfaceMesh.Build(field, kind, $"{LandName} ({kind})");
+                if (sheet == null)
+                {
+                    continue;
+                }
+
+                float lift = rank * CoastLift;
+                Sheet(kind.ToString(), sheet, catalog.MaterialFor(kind), group.transform, lift);
+                rank++;
+
+                if (island == null)
+                {
+                    island = sheet;
+                }
+
+                Mesh bank = SurfaceMesh.Bank(field, kind, thickness, $"{LandName} bank ({kind})");
+                if (bank != null)
+                {
+                    Sheet($"{kind} bank", bank, catalog.BankFor(kind), group.transform, lift);
+                }
+            }
+
+            if (island == null)
+            {
+                return;
+            }
+
+            var ground = new GameObject(GroundName);
+            ground.transform.SetParent(group.transform, false);
+            ground.AddComponent<MeshCollider>().sharedMesh = island;
+            MarkStatic(ground);
+        }
+
+        /// <summary>
+        /// Lays the shelf, and anything else drawn over the sea, over the sea.
+        /// </summary>
+        /// <param name="level">The map being built.</param>
+        /// <param name="catalog">What to paint them with.</param>
+        /// <param name="parent">Object to hang them off.</param>
+        /// <remarks>
+        /// <para>
+        /// The difference between an island and two rectangles in a pond: a pale shelf
+        /// hugging every coast, derived from distance to the realised coastline rather than
+        /// written into a level file - so every map has one and no map has to remember it.
+        /// Its inner edge is the coastline itself rather than a second line that has to
+        /// agree with it, which is what stops the open sea showing through between the two.
+        /// </para>
+        /// <para>
+        /// The lowest layer of the water is skipped, because <see cref="BuildSea"/> has
+        /// already drawn it: the open sea is a slab rather than a sheet, since it needs a
+        /// collider, a thickness and an edge at the horizon. Everything above it is a colour
+        /// laid a couple of centimetres over that, with nothing to stand on and nothing to
+        /// fall off - which is what keeps a shelf from being something a vehicle could be
+        /// standing on while it drowns.
+        /// </para>
+        /// </remarks>
+        private static void BuildCoast(LevelDefinition level, LevelCatalog catalog, Transform parent)
+        {
+            SurfaceKind[] stack = SurfaceTuning.Stack(true);
+            if (stack.Length < 2 || level.Land.Length == 0)
+            {
+                return;
+            }
+
+            SurfaceField field = level.Field;
+            float waterLevel = level.Bounds == null ? 0.0f : level.Bounds.WaterLevel;
+            GameObject group = null;
+
+            for (int layer = 1; layer < stack.Length; layer++)
+            {
+                SurfaceKind kind = stack[layer];
+                Mesh sheet = SurfaceMesh.Build(field, kind, $"{CoastName} ({kind})");
+                if (sheet == null)
+                {
+                    continue;
+                }
+
+                if (group == null)
+                {
+                    group = new GameObject(CoastName);
+                    group.transform.SetParent(parent, false);
+                }
+
+                Sheet(
+                    kind.ToString(),
+                    sheet,
+                    catalog.MaterialFor(kind),
+                    group.transform,
+                    waterLevel + (layer * CoastLift));
             }
         }
 
@@ -379,6 +512,38 @@ namespace IronFlag.Levels
                         false);
                 }
             }
+        }
+
+        /// <summary>
+        /// Hangs one generated sheet of map off the level, painted and placed.
+        /// </summary>
+        /// <param name="name">What to call it.</param>
+        /// <param name="mesh">The geometry.</param>
+        /// <param name="material">What it wears, or <c>null</c> to leave it default.</param>
+        /// <param name="parent">Object to hang it off.</param>
+        /// <param name="height">How far above the plane it is drawn, in metres.</param>
+        /// <returns>The sheet.</returns>
+        /// <remarks>
+        /// No collider, ever. Every sheet the map is drawn as is paint over something else;
+        /// the one thing a vehicle rests on is the island's own collider, and having exactly
+        /// one of those is what keeps a vehicle from finding a two-centimetre step wherever
+        /// two colours meet.
+        /// </remarks>
+        private static GameObject Sheet(
+            string name, Mesh mesh, Material material, Transform parent, float height)
+        {
+            var sheet = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer));
+            sheet.transform.SetParent(parent, false);
+            sheet.transform.localPosition = new Vector3(0.0f, height, 0.0f);
+            sheet.GetComponent<MeshFilter>().sharedMesh = mesh;
+
+            if (material != null)
+            {
+                sheet.GetComponent<MeshRenderer>().sharedMaterial = material;
+            }
+
+            MarkStatic(sheet);
+            return sheet;
         }
 
         /// <summary>

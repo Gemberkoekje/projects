@@ -161,22 +161,92 @@ namespace IronFlag.Tests.PlayMode
         }
 
         /// <summary>
-        /// The middle of the map is dry, which is what stops a match from being able to
-        /// deadlock when both bridges are down.
+        /// Every crossing nobody can shoot down is real ground a tank can stand on, which is
+        /// what stops a match from being able to deadlock when both bridges are gone.
         /// </summary>
+        /// <remarks>
+        /// This used to drop one tank on the origin, because the map used to have one
+        /// causeway down the middle. The middle is open water now and the permanent crossings
+        /// are two causeways out on the flanks, so it finds them instead of assuming where
+        /// they are - and checks every one of them rather than the first, since a second
+        /// crossing that turned out to be under water would be exactly the kind of thing
+        /// nobody notices until a match deadlocks.
+        /// </remarks>
         [UnityTest]
-        public IEnumerator TheCausewayCarriesATank()
+        public IEnumerator EveryPermanentCrossingCarriesATank()
         {
             yield return LoadTheSandbox();
 
-            VehicleHealth tank = DropATank(Vector3.zero);
-            yield return Settle();
-
-            Assert.That(tank.IsDestroyed, Is.False, "the causeway is under water");
+            List<Vector3> crossings = CrossingsOverTheChannel();
             Assert.That(
-                tank.transform.position.y,
-                Is.GreaterThan(LevelLoader.Current.Bounds.DrownDepth),
-                "the tank sank into the causeway");
+                crossings,
+                Is.Not.Empty,
+                "the map has no crossing that cannot be shot down, so dropping the last bridge "
+                + "would leave the flag uncapturable");
+
+            foreach (Vector3 at in crossings)
+            {
+                VehicleHealth tank = DropATank(at);
+                yield return Settle();
+
+                Assert.That(tank.IsDestroyed, Is.False, $"the crossing at {at} is under water");
+                Assert.That(
+                    tank.transform.position.y,
+                    Is.GreaterThan(LevelLoader.Current.Bounds.DrownDepth),
+                    $"the tank sank into the crossing at {at}");
+            }
+        }
+
+        /// <summary>
+        /// Every permanent crossing is the fastest ground on the map, measured on the map
+        /// rather than in a table.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A road that is quicker than the country either side of it is the whole argument
+        /// for asphalt having a grip figure above one, and it is worth checking here because
+        /// it is a claim about the shipped map rather than about the surface table: the
+        /// crossings have to still be painted with the built surface, the field has to still
+        /// put that surface under a vehicle standing on one, and the vehicle has to still
+        /// read it. Any of the three quietly coming apart leaves the map looking exactly the
+        /// same.
+        /// </para>
+        /// <para>
+        /// It compares two standing starts rather than two top speeds, because a causeway is
+        /// twenty-six metres long and a jeep at full throttle is off the far end of one in
+        /// rather less than a second. Grip scales the acceleration as well as the ceiling, so
+        /// a short burst measures it without needing a straight nobody built. The long runs
+        /// over a purpose-made beach are in <c>SurfaceDrivingTests</c>.
+        /// </para>
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator EveryPermanentCrossingIsQuickerThanTheCountryAroundIt()
+        {
+            yield return LoadTheSandbox();
+
+            List<Vector3> crossings = CrossingsOverTheChannel();
+            Assert.That(crossings, Is.Not.Empty, "the map has no permanent crossing to drive on");
+
+            foreach (Vector3 at in crossings)
+            {
+                GroundVehicle onTheRoad = DropAJeep(at);
+                GroundVehicle inTheField = DropAJeep(OpenCountryNear(at.x));
+                yield return Settle();
+
+                Assert.That(
+                    onTheRoad.Standing,
+                    Is.EqualTo(SurfaceKind.Asphalt),
+                    $"the crossing at {at} is not made of the surface that keeps its edges");
+                Assert.That(inTheField.Standing, Is.EqualTo(SurfaceKind.Grass));
+
+                yield return Accelerate(new[] { onTheRoad, inTheField }, 0.4f);
+
+                Assert.That(
+                    onTheRoad.ForwardSpeed,
+                    Is.GreaterThan(inTheField.ForwardSpeed),
+                    $"the crossing at {at} is no quicker to drive than the field beside it, so "
+                    + "the road is scenery");
+            }
         }
 
         /// <summary>
@@ -326,6 +396,35 @@ namespace IronFlag.Tests.PlayMode
         /// tests, so a failure means the map is wrong rather than the asset. It needs a real
         /// collider and real gravity, though: what is being measured is what it lands on.
         /// </remarks>
+        /// <summary>
+        /// Puts a jeep on the map at a point, facing north.
+        /// </summary>
+        /// <param name="at">Where to put it.</param>
+        /// <returns>The controller, already awake and reading the ground under it.</returns>
+        /// <remarks>
+        /// Assembled here rather than loaded from the prefab, exactly as
+        /// <see cref="DropATank"/> is: the prefabs have their own tests, and a failure here
+        /// should mean the map is wrong rather than the asset.
+        /// </remarks>
+        private GroundVehicle DropAJeep(Vector3 at)
+        {
+            var host = new GameObject("Dropped Jeep");
+            host.SetActive(false);
+            host.transform.position = at + (Vector3.up * 0.5f);
+            spawned.Add(host);
+
+            BoxCollider hull = host.AddComponent<BoxCollider>();
+            hull.size = new Vector3(1.8f, 1.6f, 4.0f);
+            hull.center = new Vector3(0.0f, 0.8f, 0.0f);
+
+            host.AddComponent<Rigidbody>();
+            var jeep = host.AddComponent<GroundVehicle>();
+            jeep.Configure(VehicleKind.Jeep, VehicleTuning.For(VehicleKind.Jeep));
+
+            host.SetActive(true);
+            return jeep;
+        }
+
         private VehicleHealth DropATank(Vector3 at)
         {
             var host = new GameObject("Dropped Tank");
@@ -378,6 +477,85 @@ namespace IronFlag.Tests.PlayMode
         /// Read off the level rather than written down here, so this still tests the map
         /// rather than a memory of it after somebody moves the coastline.
         /// </remarks>
+        /// <summary>
+        /// Finds the middle of every piece of land that carries the centre line across the
+        /// channel.
+        /// </summary>
+        /// <returns>One point per permanent crossing, on the ground plane.</returns>
+        /// <remarks>
+        /// A crossing is a rectangle that has dry ground on the line the channel runs along,
+        /// which is what a bridgehead - reaching into the water and stopping - does not have.
+        /// Found rather than written down, so this keeps meaning the same thing when the map
+        /// is redrawn.
+        /// </remarks>
+        /// <summary>
+        /// Finds open country on the green shore at a given point along the map.
+        /// </summary>
+        /// <param name="x">Where across the map to look.</param>
+        /// <returns>A point standing on grass, well clear of the water and of the beach.</returns>
+        /// <remarks>
+        /// Walked out from the channel rather than written down, because the coast wanders
+        /// and the beach that rims it is derived: a hard-coded z would be a claim about a
+        /// waterline nobody drew. Ten metres of the same surface ahead of it is enough for
+        /// the short burst this is used for.
+        /// </remarks>
+        private static Vector3 OpenCountryNear(float x)
+        {
+            SurfaceField field = LevelLoader.Current.Field;
+
+            for (float z = -14.0f; z > -LevelLoader.Current.Bounds.HalfExtent; z -= 1.0f)
+            {
+                var at = new Vector3(x, 0.0f, z);
+                if (field.At(at) == SurfaceKind.Grass
+                    && field.At(at + (Vector3.forward * 10.0f)) == SurfaceKind.Grass)
+                {
+                    return at;
+                }
+            }
+
+            Assert.Fail($"there is no open country to drive on at x = {x}");
+            return Vector3.zero;
+        }
+
+        /// <summary>
+        /// Holds full throttle on some vehicles for a stretch, from wherever they are.
+        /// </summary>
+        /// <param name="vehicles">Vehicles to drive.</param>
+        /// <param name="seconds">How long to hold it for.</param>
+        /// <returns>The coroutine the framework steps through.</returns>
+        private static IEnumerator Accelerate(IReadOnlyList<GroundVehicle> vehicles, float seconds)
+        {
+            var forward = new VehicleInput(Vector2.up, Vector2.zero, 0.0f);
+            float until = Time.time + seconds;
+
+            while (Time.time < until)
+            {
+                foreach (GroundVehicle vehicle in vehicles)
+                {
+                    vehicle.SetInput(forward);
+                }
+
+                yield return new WaitForFixedUpdate();
+            }
+        }
+
+        private static List<Vector3> CrossingsOverTheChannel()
+        {
+            var found = new List<Vector3>();
+
+            foreach (LevelLand piece in LevelLoader.Current.Land)
+            {
+                if (piece != null && piece.IsDrawn
+                    && !SurfaceTuning.For(piece.Ground).NaturalEdge
+                    && piece.Contains(new Vector3(piece.Centre.x, 0.0f, 0.0f)))
+                {
+                    found.Add(new Vector3(piece.Centre.x, 0.0f, 0.0f));
+                }
+            }
+
+            return found;
+        }
+
         private static Vector3 SomewhereInTheChannel()
         {
             LevelDefinition level = LevelLoader.Current;

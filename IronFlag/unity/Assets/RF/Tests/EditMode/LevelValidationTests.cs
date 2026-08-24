@@ -180,6 +180,66 @@ namespace IronFlag.Tests.EditMode
             Assert.That(LevelValidation.Problems(level), Has.Some.Contains("off the edge of the world"));
         }
 
+        /// <summary>
+        /// A surface nobody recognises still builds - it comes out grass, because a piece of
+        /// land has to be made of something - so this is the only place the typo is said out
+        /// loud, and it has to quote the word.
+        /// </summary>
+        [Test]
+        public void ALandSurfaceNobodyRecognisesIsNamed()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Land[0].Surface = "Gravel";
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("Gravel"));
+        }
+
+        /// <summary>
+        /// A shape nobody recognises still builds - it comes out a rectangle, because a
+        /// piece of land has to be cut to something - so this is the only place that typo is
+        /// said out loud, and it has to quote the word.
+        /// </summary>
+        [Test]
+        public void ALandShapeNobodyRecognisesIsNamed()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Land[0].Shape = "Trapezium";
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("Trapezium"));
+        }
+
+        /// <summary>
+        /// A piece of land painted with one of the two waters is refused, because it is a
+        /// lake that does not drown you and a hole in the island that does not look like one.
+        /// </summary>
+        /// <remarks>
+        /// Drowning goes by how low a vehicle is rather than by what it is standing on, so a
+        /// rectangle of water at ground level is a stretch of sea somebody drives straight
+        /// across - while <see cref="SurfaceField"/>, which does go by the surface, counts it
+        /// as not-land and will happily cut a map in two through the middle of it.
+        /// </remarks>
+        [Test]
+        public void LandPaintedWithWaterIsRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Land[0].Surface = nameof(SurfaceKind.ShallowWater);
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("which is water"));
+        }
+
+        /// <summary>
+        /// A rectangle written before surfaces existed is not a mistake, and must not be
+        /// reported as one.
+        /// </summary>
+        [Test]
+        public void LandThatNamesNoSurfaceIsAccepted()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Land[0].Surface = string.Empty;
+
+            Assert.That(LevelValidation.Problems(level), Is.Empty);
+        }
+
         [Test]
         public void AMissingBunkerIsRejected()
         {

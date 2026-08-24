@@ -3,6 +3,7 @@ using NUnit.Framework;
 using UnityEngine;
 using IronFlag.Combat;
 using IronFlag.Core;
+using IronFlag.Levels;
 using IronFlag.Supply;
 using IronFlag.Vehicles;
 
@@ -181,6 +182,74 @@ namespace IronFlag.Tests.EditMode
             Assert.That(VehicleSupply.DrawFor(0.0f, 0.2f), Is.EqualTo(0.2f).Within(0.0001f));
             Assert.That(VehicleSupply.DrawFor(1.0f, 0.2f), Is.EqualTo(1.0f).Within(0.0001f));
             Assert.That(VehicleSupply.DrawFor(0.5f, 0.2f), Is.EqualTo(0.6f).Within(0.0001f));
+            Assert.That(
+                VehicleSupply.DrawFor(0.5f, 0.2f, 1.0f),
+                Is.EqualTo(VehicleSupply.DrawFor(0.5f, 0.2f)).Within(0.0001f),
+                "ground that costs nothing extra is not the same as no ground");
+        }
+
+        /// <summary>
+        /// Soft ground is charged for the work it makes the engine do and not for the engine
+        /// running, so a beach costs a moving vehicle range and costs a parked one nothing.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The alternative - scaling the whole draw - would quietly retune every depot,
+        /// because a refuelling rate is only fast or slow against the draw it is racing, and
+        /// it would charge a vehicle extra for standing still on a beach it is not driving
+        /// on.
+        /// </para>
+        /// <para>
+        /// Scaling the demand rather than the draw would be worse than untidy: demand is
+        /// clamped into 0..1, so a thirstier surface would cost nothing at all at full
+        /// throttle, which is precisely where it should cost the most.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void SoftGroundCostsFuelOnlyWhileTheEngineIsWorking()
+        {
+            float sand = SurfaceTuning.For(SurfaceKind.Sand).FuelDraw;
+
+            Assert.That(
+                VehicleSupply.DrawFor(0.0f, 0.2f, sand),
+                Is.EqualTo(0.2f).Within(0.0001f),
+                "a vehicle is charged for the beach it is parked on");
+            Assert.That(
+                VehicleSupply.DrawFor(1.0f, 0.2f, sand),
+                Is.GreaterThan(VehicleSupply.DrawFor(1.0f, 0.2f)),
+                "sand costs nothing at full throttle, which is where it should cost the most");
+            Assert.That(
+                VehicleSupply.DrawFor(1.0f, 0.2f, sand),
+                Is.EqualTo(0.2f + (0.8f * sand)).Within(0.0001f));
+        }
+
+        /// <summary>
+        /// The ground that slows you is the ground that drinks, and a road is the other way
+        /// round on both counts.
+        /// </summary>
+        /// <remarks>
+        /// The two columns are read against each other, so a row cannot be quietly made
+        /// strictly better than open country. That matters most for the tank, which shrugs
+        /// off sand's grip almost entirely - see
+        /// <see cref="VehicleTuning.SurfaceSensitivity"/> - and pays its thirst in full, so a
+        /// beach costs the heaviest thing on the map range where it costs the jeep time.
+        /// </remarks>
+        [Test]
+        public void TheGroundThatSlowsYouIsTheGroundThatDrinks()
+        {
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                SurfaceTuning surface = SurfaceTuning.For(kind);
+                if (surface.Drowns || Mathf.Approximately(surface.Grip, 1.0f))
+                {
+                    continue;
+                }
+
+                Assert.That(
+                    (surface.Grip - 1.0f) * (surface.FuelDraw - 1.0f),
+                    Is.LessThan(0.0f),
+                    $"{kind} is both quicker and thriftier than open country, or both worse");
+            }
         }
 
         /// <summary>
