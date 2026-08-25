@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using IronFlag.Core;
 using IronFlag.Editor.ArtPipeline;
 using IronFlag.Levels;
 
@@ -73,7 +74,13 @@ namespace IronFlag.Editor.Gameplay
             }
 
             EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
-            VehicleSandboxScene.ConfigureLighting();
+
+            // The game's lighting, less the haze. This camera sits 200 metres above its
+            // subject, and a fog tuned for a chase camera 30 metres off the ground renders the
+            // entire map as one flat wash at that range - see LightingTuning.
+            LightingTuning lighting = LightingTuning.For(LightingMood.Daylight);
+            lighting.Fog = false;
+            SceneLighting.Apply(LightingMood.Daylight, lighting);
 
             LevelBuilder.Build(level, LevelCatalogBuilder.Load(), Instantiate);
 
@@ -112,6 +119,11 @@ namespace IronFlag.Editor.Gameplay
             view.farClipPlane = 400.0f;
             view.clearFlags = CameraClearFlags.SolidColor;
             view.backgroundColor = Color.black;
+
+            // The same grade the game is played under, so a colour judged on this map is the
+            // colour that turns up in a match. Nothing here is interface, so there is no
+            // second camera to stack.
+            ViewStack.MakeWorldView(view);
             return view;
         }
 

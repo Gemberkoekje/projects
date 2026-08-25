@@ -145,6 +145,24 @@ namespace IronFlag.Destruction
                         DebrisRadius = 3.2f,
                     };
 
+                // Eighty, which is the price of one hole rather than the price of a wall: a
+                // barrier is breached a segment at a time, so what a raider pays is this
+                // number and not the run's. Three cannon shells, four grenades, two rockets
+                // or two and a half seconds of chaingun - affordable from every vehicle in
+                // the game, and never free. Above a tree, because concrete that came down
+                // faster than a sapling would be scenery pretending to be a defence; well
+                // under a depot, because a wall is the thing in the way of the target rather
+                // than the target. The jeep's four grenades are the number to read hardest:
+                // it can let itself in, but only by parking fourteen metres from a wall that
+                // is there because something behind it is worth covering.
+                case StructureKind.Wall:
+                    return new StructureTuning
+                    {
+                        HitPoints = 80.0f,
+                        DamagedAt = 0.5f,
+                        DebrisRadius = 2.2f,
+                    };
+
                 default:
                     return new StructureTuning();
             }
@@ -176,6 +194,7 @@ namespace IronFlag.Destruction
                 StructureKind.DepotFuel,
                 StructureKind.DepotAmmo,
                 StructureKind.Turret,
+                StructureKind.Wall,
             };
 
         /// <summary>

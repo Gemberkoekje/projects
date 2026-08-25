@@ -204,6 +204,27 @@ The bunker is now the only structure on the map that cannot be shot at all.
 - 1–2 simple building shapes + 1 tree/vegetation prop, reusable across the map for terrain variety
 - `_Intact` / `_Damaged` / `_Destroyed`
 
+**Wall (added with the destructible-walls pass)**
+- A **segment**, not a wall: 5.0 m long × 0.90 m at the footing × 2.0 m tall, placed in rows
+- Neutral concrete, no team tint — a wall belongs to whoever is standing behind it
+- `_Intact` / `_Damaged` / `_Destroyed`
+- **5.0 m is the module**, because it is the coarsest step the level editor's grid offers.
+  A row placed on the grid butts up seamlessly; any other length leaves gaps to nudge shut.
+- **The piers stand at the ends, not the middle.** Each segment carries a half-pier at either
+  end, so two neighbours make one full pier at their join and a lone segment gets end posts.
+  That is what makes a row read as construction rather than as a repeated box.
+- **2.0 m tall: over a jeep (1.6 m), under a tank (2.4 m).** That single measurement is the
+  whole reason to place one, and the reason not to place them everywhere.
+- The cap is `SAND`, the same as a building's roof: the camera looks down at 58°, so the top
+  face is most of what a player sees, and a pale top is how the map says *somebody built this*
+  as against the grey of a road.
+- **The damaged state is still a barrier.** It loses its cap and its height over one end and
+  keeps an unbroken 1.15 m course from end to end — a wall that opened at half its hit points
+  would make the destroyed state mean nothing. Only the destroyed state is a hole.
+- **The destroyed state stands no higher than knee height**, because `Destructible` switches
+  the rubble's colliders off: a heap that still read as blocking would be a wall players drive
+  straight through, which is worse than no wall.
+
 ---
 
 ## Prompting Pattern

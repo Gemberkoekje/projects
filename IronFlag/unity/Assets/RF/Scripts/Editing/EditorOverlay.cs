@@ -1,5 +1,6 @@
 using UnityEngine;
 using IronFlag.Levels;
+using IronFlag.UI;
 
 namespace IronFlag.Editing
 {
@@ -65,6 +66,14 @@ namespace IronFlag.Editing
         {
             session = editor;
 
+            // The same layer the panels are on, for the same reason: markers are interface,
+            // and interface is drawn by the camera that skips the grade.
+            int layer = InterfaceLayers.EditorLayer();
+            if (layer >= 0)
+            {
+                gameObject.layer = layer;
+            }
+
             var canvas = GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceCamera;
             canvas.worldCamera = view;
@@ -92,6 +101,10 @@ namespace IronFlag.Editing
             twin = EditorOutline.Build(host.transform, "Opposite Number");
             selection = EditorOutline.Build(host.transform, "Selection");
             dragged = EditorOutline.Build(host.transform, "Drag");
+
+            // Once here is enough: Refresh only moves and recolours these four, and never
+            // makes a fifth.
+            InterfaceLayers.Paint(gameObject);
         }
 
         /// <summary>

@@ -43,6 +43,17 @@ namespace IronFlag.Levels
     /// it is not argued at all.
     /// </para>
     /// <para>
+    /// <strong>Those measured numbers were taken before there was a tone curve</strong>, and
+    /// they have not been re-measured since <see cref="IronFlag.Core.PostTuning"/> arrived.
+    /// Neutral tone mapping rolls the top of the range off, so the bright end of the ramp now
+    /// comes out lower than the comments below claim - sand measures 168 on the map shot where
+    /// this says 190, while asphalt only moves from 117 to 115 and the two waters barely move
+    /// at all. The ordering and the value gaps that the ramp is actually argued on all survive;
+    /// what is stale is the absolute figure at the top. Re-measuring the whole ramp off a fresh
+    /// map shot is the follow-up, and it belongs with a change to these colours rather than
+    /// with the change that moved them.
+    /// </para>
+    /// <para>
     /// Those measured numbers are not a function of the colour alone:
     /// <see cref="Smoothness"/> moves them, and by more than you would expect. The ground is
     /// one enormous flat plane under a sun at 52 degrees, so a rough surface scatters more of

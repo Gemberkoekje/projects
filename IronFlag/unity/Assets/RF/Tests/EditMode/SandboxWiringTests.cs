@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using IronFlag.Combat;
@@ -605,6 +606,12 @@ namespace IronFlag.Tests.EditMode
         /// A HUD is a sheet of geometry a metre in front of a camera, so the wrong culling
         /// mask puts one player fuel gauge into the other player windscreen.
         /// </summary>
+        /// <remarks>
+        /// The camera a HUD hangs off is the one stacked on that player's view, not the view
+        /// itself - see <see cref="ViewStack"/>. The world camera runs the volume profile and
+        /// this one does not, which is the whole reason it exists, and it also has to be the
+        /// one camera drawing that player's layer or the HUD is drawn twice.
+        /// </remarks>
         [Test]
         public void EachPlayerHasAHudOnTheirOwnCameraAndTheirOwnLayer()
         {
@@ -624,10 +631,18 @@ namespace IronFlag.Tests.EditMode
                         canvas.renderMode,
                         Is.EqualTo(RenderMode.ScreenSpaceCamera),
                         $"{hud.name} is not bound to a viewport");
+                    Camera world = hud.Player.CameraRig.View;
+                    Camera drawnBy = ViewStack.Existing(world);
+
+                    Assert.That(drawnBy, Is.Not.Null, $"{hud.name} has no camera of its own");
                     Assert.That(
                         canvas.worldCamera,
-                        Is.EqualTo(hud.Player.CameraRig.View),
+                        Is.EqualTo(drawnBy),
                         $"{hud.name} is drawn on the wrong camera");
+                    Assert.That(
+                        drawnBy.GetUniversalAdditionalCameraData().renderPostProcessing,
+                        Is.False,
+                        $"{hud.name} would be tone-mapped along with the world");
                     Assert.That(
                         layers.Add(hud.gameObject.layer),
                         Is.True,
@@ -638,11 +653,15 @@ namespace IronFlag.Tests.EditMode
                 {
                     foreach (PlayerHud other in huds)
                     {
-                        int mask = hud.Player.CameraRig.View.cullingMask;
-                        bool drawn = (mask & (1 << other.gameObject.layer)) != 0;
+                        int world = hud.Player.CameraRig.View.cullingMask;
+                        int drawnBy = ViewStack.Existing(hud.Player.CameraRig.View).cullingMask;
 
                         Assert.That(
-                            drawn,
+                            world & (1 << other.gameObject.layer),
+                            Is.Zero,
+                            $"{hud.name} world camera would draw {other.name} through the grade");
+                        Assert.That(
+                            (drawnBy & (1 << other.gameObject.layer)) != 0,
                             Is.EqualTo(hud == other),
                             $"{hud.name} camera and {other.name} disagree about who sees what");
                     }

@@ -8,9 +8,12 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.Rendering.Universal;
+using IronFlag.Core;
 using IronFlag.Editing;
 using IronFlag.Editor.Gameplay;
 using IronFlag.Levels;
+using IronFlag.UI;
 
 namespace IronFlag.Tests.EditMode
 {
@@ -133,13 +136,30 @@ namespace IronFlag.Tests.EditMode
         /// An overlay canvas would be drawn after every camera and therefore appear in nothing
         /// rendered to a texture, which is what the command-line still does.
         /// </summary>
+        /// <remarks>
+        /// Which is why the panels moved onto a camera stacked on the editor's own rather than
+        /// becoming overlay canvases when post-processing arrived: they still render through a
+        /// camera, so they still land in a still, but the camera drawing them skips the grade.
+        /// See <see cref="ViewStack"/>.
+        /// </remarks>
         [Test]
         public void BothEditorCanvasesAreDrawnByTheEditorsOwnCamera()
         {
             using (var editor = new OpenEditor())
             {
-                Camera view = editor.One<EditorCameraRig>().View;
+                Camera world = editor.One<EditorCameraRig>().View;
+                Camera view = ViewStack.Existing(world);
                 List<Canvas> canvases = editor.All<Canvas>();
+
+                Assert.That(view, Is.Not.Null, "the editor has no camera for its panels");
+                Assert.That(
+                    view.GetUniversalAdditionalCameraData().renderPostProcessing,
+                    Is.False,
+                    "the panels would be tone-mapped along with the map");
+                Assert.That(
+                    world.cullingMask & (1 << InterfaceLayers.EditorLayer()),
+                    Is.Zero,
+                    "the map camera would draw the panels a second time, through the grade");
 
                 // A count first, or a future change that drops the overlay's or the panels'
                 // Canvas entirely - renaming the object, forgetting the component - passes
@@ -257,6 +277,10 @@ namespace IronFlag.Tests.EditMode
 
                 Assert.That(ui.IsBuilt, Is.True, "Configure did not complete the panels");
                 Assert.That(ui.OpenPanel, Is.Not.Null, "the open-map panel was never built");
+                Assert.That(ui.MakePanel, Is.Not.Null, "the generate panel was never built");
+                Assert.That(
+                    ui.MakePanel.gameObject.activeSelf, Is.False,
+                    "the generate panel is up before anybody asked for it");
             }
             finally
             {

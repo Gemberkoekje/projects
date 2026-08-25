@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -238,6 +238,43 @@ namespace IronFlag.Editing
             levelName = UnusedName();
             Adopt(LevelEdits.Starter("New Map"), true);
             Say($"New map. It will be saved as {levelName}.");
+        }
+
+        /// <summary>
+        /// Throws away the map being edited and draws a new one out of a seed.
+        /// </summary>
+        /// <param name="options">What to generate, or <c>null</c> for the middle of everything.</param>
+        /// <remarks>
+        /// <para>
+        /// <see cref="NewLevel"/>'s exact shape, with <see cref="LevelGenerator.Generate"/>
+        /// where <see cref="LevelEdits.Starter"/> was. Generation decides nothing about the
+        /// editor: it is arithmetic on a level file that happens somewhere else and arrives
+        /// here as a map, so there is no tool state to reset and no mouse to interrupt.
+        /// </para>
+        /// <para>
+        /// <see cref="Adopt"/> revalidates, which means the Problems panel describes the
+        /// generated map before the player has looked at it - and on a solo map it will say
+        /// that green has no towers and brown has no bunker, because
+        /// <see cref="LevelValidation"/> states the rules of a match and a solo map is not
+        /// one. That is the truth until the master plan's 1-player item lands, so the status
+        /// line says it out loud rather than letting the panel look broken.
+        /// </para>
+        /// </remarks>
+        public void GenerateLevel(MapOptions options)
+        {
+            MapOptions asked = (options == null ? new MapOptions() : options).Settled();
+
+            levelName = UnusedName("generated-map");
+            LevelDefinition drawn = LevelGenerator.Generate(asked);
+            Adopt(drawn, true);
+
+            string called = drawn == null ? "A map" : drawn.Name;
+            string caveat = asked.IsSolo
+                ? " A solo map cannot be played yet - the game still seats two rosters - so the"
+                    + " problems about green's towers and brown's bunker are expected."
+                : string.Empty;
+
+            Say($"Generated {called} from seed {asked.Seed}. It will be saved as {levelName}.{caveat}");
         }
 
         /// <summary>
@@ -1211,20 +1248,32 @@ namespace IronFlag.Editing
         /// Returns a file name nothing is using yet.
         /// </summary>
         /// <returns>A name, numbered upward until it is free in both level folders.</returns>
-        private static string UnusedName()
+        private static string UnusedName() => UnusedName("new-map");
+
+        /// <summary>
+        /// Returns a file name nothing is using yet, starting from a stem.
+        /// </summary>
+        /// <param name="stem">What the name starts with.</param>
+        /// <returns>A name, numbered upward until it is free in both level folders.</returns>
+        /// <remarks>
+        /// A generated map gets its own stem rather than sharing the new-map numbering,
+        /// because the open list is the only place these are ever seen again and a column of
+        /// eleven files called new-map is one nobody can pick out of.
+        /// </remarks>
+        private static string UnusedName(string stem)
         {
             var taken = new HashSet<string>(LevelLibrary.Names(), StringComparer.OrdinalIgnoreCase);
 
             for (int number = 1; number < 1000; number++)
             {
-                string tried = $"new-map-{number}";
+                string tried = $"{stem}-{number}";
                 if (!taken.Contains(tried))
                 {
                     return tried;
                 }
             }
 
-            return "new-map";
+            return stem;
         }
 
         /// <summary>

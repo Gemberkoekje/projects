@@ -4,7 +4,7 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.Rendering;
+using IronFlag.Core;
 
 namespace IronFlag.Editor.ArtPipeline
 {
@@ -322,26 +322,14 @@ namespace IronFlag.Editor.ArtPipeline
         }
 
         /// <summary>Sets up sun angle and ambient light for a readable preview.</summary>
-        private static void ConfigureLighting()
-        {
-            Light sun = UnityEngine.Object.FindAnyObjectByType<Light>();
-            if (sun != null)
-            {
-                sun.transform.rotation = Quaternion.Euler(48.0f, -35.0f, 0.0f);
-                sun.intensity = 1.4f;
-                sun.shadows = LightShadows.Soft;
-                sun.color = new Color(1.0f, 0.97f, 0.9f);
-            }
-
-            RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.42f, 0.48f, 0.58f);
-            RenderSettings.ambientEquatorColor = new Color(0.32f, 0.34f, 0.35f);
-            RenderSettings.ambientGroundColor = new Color(0.18f, 0.17f, 0.15f);
-
-            // Ambient changes made from script only take effect once the environment is
-            // rebuilt; without this the scene keeps the ambient probe it was created with.
-            DynamicGI.UpdateEnvironment();
-        }
+        /// <remarks>
+        /// These numbers used to be written out here, a few degrees and a shade away from a
+        /// near-identical block in the sandbox builder. They are the
+        /// <see cref="LightingMood.Studio"/> row now - still the preview's own lighting and
+        /// still free to differ from the game's, but differing somewhere the difference can
+        /// be read rather than in a second copy nobody diffs against the first.
+        /// </remarks>
+        private static void ConfigureLighting() => SceneLighting.Apply(LightingMood.Studio);
 
         /// <summary>Creates the ground plane the models stand on.</summary>
         private static void CreateGround()
@@ -378,9 +366,19 @@ namespace IronFlag.Editor.ArtPipeline
             camera.orthographic = true;
             camera.nearClipPlane = 0.3f;
             // A flat backdrop rather than the default skybox: this is a product shot of
-            // the models, and a gradient sky just competes with them.
+            // the models, and a gradient sky just competes with them. The sky is still worth
+            // hanging, because it is what the METAL palette reflects.
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.09f, 0.10f, 0.12f);
+
+            // The one view in the project that deliberately runs no post-processing, and the
+            // reason is what this sheet is for. It is a contact sheet: twenty-five assets in a
+            // grid, laid out to be compared against each other and measured off. A vignette
+            // makes the same model read darker in the corner than in the middle, and a tone
+            // curve moves a colour away from the palette value somebody is checking it
+            // against - so the two effects that are worth having everywhere else are exactly
+            // the two that would break this. It keeps the shared lighting; it skips the grade.
+            // The sandbox still is where an emissive is judged with its bloom on.
 
             // Fit by measuring every corner of the bounds in camera space. Half-height is
             // what orthographicSize means; half-width has to be divided by the aspect

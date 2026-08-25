@@ -122,7 +122,7 @@ namespace IronFlag.UI
             canvas.planeDistance = 1.0f;
             canvas.sortingOrder = slot;
 
-            int layer = HudLayers.LayerFor(slot);
+            int layer = InterfaceLayers.LayerFor(slot);
             if (layer >= 0)
             {
                 gameObject.layer = layer;
@@ -176,16 +176,10 @@ namespace IronFlag.UI
         /// </summary>
         /// <remarks>
         /// Generated objects arrive on the default layer, and one label left behind is one
-        /// label hanging in the other player's view - see <see cref="HudLayers"/> for why
-        /// that happens at all.
+        /// label hanging in the other player's view - see <see cref="InterfaceLayers"/> for why
+        /// that happens at all, and why it is now also a label with the grade on it.
         /// </remarks>
-        private void ApplyLayer()
-        {
-            foreach (Transform part in GetComponentsInChildren<Transform>(true))
-            {
-                part.gameObject.layer = gameObject.layer;
-            }
-        }
+        private void ApplyLayer() => InterfaceLayers.Paint(gameObject);
 
         /// <summary>
         /// Brings every reading on the HUD up to date with the player behind it.

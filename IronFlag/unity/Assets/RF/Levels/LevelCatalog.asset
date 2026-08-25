@@ -27,6 +27,8 @@ MonoBehaviour:
     Prefab: {fileID: 2731075794887089659, guid: 6cf2310289501ce438b954d82f6de89d, type: 3}
   - Kind: 8
     Prefab: {fileID: 6754979791531405503, guid: 207b3e0dcb8401d47915a0ad34471089, type: 3}
+  - Kind: 9
+    Prefab: {fileID: 6264443084569997298, guid: 7a9fd7ffedd237e44905e79ec7a83efd, type: 3}
   bunker: {fileID: 7350495116598894301, guid: 5a8598d1424d6644c9b4c11db0d729a8, type: 3}
   tower: {fileID: 3393270847052785822, guid: a94e5f60a2f6fd440b8995d5172af954, type: 3}
   flag: {fileID: 4965343357232036794, guid: aaf184bc273be4147a3b52b937b6fa08, type: 3}

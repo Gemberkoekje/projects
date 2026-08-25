@@ -349,8 +349,9 @@ shared mechanism directly. All three verifiers found this before I did.
 ## What the next phase inherits
 
 The design document's section 10 is empty and M8 (the polish pass — music, minimap, HUD
-readability, screen shake) is still the only unstarted milestone. `M4_BUNKER_VIEW_PLAN.md`
-remains a second unstarted plan doc with an unanswered "Open questions for you" section.
+readability, screen shake) is still the only unstarted milestone. The bunker-view rework
+remains a second unstarted plan, now tracked in `MASTER_PLAN.md`, with an unanswered "Open
+questions for you" section.
 
 Still true, and still the largest gap in the project: **nobody has played a match.** The
 turrets are the first thing on the map that acts on its own, which makes that gap slightly

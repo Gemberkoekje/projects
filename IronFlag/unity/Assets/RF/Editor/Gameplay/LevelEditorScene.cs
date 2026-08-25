@@ -7,9 +7,11 @@ using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
+using IronFlag.Core;
 using IronFlag.Editing;
 using IronFlag.Editor.ArtPipeline;
 using IronFlag.Levels;
+using IronFlag.UI;
 
 namespace IronFlag.Editor.Gameplay
 {
@@ -163,7 +165,13 @@ namespace IronFlag.Editor.Gameplay
             InputActionAsset controls = EnsureUiActions();
             EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
-            VehicleSandboxScene.ConfigureLighting();
+            // The game's lighting, less the haze - the editor's camera looks straight down
+            // from 200 metres, which is the range at which a chase camera's fog is a grey
+            // sheet over the whole map. Everything else about the look is shared on purpose,
+            // so a map is authored under the light it is played under.
+            LightingTuning lighting = LightingTuning.For(LightingMood.Daylight);
+            lighting.Fog = false;
+            SceneLighting.Apply(LightingMood.Daylight, lighting);
 
             LevelDefinition level = BakeLevel(out LevelLoader loader);
             EditorCameraRig view = CreateView(level);
@@ -173,8 +181,12 @@ namespace IronFlag.Editor.Gameplay
             LevelEditorSession session = host.AddComponent<LevelEditorSession>();
             session.Configure(loader, view, VehicleSandboxScene.LevelName);
 
-            CreateOverlay(session, view.View);
-            CreatePanels(session, view.View);
+            // Both canvases draw through the stacked camera rather than the world one, so the
+            // panels stay the colours EditorTheme picked instead of being tone-mapped along
+            // with the map behind them - see IronFlag.Core.ViewStack.
+            Camera panelView = ViewStack.InterfaceView(view.View);
+            CreateOverlay(session, panelView);
+            CreatePanels(session, panelView);
 
             return session;
         }
@@ -237,10 +249,18 @@ namespace IronFlag.Editor.Gameplay
             }
 
             camera.name = "Editor Camera";
+            camera.cullingMask = InterfaceLayers.WorldMask();
 
             EditorCameraRig rig = camera.gameObject.AddComponent<EditorCameraRig>();
             rig.Configure(level.Bounds == null ? 120.0f : level.Bounds.HalfExtent);
             rig.Frame(level);
+
+            // After Frame, so the camera drawing the panels copies a projection that has
+            // already been sized to the map. It keeps that projection while this one zooms,
+            // which is what stops the interface growing and shrinking with the map under it.
+            ViewStack.MakeWorldView(camera);
+            ViewStack.AttachInterfaceView(camera, InterfaceLayers.EditorLayer());
+
             return rig;
         }
 
@@ -361,7 +381,7 @@ namespace IronFlag.Editor.Gameplay
         /// <returns>The controls asset, or <c>null</c> when it is missing.</returns>
         /// <remarks>
         /// <para>
-        /// The same shape as the game scene's <c>EnsureHudLayers</c>: a piece of project
+        /// The same shape as the game scene's <c>EnsureInterfaceLayers</c>: a piece of project
         /// configuration the runtime cannot create for itself, written once by the generator
         /// from the same name the runtime looks it up by. In practice it finds the map already
         /// there - the Input System maintains one in the project-wide asset - so this normally

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -76,6 +77,16 @@ namespace IronFlag.Editor.ArtPipeline
         /// <summary>Asset name of the material a flying piece of a building wears.</summary>
         public const string Debris = "RF_Debris";
 
+        /// <summary>Prefix on the generated sky material for each lighting condition.</summary>
+        /// <remarks>
+        /// One asset per <see cref="LightingMood"/> rather than a single sky that whichever
+        /// scene builder ran last repaints. The sandbox and the art preview are lit
+        /// differently on purpose, they both save a scene that references its sky, and one
+        /// shared asset between them would be a file whose committed contents flip-flopped
+        /// with whatever was rebuilt most recently.
+        /// </remarks>
+        public const string SkyPrefix = "RF_Sky_";
+
         /// <summary>Material name prefix marking the geometry that carries team color.</summary>
         public const string AccentPrefix = ModelPaint.AccentPrefix;
 
@@ -122,6 +133,18 @@ namespace IronFlag.Editor.ArtPipeline
 
         /// <summary>Smoothness URP's Lit material ships with.</summary>
         private const float DefaultSmoothness = 0.5f;
+
+        /// <summary>Unity's own procedural sky, which is what the sky materials wear.</summary>
+        /// <remarks>
+        /// Retuned rather than replaced with a hand-written gradient shader, which was the
+        /// other option on the table. It is worth the saving here because of where this
+        /// project's sky is actually seen: never as sky, because the gameplay camera's frame
+        /// stops 33 degrees below the horizon, and only as the reflection on metal and as the
+        /// gap past the edge of a level's sea slab. Both of those are answered by two colours
+        /// and an exposure, which this shader already exposes. See
+        /// <see cref="LightingTuning"/>.
+        /// </remarks>
+        private const string SkyShaderName = "Skybox/Procedural";
 
         /// <summary>Base color property used by URP's own shaders.</summary>
         private static readonly int UniversalBaseColor = Shader.PropertyToID("_BaseColor");
@@ -197,6 +220,8 @@ namespace IronFlag.Editor.ArtPipeline
                 UnityEngine.Object.DestroyImmediate(probe);
             }
 
+            EnsureSkies();
+
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
@@ -241,6 +266,60 @@ namespace IronFlag.Editor.ArtPipeline
         /// </remarks>
         private static Material LoadOrNothing(string name)
             => string.IsNullOrEmpty(name) ? null : Load(name);
+
+        /// <summary>
+        /// Returns the asset name of the sky for one lighting condition.
+        /// </summary>
+        /// <param name="mood">The condition the sky is painted for.</param>
+        /// <returns>The material asset name.</returns>
+        public static string SkyMaterial(LightingMood mood) => $"{SkyPrefix}{mood}";
+
+        /// <summary>
+        /// Loads the sky for one lighting condition.
+        /// </summary>
+        /// <param name="mood">The condition the sky is painted for.</param>
+        /// <returns>The material, or <c>null</c> when <see cref="EnsureAssets"/> has not run.</returns>
+        public static Material LoadSky(LightingMood mood) => Load(SkyMaterial(mood));
+
+        /// <summary>
+        /// Creates a sky material for every lighting condition and repaints the rest.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="Shader.Find"/> is safe here where it is not for the lit materials above:
+        /// the reason those are cloned off a throwaway primitive is that URP's Lit shader
+        /// needs keyword and property setup a bare material misses, and a procedural sky has
+        /// neither - it is a handful of floats and two colours.
+        /// </remarks>
+        private static void EnsureSkies()
+        {
+            Shader shader = Shader.Find(SkyShaderName);
+            if (shader == null)
+            {
+                Debug.LogError($"IronFlag: the '{SkyShaderName}' shader is missing; "
+                    + "every scene will keep Unity's default sky.");
+                return;
+            }
+
+            foreach (LightingMood mood in Enum.GetValues(typeof(LightingMood)))
+            {
+                if (mood == LightingMood.None)
+                {
+                    continue;
+                }
+
+                string path = PathOf(SkyMaterial(mood));
+                Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+                if (material == null)
+                {
+                    material = new Material(shader);
+                    AssetDatabase.CreateAsset(material, path);
+                }
+
+                LightingRig.Paint(material, LightingTuning.For(mood));
+                EditorUtility.SetDirty(material);
+            }
+        }
 
         /// <summary>
         /// Creates every missing folder along an <c>Assets/...</c> path in the asset database.

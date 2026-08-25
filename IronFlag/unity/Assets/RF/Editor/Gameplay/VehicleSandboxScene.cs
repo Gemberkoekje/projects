@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Rendering;
 using UnityEngine.UI;
 using IronFlag.Combat;
 using IronFlag.Core;
@@ -450,7 +449,7 @@ namespace IronFlag.Editor.Gameplay
         public static List<PlayerVehicleDriver> Build()
         {
             GeneratedMaterials.EnsureAssets();
-            EnsureHudLayers();
+            EnsureInterfaceLayers();
             EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
 
             ConfigureLighting();
@@ -529,26 +528,14 @@ namespace IronFlag.Editor.Gameplay
         /// Daylight, angled so the vehicles cast shadows that read from above.
         /// </summary>
         /// <remarks>
-        /// Deliberately not shared with the art preview's lighting: that one is a product
-        /// shot and this one is the game, and the two are expected to drift apart.
+        /// The numbers used to be written out here and a near-identical set was written out
+        /// again in the art preview, which is the arrangement where one of them gets fixed
+        /// and the other does not. They are two rows of <see cref="LightingTuning"/> now.
+        /// That is not the same as sharing a look: the art preview is a product shot and this
+        /// is the game, and they are still expected to drift apart - they just drift apart in
+        /// a table where the difference between them can be read.
         /// </remarks>
-        internal static void ConfigureLighting()
-        {
-            Light sun = Object.FindAnyObjectByType<Light>();
-            if (sun != null)
-            {
-                sun.transform.rotation = Quaternion.Euler(52.0f, -30.0f, 0.0f);
-                sun.intensity = 1.5f;
-                sun.shadows = LightShadows.Soft;
-                sun.color = new Color(1.0f, 0.97f, 0.9f);
-            }
-
-            RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.45f, 0.51f, 0.60f);
-            RenderSettings.ambientEquatorColor = new Color(0.34f, 0.36f, 0.36f);
-            RenderSettings.ambientGroundColor = new Color(0.19f, 0.18f, 0.16f);
-            DynamicGI.UpdateEnvironment();
-        }
+        internal static void ConfigureLighting() => SceneLighting.Apply(LightingMood.Daylight);
 
         /// <summary>
         /// Parks one side's four vehicles outside their own bunker.
@@ -625,7 +612,7 @@ namespace IronFlag.Editor.Gameplay
             var player = new GameObject($"Player {slot + 1} ({side})");
             PlayerVehicleDriver driver = player.AddComponent<PlayerVehicleDriver>();
             driver.Configure(rig, vehicles);
-            CreateHud(slot, side, driver, rig.View);
+            CreateHud(slot, side, driver, ViewStack.InterfaceView(rig.View));
             return driver;
         }
 
@@ -660,11 +647,11 @@ namespace IronFlag.Editor.Gameplay
         /// <remarks>
         /// A screen-space canvas is geometry in the world, so without a layer per player one
         /// player's instruments turn up in the other player's view the moment their cameras
-        /// get close - see <see cref="HudLayers"/>. Layers cannot be created from a runtime
+        /// get close - see <see cref="InterfaceLayers"/>. Layers cannot be created from a runtime
         /// script, so the scene builder does it, once, from the same names the runtime looks
         /// them up by.
         /// </remarks>
-        private static void EnsureHudLayers()
+        private static void EnsureInterfaceLayers()
         {
             Object[] assets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset");
             if (assets.Length == 0)
@@ -677,9 +664,9 @@ namespace IronFlag.Editor.Gameplay
             SerializedProperty layers = manager.FindProperty("layers");
             bool changed = false;
 
-            for (int slot = 0; slot < HudLayers.Count; slot++)
+            for (int slot = 0; slot < InterfaceLayers.Count; slot++)
             {
-                string wanted = HudLayers.NameFor(slot);
+                string wanted = InterfaceLayers.NameFor(slot);
                 if (IndexOfLayer(layers, wanted) >= 0)
                 {
                     continue;
@@ -781,7 +768,14 @@ namespace IronFlag.Editor.Gameplay
             camera.farClipPlane = 500.0f;
             camera.depth = slot;
             camera.rect = SplitScreenLayout.ViewportFor(slot, PlayerCount);
-            camera.cullingMask = HudLayers.CullingMaskFor(slot);
+            camera.cullingMask = InterfaceLayers.WorldMask();
+
+            // Every interface layer rather than only the other seats', because this player's
+            // own HUD is drawn by the camera stacked on this one - see ViewStack. Post has to
+            // be switched on explicitly: a URP camera runs no volume profile until it is
+            // asked, which is why every emissive material in this game had never glowed.
+            ViewStack.MakeWorldView(camera);
+            ViewStack.AttachInterfaceView(camera, InterfaceLayers.LayerFor(slot));
 
             return camera.gameObject.AddComponent<TopDownCameraRig>();
         }

@@ -214,6 +214,13 @@ namespace IronFlag.Editing
                 case StructureKind.DepotFuel:
                 case StructureKind.DepotAmmo:
                     return 3.0f;
+
+                // Half a segment, which is the one reach here that is a measurement rather
+                // than a judgement: walls are placed touching, so anything wider would make
+                // the two either side of a join fight over the same clicks, and this way the
+                // boundary between them falls exactly where the join a player can see is.
+                case StructureKind.Wall:
+                    return 2.5f;
                 default:
                     return 3.0f;
             }

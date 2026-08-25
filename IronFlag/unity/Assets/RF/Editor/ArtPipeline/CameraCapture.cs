@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+using IronFlag.Core;
 
 namespace IronFlag.Editor.ArtPipeline
 {
@@ -49,9 +52,29 @@ namespace IronFlag.Editor.ArtPipeline
         /// <exception cref="ArgumentNullException"><paramref name="cameras"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="cameras"/> is empty.</exception>
         /// <remarks>
+        /// <para>
         /// Each camera clears and draws only inside its own viewport, so rendering them one
         /// after another into the same texture composites the halves without any blitting
         /// here. Anything no camera covers stays at the texture's cleared black.
+        /// </para>
+        /// <para>
+        /// <strong>Interface is a second pass, and it has to be.</strong> The HUD and the
+        /// level editor's panels are drawn by cameras stacked on these ones so that
+        /// post-processing leaves them alone - see <see cref="IronFlag.Core.ViewStack"/> -
+        /// and URP does not render a camera stack from an offline one-shot render like this
+        /// one. Neither <see cref="Camera.Render"/> nor a standard render request draws the
+        /// overlays: both were tried, both came back as a correctly graded picture of a game
+        /// with no interface in it, and neither logged anything. So the stack is walked here
+        /// instead - the world is rendered, then the interface cameras are rendered on their
+        /// own over nothing, then the two are composited.
+        /// </para>
+        /// <para>
+        /// Compositing happens on the pixels rather than by letting the second pass draw
+        /// straight over the first, because a URP base camera has no way to leave the colour
+        /// it finds alone. <see cref="CameraClearFlags.Depth"/> - which is exactly that in
+        /// the built-in pipeline - counts as "uninitialized" in URP, and what it actually
+        /// produced was a perfect HUD floating on a sheet of flat blue.
+        /// </para>
         /// </remarks>
         public static void RenderToPng(Camera[] cameras, int width, int height, string outputPath)
         {
@@ -69,7 +92,8 @@ namespace IronFlag.Editor.ArtPipeline
             {
                 antiAliasing = 4,
             };
-            var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            var image = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            Texture2D drawn = null;
             RenderTexture previouslyActive = RenderTexture.active;
 
             bool batching = SetScriptableRenderPipelineBatching(false);
@@ -82,9 +106,16 @@ namespace IronFlag.Editor.ArtPipeline
                     camera.Render();
                 }
 
-                RenderTexture.active = target;
-                image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                image.Apply();
+                ReadInto(image, target, width, height);
+
+                Camera[] interfaces = InterfacesOf(cameras);
+                if (interfaces.Length > 0)
+                {
+                    drawn = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    RenderInterfaces(interfaces, target);
+                    ReadInto(drawn, target, width, height);
+                    Composite(image, drawn);
+                }
 
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 File.WriteAllBytes(outputPath, image.EncodeToPNG());
@@ -100,6 +131,11 @@ namespace IronFlag.Editor.ArtPipeline
                 }
 
                 UnityEngine.Object.DestroyImmediate(image);
+                if (drawn != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(drawn);
+                }
+
                 target.Release();
                 UnityEngine.Object.DestroyImmediate(target);
             }
@@ -135,6 +171,124 @@ namespace IronFlag.Editor.ArtPipeline
         }
 
         /// <summary>
+        /// Returns the interface camera stacked on each of these cameras, where there is one.
+        /// </summary>
+        /// <param name="cameras">The world cameras being rendered.</param>
+        /// <returns>Their interface cameras, in the same order.</returns>
+        private static Camera[] InterfacesOf(Camera[] cameras)
+        {
+            var found = new List<Camera>();
+
+            foreach (Camera camera in cameras)
+            {
+                Camera view = ViewStack.Existing(camera);
+                if (view != null)
+                {
+                    found.Add(view);
+                }
+            }
+
+            return found.ToArray();
+        }
+
+        /// <summary>
+        /// Draws the interface cameras on their own, over nothing.
+        /// </summary>
+        /// <param name="interfaces">The cameras drawing the interface.</param>
+        /// <param name="target">The texture to draw into, which is wiped first.</param>
+        /// <remarks>
+        /// Each is promoted to a base camera for the duration, because an overlay camera is
+        /// only ever drawn as part of a stack and a stack is the thing that does not happen
+        /// out here. They are put back afterwards: the live game does render them as a stack,
+        /// and that is what they are configured for.
+        /// </remarks>
+        private static void RenderInterfaces(Camera[] interfaces, RenderTexture target)
+        {
+            RenderTexture previouslyActive = RenderTexture.active;
+            RenderTexture.active = target;
+            GL.Clear(true, true, Color.clear);
+            RenderTexture.active = previouslyActive;
+
+            foreach (Camera view in interfaces)
+            {
+                UniversalAdditionalCameraData data = view.GetUniversalAdditionalCameraData();
+                CameraClearFlags clearing = view.clearFlags;
+                Color background = view.backgroundColor;
+
+                data.renderType = CameraRenderType.Base;
+                view.clearFlags = CameraClearFlags.SolidColor;
+                view.backgroundColor = Color.clear;
+                view.targetTexture = target;
+
+                try
+                {
+                    view.Render();
+                }
+                finally
+                {
+                    view.targetTexture = null;
+                    view.clearFlags = clearing;
+                    view.backgroundColor = background;
+                    data.renderType = CameraRenderType.Overlay;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Lays one image over another, using the top one's alpha.
+        /// </summary>
+        /// <param name="under">The image drawn onto, which is changed in place.</param>
+        /// <param name="over">The image laid over it.</param>
+        private static void Composite(Texture2D under, Texture2D over)
+        {
+            Color32[] below = under.GetPixels32();
+            Color32[] above = over.GetPixels32();
+
+            for (int index = 0; index < below.Length && index < above.Length; index++)
+            {
+                int alpha = above[index].a;
+                if (alpha == 0)
+                {
+                    continue;
+                }
+
+                if (alpha == 255)
+                {
+                    below[index] = above[index];
+                    continue;
+                }
+
+                below[index] = new Color32(
+                    Mix(below[index].r, above[index].r, alpha),
+                    Mix(below[index].g, above[index].g, alpha),
+                    Mix(below[index].b, above[index].b, alpha),
+                    255);
+            }
+
+            under.SetPixels32(below);
+            under.Apply();
+        }
+
+        private static byte Mix(byte under, byte over, int alpha)
+            => (byte)(((over * alpha) + (under * (255 - alpha))) / 255);
+
+        /// <summary>
+        /// Copies what a texture currently holds back into an image.
+        /// </summary>
+        /// <param name="image">The image to fill.</param>
+        /// <param name="target">The texture to read.</param>
+        /// <param name="width">Image width in pixels.</param>
+        /// <param name="height">Image height in pixels.</param>
+        private static void ReadInto(Texture2D image, RenderTexture target, int width, int height)
+        {
+            RenderTexture previouslyActive = RenderTexture.active;
+            RenderTexture.active = target;
+            image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+            image.Apply();
+            RenderTexture.active = previouslyActive;
+        }
+
+        /// <summary>
         /// Turns the SRP Batcher on or off, returning what it was set to before.
         /// </summary>
         /// <param name="enabled">Whether the batcher should be enabled.</param>
@@ -150,8 +304,8 @@ namespace IronFlag.Editor.ArtPipeline
         /// The flag lives on the URP asset - setting
         /// <c>GraphicsSettings.useScriptableRenderPipelineBatching</c> does not stick,
         /// because the pipeline reasserts its own value every frame. It is written through
-        /// SerializedObject to avoid taking an assembly reference on URP's runtime just for
-        /// one boolean, and is always restored by the caller.
+        /// SerializedObject rather than through the typed property because that property is
+        /// not settable, and is always restored by the caller.
         /// </remarks>
         private static bool SetScriptableRenderPipelineBatching(bool enabled)
         {

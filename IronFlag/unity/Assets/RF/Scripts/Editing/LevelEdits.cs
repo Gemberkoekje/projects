@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using IronFlag.Core;
@@ -792,7 +792,17 @@ namespace IronFlag.Editing
         /// </summary>
         /// <param name="at">The point.</param>
         /// <returns>Its opposite number.</returns>
-        private static Vector3 Turned(Vector3 at) => new Vector3(-at.x, at.y, -at.z);
+        /// <remarks>
+        /// <para>
+        /// The whole of this game's symmetry, in one line, and public so that there is one
+        /// line rather than two. <see cref="Mirror"/> uses it an element at a time, at the
+        /// end of somebody's mouse; <see cref="LevelGenerator"/> uses it as a batch pass over
+        /// a half-map it has just drawn. A second copy of it in the generator would be a
+        /// second chance to write a reflection by mistake - and a reflection is exactly the
+        /// thing <see cref="Mirror"/>'s own remarks exist to warn against.
+        /// </para>
+        /// </remarks>
+        public static Vector3 Turned(Vector3 at) => new Vector3(-at.x, at.y, -at.z);
 
         /// <summary>
         /// Returns the kinds of structure a palette can offer.

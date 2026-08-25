@@ -116,6 +116,16 @@ anybody, so taking one away is worth doing. The bunker is the only thing on the 
 be destroyed at all - the flag towers can, and have to be. The numbers are in
 [M5_NOTES.md](M5_NOTES.md).
 
+A **wall** is the one thing on the map built to be placed in rows: five metres a segment, two
+metres tall — over a jeep and under a tank — and neutral, so the wall a side put up is cover
+for whoever reaches it first. Two of them stand behind each bridgehead, closing the shoulder of
+beach a raider used to slip along to get clear of the emplacement covering that crossing; the
+turn inland is now ten metres further into the turret's reach, or eighty hit points and the
+seconds to spend them sixteen metres from the gun. Three tank shells, four grenades, two
+rockets or two and a half seconds of chaingun, per segment — you pay for the hole, not for the
+wall. Put several in a line and they read as one: the piers stand at the joins rather than in
+the middle, so the seam between two segments is exactly where a pier is.
+
 The map is one island cut in two by a channel, with the two bunkers facing each other down its
 centre line a hundred and forty metres apart — over water, because the middle of the channel is
 open. There are four ways across and not one of them is the short way: a **bridge** on each
@@ -157,6 +167,13 @@ game, and a map you edit there shadows the shipped one of the same name — so n
 damage `iron-channel`, and reverting is deleting one file. Details in
 [M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md).
 
+You do not have to start from an empty island either. **GENERATE** draws a whole map out of a
+seed — the coast, the beaches, the roads, the bunkers, the towers, the depots, the emplacements
+and the trees — on one of three kinds of ground, at one of three sizes, with the two halves
+either matching or not. It is a map like any other when it arrives: every tool works on it and
+the same rules panel judges it. The seed is shown and can be typed back in, so a map worth
+keeping is a number worth writing down. Details in [GENERATOR_NOTES.md](GENERATOR_NOTES.md).
+
 Then there is the reason you are out there. Four identical pyramids stand on the map, two at
 the back of each half, and one of each pair is holding that side's flag - but an intact tower
 looks exactly the same either way, from any distance, forever. **The only way to find out is to
@@ -178,6 +195,15 @@ Scene**, **Build Level Editor Scene**, **Build Vehicle Prefabs**, **Build Combat
 its tower come from **Build Objective Prefabs**, and **Build Level Catalog** is what tells the
 running game which prefab a level file's `"Bridge"` means. Run that one after changing any
 generated material, or the next render will still show the old colour.
+
+What the game looks like is generated the same way. **Build Volume Profile** writes
+`Assets/Settings/DefaultVolumeProfile.asset` — the tone curve, bloom, grade and vignette — from
+the table in `PostTuning.cs`, so the settings can be argued with in a diff instead of in a
+YAML file full of file IDs. The sun, the ambient fill, the haze and the sky come from
+`LightingTuning.cs`, one row per lighting condition, and every scene here is lit through the
+same call. The HUD and the editor's panels are drawn by a second camera stacked on each view so
+the grade never touches them; [LIGHTING_NOTES.md](LIGHTING_NOTES.md) explains why that is a
+camera and not a screen-space overlay canvas, and why a still has to composite it by hand.
 
 The map is the exception: it is a file rather than a generator, and the scene only carries a
 baked copy of it so that opening the scene shows something. That copy is thrown away and
@@ -232,7 +258,7 @@ rebuilt from the file on the first frame of play.
   crossings. A third of the land is sand now rather than a thirteenth, it lies across the line
   a driver cutting the corner at a crossing would take, and the road is the way round it - so
   the surface table finally decides a route instead of only a colour. The plan the whole pass
-  was built against is [SURFACES_PLAN.md](SURFACES_PLAN.md).
+  was built against is kept in [SURFACES_NOTES.md](SURFACES_NOTES.md#appendix-the-original-plan-as-written).
 - **Not scheduled**: a near-term backlog -
   locking the helicopter to a fixed altitude, automated turrets, and finishing off destruction
   (no hitbox once wrecked, everything actually destructible) - kept in

@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using IronFlag.Core;
 using IronFlag.Destruction;
 using IronFlag.Levels;
+using IronFlag.UI;
 
 namespace IronFlag.Editing
 {
@@ -66,6 +67,9 @@ namespace IronFlag.Editing
         private const float Gutter = 6.0f;
         private const float OpenPanelWidth = 520.0f;
         private const float OpenPanelHeight = 560.0f;
+        private const float MakePanelWidth = 588.0f;
+        private const float MakePanelHeight = 456.0f;
+        private const float MakeCaptionWidth = 104.0f;
 
         /// <summary>How many level files the open panel lists.</summary>
         private const int OpenRows = 11;
@@ -80,11 +84,38 @@ namespace IronFlag.Editing
         private readonly List<StructureKind> paletteOrder = new List<StructureKind>();
         private readonly List<EditorButton> sideButtons = new List<EditorButton>();
         private readonly List<EditorButton> openButtons = new List<EditorButton>();
+        private readonly List<EditorButton> sizeButtons = new List<EditorButton>();
+        private readonly List<EditorButton> playerButtons = new List<EditorButton>();
+        private readonly List<EditorButton> halfButtons = new List<EditorButton>();
+        private readonly List<EditorButton> groundButtons = new List<EditorButton>();
+
+        /// <summary>What the generate panel is currently asking for.</summary>
+        /// <remarks>
+        /// Kept here rather than read back off the buttons, because the buttons are how it is
+        /// said and this is what was said. It survives the panel being closed and reopened, so
+        /// somebody generating a run of hard channel maps sets that up once.
+        /// </remarks>
+        private readonly MapOptions wanted = new MapOptions();
+
+        /// <summary>
+        /// Whether <see cref="wanted"/> has ever been given a seed.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="MapOptions.Seed"/> has no value that means "unset" - zero is a seed like
+        /// any other - so the panel cannot tell a fresh roll from a typed zero by reading the
+        /// field back. This is the difference, set once on the panel's first showing and never
+        /// touched again, so a zero typed in on purpose survives every later reopening.
+        /// </remarks>
+        private bool seedRolled;
 
         private string armed = string.Empty;
         private int armedAtVersion = -1;
+        private int rolls;
         private RectTransform panels;
         private RectTransform openPanel;
+        private RectTransform makePanel;
+        private InputField seedField;
+        private Text makeNote;
         private EditorInspector inspector;
         private InputField fileField;
         private EditorButton saveButton;
@@ -107,6 +138,9 @@ namespace IronFlag.Editing
         /// <summary>The panel that lists the level files, shown only while opening one.</summary>
         public RectTransform OpenPanel => openPanel;
 
+        /// <summary>The panel that asks what map to draw, shown only while generating one.</summary>
+        public RectTransform MakePanel => makePanel;
+
         /// <summary>
         /// Points the panels at the editor they drive and sets the canvas up.
         /// </summary>
@@ -115,6 +149,16 @@ namespace IronFlag.Editing
         public void Configure(LevelEditorSession editor, Camera view)
         {
             session = editor;
+
+            // Before Build, so everything it generates is born on the right layer. This is
+            // what keeps the panels off the world camera and therefore out of the grade -
+            // see IronFlag.Core.ViewStack for why an editor cannot simply use an overlay
+            // canvas instead.
+            int layer = InterfaceLayers.EditorLayer();
+            if (layer >= 0)
+            {
+                gameObject.layer = layer;
+            }
 
             // The scene generator constructs this component with the GameObject's own
             // constructor - new GameObject(name, ..., typeof(EditorUi)) - which fires Awake
@@ -155,6 +199,8 @@ namespace IronFlag.Editing
             {
                 gameObject.AddComponent<GraphicRaycaster>();
             }
+
+            InterfaceLayers.Paint(gameObject);
         }
 
         /// <summary>
@@ -177,9 +223,15 @@ namespace IronFlag.Editing
             BuildInspectorColumn();
             BuildStatusBar();
             BuildOpenPanel();
+            BuildMakePanel();
 
             ReportUsableArea();
             Refresh();
+
+            // Everything on these panels is generated, and generated objects arrive on the
+            // default layer. Once here is enough: Refresh only ever changes text and which
+            // rows are visible, and the inspector works from a pool of rows built above.
+            InterfaceLayers.Paint(gameObject);
         }
 
         /// <summary>
@@ -382,6 +434,15 @@ namespace IronFlag.Editing
             left = Command(
                 bar, "Open", "OPEN", left, bottom, 92.0f,
                 () => Guard("open", "Opening another map", ShowOpenPanel));
+
+            // Not guarded, and it is the one button on this bar that is not. Opening the panel
+            // throws nothing away - it has a CANCEL - and the press that does throw the map
+            // away is the panel's own, which is guarded there. Guarding both would mean four
+            // presses to draw a map, on the one feature whose whole appeal is pressing it
+            // again. The open panel's rows are guarded individually for exactly this reason:
+            // what has to be guarded is whatever actually discards, not whatever leads to it.
+            left = Command(
+                bar, "Generate", "GENERATE", left, bottom, 128.0f, ShowMakePanel);
 
             saveButton = Make(bar, "Save", "SAVE", left, bottom, 96.0f, () => session.Save());
             left += 96.0f + Gutter;
@@ -622,6 +683,313 @@ namespace IronFlag.Editing
         private void HideOpenPanel() => openPanel.gameObject.SetActive(false);
 
         /// <summary>
+        /// Builds the panel that asks what kind of map to draw, hidden until it is asked for.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The open panel's shape - a centred plate switched on and off - because it is the
+        /// same kind of thing: a question with a handful of answers and a way out of it. Four
+        /// rows of choices and a seed, which is the whole of what <see cref="MapOptions"/>
+        /// carries; everything else about a generated map comes out of the seed, so the
+        /// dialogue asks four questions rather than forty.
+        /// </para>
+        /// <para>
+        /// The seed is on it deliberately. A generator that could not be asked for the same
+        /// map twice would be one where "that one was good" is a thing nobody can act on, and
+        /// the whole of <see cref="Dice"/> exists so that it can be.
+        /// </para>
+        /// </remarks>
+        private void BuildMakePanel()
+        {
+            Image plate = EditorTheme.Plate("Generate Panel", panels, EditorTheme.Chrome);
+            makePanel = plate.rectTransform;
+            makePanel.anchorMin = new Vector2(0.5f, 0.5f);
+            makePanel.anchorMax = new Vector2(0.5f, 0.5f);
+            makePanel.pivot = new Vector2(0.5f, 0.5f);
+            makePanel.anchoredPosition = Vector2.zero;
+            makePanel.sizeDelta = new Vector2(MakePanelWidth, MakePanelHeight);
+
+            float inner = MakePanelWidth - (Margin * 2.0f);
+
+            Text heading = EditorTheme.Label("Generate Title", makePanel, 26, TextAnchor.MiddleLeft);
+            heading.text = "GENERATE A MAP";
+            Hang(heading.rectTransform, Margin, -Margin, inner, 32.0f);
+
+            float top = -Margin - 44.0f;
+
+            top = Choices(
+                "SIZE", new[] { "EASY", "MEDIUM", "HARD" }, sizeButtons, top, inner,
+                pick =>
+                {
+                    wanted.Difficulty = (MapDifficulty)(pick + 1);
+                    RefreshMakePanel();
+                });
+
+            top = Choices(
+                "GROUND", new[] { "ANY", "ISLAND", "CHANNEL", "LAGOON" }, groundButtons, top, inner,
+                pick =>
+                {
+                    wanted.Layout = (MapLayout)pick;
+                    RefreshMakePanel();
+                });
+
+            top = Choices(
+                "HALVES", new[] { "MIRRORED", "ASYMMETRICAL" }, halfButtons, top, inner,
+                pick =>
+                {
+                    wanted.Symmetry = (MapSymmetry)(pick + 1);
+                    RefreshMakePanel();
+                });
+
+            top = Choices(
+                "PLAYERS", new[] { "1", "2" }, playerButtons, top, inner,
+                pick =>
+                {
+                    wanted.Players = pick + 1;
+                    RefreshMakePanel();
+                });
+
+            Text seedCaption = EditorTheme.Label(
+                "Seed Caption", makePanel, 18, TextAnchor.MiddleLeft);
+            seedCaption.color = EditorTheme.FadedInk;
+            seedCaption.text = "SEED";
+            Hang(seedCaption.rectTransform, Margin, top, MakeCaptionWidth, RowHeight);
+
+            float fields = Margin + MakeCaptionWidth + Gutter;
+            seedField = EditorTheme.Field("Seed", makePanel, 20, typed => Reseed(typed));
+            Hang((RectTransform)seedField.transform, fields, top, 180.0f, RowHeight - Gutter);
+
+            EditorButton roll = Make(makePanel, "Seed Roll", "ROLL", 0.0f, 0.0f, 100.0f, Reroll);
+            Hang(roll.Rect, fields + 186.0f, top, 100.0f, RowHeight - Gutter);
+            top -= RowHeight + Gutter;
+
+            makeNote = EditorTheme.Paragraph("Generate Note", makePanel, 17);
+            makeNote.color = EditorTheme.FadedInk;
+            Hang(makeNote.rectTransform, Margin, top, inner, 104.0f);
+
+            float bottom = -MakePanelHeight + Margin + RowHeight;
+            float half = (inner - Gutter) * 0.5f;
+
+            EditorButton draw = Make(
+                makePanel, "Generate Now", "GENERATE", 0.0f, 0.0f, half,
+                () => Guard("generate", "Generating a map", MakeNow));
+            Hang(draw.Rect, Margin, bottom, half, RowHeight - Gutter);
+
+            EditorButton close = Make(
+                makePanel, "Generate Close", "CANCEL", 0.0f, 0.0f, half, HideMakePanel);
+            Hang(close.Rect, Margin + half + Gutter, bottom, half, RowHeight - Gutter);
+
+            makePanel.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Builds one row of the generate panel: a caption and a run of choices.
+        /// </summary>
+        /// <param name="caption">What the row is asking.</param>
+        /// <param name="words">What is on each button.</param>
+        /// <param name="into">List the buttons are kept in, so the chosen one can be lit.</param>
+        /// <param name="top">Where the row hangs from.</param>
+        /// <param name="inner">How wide the panel is inside its margins.</param>
+        /// <param name="chose">What to do with the index that was pressed.</param>
+        /// <returns>Where the next row hangs from.</returns>
+        /// <remarks>
+        /// The index is copied into a local before the closure is made. Capturing the loop
+        /// variable itself is the oldest bug in this shape of code, and its symptom is every
+        /// button on the row doing what the last one says.
+        /// </remarks>
+        private float Choices(
+            string caption,
+            IReadOnlyList<string> words,
+            List<EditorButton> into,
+            float top,
+            float inner,
+            System.Action<int> chose)
+        {
+            Text label = EditorTheme.Label(
+                $"{caption} Caption", makePanel, 18, TextAnchor.MiddleLeft);
+            label.color = EditorTheme.FadedInk;
+            label.text = caption;
+            Hang(label.rectTransform, Margin, top, MakeCaptionWidth, RowHeight);
+
+            float left = Margin + MakeCaptionWidth + Gutter;
+            float room = inner - MakeCaptionWidth - Gutter;
+            float width = (room - (Gutter * (words.Count - 1))) / words.Count;
+
+            for (int pick = 0; pick < words.Count; pick++)
+            {
+                int chosen = pick;
+                EditorButton button = Make(
+                    makePanel, $"{caption} {pick}", words[pick], 0.0f, 0.0f, width,
+                    () => chose(chosen));
+                Hang(button.Rect, left, top, width, RowHeight - Gutter);
+                left += width + Gutter;
+                into.Add(button);
+            }
+
+            return top - RowHeight - Gutter;
+        }
+
+        /// <summary>
+        /// Fills the generate panel in from what is currently being asked for, and shows it.
+        /// </summary>
+        private void ShowMakePanel()
+        {
+            if (!seedRolled)
+            {
+                wanted.Seed = RolledSeed();
+                seedRolled = true;
+            }
+
+            RefreshMakePanel();
+            makePanel.gameObject.SetActive(true);
+            makePanel.SetAsLastSibling();
+        }
+
+        /// <summary>
+        /// Closes the generate panel without drawing anything.
+        /// </summary>
+        /// <remarks>
+        /// Also forgets an armed GENERATE confirmation, if there is one. Without this, arming
+        /// it, closing the panel with CANCEL, and coming back later to change a setting and
+        /// press GENERATE once fires the *previous* confirmation against a *different* map
+        /// than the one it was given for - the same "armed forever" mistake
+        /// <see cref="Guard"/>'s own version stamp exists to catch, reached by a door the
+        /// stamp does not cover.
+        /// </remarks>
+        private void HideMakePanel()
+        {
+            DisarmGenerate();
+            makePanel.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Forgets an armed GENERATE confirmation, if there is one.
+        /// </summary>
+        /// <remarks>
+        /// Called by everything that changes what GENERATE would draw - every row of options,
+        /// a typed or rolled seed, and closing the panel - so a confirmation given for one set
+        /// of settings can never fire against a different one it was never shown for.
+        /// </remarks>
+        private void DisarmGenerate()
+        {
+            if (armed == "generate")
+            {
+                armed = string.Empty;
+                armedAtVersion = -1;
+            }
+        }
+
+        /// <summary>
+        /// Lights whichever button on each row matches what is being asked for.
+        /// </summary>
+        private void RefreshMakePanel()
+        {
+            DisarmGenerate();
+
+            Lit(sizeButtons, (int)wanted.Difficulty - 1);
+            Lit(groundButtons, (int)wanted.Layout);
+            Lit(halfButtons, (int)wanted.Symmetry - 1);
+            Lit(playerButtons, wanted.Players - 1);
+
+            if (seedField != null && !seedField.isFocused)
+            {
+                seedField.text = wanted.Seed.ToString();
+            }
+
+            makeNote.text = wanted.IsSolo
+                ? "One bunker, and an enemy that is a field of flag towers behind their own "
+                    + "emplacements. A solo map cannot be played yet, so the Problems panel "
+                    + "will name green's missing towers and brown's missing bunker: both are "
+                    + "expected."
+                : "The same seed and the same settings always draw the same map, so a seed "
+                    + "worth keeping is worth writing down. What comes out is an ordinary map: "
+                    + "every tool works on it, and the Problems panel says whether it plays.";
+        }
+
+        /// <summary>
+        /// Lights one button in a row and puts the rest out.
+        /// </summary>
+        /// <param name="buttons">The row.</param>
+        /// <param name="chosen">Which one, or out of range for none.</param>
+        private static void Lit(List<EditorButton> buttons, int chosen)
+        {
+            for (int row = 0; row < buttons.Count; row++)
+            {
+                buttons[row].SetChosen(row == chosen);
+            }
+        }
+
+        /// <summary>
+        /// Draws a map from what the panel is asking for.
+        /// </summary>
+        /// <remarks>
+        /// The panel closes, exactly as the open panel does when a row is picked, because what
+        /// there is to look at now is the map rather than the question. A fresh seed is rolled
+        /// on the way out, so pressing GENERATE again is a different map rather than the same
+        /// one drawn twice.
+        /// </remarks>
+        private void MakeNow()
+        {
+            session.GenerateLevel(wanted);
+            wanted.Seed = RolledSeed();
+            HideMakePanel();
+        }
+
+        /// <summary>
+        /// Takes a typed seed.
+        /// </summary>
+        /// <param name="typed">What was typed into the seed field.</param>
+        /// <remarks>
+        /// Anything that is not a number is put back rather than argued with. The field shows
+        /// the seed that will be used, so the way to say "that was not a seed" is to show the
+        /// one that still is.
+        /// </remarks>
+        private void Reseed(string typed)
+        {
+            if (int.TryParse(typed, out int given))
+            {
+                wanted.Seed = given;
+            }
+
+            RefreshMakePanel();
+        }
+
+        /// <summary>
+        /// Rolls a fresh seed into the panel.
+        /// </summary>
+        private void Reroll()
+        {
+            wanted.Seed = RolledSeed();
+            RefreshMakePanel();
+        }
+
+        /// <summary>
+        /// Returns a seed nobody asked for.
+        /// </summary>
+        /// <returns>A number to draw a map from.</returns>
+        /// <remarks>
+        /// <para>
+        /// The one place in this whole feature where something genuinely arbitrary happens,
+        /// and it happens <em>outside</em> the map. This picks which map; everything from here
+        /// down is a pure function of it - see <see cref="Dice"/>. The number is written into
+        /// the level file and shown in the field, so nothing about the map is unrepeatable.
+        /// </para>
+        /// <para>
+        /// The press count is mixed in because the clock only moves every millisecond or so,
+        /// and two presses inside one tick would otherwise draw the same map twice and look
+        /// like a button that did not work.
+        /// </para>
+        /// </remarks>
+        private int RolledSeed()
+        {
+            unchecked
+            {
+                rolls++;
+                return System.Environment.TickCount + (rolls * 7919);
+            }
+        }
+
+        /// <summary>
         /// Runs something that would throw away unsaved work, once it has been asked twice.
         /// </summary>
         /// <param name="id">What is being armed, so a different button disarms this one.</param>
@@ -825,14 +1193,21 @@ namespace IronFlag.Editing
 
             panels = null;
             openPanel = null;
+            makePanel = null;
             inspector = null;
             fileField = null;
+            seedField = null;
+            makeNote = null;
             toolButtons.Clear();
             toolOrder.Clear();
             paletteButtons.Clear();
             paletteOrder.Clear();
             sideButtons.Clear();
             openButtons.Clear();
+            sizeButtons.Clear();
+            playerButtons.Clear();
+            halfButtons.Clear();
+            groundButtons.Clear();
         }
     }
 }

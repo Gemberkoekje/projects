@@ -71,8 +71,21 @@ blender/**/__pycache__/
 # Renders land wherever -sandboxOutput points, which the notes say is the repo
 # root. Test results land relative to -projectPath, because Unity changes its
 # working directory to it - so they turn up inside unity/ however they were run.
+# Both are wildcarded rather than named exactly, because a milestone prefix
+# (lighting-editmode.xml, m9-map.png, surfaces-e-map.png, ...) is the normal way
+# these get named and an exact-match rule silently misses every prefixed one -
+# found the hard way when two lighting-pass result files slipped past the old
+# editmode.xml/playmode.xml-only rule and sat untracked in the repo root.
 /*.png
+*-editmode.xml
+*-playmode.xml
 /editmode.xml
 /playmode.xml
 /unity/editmode.xml
 /unity/playmode.xml
+
+# com.unity.test-framework's own bootstrap scene for a -runTests PlayMode batch, named
+# "Assets/InitTestScene<new Guid>.unity" by CreateBootstrapSceneTask and left behind rather
+# than cleaned up. A fresh empty scene every run - never anything authored.
+/unity/Assets/InitTestScene*.unity
+/unity/Assets/InitTestScene*.unity.meta

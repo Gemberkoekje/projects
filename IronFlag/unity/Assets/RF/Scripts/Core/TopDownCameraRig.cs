@@ -90,12 +90,15 @@ namespace IronFlag.Core
         /// <remarks>
         /// Set from <see cref="SplitScreenLayout.ViewportFor"/> by
         /// <c>LocalMultiplayer</c>, which is the only thing that knows how many players are
-        /// sharing the screen.
+        /// sharing the screen. It goes through <see cref="ViewStack.SetViewport"/> rather
+        /// than straight onto the camera so that the camera drawing this player's HUD moves
+        /// with it: a seat that changed size and left its instruments measuring the old one
+        /// is a HUD laid out for half a screen on a quarter of one.
         /// </remarks>
         public Rect Viewport
         {
             get => View.rect;
-            set => View.rect = value;
+            set => ViewStack.SetViewport(View, value);
         }
 
         /// <summary>

@@ -455,9 +455,10 @@ number is worth trying, and this whole feature is about trying numbers.
   loaded rather than against `iron-channel` — point them at a new file and they check the new
   map.
 - **The surfaces pass is now the obvious partner to this.**
-  [SURFACES_PLAN.md](SURFACES_PLAN.md) is still proposed and not started, and it says it owes
-  the editor "a format it can paint into and a palette it can offer". The palette is a list of
-  enum members in a column, which is exactly the shape a surface palette would be.
+  [SURFACES_NOTES.md](SURFACES_NOTES.md#appendix-the-original-plan-as-written) (then still
+  proposed and not started) said it owes the editor "a format it can paint into and a palette
+  it can offer". The palette is a list of enum members in a column, which is exactly the shape
+  a surface palette would be.
 - **Nothing here saves a map into the shipped folder, deliberately.** Promoting a map somebody
   made into `StreamingAssets/Levels` is a copy in a file manager today. If maps start being
   shared, that becomes a real feature and it is one this format is already ready for.

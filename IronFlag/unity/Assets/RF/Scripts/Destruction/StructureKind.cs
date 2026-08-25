@@ -63,5 +63,21 @@ namespace IronFlag.Destruction
         /// side and refuses a side on anything else.
         /// </remarks>
         Turret = 8,
+
+        /// <summary>
+        /// A short length of concrete barrier: the one destructible meant to be placed in
+        /// rows.
+        /// </summary>
+        /// <remarks>
+        /// Everything else on this list is a thing; a wall is a <em>unit of a thing</em>,
+        /// five metres of it, and a fortified corner is four of them and a turret. That is
+        /// the only way this format can express a wall at all - a
+        /// <see cref="IronFlag.Levels.LevelStructure"/> is a point and a heading, so a
+        /// barrier spanning two chosen ends would need a placement primitive the level file
+        /// does not have. Segments cost nothing to add and read as construction rather than
+        /// as tiling, because the piers stand at the joins - see
+        /// <c>blender/assets/prop_wall.py</c>.
+        /// </remarks>
+        Wall = 9,
     }
 }
