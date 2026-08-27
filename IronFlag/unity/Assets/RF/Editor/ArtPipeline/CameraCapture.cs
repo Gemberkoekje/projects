@@ -142,6 +142,62 @@ namespace IronFlag.Editor.ArtPipeline
         }
 
         /// <summary>
+        /// Points an orthographic camera at some bounds and sizes it so they fill the frame.
+        /// </summary>
+        /// <param name="camera">Camera to place. Its rotation is used and not changed.</param>
+        /// <param name="contents">World-space bounds to frame.</param>
+        /// <param name="aspect">Width divided by height of the intended output.</param>
+        /// <param name="margin">How much slack to leave, as a multiplier; 1.0 is tight.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="camera"/> is null.</exception>
+        /// <remarks>
+        /// <para>
+        /// Every generated preview in this project frames a pile of objects it just laid
+        /// out, and each of them was getting this wrong in its own way. It is fiddlier than
+        /// it looks: <see cref="Camera.orthographicSize"/> is a half-<em>height</em>, so the
+        /// half-width has to be divided by the aspect before the two can be compared, and
+        /// the bounds have to be measured in the camera's own space rather than the world's
+        /// or a raked view crops its own corners.
+        /// </para>
+        /// <para>
+        /// The camera is pulled a long way back and given a far plane to match rather than
+        /// fitted to the depth of the contents, because an orthographic camera loses nothing
+        /// by standing further off and a near plane that clips the front row of a preview is
+        /// the failure this avoids.
+        /// </para>
+        /// </remarks>
+        public static void FrameOrthographic(
+            Camera camera, Bounds contents, float aspect, float margin)
+        {
+            if (camera == null)
+            {
+                throw new ArgumentNullException(nameof(camera));
+            }
+
+            Quaternion inverseRotation = Quaternion.Inverse(camera.transform.rotation);
+            float halfWidth = 0.0f;
+            float halfHeight = 0.0f;
+            float halfDepth = 0.0f;
+
+            for (int corner = 0; corner < 8; corner++)
+            {
+                var offset = new Vector3(
+                    (corner & 1) == 0 ? -contents.extents.x : contents.extents.x,
+                    (corner & 2) == 0 ? -contents.extents.y : contents.extents.y,
+                    (corner & 4) == 0 ? -contents.extents.z : contents.extents.z);
+                Vector3 local = inverseRotation * offset;
+
+                halfWidth = Mathf.Max(halfWidth, Mathf.Abs(local.x));
+                halfHeight = Mathf.Max(halfHeight, Mathf.Abs(local.y));
+                halfDepth = Mathf.Max(halfDepth, Mathf.Abs(local.z));
+            }
+
+            camera.orthographic = true;
+            camera.orthographicSize = Mathf.Max(halfHeight, halfWidth / aspect) * margin;
+            camera.farClipPlane = (2.0f * halfDepth) + 400.0f;
+            camera.transform.position = contents.center - (camera.transform.forward * (halfDepth + 200.0f));
+        }
+
+        /// <summary>
         /// Reads an output path from the command line, falling back to a default.
         /// </summary>
         /// <param name="argument">Switch to look for, including its leading dash.</param>

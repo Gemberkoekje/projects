@@ -461,15 +461,32 @@ namespace IronFlag.Editing
             dirtyMark = EditorTheme.Label("Dirty", bar, 19, TextAnchor.MiddleLeft);
             EditorTheme.Place(dirtyMark.rectTransform, left + Gutter, bottom, 140.0f, RowHeight);
 
-            // Play is the only button on this bar that leaves the editor, so it goes on the
-            // far side of it, away from everything that does not.
+            // The two buttons that leave the editor go on the far side of the bar, away from
+            // everything that does not. Play saves on its way out and Menu does not, which is
+            // why only one of them is guarded: leaving for the menu is the only door out of
+            // here that can discard a map.
             EditorButton play = Make(
                 bar, "Play", "PLAY THIS MAP", 0.0f, bottom, 210.0f, () => session.Playtest());
-            RectTransform playRect = play.Rect;
-            playRect.anchorMin = new Vector2(1.0f, 0.0f);
-            playRect.anchorMax = new Vector2(1.0f, 0.0f);
-            playRect.pivot = new Vector2(1.0f, 0.0f);
-            playRect.anchoredPosition = new Vector2(-Margin, bottom);
+            PinRight(play.Rect, Margin, bottom);
+
+            EditorButton menu = Make(
+                bar, "Menu", "MENU", 0.0f, bottom, 108.0f,
+                () => Guard("menu", "Going back to the menu", () => session.BackToMenu()));
+            PinRight(menu.Rect, Margin + 210.0f + Gutter, bottom);
+        }
+
+        /// <summary>
+        /// Anchors a rectangle to the right-hand end of the bar it is on.
+        /// </summary>
+        /// <param name="rect">Rectangle to place.</param>
+        /// <param name="right">Distance in from the right-hand edge, in canvas units.</param>
+        /// <param name="bottom">Distance up from the bottom edge, in canvas units.</param>
+        private static void PinRight(RectTransform rect, float right, float bottom)
+        {
+            rect.anchorMin = new Vector2(1.0f, 0.0f);
+            rect.anchorMax = new Vector2(1.0f, 0.0f);
+            rect.pivot = new Vector2(1.0f, 0.0f);
+            rect.anchoredPosition = new Vector2(-right, bottom);
         }
 
         /// <summary>
@@ -898,9 +915,9 @@ namespace IronFlag.Editing
 
             makeNote.text = wanted.IsSolo
                 ? "One bunker, and an enemy that is a field of flag towers behind their own "
-                    + "emplacements. A solo map cannot be played yet, so the Problems panel "
-                    + "will name green's missing towers and brown's missing bunker: both are "
-                    + "expected."
+                    + "emplacements. Break towers until you find the flag, then drive it home. "
+                    + "The Problems panel judges it as a one-player map, so brown's missing "
+                    + "bunker is the mode rather than a fault."
                 : "The same seed and the same settings always draw the same map, so a seed "
                     + "worth keeping is worth writing down. What comes out is an ordinary map: "
                     + "every tool works on it, and the Problems panel says whether it plays.";

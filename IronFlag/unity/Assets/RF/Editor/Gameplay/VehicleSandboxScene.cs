@@ -11,6 +11,7 @@ using IronFlag.Destruction;
 using IronFlag.Editing;
 using IronFlag.Editor.ArtPipeline;
 using IronFlag.Levels;
+using IronFlag.Menu;
 using IronFlag.Objective;
 using IronFlag.Players;
 using IronFlag.Supply;
@@ -59,7 +60,15 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Input actions the players are wired up to.</summary>
         public const string ActionsPath = "Assets/RF/Input/IronFlagControls.inputactions";
 
-        /// <summary>How many local players the sandbox seats.</summary>
+        /// <summary>How many local players the sandbox builds seats for.</summary>
+        /// <remarks>
+        /// Seats <em>built</em>, which since one-player mode is no longer the same number as
+        /// seats played. The scene is generated once and the map is chosen later, off a menu,
+        /// so this cannot be the answer to how many people are playing - it is the most the
+        /// scene is ready for. <see cref="IronFlag.Players.SessionSeating"/> empties the ones
+        /// the loaded map has no side for, on the first frame, before anybody is dealt a
+        /// controller or half a screen.
+        /// </remarks>
         public const int PlayerCount = 2;
 
         /// <summary>The map the scene is built around.</summary>
@@ -124,6 +133,7 @@ namespace IronFlag.Editor.Gameplay
             Build();
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(ScenePath)));
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
+            BuildScenes.Register();
             AssetDatabase.Refresh();
             Debug.Log($"IronFlag: vehicle sandbox saved to {ScenePath}");
         }
@@ -797,6 +807,12 @@ namespace IronFlag.Editor.Gameplay
             session.Configure(controls, players);
             session.ApplyViewports();
 
+            // How many of those seats are actually played is the map's answer rather than
+            // this builder's, and the map is not chosen until the menu. This is what asks it,
+            // on the first frame of every match: on a one-player map it empties the seat
+            // whose side has no bunker and gives the player who is left the whole screen.
+            host.AddComponent<SessionSeating>();
+
             // The match is what is being played, not part of what it is played on: it goes
             // here rather than on the map so that loading a level does not silently restart
             // it, and so a level file never has to describe a rule.
@@ -805,6 +821,11 @@ namespace IronFlag.Editor.Gameplay
             // The way back out of a playtest. It switches itself off unless the editor is
             // what loaded this scene, so a match started normally is exactly what it was.
             host.AddComponent<PlaytestReturn>();
+
+            // The way back out of a match, which every session has: Escape twice returns to
+            // the menu. Always on, unlike the one above - the menu is where every session
+            // started, so there is always something behind a match to go back to.
+            host.AddComponent<MenuReturn>();
         }
 
         /// <summary>

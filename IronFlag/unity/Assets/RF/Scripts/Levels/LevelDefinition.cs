@@ -22,7 +22,10 @@ namespace IronFlag.Levels
     /// What it deliberately does <em>not</em> carry is balance. A level says a building
     /// stands here; how much a building takes is <see cref="StructureTuning.For"/>, and how
     /// far you can see a flag from is <see cref="IronFlag.Objective.FlagRules"/>. Two levels
-    /// that disagreed about either would be two games wearing one name.
+    /// that disagreed about either would be two games wearing one name. There is exactly one
+    /// exception, <see cref="Reserve"/>, and it is one because how many vehicles a side is
+    /// given is a quantity placed on a map rather than a rule about what one of them does -
+    /// the same kind of fact as how many towers there are.
     /// </para>
     /// <para>
     /// It is read and written by <see cref="LevelFile"/> as JSON, through Unity's
@@ -67,8 +70,16 @@ namespace IronFlag.Levels
         /// <see cref="LevelStructure.Side"/> alongside this - it is the whole of what
         /// changed in the format.
         /// </para>
+        /// <para>
+        /// Version 4 is <see cref="Reserve"/>: how many of each vehicle a side gets before
+        /// it has none. This is the sharpest bump yet, because the field an older build
+        /// cannot see is the one that ends the match. A map built around four jeeps a side
+        /// read by a build that has never heard of the reserve is played with an endless
+        /// supply of them, which is not a version of that map - it is a different game with
+        /// no losing in it.
+        /// </para>
         /// </remarks>
-        public const int Schema = 3;
+        public const int Schema = 4;
 
         /// <summary>Format version of the file this came from.</summary>
         [Tooltip("Format version of the level file.")]
@@ -110,6 +121,15 @@ namespace IronFlag.Levels
 
         /// <summary>How far the world goes, and where the sea sits in it.</summary>
         public LevelBounds Bounds = new LevelBounds();
+
+        /// <summary>How many of each vehicle each side gets for the whole match.</summary>
+        /// <remarks>
+        /// The one piece of balance a level is allowed to carry, and
+        /// <see cref="LevelReserve"/> argues why. A file that leaves it out gets the
+        /// standard allotment rather than nothing, which is what makes every map written
+        /// before version 4 still a playable map.
+        /// </remarks>
+        public LevelReserve Reserve = new LevelReserve();
 
         /// <summary>Every rectangle of dry ground. Everything else is sea.</summary>
         public LevelLand[] Land = Array.Empty<LevelLand>();
@@ -176,6 +196,54 @@ namespace IronFlag.Levels
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Reports whether a side is played on this map at all.
+        /// </summary>
+        /// <param name="side">Side to look up.</param>
+        /// <returns><c>true</c> when the map gives that side somewhere to deploy from.</returns>
+        /// <remarks>
+        /// A bunker is the whole of the question. It is where a side's vehicles come from,
+        /// where they are repaired, and where a flag has to be driven to for the match to be
+        /// won - so a side without one cannot take part, whatever else the file gives it.
+        /// Emplacements and flag towers are not a side taking part: they are scenery that
+        /// belongs to somebody, which is exactly what a one-player map's enemy is.
+        /// </remarks>
+        public bool IsPlayed(Team side) => BunkerFor(side) != null;
+
+        /// <summary>
+        /// Whether this is a one-player map: one side is played and the other is not.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The one fact the rest of the game reads off a level file to tell the two modes
+        /// apart, and it is deliberately derived rather than a flag in the JSON. A map with
+        /// one bunker on it <em>is</em> a solo map - there is no second arrangement of the
+        /// same file that means something else - and a stored boolean would be a second
+        /// answer that could disagree with the first.
+        /// </para>
+        /// <para>
+        /// Read by <see cref="LevelValidation"/> to know which rules apply and by
+        /// <see cref="IronFlag.Players.SessionSeating"/> to know how many seats to fill. A
+        /// map with no bunkers at all is not solo: it is broken, and validation says so.
+        /// </para>
+        /// </remarks>
+        public bool IsSolo
+        {
+            get
+            {
+                int played = 0;
+                foreach (Team side in Teams.Playing)
+                {
+                    if (IsPlayed(side))
+                    {
+                        played++;
+                    }
+                }
+
+                return played == 1;
+            }
         }
 
         /// <summary>

@@ -422,8 +422,33 @@ namespace IronFlag.UI
             bool won = match.Winner == player.Team;
             resultTitle.text = won ? "VICTORY" : "DEFEAT";
             resultTitle.color = won ? HudPalette.For(match.Winner) : HudPalette.FadedInk;
-            resultNote.text =
-                $"{match.FlagTaken.ToString().ToUpperInvariant()} FLAG RETURNED TO THE BUNKER";
+            resultNote.text = ResultNote(match);
+        }
+
+        /// <summary>
+        /// Returns the line under VICTORY or DEFEAT saying what actually happened.
+        /// </summary>
+        /// <param name="match">The finished match.</param>
+        /// <returns>One line, naming the side it happened to.</returns>
+        /// <remarks>
+        /// Named for the loser in both cases, which is the same choice
+        /// <see cref="Match.Beaten"/> makes: the winner is already on the line above in
+        /// letters an inch high, and what the player in front of this panel does not know is
+        /// which of the two ways it ended.
+        /// </remarks>
+        private static string ResultNote(Match match)
+        {
+            string side = match.Beaten.ToString().ToUpperInvariant();
+
+            switch (match.Outcome)
+            {
+                case MatchOutcome.FlagCaptured:
+                    return $"{side} FLAG RETURNED TO THE BUNKER";
+                case MatchOutcome.OutOfJeeps:
+                    return $"{side} HAS NO JEEPS LEFT";
+                default:
+                    return string.Empty;
+            }
         }
 
         /// <summary>
@@ -566,14 +591,22 @@ namespace IronFlag.UI
                 VehicleBay bay = player.BayFor(row);
                 bool chosen = row == player.Selected;
 
+                // How many are left is shown against the name rather than in the state
+                // column, because it is a fact about the vehicle rather than about what it
+                // is doing - and the state column already has a number in it while a wreck
+                // is being repaired.
+                int left = player.RemainingOf(row);
+                bool counted = vehicle != null && left != int.MaxValue;
+                bool gone = counted && left <= 0;
+
                 rowPlates[row].enabled = chosen;
                 rowNames[row].color = chosen ? HudPalette.Ink : HudPalette.FadedInk;
                 rowNames[row].text = chosen
-                    ? $"> {NameOf(vehicle)}"
-                    : $"  {NameOf(vehicle)}";
+                    ? $"> {NameOf(vehicle)}{Stock(counted, left)}"
+                    : $"  {NameOf(vehicle)}{Stock(counted, left)}";
 
-                rowStates[row].text = StateOf(bay);
-                rowStates[row].color = ColorOf(bay, side);
+                rowStates[row].text = gone ? "NONE LEFT" : StateOf(bay);
+                rowStates[row].color = gone ? HudPalette.Alarm : ColorOf(bay, side);
             }
 
             bunkerPrompt.text = Prompt();
@@ -698,6 +731,20 @@ namespace IronFlag.UI
             => vehicle == null ? "-" : VehicleNames.For(vehicle.Kind);
 
         /// <summary>
+        /// Returns how many of one vehicle are left, as it reads on the roster.
+        /// </summary>
+        /// <param name="counted">Whether anything is limiting this vehicle at all.</param>
+        /// <param name="left">How many are left.</param>
+        /// <returns>A count to put after the name, or nothing when none is being kept.</returns>
+        /// <remarks>
+        /// Blank rather than a large number when nothing limits it. A sandbox with no
+        /// reserve in it is not a side with a million jeeps; it is a side nobody is counting,
+        /// and a panel that said so would be reporting a rule that is not being played.
+        /// </remarks>
+        private static string Stock(bool counted, int left)
+            => counted ? $"  ×{left}" : string.Empty;
+
+        /// <summary>
         /// Returns the line under the roster telling the player which buttons do what.
         /// </summary>
         /// <returns>A prompt in the words of whatever they are holding.</returns>
@@ -722,9 +769,16 @@ namespace IronFlag.UI
             string choose = pad ? "LB / RB" : "Q / E";
             string send = pad ? "X" : "F";
 
-            return player.CanDeploy
-                ? $"{choose}  CHOOSE          {send}  DEPLOY"
-                : $"{choose}  CHOOSE          STILL IN REPAIR";
+            if (player.CanDeploy)
+            {
+                return $"{choose}  CHOOSE          {send}  DEPLOY";
+            }
+
+            // Two different reasons a vehicle cannot leave, and they want opposite things
+            // from the player: one is worth waiting out and the other never comes back.
+            return player.HasOneLeft(player.Selected)
+                ? $"{choose}  CHOOSE          STILL IN REPAIR"
+                : $"{choose}  CHOOSE          NONE LEFT";
         }
 
         /// <summary>
@@ -749,6 +803,15 @@ namespace IronFlag.UI
                 && theirs.IsWithinReach(watched.transform.position))
             {
                 return "ONLY THE JEEP CARRIES IT";
+            }
+
+            // Second, and the only line here about something that will not come back. The
+            // roster panel counts the reserve and this screen does not, so a pilot who is
+            // driving the last of something would otherwise find out by losing it.
+            if (watched != null
+                && TeamReserve.LeftFor(player.Team, watched.Kind) == 1)
+            {
+                return $"YOUR LAST {VehicleNames.For(watched.Kind).ToUpperInvariant()}";
             }
 
             if (watchedSupply != null && watchedSupply.Serving != null)

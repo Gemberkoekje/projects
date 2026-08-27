@@ -128,6 +128,16 @@ namespace IronFlag.Editing
         /// <summary>Metres of clearance a bridge is settled with.</summary>
         private const float BridgeRoom = 10.0f;
 
+        /// <summary>Metres of clearance one segment of a wall run is settled with.</summary>
+        /// <remarks>
+        /// Half a segment, which is the only room here that is a measurement rather than a
+        /// judgement — and it has to be under <see cref="LevelEdits.SegmentLength"/> or a run
+        /// would crowd itself out one segment after the first. It is the same number
+        /// <see cref="LevelPick.ReachOf"/> uses for the same reason: the boundary between two
+        /// segments falls exactly on the join a player can see.
+        /// </remarks>
+        private const float RampartRoom = LevelEdits.SegmentLength * 0.5f;
+
         /// <summary>How far out a side's bunker stands, as a share of the world.</summary>
         /// <remarks>
         /// These six ratios are read off the shipped map rather than invented. At its 120 m
@@ -153,6 +163,16 @@ namespace IronFlag.Editing
 
         /// <summary>How far out a side's emplacements stand, as a share of the world.</summary>
         private const float FrontOut = 0.20f;
+
+        /// <summary>How far out a side's wall runs stand, as a share of the world.</summary>
+        /// <remarks>
+        /// <strong>Behind the emplacements, not in front of them.</strong> A round stops on
+        /// the first thing it hits and a wall is two metres tall, so a run laid between a
+        /// turret and the enemy is a turret firing into its own defences. Between
+        /// <see cref="FrontOut"/> and <see cref="DepotOut"/> puts it where a second line
+        /// belongs: the guns cover the approach, and what gets past them meets the wall.
+        /// </remarks>
+        private const float RampartOut = 0.24f;
 
         /// <summary>Metres wide a causeway is built.</summary>
         /// <remarks>
@@ -280,32 +300,31 @@ namespace IronFlag.Editing
         /// Lists what is wrong with a candidate, judged as the kind of map it was asked to be.
         /// </summary>
         /// <param name="level">The candidate.</param>
-        /// <param name="options">What was asked for.</param>
+        /// <param name="options">What was asked for, which nothing here needs any more.</param>
         /// <returns>One sentence per fault; empty when there is nothing to re-roll away from.</returns>
         /// <remarks>
         /// <para>
-        /// For an ordinary two-sided map this is <see cref="LevelValidation.Problems"/> and
-        /// nothing else. There is one definition of a broken map and this is not a second one.
+        /// <see cref="LevelValidation.Problems"/> and nothing else, for both kinds of map.
+        /// There is one definition of a broken map and this is not a second one.
         /// </para>
         /// <para>
-        /// A solo map is the exception, and an honest one. Validation encodes the rules of a
-        /// <em>match</em> - both sides own a bunker, both sides own exactly one real tower -
-        /// and a map with one side on it breaks three of them on purpose. Scoring re-rolls
-        /// against those would leave every attempt tied at three, with the loop picking
-        /// between them on noise. So a solo candidate is scored on the rules that survive the
-        /// shape change, plus the one that replaces the missing crossing rule: every enemy
-        /// tower has to be reachable from the one bunker by land. The editor's Problems panel
-        /// still shows <see cref="LevelValidation"/>'s unfiltered answer, which will still
-        /// name the three - the truthful thing for it to say until the master plan's 1-player
-        /// item teaches validation what a solo map is. These checks should move there when it
-        /// does.
+        /// It used to be two. A solo candidate was scored against a private copy of the rules
+        /// that survive the shape change, because validation knew only the rules of a
+        /// <em>match</em> - both sides own a bunker, both own exactly one real tower - and a
+        /// one-player map breaks three of them on purpose, which left every re-roll tied at
+        /// three faults and the loop picking between them on noise. Validation knows what a
+        /// one-player map is now, so the copy is gone and the editor's Problems panel and the
+        /// re-roll loop are reading the same answer again.
+        /// </para>
+        /// <para>
+        /// The options are still taken, and still ignored, so that the caller does not have to
+        /// know that the distinction has stopped mattering - the kind of map a candidate is
+        /// is legible from the candidate itself, which is the point of
+        /// <see cref="LevelDefinition.IsSolo"/>.
         /// </para>
         /// </remarks>
         public static List<string> Faults(LevelDefinition level, MapOptions options)
-        {
-            MapOptions settled = (options == null ? new MapOptions() : options).Settled();
-            return settled.IsSolo ? SoloFaults(level) : LevelValidation.Problems(level);
-        }
+            => LevelValidation.Problems(level);
 
         /// <summary>
         /// Returns how far apart two of a side's towers have to stand.
@@ -1154,6 +1173,16 @@ namespace IronFlag.Editing
 
             Bunker(level, side, frame, taken, dice);
             Towers(level, side, frame, taken, dice);
+
+            // Before the depots and the guns, which is a claim about priority and worth
+            // reading as one. A wall run is not something a map owes - it is skipped when
+            // there is nowhere for it - but it is the one thing here whose shape is fixed:
+            // its segments must touch, so it cannot be nudged aside the way a settled depot
+            // or a settled emplacement can. Laid first, everything after it settles around
+            // the finished run; laid last, it would be the only thing on the map that could
+            // not get out of its own way.
+            Ramparts(level, side, frame, tier.Ramparts, taken, dice);
+
             Depots(level, side, frame, taken, dice);
             Turrets(level, side, frame, tier.Turrets, taken, dice);
             Scenery(level, side, frame, tier, taken, dice);
@@ -1180,6 +1209,15 @@ namespace IronFlag.Editing
         /// of the order they were placed in. <see cref="LevelEdits.AddTower"/> makes a side's
         /// first tower the real one, which is the right rule for somebody building a map by
         /// hand and would put a generated map's flag in the same relative position every time.
+        /// </para>
+        /// <para>
+        /// <strong>A solo map gets no <see cref="Ramparts"/>, deliberately.</strong> Green's
+        /// front is the one piece of ground on a solo map that nothing ever attacks, so a
+        /// gated wall run across it would be a defence against nobody; and the place a wall
+        /// genuinely belongs here - ringing each of brown's fortresses - wants a run laid
+        /// against a tower rather than settled away from one, which
+        /// <see cref="FortressRoom"/> currently makes impossible. That is a piece of design
+        /// work rather than a missing call, and it is the obvious next thing to do with this.
         /// </para>
         /// </remarks>
         private static void SoloProps(
@@ -1266,7 +1304,7 @@ namespace IronFlag.Editing
                 if (Settle(level, wanted, LevelValidation.ShoreMargin, TurretRoom, taken, dice,
                     out Vector3 at))
                 {
-                    Emplacement(level, Team.Brown, at, dice);
+                    Emplacement(level, Team.Brown, at);
                 }
             }
         }
@@ -1434,7 +1472,7 @@ namespace IronFlag.Editing
                 if (Settle(level, wanted, LevelValidation.ShoreMargin, TurretRoom, taken, dice,
                     out Vector3 at))
                 {
-                    Emplacement(level, side, at, dice);
+                    Emplacement(level, side, at);
                 }
             }
         }
@@ -1445,14 +1483,24 @@ namespace IronFlag.Editing
         /// <param name="level">The level being built.</param>
         /// <param name="side">Whose it is.</param>
         /// <param name="at">Where it stands.</param>
-        /// <param name="dice">The dice, for the heading.</param>
         /// <remarks>
+        /// <para>
         /// An emplacement always belongs to somebody. One with no side has nobody to shoot at
         /// and stands there looking exactly like one that works, which is a mistake only
         /// <see cref="LevelValidation"/> catches - so the side goes in at the moment of
         /// placing rather than being something a later pass remembers.
+        /// </para>
+        /// <para>
+        /// The heading is the one thing here the dice do not touch. Where an emplacement
+        /// stands is a roll; which way it looks is
+        /// <see cref="LevelEdits.FacingTheEnemy"/>, the same answer a hand-placed one gets.
+        /// It used to be that heading give or take twenty-five degrees, which was meant to
+        /// stop a line of guns looking stamped out and instead made every generated map
+        /// look like nobody had aimed them: at rest a side's barrels all point the same way
+        /// or the emplacements read as scattered rather than sited.
+        /// </para>
         /// </remarks>
-        private static void Emplacement(LevelDefinition level, Team side, Vector3 at, Dice dice)
+        private static void Emplacement(LevelDefinition level, Team side, Vector3 at)
         {
             int placed = LevelEdits.AddStructure(level, StructureKind.Turret, at, side);
             if (placed < 0)
@@ -1461,8 +1509,233 @@ namespace IronFlag.Editing
             }
 
             level.Structures[placed].Name = Name("Turret", side);
-            level.Structures[placed].YawDegrees = Mathf.Repeat(
-                (side == Team.Brown ? 180.0f : 0.0f) + dice.Spread(25.0f), 360.0f);
+            level.Structures[placed].YawDegrees = LevelEdits.FacingTheEnemy(side);
+        }
+
+        /// <summary>
+        /// Lays one side's wall runs across the ground in front of its home.
+        /// </summary>
+        /// <param name="level">The level being built.</param>
+        /// <param name="side">Whose runs.</param>
+        /// <param name="frame">The shared numbers.</param>
+        /// <param name="count">How many runs there are.</param>
+        /// <param name="taken">Spots already used.</param>
+        /// <param name="dice">This side's dice.</param>
+        /// <remarks>
+        /// <para>
+        /// Dealt round the crossings like the emplacements are, and for the same reason: a
+        /// crossing is the one place on a map where an attacker's route is already decided,
+        /// so it is the one place where a twenty-metre barrier is worth the concrete. Where
+        /// there are no crossings there is no such place, and the runs spread along the front
+        /// instead.
+        /// </para>
+        /// <para>
+        /// <strong>The middle is settled and the rest is not.</strong> Only the gate has to
+        /// find somewhere sensible; the segments either side of it have to be exactly one
+        /// segment apart or the run is not a run — see <see cref="Rampart"/>. That is the
+        /// whole reason this could not be one more loop in <see cref="Scenery"/>:
+        /// <see cref="Settle"/> exists to keep things apart, and a wall only reads as a wall
+        /// when it touches itself.
+        /// </para>
+        /// </remarks>
+        private static void Ramparts(
+            LevelDefinition level,
+            Team side,
+            Frame frame,
+            int count,
+            List<Placed> taken,
+            Dice dice)
+        {
+            float[] crossings = Crossings(frame);
+
+            // One run per crossing at most. Two runs dealt the same crossing would want the
+            // same spot with only the depth jitter between them, and land as a double wall
+            // four metres apart - which is not two defences, it is one defence drawn twice.
+            // An asymmetrical channel can come out with as few as two crossings, so this is
+            // reachable at the hard setting rather than theoretical.
+            int runs = crossings.Length > 0 ? Mathf.Min(count, crossings.Length) : count;
+
+            for (int run = 0; run < runs; run++)
+            {
+                // Dead centre on the crossing, with no jitter across at all - which is the
+                // opposite of what every other placement here does and is the whole point of
+                // this one. The gate is the middle segment, so centring the run on the road
+                // puts the gate on the road; nudging it even a few metres sideways puts a
+                // *wall* on the road instead, and the side that built it then has to shoot
+                // its own rampart to use its own causeway. The variety this gives up comes
+                // back as the depth jitter below and the rolled length.
+                float across = crossings.Length > 0
+                    ? crossings[run % crossings.Length] / frame.Extent
+                    : dice.Between(-0.40f, 0.40f);
+
+                float outward = RampartOut + dice.Spread(0.03f);
+
+                // The run lies across the line of advance, so its heading is the one that
+                // keeps the same distance from home. Taken as the difference between two
+                // points either side of it rather than as world X, because on a lagoon that
+                // heading is a tangent to the ring and on everything else it is X - and Where
+                // is the one place that fold is written down. Measured off the asked-for spot
+                // rather than the settled one, so a run that had to shuffle inland still lies
+                // the way the map wanted it to.
+                Vector3 along = Where(frame, side, outward, across + 0.05f)
+                    - Where(frame, side, outward, across - 0.05f);
+
+                // Skipped rather than forced when there is nowhere for it, exactly as an
+                // emplacement is: a wall is how heavily a map is defended rather than
+                // something it owes, and one in the sea fails the whole map.
+                if (!Settle(level, Where(frame, side, outward, across), LevelValidation.ShoreMargin,
+                    RampartRoom, taken, dice, out Vector3 at))
+                {
+                    continue;
+                }
+
+                // Settle reserves the spot it found, and the gate is about to ask whether that
+                // spot is free. Taking the reservation back is what stops the run being
+                // crowded out by its own placeholder - and it is safe to take the last one,
+                // because Settle appends exactly one entry and nothing has run since.
+                taken.RemoveAt(taken.Count - 1);
+
+                Rampart(level, side, at, along, 3 + (2 * dice.Upto(3)), taken);
+            }
+        }
+
+        /// <summary>
+        /// Lays a run of wall outward from a gate belonging to one side.
+        /// </summary>
+        /// <param name="level">The level being built.</param>
+        /// <param name="side">Whose gate stands in the middle of it.</param>
+        /// <param name="middle">Where the gate goes.</param>
+        /// <param name="along">Which way the run lies; its length is ignored.</param>
+        /// <param name="segments">How long the run is, gate included. Odd.</param>
+        /// <param name="taken">Spots already used.</param>
+        /// <returns>How many segments were actually laid, or zero when none were.</returns>
+        /// <remarks>
+        /// <para>
+        /// <strong>Grown outward from the gate, not laid end to end.</strong> A run that meets
+        /// the water halfway comes out short at that end with its gate still in it; laid from
+        /// one end, the arm that ran out of land would be the one carrying the gate, and the
+        /// side that built the wall would have walled itself in.
+        /// </para>
+        /// <para>
+        /// The gate is the middle segment, which is the only place it is worth having: a gate
+        /// at the end of a run is one an attacker drives round rather than one they have to
+        /// answer. It is also why the count is odd — an even run has no middle.
+        /// </para>
+        /// <para>
+        /// The segments are placed rather than settled, and the pitch is exactly
+        /// <see cref="LevelEdits.SegmentLength"/>: two neighbours have to butt into one wall
+        /// with a single pier at the join, which is the whole difference between a wall and a
+        /// row of boxes. They still go into <paramref name="taken"/>, so everything placed
+        /// after keeps its own distance from the finished run.
+        /// </para>
+        /// </remarks>
+        private static int Rampart(
+            LevelDefinition level,
+            Team side,
+            Vector3 middle,
+            Vector3 along,
+            int segments,
+            List<Placed> taken)
+        {
+            var step = new Vector3(along.x, 0.0f, along.z);
+            if (segments < 1 || step.sqrMagnitude < 0.0001f)
+            {
+                return 0;
+            }
+
+            step = step.normalized;
+
+            // Unity's yaw is clockwise from +Z and a segment is modelled running along its own
+            // X - see prop_wall.py's facing note - so this is the heading that turns world X
+            // onto the run. A wall reads the same from either end, so the opposite heading
+            // would do just as well.
+            float yaw = Mathf.Repeat(Mathf.Atan2(-step.z, step.x) * Mathf.Rad2Deg, 360.0f);
+
+            // No gate, no run. A run the generator meant to be somebody's, laid without the
+            // one segment that makes it theirs, is a plain wall across their own approach -
+            // which is worse for the side that built it than no wall at all, and looks
+            // exactly like a wall that is working.
+            if (!Lay(level, StructureKind.Door, side, Name("Gate", side), middle, yaw, taken))
+            {
+                return 0;
+            }
+
+            int laid = 1;
+
+            foreach (int way in new[] { -1, 1 })
+            {
+                for (int arm = 1; arm <= (segments - 1) / 2; arm++)
+                {
+                    Vector3 at = middle + (step * (way * arm * LevelEdits.SegmentLength));
+                    if (!Lay(level, StructureKind.Wall, Team.None, Name("Rampart", side), at, yaw, taken))
+                    {
+                        break;
+                    }
+
+                    laid++;
+                }
+            }
+
+            if (laid > 1)
+            {
+                return laid;
+            }
+
+            // A gate with no wall either side of it is not a gate, it is a five-metre kerb
+            // with a door in it that anybody walks round - and it is worse than nothing,
+            // because it costs its owner sixty hit points of their own line for no barrier at
+            // all. Both arms failing at once means the middle was the only dry, clear ground
+            // there was, so the run comes out rather than coming out wrong. Taking the last
+            // structure and the last reservation is safe for the same reason as above:
+            // nothing has been placed since the gate.
+            LevelEdits.Remove(
+                level, new EditSelection(EditTarget.Structure, level.Structures.Length - 1));
+            taken.RemoveAt(taken.Count - 1);
+            return 0;
+        }
+
+        /// <summary>
+        /// Puts one segment of a run down, if there is dry ground for it.
+        /// </summary>
+        /// <param name="level">The level being built.</param>
+        /// <param name="kind">A wall or a gate.</param>
+        /// <param name="side">Whose it is; nobody, for a wall.</param>
+        /// <param name="called">What to call it in the hierarchy.</param>
+        /// <param name="at">Where it stands.</param>
+        /// <param name="yaw">Which way the run lies.</param>
+        /// <param name="taken">Spots already used.</param>
+        /// <returns><c>true</c> when a segment was laid.</returns>
+        /// <remarks>
+        /// A wall belongs to nobody even when it is part of somebody's rampart, because that
+        /// is what <see cref="StructureTuning.BelongsToASide"/> says and a level that disagrees
+        /// is refused. The run's side survives in the segment's <em>name</em>, which is also
+        /// what <see cref="Recoloured"/> flips when a mirrored map turns the run over.
+        /// </remarks>
+        private static bool Lay(
+            LevelDefinition level,
+            StructureKind kind,
+            Team side,
+            string called,
+            Vector3 at,
+            float yaw,
+            List<Placed> taken)
+        {
+            if (!level.IsOnLand(at, LevelValidation.ShoreMargin)
+                || Crowded(taken, at, RampartRoom))
+            {
+                return false;
+            }
+
+            int placed = LevelEdits.AddStructure(level, kind, at, side);
+            if (placed < 0)
+            {
+                return false;
+            }
+
+            level.Structures[placed].Name = called;
+            level.Structures[placed].YawDegrees = yaw;
+            taken.Add(new Placed(at, RampartRoom));
+            return true;
         }
 
         /// <summary>
@@ -1794,109 +2067,6 @@ namespace IronFlag.Editing
         }
 
         /// <summary>
-        /// Lists what is wrong with a solo map.
-        /// </summary>
-        /// <param name="level">The candidate.</param>
-        /// <returns>One sentence per fault.</returns>
-        /// <remarks>
-        /// Every rule here is one <see cref="LevelValidation"/> already states for a match,
-        /// asked again of a map with one side on it - and asked through that class's own
-        /// public numbers and its own flood fill, so a retuned shore margin or a rebuilt
-        /// connectivity walk moves both at once. See <see cref="Faults"/> for why this exists
-        /// at all and where it should go when it stops needing to.
-        /// </remarks>
-        private static List<string> SoloFaults(LevelDefinition level)
-        {
-            var faults = new List<string>();
-
-            if (level == null)
-            {
-                faults.Add("There is no level.");
-                return faults;
-            }
-
-            LevelBunker home = level.BunkerFor(Team.Green);
-            if (home == null)
-            {
-                faults.Add("The solo map has no bunker to start from.");
-                return faults;
-            }
-
-            if (!level.IsOnLand(home.Position, LevelValidation.BunkerShoreMargin))
-            {
-                faults.Add("The bunker is not on dry land with room around it.");
-            }
-
-            List<LevelTower> towers = level.TowersFor(Team.Brown);
-            if (towers.Count < 2)
-            {
-                faults.Add($"The enemy has {towers.Count} tower(s): a decoy needs two.");
-            }
-
-            int real = 0;
-            foreach (LevelTower tower in towers)
-            {
-                if (tower.HoldsTheFlag)
-                {
-                    real++;
-                }
-
-                if (!level.IsOnLand(tower.Position, LevelValidation.ShoreMargin))
-                {
-                    faults.Add("An enemy tower is not on dry land.");
-                    continue;
-                }
-
-                if (!LevelValidation.IsConnected(level, home.Position, tower.Position))
-                {
-                    faults.Add("An enemy tower cannot be reached from the bunker by land.");
-                }
-            }
-
-            if (real != 1)
-            {
-                faults.Add($"The enemy has {real} real towers; it needs exactly one.");
-            }
-
-            float needed = SpacingNeeded();
-            for (int a = 0; a < towers.Count; a++)
-            {
-                for (int b = a + 1; b < towers.Count; b++)
-                {
-                    if (Vector3.Distance(towers[a].Position, towers[b].Position) <= needed)
-                    {
-                        faults.Add("Two enemy towers stand inside one blast of each other.");
-                    }
-                }
-            }
-
-            foreach (LevelStructure structure in level.Structures)
-            {
-                if (structure == null || structure.Structure == StructureKind.Bridge)
-                {
-                    continue;
-                }
-
-                if (!level.IsOnLand(structure.Position, LevelValidation.ShoreMargin))
-                {
-                    faults.Add($"A {structure.Kind} at {structure.Position} stands in the sea.");
-                }
-            }
-
-            if (level.CountOf(StructureKind.DepotFuel) == 0)
-            {
-                faults.Add("There is nowhere on the map to refuel away from home.");
-            }
-
-            if (level.CountOf(StructureKind.DepotAmmo) == 0)
-            {
-                faults.Add("There is nowhere on the map to rearm away from home.");
-            }
-
-            return faults;
-        }
-
-        /// <summary>
         /// Returns the x of every crossing on the map, or nothing when it has none.
         /// </summary>
         /// <param name="frame">The shared numbers.</param>
@@ -2142,11 +2312,20 @@ namespace IronFlag.Editing
                     break;
             }
 
+            Tier tier = TierFor(options.Difficulty);
+            string defence = options.IsSolo
+                ? string.Empty
+                : $"Each side gets {Count(tier.Turrets, "emplacement", "emplacements")} and "
+                    + $"{Count(tier.Ramparts, "wall run", "wall runs")}, laid across the ground "
+                    + "behind the guns with a gate in the middle of each. A gate drops into the "
+                    + "floor for the side that built it, stands there like the wall for the "
+                    + "other, and is the softest part of the run to break through. ";
+
             string sides = options.IsSolo
                 ? "One side. Green has a bunker and no flag of its own; brown is a field of "
-                    + "towers guarded by emplacements, one of them real. Note that a solo map "
-                    + "is not playable yet - the game still seats two rosters - so this is a "
-                    + "map to edit and look at until 1-player mode lands."
+                    + "towers guarded by emplacements, one of them real. The second seat is "
+                    + "left empty when you play it, and the editor's Problems panel judges "
+                    + "the map by one-player rules rather than a match's."
                 : options.Symmetry == MapSymmetry.Mirrored
                     ? "Both halves are the same shape: everything is placed in pairs rotated "
                         + "half a turn about the origin, so neither side has a shorter run to "
@@ -2157,7 +2336,7 @@ namespace IronFlag.Editing
 
             return $"{name}. Generated from seed {options.Seed} at the "
                 + $"{options.Difficulty.ToString().ToLowerInvariant()} setting, which is a world "
-                + $"{frame.Extent * 2.0f:0} m across. {ground} {sides} Asking for seed "
+                + $"{frame.Extent * 2.0f:0} m across. {ground} {defence}{sides} Asking for seed "
                 + $"{options.Seed} again at these settings draws this map again, down to the "
                 + "trees. A generated map is a starting point rather than a finished one: the "
                 + "editor's Problems panel is the authority on whether this one is playable, "
@@ -2197,11 +2376,11 @@ namespace IronFlag.Editing
             switch (difficulty)
             {
                 case MapDifficulty.Easy:
-                    return new Tier(1, 9, 3, 3, 4);
+                    return new Tier(1, 1, 9, 3, 3, 4);
                 case MapDifficulty.Hard:
-                    return new Tier(4, 20, 6, 6, 11);
+                    return new Tier(4, 3, 20, 6, 6, 11);
                 default:
-                    return new Tier(2, 14, 4, 4, 7);
+                    return new Tier(2, 2, 14, 4, 4, 7);
             }
         }
 
@@ -2263,6 +2442,9 @@ namespace IronFlag.Editing
             /// <summary>Emplacements a side gets on a two-sided map.</summary>
             public readonly int Turrets;
 
+            /// <summary>Wall runs a side gets on a two-sided map, each with a gate in it.</summary>
+            public readonly int Ramparts;
+
             /// <summary>Trees a side gets.</summary>
             public readonly int Trees;
 
@@ -2279,13 +2461,16 @@ namespace IronFlag.Editing
             /// Makes one tier.
             /// </summary>
             /// <param name="turrets">Emplacements a side gets on a two-sided map.</param>
+            /// <param name="ramparts">Wall runs a side gets on a two-sided map.</param>
             /// <param name="trees">Trees a side gets.</param>
             /// <param name="buildings">Buildings a side gets.</param>
             /// <param name="soloTowers">Flag towers the enemy gets on a solo map.</param>
             /// <param name="soloTurrets">Emplacements the enemy gets on a solo map.</param>
-            public Tier(int turrets, int trees, int buildings, int soloTowers, int soloTurrets)
+            public Tier(
+                int turrets, int ramparts, int trees, int buildings, int soloTowers, int soloTurrets)
             {
                 Turrets = turrets;
+                Ramparts = ramparts;
                 Trees = trees;
                 Buildings = buildings;
                 SoloTowers = soloTowers;

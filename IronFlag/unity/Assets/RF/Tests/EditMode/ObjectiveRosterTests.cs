@@ -516,15 +516,31 @@ namespace IronFlag.Tests.EditMode
 
                 Assert.That(match.IsOver, Is.False);
                 Assert.That(match.Winner, Is.EqualTo(Team.None));
-                Assert.That(match.Win(Team.None, Team.Green), Is.False, "nobody won the match");
-                Assert.That(match.Win(Team.Brown, Team.Green), Is.True, "the match refused a winner");
-                Assert.That(match.Winner, Is.EqualTo(Team.Brown));
-                Assert.That(match.FlagTaken, Is.EqualTo(Team.Green));
+                Assert.That(match.Outcome, Is.EqualTo(MatchOutcome.None));
                 Assert.That(
-                    match.Win(Team.Green, Team.Brown),
+                    match.Win(Team.None, Team.Green, MatchOutcome.FlagCaptured),
+                    Is.False,
+                    "nobody won the match");
+                Assert.That(
+                    match.Win(Team.Brown, Team.Green, MatchOutcome.None),
+                    Is.False,
+                    "the match was won by nothing in particular");
+                Assert.That(
+                    match.Win(Team.Brown, Team.Green, MatchOutcome.FlagCaptured),
+                    Is.True,
+                    "the match refused a winner");
+                Assert.That(match.Winner, Is.EqualTo(Team.Brown));
+                Assert.That(match.Beaten, Is.EqualTo(Team.Green));
+                Assert.That(match.Outcome, Is.EqualTo(MatchOutcome.FlagCaptured));
+                Assert.That(
+                    match.Win(Team.Green, Team.Brown, MatchOutcome.OutOfJeeps),
                     Is.False,
                     "the match was won twice");
                 Assert.That(match.Winner, Is.EqualTo(Team.Brown), "the first result did not stand");
+                Assert.That(
+                    match.Outcome,
+                    Is.EqualTo(MatchOutcome.FlagCaptured),
+                    "the second ending overwrote how the match was actually won");
             }
             finally
             {

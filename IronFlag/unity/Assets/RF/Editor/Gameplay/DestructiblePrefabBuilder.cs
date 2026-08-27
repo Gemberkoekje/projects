@@ -58,6 +58,38 @@ namespace IronFlag.Editor.Gameplay
         public const float TurretTraverseRate = 80.0f;
 
         /// <summary>
+        /// Metres from a gate at which a vehicle of its own side opens it.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Not a taste number: it falls out of one requirement, which is that
+        /// <strong>the fastest thing in the game must not have to slow down</strong>. A
+        /// gate that made the jeep brake would be a gate its owner drove round, and the
+        /// jeep is the vehicle that carries the flag, so a defence that inconveniences the
+        /// side that built it is worse than no defence.
+        /// </para>
+        /// <para>
+        /// The jeep tops out at 22 m/s and the leaf takes 0.60 s to drop, so it must be
+        /// noticed at least 13.2 m out. Sixteen gives a fifth of that again in margin,
+        /// which covers the leaf's own half-thickness and the fact that a driver aims at
+        /// the gate rather than at its centre. <c>DoorTuningTests</c> checks that
+        /// arithmetic against the built asset rather than against this comment.
+        /// </para>
+        /// </remarks>
+        public const float DoorReach = 16.0f;
+
+        /// <summary>
+        /// Metres per second a gate's leaf travels.
+        /// </summary>
+        /// <remarks>
+        /// Roughly two metres in six tenths of a second. Fast enough to satisfy
+        /// <see cref="DoorReach"/>'s requirement above, slow enough that a player watching
+        /// an enemy gate sees it move and knows somebody is coming - which is the one thing
+        /// a gate tells the side it is not built for.
+        /// </remarks>
+        public const float DoorLeafSpeed = 3.5f;
+
+        /// <summary>
         /// Rebuilds every destructible prefab.
         /// </summary>
         [MenuItem("Tools/IronFlag/Build Destructible Prefabs", false, 153)]
@@ -205,12 +237,130 @@ namespace IronFlag.Editor.Gameplay
                 destroyed,
                 CombatPrefabBuilder.LoadDebris());
 
+            AddSmoke(root, intact);
+
             if (kind == StructureKind.Turret)
             {
                 AddGun(root);
             }
 
+            if (kind == StructureKind.Door)
+            {
+                AddLeaf(root);
+            }
+
             return root;
+        }
+
+        /// <summary>
+        /// Gives a structure something to smoke with once it has been cracked.
+        /// </summary>
+        /// <param name="root">The assembled prefab.</param>
+        /// <param name="intact">The untouched model, which is what gets measured.</param>
+        /// <remarks>
+        /// <para>
+        /// Measured off the <em>intact</em> model rather than off whatever is showing, for
+        /// the reason <see cref="IronFlag.Destruction.Destructible"/> measures its debris
+        /// before the swap: the smoke marks a building, and taking the size of the knee-high
+        /// rubble that replaced it would put a wall's plume where a wall is not.
+        /// </para>
+        /// <para>
+        /// Every destructible gets one, including the tree and the bridge. A cracked tree
+        /// smoking is a tree on fire, which is fair; and a rule about which kinds may smoke
+        /// would be a second list to keep in step with
+        /// <see cref="IronFlag.Destruction.StructureKind"/> for the sake of excluding two
+        /// things nobody would miss.
+        /// </para>
+        /// </remarks>
+        private static void AddSmoke(GameObject root, GameObject intact)
+        {
+            Vector3 middle = Vector3.up;
+            float size = 3.0f;
+
+            var bounds = new Bounds();
+            bool started = false;
+            foreach (Renderer renderer in intact.GetComponentsInChildren<Renderer>(true))
+            {
+                if (started)
+                {
+                    bounds.Encapsulate(renderer.bounds);
+                }
+                else
+                {
+                    bounds = renderer.bounds;
+                    started = true;
+                }
+            }
+
+            if (started)
+            {
+                // Two thirds of the way up, which is where a building burns rather than
+                // where its middle is.
+                middle = new Vector3(
+                    bounds.center.x,
+                    bounds.center.y + (bounds.extents.y * 0.35f),
+                    bounds.center.z);
+                size = Mathf.Max(1.5f, bounds.extents.magnitude);
+            }
+
+            VfxPrefabBuilder.AddDamageSmoke(root, middle, size);
+        }
+
+        /// <summary>
+        /// Makes the one destructible that gets out of the way able to move.
+        /// </summary>
+        /// <param name="root">The assembled door prefab.</param>
+        /// <remarks>
+        /// <para>
+        /// The opposite of what <see cref="AddGun"/> does to a turret's head, and worth
+        /// reading against it. A turret's head has its colliders <em>stripped</em>, because
+        /// it traverses every frame and a mesh collider that moves is a static collider
+        /// Unity rebuilds each time it does - and the base underneath is already the thing
+        /// a vehicle bumps into. A door's leaf has no such stand-in: being solid is the
+        /// entire point of it, and stripping its colliders would leave a gate that looks
+        /// shut and is not.
+        /// </para>
+        /// <para>
+        /// So the leaf keeps its colliders and gets a kinematic <see cref="Rigidbody"/>
+        /// instead, which is the same problem answered the other way round: it tells the
+        /// physics engine this collider is expected to move, so a sliding leaf re-places
+        /// one body rather than dirtying the static scene every step. Kinematic because
+        /// nothing may push a gate - not gravity, not a tank leaning on it - and a
+        /// non-convex mesh collider is only allowed on a body that is.
+        /// </para>
+        /// <para>
+        /// Which side a gate is on is not decided here. One prefab serves both, and the
+        /// level file is what hands it over - see
+        /// <see cref="IronFlag.Levels.LevelBuilder"/>.
+        /// </para>
+        /// </remarks>
+        private static void AddLeaf(GameObject root)
+        {
+            int moving = 0;
+            foreach (DestructionState state in
+                new[] { DestructionState.Intact, DestructionState.Damaged, DestructionState.Destroyed })
+            {
+                Transform model = FindIn(root.transform, NodeNameFor(state));
+                Transform leaf = model == null ? null : FindIn(model, AutoDoor.LeafNodeName);
+                if (leaf == null)
+                {
+                    continue;
+                }
+
+                var body = leaf.gameObject.AddComponent<Rigidbody>();
+                body.isKinematic = true;
+                body.useGravity = false;
+                moving++;
+            }
+
+            if (moving == 0)
+            {
+                Debug.LogWarning(
+                    $"IronFlag: {root.name} has no {AutoDoor.LeafNodeName} in any state, so it "
+                    + "is a gate that can never open. Re-run the Blender art pipeline.");
+            }
+
+            root.AddComponent<AutoDoor>().Configure(DoorReach, DoorLeafSpeed);
         }
 
         /// <summary>
@@ -259,7 +409,12 @@ namespace IronFlag.Editor.Gameplay
 
             WeaponTuning weapon = WeaponTuning.Emplacement();
             VehicleWeapon gun = root.AddComponent<VehicleWeapon>();
-            gun.Configure(null, null, weapon, CombatPrefabBuilder.LoadProjectile(weapon.Kind));
+            gun.Configure(
+                null,
+                null,
+                weapon,
+                CombatPrefabBuilder.LoadProjectile(weapon.Kind),
+                CombatPrefabBuilder.LoadMuzzleFlash());
 
             // The muzzle is deliberately left null: AutoTurret points the gun at whichever
             // state's barrel is showing the first time it runs, and would have to undo an
@@ -410,16 +565,20 @@ namespace IronFlag.Editor.Gameplay
         /// Returns which half of the asset spec's naming a structure falls under.
         /// </summary>
         /// <param name="kind">Structure to look up.</param>
-        /// <returns><c>Structure</c> for the depots, <c>Prop</c> for everything else.</returns>
+        /// <returns><c>Structure</c> for the installations, <c>Prop</c> for the scenery.</returns>
         /// <remarks>
         /// Not a judgement about what these things are - it is what the exported files are
-        /// called, and the models are the only place that distinction exists.
+        /// called, and the models are the only place that distinction exists. It does track
+        /// one, though: the props are repeated neutral cover and the structures are
+        /// purpose-built things that belong to somebody and act. A door tiles with the wall
+        /// and is named like the turret, and that is the right way round - it opens.
         /// </remarks>
         private static string CategoryOf(StructureKind kind)
             => kind == StructureKind.DepotFuel
                 || kind == StructureKind.DepotAmmo
                 || kind == StructureKind.FlagTower
                 || kind == StructureKind.Turret
+                || kind == StructureKind.Door
                 ? "Structure"
                 : "Prop";
 

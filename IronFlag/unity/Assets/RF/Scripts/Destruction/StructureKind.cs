@@ -55,12 +55,12 @@ namespace IronFlag.Destruction
         /// An automated turret: the one destructible that shoots back.
         /// </summary>
         /// <remarks>
-        /// Also the one that belongs to a side. Everything else on this list is furniture
-        /// both players can knock down, and a turret that fired on whoever was nearest
-        /// would be a hazard rather than a defence - see
+        /// One of the two that belong to a side, the other being <see cref="Door"/>. The
+        /// rest of this list is furniture both players can knock down, and a turret that
+        /// fired on whoever was nearest would be a hazard rather than a defence - see
         /// <see cref="IronFlag.Destruction.AutoTurret"/>, and
-        /// <see cref="IronFlag.Levels.LevelValidation"/>, which refuses a turret with no
-        /// side and refuses a side on anything else.
+        /// <see cref="IronFlag.Levels.LevelValidation"/>, which refuses a side on anything
+        /// that cannot have one and refuses to leave one off anything that must.
         /// </remarks>
         Turret = 8,
 
@@ -79,5 +79,26 @@ namespace IronFlag.Destruction
         /// <c>blender/assets/prop_wall.py</c>.
         /// </remarks>
         Wall = 9,
+
+        /// <summary>
+        /// A gate: a <see cref="Wall"/> segment that sinks into the ground for one side.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The second destructible that belongs to a side, and the reason
+        /// <see cref="StructureTuning.BelongsToASide"/> is a method rather than a
+        /// comparison. A vehicle of the owning side coming near drops the leaf into the
+        /// floor and drives through; to everybody else it is a wall - see
+        /// <see cref="IronFlag.Destruction.AutoDoor"/>.
+        /// </para>
+        /// <para>
+        /// Built to a wall's dimensions down to the pier spacing, because a gate is only
+        /// worth having as part of a run: on its own it is five metres of barrier with a
+        /// hole in it that anybody can drive round. It is also deliberately the
+        /// <em>softest</em> part of any run it is in, which is the oldest rule in
+        /// fortification - the gate is where the wall is attacked.
+        /// </para>
+        /// </remarks>
+        Door = 10,
     }
 }

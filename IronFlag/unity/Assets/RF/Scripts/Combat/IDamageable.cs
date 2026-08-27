@@ -29,6 +29,16 @@ namespace IronFlag.Combat
         /// <summary>Whether this has already been shot to pieces.</summary>
         bool IsDestroyed { get; }
 
+        /// <summary>Hit points remaining as a fraction of full, in 0..1.</summary>
+        /// <remarks>
+        /// Added for <see cref="IronFlag.Vfx.DamageSmoke"/>, which is the first thing that
+        /// wanted to know <em>how</em> hurt something is rather than whether it is finished.
+        /// Both implementers already had this property and neither had to grow one - which
+        /// is the argument for it being on the interface rather than a branch on which kind
+        /// of target it is, the same argument the other three members were added on.
+        /// </remarks>
+        float Fraction { get; }
+
         /// <summary>
         /// Takes a hit.
         /// </summary>

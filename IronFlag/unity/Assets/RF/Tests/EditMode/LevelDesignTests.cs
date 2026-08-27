@@ -63,6 +63,28 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
+        /// The shipped map is played on the standard allotment of vehicles.
+        /// </summary>
+        /// <remarks>
+        /// It says so in the file rather than leaving it to the defaults, which is the
+        /// same choice every other number on this map makes: a map that explains itself is
+        /// one somebody can change. The assertion is against the defaults rather than
+        /// against eight, three, three and three, so that retuning the standard allotment
+        /// is one edit rather than two that have to agree.
+        /// </remarks>
+        [Test]
+        public void TheShippedMapGivesEachSideTheStandardAllotment()
+        {
+            Assert.That(level.Reserve, Is.Not.Null, "the shipped map says nothing about vehicles");
+            Assert.That(level.Reserve.For(VehicleKind.Jeep), Is.EqualTo(LevelReserve.DefaultJeeps));
+            Assert.That(level.Reserve.For(VehicleKind.Tank), Is.EqualTo(LevelReserve.DefaultTanks));
+            Assert.That(level.Reserve.For(VehicleKind.Asv), Is.EqualTo(LevelReserve.DefaultAsvs));
+            Assert.That(
+                level.Reserve.For(VehicleKind.Helicopter),
+                Is.EqualTo(LevelReserve.DefaultHelicopters));
+        }
+
+        /// <summary>
         /// Neither side is looking at a different game: every prop is one of a pair rotated
         /// half a turn about the middle of the map.
         /// </summary>

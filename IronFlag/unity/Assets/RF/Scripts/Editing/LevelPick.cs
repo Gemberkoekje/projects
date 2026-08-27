@@ -219,7 +219,10 @@ namespace IronFlag.Editing
                 // than a judgement: walls are placed touching, so anything wider would make
                 // the two either side of a join fight over the same clicks, and this way the
                 // boundary between them falls exactly where the join a player can see is.
+                // A door is a wall segment that opens and is placed in the same runs on the
+                // same grid, so it is the same measurement rather than a second opinion.
                 case StructureKind.Wall:
+                case StructureKind.Door:
                     return 2.5f;
                 default:
                     return 3.0f;

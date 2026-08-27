@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using IronFlag.Core;
 using IronFlag.Levels;
+using IronFlag.Vehicles;
 
 namespace IronFlag.Editing
 {
@@ -36,11 +37,12 @@ namespace IronFlag.Editing
     {
         /// <summary>How many labelled fields the panel can show at once.</summary>
         /// <remarks>
-        /// The largest thing a level can hold is a supplying structure - a name, two
-        /// coordinates, a heading, two rates and a radius - so seven is the number this has
-        /// to reach, and the eighth is the room a new field would want.
+        /// The map itself is now the longest of these, not a selected prop: a title, a
+        /// description, three numbers about the world and one per vehicle in the reserve.
+        /// That is nine, and the tenth is the room a new field would want. A supplying
+        /// structure - the longest selection - still only reaches seven.
         /// </remarks>
-        public const int RowCount = 8;
+        public const int RowCount = 10;
 
         /// <summary>How many stacked action buttons the panel can show at once.</summary>
         public const int ActionCount = 4;
@@ -225,6 +227,49 @@ namespace IronFlag.Editing
                 bounds.SeaThickness,
                 value => Set(
                     () => bounds.SeaThickness = Mathf.Max(0.1f, value), "Changed the sea slab."));
+
+            ShowReserve(level);
+        }
+
+        /// <summary>
+        /// Shows how many of each vehicle this map gives a side.
+        /// </summary>
+        /// <param name="level">The map being edited.</param>
+        /// <remarks>
+        /// <para>
+        /// A loop over <see cref="VehicleRoster.Kinds"/> rather than four written-out rows,
+        /// so that a fifth vehicle appears on this panel without anybody opening this file -
+        /// the same bet <see cref="LevelReserve.Set"/> is there to make good on.
+        /// </para>
+        /// <para>
+        /// On the map rather than on either bunker, which is the level format's own choice:
+        /// one reserve for the level means neither side can be given more than the other by
+        /// an editor slip nobody would see.
+        /// </para>
+        /// </remarks>
+        private void ShowReserve(LevelDefinition level)
+        {
+            if (level.Reserve == null)
+            {
+                // Never actually null in practice - JsonUtility keeps the field initializer
+                // for a file written before version 4 - but Set() rather than a bare
+                // assignment in case that ever stops being true, so a repair still marks the
+                // session dirty instead of silently mutating the model underneath it.
+                Set(() => level.Reserve = new LevelReserve(), "Filled in the default vehicle reserve.");
+            }
+
+            LevelReserve stock = level.Reserve;
+
+            foreach (VehicleKind kind in VehicleRoster.Kinds)
+            {
+                VehicleKind counted = kind;
+                Number(
+                    $"{VehicleNames.For(counted)}s",
+                    stock.For(counted),
+                    value => Set(
+                        () => stock.Set(counted, Mathf.RoundToInt(value)),
+                        $"Changed how many {VehicleNames.For(counted)}s a side gets."));
+            }
         }
 
         /// <summary>
@@ -345,7 +390,8 @@ namespace IronFlag.Editing
             {
                 title.color = EditorTheme.For(structure.Team);
                 Side(structure.Team, side => Set(
-                    () => structure.Side = side.ToString(), $"Gave the turret to {side}."));
+                    () => structure.Side = side.ToString(),
+                    $"Gave the {structure.Kind} to {side}."));
             }
 
             Row(

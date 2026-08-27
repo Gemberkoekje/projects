@@ -15,12 +15,13 @@ namespace IronFlag.Objective
     /// this turns that moment into a result and stops the match.
     /// </para>
     /// <para>
-    /// The design document's <em>secondary</em> condition, "destroy all enemy vehicles/base
-    /// structures", is deliberately not here. Nothing in the game today can satisfy it: a
-    /// side's roster is a fixed four that are always repaired and put back in the bunker,
-    /// and the bunker and the flag towers are the two things on the map that cannot be shot
-    /// down. Implementing a condition that can never fire would be a rule nobody could tell
-    /// was broken.
+    /// The design document's <em>secondary</em> condition, "destroy all enemy vehicles",
+    /// is here now, in the only form that decides anything: a side that has lost its last
+    /// jeep has lost the ability to carry a flag home, so the match is over and the other
+    /// side has won. That is <see cref="TeamReserve.IsBeaten"/>, and it arrives here the
+    /// same way a capture does - as an event, from something that was already watching.
+    /// It could not exist before M6 because a side's roster was a fixed four that were
+    /// always repaired and put back in the bunker; a level now says how many there are.
     /// </para>
     /// <para>
     /// One per scene, found statically the way every other place in this game is - see
@@ -38,8 +39,12 @@ namespace IronFlag.Objective
         private Team winner = Team.None;
 
         [SerializeField]
-        [Tooltip("How the match was won. Not authored; set when a flag comes home.")]
-        private Team flagTaken = Team.None;
+        [Tooltip("Side it was won against. Not authored; set when the match ends.")]
+        private Team beaten = Team.None;
+
+        [SerializeField]
+        [Tooltip("How the match was won. Not authored; set when the match ends.")]
+        private MatchOutcome outcome = MatchOutcome.None;
 
         /// <summary>The match in the current scene, or <c>null</c> when there is none.</summary>
         private static Match current;
@@ -67,35 +72,42 @@ namespace IronFlag.Objective
         public bool IsOver => winner != Team.None;
 
         /// <summary>
-        /// The side whose flag was captured, or <see cref="Team.None"/> while the match runs.
+        /// The side it was won against, or <see cref="Team.None"/> while the match runs.
         /// </summary>
         /// <remarks>
         /// Kept alongside the winner because a HUD in front of the losing player wants to
         /// say what happened rather than who it happened to, and with more than two sides
-        /// those stop being the same fact.
+        /// those stop being the same fact. Which of the two things happened to them is
+        /// <see cref="Outcome"/>: their flag was driven away, or they ran out of jeeps.
         /// </remarks>
-        public Team FlagTaken => flagTaken;
+        public Team Beaten => beaten;
+
+        /// <summary>How the match was won, or <see cref="MatchOutcome.None"/> while it runs.</summary>
+        public MatchOutcome Outcome => outcome;
 
         /// <summary>
         /// Ends the match with a winner.
         /// </summary>
         /// <param name="side">Side that won.</param>
-        /// <param name="stolen">Side whose flag was captured.</param>
+        /// <param name="loser">Side it was won against.</param>
+        /// <param name="how">Which of the two endings this is.</param>
         /// <returns><c>true</c> when this call is the one that ended it.</returns>
         /// <remarks>
         /// The first result stands. Two flags arriving home on the same frame is a draw
         /// nobody has designed, and the game the players just watched had one jeep reach a
-        /// bunker before the other.
+        /// bunker before the other. A win with no ending named is refused rather than
+        /// recorded blank, because the panel that reports it has nothing to say about one.
         /// </remarks>
-        public bool Win(Team side, Team stolen)
+        public bool Win(Team side, Team loser, MatchOutcome how)
         {
-            if (winner != Team.None || side == Team.None)
+            if (winner != Team.None || side == Team.None || how == MatchOutcome.None)
             {
                 return false;
             }
 
             winner = side;
-            flagTaken = stolen;
+            beaten = loser;
+            outcome = how;
             Ended?.Invoke(this);
             return true;
         }
@@ -110,7 +122,8 @@ namespace IronFlag.Objective
         public void Restart()
         {
             winner = Team.None;
-            flagTaken = Team.None;
+            beaten = Team.None;
+            outcome = MatchOutcome.None;
         }
 
         private void OnEnable()
@@ -121,11 +134,13 @@ namespace IronFlag.Objective
             }
 
             Flag.AnyCaptured += OnCaptured;
+            TeamReserve.AnyBeaten += OnRunOut;
         }
 
         private void OnDisable()
         {
             Flag.AnyCaptured -= OnCaptured;
+            TeamReserve.AnyBeaten -= OnRunOut;
 
             if (current == this)
             {
@@ -141,8 +156,29 @@ namespace IronFlag.Objective
         {
             if (flag != null)
             {
-                Win(flag.CarriedBy, flag.Team);
+                Win(flag.CarriedBy, flag.Team, MatchOutcome.FlagCaptured);
             }
+        }
+
+        /// <summary>
+        /// Turns a side running out of jeeps into a result for the other one.
+        /// </summary>
+        /// <param name="reserve">The reserve that has just lost its last carrier.</param>
+        /// <remarks>
+        /// The winner is worked out here rather than announced by the reserve, because
+        /// "who wins when this side cannot" is a question about the match rather than about
+        /// a stock of vehicles - and it is a question that stops having one answer as soon
+        /// as there are three sides. <see cref="Teams.OpponentOf"/> says so by answering
+        /// <see cref="Team.None"/>, and a match with nobody to award it to keeps running.
+        /// </remarks>
+        private void OnRunOut(TeamReserve reserve)
+        {
+            if (reserve == null)
+            {
+                return;
+            }
+
+            Win(Teams.OpponentOf(reserve.Team), reserve.Team, MatchOutcome.OutOfJeeps);
         }
     }
 }

@@ -6,8 +6,8 @@ using IronFlag.Core;
 namespace IronFlag.Players
 {
     /// <summary>
-    /// The two seats in front of the screen: who is holding what, and which half of the
-    /// screen each of them is looking at.
+    /// The seats in front of the screen: who is holding what, and which part of the screen
+    /// each of them is looking at.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -55,6 +55,40 @@ namespace IronFlag.Players
             if (seated != null)
             {
                 players.AddRange(seated);
+            }
+        }
+
+        /// <summary>
+        /// Changes who is sitting down, and re-deals the screen and the devices to them.
+        /// </summary>
+        /// <param name="seated">The local players, in seat order.</param>
+        /// <remarks>
+        /// <para>
+        /// Separate from <see cref="Configure"/> because the two are asked at different
+        /// times by different things: the scene builder wires up the controls asset and the
+        /// seats together, once, in the editor - and <see cref="SessionSeating"/> changes
+        /// only who is in those seats, at load, when the map turns out to be a one-player
+        /// map. A seat-change that also took the controls asset would be a chance to lose it.
+        /// </para>
+        /// <para>
+        /// Re-deals immediately rather than waiting for the next device change, because the
+        /// player who is left is owed the whole screen on the first frame rather than the
+        /// half they were built with.
+        /// </para>
+        /// </remarks>
+        public void Seat(IEnumerable<PlayerVehicleDriver> seated)
+        {
+            players = new List<PlayerVehicleDriver>();
+            if (seated != null)
+            {
+                players.AddRange(seated);
+            }
+
+            ApplyViewports();
+
+            if (Application.isPlaying)
+            {
+                AssignDevices();
             }
         }
 

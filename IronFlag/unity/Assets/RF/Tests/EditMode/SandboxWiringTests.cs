@@ -226,6 +226,59 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
+        /// Every bunker holds its own side a stock of vehicles, both sides get the same one,
+        /// and both start the match with something that could win it.
+        /// </summary>
+        /// <remarks>
+        /// The numbers themselves are not asserted, on purpose: this scene is baked from
+        /// whichever copy of the map <see cref="LevelLibrary.PathFor"/> finds, and a player
+        /// who has saved their own <c>iron-channel</c> is entitled to a different allotment
+        /// in it. What may never differ is the two sides from each other - a map that gave
+        /// one side more jeeps than the other would be unfair in a way nothing on screen
+        /// would show.
+        /// </remarks>
+        [Test]
+        public void EveryBunkerHoldsItsOwnSideAReserveOfVehicles()
+        {
+            using (var sandbox = new OpenSandbox())
+            {
+                var stocked = new Dictionary<VehicleKind, int>();
+
+                foreach (TeamBunker bunker in sandbox.All<TeamBunker>())
+                {
+                    var reserve = bunker.GetComponent<TeamReserve>();
+
+                    Assert.That(reserve, Is.Not.Null, $"{bunker.name} hands out unlimited vehicles");
+                    Assert.That(
+                        reserve.Team,
+                        Is.EqualTo(bunker.Team),
+                        $"{bunker.name} is holding the other side's vehicles");
+                    Assert.That(
+                        reserve.IsBeaten,
+                        Is.False,
+                        $"{bunker.Team} starts the match with nothing that can carry a flag");
+
+                    foreach (VehicleKind kind in VehiclePrefabBuilder.Roster())
+                    {
+                        if (stocked.TryGetValue(kind, out int first))
+                        {
+                            Assert.That(
+                                reserve.Remaining(kind),
+                                Is.EqualTo(first),
+                                $"the two sides are given different numbers of {kind}s");
+                        }
+                        else
+                        {
+                            stocked[kind] = reserve.Remaining(kind);
+                        }
+                    }
+                }
+
+                Assert.That(stocked, Is.Not.Empty, "the sandbox has no bunkers at all");
+            }
+        }
+
+        /// <summary>
         /// Home ground: the only place that fills both pools, and the only one that will
         /// serve the helicopter.
         /// </summary>

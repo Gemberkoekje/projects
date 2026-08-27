@@ -253,11 +253,10 @@ namespace IronFlag.Editing
         /// </para>
         /// <para>
         /// <see cref="Adopt"/> revalidates, which means the Problems panel describes the
-        /// generated map before the player has looked at it - and on a solo map it will say
-        /// that green has no towers and brown has no bunker, because
-        /// <see cref="LevelValidation"/> states the rules of a match and a solo map is not
-        /// one. That is the truth until the master plan's 1-player item lands, so the status
-        /// line says it out loud rather than letting the panel look broken.
+        /// generated map before the player has looked at it. A solo map is judged as one -
+        /// <see cref="LevelValidation"/> branches on <see cref="LevelDefinition.IsSolo"/> -
+        /// so a clean one-player map comes out of the generator with an empty panel, the same
+        /// as a clean match does.
         /// </para>
         /// </remarks>
         public void GenerateLevel(MapOptions options)
@@ -270,8 +269,8 @@ namespace IronFlag.Editing
 
             string called = drawn == null ? "A map" : drawn.Name;
             string caveat = asked.IsSolo
-                ? " A solo map cannot be played yet - the game still seats two rosters - so the"
-                    + " problems about green's towers and brown's bunker are expected."
+                ? " It is a one-player map: you against a field of flag towers, with the second"
+                    + " seat left empty when you play it."
                 : string.Empty;
 
             Say($"Generated {called} from seed {asked.Seed}. It will be saved as {levelName}.{caveat}");
@@ -394,6 +393,32 @@ namespace IronFlag.Editing
             LevelHandoff.Playtest(levelName);
             SceneManager.LoadScene(LevelScenes.Game);
             return true;
+        }
+
+        /// <summary>
+        /// Leaves the editor and goes back to the main menu.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Deliberately does not save, and is deliberately not a key. Unlike
+        /// <see cref="Playtest"/> - which saves on the way out, because the file is how the map
+        /// reaches the game - leaving for the menu is leaving, and a button that silently wrote
+        /// the map to disk on the way would be a button that could not be used to abandon an
+        /// experiment. What stops that losing work is the guard on the button itself, the same
+        /// one New, Open and Revert use.
+        /// </para>
+        /// <para>
+        /// Not a key because the obvious key is already taken: Escape clears the selection
+        /// here, which is a thing somebody does dozens of times an hour, and rebinding it to
+        /// "leave the editor" would be the single most expensive keystroke in the project.
+        /// </para>
+        /// </remarks>
+        public void BackToMenu()
+        {
+            // Cleared so the menu is not still holding this map, which would otherwise be the
+            // map a later scene opened without anybody choosing it.
+            LevelHandoff.Clear();
+            SceneManager.LoadScene(LevelScenes.MainMenu);
         }
 
         /// <summary>
@@ -988,9 +1013,9 @@ namespace IronFlag.Editing
                     return;
 
                 case EditTool.Structure:
-                    // The palette's side goes with it. Everything except a turret drops it
-                    // on the way in, so the same click places a tree and a Green turret
-                    // without the palette needing two modes.
+                    // The palette's side goes with it. Everything but a turret and a door
+                    // drops it on the way in, so the same click places a tree and a Green
+                    // gate without the palette needing two modes.
                     Place(
                         EditTarget.Structure,
                         LevelEdits.AddStructure(level, paletteKind, snapped, paletteSide),

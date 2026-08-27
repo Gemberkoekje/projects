@@ -375,7 +375,11 @@ namespace IronFlag.Tests.PlayMode
             Assert.That(flag.State, Is.EqualTo(FlagState.Captured), "the flag was not delivered");
             Assert.That(match.IsOver, Is.True, "nobody won");
             Assert.That(match.Winner, Is.EqualTo(Team.Brown), "the wrong side won");
-            Assert.That(match.FlagTaken, Is.EqualTo(Team.Green));
+            Assert.That(match.Beaten, Is.EqualTo(Team.Green));
+            Assert.That(
+                match.Outcome,
+                Is.EqualTo(MatchOutcome.FlagCaptured),
+                "a delivered flag was recorded as some other ending");
             Assert.That(Match.IsFinished, Is.True);
         }
 

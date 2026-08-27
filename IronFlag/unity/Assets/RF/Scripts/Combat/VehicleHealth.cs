@@ -44,6 +44,16 @@ namespace IronFlag.Combat
         /// <summary>Raised the moment this vehicle's hit points reach zero.</summary>
         public event Action<VehicleHealth> Destroyed;
 
+        /// <summary>Raised when any vehicle anywhere is destroyed.</summary>
+        /// <remarks>
+        /// The same moment as <see cref="Destroyed"/>, for the one thing that cannot hold a
+        /// reference to the vehicle it is about: a side's
+        /// <see cref="IronFlag.Objective.TeamReserve"/> counts every wreck of its own colour
+        /// and is built with the map, long before most of the vehicles it will count exist.
+        /// Subscribers must let go in <c>OnDisable</c> - a static event outlives the scene.
+        /// </remarks>
+        public static event Action<VehicleHealth> AnyDestroyed;
+
         /// <summary>Raised when the vehicle comes back with a full pool.</summary>
         public event Action<VehicleHealth> Repaired;
 
@@ -163,6 +173,7 @@ namespace IronFlag.Combat
         {
             Explosion.Spawn(wreckExplosion, transform.position, wreckBlastRadius);
             Destroyed?.Invoke(this);
+            AnyDestroyed?.Invoke(this);
         }
     }
 }

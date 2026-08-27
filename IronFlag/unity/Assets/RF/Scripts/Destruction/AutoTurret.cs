@@ -6,8 +6,9 @@ using IronFlag.Vehicles;
 namespace IronFlag.Destruction
 {
     /// <summary>
-    /// A gun emplacement with nobody in it: it picks the nearest enemy vehicle in range,
-    /// traverses onto it, and fires until it is gone or the turret is.
+    /// A gun emplacement with nobody in it: it picks up the nearest enemy vehicle that
+    /// comes near, traverses onto it, and once that vehicle is in range fires until it is
+    /// gone or the turret is.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -32,6 +33,14 @@ namespace IronFlag.Destruction
     /// root would fire out of thin air once the emplacement was half wrecked. So the mount
     /// is re-found whenever the state changes, and a state with no <c>Turret</c> node in it
     /// - which the rubble deliberately has not - simply has no gun.
+    /// </para>
+    /// <para>
+    /// Watching and shooting are two different distances, and the wider one is the whole
+    /// reason a turret reads as a thing that noticed you: the gun starts coming round at
+    /// <see cref="WatchRange"/> and only fires inside <see cref="Range"/>, so an approach
+    /// is met by a barrel that is already there rather than by one that begins its swing
+    /// at the moment the first round could have been fired. It is one roll-call and two
+    /// questions asked of the answer, not two searches - see <see cref="Watching"/>.
     /// </para>
     /// <para>
     /// Targets come off <see cref="VehicleController.OnTheField"/> rather than out of a
@@ -73,6 +82,29 @@ namespace IronFlag.Destruction
         /// </remarks>
         public const float AimTolerance = 6.0f;
 
+        /// <summary>
+        /// Metres beyond its reach a turret watches, and starts traversing, from.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The gun swings at eighty degrees a second, so a ninety-degree turn costs about
+        /// 1.1 seconds - and twelve metres is what a tank covers in that. So an emplacement
+        /// picking a tank up at the edge of its watch is aimed at it by the time it crosses
+        /// into range, whichever way the barrel was pointing beforehand. Faster things
+        /// arrive with the swing half finished, which is the right way round: the jeep is
+        /// the one vehicle that is meant to be able to run past a turret.
+        /// </para>
+        /// <para>
+        /// It costs the turret nothing and the player something real. A barrel already
+        /// tracking is a warning given at a distance where turning back is still free,
+        /// which is what makes an emplacement a thing to plan around rather than a thing
+        /// that opens fire the instant you are close enough to be hit. It is not reach:
+        /// nothing outside <see cref="Range"/> is ever fired at, so the tank's standoff is
+        /// exactly what it was - it is simply watched while it uses it.
+        /// </para>
+        /// </remarks>
+        public const float WatchMargin = 12.0f;
+
         [SerializeField]
         [Tooltip("The gun this turret fires. Stamped by the prefab builder.")]
         private VehicleWeapon weapon;
@@ -96,6 +128,13 @@ namespace IronFlag.Destruction
 
         /// <summary>How far this turret can reach, in metres across the map.</summary>
         public float Range => weapon == null ? 0.0f : weapon.Tuning.Range;
+
+        /// <summary>How far out this turret starts traversing onto something.</summary>
+        /// <remarks>
+        /// Always wider than <see cref="Range"/> by <see cref="WatchMargin"/>, so the
+        /// answer to "am I being tracked" comes before the answer to "am I being shot at".
+        /// </remarks>
+        public float WatchRange => weapon == null ? 0.0f : weapon.Tuning.Range + WatchMargin;
 
         /// <summary>The part currently traversing, or <c>null</c> when this state has none.</summary>
         public Transform Turret
@@ -143,9 +182,13 @@ namespace IronFlag.Destruction
         }
 
         /// <summary>
-        /// Returns the enemy vehicle this turret would shoot at right now.
+        /// Returns the enemy vehicle this turret is following right now.
         /// </summary>
-        /// <returns>The nearest hostile vehicle in range, or <c>null</c> when there is none.</returns>
+        /// <returns>
+        /// The nearest hostile vehicle inside <see cref="WatchRange"/>, or <c>null</c> when
+        /// there is none. It may be out of reach, in which case the gun tracks it and holds
+        /// its fire.
+        /// </returns>
         /// <remarks>
         /// <para>
         /// Nearest across the map rather than through the air, so a helicopter overhead is
@@ -154,13 +197,21 @@ namespace IronFlag.Destruction
         /// turret would track something it could never hit.
         /// </para>
         /// <para>
+        /// Nearest is also what lets one search answer both questions. Because the watch is
+        /// the wider circle, anything inside reach is inside it too - so if the nearest
+        /// thing being watched is out of reach, everything else is further still and there
+        /// is nothing to shoot at. A second search for "the nearest one in range" could
+        /// only ever return this vehicle or nobody, and a turret that tracked one vehicle
+        /// while firing at another would be aiming at neither.
+        /// </para>
+        /// <para>
         /// A turret on no side has no enemies and shoots at nothing. That is the safe way
         /// round for an authoring slip: <see cref="Teams.IsHostile"/> says everybody is
         /// hostile to <see cref="Team.None"/>, so reading it the other way would make an
         /// unconfigured emplacement open fire on both players at once.
         /// </para>
         /// </remarks>
-        public VehicleController Target()
+        public VehicleController Watching()
         {
             Team side = Team;
             if (side == Team.None || weapon == null || Shell.IsDestroyed)
@@ -169,7 +220,7 @@ namespace IronFlag.Destruction
             }
 
             VehicleController closest = null;
-            float nearest = weapon.Tuning.Range;
+            float nearest = WatchRange;
 
             foreach (VehicleController vehicle in VehicleController.OnTheField)
             {
@@ -187,6 +238,20 @@ namespace IronFlag.Destruction
             }
 
             return closest;
+        }
+
+        /// <summary>
+        /// Returns the enemy vehicle this turret would shoot at right now.
+        /// </summary>
+        /// <returns>
+        /// The vehicle it is <see cref="Watching"/> once that is inside <see cref="Range"/>,
+        /// or <c>null</c> - which is what a turret tracking something it cannot yet reach
+        /// answers.
+        /// </returns>
+        public VehicleController Target()
+        {
+            VehicleController watched = Watching();
+            return IsInReach(watched) ? watched : null;
         }
 
         private void Awake()
@@ -212,20 +277,39 @@ namespace IronFlag.Destruction
                 return;
             }
 
-            VehicleController target = Target();
-            float wanted = target == null
+            VehicleController watched = Watching();
+            float wanted = watched == null
                 ? RestYawDegrees
-                : VehicleTurret.TargetYaw(Bearing(target.transform.position), RestYawDegrees);
+                : VehicleTurret.TargetYaw(Bearing(watched.transform.position), RestYawDegrees);
 
             float next = Mathf.MoveTowardsAngle(
                 turret.eulerAngles.y, wanted, turnRate * Time.deltaTime);
             turret.rotation = Quaternion.Euler(0.0f, next, 0.0f);
 
-            if (target != null && Mathf.Abs(Mathf.DeltaAngle(next, wanted)) <= AimTolerance)
+            // Two conditions rather than one, and they are the two circles: the gun follows
+            // anything it is watching, and fires only at what it can actually reach and has
+            // finished swinging onto.
+            if (IsInReach(watched) && Mathf.Abs(Mathf.DeltaAngle(next, wanted)) <= AimTolerance)
             {
                 weapon.TryFire();
             }
         }
+
+        /// <summary>
+        /// Reports whether a vehicle is close enough to be fired at.
+        /// </summary>
+        /// <param name="vehicle">The vehicle to measure, or <c>null</c>.</param>
+        /// <returns><c>true</c> when it is inside <see cref="Range"/>.</returns>
+        /// <remarks>
+        /// Measured across the map, exactly as <see cref="Watching"/> measures and as the
+        /// round itself resolves. Nothing is the answer <c>false</c>, so a caller does not
+        /// have to check for it first.
+        /// </remarks>
+        private bool IsInReach(VehicleController vehicle)
+            => vehicle != null
+                && weapon != null
+                && CombatPlane.DistanceOnMap(transform.position, vehicle.transform.position)
+                    <= weapon.Tuning.Range;
 
         /// <summary>
         /// Finds the gun inside whichever state model is showing, when that has changed.

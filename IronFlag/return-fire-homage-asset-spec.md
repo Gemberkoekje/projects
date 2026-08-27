@@ -225,6 +225,68 @@ The bunker is now the only structure on the map that cannot be shot at all.
   the rubble's colliders off: a heap that still read as blocking would be a wall players drive
   straight through, which is worse than no wall.
 
+**Gun tower (added with M9, raised with the team-doors pass)** — `RF_Structure_Turret_*`
+- A hexagonal shaft **4.0 m tall** on a 2.6 m apron, flaring at the top into a gallery with a
+  squat armoured head on it. The barrel is the only horizontal spike on any structure in the
+  game, and is what tells it apart from both depots at a glance.
+- **Team-tinted**, and the first structure that was: which side an emplacement belongs to is the
+  most important thing a player reads about it, from across the map
+- `_Intact` / `_Damaged` / `_Destroyed`
+- The head is a separate **`Turret`** child pivoted on its ring, exactly as on the tank, and it
+  carries the `Muzzle` group so the firing point traverses with the barrel
+- **Only the intact and damaged states have a `Turret`.** The rubble is a cracked apron with the
+  head lying beside it, and having no traversing part is how a wrecked emplacement is silent by
+  construction rather than by a check somebody could forget to write.
+- **The destroyed state stands no higher than knee height**, the same 0.45 m ceiling the wall
+  keeps, and it matters more here: the taller the thing that fell, the more tempting it is to
+  draw the wreck as a heap — and a heap is what a player reads as cover, right up until the
+  round they were sheltering from goes through it
+- Team trim goes on the **gallery and the apron**, never on the head, for the reason the tank's
+  does: a stripe that swings around with the gun stops being a readable marker of whose
+  emplacement this is. The gallery ring is the important one — the camera looks down at 58°, so
+  on a four-metre shaft the apron is the part the tower itself hides, and a collar directly
+  under the head is the one team-coloured surface nothing can occlude.
+
+**Height rule (revised with the team-doors pass):** the three built structures read as a
+sequence — a **wall** at 2.0 m hides a jeep and stops it, a **gun tower** at 4.0 m is exactly
+twice that and is unmistakably a built defence, and a **flag tower** at 6.2 m is half again as
+tall and is the thing the whole map is about.
+
+M9 built the emplacement at 1.68 m, deliberately, so that it "never becomes cover in its own
+right". Both halves of that retired. Walls arrived at 2.0 m, so the gun tower was shorter than
+the fence beside it; and the reason was never true in the first place, because a round sweeps a
+`CombatPlane` column from 0.5 m to 30 m whatever its height — so a turret's base always was
+cover and always did block fire. **Height in this game is silhouette and nothing else.**
+
+**Door (added with the team-doors pass)** — `RF_Structure_Door_*`
+- **A wall segment that opens.** Every dimension is copied from the wall rather than chosen:
+  5.0 m long, 2.0 m tall, the same footing, the same half-piers at ±2.25, the same coping. A
+  gate and a wall placed at the same yaw are the same wall.
+- **Team-tinted**, and the second structure that is. A gate is only meaningful if it belongs to
+  somebody — see the door rule below.
+- `_Intact` / `_Damaged` / `_Destroyed`
+- The leaf is a separate **`Leaf`** child with its origin on the ground at the middle of the
+  opening, so Unity's shut position is zero and its open position is a plain negative Y
+- **The bay is the door.** The opening is 4.00 m, which is the same bay a wall leaves between
+  its own piers, and 0.40 m of daylight either side of the tank at 3.19 m
+- **Nothing crosses the threshold.** The footing runs under the two piers and stops; where a
+  wall has a continuous plinth, a gate has bare ground. An open gate must be ground, not a
+  0.30 m step a vehicle bumps over.
+- Team trim in **two places for two jobs**: collars round the piers, which never move and say
+  whose gate it is; and a cap along the top of the leaf, which is the *state* — from the
+  top-down camera a shut gate is a coloured bar in a grey wall and an open one is a gap
+- **The damaged state still opens and still blocks.** What a damaged gate has lost is armour;
+  losing the mechanism is what being destroyed is.
+- **Only the intact and damaged states have a `Leaf`**, on the turret's precedent: a destroyed
+  gate has nothing to drive, so a wrecked one is a permanent hole rather than a hole the code
+  has to remember not to close
+
+**Door rule (added with the team-doors pass):** a gate is the *softest* part of any run it
+stands in — 60 hit points against the wall's 80. That is the oldest rule in fortification and
+the only arrangement that keeps both pieces worth placing: a gate tougher than its wall would
+mean building the whole run out of gates, and a gate equal to it would be a wall that happens
+to open. It still survives every single round in the game, so nothing opens one with one shot.
+
 ---
 
 ## Prompting Pattern

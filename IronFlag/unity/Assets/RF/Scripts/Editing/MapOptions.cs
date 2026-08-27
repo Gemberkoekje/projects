@@ -64,8 +64,9 @@ namespace IronFlag.Editing
         /// <para>
         /// One is the solo shape: a green bunker, no green towers and no green flag, and a
         /// brown side that is a field of flag towers guarded by emplacements rather than an
-        /// opponent. See <see cref="LevelGenerator"/> for what that costs in validation, and
-        /// the master plan's 1-player item for why such a map is not yet playable.
+        /// opponent. Playing one seats a single player - see
+        /// <see cref="IronFlag.Players.SessionSeating"/> - and it is judged by its own rules
+        /// rather than a match's, see <see cref="IronFlag.Levels.LevelDefinition.IsSolo"/>.
         /// </para>
         /// <para>
         /// An <see cref="int"/> rather than an enum because it is a count, it is spelled 1

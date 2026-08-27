@@ -25,6 +25,16 @@ namespace IronFlag.Levels
     /// These are hard failures rather than taste. Whether a map is <em>good</em> is not
     /// checkable; whether it can be finished is.
     /// </para>
+    /// <para>
+    /// <strong>There are two kinds of map and one set of rules.</strong> A match is played
+    /// between two sides that each own a bunker and a flag; a one-player map has a single
+    /// bunker and an enemy that is a field of flag towers behind emplacements, with nobody
+    /// sitting behind it. The checks below branch on <see cref="LevelDefinition.IsSolo"/>
+    /// rather than being duplicated per mode, because most of them - the shore margins, the
+    /// tower spacing, the reserve, the land - are the same question either way, and the
+    /// three that differ (who owes a bunker, who owes towers, what has to be drivable to)
+    /// differ in a sentence each.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -83,6 +93,7 @@ namespace IronFlag.Levels
             }
 
             CheckBounds(level, problems);
+            CheckReserve(level, problems);
             CheckLand(level, problems);
             CheckBunkers(level, problems);
             CheckTowers(level, problems);
@@ -205,6 +216,55 @@ namespace IronFlag.Levels
             }
         }
 
+        /// <summary>
+        /// Checks that both sides are given enough vehicles to play the match out.
+        /// </summary>
+        /// <param name="level">The level to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// <para>
+        /// A level that gives nobody a flag carrier is the arithmetic version of a map with
+        /// no crossing on it: the game is unwinnable from the first frame, and it does not
+        /// look wrong anywhere. Everything else about the reserve is a taste question - four
+        /// jeeps is a short match and twelve is a long one, and neither is broken.
+        /// </para>
+        /// <para>
+        /// A level with no reserve block at all is not a problem. That is every map written
+        /// before version 4, and it means the standard allotment.
+        /// </para>
+        /// </remarks>
+        private static void CheckReserve(LevelDefinition level, List<string> problems)
+        {
+            LevelReserve stock = level.Reserve;
+            if (stock == null)
+            {
+                return;
+            }
+
+            bool carrier = false;
+
+            foreach (VehicleKind kind in VehicleRoster.Kinds)
+            {
+                int held = stock.For(kind);
+
+                if (held < 0)
+                {
+                    problems.Add(
+                        $"The level gives each side {held} {VehicleNames.For(kind)}s, "
+                        + "which is not a number of vehicles.");
+                }
+
+                carrier = carrier || (held > 0 && FlagRules.CanCarry(kind));
+            }
+
+            if (!carrier)
+            {
+                problems.Add(
+                    "The level gives each side no jeeps, so neither side can carry a flag "
+                    + "home and the match cannot be won.");
+            }
+        }
+
         private static void CheckLand(LevelDefinition level, List<string> problems)
         {
             if (level.Land.Length == 0)
@@ -313,14 +373,50 @@ namespace IronFlag.Levels
                 + "game has. It will be a rectangle.");
         }
 
+        /// <summary>
+        /// Checks the bunkers, against the rules of whichever kind of map this is.
+        /// </summary>
+        /// <param name="level">The level to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// A match owes both sides a bunker. A one-player map owes exactly one, and the side
+        /// that has none is not a fault but the mode - see
+        /// <see cref="LevelDefinition.IsSolo"/>. A map with no bunker anywhere is neither,
+        /// and is reported as a match missing both, because that is what an empty file most
+        /// likely is on its way to being.
+        /// </remarks>
         private static void CheckBunkers(LevelDefinition level, List<string> problems)
         {
+            bool solo = level.IsSolo;
+
             foreach (Team side in Teams.Playing)
             {
+                int owned = 0;
+                foreach (LevelBunker candidate in level.Bunkers)
+                {
+                    if (candidate != null && candidate.Side == side)
+                    {
+                        owned++;
+                    }
+                }
+
+                if (owned > 1)
+                {
+                    // Caught here rather than left to the total-count check below: two
+                    // bunkers on the same side reads as one played side to IsSolo, which
+                    // would otherwise wave the map through as a clean one-player map while
+                    // silently orphaning the second bunker at build time.
+                    problems.Add($"{side} has {owned} bunkers; only one is allowed.");
+                }
+
                 LevelBunker bunker = level.BunkerFor(side);
                 if (bunker == null)
                 {
-                    problems.Add($"{side} has no bunker, so that side cannot deploy or win.");
+                    if (!solo)
+                    {
+                        problems.Add($"{side} has no bunker, so that side cannot deploy or win.");
+                    }
+
                     continue;
                 }
 
@@ -342,11 +438,45 @@ namespace IronFlag.Levels
             }
         }
 
+        /// <summary>
+        /// Checks the flag towers, against the rules of whichever kind of map this is.
+        /// </summary>
+        /// <param name="level">The level to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// <para>
+        /// In a match every side owns a flag and hunts for the other one, so both sides owe
+        /// two towers and exactly one real. A one-player map inverts that for the side
+        /// nobody is sitting at: it owes the towers, because they are the objective, and the
+        /// side that <em>is</em> played owes none at all.
+        /// </para>
+        /// <para>
+        /// A flag on the solo player's own side is a fault rather than harmless clutter.
+        /// Nothing on a one-player map ever attacks it, so it is an objective with no
+        /// opponent - a line on the HUD that can never change, and a second real flag in a
+        /// scene whose whole loop is finding the first one.
+        /// </para>
+        /// </remarks>
         private static void CheckTowers(LevelDefinition level, List<string> problems)
         {
+            bool solo = level.IsSolo;
+
             foreach (Team side in Teams.Playing)
             {
                 List<LevelTower> towers = level.TowersFor(side);
+
+                if (solo && level.IsPlayed(side))
+                {
+                    if (towers.Count > 0)
+                    {
+                        problems.Add(
+                            $"{side} is the only side playing and has {towers.Count} tower(s). "
+                            + "On a one-player map nothing ever comes for them, so they are a "
+                            + "flag that cannot be lost.");
+                    }
+
+                    continue;
+                }
 
                 if (towers.Count < 2)
                 {
@@ -458,22 +588,25 @@ namespace IronFlag.Levels
                     continue;
                 }
 
-                // A turret is the one destructible that belongs to somebody, and it has to:
-                // an emplacement with no side has no enemies and stands there doing nothing,
-                // which looks exactly like one that is working. The check runs both ways,
-                // because a tree with a side is a level saying something the game has no
-                // meaning for - see Destructible.Team.
+                // Two destructibles belong to somebody, and both have to: an emplacement
+                // with no side has no enemies and a gate with no side has nobody to open
+                // for, and each of them stands there doing nothing in a way that looks
+                // exactly like one that is working. The check runs both ways, because a
+                // tree with a side is a level saying something the game has no meaning for
+                // - see Destructible.Team. Which kinds care is StructureTuning's answer
+                // rather than a comparison spelled out again here.
                 if (structure.NeedsASide && structure.Team == Team.None)
                 {
                     problems.Add(
-                        $"The turret at {structure.Position} is on no side, so it has nobody "
-                        + "to shoot at. Give it Green or Brown.");
+                        $"The {structure.Kind} at {structure.Position} is on no side, so it "
+                        + "does nothing: a turret with nobody to shoot at, or a gate with "
+                        + "nobody to open for. Give it Green or Brown.");
                 }
                 else if (!structure.NeedsASide && structure.Team != Team.None)
                 {
                     problems.Add(
                         $"The {structure.Kind} at {structure.Position} is given to "
-                        + $"{structure.Team}, and only a turret can belong to a side.");
+                        + $"{structure.Team}, and only a turret or a door can belong to a side.");
                 }
 
                 // A bridge is the one prop meant to be over water. Anything else standing
@@ -505,8 +638,27 @@ namespace IronFlag.Levels
             }
         }
 
+        /// <summary>
+        /// Checks that the objective can be driven to and driven home from.
+        /// </summary>
+        /// <param name="level">The level to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// Two shapes of the same rule. In a match the run that has to exist is bunker to
+        /// bunker, because that is the round trip a captured flag makes. On a one-player map
+        /// there is no second bunker, so the run is from the one bunker out to every enemy
+        /// tower: any tower a jeep cannot reach by land is a tower that might be holding the
+        /// flag, and a map whose flag is on the wrong side of the water is unwinnable in
+        /// exactly the way this check exists to catch.
+        /// </remarks>
         private static void CheckCrossings(LevelDefinition level, List<string> problems)
         {
+            if (level.IsSolo)
+            {
+                CheckSoloCrossings(level, problems);
+                return;
+            }
+
             LevelBunker green = level.BunkerFor(Team.Green);
             LevelBunker brown = level.BunkerFor(Team.Brown);
             if (green == null || brown == null)
@@ -520,6 +672,50 @@ namespace IronFlag.Levels
                     "The two bunkers are not joined by dry land. Every crossing on this map can "
                     + "be destroyed, so dropping the last one would leave the flag uncapturable: "
                     + "only the jeep carries it, and the jeep cannot fly.");
+            }
+        }
+
+        /// <summary>
+        /// Checks that every enemy tower on a one-player map can be driven to and back from.
+        /// </summary>
+        /// <param name="level">The level to check.</param>
+        /// <param name="problems">List to add to.</param>
+        /// <remarks>
+        /// Every tower rather than only the real one, and that is the point: the player
+        /// cannot tell which is which until they have broken one open, so a decoy across the
+        /// water is a drive nobody can make against a tower nobody can rule out.
+        /// </remarks>
+        private static void CheckSoloCrossings(LevelDefinition level, List<string> problems)
+        {
+            foreach (Team side in Teams.Playing)
+            {
+                if (!level.IsPlayed(side))
+                {
+                    continue;
+                }
+
+                Vector3 home = level.BunkerPosition(side);
+
+                foreach (Team enemy in Teams.Playing)
+                {
+                    if (enemy == side)
+                    {
+                        continue;
+                    }
+
+                    foreach (LevelTower tower in level.TowersFor(enemy))
+                    {
+                        if (IsConnected(level, home, tower.Position))
+                        {
+                            continue;
+                        }
+
+                        problems.Add(
+                            $"A {enemy} tower cannot be reached from the {side} bunker by "
+                            + "land. Only the jeep carries the flag and the jeep cannot fly, "
+                            + "so a tower that might be holding it has to be drivable to.");
+                    }
+                }
             }
         }
 

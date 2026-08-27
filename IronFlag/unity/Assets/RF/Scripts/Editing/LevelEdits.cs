@@ -51,6 +51,29 @@ namespace IronFlag.Editing
         /// </remarks>
         public const float BridgeSink = -1.2f;
 
+        /// <summary>
+        /// Metres one wall or door segment is long, which is the pitch a run is laid at.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// A fact about the models rather than about the map, and here for the same reason
+        /// <see cref="BridgeSink"/> is: nothing in a level file can catch a run laid at 4.8 m,
+        /// and nobody laying one should have to know the number. It is
+        /// <c>blender/assets/prop_wall.py</c>'s <c>_LENGTH</c> and
+        /// <c>structure_door.py</c>'s, which are the same number on purpose so that a gate
+        /// drops into a wall run.
+        /// </para>
+        /// <para>
+        /// It is also the coarsest step <see cref="LevelEditorSession.GridSteps"/> offers,
+        /// which is what makes a hand-laid run click together: those two agreeing is the
+        /// whole reason the segment is five metres rather than four or six.
+        /// <c>LevelGeneratorTests</c> checks this against the built prefab rather than against
+        /// the Python, so a re-exported wall that changed length is caught here instead of as
+        /// a row of boxes with gaps in it.
+        /// </para>
+        /// </remarks>
+        public const float SegmentLength = 5.0f;
+
         /// <summary>Fraction of a pool a depot hands out per second when one is placed.</summary>
         /// <remarks>
         /// A depot placed with a rate of zero is a model of a depot: it looks exactly like the
@@ -285,9 +308,9 @@ namespace IronFlag.Editing
         /// <param name="at">Where, on the ground plane; its height is replaced.</param>
         /// <returns>Its index, or -1 when there is no such kind.</returns>
         /// <remarks>
-        /// Places it on no side, which is right for everything except a turret. The overload
-        /// taking a side is what the editor's palette calls, because the palette already has
-        /// one selected for the towers and bunkers.
+        /// Places it on no side, which is right for everything except a turret or a door. The
+        /// overload taking a side is what the editor's palette calls, because the palette
+        /// already has one selected for the towers and bunkers.
         /// </remarks>
         public static int AddStructure(LevelDefinition level, StructureKind kind, Vector3 at)
             => AddStructure(level, kind, at, Team.None);
@@ -298,7 +321,8 @@ namespace IronFlag.Editing
         /// <param name="level">The level to add to.</param>
         /// <param name="kind">What to place.</param>
         /// <param name="at">Where, on the ground plane; its height is replaced.</param>
-        /// <param name="side">Side it belongs to; ignored by everything but a turret.</param>
+        /// <param name="side">Side it belongs to; ignored by everything but a turret or a
+        /// door.</param>
         /// <returns>Its index, or -1 when there is no such kind.</returns>
         /// <remarks>
         /// The side is dropped rather than refused for a kind that cannot have one, so that
@@ -669,6 +693,39 @@ namespace IronFlag.Editing
         }
 
         /// <summary>
+        /// Returns the heading an emplacement belonging to one side is placed facing.
+        /// </summary>
+        /// <param name="side">Whose emplacement it is.</param>
+        /// <returns>
+        /// A heading in degrees clockwise from world +Z - down the map at the other side's
+        /// half - or zero for nobody.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// One heading per side rather than one worked out from where each turret happens
+        /// to stand, and that is the whole point: a side's emplacements come out parallel
+        /// to each other before anything has driven at them, so a row of them reads as a
+        /// defence line somebody laid out. Pointing each one at the middle of the map -
+        /// which is what <see cref="FacingTheField"/> does for a bunker, and rightly - would
+        /// fan them out by a few degrees each and look like a set of individual decisions
+        /// nobody actually took.
+        /// </para>
+        /// <para>
+        /// Green sits at negative Z and Brown at positive Z on every map this game can
+        /// describe: it is the convention <see cref="Starter"/> lays the two bunkers out on
+        /// and the one <see cref="Mirror"/> flips a placement across. So facing the enemy is
+        /// nothing or half a turn, and neither this nor the map generator has to read the
+        /// level to know which.
+        /// </para>
+        /// <para>
+        /// It is only where a turret <em>starts</em>. Turning one afterwards is an ordinary
+        /// edit, and in play the gun traverses onto whatever it is watching and stows back
+        /// to the heading its placement gave it.
+        /// </para>
+        /// </remarks>
+        public static float FacingTheEnemy(Team side) => side == Team.Brown ? 180.0f : 0.0f;
+
+        /// <summary>
         /// Adds the opposite number of something: the same thing, rotated half a turn about
         /// the origin, belonging to the other side.
         /// </summary>
@@ -829,7 +886,11 @@ namespace IronFlag.Editing
                 Side = (StructureTuning.BelongsToASide(kind) ? side : Team.None).ToString(),
                 Name = string.Empty,
                 Position = new Vector3(at.x, RestingHeight(kind), at.z),
-                YawDegrees = 0.0f,
+
+                // Everything else is placed square to the map and turned by hand if it
+                // wants to be. An emplacement is the one kind with a wrong answer here: one
+                // facing its own back line is a gun the map paid for and nobody aimed.
+                YawDegrees = kind == StructureKind.Turret ? FacingTheEnemy(side) : 0.0f,
                 FuelRate = kind == StructureKind.DepotFuel ? DepotRate : 0.0f,
                 AmmoRate = kind == StructureKind.DepotAmmo ? DepotRate : 0.0f,
                 SupplyRadius = DepotRadius,

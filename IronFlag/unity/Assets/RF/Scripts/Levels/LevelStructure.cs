@@ -23,27 +23,28 @@ namespace IronFlag.Levels
     /// with both rates at zero is scenery.
     /// </para>
     /// <para>
-    /// <see cref="Side"/> is the other exception and belongs to exactly one kind. An
-    /// automated turret has to know who it is defending, and that is a fact about the map
-    /// rather than about turrets - the same emplacement thirty metres further north is the
-    /// other side's. Everything else on the map belongs to nobody, and
-    /// <see cref="LevelValidation"/> refuses a level that says otherwise in either
-    /// direction: a turret with no side, or a side on a tree.
+    /// <see cref="Side"/> is the other exception and belongs to two kinds. An automated
+    /// turret has to know who it is defending and a gate has to know who to open for, and
+    /// both are facts about the map rather than about turrets and gates - the same
+    /// emplacement thirty metres further north is the other side's. Everything else on the
+    /// map belongs to nobody, and <see cref="LevelValidation"/> refuses a level that says
+    /// otherwise in either direction: a turret with no side, or a side on a tree.
     /// </para>
     /// </remarks>
     [Serializable]
     public sealed class LevelStructure
     {
         /// <summary>What it is, by name - a member of <see cref="StructureKind"/>.</summary>
-        [Tooltip("What it is: Tree, BuildingA, BuildingB, Bridge, DepotFuel, DepotAmmo or Turret.")]
+        [Tooltip("What it is: Tree, BuildingA, BuildingB, Bridge, DepotFuel, DepotAmmo, Turret, Wall or Door.")]
         public string Kind = nameof(StructureKind.Tree);
 
-        /// <summary>Which side it belongs to, by name. Only a turret has one.</summary>
+        /// <summary>Which side it belongs to, by name. Only a turret or a door has one.</summary>
         /// <remarks>
         /// Empty, or <c>None</c>, for the scenery both sides can knock down, which is
-        /// everything except <see cref="StructureKind.Turret"/>.
+        /// everything except <see cref="StructureKind.Turret"/> and
+        /// <see cref="StructureKind.Door"/>.
         /// </remarks>
-        [Tooltip("Which side it belongs to: Green or Brown. Only a turret has one.")]
+        [Tooltip("Which side it belongs to: Green or Brown. Only a turret or a door has one.")]
         public string Side = nameof(Team.None);
 
         /// <summary>What to call it in the hierarchy. Optional.</summary>

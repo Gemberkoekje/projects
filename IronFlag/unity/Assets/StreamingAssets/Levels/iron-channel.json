@@ -1,12 +1,18 @@
 {
-    "SchemaVersion": 3,
+    "SchemaVersion": 4,
     "Name": "Iron Channel",
-    "Description": "The v0.1 map. Two islands facing each other across an east-west channel with four ways over it, and not one of them in the middle: the centre is open water, so neither bunker has a straight run at the other and every crossing is a decision about which flank to commit to. Two bridges at x -30 and x +30 span 13 m of narrows each, and anybody can drop them. Two causeways at x -62 and x +62 run out from a headland on each flank and nobody can take them away - which is what stops the match deadlocking once both bridges are gone, at the cost of a drive round that is half as long again. Bunkers face each other down the centre line at 140 m, over water the whole way. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you. Each island is drawn as sand with grass laid over the middle of it, which is why it has a beach nobody drew: what the grass does not cover is beach. The grass falls back at every crossing and reaches furthest toward the water between them, so a straight run at a bridge or a causeway crosses fifteen to thirty metres of soft going - a fifth off a jeep's speed and fifteen per cent more thirst - and the roads are the answer to that. They run from each bunker to its two depots and on to its bridges, and each side has a road out to the causeway on one flank only, its own: the green road goes west and the brown road goes east. So tarmac never runs right round the channel, and reaching the far causeway means leaving it. Asphalt is the one surface whose edges are kept exactly as written, which is what holds each causeway 12 m wide and each bridge's narrows at 13 m: narrow enough to be a crossing, too wide for a jeep at top speed to jump. Every other coastline wanders - a natural surface is pushed about by up to 3 m of seeded noise - so the waterline is a line rather than a ruler. Change the seed and every natural coast on the map moves; change it back and they all return. Each side has two automated turrets, one behind each of its own bridgeheads at x -35 and x +35, set back 24 m from the water. They reach 20 m, which is short of the far bank on purpose: crossing a bridge is still a decision made under fire from the far side, not one refused before it starts, and the turret only speaks once a raider is across. They are the only team-coloured furniture on the map, and like everything else they come in a pair rotated half a turn. Each bridgehead also carries two wall segments on its inboard side, at x -19 and x +19, running ten metres inland from the water's edge with a metre and a half of beach left at the top - narrower than a jeep, so nothing gets round the end of one. That shoulder was the cheap way out of a crossing: a raider off a bridge could turn along the shore and be clear of the emplacement before it had finished traversing. Walled, the turn inboard is ten metres further inland, which is ten metres more of the turret's twenty. Breaking through instead costs eighty hit points and the seconds to spend them, sixteen metres from the gun. Walls belong to nobody, so the one a side built is cover for whoever reaches it first. They are five metres a segment with the piers at the joins, which is why two of them read as one wall rather than as two boxes.",
+    "Description": "The v0.1 map. Two islands facing each other across an east-west channel with four ways over it, and not one of them in the middle: the centre is open water, so neither bunker has a straight run at the other and every crossing is a decision about which flank to commit to. Two bridges at x -30 and x +30 span 13 m of narrows each, and anybody can drop them. Two causeways at x -62 and x +62 run out from a headland on each flank and nobody can take them away - which is what stops the match deadlocking once both bridges are gone, at the cost of a drive round that is half as long again. Bunkers face each other down the centre line at 140 m, over water the whole way. Each side's two towers stand 36 m apart, more than twice the 10 m reveal radius, so one drive cannot confirm both. Everything is placed in pairs rotated 180 degrees about the origin: neither side has a shorter run to the other's flag. Land is always at y = 0 - the whole game is resolved on that one plane - so the only relief on the map is the 0.7 m bank down to the water, and driving off one drowns you. Each island is drawn as sand with grass laid over the middle of it, which is why it has a beach nobody drew: what the grass does not cover is beach. The grass falls back at every crossing and reaches furthest toward the water between them, so a straight run at a bridge or a causeway crosses fifteen to thirty metres of soft going - a fifth off a jeep's speed and fifteen per cent more thirst - and the roads are the answer to that. They run from each bunker to its two depots and on to its bridges, and each side has a road out to the causeway on one flank only, its own: the green road goes west and the brown road goes east. So tarmac never runs right round the channel, and reaching the far causeway means leaving it. Asphalt is the one surface whose edges are kept exactly as written, which is what holds each causeway 12 m wide and each bridge's narrows at 13 m: narrow enough to be a crossing, too wide for a jeep at top speed to jump. Every other coastline wanders - a natural surface is pushed about by up to 3 m of seeded noise - so the waterline is a line rather than a ruler. Change the seed and every natural coast on the map moves; change it back and they all return. Each side has two automated turrets, one behind each of its own bridgeheads at x -35 and x +35, set back 24 m from the water. They reach 20 m, which is short of the far bank on purpose: crossing a bridge is still a decision made under fire from the far side, not one refused before it starts, and the turret only speaks once a raider is across. They are the only team-coloured furniture on the map, and like everything else they come in a pair rotated half a turn. Each bridgehead also carries a two-segment run across its inboard shoulder, at x -19 and x +19, running ten metres inland from the water's edge with a metre and a half of beach left at the top - narrower than a jeep, so nothing gets round the end of one. That shoulder was the cheap way out of a crossing: a raider off a bridge could turn along the shore and be clear of the emplacement before it had finished traversing. Closed, the turn inboard is ten metres further inland, which is ten metres more of the turret's twenty. The seaward segment of each run is a plain wall belonging to nobody, so it is cover for whoever reaches it first; the inland one is a gate belonging to the side whose bridgehead it is, and it drops into the ground for that side's vehicles and stands there like the wall for the other's. So the shoulder is shut to a raider and open to its owner, which is the whole of what a gate is for. Both are five metres a segment with the piers at the joins, which is why the two read as one run rather than as two boxes - and the gate is the softer half of it, sixty hit points against eighty, which is the oldest rule there is about walls: the gate is where one gets attacked. Each side gets the standard allotment of vehicles: eight jeeps, three tanks, three ASVs and three helicopters, and nothing puts one back. The eight is the length of the match rather than a stock of runabouts - only a jeep can carry a flag, so a side that has lost its last one has lost - and it is read against the four crossings: a raid that goes in over a bridge somebody drops behind it costs a jeep, and there are eight of those in the whole game.",
     "Seed": 1995,
     "Bounds": {
         "HalfExtent": 120.0,
         "WaterDepth": 0.7,
         "SeaThickness": 3.0
+    },
+    "Reserve": {
+        "Jeeps": 8,
+        "Tanks": 3,
+        "Asvs": 3,
+        "Helicopters": 3
     },
     "Land": [
         {
@@ -576,9 +582,9 @@
             "SupplyRadius": 7.0
         },
         {
-            "Kind": "Wall",
-            "Side": "None",
-            "Name": "West bridgehead wall, inland (green)",
+            "Kind": "Door",
+            "Side": "Green",
+            "Name": "West bridgehead gate (green)",
             "Position": {
                 "x": -19.0,
                 "y": 0.0,
@@ -604,9 +610,9 @@
             "SupplyRadius": 7.0
         },
         {
-            "Kind": "Wall",
-            "Side": "None",
-            "Name": "East bridgehead wall, inland (green)",
+            "Kind": "Door",
+            "Side": "Green",
+            "Name": "East bridgehead gate (green)",
             "Position": {
                 "x": 19.0,
                 "y": 0.0,
@@ -632,9 +638,9 @@
             "SupplyRadius": 7.0
         },
         {
-            "Kind": "Wall",
-            "Side": "None",
-            "Name": "East bridgehead wall, inland (brown)",
+            "Kind": "Door",
+            "Side": "Brown",
+            "Name": "East bridgehead gate (brown)",
             "Position": {
                 "x": 19.0,
                 "y": 0.0,
@@ -660,9 +666,9 @@
             "SupplyRadius": 7.0
         },
         {
-            "Kind": "Wall",
-            "Side": "None",
-            "Name": "West bridgehead wall, inland (brown)",
+            "Kind": "Door",
+            "Side": "Brown",
+            "Name": "West bridgehead gate (brown)",
             "Position": {
                 "x": -19.0,
                 "y": 0.0,

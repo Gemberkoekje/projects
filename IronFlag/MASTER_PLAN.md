@@ -34,9 +34,9 @@ between.
 1. ~~[Lighting, Sky & Post-Processing](#1-lighting-sky--post-processing)~~ — **done**, see [LIGHTING_NOTES.md](LIGHTING_NOTES.md).
 2. ~~[Random Map Generator](#2-random-map-generator)~~ — **done**, see [GENERATOR_NOTES.md](GENERATOR_NOTES.md).
 3. ~~[Destructible Wall Sections](#3-destructible-wall-sections)~~ — **done**, see [WALLS_NOTES.md](WALLS_NOTES.md).
-4. [Main Menu](#4-main-menu) — the game currently boots straight into a match; no entry flow exists at all.
-5. [Combat & Movement VFX](#5-combat--movement-vfx) — muzzle flash, smoke, dust; hooks already exist unused.
-6. [1-Player Mode](#6-1-player-mode) — real value, bigger lift, genuine open design questions; benefits from item 2 existing first.
+4. ~~[Main Menu](#4-main-menu)~~ — **done**, see [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md).
+5. ~~[Combat & Movement VFX](#5-combat--movement-vfx)~~ — **done**, see [VFX_NOTES.md](VFX_NOTES.md).
+6. ~~[1-Player Mode](#6-1-player-mode)~~ — **done**, see [SOLO_NOTES.md](SOLO_NOTES.md).
 7. [Ground & Water Material Upgrade](#7-ground--water-material-upgrade) — bigger effort, still self-contained.
 8. [Sounds and Music](#8-sounds-and-music) — highest scope/ambiguity of everything here; first feature needing real external assets.
 9. [UI Visual Identity](#9-ui-visual-identity) — determines the final skin for items 4 and 10.
@@ -67,6 +67,12 @@ rather than discarding them:
   VFX (muzzle flash, impact sparks) stay in the closed-form-math style of
   `Explosion.cs`/`DebrisBurst.cs`, consistent with the existing pattern and
   because they fire constantly and are worth keeping reviewable.
+
+> **Settled for item 5**: the balance above was confirmed as written. Particle
+> systems are in for cosmetic state-driven effects; the two high-frequency
+> combat effects stayed closed-form. Textures stayed out entirely — the
+> particles are meshes, not billboards. See [VFX_NOTES.md](VFX_NOTES.md).
+> Items 7 and 9 still have their own versions of this question open.
 
 If this balance is wrong in either direction, redirect — this is a judgment
 call, not a rule extracted from anything said explicitly. Item 10 (Bunker
@@ -412,6 +418,21 @@ version only if fixed segments turn out to feel wrong in practice.
 
 ## 4. Main Menu
 
+> **Done.** Shipped close to the plan, with one of its steps corrected and one of its
+> exclusions reversed. **Step 3 was wrong**: level-select must not call
+> `LevelHandoff.Playtest`, which sets the flag `PlaytestReturn` reads — that would have put a
+> "back to the editor" notice over every match in the game. `LevelHandoff.Play` exists now to
+> say the *menu* sent this. And open question 3 (return-to-menu) is **in**, both ways, because
+> without it the menu is a screen the game shows once per launch: Escape twice out of a match,
+> a guarded MENU button out of the editor — Escape could not be used there, it already clears
+> the selection. Question 1 was answered "screen mode, size and quality tier", on the rule that
+> a setting has to do something the day it ships; question 4 was answered by opening a level
+> file — the map list shows each map's own name over its size, towers and props, and not the
+> `Description`, which on the shipped map is 1,900 words. The unplanned cost was the backdrop:
+> this game has no horizon, and framing an oblique camera that cannot see the edge of the world
+> took three attempts. What was built, what was decided and what is still open is in
+> [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md). The original text is left below unchanged.
+
 Add a Main Menu scene as the game's new startup scene, with Play (level
 select), Level Editor, Settings, and Quit. Reuse the project's existing
 conventions: scenes are code-generated, UI is hand-built UGUI-from-code
@@ -523,6 +544,16 @@ generator shows up there automatically — no extra wiring needed.
 
 ## 5. Combat & Movement VFX
 
+> **Done**, all six items, in two passes — see [VFX_NOTES.md](VFX_NOTES.md). The
+> hand-coded pair shipped first; the four particle items followed once the Design Stance
+> question above was answered, and the answer was **yes, use particle systems**. The old
+> objection ("an asset nobody can review in a diff") is answered rather than waived: one
+> file knows Unity's particle API, every effect is a dozen named numbers, and all five sets
+> of numbers sit on one screen. Two of the plan's premises were wrong and are corrected in
+> the notes — the existing `Explosion` is *not* kill-only, and there is no such thing as a
+> vehicle moving through shallow water, because both water surfaces drown you. The original
+> text is left below unchanged.
+
 **Why this priority**: highest player-facing "juice" payoff, and the anchor
 points already exist unused — `Muzzle` transforms ship on every vehicle
 prefab, `Underfoot`/`Standing` hooks already exist per `SURFACES_NOTES.md`.
@@ -575,6 +606,17 @@ itself, `CombatPrefabBuilder.cs` (new prefabs), `VehicleWeapon.cs`/
 ---
 
 ## 6. 1-Player Mode
+
+> **Shipped** — see [SOLO_NOTES.md](SOLO_NOTES.md). The plan below is left as written, and
+> what it got right is worth reading: the objective loop needed zero changes, the
+> player/input/camera layer really was already generic over player count, and the only thing
+> hardcoded to two was where seats are built. Three things came out differently. The seat
+> count was decoupled at *runtime* (`SessionSeating`) rather than in the scene builder,
+> because the map is chosen from a menu long after the scene is saved. Step 3 was not taken:
+> rather than accepting validation warnings as expected noise, `LevelValidation` learned what
+> a one-player map is — which also let the generator delete its private copy of the same
+> rules. And the two open questions were already answered by the generator's own solo shape:
+> no defence on the home bunker, and decoy count as the difficulty lever.
 
 The garage is yours; the flag is the enemy's, held in one of potentially
 several flag towers — you have to find it by destroying towers (decoys
@@ -1040,6 +1082,126 @@ point).
 
 ## Completed
 
+### 1-Player Mode: one seat, and a map that says so
+Finished — see [SOLO_NOTES.md](SOLO_NOTES.md). Item 6. There is no toggle: a level with one
+bunker on it **is** a one-player map (`LevelDefinition.IsSolo`, derived rather than stored),
+and `SessionSeating` empties the seat whose side the loaded map does not play before anybody
+is dealt a controller or half a screen. The player who is left gets the whole screen, the
+enemy is flag towers behind emplacements with nobody driving, and the win is the capture loop
+a match already had. `LevelValidation` now judges both shapes instead of one, which let
+`LevelGenerator.SoloFaults` — a private copy of the same rules — be deleted. Ships one
+generated map, `IRON WATCH`, marked `1 PLAYER` on the menu. EditMode 474/474, PlayMode
+172/172.
+
+### Turret tweaks: one heading, an early swing, a slower gun
+Finished — see [TURRETS_NOTES.md](TURRETS_NOTES.md). **Never in this plan**; three tweaks
+asked for directly against M9's emplacement. A side's guns now all start on one heading
+(`LevelEdits.FacingTheEnemy`) instead of the generator rolling each one within 25 degrees and
+the editor placing every one square to the map — which pointed half of them at their own back
+line. A turret watches twelve metres further than it can shoot (`AutoTurret.WatchMargin`), so
+the barrel is already on you when you cross into range rather than starting its swing then.
+And the gun went from 12 damage every 0.33 s to **15 every 1.5 s** — from 36 damage a second
+to 10.
+
+The last of those is the one with teeth: a stream at 36 dps was unanswerable at contact range
+and irrelevant one metre outside twenty, so the only decision an emplacement left was which
+vehicle outranges it. At 10 dps the **tank can close with one and win** — six seconds, for
+sixty to seventy-five of its hundred — while the **jeep still cannot**, which keeps the design
+document's first pillar intact. That pair is asserted against the live tables rather than left
+as prose (`StructureRosterTests.TheEmplacementLosesToTheTankAndBeatsTheJeep`); 15 and 1.5
+themselves are taste and nobody has played them yet.
+
+Reach, hit points and traverse rate are all untouched, so M9's two answers to an emplacement —
+stand off in the tank, or get inside sixteen metres and out-turn it — both still work.
+Stowing to the rest heading was questioned and deliberately kept: it is what puts a side's row
+of guns back on one heading after a raid. EditMode 468/468, PlayMode 166/166.
+
+### Vehicle Reserves, and the second way to lose
+Finished — see [RESERVES_NOTES.md](RESERVES_NOTES.md). **Never in this plan**; asked for
+directly, on the back of the doors pass. A side now gets a fixed allotment of each vehicle
+for the whole match — 8 jeeps, 3 tanks, 3 ASVs and 3 helicopters by default, and whatever
+the level file says instead — every wreck comes off it, and nothing puts one back. Run out
+of jeeps and you have lost, because only a jeep can carry a flag.
+
+This is the design document's *secondary* win condition, deferred at M6 for want of exactly
+this: "it needs either a finite vehicle roster or a destructible bunker, and v0.1 has
+neither."
+
+Three decisions to carry forward. **The level file now carries balance for the first time**,
+against `LevelDefinition`'s own stated rule, on the argument that how many vehicles a side
+is given is a quantity placed on a map rather than a rule about what one of them does — the
+remark now says "there is exactly one exception" so that a second is an argument somebody
+has to make. **The allotment is one block for the level, not one per bunker**, so it cannot
+be asymmetric at all; a handicap belongs to [1-Player Mode](#6-1-player-mode) and its shape
+is a per-bunker override of a level default. And **scuttling is no longer free** — it costs
+a vehicle exactly like dying does, which is what makes the drive home a decision.
+
+Two things it does not do: the generator does not vary the allotment by difficulty (the
+cheapest difficulty lever this game has, still unused), and **neither player can see how
+many the enemy has left**, which is arguably where the tension in attrition actually lives.
+EditMode 438/438, PlayMode 160/160.
+
+### Main Menu
+Finished — see [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md). The game starts in a menu now
+rather than in a match: `MainMenu.unity` is index 0, which makes it the one scene every
+session passes through and therefore the only honest place to apply a stored setting.
+Play lists every map in both level folders with each one's size, towers and props read
+off its file; Level Editor is the first direct door into the editor the project has had;
+Settings is three rows that all do something today, backed by the first `PlayerPrefs`
+this project has ever written.
+
+Two things worth carrying forward. **`LevelHandoff.Play` is not `Playtest`** — the plan
+said to reuse `Playtest`, and it would have claimed every match came from the editor.
+**And this game has no horizon**: `LevelBuilder` builds the sea exactly as wide as the
+map, so the first oblique camera anyone has pointed across a level photographed the edge
+of the world. A wide shot of a whole map is not available at any distance; the menu shows
+a close view of one side's half instead, aimed short of the middle because the middle is
+the one place that belongs to nobody.
+
+Escape twice leaves a match and a guarded MENU button leaves the editor — out of scope in
+the plan, and the difference between a menu you use and one you pass. EditMode 428/428,
+PlayMode 153/153.
+
+### Team Doors, and the gun tower raised to suit
+Finished — see [DOORS_NOTES.md](DOORS_NOTES.md). **Never in this plan**; asked for
+directly, on the back of the walls pass. `StructureKind.Door` is a wall segment that
+belongs to a side and sinks into the floor for that side's vehicles: same five metres,
+same grid, same piers at the same joins, and to the enemy it is simply the part of the
+wall that is a different colour — and the cheapest part to break, at 60 hit points
+against the wall's 80.
+
+It is the **second** structure to take a side, which is the first real test of M9's
+claim that `StructureTuning.BelongsToASide` being one method rather than four
+comparisons would make a second row cheap. It held: the validator, the builder, the
+inspector, the mirror tool and the palette all needed nothing. What did need touching
+was the *wording* — four messages and a handful of doc comments said "only a turret."
+
+Four of the shipped map's eight wall segments — the inland one of each bridgehead run —
+are now that bridgehead's own gate. EditMode 409/409, PlayMode 147/147.
+
+**The generator places them too**, added straight afterwards: a two-sided map now gets
+one gated wall run per crossing per side, sized by difficulty. That needed a placement
+path of its own rather than one more loop, because `Settle` exists to keep things apart
+and a wall only reads as a wall when its segments touch — see
+[GENERATOR_NOTES.md](GENERATOR_NOTES.md#wall-runs-added-after-the-doors-pass).
+
+Two things carried forward from that. **Solo maps get no runs**, deliberately: green's
+front is never attacked, and brown's fortresses — where a wall genuinely belongs — need
+a run laid *against* a tower rather than settled away from one. And it turned up a
+**pre-existing generator bug that is still open**: `Garrison` rings a solo map's towers
+at 40–53 m rather than the 13–19 m it intends, because `FortressRoom` is both the
+tower's reservation and its keep-away distance. No emplacement on a solo map covers the
+tower it guards.
+
+**The gun tower went from 1.68 m to 4.00 m** on the back of this, because a wall at
+2.0 m left the emplacement shorter than the fence beside it. Cosmetic only, and the
+reason M9 built it low — "so it never becomes cover in its own right" — turned out never
+to have been true: a round sweeps a `CombatPlane` column from 0.5 m to 30 m whatever is
+in the way, so height in this game is silhouette and nothing else. The three built
+structures now read as a sequence — wall 2.0 m, gun tower 4.0 m, flag tower 6.2 m — and
+`StructureRosterTests.TheBuiltStructuresReadAsAHeightSequence` is the only thing in the
+project that reads a structure's height at all.
+
 ### Destructible Wall Sections
 Finished — see [WALLS_NOTES.md](WALLS_NOTES.md). `StructureKind.Wall`, a three-state
 Blender asset, a tuning row at 80 hit points, and eight segments behind the shipped
@@ -1050,12 +1212,12 @@ from the plan's letter, each argued in the notes: the wall is a `Prop`, not a
 `Structure`; it is tougher than a tree rather than thinner; and it went onto the
 shipped map, which the plan did not ask for. EditMode 405/405, PlayMode unchanged.
 
-The one thing carried forward: **the generator still places no walls**, and the
-generator notes' estimate that they "slot straight into `Scenery`/`Garrison` — one
-list and one loop away" turns out to be optimistic. `Settle` exists to keep placements
-*apart*, and a wall only reads as a wall when its segments touch — so wall runs need a
-placement path that settles the run's ends and then fills between them, which is a
-different shape from every other scenery loop in that file.
+The one thing carried forward was **the generator places no walls**, and the generator
+notes' estimate that they "slot straight into `Scenery`/`Garrison` — one list and one
+loop away" turning out to be optimistic. That has since been done as part of the team
+doors work above, and the estimate really was wrong: `Settle` exists to keep placements
+*apart* and a wall only reads as a wall when its segments touch, so runs needed a
+placement path of their own.
 
 ### Random Map Generator
 Finished — see [GENERATOR_NOTES.md](GENERATOR_NOTES.md). A GENERATE button in the

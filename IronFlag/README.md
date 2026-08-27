@@ -14,8 +14,12 @@ for the bunker you choose from and the fuel and ammunition you leave it with, [M
 [M7_NOTES.md](M7_NOTES.md) for the map itself — which is a file you can edit — and
 [M8_EDITOR_NOTES.md](M8_EDITOR_NOTES.md) for the level editor you can edit it in, and
 [SURFACES_NOTES.md](SURFACES_NOTES.md) for what the ground is made of.
+[MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md) covers the screen the game now starts on.
 [TOWER_RULES_NOTES.md](TOWER_RULES_NOTES.md) explains why you have to shell a pyramid before
-you can rob it.
+you can rob it, [RESERVES_NOTES.md](RESERVES_NOTES.md) how many vehicles you get to lose
+before you have lost, [TURRETS_NOTES.md](TURRETS_NOTES.md) why an emplacement watches you
+for twelve metres before it starts shooting, and [SOLO_NOTES.md](SOLO_NOTES.md) how to play
+on your own.
 
 ---
 
@@ -41,12 +45,16 @@ IronFlag/
         ├── Levels/                     the catalog: what a map is built out of
         ├── Scripts/Levels/             the level format, its loader and its rules
         ├── Scripts/Editing/            the in-game level editor
+        ├── Scripts/Menu/               the main menu, its settings and the ways back to it
         ├── Prefabs/ · Scenes/ · Scripts/ · Tests/
 ```
 
-There are two scenes. `Scenes/Sandbox.unity` is the game; `Scenes/LevelEditor.unity` is where
-maps are made. Both are generated, and the editor's **PLAY THIS MAP** button and the game's
-`F1` move between them.
+There are three scenes. `Scenes/MainMenu.unity` is where the game starts,
+`Scenes/Sandbox.unity` is the game and `Scenes/LevelEditor.unity` is where maps are made. All
+three are generated, and they are in that order in the build list — the menu is index 0, which
+is what makes a built copy start there. The menu reaches the other two; the editor's **PLAY
+THIS MAP** button and the game's `F1` move between those; and `ESC` from a match or the
+editor's **MENU** button come back.
 
 `Assets/StreamingAssets/` sits outside `Assets/RF/` because Unity requires it there. It is
 the one exception to "all project content lives under `Assets/RF/`".
@@ -78,8 +86,22 @@ models still to build.
 
 ## Playing it
 
-Open `unity/Assets/RF/Scenes/Sandbox.unity` and press Play. The screen splits in two: green on
-top, brown below. Both of you start **inside your bunker**, looking at a panel listing your
+Open `unity/Assets/RF/Scenes/MainMenu.unity` and press Play. **PLAY** lists every map in both
+level folders — the ones that shipped and the ones you have drawn — with what each one is
+underneath its name; pick one and the match starts. **LEVEL EDITOR** goes straight to the
+editor and **SETTINGS** holds the window and the detail level, which are remembered between
+sessions. `ESC` backs out of either panel, and from inside a match it leaves the match: once to
+ask, again to go. In the editor the way back is the **MENU** button, which asks twice if you
+have unsaved work. (`Scenes/Sandbox.unity` still opens straight into a match if you would
+rather skip the menu.)
+
+The screen splits in two: green on
+top, brown below — unless the map you picked is a **one-player** map, in which case there is
+one of you, you have the whole screen, and the enemy is a field of flag towers behind their
+own emplacements with nobody driving. The menu marks those maps `1 PLAYER`; the shipped one is
+`IRON WATCH`, and the level editor generates more. See [SOLO_NOTES.md](SOLO_NOTES.md).
+
+Either way you start **inside your bunker**, looking at a panel listing your
 four vehicles — pick one and send it out, and it rides up the lift (or lifts off the roof pad,
 if you picked the helicopter) before you can drive it.
 
@@ -93,7 +115,18 @@ and descend. Plug a second pad in and both players move onto pads. Full details 
 You only ever have one vehicle out. To swap, **hold** the deploy button: standing on your own
 bunker that parks it and puts you back in front of the roster with nothing spent, and anywhere
 else it blows the vehicle up — which is also the way out when you have run dry in the middle
-of the map. A wreck spends four seconds being repaired before it can be picked again.
+of the map. A wreck spends four seconds being repaired before it can be picked again, and it
+costs you one of that vehicle for good.
+
+Because **you only have so many**. The count beside each row of the roster is how many of that
+vehicle your side has left — eight jeeps, three tanks, three ASVs and three helicopters to
+start with, and whatever the map says instead. Anything destroyed comes off it and nothing
+puts one back: not the bunker, which repairs and refuels everything else, and not time. Run out
+of a vehicle and its row says **NONE LEFT** and stays there, unpickable, for the rest of the
+match. **Run out of jeeps and you have lost** — only a jeep can carry a flag, so a side without
+one has no way left to win. Blowing up your own vehicle rather than driving it home is
+therefore a real price now, which is the whole point of it. Details in
+[RESERVES_NOTES.md](RESERVES_NOTES.md).
 
 Everything you take out has a tank of fuel and a load of ammunition, both on the strip in the
 corner of your half. Fuel is measured in seconds of running, drains faster the harder you work
@@ -118,13 +151,35 @@ be destroyed at all - the flag towers can, and have to be. The numbers are in
 
 A **wall** is the one thing on the map built to be placed in rows: five metres a segment, two
 metres tall — over a jeep and under a tank — and neutral, so the wall a side put up is cover
-for whoever reaches it first. Two of them stand behind each bridgehead, closing the shoulder of
-beach a raider used to slip along to get clear of the emplacement covering that crossing; the
-turn inland is now ten metres further into the turret's reach, or eighty hit points and the
-seconds to spend them sixteen metres from the gun. Three tank shells, four grenades, two
-rockets or two and a half seconds of chaingun, per segment — you pay for the hole, not for the
-wall. Put several in a line and they read as one: the piers stand at the joins rather than in
-the middle, so the seam between two segments is exactly where a pier is.
+for whoever reaches it first. Three tank shells, four grenades, two rockets or two and a half
+seconds of chaingun, per segment — you pay for the hole, not for the wall. Put several in a
+line and they read as one: the piers stand at the joins rather than in the middle, so the seam
+between two segments is exactly where a pier is.
+
+A **gate** is a wall segment that opens. It is the same five metres on the same grid, with the
+same piers at the same joins, and the only thing that tells it apart from a wall is that it
+belongs to somebody: drive one of that side's vehicles within sixteen metres and the steel leaf
+drops into the ground and stays down until you are through. To the other side nothing happens
+at all, and a gate is simply the part of the wall that is a different colour. It is also the
+part that is cheapest to break — sixty hit points against the wall's eighty, two tank shells or
+three grenades — which is the oldest rule there is about walls: the gate is where one gets
+attacked. Nothing in the game opens one with a single round, and a gate that has been broken
+open stays open, because there is nothing left to close.
+
+Each bridgehead has a two-segment run across its inboard shoulder, closing the strip of beach a
+raider used to slip along to get clear of the emplacement covering that crossing. The seaward
+segment is a plain wall; the inland one is a gate belonging to whichever side that bridgehead
+is on. So the turn inland is ten metres further into the turret's reach for an attacker, and no
+detour at all for the side that built it.
+
+A **gun tower** is four metres of hexagonal shaft with an automated gun on top of it, and it is
+one of the two things on the map that belongs to a side. It shoots at anything of the other
+side within twenty metres and it is knocked down like everything else. Four metres is exactly
+twice a wall and well under the flag tower's six, which is the whole of why it is that number:
+the three built things on the map are meant to read as a sequence at a glance. Height is
+*only* silhouette here — a round in this game sweeps a column from knee height to well above
+the helicopter, so what it hits depends on where things are on the map and never on how tall
+they are.
 
 The map is one island cut in two by a channel, with the two bunkers facing each other down its
 centre line a hundred and forty metres apart — over water, because the middle of the channel is
@@ -156,7 +211,8 @@ undo, `Ctrl+S` to save.
 
 The panel on the right is the exact numbers behind whatever is selected — the mouse is for
 roughly where a thing goes and that is for exactly where — and with nothing selected it is the
-map itself: its name, what it is trying to be, and how big the world is. Under it is every rule
+map itself: its name, what it is trying to be, how big the world is, and how many of each
+vehicle it gives a side. Under it is every rule
 the map is currently breaking, live, in the same words the game logs. **Mirror to the other
 side** copies whatever is selected to the far side of the origin, rotated half a turn and
 handed to the other team, which is how every map in this game is laid out.
@@ -187,7 +243,9 @@ Drive it into the enemy's and it leaves on a mast above the roll cage, where the
 of you where both flags are, whatever else you are doing. Get it back to your own bunker,
 which is the same place you refuel, and you have won. Get killed on the way and the flag
 stands where you fell for twelve seconds: anybody's jeep can take it on, and if nobody does it
-goes back to its tower. The numbers are in [M6_NOTES.md](M6_NOTES.md).
+goes back to its tower. The numbers are in [M6_NOTES.md](M6_NOTES.md). That is one of the two
+ways a match ends; the other is one side running out of jeeps, which is the same sentence read
+backwards.
 
 The scenes and the prefabs are all generated — **Tools > IronFlag > Build Vehicle Sandbox
 Scene**, **Build Level Editor Scene**, **Build Vehicle Prefabs**, **Build Combat Prefabs** and
@@ -238,6 +296,11 @@ rebuilt from the file on the first frame of play.
   round trip to the game and back. Not in the design document's milestone plan - it is what M7
   said should come next once levels became files, and nothing in the format had to change to
   allow it.
+- **The main menu**: done. See [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md). The game starts in a
+  menu rather than in a match — a map list read off the level folders, a direct door into the
+  editor, three settings that are remembered between sessions, and a real map turning slowly
+  behind all of it. `ESC` twice leaves a match and a guarded **MENU** button leaves the editor,
+  which is what makes it a screen you use rather than one you pass through at boot.
 - **M8 - polish pass**: not started. Per-vehicle audio, a minimap, HUD readability and juice.
   The minimap has a data source: a level is a list of rectangles.
 - **Surfaces**: done, all five phases. See [SURFACES_NOTES.md](SURFACES_NOTES.md). The map is

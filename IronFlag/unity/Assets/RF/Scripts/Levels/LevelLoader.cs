@@ -27,6 +27,7 @@ namespace IronFlag.Levels
     /// </para>
     /// </remarks>
     [AddComponentMenu("IronFlag/Level Loader")]
+    [DefaultExecutionOrder(-200)]
     public sealed class LevelLoader : MonoBehaviour
     {
         [SerializeField]
@@ -173,6 +174,14 @@ namespace IronFlag.Levels
         /// on <see cref="IronFlag.Core.TeamBunker.For"/> by the time
         /// <see cref="IronFlag.Players.PlayerVehicleDriver"/> stows its roster in one - and
         /// that happens in <c>Start</c>, for exactly this reason.
+        /// </para>
+        /// <para>
+        /// The execution order puts this ahead of everything that asks about the map, which
+        /// is what makes the map a thing the rest of the scene can read at <c>Awake</c>
+        /// rather than a thing that appears at some point during the first frame. It is
+        /// ahead of <see cref="IronFlag.Players.SessionSeating"/> for a stronger reason than
+        /// tidiness: how many people are playing is read off the level file, so the level
+        /// file has to have been read.
         /// </para>
         /// <para>
         /// A map asked for through <see cref="LevelHandoff"/> beats the one baked into the

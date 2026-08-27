@@ -5,6 +5,7 @@ using IronFlag.Core;
 using IronFlag.Destruction;
 using IronFlag.Editing;
 using IronFlag.Levels;
+using IronFlag.Vehicles;
 
 namespace IronFlag.Tests.EditMode
 {
@@ -28,6 +29,44 @@ namespace IronFlag.Tests.EditMode
     /// </remarks>
     public sealed class LevelEditingTests
     {
+        /// <summary>
+        /// A turret is placed facing the side it was built to shoot at, and every one of a
+        /// side's faces the same way. Placing them all square to the map instead would
+        /// point half of them at their own back line - a gun the map paid for and nobody
+        /// aimed, and one that looks exactly like a working one.
+        /// </summary>
+        [Test]
+        public void AnEmplacementIsPlacedFacingTheOtherSide()
+        {
+            LevelDefinition level = LevelEdits.Starter("Test Map");
+
+            int green = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(-20.0f, 0.0f, -30.0f), Team.Green);
+            int brown = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(20.0f, 0.0f, 30.0f), Team.Brown);
+            int elsewhere = LevelEdits.AddStructure(
+                level, StructureKind.Turret, new Vector3(-4.0f, 0.0f, 12.0f), Team.Green);
+            int tree = LevelEdits.AddStructure(
+                level, StructureKind.Tree, new Vector3(6.0f, 0.0f, 6.0f), Team.None);
+
+            Assert.That(
+                level.Structures[green].YawDegrees,
+                Is.EqualTo(0.0f).Within(0.001f),
+                "green sits at negative Z, so its guns look up the map");
+            Assert.That(
+                level.Structures[brown].YawDegrees,
+                Is.EqualTo(180.0f).Within(0.001f),
+                "a brown emplacement is facing its own bunker");
+            Assert.That(
+                level.Structures[elsewhere].YawDegrees,
+                Is.EqualTo(level.Structures[green].YawDegrees).Within(0.001f),
+                "two of a side's emplacements came out on different headings");
+            Assert.That(
+                level.Structures[tree].YawDegrees,
+                Is.EqualTo(0.0f).Within(0.001f),
+                "a tree was given a heading, so the rule is not about turrets");
+        }
+
         /// <summary>
         /// A mirrored turret is the other side's turret. Copying the side across instead
         /// would give one player both emplacements on a map that still looked symmetrical,
@@ -619,6 +658,27 @@ namespace IronFlag.Tests.EditMode
                 LevelFile.ToJson(read),
                 Is.EqualTo(LevelFile.ToJson(made)),
                 "a map made in the editor does not come back off disk the same map");
+        }
+
+        /// <summary>
+        /// The inspector has room for every row the map itself wants.
+        /// </summary>
+        /// <remarks>
+        /// The panel with nothing selected is the longest one there is now: a title, a
+        /// description, three numbers about the world and one per vehicle in the reserve.
+        /// A row past the end is dropped in silence rather than reported - see
+        /// <see cref="EditorInspector.RowCount"/> - so a fifth vehicle would take the
+        /// helicopter count off the panel and nothing anywhere would say so.
+        /// </remarks>
+        [Test]
+        public void TheInspectorHasRoomForEveryRowTheMapWants()
+        {
+            int wanted = 5 + VehicleRoster.Kinds.Length;
+
+            Assert.That(
+                EditorInspector.RowCount,
+                Is.GreaterThanOrEqualTo(wanted),
+                "the map panel is longer than the inspector can show");
         }
 
         /// <summary>

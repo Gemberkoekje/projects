@@ -486,7 +486,7 @@ namespace IronFlag.Tests.PlayMode
                 new Vector3(0.0f, MuzzleHeightOf(kind), (hull.z * 0.5f) + 0.2f);
 
             VehicleWeapon gun = host.AddComponent<VehicleWeapon>();
-            gun.Configure(controller, muzzle.transform, WeaponTuning.For(kind), Round());
+            gun.Configure(controller, muzzle.transform, WeaponTuning.For(kind), Round(), null);
 
             var bay = host.AddComponent<VehicleBay>();
 
@@ -519,7 +519,7 @@ namespace IronFlag.Tests.PlayMode
             body.transform.SetParent(host.transform, false);
 
             round = host.AddComponent<Projectile>();
-            round.Configure(body.transform, null);
+            round.Configure(body.transform, null, null, null);
             spawned.Add(host);
             return round;
         }

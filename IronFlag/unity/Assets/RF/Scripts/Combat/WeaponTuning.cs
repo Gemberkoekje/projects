@@ -279,13 +279,30 @@ namespace IronFlag.Combat
         /// metres of reach is well inside the tank's thirty-six - sixteen metres of standoff
         /// the tank and nothing else in the roster has - so an emplacement can be fought from
         /// outside its own range by the one vehicle equipped to, and is something the jeep
-        /// and the helicopter have to close with instead. Twelve a hit at three a second is
-        /// thirty-six damage a second, which is a full tank's hundred in under three seconds
-        /// and a jeep's fifty in under a second and a half if either stands in the beam the
-        /// whole time. That is deliberately brutal rather than merely "expensive": nothing in
-        /// the roster is meant to sit inside twenty metres of one and trade shots, which is
-        /// the whole reason the tank's own reach clears it by that much. No blast, so it
-        /// hurts exactly what it hits and a turret cannot clear the ground around itself.
+        /// and the helicopter have to close with instead. No blast, so it hurts exactly what
+        /// it hits and a turret cannot clear the ground around itself.
+        /// </para>
+        /// <para>
+        /// Fifteen a hit, once every second and a half - the tank's own cadence, for under
+        /// half the tank's damage. Every round is worth feeling: three of them end a
+        /// helicopter and four end a jeep, so a hit is an event rather than a tick, and the
+        /// second and a half between them is the room a driver has to do something about
+        /// it. Ten damage a second is what that adds up to, a tenth of a tank's hit points
+        /// for every second it spends inside twenty metres - which makes an emplacement
+        /// something the tank can close with and beat rather than something it has to
+        /// outrange. Five cannon shells is six seconds of standing there and four or five
+        /// rounds taken, sixty to seventy-five of its hundred. The jeep still cannot: eight
+        /// grenades is eight seconds parked fourteen metres out, and six rounds is ninety
+        /// damage against fifty hit points. That gap is the whole reason for the rate.
+        /// </para>
+        /// <para>
+        /// It used to fire three times a second for twelve, which is thirty-six damage a
+        /// second and a dead tank in under three. That is not a defence anybody plans
+        /// around; it is a line on the map, and the only decision it leaves is which
+        /// vehicle can shoot from outside it. The slow gun is worth more precisely because
+        /// it can be walked into and answered - and it is loud about the attempt, because
+        /// <see cref="IronFlag.Destruction.AutoTurret.WatchMargin"/> has the barrel come
+        /// round twelve metres before the first round could be fired.
         /// </para>
         /// <para>
         /// It carries no <see cref="Rounds"/> that matter, because a turret has no
@@ -299,10 +316,10 @@ namespace IronFlag.Combat
             => new WeaponTuning
             {
                 Kind = WeaponKind.Autocannon,
-                Damage = 12.0f,
+                Damage = 15.0f,
                 SplashRadius = 0.0f,
                 MuzzleSpeed = 90.0f,
-                ShotInterval = 0.33f,
+                ShotInterval = 1.5f,
                 Range = 20.0f,
                 Drop = 0.0f,
                 ElevationDegrees = 0.0f,

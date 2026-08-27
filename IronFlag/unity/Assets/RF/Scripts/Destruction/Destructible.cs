@@ -133,11 +133,14 @@ namespace IronFlag.Destruction
         /// depot. See <see cref="Teams.IsHostile"/>.
         /// </para>
         /// <para>
-        /// <see cref="StructureKind.Turret"/> is the one exception, and is why this is a
-        /// field rather than a constant: an emplacement that shoots at the enemy has to know
-        /// which side that is, and the same answer that points its gun is what makes it
-        /// immune to its own side's fire. <see cref="IronFlag.Levels.LevelValidation"/> is
-        /// what stops a level handing a side to anything else.
+        /// <see cref="StructureKind.Turret"/> and <see cref="StructureKind.Door"/> are the
+        /// exceptions, and are why this is a field rather than a constant: an emplacement
+        /// that shoots at the enemy has to know which side that is, a gate that opens for
+        /// one side has to know which, and in both cases the same answer is what makes it
+        /// immune to its own side's fire. <see cref="StructureTuning.BelongsToASide"/> is
+        /// the one place that says which kinds care, and
+        /// <see cref="IronFlag.Levels.LevelValidation"/> is what stops a level handing a
+        /// side to anything else.
         /// </para>
         /// </remarks>
         public Team Team => team;

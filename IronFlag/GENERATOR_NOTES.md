@@ -81,9 +81,11 @@ roll to one half will not silently redraw the other for every seed ever noted do
 ### Solo maps
 
 One green bunker, no green towers, and a brown side that is several flag towers — one real,
-rolled — each ringed with its own emplacements. `LevelValidation` states the rules of a
-*match*, so a solo map breaks three of them on purpose and the panel says so. Both the modal
-and the status line say that is expected. See **Gotchas** below.
+rolled — each ringed with its own emplacements. Since the 1-player pass, `LevelValidation`
+knows what a one-player map is (`LevelDefinition.IsSolo`) and judges one by its own rules, so
+a clean solo map now comes out of the generator with an empty Problems panel — and
+`LevelGenerator.SoloFaults`, the private copy of those rules the re-roll loop scored against,
+is gone. See **Gotchas** below.
 
 ---
 
@@ -228,12 +230,183 @@ knowing it can flake rather than chasing it as a regression next time.
 
 ## What this does not do
 
-- **Solo maps are not playable yet.** Generating the JSON is easy; playing it still boots the
-  hardcoded 2-player `Sandbox` scene and tries to seat a Brown roster with nowhere to spawn
-  from. That is [item 6](MASTER_PLAN.md) of the master plan, and this exists partly to give it
-  real test maps to develop against. When it lands, the solo rules in
-  `LevelGenerator.SoloFaults` should move into `LevelValidation` where they belong.
-- **No walls.** [Item 3](MASTER_PLAN.md#3-destructible-wall-sections) does not exist yet;
-  when it does, `Scenery` and `Garrison` are where it goes in — the plan's "turret clusters
-  pair nicely with destructible walls" is one list and one loop from here.
+- ~~**Solo maps are not playable yet.**~~ **Done** — see [SOLO_NOTES.md](SOLO_NOTES.md). The
+  `Sandbox` scene still builds two seats; `SessionSeating` empties the one the loaded map has
+  no side for. As predicted here, `LevelGenerator.SoloFaults` moved into `LevelValidation`
+  when it landed, and this generator is where the shipped one-player map comes from.
+- ~~**No walls.**~~ **Done, and the estimate below was wrong** — see
+  [Wall runs, added after the doors pass](#wall-runs-added-after-the-doors-pass). It said
+  `Scenery` and `Garrison` were "one list and one loop from here"; they were not, because
+  every loop in this file places things through `Settle`, whose whole job is keeping them
+  *apart*, and a wall only reads as a wall when its segments *touch*. Wall runs needed a
+  placement path of their own. Solo maps still get none, and that part is deliberate.
 - **Difficulty does not make anything tougher**, only bigger and more numerous. See above.
+
+---
+
+# Wall runs, added after the doors pass
+
+**To understand this, read `LevelGenerator.Rampart` and `LevelGenerator.Ramparts` together.**
+The first lays one run; the second decides where runs go.
+
+A two-sided generated map now comes out with **one gated wall run per crossing per side**,
+sized by difficulty: one run each at easy, two at medium, three at hard, capped at one per
+crossing. Each run is an odd 3, 5 or 7 segments with a **gate in the middle belonging to that
+side** and plain neutral walls either side of it.
+
+## Why this could not be one more loop in `Scenery`
+
+Every other placement in this file goes through `Settle`, and `Settle` exists to keep things
+**apart** — it walks outward from the wanted spot until it finds one that is not `Crowded`. A
+wall run needs the exact opposite: its segments must be exactly `LevelEdits.SegmentLength`
+apart and touching, or two neighbours do not butt into one wall with a single pier at the join
+and the run reads as a row of boxes.
+
+So `Rampart` places rather than settles, and it grows **outward from the gate** rather than
+laying end to end. A run that meets the water halfway comes out short at that end with its
+gate still in it; laid from one end, the arm that ran out of land would be the one carrying
+the gate — and the side that built the wall would have walled itself in.
+
+This file's own estimate that walls were "one list and one loop from here" was wrong, and
+[WALLS_NOTES.md](WALLS_NOTES.md) said so at the time. It was right to.
+
+## The three decisions
+
+### The gate is dead centre on the crossing, with no jitter across at all
+
+The opposite of what every other placement here does, and the single thing that makes the
+feature work rather than backfire. The gate is the middle segment, so centring the run on the
+road puts the gate on the road. **The first version jittered `across` by ±0.07 of the world —
+±10 m — and the result was a gate sitting on the grass beside the causeway with a wall segment
+across the road.** Green would have had to shoot its own rampart to use its own causeway. It
+was invisible in the level file, obvious in the first render, and the fix was deleting one
+`dice.Spread`.
+
+The variety that gives up comes back as the depth jitter and the rolled segment count.
+
+### Ramparts are laid before the depots and the guns
+
+`SideProps` now runs bunker, towers, **ramparts**, depots, emplacements, scenery, and the
+order is a claim about priority. A run is not something a map owes — it is skipped when there
+is nowhere for it — but it is the one thing here whose *shape* is fixed. A settled depot or a
+settled emplacement can be nudged aside; a run cannot, because nudging one segment breaks the
+join. Laid first, everything after it settles around the finished run. Laid last, it would be
+the only thing on the map that could not get out of its own way.
+
+### Behind the guns, never in front of them
+
+`RampartOut` is 0.24 against the emplacements' `FrontOut` of 0.20, and the gap is not taste.
+A round stops on the first thing it hits and a wall is two metres tall, so a run laid between
+a turret and the enemy is a turret firing into its own defences.
+
+## Gotchas
+
+### `Settle` reserves the spot it finds, and the gate then asks whether that spot is free
+
+`Ramparts` settles the middle and `Rampart` then tries to lay a gate there — against a `taken`
+list that now holds a reservation at exactly that point, at distance zero. Every gate failed to
+place. `Ramparts` takes the reservation back before calling `Rampart`, which is safe because
+`Settle` appends exactly one entry and nothing runs in between. Worth knowing before using
+`Settle` as a "find me somewhere" helper rather than as a "put this here" one.
+
+`Rampart`'s own abandon-the-run path (below) takes a reservation back the identical way, for
+the identical reason - safe for as long as nothing runs between the gate going down and the
+run coming out again. Both sites are trusting `taken`'s tail rather than checking it, which is
+worth a real release operation on `Settle` if a third one ever turns up.
+
+### A run of one is worse than no run
+
+If both arms fail immediately — the middle was the only dry, clear ground there was — the gate
+comes back out again. A lone gate is five metres of kerb with a door in it that anybody drives
+round, and it costs its owner sixty hit points of their own line for no barrier at all.
+
+### A relocated gate can drift off the line it is meant to gate — found during review, not fixed
+
+`Settle` looks outward in every direction, because it has no notion of an axis to prefer and
+that generality is the whole point of sharing it with bunkers, towers and trees. So when the
+exact crossing point is blocked, the spot it settles for instead can be shifted sideways along
+the run's own line rather than only nearer or further from the shore — and `Rampart` lays the
+whole run there regardless, gate and all, beside the crossing instead of on it. That is the
+identical failure the fixed `across` draw above exists to prevent, reached by a path that fix
+never touched.
+
+A first attempt at a fix rejected any run whose settled gate drifted more than half a segment
+off the crossing's own axis, treating it the same as `Settle` finding nowhere at all. That
+broke `EveryGeneratedMapIsWalledAndGated`: Lagoon/Easy alone failed on five of six sampled
+seeds, because a lagoon's crossing points sit close enough to open water that the exact spot
+is blocked more often than not, and easy difficulty gets exactly one attempt at a run — reject
+that one attempt and the map gets none at all. Settle's omnidirectional relocation is not the
+rare edge case that fix assumed; on a lagoon it is closer to the common case.
+
+The real fix wants a search that stays on the crossing's own axis rather than one that looks in
+every direction and gets rejected after the fact — nudging `outward` while holding `across`
+fixed, the same shape `Settle` already has but run along one line instead of a full ring. That
+is more machinery than a reject and wants writing and looking at, the way the original
+gate-beside-the-road bug was only caught by rendering it, not deciding blind under review-time
+pressure — so it is reverted here rather than shipped half right. Left as a known gap for the
+same reason the tower-spacing bug below is: it moves what a map looks like on affected seeds,
+which wants deciding rather than doing.
+
+### The pitch is the model's, not a number
+
+`LevelEdits.SegmentLength` is new, and it lives there for the same reason `BridgeSink` does:
+it is a fact about `prop_wall.py` and `structure_door.py` that nothing in a level file can
+catch and nobody laying a run should have to know.
+`StructureRosterTests.TheSegmentLengthIsWhatTheModelsWereBuiltTo` measures both prefabs against
+it rather than comparing it with a second copy of the number, so a wall re-exported at 4.8 m is
+caught there instead of as a row of boxes with gaps in it.
+
+## A pre-existing bug this pass found and did **not** fix
+
+**`Garrison` does not ring a solo map's towers at 13–19 m. It rings them at 40–53 m.**
+
+`SoloProps` settles each fortress tower with `FortressRoom` (40 m), which goes into `taken` as
+that tower's room. `Crowded` compares against `Mathf.Max(room, spot.Room)`, so a turret asking
+for a spot 13–19 m out — with its own `TurretRoom` of 9 — is measured against 40 and shoved
+outside it. Measured over three seeds at the medium setting, every emplacement on the map came
+out between 40.0 m and 53.2 m from its nearest tower.
+
+What that costs: an emplacement reaches 20 m, so **not one of them covers the tower it was
+placed to guard.** The solo mode's whole shape — "a field of small fortresses to crack open one
+at a time, each with its own ring of emplacements" — is not what the generator draws.
+
+Untouched here because fixing it moves every solo map for every seed, which is a bigger change
+than adding a feature and wants deciding rather than doing. The fix is probably that a tower's
+*reservation* room and its *keep-away-from-me* room are two different numbers that `Placed`
+currently conflates.
+
+## Tests
+
+Five new, all in edit mode, and the sweep already here covers ramparts for free —
+`EveryGeneratedMapIsPlayable` draws every layout, size and symmetry across twelve seeds and
+still passes with runs on every map.
+
+- `EveryGeneratedMapIsWalledAndGated` — the feature is on: every two-sided map, on every
+  layout and size, comes out with at least one wall and one gate.
+- `EveryGeneratedGateStandsInARunOfWall` — the rule that made this a separate placement path:
+  every gate has a wall exactly one segment away, lying the same way, to within a centimetre.
+- `AGeneratedGateStandsOnItsOwnSidesGround` — a side's gate is on its own half.
+- `AMirroredMapGivesEachSideItsOwnGates` — equal counts per side, and the mirrored one belongs
+  to the *other* side.
+- `StructureRosterTests.TheSegmentLengthIsWhatTheModelsWereBuiltTo` — the pitch, against the
+  built prefabs.
+
+**Looked at, not only asserted.** An overhead render of seed 4242 and a close shot of one run,
+through a throwaway preview since deleted. The overhead is what showed the gate-beside-the-road
+bug above; no test would have caught it, because a gate on the grass is a perfectly valid map.
+
+EditMode **414/414**, PlayMode **147/147**.
+
+## What this still does not do
+
+- **Solo maps get no ramparts**, and that is a decision rather than an omission. Green's front
+  is the one piece of ground on a solo map that nothing ever attacks, so a gated run across it
+  would be a defence against nobody — and the place a wall genuinely belongs there is ringing
+  each of brown's fortresses, which wants a run laid *against* a tower rather than settled away
+  from one. `FortressRoom` currently makes that impossible; see the bug above.
+- **Nothing gates a bridge on purpose.** Runs are dealt round `Crossings`, which lists causeways
+  first, so on a medium map the two runs land on the two causeways and the bridges get none.
+  Whether a bridge landing wants one is a play question nobody can answer yet.
+- **A run does not know how wide the thing it crosses is.** It is 3, 5 or 7 segments because
+  those are odd, not because a 12 m causeway wants 25 m of wall. A run that measured its
+  crossing and closed it exactly would be better, and is a real piece of work.

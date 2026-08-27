@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using IronFlag.Core;
+using IronFlag.Levels;
+using IronFlag.Vfx;
 
 namespace IronFlag.Combat
 {
@@ -49,6 +51,14 @@ namespace IronFlag.Combat
         [Tooltip("Explosion prefab spawned where the round goes off. Optional.")]
         private Explosion impact;
 
+        [SerializeField]
+        [Tooltip("Spark prefab thrown off a target that survives this round. Optional.")]
+        private ImpactSparks sparks;
+
+        [SerializeField]
+        [Tooltip("Spray prefab put up when this round goes off in the water. Optional.")]
+        private ParticleBurst splash;
+
         /// <summary>Reused sweep results, so a chaingun does not allocate per round.</summary>
         private static readonly RaycastHit[] SweepHits = new RaycastHit[32];
 
@@ -72,6 +82,25 @@ namespace IronFlag.Combat
 
         /// <summary>Which side fired it.</summary>
         public Team Team => team;
+
+        /// <summary>How far above the waterline a round still counts as hitting the sea.</summary>
+        /// <remarks>
+        /// A metre and a half. A flat-flying round is aimed down onto the
+        /// <see cref="CombatPlane"/>, so one that expires over open water is already near the
+        /// surface - and a round that goes off well above it hit something, which is the
+        /// other half of the rule.
+        /// </remarks>
+        public const float SprayReach = 1.5f;
+
+        /// <summary>The sparks this round throws off a target it fails to kill, or null.</summary>
+        /// <remarks>
+        /// Exposed for the reason <see cref="VehicleWeapon.Flash"/> is: so a test can tell a
+        /// round built without one from a round whose wiring was dropped.
+        /// </remarks>
+        public ImpactSparks Sparks => sparks;
+
+        /// <summary>The spray this round puts up when it lands in water, or null.</summary>
+        public ParticleBurst Splash => splash;
 
         /// <summary>Whether the fuze has armed and the round can hit anything yet.</summary>
         public bool IsArmed => travelled >= weapon.ArmingDistance;
@@ -138,12 +167,46 @@ namespace IronFlag.Combat
         /// </summary>
         /// <param name="body">The visible part of the round.</param>
         /// <param name="explosion">Explosion prefab for the impact, or null for none.</param>
+        /// <param name="shower">Spark prefab for a hit that does not kill, or null for none.</param>
+        /// <param name="spray">Spray prefab for a hit on water, or null for none.</param>
         /// <remarks>Called by the prefab builder.</remarks>
-        public void Configure(Transform body, Explosion explosion)
+        public void Configure(
+            Transform body, Explosion explosion, ImpactSparks shower, ParticleBurst spray)
         {
             visual = body;
             impact = explosion;
+            sparks = shower;
+            splash = spray;
         }
+
+        /// <summary>
+        /// Returns whether a round that went off here should throw spray rather than fire.
+        /// </summary>
+        /// <param name="overWater">Whether the ground under the point is water.</param>
+        /// <param name="struckSomething">Whether the round hit a target rather than expiring.</param>
+        /// <param name="height">How high the round went off, in metres.</param>
+        /// <param name="waterSurface">Height of the water surface, in metres.</param>
+        /// <returns><c>true</c> when it went into the sea.</returns>
+        /// <remarks>
+        /// <para>
+        /// Static and side-effect free, so the rule can be checked without a sea. All three
+        /// conditions earn their place. Over water is obvious. <em>Not</em> having struck
+        /// anything is what stops a helicopter shot down over the bay throwing up a splash
+        /// from ten metres in the air - it was hit, so the round found a hull rather than the
+        /// water. And the height is the backstop for the same case where the round hit
+        /// nothing, since a shot that sails past a helicopter still expires up where it was
+        /// aimed.
+        /// </para>
+        /// <para>
+        /// Note this replaces the explosion rather than joining it. A shell landing in the
+        /// sea and a shell landing on the beach beside it drew the same orange fireball
+        /// before, which is simply wrong: the sea is the darkest thing on the map and the
+        /// one place fire cannot happen.
+        /// </para>
+        /// </remarks>
+        public static bool DrawsSpray(
+            bool overWater, bool struckSomething, float height, float waterSurface)
+            => overWater && !struckSomething && height <= waterSurface + SprayReach;
 
         private void FixedUpdate()
         {
@@ -276,7 +339,10 @@ namespace IronFlag.Combat
         /// </remarks>
         private void Detonate(Vector3 at, IDamageable direct)
         {
-            Explosion.Spawn(impact, at, Mathf.Max(weapon.SplashRadius, weapon.Radius * 4.0f));
+            if (!TrySplash(at, direct))
+            {
+                Explosion.Spawn(impact, at, Mathf.Max(weapon.SplashRadius, weapon.Radius * 4.0f));
+            }
 
             if (weapon.SplashRadius <= 0.0f)
             {
@@ -285,6 +351,7 @@ namespace IronFlag.Combat
                     direct.TakeDamage(weapon.Damage, team);
                 }
 
+                Spark(at, direct);
                 Destroy(gameObject);
                 return;
             }
@@ -321,7 +388,72 @@ namespace IronFlag.Combat
             }
 
             Damaged.Clear();
+            Spark(at, direct);
             Destroy(gameObject);
+        }
+
+        /// <summary>
+        /// Puts up spray if this round went into the water.
+        /// </summary>
+        /// <param name="at">Where the round went off, in world space.</param>
+        /// <param name="direct">What it struck, or null when it hit the world or expired.</param>
+        /// <returns><c>true</c> when spray was drawn, so no fireball should be.</returns>
+        /// <remarks>
+        /// The spray is put on the waterline rather than where the round happened to expire,
+        /// which may be a little under it or a little over. Water is thrown up from the
+        /// surface, and a splash centred half a metre down is a splash with its bottom half
+        /// inside the sea.
+        /// </remarks>
+        private bool TrySplash(Vector3 at, IDamageable direct)
+        {
+            WaterLine water = WaterLine.Active;
+            LevelDefinition level = LevelLoader.Current;
+            if (splash == null || water == null || level == null)
+            {
+                return false;
+            }
+
+            bool overWater = SurfaceTuning.For(level.Field.At(at)).Drowns;
+            if (!DrawsSpray(overWater, direct != null, at.y, water.Surface))
+            {
+                return false;
+            }
+
+            ParticleBurst.Spawn(
+                splash,
+                new Vector3(at.x, water.Surface, at.z),
+                Mathf.Max(weapon.SplashRadius, weapon.Radius * 6.0f));
+            return true;
+        }
+
+        /// <summary>
+        /// Throws sparks off a target this round struck and failed to kill.
+        /// </summary>
+        /// <param name="at">Where the round struck, in world space.</param>
+        /// <param name="direct">What it struck, or null when it hit the world or expired.</param>
+        /// <remarks>
+        /// <para>
+        /// Called after the damage rather than before it, because whether the target is
+        /// still standing is the whole question: a hit that kills already draws a wreck or a
+        /// collapse, and a hit that does not previously drew nothing the ground would not
+        /// have drawn too.
+        /// </para>
+        /// <para>
+        /// A direct hit only. Everything a blast catches at the edge of its radius is
+        /// already inside an explosion several metres across, and lighting each of them up
+        /// as well would turn one rocket into a firework - sparks say "this shot connected
+        /// with <em>that</em>", which is a sentence about the thing the round actually
+        /// struck.
+        /// </para>
+        /// </remarks>
+        private void Spark(Vector3 at, IDamageable direct)
+        {
+            if (direct == null || direct.IsDestroyed)
+            {
+                return;
+            }
+
+            ImpactSparks.Spawn(sparks, at, -state.Velocity, weapon.Radius);
         }
 
         /// <summary>

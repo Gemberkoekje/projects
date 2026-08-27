@@ -56,6 +56,32 @@ namespace IronFlag.Levels
         }
 
         /// <summary>
+        /// Sends a map to the game to be played, with nothing behind it.
+        /// </summary>
+        /// <param name="name">Level name, without a folder or an extension.</param>
+        /// <remarks>
+        /// <para>
+        /// The same as <see cref="Playtest"/> except for <see cref="FromEditor"/>, and that one
+        /// difference is the whole reason both exist. The main menu launches a match the same
+        /// way the editor does - name the map, load the game scene - but a player who chose a
+        /// map off the menu has never been in the editor, and
+        /// <see cref="IronFlag.Editing.PlaytestReturn"/> reads this flag to decide whether F1
+        /// has anywhere to go back to. Reusing <c>Playtest</c> here would put a "back to the
+        /// editor" notice over every match in the game and bind a key that loads a scene
+        /// nobody asked for.
+        /// </para>
+        /// <para>
+        /// So: <c>Playtest</c> means the editor sent this, <c>Play</c> means the menu did, and
+        /// <see cref="Edit"/> means the map is going the other way.
+        /// </para>
+        /// </remarks>
+        public static void Play(string name)
+        {
+            Level = name == null ? string.Empty : name.Trim();
+            FromEditor = false;
+        }
+
+        /// <summary>
         /// Sends a map back to the editor to be worked on.
         /// </summary>
         /// <param name="name">Level name, without a folder or an extension.</param>
@@ -81,7 +107,8 @@ namespace IronFlag.Levels
         /// </summary>
         /// <remarks>
         /// For the tests, which share a process and would otherwise inherit whichever map the
-        /// test before them handed over.
+        /// test before them handed over - and for the menu's Level Editor button, which means
+        /// "open the editor" rather than "open the editor on the map from the last match".
         /// </remarks>
         public static void Clear()
         {

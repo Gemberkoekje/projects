@@ -316,19 +316,159 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
-        /// The turret is the only structure that belongs to a side, and the level format,
-        /// the validator and the mirror tool all turn on that one answer.
+        /// The turret and the door are the only structures that belong to a side, and the
+        /// level format, the validator, the builder and the mirror tool all turn on that
+        /// one answer.
         /// </summary>
+        /// <remarks>
+        /// Written as an explicit set rather than as a repeat of
+        /// <see cref="StructureTuning.BelongsToASide"/>'s own expression, so that widening
+        /// the rule is a deliberate edit here as well as there. A test that said
+        /// <c>BelongsToASide(kind) == BelongsToASide(kind)</c> would pass whatever the game
+        /// believed.
+        /// </remarks>
         [Test]
-        public void OnlyTheTurretBelongsToASide()
+        public void OnlyTheTurretAndTheDoorBelongToASide()
         {
+            var owned = new[] { StructureKind.Turret, StructureKind.Door };
+
             foreach (StructureKind kind in Enum.GetValues(typeof(StructureKind)))
             {
                 Assert.That(
                     StructureTuning.BelongsToASide(kind),
-                    Is.EqualTo(kind == StructureKind.Turret),
+                    Is.EqualTo(Array.IndexOf(owned, kind) >= 0),
                     $"{kind} disagrees with the rest of the game about whose it is");
             }
+        }
+
+        /// <summary>
+        /// A gate is built with a leaf in the states that can still open and none in the
+        /// rubble, and the part that slides keeps its colliders and gets a kinematic body.
+        /// </summary>
+        /// <remarks>
+        /// The exact inverse of what
+        /// <see cref="TheTurretPrefabCarriesAGunOnEveryStateThatStillHasABarrel"/> demands,
+        /// and both are asserted because the reasoning is opposite rather than absent. A
+        /// turret's head is stripped of colliders because it moves and the base underneath
+        /// is what a vehicle bumps into; a gate's leaf has no stand-in, so being solid is
+        /// the whole of what it is for and the moving-collider cost is paid with a
+        /// kinematic rigidbody instead. Losing either half is silent: colliders gone is a
+        /// gate that looks shut and is not, and the body gone is a gate that works and
+        /// quietly dirties the static physics scene every step it moves.
+        /// </remarks>
+        [Test]
+        public void TheDoorPrefabCarriesASolidLeafOnEveryStateThatStillOpens()
+        {
+            DestructiblePrefabBuilder.EnsureAssets();
+            GameObject prefab = DestructiblePrefabBuilder.Load(StructureKind.Door);
+            Assert.That(prefab, Is.Not.Null, "the door has no prefab");
+
+            var door = prefab.GetComponent<AutoDoor>();
+            Assert.That(door, Is.Not.Null, "the door has nobody opening it");
+            Assert.That(door.Reach, Is.GreaterThan(0.0f), "the gate never notices anybody");
+            Assert.That(door.Speed, Is.GreaterThan(0.0f), "the leaf never moves");
+
+            foreach (DestructionState state in new[]
+            {
+                DestructionState.Intact, DestructionState.Damaged,
+            })
+            {
+                Transform leaf = Sliding(prefab, state);
+                Assert.That(leaf, Is.Not.Null, $"the {state} gate has nothing that opens");
+                Assert.That(
+                    leaf.GetComponentsInChildren<Collider>(true).Length,
+                    Is.GreaterThan(0),
+                    $"the {state} gate's leaf can be driven through while it is shut");
+
+                var body = leaf.GetComponent<Rigidbody>();
+                Assert.That(
+                    body,
+                    Is.Not.Null,
+                    $"the {state} gate's leaf is a static collider that moves");
+                Assert.That(
+                    body.isKinematic,
+                    Is.True,
+                    $"the {state} gate's leaf can be pushed, so a tank could shove it open");
+            }
+
+            Assert.That(
+                Sliding(prefab, DestructionState.Destroyed),
+                Is.Null,
+                "the rubble still has a gate in it, so a wrecked door could close again");
+        }
+
+        /// <summary>
+        /// The fastest vehicle in the game must not have to slow down at its own gate.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the one requirement <see cref="DestructiblePrefabBuilder.DoorReach"/>
+        /// and <see cref="DestructiblePrefabBuilder.DoorLeafSpeed"/> were picked from, so
+        /// it is checked rather than described: a gate its owner had to brake for is a gate
+        /// its owner drives round, and the jeep - the only vehicle that can carry the flag
+        /// - is the one that would be doing the braking.
+        /// </para>
+        /// <para>
+        /// The drop is measured off the built prefab rather than written down again, so
+        /// re-exporting a taller gate is caught here instead of in a match.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void AJeepNeverHasToWaitAtItsOwnGate()
+        {
+            DestructiblePrefabBuilder.EnsureAssets();
+            GameObject prefab = DestructiblePrefabBuilder.Load(StructureKind.Door);
+            Assert.That(prefab, Is.Not.Null, "the door has no prefab");
+
+            Transform leaf = Sliding(prefab, DestructionState.Intact);
+            float drop = AutoDoor.TravelFor(prefab.transform, leaf);
+            Assert.That(drop, Is.GreaterThan(0.0f), "the leaf has nowhere to go");
+
+            var door = prefab.GetComponent<AutoDoor>();
+            float toOpen = drop / door.Speed;
+            float toArrive = door.Reach / VehicleTuning.For(VehicleKind.Jeep).MaxSpeed;
+
+            Assert.That(
+                toArrive,
+                Is.GreaterThan(toOpen),
+                $"a jeep covers the gate's {door.Reach:0.#} m reach in {toArrive:0.00} s and the "
+                + $"leaf takes {toOpen:0.00} s to drop, so its own side drives into it");
+        }
+
+        /// <summary>
+        /// A gate is the softest part of any run it stands in.
+        /// </summary>
+        /// <remarks>
+        /// The oldest rule in fortification, and the only arrangement that keeps both
+        /// pieces worth placing. A gate tougher than the wall would mean building the whole
+        /// run out of gates; a gate equal to it would be a wall that happens to open. It
+        /// still has to survive one round of everything, which is what keeps a breach a
+        /// decision rather than a reflex - see
+        /// <see cref="EveryStructureFallsToOneFullLoadAndNoneToASingleRound"/>, which
+        /// checks the tank's shell, and the ASV's rocket below, which is the biggest single
+        /// round in the game and the one that comes closest.
+        /// </remarks>
+        [Test]
+        public void AGateIsTheWeakPointOfTheWallItStandsIn()
+        {
+            float gate = StructureTuning.For(StructureKind.Door).HitPoints;
+            float wall = StructureTuning.For(StructureKind.Wall).HitPoints;
+
+            Assert.That(
+                gate,
+                Is.LessThan(wall),
+                "the gate is no cheaper to breach than the wall, so nothing is gained by aiming at it");
+
+            float heaviest = 0.0f;
+            foreach (VehicleKind kind in Enum.GetValues(typeof(VehicleKind)))
+            {
+                heaviest = Mathf.Max(heaviest, WeaponTuning.For(kind).Damage);
+            }
+
+            Assert.That(
+                gate,
+                Is.GreaterThan(heaviest),
+                $"the biggest single round in the game does {heaviest:0.#}, so one shot opens a gate");
         }
 
         /// <summary>
@@ -353,6 +493,7 @@ namespace IronFlag.Tests.EditMode
                 gun.Tuning.Kind,
                 Is.EqualTo(WeaponTuning.Emplacement().Kind),
                 "the turret carries a gun the table does not give it");
+            Assert.That(gun.Flash, Is.Not.Null, "the turret fires without a muzzle flash");
 
             var turret = prefab.GetComponent<AutoTurret>();
             Assert.That(turret, Is.Not.Null, "the turret has nobody aiming it");
@@ -411,6 +552,49 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
+        /// The rate of fire is what decides whether an emplacement can be taken on at all,
+        /// so it is read against the two vehicles that would try: the tank wins the
+        /// exchange and pays most of its armour for it, and the jeep loses.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The relationship rather than the two numbers, because the numbers are taste and
+        /// this is not. A turret that beat the tank sent to remove it would leave exactly
+        /// one decision on the map - bring the gun that outranges it - and a turret the jeep
+        /// could shoot its way past would break the design document's first pillar, which is
+        /// that everything else exists to clear the jeep's path. The gun is tuned to sit
+        /// between those, and this is where that is written down.
+        /// </para>
+        /// <para>
+        /// A straight trade, standing still, which is the worst way either vehicle could do
+        /// it and the only one that can be read off the table at all. Anything a player
+        /// actually does - reversing out, circling, using the sixteen metres of standoff -
+        /// is better than this for the vehicle and worse for the emplacement.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void TheEmplacementLosesToTheTankAndBeatsTheJeep()
+        {
+            WeaponTuning emplacement = WeaponTuning.Emplacement();
+            float pool = StructureTuning.For(StructureKind.Turret).HitPoints;
+
+            foreach (VehicleKind kind in new[] { VehicleKind.Tank, VehicleKind.Jeep })
+            {
+                WeaponTuning carried = WeaponTuning.For(kind);
+                VehicleTuning hull = VehicleTuning.For(kind);
+
+                float seconds = pool / carried.DamagePerSecond;
+                float taken = seconds * emplacement.DamagePerSecond;
+
+                Assert.That(
+                    taken < hull.HitPoints,
+                    Is.EqualTo(kind == VehicleKind.Tank),
+                    $"a {kind} trading with an emplacement needs {seconds:0.#} s and takes "
+                        + $"{taken:0.#} of its {hull.HitPoints:0.#} hit points doing it");
+            }
+        }
+
+        /// <summary>
         /// Returns the traversing part of one of the turret's states, or null.
         /// </summary>
         /// <param name="prefab">The turret prefab.</param>
@@ -420,6 +604,18 @@ namespace IronFlag.Tests.EditMode
         {
             Transform model = prefab.transform.Find(Destructible.NodeNameFor(state));
             return model == null ? null : Find(model, AutoTurret.TurretNodeName);
+        }
+
+        /// <summary>
+        /// Returns the sliding part of one of the door's states, or null.
+        /// </summary>
+        /// <param name="prefab">The door prefab.</param>
+        /// <param name="state">State to look inside.</param>
+        /// <returns>The leaf node, or <c>null</c> when that state has none.</returns>
+        private static Transform Sliding(GameObject prefab, DestructionState state)
+        {
+            Transform model = prefab.transform.Find(Destructible.NodeNameFor(state));
+            return model == null ? null : Find(model, AutoDoor.LeafNodeName);
         }
 
         /// <summary>
@@ -458,6 +654,126 @@ namespace IronFlag.Tests.EditMode
                 Is.EqualTo(0),
                 "debris would leave an invisible wall where the building stood");
             Assert.That(debris.Duration, Is.LessThan(2.0f), "debris outstays the explosion that threw it");
+        }
+
+        /// <summary>
+        /// The pitch a run is laid at is the length the segments were actually modelled to.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// <see cref="IronFlag.Editing.LevelEdits.SegmentLength"/> is the one number in the
+        /// game that has to agree with two different files it cannot see: <c>prop_wall.py</c>
+        /// and <c>structure_door.py</c>. Everything that lays a run - the generator's
+        /// <c>Rampart</c>, and a person clicking along the editor's 5 m grid - trusts it, and
+        /// a wall re-exported at 4.8 m would come out as a row of boxes with gaps in it that
+        /// nothing else in the project would notice.
+        /// </para>
+        /// <para>
+        /// Measured off the built prefabs rather than compared against a second copy of the
+        /// number, which is the same discipline the walls pass arrived at the hard way: ask
+        /// what was built, not what the tuple said.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void TheSegmentLengthIsWhatTheModelsWereBuiltTo()
+        {
+            DestructiblePrefabBuilder.EnsureAssets();
+
+            foreach (StructureKind kind in new[] { StructureKind.Wall, StructureKind.Door })
+            {
+                GameObject prefab = DestructiblePrefabBuilder.Load(kind);
+                Assert.That(prefab, Is.Not.Null, $"{kind} has no prefab");
+
+                Transform model = prefab.transform.Find(
+                    Destructible.NodeNameFor(DestructionState.Intact));
+                Assert.That(model, Is.Not.Null, $"{kind} has no intact model");
+
+                Renderer[] parts = model.GetComponentsInChildren<Renderer>(true);
+                Assert.That(parts.Length, Is.GreaterThan(0), $"{kind} draws nothing");
+
+                Bounds box = parts[0].bounds;
+                for (int part = 1; part < parts.Length; part++)
+                {
+                    box.Encapsulate(parts[part].bounds);
+                }
+
+                Assert.That(
+                    box.size.x,
+                    Is.EqualTo(IronFlag.Editing.LevelEdits.SegmentLength).Within(0.01f),
+                    $"a {kind} is {box.size.x:0.###} m long, so a run of them laid at "
+                    + $"{IronFlag.Editing.LevelEdits.SegmentLength} m does not butt up");
+            }
+        }
+
+        /// <summary>
+        /// The three built structures read as a height sequence: a wall, a gun tower at twice
+        /// it, and a flag tower half again as tall as that.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The gun tower spent its first life at 1.68 m, below the 2.0 m wall that arrived
+        /// later, and it read as a bollard rather than as a defence. Nothing caught that,
+        /// because nothing in the game reads a structure's height: a round sweeps a
+        /// <see cref="CombatPlane"/> column from 0.5 m to 30 m whatever is in the way, so
+        /// height here is silhouette and only silhouette — and silhouette is exactly the kind
+        /// of thing that regresses silently on a re-export.
+        /// </para>
+        /// <para>
+        /// So the rule is asserted rather than described. Measured off the built prefabs,
+        /// like the segment length, because the numbers live in three separate Blender files
+        /// that cannot see each other.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void TheBuiltStructuresReadAsAHeightSequence()
+        {
+            DestructiblePrefabBuilder.EnsureAssets();
+            ObjectivePrefabBuilder.EnsureAssets();
+
+            float wall = StandingHeight(DestructiblePrefabBuilder.Load(StructureKind.Wall));
+            float gate = StandingHeight(DestructiblePrefabBuilder.Load(StructureKind.Door));
+            float gun = StandingHeight(DestructiblePrefabBuilder.Load(StructureKind.Turret));
+            float flag = StandingHeight(ObjectivePrefabBuilder.LoadTower());
+
+            Assert.That(
+                gate, Is.EqualTo(wall).Within(0.01f),
+                $"a gate is {gate:0.##} m and a wall is {wall:0.##} m, so a run of the two has "
+                + "two cap lines instead of one");
+
+            Assert.That(
+                gun, Is.GreaterThan(wall * 1.5f),
+                $"the gun tower is {gun:0.##} m against a {wall:0.##} m wall, so it does not "
+                + "tower over anything and reads as a bollard behind its own fence");
+
+            Assert.That(
+                gun, Is.LessThan(flag),
+                $"the gun tower is {gun:0.##} m and the flag tower is {flag:0.##} m; the thing "
+                + "the whole map is about has to be the tallest thing on it");
+        }
+
+        /// <summary>
+        /// Returns how tall a destructible's intact model stands, in metres.
+        /// </summary>
+        /// <param name="prefab">The assembled prefab.</param>
+        /// <returns>The height of its intact state, measured off the renderers.</returns>
+        private static float StandingHeight(GameObject prefab)
+        {
+            Assert.That(prefab, Is.Not.Null, "a prefab this test measures has not been built");
+
+            Transform model = prefab.transform.Find(
+                Destructible.NodeNameFor(DestructionState.Intact));
+            Assert.That(model, Is.Not.Null, $"{prefab.name} has no intact model");
+
+            Renderer[] parts = model.GetComponentsInChildren<Renderer>(true);
+            Assert.That(parts.Length, Is.GreaterThan(0), $"{prefab.name} draws nothing");
+
+            Bounds box = parts[0].bounds;
+            for (int part = 1; part < parts.Length; part++)
+            {
+                box.Encapsulate(parts[part].bounds);
+            }
+
+            return box.max.y - prefab.transform.position.y;
         }
 
         /// <summary>

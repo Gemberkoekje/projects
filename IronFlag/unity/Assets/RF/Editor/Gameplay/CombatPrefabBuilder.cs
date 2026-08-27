@@ -8,15 +8,18 @@ using IronFlag.Editor.ArtPipeline;
 namespace IronFlag.Editor.Gameplay
 {
     /// <summary>
-    /// Builds the three things combat draws that were never modelled: a round in flight,
-    /// the flash it makes when it arrives, and the debris a structure throws when it breaks.
+    /// Builds the five things combat draws that were never modelled: a round in flight, the
+    /// flash a gun makes when it leaves, the sparks it throws off armour it does not get
+    /// through, the flash it makes when it arrives, and the debris a structure throws when
+    /// it breaks.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Everything else in this game comes out of Blender, and these three deliberately do
-    /// not. A tracer is a lit sphere, an explosion is a bigger one and debris is ten cubes,
-    /// so putting them through the asset pipeline would add three <c>.glb</c> files carrying
-    /// no information that is not in the handful of numbers below. Generating them here also keeps them bound to the same
+    /// Everything else in this game comes out of Blender, and these five deliberately do
+    /// not. A tracer is a lit sphere, an explosion is a bigger one, a muzzle flash is a
+    /// squashed one, and debris and sparks are cubes, so putting them through the asset
+    /// pipeline would add five <c>.glb</c> files carrying no information that is not in the
+    /// handful of numbers below. Generating them here also keeps them bound to the same
     /// generated materials the vehicles use, which is the part that is easy to get wrong by
     /// hand.
     /// </para>
@@ -39,17 +42,45 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Asset name of the debris prefab a structure throws when it breaks.</summary>
         public const string DebrisAssetName = "RF_Debris";
 
+        /// <summary>Asset name of the flash prefab a gun draws when it fires.</summary>
+        public const string MuzzleFlashAssetName = "RF_MuzzleFlash";
+
+        /// <summary>Asset name of the spark prefab a round throws off armour it does not kill.</summary>
+        public const string SparksAssetName = "RF_Sparks";
+
         /// <summary>Name of the node a projectile's visible part hangs off.</summary>
         public const string BodyNodeName = "Body";
 
         /// <summary>Name of the node an explosion's swelling sphere hangs off.</summary>
         public const string BallNodeName = "Ball";
 
+        /// <summary>Name of the node a muzzle flash's collapsing flame hangs off.</summary>
+        public const string FlameNodeName = "Flame";
+
         /// <summary>Seconds an explosion takes from ignition to gone.</summary>
         private const float ExplosionDuration = 0.55f;
 
         /// <summary>Seconds a debris burst takes from the bang to gone.</summary>
         private const float DebrisDuration = 0.9f;
+
+        /// <summary>Seconds a muzzle flash takes from the shot to gone.</summary>
+        /// <remarks>
+        /// Four frames at sixty. Shorter and a flash can fall between two of them and never
+        /// be drawn at all; much longer and the chaingun - which fires every 125 ms - starts
+        /// to look like it is holding a torch rather than firing a gun.
+        /// </remarks>
+        private const float MuzzleFlashDuration = 0.065f;
+
+        /// <summary>Seconds a spark burst takes from the strike to gone.</summary>
+        private const float SparksDuration = 0.22f;
+
+        /// <summary>How many shards a spark burst throws.</summary>
+        /// <remarks>
+        /// Seven, and it is a small number on purpose: this is the one effect in the game
+        /// that can be on screen eight times a second per chaingun, so it is priced as
+        /// something that happens constantly rather than as something that happens once.
+        /// </remarks>
+        private const int SparkShardCount = 7;
 
         /// <summary>How many chunks a debris burst throws.</summary>
         /// <remarks>
@@ -72,8 +103,20 @@ namespace IronFlag.Editor.Gameplay
         {
             GeneratedMaterials.EnsureAssets();
             GeneratedMaterials.EnsureAssetFolder(PrefabFolder);
+            // A round binds the spray it puts up as well as the flash it makes on arrival,
+            // and the spray is not built here - see VfxPrefabBuilder for why smoke and water
+            // live in their own folder.
+            VfxPrefabBuilder.EnsureAssets();
 
-            var built = new List<string> { BuildExplosion().name, BuildDebris().name };
+            // The explosion and the sparks first: a projectile prefab binds both, and a
+            // round built before them would be saved pointing at nothing.
+            var built = new List<string>
+            {
+                BuildExplosion().name,
+                BuildDebris().name,
+                BuildMuzzleFlash().name,
+                BuildSparks().name,
+            };
             foreach (WeaponKind kind in Arsenal())
             {
                 built.Add(BuildProjectile(kind).name);
@@ -139,6 +182,28 @@ namespace IronFlag.Editor.Gameplay
         }
 
         /// <summary>
+        /// Loads the muzzle flash prefab.
+        /// </summary>
+        /// <returns>The flash, or <c>null</c> when it has not been built yet.</returns>
+        public static MuzzleFlash LoadMuzzleFlash()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                PrefabPathFor(MuzzleFlashAssetName));
+            return prefab == null ? null : prefab.GetComponent<MuzzleFlash>();
+        }
+
+        /// <summary>
+        /// Loads the spark prefab.
+        /// </summary>
+        /// <returns>The burst, or <c>null</c> when it has not been built yet.</returns>
+        public static ImpactSparks LoadSparks()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                PrefabPathFor(SparksAssetName));
+            return prefab == null ? null : prefab.GetComponent<ImpactSparks>();
+        }
+
+        /// <summary>
         /// Loads one weapon's round.
         /// </summary>
         /// <param name="kind">Weapon to look up.</param>
@@ -159,7 +224,10 @@ namespace IronFlag.Editor.Gameplay
         /// </remarks>
         public static void EnsureAssets()
         {
-            bool missing = LoadExplosion() == null || LoadDebris() == null;
+            bool missing = LoadExplosion() == null
+                || LoadDebris() == null
+                || LoadMuzzleFlash() == null
+                || LoadSparks() == null;
             foreach (WeaponKind kind in Arsenal())
             {
                 missing |= LoadProjectile(kind) == null;
@@ -238,6 +306,88 @@ namespace IronFlag.Editor.Gameplay
         }
 
         /// <summary>
+        /// Builds the flash prefab a gun draws at its barrel when it fires.
+        /// </summary>
+        /// <returns>The saved prefab asset.</returns>
+        /// <remarks>
+        /// <para>
+        /// The same two objects an explosion is - a light on the root and a sphere below it,
+        /// for the same reason: the sphere is scaled every frame, and a scaled light is a
+        /// light with a scaled range on top of the range it was given. What makes it read as
+        /// a muzzle flash rather than as a small explosion is entirely in
+        /// <see cref="MuzzleFlash"/>: the flame is stretched along the barrel and collapses
+        /// instead of swelling.
+        /// </para>
+        /// <para>
+        /// One prefab for every gun in the game, sized per shot from the weapon's calibre.
+        /// A tank's flash and a chaingun's differ by a number rather than by an asset,
+        /// which is the same trade <see cref="Explosion"/> already makes with blast radius.
+        /// </para>
+        /// </remarks>
+        public static GameObject BuildMuzzleFlash()
+        {
+            var root = new GameObject(MuzzleFlashAssetName);
+            try
+            {
+                GameObject flame = CreateSphere(FlameNodeName, root.transform, GeneratedMaterials.Blast);
+                flame.transform.localScale = Vector3.zero;
+
+                Light glow = root.AddComponent<Light>();
+                glow.type = LightType.Point;
+                // Whiter than the explosion's light. Burning propellant at the barrel is
+                // hotter than the fireball a shell makes when it arrives, and the pair read
+                // as two different events partly because of it.
+                glow.color = new Color(1.0f, 0.86f, 0.58f);
+                glow.shadows = LightShadows.None;
+                glow.intensity = 0.0f;
+
+                MuzzleFlash flash = root.AddComponent<MuzzleFlash>();
+                flash.Configure(flame.transform, glow, MuzzleFlashDuration, 0.9f);
+
+                return PrefabUtility.SaveAsPrefabAsset(root, PrefabPathFor(MuzzleFlashAssetName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        /// <summary>
+        /// Builds the spark prefab a round throws off armour it does not get through.
+        /// </summary>
+        /// <returns>The saved prefab asset.</returns>
+        /// <remarks>
+        /// Cubes wearing the tracer's material, because a spark is a piece of the round that
+        /// came back: same colour as the tracer that made it, so a burst reads as belonging
+        /// to the gun firing it. They are stretched into streaks and placed by
+        /// <see cref="ImpactSparks"/> every frame, so their size and position in the prefab
+        /// do not matter - only how many there are.
+        /// </remarks>
+        public static GameObject BuildSparks()
+        {
+            var root = new GameObject(SparksAssetName);
+            try
+            {
+                var shards = new Transform[SparkShardCount];
+                for (int index = 0; index < shards.Length; index++)
+                {
+                    GameObject shard = CreateShard($"Shard{index}", root.transform);
+                    shard.transform.localScale = Vector3.zero;
+                    shards[index] = shard.transform;
+                }
+
+                ImpactSparks burst = root.AddComponent<ImpactSparks>();
+                burst.Configure(shards, SparksDuration, 1.0f);
+
+                return PrefabUtility.SaveAsPrefabAsset(root, PrefabPathFor(SparksAssetName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        /// <summary>
         /// Builds one weapon's round.
         /// </summary>
         /// <param name="kind">Weapon whose round to build.</param>
@@ -265,7 +415,11 @@ namespace IronFlag.Editor.Gameplay
                     lobbed ? TracerExaggeration : TracerExaggeration * TracerElongation);
 
                 Projectile round = root.AddComponent<Projectile>();
-                round.Configure(body.transform, LoadExplosion());
+                round.Configure(
+                    body.transform,
+                    LoadExplosion(),
+                    LoadSparks(),
+                    VfxPrefabBuilder.LoadSplash());
 
                 return PrefabUtility.SaveAsPrefabAsset(root, PrefabPathFor(assetName));
             }
@@ -297,6 +451,35 @@ namespace IronFlag.Editor.Gameplay
                 GeneratedMaterials.Load(GeneratedMaterials.Debris);
 
             return chunk;
+        }
+
+        /// <summary>
+        /// Creates one flying fleck of hot metal, with no collider on it.
+        /// </summary>
+        /// <param name="name">Object name.</param>
+        /// <param name="parent">Object to hang it off.</param>
+        /// <returns>The shard.</returns>
+        /// <remarks>
+        /// A cube rather than a sphere, because it is drawn stretched into a streak and a
+        /// stretched sphere is a lozenge with soft ends - which at this size is a smudge.
+        /// No collider and no shadow, for the reasons a debris chunk and a tracer have
+        /// none: nothing should be able to drive into a spark, and nothing this bright
+        /// should darken the ground it is lighting.
+        /// </remarks>
+        private static GameObject CreateShard(string name, Transform parent)
+        {
+            GameObject shard = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            shard.name = name;
+            shard.transform.SetParent(parent, false);
+
+            Object.DestroyImmediate(shard.GetComponent<Collider>());
+
+            var renderer = shard.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = GeneratedMaterials.Load(GeneratedMaterials.Tracer);
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            return shard;
         }
 
         /// <summary>

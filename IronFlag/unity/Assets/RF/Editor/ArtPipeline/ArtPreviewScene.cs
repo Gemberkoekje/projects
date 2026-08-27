@@ -363,7 +363,6 @@ namespace IronFlag.Editor.ArtPipeline
             // 25-asset grid renders at a fraction of the size of the front row, and the
             // whole point is comparing assets against each other.
             camera.transform.rotation = Quaternion.Euler(38.0f, 0.0f, 0.0f);
-            camera.orthographic = true;
             camera.nearClipPlane = 0.3f;
             // A flat backdrop rather than the default skybox: this is a product shot of
             // the models, and a gradient sky just competes with them. The sky is still worth
@@ -380,30 +379,10 @@ namespace IronFlag.Editor.ArtPipeline
             // the two that would break this. It keeps the shared lighting; it skips the grade.
             // The sandbox still is where an emissive is judged with its bloom on.
 
-            // Fit by measuring every corner of the bounds in camera space. Half-height is
-            // what orthographicSize means; half-width has to be divided by the aspect
-            // before the two are compared.
-            Quaternion inverseRotation = Quaternion.Inverse(camera.transform.rotation);
-            float halfWidth = 0.0f;
-            float halfHeight = 0.0f;
-            float halfDepth = 0.0f;
-
-            for (int corner = 0; corner < 8; corner++)
-            {
-                Vector3 offset = new Vector3(
-                    (corner & 1) == 0 ? -contents.extents.x : contents.extents.x,
-                    (corner & 2) == 0 ? -contents.extents.y : contents.extents.y,
-                    (corner & 4) == 0 ? -contents.extents.z : contents.extents.z);
-                Vector3 local = inverseRotation * offset;
-
-                halfWidth = Mathf.Max(halfWidth, Mathf.Abs(local.x));
-                halfHeight = Mathf.Max(halfHeight, Mathf.Abs(local.y));
-                halfDepth = Mathf.Max(halfDepth, Mathf.Abs(local.z));
-            }
-
-            camera.orthographicSize = Mathf.Max(halfHeight, halfWidth / aspect) * 1.04f;
-            camera.farClipPlane = (2.0f * halfDepth) + 400.0f;
-            camera.transform.position = contents.center - (camera.transform.forward * (halfDepth + 200.0f));
+            // Four per cent of slack: this is a contact sheet, so the grid should fill the
+            // sheet, and the margin is only there to keep the outermost silhouette off the
+            // edge. The fit itself is shared with the other generated previews.
+            CameraCapture.FrameOrthographic(camera, contents, aspect, 1.04f);
             return camera;
         }
     }

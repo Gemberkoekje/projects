@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -76,7 +75,7 @@ namespace IronFlag.Editor.Gameplay
             string path = LevelScenes.EditorPath;
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), path);
-            RegisterScenes();
+            BuildScenes.Register();
             AssetDatabase.Refresh();
             Debug.Log($"IronFlag: level editor saved to {path}");
         }
@@ -393,7 +392,7 @@ namespace IronFlag.Editor.Gameplay
         /// a different asset from every other thing in the game.
         /// </para>
         /// </remarks>
-        private static InputActionAsset EnsureUiActions()
+        internal static InputActionAsset EnsureUiActions()
         {
             string path = VehicleSandboxScene.ActionsPath;
             var controls = AssetDatabase.LoadAssetAtPath<InputActionAsset>(path);
@@ -442,39 +441,6 @@ namespace IronFlag.Editor.Gameplay
         {
             InputAction action = map.AddAction(name, InputActionType.PassThrough, path);
             action.expectedControlType = "Button";
-        }
-
-        /// <summary>
-        /// Puts both scenes in the build, with the game first.
-        /// </summary>
-        /// <remarks>
-        /// The game first because that is what a built copy should start in: the editor is a
-        /// place you go from the game, not the thing the game is. Both have to be listed at
-        /// all, though - <c>SceneManager.LoadScene</c> can only reach a scene in this list,
-        /// and a playtest that silently did nothing would be the whole feature failing at its
-        /// last step.
-        /// </remarks>
-        private static void RegisterScenes()
-        {
-            var wanted = new List<string> { LevelScenes.GamePath, LevelScenes.EditorPath };
-            var listed = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
-            bool changed = false;
-
-            foreach (string path in wanted)
-            {
-                if (listed.Exists(scene => scene.path == path))
-                {
-                    continue;
-                }
-
-                listed.Add(new EditorBuildSettingsScene(path, true));
-                changed = true;
-            }
-
-            if (changed)
-            {
-                EditorBuildSettings.scenes = listed.ToArray();
-            }
         }
 
         private static GameObject InstantiatePrefab(GameObject prefab)

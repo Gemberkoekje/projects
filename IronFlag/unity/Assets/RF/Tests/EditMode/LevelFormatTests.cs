@@ -5,6 +5,7 @@ using UnityEngine;
 using IronFlag.Core;
 using IronFlag.Destruction;
 using IronFlag.Levels;
+using IronFlag.Vehicles;
 
 namespace IronFlag.Tests.EditMode
 {
@@ -72,6 +73,89 @@ namespace IronFlag.Tests.EditMode
             Assert.That(copy.Structures.Length, Is.EqualTo(original.Structures.Length));
             Assert.That(copy.Structures[0].Structure, Is.EqualTo(StructureKind.Bridge));
             Assert.That(copy.Structures[0].Position.y, Is.EqualTo(-1.2f));
+
+            foreach (VehicleKind kind in VehicleRoster.Kinds)
+            {
+                Assert.That(
+                    copy.Reserve.For(kind),
+                    Is.EqualTo(original.Reserve.For(kind)),
+                    $"the level came back with a different number of {kind}s");
+            }
+        }
+
+        /// <summary>
+        /// Every map written before version 4 is a map played on the standard allotment,
+        /// rather than one with no vehicles on it at all.
+        /// </summary>
+        /// <remarks>
+        /// This is the whole of what makes the reserve a safe field to have added. A file
+        /// that says nothing about vehicles is the common case - every map on disk before
+        /// this feature, and every map anybody writes by hand from an older example - and
+        /// the failure it must not have is the quiet one: a side that starts a match with
+        /// nothing to drive and no message anywhere saying why.
+        /// </remarks>
+        [Test]
+        public void ALevelFileWithNoReserveGetsTheStandardAllotment()
+        {
+            const string older = "{\"SchemaVersion\": 3, \"Name\": \"Older\"}";
+
+            Assert.That(
+                LevelFile.TryParse(older, "older", out LevelDefinition level, out string problem),
+                Is.True,
+                problem);
+
+            Assert.That(level.Reserve, Is.Not.Null, "an older map came back with no reserve at all");
+            Assert.That(level.Reserve.For(VehicleKind.Jeep), Is.EqualTo(LevelReserve.DefaultJeeps));
+            Assert.That(level.Reserve.For(VehicleKind.Tank), Is.EqualTo(LevelReserve.DefaultTanks));
+            Assert.That(level.Reserve.For(VehicleKind.Asv), Is.EqualTo(LevelReserve.DefaultAsvs));
+            Assert.That(
+                level.Reserve.For(VehicleKind.Helicopter),
+                Is.EqualTo(LevelReserve.DefaultHelicopters));
+        }
+
+        /// <summary>
+        /// The reserve answers for every vehicle in the roster, and refuses a stock below
+        /// zero rather than carrying one.
+        /// </summary>
+        /// <remarks>
+        /// The completeness half of this is the point: a fifth vehicle added to
+        /// <see cref="VehicleRoster.Kinds"/> and not to <see cref="LevelReserve"/> would be
+        /// a vehicle every level silently gives you none of, and the panel would say
+        /// NONE LEFT from the first frame of every match.
+        /// </remarks>
+        [Test]
+        public void TheReserveHoldsAStockOfEveryVehicleInTheRoster()
+        {
+            var stock = new LevelReserve();
+
+            foreach (VehicleKind kind in VehicleRoster.Kinds)
+            {
+                Assert.That(stock.For(kind), Is.GreaterThan(0), $"a side starts with no {kind}");
+
+                stock.Set(kind, 5);
+                Assert.That(stock.For(kind), Is.EqualTo(5), $"{kind} cannot be stocked");
+
+                stock.Set(kind, -3);
+                Assert.That(stock.For(kind), Is.Zero, $"{kind} took a stock below zero");
+            }
+
+            Assert.That(stock.For(VehicleKind.None), Is.Zero, "no vehicle at all was stocked");
+        }
+
+        /// <summary>
+        /// The standard allotment is deeper in jeeps than in anything else, on purpose.
+        /// </summary>
+        /// <remarks>
+        /// The jeep is the only vehicle that can win and the one that dies to two hits, and
+        /// running out of them is losing the match. If this ever reads the other way round,
+        /// the game's whole shape has changed and it was not changed here.
+        /// </remarks>
+        [Test]
+        public void TheStandardAllotmentIsDeepestInJeeps()
+        {
+            Assert.That(LevelReserve.DefaultJeeps, Is.GreaterThan(LevelReserve.DefaultTanks));
+            Assert.That(LevelReserve.DefaultJeeps, Is.GreaterThan(LevelReserve.DefaultAsvs));
+            Assert.That(LevelReserve.DefaultJeeps, Is.GreaterThan(LevelReserve.DefaultHelicopters));
         }
 
         /// <summary>
@@ -216,6 +300,9 @@ namespace IronFlag.Tests.EditMode
                 Name = "Test Water",
                 Description = "Two shores and a bridge.",
                 Bounds = new LevelBounds { HalfExtent = 60.0f, WaterDepth = 0.7f },
+                // Deliberately not the standard allotment: a reserve left at its defaults
+                // would round-trip whether or not it was written out at all.
+                Reserve = new LevelReserve { Jeeps = 4, Tanks = 1, Asvs = 2, Helicopters = 0 },
                 Land = new[]
                 {
                     new LevelLand { Name = "South", MinX = -40, MaxX = 40, MinZ = -40, MaxZ = -6 },

@@ -240,6 +240,217 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
+        /// A mirrored map's gates come in pairs belonging to opposite sides, exactly as its
+        /// emplacements do.
+        /// </summary>
+        /// <remarks>
+        /// The failure this exists to catch is the invisible one: a mirrored run whose gate
+        /// was copied across with its side intact would give one player a way through both
+        /// walls on a map that still looked symmetrical.
+        /// </remarks>
+        [Test]
+        public void AMirroredMapGivesEachSideItsOwnGates()
+        {
+            LevelDefinition map = LevelGenerator.Generate(new MapOptions
+            {
+                Seed = 31337,
+                Symmetry = MapSymmetry.Mirrored,
+                Difficulty = MapDifficulty.Hard,
+            });
+
+            int green = 0;
+            int brown = 0;
+            foreach (LevelStructure structure in map.Structures)
+            {
+                if (structure.Structure != StructureKind.Door)
+                {
+                    continue;
+                }
+
+                if (structure.Team == Team.Green)
+                {
+                    green++;
+                }
+                else if (structure.Team == Team.Brown)
+                {
+                    brown++;
+                }
+            }
+
+            Assert.That(green, Is.GreaterThan(0), "the map has no green gates at all");
+            Assert.That(brown, Is.EqualTo(green), "one side got more ways through than the other");
+        }
+
+        /// <summary>
+        /// Every two-sided map comes out with wall runs on it, and every run has a gate.
+        /// </summary>
+        /// <remarks>
+        /// A generated map with no walls is the state this feature was added from, so this is
+        /// the test that says the feature is on. Solo maps are excluded deliberately and not
+        /// by oversight - see <c>LevelGenerator.SoloProps</c>.
+        /// </remarks>
+        [Test]
+        public void EveryGeneratedMapIsWalledAndGated()
+        {
+            var bare = new List<string>();
+
+            foreach (MapLayout layout in Layouts())
+            {
+                foreach (MapDifficulty difficulty in Difficulties())
+                {
+                    for (int seed = 1; seed <= Seeds; seed++)
+                    {
+                        LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                        {
+                            Seed = seed * 104729,
+                            Layout = layout,
+                            Difficulty = difficulty,
+                        });
+
+                        int gates = map.CountOf(StructureKind.Door);
+                        int walls = map.CountOf(StructureKind.Wall);
+
+                        if (gates == 0 || walls == 0)
+                        {
+                            bare.Add(
+                                $"{layout}/{difficulty} seed {seed * 104729}: "
+                                + $"{gates} gate(s) and {walls} wall(s)");
+                        }
+                    }
+                }
+            }
+
+            Assert.That(bare, Is.Empty, string.Join("\n", bare));
+        }
+
+        /// <summary>
+        /// Every gate the generator lays is part of a run: there is a wall segment exactly one
+        /// segment away from it, lying the same way.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This is the rule that made wall runs a different placement path rather than one
+        /// more loop in the scenery pass. Everything else on a generated map goes through
+        /// <c>Settle</c>, whose entire job is keeping placements <em>apart</em>; a wall only
+        /// reads as a wall when its segments <em>touch</em>, which means exactly
+        /// <see cref="LevelEdits.SegmentLength"/> centre to centre and not a centimetre more.
+        /// </para>
+        /// <para>
+        /// A tenth of a millimetre of drift would be invisible in a level file and a visible
+        /// seam on the map, so the tolerance here is tight on purpose.
+        /// </para>
+        /// </remarks>
+        [Test]
+        public void EveryGeneratedGateStandsInARunOfWall()
+        {
+            const float Tolerance = 0.01f;
+            var lonely = new List<string>();
+
+            foreach (MapLayout layout in Layouts())
+            {
+                foreach (MapDifficulty difficulty in Difficulties())
+                {
+                    for (int seed = 1; seed <= Seeds; seed++)
+                    {
+                        LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                        {
+                            Seed = seed * 15485863,
+                            Layout = layout,
+                            Difficulty = difficulty,
+                        });
+
+                        foreach (LevelStructure gate in map.Structures)
+                        {
+                            if (gate.Structure != StructureKind.Door || Touches(map, gate, Tolerance))
+                            {
+                                continue;
+                            }
+
+                            lonely.Add(
+                                $"{layout}/{difficulty} seed {seed * 15485863}: the gate at "
+                                + $"{gate.Position} has no wall beside it");
+                        }
+                    }
+                }
+            }
+
+            Assert.That(lonely, Is.Empty, string.Join("\n", lonely));
+        }
+
+        /// <summary>
+        /// A side's gate stands on that side's own ground, which is the only place a way
+        /// through its own wall is worth anything to it.
+        /// </summary>
+        [Test]
+        public void AGeneratedGateStandsOnItsOwnSidesGround()
+        {
+            var stray = new List<string>();
+
+            foreach (MapDifficulty difficulty in Difficulties())
+            {
+                for (int seed = 1; seed <= Seeds; seed++)
+                {
+                    LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                    {
+                        Seed = seed * 1299709,
+                        Difficulty = difficulty,
+                    });
+
+                    foreach (LevelStructure gate in map.Structures)
+                    {
+                        if (gate.Structure != StructureKind.Door)
+                        {
+                            continue;
+                        }
+
+                        // Green is south and brown is north on every map this game has.
+                        bool home = gate.Team == Team.Green
+                            ? gate.Position.z < 0.0f
+                            : gate.Position.z > 0.0f;
+
+                        if (!home)
+                        {
+                            stray.Add(
+                                $"{difficulty} seed {seed * 1299709}: a {gate.Team} gate stands "
+                                + $"at {gate.Position}, on the other side's ground");
+                        }
+                    }
+                }
+            }
+
+            Assert.That(stray, Is.Empty, string.Join("\n", stray));
+        }
+
+        /// <summary>
+        /// Reports whether a segment has a wall butted against it.
+        /// </summary>
+        /// <param name="map">The map to look in.</param>
+        /// <param name="segment">The segment to look around.</param>
+        /// <param name="tolerance">How much drift counts as touching.</param>
+        /// <returns><c>true</c> when a wall stands one segment away, lying the same way.</returns>
+        private static bool Touches(LevelDefinition map, LevelStructure segment, float tolerance)
+        {
+            foreach (LevelStructure other in map.Structures)
+            {
+                if (other == null || other.Structure != StructureKind.Wall)
+                {
+                    continue;
+                }
+
+                float apart = Vector3.Distance(segment.Position, other.Position);
+                float turned = Mathf.Abs(
+                    Mathf.DeltaAngle(segment.YawDegrees, other.YawDegrees));
+
+                if (Mathf.Abs(apart - LevelEdits.SegmentLength) < tolerance && turned < tolerance)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// An asymmetrical map really is asymmetrical: the two halves are drawn from separate
         /// streams and do not come out as each other's opposite numbers.
         /// </summary>
@@ -268,6 +479,51 @@ namespace IronFlag.Tests.EditMode
             Assert.That(
                 matched, Is.LessThan(Seeds),
                 "every asymmetrical map came out as a mirrored one");
+        }
+
+        /// <summary>
+        /// A side's emplacements all face the same way, on every map the generator can
+        /// draw: down the field at the other side, and not a degree either way.
+        /// </summary>
+        /// <remarks>
+        /// Where a gun stands is a roll and which way it looks is not, which is what makes
+        /// a run of them read as a line somebody sited rather than as scenery that landed
+        /// facing outwards. The rolled heading this replaced was only ever visible as
+        /// exactly that: emplacements that looked, at rest, as though nobody had aimed them.
+        /// </remarks>
+        [Test]
+        public void EveryEmplacementOfASideFacesTheSameWay()
+        {
+            var seen = new List<Team>();
+
+            for (int seed = 1; seed <= Seeds; seed++)
+            {
+                LevelDefinition map = LevelGenerator.Generate(new MapOptions
+                {
+                    Seed = seed * 4099,
+                    Difficulty = MapDifficulty.Hard,
+                    Symmetry = seed % 2 == 0 ? MapSymmetry.Mirrored : MapSymmetry.Asymmetrical,
+                });
+
+                foreach (LevelStructure structure in map.Structures)
+                {
+                    if (structure.Structure != StructureKind.Turret)
+                    {
+                        continue;
+                    }
+
+                    seen.Add(structure.Team);
+                    Assert.That(
+                        Mathf.DeltaAngle(
+                            structure.YawDegrees, LevelEdits.FacingTheEnemy(structure.Team)),
+                        Is.EqualTo(0.0f).Within(0.001f),
+                        $"a {structure.Team} emplacement on seed {seed * 4099} is turned "
+                            + $"{structure.YawDegrees:0.#} degrees, off its side's heading");
+                }
+            }
+
+            Assert.That(seen, Does.Contain(Team.Green), "no green emplacement was ever placed");
+            Assert.That(seen, Does.Contain(Team.Brown), "no brown emplacement was ever placed");
         }
 
         /// <summary>

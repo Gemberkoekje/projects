@@ -4,6 +4,7 @@ using IronFlag.Core;
 using IronFlag.Destruction;
 using IronFlag.Objective;
 using IronFlag.Supply;
+using IronFlag.Vehicles;
 
 namespace IronFlag.Levels
 {
@@ -361,6 +362,17 @@ namespace IronFlag.Levels
 
                 instance.AddComponent<TeamBunker>().Configure(placement.Side, lift, pad);
 
+                // Everything this side has to spend, on the building it spends it from. A
+                // level that says nothing about it is a level played on the standard
+                // allotment - see LevelReserve - rather than one with no vehicles at all.
+                TeamReserve reserve = instance.AddComponent<TeamReserve>();
+                reserve.Configure(placement.Side);
+                LevelReserve stock = level.Reserve == null ? new LevelReserve() : level.Reserve;
+                foreach (VehicleKind kind in VehicleRoster.Kinds)
+                {
+                    reserve.Give(kind, stock.For(kind));
+                }
+
                 // Home ground: the only place that fills both pools, and the only one that
                 // will serve the helicopter - which is why it has a pad on the roof.
                 instance.AddComponent<SupplyPoint>().Configure(
@@ -500,10 +512,11 @@ namespace IronFlag.Levels
                 GameObject instance = PlaceInstance(
                     prefab, placement.Name, group.transform, placement.Position, placement.YawDegrees, make);
 
-                // Only a turret is ever on a side, and being on one is the whole of what
-                // makes it work: the same answer paints it, points its gun and makes it
-                // immune to its owner's fire. A level that gives a side to anything else is
-                // refused by LevelValidation rather than quietly obeyed here.
+                // A turret and a door are the only things ever on a side, and being on one
+                // is the whole of what makes either work: the same answer paints it, aims
+                // the gun or decides who the gate opens for, and makes it immune to its
+                // owner's fire. A level that gives a side to anything else is refused by
+                // LevelValidation rather than quietly obeyed here.
                 if (placement.NeedsASide)
                 {
                     Team side = placement.Team;

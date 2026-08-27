@@ -30,9 +30,12 @@ A tight, split-screen vehicular capture-the-flag game where only the fastest, we
 
 **Win conditions (v0.1)**
 - Primary: return the enemy flag to your bunker.
-- Secondary: destroy all enemy vehicles/base structures. *Deferred as of M6 — see
-  [M6_NOTES.md](M6_NOTES.md): it needs either a finite vehicle roster or a destructible bunker,
-  and v0.1 has neither.*
+- Secondary: destroy all the enemy vehicles that could ever have done that. *Done — see
+  [RESERVES_NOTES.md](RESERVES_NOTES.md). It needed the finite vehicle roster M6 said it
+  needed: a side now gets a fixed allotment per level (8 jeeps, 3 tanks, 3 ASVs, 3
+  helicopters by default), a destroyed vehicle never comes back, and losing the last jeep
+  loses the match because only a jeep can carry a flag. The base structures half of the
+  original wording is still not a win condition — the bunker cannot be destroyed.*
 
 ---
 

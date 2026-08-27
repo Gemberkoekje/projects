@@ -1,7 +1,7 @@
 namespace IronFlag.Levels
 {
     /// <summary>
-    /// The two scenes the game has, by name, and where they are saved.
+    /// The three scenes the game has, by name, and where they are saved.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -20,11 +20,22 @@ namespace IronFlag.Levels
         /// <summary>Folder every scene in this project is saved under.</summary>
         public const string Folder = "Assets/RF/Scenes";
 
+        /// <summary>The scene the game starts in.</summary>
+        /// <remarks>
+        /// First in the build list, which is what makes it the one every session passes
+        /// through - and therefore the one place the stored settings are applied and the only
+        /// screen that can be sure of running before a match does.
+        /// </remarks>
+        public const string MainMenu = "MainMenu";
+
         /// <summary>The scene a match is played in.</summary>
         public const string Game = "Sandbox";
 
         /// <summary>The scene a map is built in.</summary>
         public const string Editor = "LevelEditor";
+
+        /// <summary>Where the menu scene is saved.</summary>
+        public static string MainMenuPath => PathFor(MainMenu);
 
         /// <summary>Where the game scene is saved.</summary>
         public static string GamePath => PathFor(Game);

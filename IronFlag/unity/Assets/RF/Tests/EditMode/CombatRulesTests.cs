@@ -9,7 +9,8 @@ namespace IronFlag.Tests.EditMode
 {
     /// <summary>
     /// The small rules combat is built out of: who counts as an enemy, where a bunker puts
-    /// the vehicles it deploys, and the shape of an explosion.
+    /// the vehicles it deploys, and the shape of the three things it draws - an explosion,
+    /// a muzzle flash and a shower of sparks.
     /// </summary>
     /// <remarks>
     /// All three are pure enough to check without a scene running, which is the same reason
@@ -198,6 +199,141 @@ namespace IronFlag.Tests.EditMode
             Assert.That(Explosion.Scale(-1.0f), Is.EqualTo(0.0f).Within(0.0001f));
             Assert.That(Explosion.Scale(2.0f), Is.EqualTo(0.0f).Within(0.0001f));
         }
+
+        [Test]
+        public void AFlashIsBrightestAtTheInstantOfTheShot()
+        {
+            Assert.That(MuzzleFlash.Flare(0.0f), Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(MuzzleFlash.Flare(1.0f), Is.EqualTo(0.0f).Within(0.0001f));
+        }
+
+        /// <summary>
+        /// A flash and an explosion are the same length of animation pointed in opposite
+        /// directions, and that is the whole reason they are two components. At the moment
+        /// the explosion reaches its widest, the flash is already more than half spent.
+        /// </summary>
+        [Test]
+        public void AFlashCollapsesWhereAnExplosionSwells()
+        {
+            Assert.That(MuzzleFlash.Flare(0.25f), Is.LessThan(0.6f));
+            Assert.That(Explosion.Scale(0.25f), Is.EqualTo(1.0f).Within(0.0001f));
+
+            Assert.That(MuzzleFlash.Flare(0.05f), Is.GreaterThan(Explosion.Scale(0.05f)));
+            Assert.That(MuzzleFlash.Flare(0.1f), Is.GreaterThan(MuzzleFlash.Flare(0.5f)));
+            Assert.That(MuzzleFlash.Flare(0.5f), Is.GreaterThan(MuzzleFlash.Flare(0.9f)));
+        }
+
+        [Test]
+        public void AFlashCannotBeAskedForMoreThanItHas()
+        {
+            Assert.That(MuzzleFlash.Flare(-1.0f), Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(MuzzleFlash.Flare(2.0f), Is.EqualTo(0.0f).Within(0.0001f));
+        }
+
+        [Test]
+        public void SparksStartWhereTheRoundStruck()
+        {
+            for (int index = 0; index < Shards; index++)
+            {
+                Assert.That(
+                    ImpactSparks.Offset(index, Shards, Vector3.forward, 1.0f, 0.0f),
+                    Is.EqualTo(Vector3.zero));
+            }
+        }
+
+        /// <summary>
+        /// The one thing a spark burst does that a debris burst does not: it takes an aim.
+        /// Every shard goes the way it was thrown, which is back at whoever fired.
+        /// </summary>
+        [Test]
+        public void SparksAreThrownBackTheWayTheRoundCame()
+        {
+            for (int index = 0; index < Shards; index++)
+            {
+                Assert.That(
+                    ImpactSparks.Offset(index, Shards, Vector3.forward, 1.0f, 0.02f).z,
+                    Is.GreaterThan(0.0f),
+                    $"shard {index} went the wrong way");
+                Assert.That(
+                    ImpactSparks.Offset(index, Shards, Vector3.back, 1.0f, 0.02f).z,
+                    Is.LessThan(0.0f),
+                    $"shard {index} went the wrong way");
+            }
+        }
+
+        /// <summary>
+        /// A round that arrived from nowhere - one that expired rather than struck - still
+        /// has to throw its sparks somewhere, and up is the answer that never divides by a
+        /// zero-length direction.
+        /// </summary>
+        [Test]
+        public void SparksThrownInNoDirectionGoUpwards()
+        {
+            for (int index = 0; index < Shards; index++)
+            {
+                Assert.That(
+                    ImpactSparks.Offset(index, Shards, Vector3.zero, 1.0f, 0.01f).y,
+                    Is.GreaterThan(0.0f),
+                    $"shard {index} did not clear the impact");
+            }
+        }
+
+        /// <summary>
+        /// The golden angle is there to stop an even fan coming out as a ring, so no two
+        /// shards may end up in the same place however many there are.
+        /// </summary>
+        [Test]
+        public void NoTwoSparksFlyTheSameWay()
+        {
+            for (int first = 0; first < Shards; first++)
+            {
+                for (int second = first + 1; second < Shards; second++)
+                {
+                    Assert.That(
+                        Vector3.Distance(
+                            ImpactSparks.Offset(first, Shards, Vector3.forward, 1.0f, 0.05f),
+                            ImpactSparks.Offset(second, Shards, Vector3.forward, 1.0f, 0.05f)),
+                        Is.GreaterThan(0.01f),
+                        $"shards {first} and {second} fly together");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Sparks arc rather than travel in straight lines, which is what stops a burst
+        /// reading as a decal stuck on the hull.
+        /// </summary>
+        [Test]
+        public void SparksFallAwayAsTheyGo()
+        {
+            for (int index = 0; index < Shards; index++)
+            {
+                float halfway = ImpactSparks.Offset(index, Shards, Vector3.forward, 1.0f, 0.05f).y;
+                float later = ImpactSparks.Offset(index, Shards, Vector3.forward, 1.0f, 0.1f).y;
+
+                Assert.That(later, Is.LessThan(halfway * 2.0f), $"shard {index} does not fall");
+            }
+        }
+
+        [Test]
+        public void ASparkBurstWithNoSparksInItGoesNowhere()
+        {
+            Assert.That(
+                ImpactSparks.Offset(0, 0, Vector3.forward, 1.0f, 0.1f), Is.EqualTo(Vector3.zero));
+        }
+
+        [Test]
+        public void ASparkGoesOutSteadilyAndCannotBeAskedForMoreThanItHas()
+        {
+            Assert.That(ImpactSparks.Fade(0.0f), Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(ImpactSparks.Fade(0.5f), Is.EqualTo(0.5f).Within(0.0001f));
+            Assert.That(ImpactSparks.Fade(1.0f), Is.EqualTo(0.0f).Within(0.0001f));
+            Assert.That(ImpactSparks.Fade(-1.0f), Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(ImpactSparks.Fade(2.0f), Is.EqualTo(0.0f).Within(0.0001f));
+        }
+
+        /// <summary>How many shards the spark tests fan out, matching the built prefab.</summary>
+        private const int Shards = 7;
 
         /// <summary>Whether a bunker is built with the markers the real model carries.</summary>
         private const bool Modelled = true;

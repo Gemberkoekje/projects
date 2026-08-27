@@ -320,6 +320,42 @@ namespace IronFlag.Tests.EditMode
             return prefab.GetComponent<VehicleWeapon>().Muzzle.IsChildOf(mount.Turret);
         }
 
+        /// <summary>
+        /// The flash goes on through <see cref="VehicleWeapon.Configure"/> rather than
+        /// through a setter of its own precisely so that a gun cannot be built half-wired,
+        /// and this is the test that holds the other end of that argument up.
+        /// </summary>
+        [Test]
+        public void EveryGunDrawsAFlashWhenItFires()
+        {
+            foreach (VehicleKind kind in VehiclePrefabBuilder.Roster())
+            {
+                Assert.That(
+                    Load(kind).GetComponent<VehicleWeapon>().Flash,
+                    Is.Not.Null,
+                    $"{kind}'s gun fires without a muzzle flash");
+            }
+        }
+
+        /// <summary>
+        /// Every round in the arsenal, not just the four a vehicle carries: the emplacement
+        /// fires one too, and a turret whose hits produced no sparks would be the one gun on
+        /// the map a player could not tell they were connecting with.
+        /// </summary>
+        [Test]
+        public void EveryRoundThrowsSparksOffWhatItFailsToKill()
+        {
+            CombatPrefabBuilder.EnsureAssets();
+
+            foreach (WeaponKind kind in CombatPrefabBuilder.Arsenal())
+            {
+                Projectile round = CombatPrefabBuilder.LoadProjectile(kind);
+
+                Assert.That(round, Is.Not.Null, $"{kind} has no round");
+                Assert.That(round.Sparks, Is.Not.Null, $"a {kind} hit throws no sparks");
+            }
+        }
+
         private static GameObject Load(VehicleKind kind)
             => AssetDatabase.LoadAssetAtPath<GameObject>(VehiclePrefabBuilder.PrefabPathFor(kind));
     }

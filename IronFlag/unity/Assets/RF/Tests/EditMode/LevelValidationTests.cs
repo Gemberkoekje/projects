@@ -5,6 +5,7 @@ using UnityEngine;
 using IronFlag.Core;
 using IronFlag.Destruction;
 using IronFlag.Levels;
+using IronFlag.Vehicles;
 
 namespace IronFlag.Tests.EditMode
 {
@@ -145,9 +146,9 @@ namespace IronFlag.Tests.EditMode
         }
 
         /// <summary>
-        /// And the rule runs the other way: only a turret may belong to anybody. A green
-        /// building is a level saying something the game has no meaning for - and worse, one
-        /// its own side could not shoot down.
+        /// And the rule runs the other way: only a turret or a door may belong to anybody.
+        /// A green building is a level saying something the game has no meaning for - and
+        /// worse, one its own side could not shoot down.
         /// </summary>
         [Test]
         public void AnythingElseGivenToASideIsRejected()
@@ -157,7 +158,34 @@ namespace IronFlag.Tests.EditMode
             added[added.Length - 1].Kind = nameof(StructureKind.Tree);
             level.Structures = added;
 
-            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("only a turret"));
+            Assert.That(
+                LevelValidation.Problems(level),
+                Has.Some.Contains("only a turret or a door"));
+        }
+
+        /// <summary>
+        /// A gate is refused on the same two counts as a turret, and by the same rule
+        /// rather than by a second one that agrees with it.
+        /// </summary>
+        /// <remarks>
+        /// The door is the second kind to take a side, so this is the test that would have
+        /// caught the rule being spelled out again somewhere instead of being asked of
+        /// <see cref="StructureTuning.BelongsToASide"/>. A gate on no side opens for
+        /// nobody, which on the map is indistinguishable from an enemy's gate.
+        /// </remarks>
+        [Test]
+        public void ADoorOnNoSideIsRejectedAndOneOnASideIsNot()
+        {
+            LevelDefinition level = PlayableLevel();
+            LevelStructure[] added = WithTurret(level, nameof(Team.None));
+            added[added.Length - 1].Kind = nameof(StructureKind.Door);
+            level.Structures = added;
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("on no side"));
+
+            added[added.Length - 1].Side = nameof(Team.Green);
+            var problems = LevelValidation.Problems(level);
+            Assert.That(problems, Is.Empty, string.Join("; ", problems));
         }
 
         /// <summary>
@@ -307,13 +335,29 @@ namespace IronFlag.Tests.EditMode
             Assert.That(LevelValidation.Problems(level), Is.Empty);
         }
 
+        /// <summary>
+        /// Taking a bunker off a match does not leave a match with a bunker missing: it
+        /// leaves a one-player map, and the level is judged as one from that moment.
+        /// </summary>
+        /// <remarks>
+        /// This test used to assert the opposite - that the second bunker was owed - and the
+        /// change is the whole of what one-player mode did to the level format. The fault it
+        /// finds now is the one that is genuinely left: green kept the towers it had as a
+        /// side in a match, and on a one-player map nothing can ever come for them. What a
+        /// map with <em>no</em> bunker at all does is
+        /// <see cref="ALevelWithNoBunkerAtAllIsStillRejected"/>.
+        /// </remarks>
         [Test]
-        public void AMissingBunkerIsRejected()
+        public void RemovingABunkerMakesItAOnePlayerMap()
         {
             LevelDefinition level = PlayableLevel();
             level.Bunkers = new[] { level.BunkerFor(Team.Green) };
 
-            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("no bunker"));
+            Assert.That(level.IsSolo, Is.True);
+
+            var problems = LevelValidation.Problems(level);
+            Assert.That(problems, Has.None.Contains("no bunker"));
+            Assert.That(problems, Has.Some.Contains("is the only side playing"));
         }
 
         [Test]
@@ -482,6 +526,205 @@ namespace IronFlag.Tests.EditMode
             level.Structures = new[] { level.Structures[0] };
 
             Assert.That(LevelValidation.Problems(level), Has.Some.Contains("nowhere on the map to rearm"));
+        }
+
+        /// <summary>
+        /// A level that gives nobody a jeep is unwinnable from its first frame, and there is
+        /// nothing on the map to look at that would say so.
+        /// </summary>
+        [Test]
+        public void ALevelWithNoJeepsIsRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Reserve.Set(VehicleKind.Jeep, 0);
+
+            Assert.That(
+                LevelValidation.Problems(level),
+                Has.Some.Contains("no jeeps"));
+        }
+
+        /// <summary>
+        /// The rest of the roster may be empty. A map that gives a side jeeps and nothing
+        /// else is a design, not a mistake - it is still winnable, which is the only thing
+        /// this rule is about.
+        /// </summary>
+        [Test]
+        public void ALevelWithNothingButJeepsIsAccepted()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Reserve.Set(VehicleKind.Tank, 0);
+            level.Reserve.Set(VehicleKind.Asv, 0);
+            level.Reserve.Set(VehicleKind.Helicopter, 0);
+
+            var problems = LevelValidation.Problems(level);
+            Assert.That(problems, Is.Empty, string.Join("; ", problems));
+        }
+
+        /// <summary>
+        /// A count below zero can only arrive by hand, through the file - the editor and
+        /// <see cref="LevelReserve.Set"/> both clamp - and it has to be named rather than
+        /// quietly read as none.
+        /// </summary>
+        [Test]
+        public void ANegativeStockOfVehiclesIsRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Reserve.Tanks = -2;
+
+            Assert.That(
+                LevelValidation.Problems(level),
+                Has.Some.Contains("not a number of vehicles"));
+        }
+
+        /// <summary>
+        /// A map written before the reserve existed is not a broken map.
+        /// </summary>
+        [Test]
+        public void ALevelWithNoReserveBlockAtAllIsAccepted()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Reserve = null;
+
+            var problems = LevelValidation.Problems(level);
+            Assert.That(problems, Is.Empty, string.Join("; ", problems));
+        }
+
+        /// <summary>
+        /// Turns the baseline into a one-player map: green keeps its bunker and loses its
+        /// towers, brown keeps its towers and loses its bunker.
+        /// </summary>
+        /// <returns>A fresh, fully playable one-player level.</returns>
+        /// <remarks>
+        /// Built by subtraction from the map a match is played on, because that is honestly
+        /// what the mode is - the same objective with a human missing from one side - and a
+        /// separate baseline would be a second opinion about what a level is.
+        /// </remarks>
+        private static LevelDefinition SoloLevel()
+        {
+            LevelDefinition level = PlayableLevel();
+
+            level.Bunkers = new[] { level.BunkerFor(Team.Green) };
+
+            var enemy = new List<LevelTower>(level.TowersFor(Team.Brown));
+            level.Towers = enemy.ToArray();
+
+            return level;
+        }
+
+        /// <summary>
+        /// Guards every solo test below, the same way the baseline test guards the rest.
+        /// </summary>
+        [Test]
+        public void AOnePlayerLevelHasNoProblems()
+        {
+            LevelDefinition level = SoloLevel();
+
+            Assert.That(level.IsSolo, Is.True);
+
+            var problems = LevelValidation.Problems(level);
+            Assert.That(problems, Is.Empty, string.Join("; ", problems));
+        }
+
+        /// <summary>
+        /// The missing bunker is the mode, not a fault - which is the whole difference
+        /// between this and what validation said before one-player maps existed.
+        /// </summary>
+        [Test]
+        public void AOnePlayerLevelIsNotAskedForASecondBunker()
+        {
+            Assert.That(LevelValidation.Problems(SoloLevel()), Has.None.Contains("has no bunker"));
+        }
+
+        /// <summary>
+        /// A map with no bunker at all is still broken, and is reported as the match it was
+        /// most likely on its way to being rather than being waved through as solo.
+        /// </summary>
+        [Test]
+        public void ALevelWithNoBunkerAtAllIsStillRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            level.Bunkers = Array.Empty<LevelBunker>();
+
+            Assert.That(level.IsSolo, Is.False);
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("has no bunker"));
+        }
+
+        /// <summary>
+        /// Two bunkers on the same side still counts as one played side to
+        /// <see cref="LevelDefinition.IsSolo"/>, so it is caught on its own rather than
+        /// folded into the missing-bunker check above - otherwise a map like this would be
+        /// waved through as a clean one-player map while quietly orphaning its second
+        /// bunker at build time.
+        /// </summary>
+        [Test]
+        public void TwoBunkersOnOneSideAreRejected()
+        {
+            LevelDefinition level = PlayableLevel();
+            LevelBunker green = level.BunkerFor(Team.Green);
+            level.Bunkers = new[]
+            {
+                green,
+                new LevelBunker { Team = nameof(Team.Green), Position = new Vector3(-30.0f, 0.0f, -40.0f) },
+            };
+
+            Assert.That(level.IsSolo, Is.True, "two bunkers on one side still reads as one played side");
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("only one is allowed"));
+        }
+
+        /// <summary>
+        /// A flag on the solo player's own side is an objective with no opponent: nothing on
+        /// the map can ever come for it.
+        /// </summary>
+        [Test]
+        public void TowersOnTheSoloPlayersOwnSideAreRejected()
+        {
+            LevelDefinition level = SoloLevel();
+            var towers = new List<LevelTower>(level.Towers)
+            {
+                new LevelTower
+                {
+                    Team = nameof(Team.Green),
+                    HoldsTheFlag = true,
+                    Position = new Vector3(-20.0f, 0.0f, -50.0f),
+                },
+            };
+            level.Towers = towers.ToArray();
+
+            Assert.That(
+                LevelValidation.Problems(level),
+                Has.Some.Contains("is the only side playing"));
+        }
+
+        /// <summary>
+        /// The enemy still owes a decoy. One tower is a flag whose position is known before
+        /// the first shot, which is the mode with its own mechanic taken out.
+        /// </summary>
+        [Test]
+        public void AOnePlayerLevelWithOneEnemyTowerIsRejected()
+        {
+            LevelDefinition level = SoloLevel();
+            level.Towers = new[] { level.TowersFor(Team.Brown)[1] };
+
+            Assert.That(LevelValidation.Problems(level), Has.Some.Contains("a decoy needs two"));
+        }
+
+        /// <summary>
+        /// An enemy tower across the water is a tower that might be holding the flag and
+        /// cannot be driven to - the one-player shape of the crossing rule.
+        /// </summary>
+        [Test]
+        public void AnUnreachableEnemyTowerIsRejected()
+        {
+            LevelDefinition level = SoloLevel();
+            level.Land = new[]
+            {
+                new LevelLand { Name = "South", MinX = -60, MaxX = 60, MinZ = -60, MaxZ = -10 },
+                new LevelLand { Name = "North", MinX = -60, MaxX = 60, MinZ = 10, MaxZ = 60 },
+            };
+
+            Assert.That(
+                LevelValidation.Problems(level),
+                Has.Some.Contains("cannot be reached from the Green bunker by land"));
         }
 
         [Test]

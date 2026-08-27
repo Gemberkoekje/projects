@@ -137,6 +137,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: IronFlag.Runtime::IronFlag.Combat.Projectile
   visual: {fileID: 3224689593845770348}
   impact: {fileID: 83958270509870403, guid: 3add27fa784980c4f9e3717d64ff8c75, type: 3}
+  sparks: {fileID: 5599276286017787848, guid: b7c9dc13cba9a5246b8e8d7e40b806c9, type: 3}
+  splash: {fileID: 2210245384194494569, guid: 8a434ce6ef80bf24d88840a4c7512944, type: 3}
 --- !u!1 &8043188763998082072
 GameObject:
   m_ObjectHideFlags: 0

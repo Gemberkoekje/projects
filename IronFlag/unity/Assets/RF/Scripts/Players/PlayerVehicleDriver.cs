@@ -22,6 +22,13 @@ namespace IronFlag.Players
     /// getting a different one means coming home or dying.
     /// </para>
     /// <para>
+    /// The roster is four <em>kinds</em> rather than four vehicles, and how many of each a
+    /// side actually has is <see cref="TeamReserve"/>, which the level file stocks. A row
+    /// whose reserve is empty stays on the panel and stays selectable and simply cannot be
+    /// sent out - see <see cref="HasOneLeft"/> - because the panel is where a player finds
+    /// out why.
+    /// </para>
+    /// <para>
     /// The driver owns none of its own input plumbing. <see cref="LocalMultiplayer"/> works
     /// out which devices this player holds and hands over a <see cref="PlayerControls"/>;
     /// what happens here is the translation from that into a <see cref="VehicleInput"/>,
@@ -123,9 +130,46 @@ namespace IronFlag.Players
             get
             {
                 VehicleBay bay = BayFor(selected);
-                return AtTheBunker && bay != null && bay.IsReady && !bay.IsDeploying;
+                return AtTheBunker && bay != null && bay.IsReady && !bay.IsDeploying
+                    && HasOneLeft(selected);
             }
         }
+
+        /// <summary>
+        /// How many of one roster entry this side still has, counting the one in the bay.
+        /// </summary>
+        /// <param name="index">Roster index.</param>
+        /// <returns>
+        /// How many are left, or <see cref="int.MaxValue"/> in a scene that keeps no
+        /// reserve - which is what a test rig and a bare sandbox are.
+        /// </returns>
+        /// <remarks>
+        /// The vehicle standing in the bay is included, because it has not been lost yet:
+        /// this is the number of times this side can still lose one, which is the number a
+        /// pilot deciding what to take out actually wants.
+        /// </remarks>
+        public int RemainingOf(int index)
+        {
+            VehicleController vehicle
+                = index >= 0 && index < roster.Count ? roster[index] : null;
+
+            return vehicle == null
+                ? 0
+                : TeamReserve.LeftFor(Team, vehicle.Kind);
+        }
+
+        /// <summary>
+        /// Whether one roster entry is a vehicle this side has any of left.
+        /// </summary>
+        /// <param name="index">Roster index.</param>
+        /// <returns><c>false</c> only when the reserve for that vehicle is empty.</returns>
+        /// <remarks>
+        /// The whole of what a finite roster does to the bunker screen. A vehicle nobody has
+        /// any of stays on the panel and stays selectable, for the same reason one being
+        /// repaired does: the answer to "why can I not take the tank" has to be somewhere a
+        /// player can read it, and a row that vanished would take the answer with it.
+        /// </remarks>
+        public bool HasOneLeft(int index) => RemainingOf(index) > 0;
 
         /// <summary>Seconds the deploy button has to be held to leave the field.</summary>
         public float RecallHoldSeconds => recallHoldSeconds;
@@ -297,6 +341,11 @@ namespace IronFlag.Players
         public bool TakeTheField(int index)
         {
             Select(index);
+
+            if (!HasOneLeft(selected))
+            {
+                return false;
+            }
 
             VehicleBay bay = BayFor(selected);
             if (bay == null || !bay.DeployNow())

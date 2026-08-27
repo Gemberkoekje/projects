@@ -45,5 +45,43 @@ namespace IronFlag.Core
         /// </para>
         /// </remarks>
         public static bool IsHostile(Team shooter, Team target) => shooter != target;
+
+        /// <summary>
+        /// Returns the side one side is playing against.
+        /// </summary>
+        /// <param name="side">Side to look up.</param>
+        /// <returns>
+        /// The other side of a two-sided match, or <see cref="Team.None"/> when there is not
+        /// exactly one - which is what a third team, or a side that is not playing at all,
+        /// would mean.
+        /// </returns>
+        /// <remarks>
+        /// Answering <see cref="Team.None"/> rather than guessing is the whole point of
+        /// having this. The one caller is <see cref="IronFlag.Objective.Match"/> deciding
+        /// who wins when a side runs out of jeeps, and with three sides "the other one" is a
+        /// question with two answers - a match that quietly picked one would hand somebody a
+        /// victory nobody could explain.
+        /// </remarks>
+        public static Team OpponentOf(Team side)
+        {
+            Team found = Team.None;
+
+            foreach (Team other in Playing)
+            {
+                if (other == side || other == Team.None)
+                {
+                    continue;
+                }
+
+                if (found != Team.None)
+                {
+                    return Team.None;
+                }
+
+                found = other;
+            }
+
+            return found;
+        }
     }
 }

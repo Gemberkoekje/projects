@@ -163,6 +163,28 @@ namespace IronFlag.Destruction
                         DebrisRadius = 2.2f,
                     };
 
+                // Sixty, and the only number in this table that is deliberately *below*
+                // the thing it is built out of. A gate is the weak point of the wall it
+                // sits in, which is the oldest rule in fortification and the only one that
+                // keeps both pieces worth placing: a gate tougher than the wall would mean
+                // building the whole run out of gates, and a gate the same as the wall
+                // would be a wall that happens to open. Softer, and the trade is real -
+                // the side that owns the run gets a way through it, and the side that does
+                // not gets somewhere cheaper to aim.
+                //
+                // Two cannon shells against the wall's three, three grenades against four,
+                // and 1.9 seconds of chaingun against 2.5. It is still above every single
+                // round in the game including the ASV's 55, so nothing opens a gate with
+                // one shot - one rocket leaves it standing on five hit points, which is the
+                // most expensive near miss on the map.
+                case StructureKind.Door:
+                    return new StructureTuning
+                    {
+                        HitPoints = 60.0f,
+                        DamagedAt = 0.5f,
+                        DebrisRadius = 2.2f,
+                    };
+
                 default:
                     return new StructureTuning();
             }
@@ -178,11 +200,11 @@ namespace IronFlag.Destruction
         /// side and a real-or-decoy flag - so it is not something a structure list may hold.
         /// </returns>
         /// <remarks>
-        /// The turret <em>is</em> on this list even though it also needs a side, because a
-        /// side is all it needs: a level scatters turrets the way it scatters trees, and
-        /// <see cref="LevelStructure.Side"/> carries the one extra word. The tower needs a
-        /// second thing that has no sensible default - which of a side's pyramids is the
-        /// real one - and that is what keeps it off here.
+        /// The turret and the door <em>are</em> on this list even though they also need a
+        /// side, because a side is all they need: a level scatters them the way it
+        /// scatters trees, and <see cref="LevelStructure.Side"/> carries the one extra
+        /// word. The tower needs a second thing that has no sensible default - which of a
+        /// side's pyramids is the real one - and that is what keeps it off here.
         /// </remarks>
         public static StructureKind[] Roster()
             => new[]
@@ -195,6 +217,7 @@ namespace IronFlag.Destruction
                 StructureKind.DepotAmmo,
                 StructureKind.Turret,
                 StructureKind.Wall,
+                StructureKind.Door,
             };
 
         /// <summary>
@@ -203,12 +226,22 @@ namespace IronFlag.Destruction
         /// <param name="kind">Structure to look up.</param>
         /// <returns><c>true</c> for the destructibles a level must give a team.</returns>
         /// <remarks>
-        /// One place rather than a comparison spelled out in the level file's validator, the
-        /// level builder, the editor's inspector and the mirror tool. There is exactly one
-        /// row for now; the point is that adding a second does not mean finding four
-        /// comparisons that happened to agree.
+        /// <para>
+        /// One place rather than a comparison spelled out in the level file's validator,
+        /// the level builder, the editor's inspector and the mirror tool. This started with
+        /// exactly one row and the point of it was that a second would not mean finding
+        /// four comparisons that happened to agree; the door is that second row, and none
+        /// of the four needed touching.
+        /// </para>
+        /// <para>
+        /// What the two have in common is that knowing whose they are is the whole of what
+        /// makes them work - a turret has to know which way to point and a gate has to know
+        /// who to let through - and that in both cases the answer is a fact about the map
+        /// rather than about the thing, so it cannot come off the prefab.
+        /// </para>
         /// </remarks>
-        public static bool BelongsToASide(StructureKind kind) => kind == StructureKind.Turret;
+        public static bool BelongsToASide(StructureKind kind)
+            => kind == StructureKind.Turret || kind == StructureKind.Door;
 
         /// <summary>
         /// Returns the state a structure is in at a given share of its pool.

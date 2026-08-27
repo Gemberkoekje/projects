@@ -77,6 +77,16 @@ namespace IronFlag.Editor.ArtPipeline
         /// <summary>Asset name of the material a flying piece of a building wears.</summary>
         public const string Debris = "RF_Debris";
 
+        /// <summary>Asset name of the material every particle system wears.</summary>
+        /// <remarks>
+        /// One material for smoke, dust and spray alike. It is plain white and transparent,
+        /// and every effect tints itself through its own start colour - a particle system
+        /// multiplies its material by the particle's colour, so a colour per effect costs a
+        /// field rather than an asset. That is also what lets a dust trail take its colour
+        /// from the ground it is being kicked off, which no material could do.
+        /// </remarks>
+        public const string Particle = "RF_Particle";
+
         /// <summary>Prefix on the generated sky material for each lighting condition.</summary>
         /// <remarks>
         /// One asset per <see cref="LightingMood"/> rather than a single sky that whichever
@@ -146,11 +156,29 @@ namespace IronFlag.Editor.ArtPipeline
         /// </remarks>
         private const string SkyShaderName = "Skybox/Procedural";
 
+        /// <summary>URP's particle shader, which is the one that reads a particle's colour.</summary>
+        /// <remarks>
+        /// Not <c>Universal Render Pipeline/Unlit</c>, which looks like it would do and does
+        /// not: it ignores vertex colour, so every particle in a system comes out the same
+        /// shade and nothing can fade out. Multiplying by the particle colour is the whole
+        /// reason this shader exists and the whole reason one material can serve smoke, dust
+        /// and spray at once.
+        /// </remarks>
+        private const string ParticleShaderName = "Universal Render Pipeline/Particles/Unlit";
+
         /// <summary>Base color property used by URP's own shaders.</summary>
         private static readonly int UniversalBaseColor = Shader.PropertyToID("_BaseColor");
 
         /// <summary>Base color property used by glTFast's imported materials.</summary>
         private static readonly int GltfBaseColor = Shader.PropertyToID("baseColorFactor");
+
+        /// <summary>The properties behind URP's Surface Type drop-down.</summary>
+        private static readonly int SurfaceType = Shader.PropertyToID("_Surface");
+        private static readonly int BlendMode = Shader.PropertyToID("_Blend");
+        private static readonly int SourceBlend = Shader.PropertyToID("_SrcBlend");
+        private static readonly int DestinationBlend = Shader.PropertyToID("_DstBlend");
+        private static readonly int DepthWrite = Shader.PropertyToID("_ZWrite");
+        private static readonly int AlphaClip = Shader.PropertyToID("_AlphaClip");
 
         /// <summary>
         /// Returns the project path of one generated material.
@@ -221,6 +249,7 @@ namespace IronFlag.Editor.ArtPipeline
             }
 
             EnsureSkies();
+            EnsureParticle();
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -319,6 +348,64 @@ namespace IronFlag.Editor.ArtPipeline
                 LightingRig.Paint(material, LightingTuning.For(mood));
                 EditorUtility.SetDirty(material);
             }
+        }
+
+        /// <summary>
+        /// Creates or refreshes the one material every particle system wears.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Built from <c>Shader.Find</c> and set up by hand, which the class summary warns
+        /// against for URP's Lit shader - the difference is that there is no primitive to
+        /// steal a correctly configured particle material from, so there is no template to
+        /// copy. The six lines below are what the material inspector's Surface Type
+        /// drop-down actually does: a blend mode, a depth-write, a keyword and a queue.
+        /// Getting one of them wrong renders solid white boxes rather than smoke, which is
+        /// obvious the first time it is looked at and invisible in a diff.
+        /// </para>
+        /// <para>
+        /// Deliberately untextured. Every particle in this game is a mesh - a sphere, drawn
+        /// flat - rather than a billboard, so there is no soft round blob to sample and
+        /// nothing to fade at the edges. That is a style decision rather than a saving: this
+        /// game is boxes and spheres seen from above, and a soft photographic puff of smoke
+        /// sitting on top of it would be the one thing in the frame that came from somewhere
+        /// else.
+        /// </para>
+        /// </remarks>
+        private static void EnsureParticle()
+        {
+            Shader shader = Shader.Find(ParticleShaderName);
+            if (shader == null)
+            {
+                Debug.LogError($"IronFlag: the '{ParticleShaderName}' shader is missing; "
+                    + "smoke, dust and spray will render as solid boxes.");
+                return;
+            }
+
+            string path = PathOf(Particle);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            material.shader = shader;
+            material.SetColor(UniversalBaseColor, Color.white);
+
+            // Transparent, alpha-blended, writing no depth. This is the Surface Type
+            // drop-down, expanded.
+            material.SetFloat(SurfaceType, 1.0f);
+            material.SetFloat(BlendMode, 0.0f);
+            material.SetFloat(SourceBlend, (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            material.SetFloat(DestinationBlend, (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            material.SetFloat(DepthWrite, 0.0f);
+            material.SetFloat(AlphaClip, 0.0f);
+            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            material.DisableKeyword("_ALPHATEST_ON");
+            material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+
+            EditorUtility.SetDirty(material);
         }
 
         /// <summary>

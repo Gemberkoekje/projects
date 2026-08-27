@@ -117,13 +117,13 @@ namespace IronFlag.Editor.Gameplay
         /// The four vehicles, in roster order.
         /// </summary>
         /// <returns>Every <see cref="VehicleKind"/> except <see cref="VehicleKind.None"/>.</returns>
-        public static IEnumerable<VehicleKind> Roster()
-        {
-            yield return VehicleKind.Jeep;
-            yield return VehicleKind.Tank;
-            yield return VehicleKind.Asv;
-            yield return VehicleKind.Helicopter;
-        }
+        /// <remarks>
+        /// The game's own list rather than a second copy of it. It used to be written out
+        /// here because nothing in the runtime needed one; the level format now counts a
+        /// stock of each vehicle, so <see cref="VehicleRoster.Kinds"/> exists on the other
+        /// side of the assembly line and this is the same four names, once.
+        /// </remarks>
+        public static IEnumerable<VehicleKind> Roster() => VehicleRoster.Kinds;
 
         /// <summary>
         /// Returns the asset name shared by one vehicle's model and prefab.
@@ -206,6 +206,8 @@ namespace IronFlag.Editor.Gameplay
                 AddHealth(root, tuning, hull);
                 AddSupply(root, tuning, kind);
                 AddWeapon(root, instance, controller, kind);
+                AddSmoke(root, hull);
+                AddDust(root, controller, hull);
                 root.AddComponent<VehicleBay>().Configure(RepairSeconds, DeployRideSeconds);
 
                 string prefabPath = PrefabPathFor(kind);
@@ -311,6 +313,55 @@ namespace IronFlag.Editor.Gameplay
         }
 
         /// <summary>
+        /// Gives the vehicle something to smoke with once it has been hurt.
+        /// </summary>
+        /// <param name="root">Prefab root the component goes on.</param>
+        /// <param name="hull">Bounds of the vehicle, for where the smoke comes from.</param>
+        /// <remarks>
+        /// The plume sits high on the hull rather than at its middle, because smoke comes off
+        /// an engine deck and not out of a floor. It is sized off the same number the wreck
+        /// explosion is, so the column that marks where a vehicle died is the same size as the
+        /// blast that killed it - the ASV going up is visibly a bigger event than the jeep
+        /// going up in both.
+        /// </remarks>
+        private static void AddSmoke(GameObject root, Bounds hull)
+        {
+            var at = new Vector3(
+                hull.center.x, hull.center.y + (hull.extents.y * 0.6f), hull.center.z);
+            VfxPrefabBuilder.AddDamageSmoke(
+                root, at, Mathf.Max(SmallestWreckBlast, hull.extents.magnitude));
+        }
+
+        /// <summary>
+        /// Gives a vehicle that drives on the ground something to kick up off it.
+        /// </summary>
+        /// <param name="root">Prefab root the component goes on.</param>
+        /// <param name="controller">The movement component, to tell a driver from a pilot.</param>
+        /// <param name="hull">Bounds of the vehicle, for where the dust comes off.</param>
+        /// <remarks>
+        /// The helicopter is excluded by the one question that already tells the two apart -
+        /// is this a <see cref="GroundVehicle"/> - rather than by naming it, which is the same
+        /// move <see cref="DustTrail"/> makes and for the same reason: a vehicle that does not
+        /// touch the ground cannot lift anything off it.
+        /// </remarks>
+        private static void AddDust(GameObject root, VehicleController controller, Bounds hull)
+        {
+            if (!(controller is GroundVehicle))
+            {
+                return;
+            }
+
+            // Behind the back axle and just off the ground. Vehicles are authored facing +Z,
+            // so behind is negative, and the floor of the hull is where the wheels meet it.
+            var at = new Vector3(
+                hull.center.x,
+                Mathf.Max(0.1f, hull.center.y - hull.extents.y + 0.15f),
+                hull.center.z - (hull.extents.z * 0.85f));
+
+            VfxPrefabBuilder.AddDustTrail(root, at, hull.size.x);
+        }
+
+        /// <summary>
         /// Gives the vehicle a tank of fuel and a load of ammunition.
         /// </summary>
         /// <param name="root">Prefab root the component goes on.</param>
@@ -364,7 +415,11 @@ namespace IronFlag.Editor.Gameplay
             point.transform.SetPositionAndRotation(MuzzleTip(muzzle), Quaternion.identity);
 
             root.AddComponent<VehicleWeapon>().Configure(
-                controller, point.transform, weapon, CombatPrefabBuilder.LoadProjectile(weapon.Kind));
+                controller,
+                point.transform,
+                weapon,
+                CombatPrefabBuilder.LoadProjectile(weapon.Kind),
+                CombatPrefabBuilder.LoadMuzzleFlash());
         }
 
         /// <summary>

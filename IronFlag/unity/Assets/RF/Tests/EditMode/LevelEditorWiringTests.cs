@@ -43,8 +43,13 @@ namespace IronFlag.Tests.EditMode
         /// Both scenes have to be listed, because <c>SceneManager.LoadScene</c> can only reach
         /// a scene in the build - and the round trip between them is the whole feature.
         /// </summary>
+        /// <remarks>
+        /// The game is no longer <em>first</em> on that list - the menu is, and
+        /// <see cref="MainMenuTests"/> owns that - but it still has to come before the editor,
+        /// which is what this checks.
+        /// </remarks>
         [Test]
-        public void BothScenesAreInTheBuildWithTheGameFirst()
+        public void BothScenesAreInTheBuildWithTheGameBeforeTheEditor()
         {
             var listed = new List<string>();
             foreach (EditorBuildSettingsScene scene in EditorBuildSettings.scenes)
@@ -60,7 +65,7 @@ namespace IronFlag.Tests.EditMode
             Assert.That(
                 listed.IndexOf(LevelScenes.GamePath),
                 Is.LessThan(listed.IndexOf(LevelScenes.EditorPath)),
-                "a built copy would start in the level editor rather than in the game");
+                "the game and the editor have swapped places on the build list");
         }
 
         [Test]

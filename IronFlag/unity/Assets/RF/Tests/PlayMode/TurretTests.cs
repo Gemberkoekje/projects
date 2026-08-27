@@ -97,7 +97,8 @@ namespace IronFlag.Tests.PlayMode
 
         /// <summary>
         /// Reach is a real limit, and it is measured across the map: a vehicle a metre past
-        /// the range is as safe as one on the far shore.
+        /// the range is as safe as one on the far shore. It is watched while it stands
+        /// there - which is the point of the watch - and never fired at.
         /// </summary>
         [UnityTest]
         public IEnumerator NothingOutsideItsReachIsATarget()
@@ -107,11 +108,75 @@ namespace IronFlag.Tests.PlayMode
             VehicleHealth far = CreateVehicle(Team.Brown, new Vector3(0.0f, 0.0f, reach + 4.0f));
             yield return Wait(1.5f);
 
-            Assert.That(turret.Target(), Is.Null, "it is tracking something out of range");
+            Assert.That(turret.Target(), Is.Null, "it counts something out of range as a target");
+            Assert.That(turret.Watching(), Is.Not.Null, "it did not even notice it");
             Assert.That(
                 far.HitPoints,
                 Is.EqualTo(far.MaxHitPoints),
                 "the turret hit something it cannot reach");
+        }
+
+        /// <summary>
+        /// The watch is a limit too, and a wider one. Past it the emplacement does nothing
+        /// at all - so a turret is something a player drives around rather than a thing
+        /// whose barrel follows them across the whole map.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator NothingOutsideItsWatchIsEvenLookedAt()
+        {
+            AutoTurret turret = CreateTurret(Team.Green, Vector3.zero);
+            CreateVehicle(Team.Brown, new Vector3(-(turret.WatchRange + 4.0f), 0.0f, 0.0f));
+            yield return Wait(1.5f);
+
+            Assert.That(turret.Watching(), Is.Null, "it is tracking something across the map");
+            Assert.That(
+                Mathf.Abs(Mathf.DeltaAngle(turret.AimYawDegrees, 0.0f)),
+                Is.LessThan(1.0f),
+                "the gun came off its rest for something it could never reach");
+        }
+
+        /// <summary>
+        /// The whole of the watch in one test: a vehicle that is inside it and outside the
+        /// reach is tracked and not shot at, and when it does cross into range the gun is
+        /// already pointing at it and fires at once.
+        /// </summary>
+        /// <remarks>
+        /// This is what <see cref="AutoTurret.WatchMargin"/> buys, and it is worth spelling
+        /// out as one sequence rather than two tests: the value of the early swing is not
+        /// that the barrel moves sooner, it is that there is no swing left to pay for at
+        /// the moment the shooting starts.
+        /// </remarks>
+        [UnityTest]
+        public IEnumerator TheGunComesRoundBeforeTheVehicleIsInRangeToBeShot()
+        {
+            AutoTurret turret = CreateTurret(Team.Green, Vector3.zero);
+            float watched = turret.Range + (AutoTurret.WatchMargin * 0.5f);
+            VehicleHealth approaching =
+                CreateVehicle(Team.Brown, new Vector3(-watched, 0.0f, 0.0f));
+
+            // Comfortably past the ~1.1 s an 80 deg/s traverse needs for a quarter turn.
+            yield return Wait(1.5f);
+
+            Assert.That(turret.Watching(), Is.Not.Null, "it never picked the approach up");
+            Assert.That(
+                turret.Target(), Is.Null, "it can already shoot it, so this proves nothing");
+            Assert.That(
+                Mathf.Abs(Mathf.DeltaAngle(turret.AimYawDegrees, -90.0f)),
+                Is.LessThan(AutoTurret.AimTolerance),
+                "the gun waited until the vehicle was in range before it started turning");
+            Assert.That(
+                approaching.HitPoints,
+                Is.EqualTo(approaching.MaxHitPoints),
+                "it fired at something out of reach");
+
+            // Straight down the same bearing, so nothing is owed to a second traverse.
+            approaching.transform.position = new Vector3(-(turret.Range - 4.0f), 0.0f, 0.0f);
+            yield return Wait(1.0f);
+
+            Assert.That(
+                approaching.HitPoints,
+                Is.LessThan(approaching.MaxHitPoints),
+                "the gun was already aimed and still did not fire once the vehicle closed");
         }
 
         /// <summary>
@@ -192,6 +257,12 @@ namespace IronFlag.Tests.PlayMode
         /// does. A barrel left pointing wherever the last raider died reads as a turret still
         /// tracking somebody who is not there.
         /// </summary>
+        /// <remarks>
+        /// It is also what keeps a side's emplacements looking like one defence rather than
+        /// several: they are placed on a single heading per side - see
+        /// <c>LevelEdits.FacingTheEnemy</c> - and stowing is what puts them back on it once
+        /// the raid is over.
+        /// </remarks>
         [UnityTest]
         public IEnumerator AnIdleTurretStowsItsGun()
         {
@@ -297,7 +368,7 @@ namespace IronFlag.Tests.PlayMode
             shell.SetTeam(side);
 
             VehicleWeapon gun = host.AddComponent<VehicleWeapon>();
-            gun.Configure(null, null, WeaponTuning.Emplacement(), Round());
+            gun.Configure(null, null, WeaponTuning.Emplacement(), Round(), null);
 
             AutoTurret turret = host.AddComponent<AutoTurret>();
             turret.Configure(gun, 80.0f);
@@ -386,7 +457,7 @@ namespace IronFlag.Tests.PlayMode
             body.transform.SetParent(host.transform, false);
 
             round = host.AddComponent<Projectile>();
-            round.Configure(body.transform, null);
+            round.Configure(body.transform, null, null, null);
             spawned.Add(host);
             return round;
         }

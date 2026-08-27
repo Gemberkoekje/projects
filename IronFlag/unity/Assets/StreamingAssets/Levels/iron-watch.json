@@ -1,0 +1,836 @@
+{
+    "SchemaVersion": 4,
+    "Name": "Iron Watch",
+    "Description": "Iron Watch. Generated from seed 20260827 at the medium setting, which is a world 280 m across. One landmass with both bunkers on it. Nothing stops a straight run at the other side except what is standing in the way, so this is a map about cover rather than about crossings. One side. Green has a bunker and no flag of its own; brown is a field of towers guarded by emplacements, one of them real. The second seat is left empty when you play it, and the editor's Problems panel judges the map by one-player rules rather than a match's. Asking for seed 20260827 again at these settings draws this map again, down to the trees. A generated map is a starting point rather than a finished one: the editor's Problems panel is the authority on whether this one is playable, and every tool works on it exactly as on a hand-authored map.",
+    "Seed": 2117160914,
+    "Bounds": {
+        "HalfExtent": 140.0,
+        "WaterDepth": 0.699999988079071,
+        "SeaThickness": 3.0
+    },
+    "Reserve": {
+        "Jeeps": 8,
+        "Tanks": 3,
+        "Asvs": 3,
+        "Helicopters": 3
+    },
+    "Land": [
+        {
+            "Name": "Shore (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -84.69096374511719,
+            "MaxX": 88.36541748046875,
+            "MinZ": -106.86630249023438,
+            "MaxZ": 21.574234008789064
+        },
+        {
+            "Name": "Shore (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -88.36541748046875,
+            "MaxX": 84.69096374511719,
+            "MinZ": -21.574234008789064,
+            "MaxZ": 106.86630249023438
+        },
+        {
+            "Name": "Downs (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -77.69096374511719,
+            "MaxX": 81.36541748046875,
+            "MinZ": -99.86630249023438,
+            "MaxZ": 14.574234008789063
+        },
+        {
+            "Name": "Downs (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -81.36541748046875,
+            "MaxX": 77.69096374511719,
+            "MinZ": -14.574234008789063,
+            "MaxZ": 99.86630249023438
+        },
+        {
+            "Name": "Meadow (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -1.6643180847167969,
+            "MaxX": 33.41233825683594,
+            "MinZ": -25.606294631958009,
+            "MaxZ": 7.452447891235352
+        },
+        {
+            "Name": "Meadow (green)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -10.07343578338623,
+            "MaxX": 6.759608268737793,
+            "MinZ": -44.23862075805664,
+            "MaxZ": -32.0705451965332
+        },
+        {
+            "Name": "Meadow (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -33.41233825683594,
+            "MaxX": 1.6643180847167969,
+            "MinZ": -7.452447891235352,
+            "MaxZ": 25.606294631958009
+        },
+        {
+            "Name": "Meadow (brown)",
+            "Surface": "Grass",
+            "Shape": "Ellipse",
+            "MinX": -6.759608268737793,
+            "MaxX": 10.07343578338623,
+            "MinZ": 32.0705451965332,
+            "MaxZ": 44.23862075805664
+        },
+        {
+            "Name": "Scuff (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 21.883502960205079,
+            "MaxX": 49.73906326293945,
+            "MinZ": -58.46290588378906,
+            "MaxZ": -42.75975036621094
+        },
+        {
+            "Name": "Scuff (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -23.034420013427736,
+            "MaxX": -4.300375938415527,
+            "MinZ": -39.45807647705078,
+            "MaxZ": -21.973846435546876
+        },
+        {
+            "Name": "Scuff (green)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -14.937633514404297,
+            "MaxX": 9.09371566772461,
+            "MinZ": -36.5518913269043,
+            "MaxZ": -19.554122924804689
+        },
+        {
+            "Name": "Scuff (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -49.73906326293945,
+            "MaxX": -21.883502960205079,
+            "MinZ": 42.75975036621094,
+            "MaxZ": 58.46290588378906
+        },
+        {
+            "Name": "Scuff (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": 4.300375938415527,
+            "MaxX": 23.034420013427736,
+            "MinZ": 21.973846435546876,
+            "MaxZ": 39.45807647705078
+        },
+        {
+            "Name": "Scuff (brown)",
+            "Surface": "Sand",
+            "Shape": "Ellipse",
+            "MinX": -9.09371566772461,
+            "MaxX": 14.937633514404297,
+            "MinZ": 19.554122924804689,
+            "MaxZ": 36.5518913269043
+        },
+        {
+            "Name": "Bunker road (green)",
+            "Surface": "Asphalt",
+            "Shape": "Rectangle",
+            "MinX": -1.1987818479537964,
+            "MaxX": 3.801218032836914,
+            "MinZ": -81.19999694824219,
+            "MaxZ": -33.600006103515628
+        },
+        {
+            "Name": "Bunker road (brown)",
+            "Surface": "Asphalt",
+            "Shape": "Rectangle",
+            "MinX": -3.801218032836914,
+            "MaxX": 1.1987818479537964,
+            "MinZ": 33.600006103515628,
+            "MaxZ": 81.19999694824219
+        }
+    ],
+    "Bunkers": [
+        {
+            "Team": "Green",
+            "Position": {
+                "x": 4.874995708465576,
+                "y": 0.0,
+                "z": -79.77162170410156
+            },
+            "YawDegrees": 356.5028991699219,
+            "SupplyRadius": 12.0,
+            "SupplyRate": 0.25
+        }
+    ],
+    "Towers": [
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": false,
+            "Position": {
+                "x": -13.203070640563965,
+                "y": 0.0,
+                "z": 54.05672073364258
+            },
+            "YawDegrees": 166.2745361328125
+        },
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": false,
+            "Position": {
+                "x": 27.60938262939453,
+                "y": 0.0,
+                "z": 46.367801666259769
+            },
+            "YawDegrees": 210.77139282226563
+        },
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": false,
+            "Position": {
+                "x": 22.900243759155275,
+                "y": 0.0,
+                "z": 87.54647827148438
+            },
+            "YawDegrees": 194.65887451171876
+        },
+        {
+            "Team": "Brown",
+            "HoldsTheFlag": true,
+            "Position": {
+                "x": -16.016965866088868,
+                "y": 0.0,
+                "z": 100.38481903076172
+            },
+            "YawDegrees": 170.93455505371095
+        }
+    ],
+    "Structures": [
+        {
+            "Kind": "DepotFuel",
+            "Side": "None",
+            "Name": "Fuel depot (green)",
+            "Position": {
+                "x": -43.55356979370117,
+                "y": 0.0,
+                "z": -37.509342193603519
+            },
+            "YawDegrees": 260.9955749511719,
+            "FuelRate": 0.11999999731779099,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotAmmo",
+            "Side": "None",
+            "Name": "Ammo depot (green)",
+            "Position": {
+                "x": 48.729496002197269,
+                "y": 0.0,
+                "z": -36.72367477416992
+            },
+            "YawDegrees": 166.3771514892578,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.11999999731779099,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 59.131858825683597,
+                "y": 0.0,
+                "z": -43.48564529418945
+            },
+            "YawDegrees": 2.5476908683776857,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 18.83159637451172,
+                "y": 0.0,
+                "z": -61.58198928833008
+            },
+            "YawDegrees": 359.75653076171877,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 56.10045623779297,
+                "y": 0.0,
+                "z": -73.44537353515625
+            },
+            "YawDegrees": 31.0928955078125,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 20.159521102905275,
+                "y": 0.0,
+                "z": -92.72925567626953
+            },
+            "YawDegrees": 138.9413604736328,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -52.41340255737305,
+                "y": 0.0,
+                "z": -59.75589370727539
+            },
+            "YawDegrees": 16.5174503326416,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -41.23169708251953,
+                "y": 0.0,
+                "z": -89.89652252197266
+            },
+            "YawDegrees": 54.7574462890625,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -12.095040321350098,
+                "y": 0.0,
+                "z": -57.1270637512207
+            },
+            "YawDegrees": 18.635108947753908,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -69.82715606689453,
+                "y": 0.0,
+                "z": -51.70673751831055
+            },
+            "YawDegrees": 166.71463012695313,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 15.775714874267579,
+                "y": 0.0,
+                "z": -50.83946228027344
+            },
+            "YawDegrees": 180.1078643798828,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -27.486204147338868,
+                "y": 0.0,
+                "z": -73.2456283569336
+            },
+            "YawDegrees": 16.88454818725586,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 4.674535274505615,
+                "y": 0.0,
+                "z": -39.96327590942383
+            },
+            "YawDegrees": 183.52305603027345,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -60.2769889831543,
+                "y": 0.0,
+                "z": -75.90001678466797
+            },
+            "YawDegrees": 211.2664031982422,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -19.24182891845703,
+                "y": 0.0,
+                "z": -41.54629135131836
+            },
+            "YawDegrees": 15.778663635253907,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 50.73672866821289,
+                "y": 0.0,
+                "z": -53.645198822021487
+            },
+            "YawDegrees": 326.4795227050781,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -4.575549125671387,
+                "y": 0.0,
+                "z": -36.37500762939453
+            },
+            "YawDegrees": 197.2555694580078,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -21.65774154663086,
+                "y": 0.0,
+                "z": -90.59677124023438
+            },
+            "YawDegrees": 315.2359313964844,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -19.71644401550293,
+                "y": 0.0,
+                "z": -63.32664108276367
+            },
+            "YawDegrees": 6.442558765411377,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 34.83950424194336,
+                "y": 0.0,
+                "z": -33.82973861694336
+            },
+            "YawDegrees": 95.94508361816406,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": -50.13626480102539,
+                "y": 0.0,
+                "z": 71.67399597167969
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": 52.072593688964847,
+                "y": 0.0,
+                "z": 11.935710906982422
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": -64.22327423095703,
+                "y": 0.0,
+                "z": 77.64817810058594
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": -60.61349868774414,
+                "y": 0.0,
+                "z": 61.657798767089847
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": 22.610103607177736,
+                "y": 0.0,
+                "z": 6.340574264526367
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Turret",
+            "Side": "Brown",
+            "Name": "Turret (brown)",
+            "Position": {
+                "x": 64.14286804199219,
+                "y": 0.0,
+                "z": 64.7733383178711
+            },
+            "YawDegrees": 180.0,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotFuel",
+            "Side": "None",
+            "Name": "Fuel depot (brown)",
+            "Position": {
+                "x": 66.10452270507813,
+                "y": 0.0,
+                "z": 23.147708892822267
+            },
+            "YawDegrees": 255.88377380371095,
+            "FuelRate": 0.11999999731779099,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "DepotAmmo",
+            "Side": "None",
+            "Name": "Ammo depot (brown)",
+            "Position": {
+                "x": -46.895721435546878,
+                "y": 0.0,
+                "z": 31.775781631469728
+            },
+            "YawDegrees": 187.0120086669922,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.11999999731779099,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -56.16102600097656,
+                "y": 0.0,
+                "z": 52.202857971191409
+            },
+            "YawDegrees": 103.84528350830078,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingB",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -54.67988204956055,
+                "y": 0.0,
+                "z": 85.42451477050781
+            },
+            "YawDegrees": 268.0025939941406,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "BuildingA",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -26.84772491455078,
+                "y": 0.0,
+                "z": 12.632244110107422
+            },
+            "YawDegrees": 21.39862060546875,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 65.51593017578125,
+                "y": 0.0,
+                "z": 74.21726989746094
+            },
+            "YawDegrees": 89.141845703125,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 1.6026813983917237,
+                "y": 0.0,
+                "z": 15.509946823120118
+            },
+            "YawDegrees": 105.1544189453125,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -75.68782806396485,
+                "y": 0.0,
+                "z": 65.17024230957031
+            },
+            "YawDegrees": 300.1880798339844,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -37.96305465698242,
+                "y": 0.0,
+                "z": 22.326509475708009
+            },
+            "YawDegrees": 133.009521484375,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 44.332427978515628,
+                "y": 0.0,
+                "z": 7.189315319061279
+            },
+            "YawDegrees": 231.25416564941407,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -68.10640716552735,
+                "y": 0.0,
+                "z": 68.05972290039063
+            },
+            "YawDegrees": 313.71112060546877,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -9.04641342163086,
+                "y": 0.0,
+                "z": 7.968784809112549
+            },
+            "YawDegrees": 316.3630676269531,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -5.156756401062012,
+                "y": 0.0,
+                "z": 14.681495666503907
+            },
+            "YawDegrees": 55.9281120300293,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -14.005365371704102,
+                "y": 0.0,
+                "z": 12.500102043151856
+            },
+            "YawDegrees": 2.4463248252868654,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -71.02247619628906,
+                "y": 0.0,
+                "z": 56.687828063964847
+            },
+            "YawDegrees": 199.59576416015626,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": -70.38457489013672,
+                "y": 0.0,
+                "z": 61.65580368041992
+            },
+            "YawDegrees": 320.6011962890625,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 68.22172546386719,
+                "y": 0.0,
+                "z": 50.16464614868164
+            },
+            "YawDegrees": 317.8015441894531,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        },
+        {
+            "Kind": "Tree",
+            "Side": "None",
+            "Name": "",
+            "Position": {
+                "x": 8.366045951843262,
+                "y": 0.0,
+                "z": 10.235743522644043
+            },
+            "YawDegrees": 236.79034423828126,
+            "FuelRate": 0.0,
+            "AmmoRate": 0.0,
+            "SupplyRadius": 7.0
+        }
+    ]
+}
