@@ -194,6 +194,64 @@ namespace IronFlag.Objective
         }
 
         /// <summary>
+        /// Rerolls which of each side's towers actually flies the flag.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Called by <see cref="Match"/> once, the moment a real match begins - not a
+        /// playtest lived in the level editor, and not the still. A raider who has already
+        /// played a map has already learned which pyramid to shell, and at that point rule
+        /// one - an intact tower gives nothing away - has stopped being true of the
+        /// <em>player</em> even though it is still true of the tower. Rolling the choice
+        /// fresh keeps both.
+        /// </para>
+        /// <para>
+        /// What the level file marks real is untouched by this and still means something:
+        /// it is what the level editor shows and edits, and it is where
+        /// <see cref="IronFlag.Levels.LevelBuilder"/> puts the one <see cref="Flag"/> it
+        /// builds per side. This only moves that flag afterwards, so a side with the one
+        /// tower <see cref="IronFlag.Levels.LevelValidation"/> allows on a solo map is left
+        /// exactly where <see cref="IronFlag.Levels.LevelBuilder"/> put it.
+        /// </para>
+        /// </remarks>
+        public static void Roll()
+        {
+            foreach (Team side in Teams.Playing)
+            {
+                Roll(side);
+            }
+        }
+
+        /// <summary>
+        /// Rerolls which of one side's towers flies the flag.
+        /// </summary>
+        /// <param name="side">Side to roll for.</param>
+        private static void Roll(Team side)
+        {
+            var owned = new List<FlagTower>();
+            foreach (FlagTower tower in Live)
+            {
+                if (tower != null && tower.team == side)
+                {
+                    owned.Add(tower);
+                }
+            }
+
+            if (owned.Count == 0)
+            {
+                return;
+            }
+
+            FlagTower chosen = owned[UnityEngine.Random.Range(0, owned.Count)];
+            foreach (FlagTower tower in owned)
+            {
+                tower.Configure(side, tower == chosen);
+            }
+
+            Flag.Of(side)?.Configure(side, chosen);
+        }
+
+        /// <summary>
         /// Sets which side this tower belongs to and whether it is the real one.
         /// </summary>
         /// <param name="side">Side whose base this tower stands in.</param>

@@ -265,6 +265,10 @@ namespace IronFlag.Editor.Gameplay
                 Explosion burst = root.AddComponent<Explosion>();
                 burst.Configure(ball.transform, flash, ExplosionDuration, 2.0f);
 
+                // Every blast in the game comes through Explosion.Spawn, so the scorch is
+                // bound once here rather than at each of the half-dozen things that go off.
+                burst.Scorches(VfxPrefabBuilder.LoadScorch());
+
                 return PrefabUtility.SaveAsPrefabAsset(root, PrefabPathFor(ExplosionAssetName));
             }
             finally

@@ -5298,6 +5298,7 @@ MonoBehaviour:
   damaged: {fileID: 6216693599175133364}
   destroyed: {fileID: 2563125458482804935}
   debris: {fileID: 5535295485183779225, guid: 5726d28f7600ae244a5f470191967bec, type: 3}
+  scorch: {fileID: 1127769014511133692, guid: e7363abde8c18f14c856a0e6c7994b39, type: 3}
 --- !u!114 &5743848546866290455
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -3,6 +3,7 @@ using UnityEngine;
 using IronFlag.Combat;
 using IronFlag.Core;
 using IronFlag.Supply;
+using IronFlag.Vfx;
 
 namespace IronFlag.Destruction
 {
@@ -84,7 +85,12 @@ namespace IronFlag.Destruction
         [Tooltip("Debris burst thrown on each transition. Optional.")]
         private DebrisBurst debris;
 
+        [SerializeField]
+        [Tooltip("Burn left on the ground when this collapses. Optional.")]
+        private GroundMark scorch;
+
         private DestructionState state = DestructionState.None;
+        private GroundMark burn;
         private float hitPoints = -1.0f;
 
         /// <summary>Raised whenever the structure swaps to a different model.</summary>
@@ -198,6 +204,18 @@ namespace IronFlag.Destruction
             state = DestructionState.None;
             Enter(DestructionState.Intact, throwDebris: false);
         }
+
+        /// <summary>
+        /// Gives this structure a burn to leave behind when it collapses.
+        /// </summary>
+        /// <param name="mark">The scorch prefab, or null for none.</param>
+        /// <remarks>
+        /// Its own setter rather than a seventh argument to <see cref="Configure"/>, which
+        /// six call sites and a dozen tests would have had to be widened for to say "null"
+        /// - and which would have put a decoration in among the six things a structure
+        /// cannot be built without.
+        /// </remarks>
+        public void Scorches(GroundMark mark) => scorch = mark;
 
         /// <summary>
         /// Takes a hit, and swaps model if that is what the hit means.
@@ -328,7 +346,18 @@ namespace IronFlag.Destruction
 
             if (wanted == DestructionState.Destroyed)
             {
+                // Left to stay rather than to fade, because what made it has not gone
+                // anywhere: the rubble is standing on it. A map has as many structures as it
+                // has and each of them collapses once, so this cannot accumulate.
+                burn = GroundMark.Spawn(scorch, origin, tuning.DebrisRadius, 0.0f);
                 Collapsed?.Invoke(this);
+            }
+            else if (burn != null)
+            {
+                // Put back up by the level editor or by a test. The burn goes with the
+                // rubble it belonged to.
+                Destroy(burn.gameObject);
+                burn = null;
             }
         }
 

@@ -182,6 +182,15 @@ namespace IronFlag.Combat
                 return false;
             }
 
+            // A paused match sets Time.timeScale to zero but does not disable any
+            // MonoBehaviour, so Update() keeps calling in here on every real frame - this is
+            // the one place that stops a shot actually leaving the barrel while the pause
+            // panel is up.
+            if (Time.timeScale <= 0.0f)
+            {
+                return false;
+            }
+
             ProjectileState launch = ProjectileMotion.Launch(
                 muzzle.position, muzzle.forward, tuning.MuzzleSpeed, Elevation());
 

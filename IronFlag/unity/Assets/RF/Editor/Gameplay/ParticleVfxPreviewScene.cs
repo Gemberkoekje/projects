@@ -59,6 +59,13 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>How many frames each strip has.</summary>
         private const int Frames = 4;
 
+        /// <summary>How many strips the sheet has.</summary>
+        /// <remarks>
+        /// Named rather than written into <see cref="CellAt"/> twice, which is what it was
+        /// until a fifth strip arrived and the sheet came out photographed off-centre.
+        /// </remarks>
+        private const int Rows = 5;
+
         /// <summary>Seconds into its life each frame of the damage plume is drawn.</summary>
         private static readonly float[] PlumeFrames = { 0.35f, 0.9f, 1.7f, 2.6f };
 
@@ -140,6 +147,7 @@ namespace IronFlag.Editor.Gameplay
             LayOutColumns(ref contents, ref started);
             LayOutSplashes(ref contents, ref started);
             LayOutDust(ref contents, ref started);
+            LayOutMarks(ref contents, ref started);
 
             return FrameCamera(started ? contents : new Bounds(Vector3.zero, Vector3.one * 20.0f), aspect);
         }
@@ -254,6 +262,78 @@ namespace IronFlag.Editor.Gameplay
         }
 
         /// <summary>
+        /// Lays out the marks row: two scorches and two sets of wheel tracks, each on a
+        /// different surface.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The row exists to make one claim checkable: <c>RF_Mark.shader</c> multiplies
+        /// rather than blends, so the <em>same</em> stain is the right colour on every
+        /// ground. The first three cells are one burn on sand, on grass and on a road, and
+        /// they should read as one mark on three surfaces rather than as three marks.
+        /// </para>
+        /// <para>
+        /// The fourth is the shader's other half: the same material a wheel track wears,
+        /// laid as a strip. It is <strong>not</strong> a wheel track - it is that material's
+        /// ribbon falloff on a piece of ground, and it is here because the real thing cannot
+        /// be photographed. A <see cref="TrailRenderer"/> builds its ribbon during the game
+        /// loop and a headless one-shot render never runs one, so a posed track has all its
+        /// points, bakes to a correctly placed flat mesh, and draws nothing. See
+        /// <c>GROUND_WATER_NOTES.md</c>.
+        /// </para>
+        /// <para>
+        /// Posed rather than made: a mark is built straight from
+        /// <see cref="GroundMark.Configure"/>, never from <c>Spawn</c>, which refuses outside
+        /// play mode on purpose. That refusal is the doors pass's frozen-debris lesson, and
+        /// posing round it is the same move the dust row already makes.
+        /// </para>
+        /// </remarks>
+        private static void LayOutMarks(ref Bounds contents, ref bool started)
+        {
+            // How high the marks sit: on top of the cell's slab rather than on the ground
+            // plane the slab is laid over. Slab returns a cube whose top face is four
+            // centimetres up - see the lip in Slab.
+            const float onTheSlab = 0.04f;
+            const float burnAcross = 5.0f;
+            const float ribbonLong = 9.0f;
+            const float ribbonWide = 0.7f;
+
+            SurfaceKind[] burns = { SurfaceKind.Sand, SurfaceKind.Grass, SurfaceKind.Asphalt };
+
+            GroundMark scorch = VfxPrefabBuilder.LoadScorch();
+            if (scorch == null)
+            {
+                Debug.LogWarning("IronFlag: there is no scorch prefab to photograph.");
+                return;
+            }
+
+            for (int frame = 0; frame < burns.Length; frame++)
+            {
+                SurfaceKind ground = burns[frame];
+                Vector3 at = CellAt(frame, 4);
+                Swallow(ref contents, ref started, Slab($"Burn{ground}", at, ground));
+
+                var mark = (GroundMark)PrefabUtility.InstantiatePrefab(scorch);
+                mark.name = $"Scorch{ground}";
+                mark.transform.position = at + (Vector3.up * (onTheSlab + GroundMark.Height));
+                mark.Configure(burnAcross, 0.0f);
+                Swallow(ref contents, ref started, mark.gameObject);
+            }
+
+            Vector3 last = CellAt(burns.Length, 4);
+            Swallow(ref contents, ref started, Slab("RibbonGrass", last, SurfaceKind.Grass));
+
+            var strip = (GroundMark)PrefabUtility.InstantiatePrefab(scorch);
+            strip.name = "TrackRibbon";
+            strip.transform.position = last + (Vector3.up * (onTheSlab + TyreTracks.Height));
+            strip.Configure(1.0f, 0.0f);
+            strip.transform.localScale = new Vector3(ribbonLong, 1.0f, ribbonWide);
+            strip.GetComponent<Renderer>().sharedMaterial =
+                GeneratedMaterials.Load(GeneratedMaterials.Track);
+            Swallow(ref contents, ref started, strip.gameObject);
+        }
+
+        /// <summary>
         /// Returns where one cell of the sheet is.
         /// </summary>
         /// <param name="column">Which frame of the strip, zero-based and left to right.</param>
@@ -263,7 +343,7 @@ namespace IronFlag.Editor.Gameplay
             => new Vector3(
                 (column * ColumnPitch) - ((Frames - 1) * ColumnPitch * 0.5f),
                 0.0f,
-                ((3 - row) * RowPitch) - (1.5f * RowPitch));
+                ((Rows - 1 - row) * RowPitch) - ((Rows - 1) * RowPitch * 0.5f));
 
         /// <summary>
         /// Drops one tank into a cell, side-on to the camera.

@@ -97,6 +97,11 @@ namespace IronFlag.Editor.Gameplay
         {
             GeneratedMaterials.EnsureAssets();
             CombatPrefabBuilder.EnsureAssets();
+
+            // Named here as well as inside the combat builder, because that one only reaches
+            // the VFX prefabs when a combat prefab is missing - and a structure needs the
+            // scorch it leaves behind whether or not the rounds that flatten it were rebuilt.
+            VfxPrefabBuilder.EnsureAssets();
             GeneratedMaterials.EnsureAssetFolder(PropFolder);
             GeneratedMaterials.EnsureAssetFolder(StructureFolder);
 
@@ -229,13 +234,19 @@ namespace IronFlag.Editor.Gameplay
                 root, DestructionState.Damaged, LoadModel(kind, DestructionState.Damaged));
             GameObject destroyed = AddState(root, DestructionState.Destroyed, destroyedModel);
 
-            root.AddComponent<Destructible>().Configure(
+            Destructible destructible = root.AddComponent<Destructible>();
+            destructible.Configure(
                 kind,
                 StructureTuning.For(kind),
                 intact,
                 damaged,
                 destroyed,
                 CombatPrefabBuilder.LoadDebris());
+
+            // The burn that stays behind under the rubble. Bound after Configure, because
+            // Configure enters the intact state and a structure that has not fallen over yet
+            // has nothing to have burned.
+            destructible.Scorches(VfxPrefabBuilder.LoadScorch());
 
             AddSmoke(root, intact);
 

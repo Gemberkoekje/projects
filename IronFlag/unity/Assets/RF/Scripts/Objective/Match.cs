@@ -133,6 +133,16 @@ namespace IronFlag.Objective
                 current = this;
             }
 
+            // This component only ever exists in a real match - not the editor, not a
+            // preview render - so its own OnEnable is the one moment "a match has begun"
+            // can be answered from. See FlagTower.Roll. Guarded the same way the state
+            // machines in Flag and FlagTower are: Match is ExecuteAlways so an editor
+            // simply opening this scene must not go rolling its saved layout.
+            if (Application.isPlaying)
+            {
+                FlagTower.Roll();
+            }
+
             Flag.AnyCaptured += OnCaptured;
             TeamReserve.AnyBeaten += OnRunOut;
         }

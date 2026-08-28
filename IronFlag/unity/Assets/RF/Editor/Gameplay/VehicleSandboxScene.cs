@@ -3,7 +3,9 @@ using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 using IronFlag.Combat;
 using IronFlag.Core;
@@ -802,6 +804,11 @@ namespace IronFlag.Editor.Gameplay
                 Debug.LogWarning($"IronFlag: {ActionsPath} is missing; the sandbox will not respond.");
             }
 
+            // The pause menu is the first thing in this scene anybody clicks, so it is the
+            // first thing here that needs a way to turn a mouse into a button press - see
+            // MainMenuScene, which sets the same thing up the same way.
+            CreateEventSystem(LevelEditorScene.EnsureUiActions());
+
             var host = new GameObject("Local Multiplayer");
             LocalMultiplayer session = host.AddComponent<LocalMultiplayer>();
             session.Configure(controls, players);
@@ -822,10 +829,31 @@ namespace IronFlag.Editor.Gameplay
             // what loaded this scene, so a match started normally is exactly what it was.
             host.AddComponent<PlaytestReturn>();
 
-            // The way back out of a match, which every session has: Escape twice returns to
-            // the menu. Always on, unlike the one above - the menu is where every session
-            // started, so there is always something behind a match to go back to.
-            host.AddComponent<MenuReturn>();
+            // The way back out of a match, which every session has: Escape pauses and offers
+            // it. Always on, unlike the one above - the menu is where every session started,
+            // so there is always something behind a match to go back to.
+            host.AddComponent<PauseMenu>();
+        }
+
+        /// <summary>
+        /// Creates the thing that turns a mouse into a button press.
+        /// </summary>
+        /// <param name="controls">The actions asset carrying the UI map.</param>
+        private static void CreateEventSystem(InputActionAsset controls)
+        {
+            var host = new GameObject("Event System", typeof(EventSystem));
+            var module = host.AddComponent<InputSystemUIInputModule>();
+
+            if (controls != null && controls.FindActionMap(LevelEditorScene.UiActionMap, false) != null)
+            {
+                module.actionsAsset = controls;
+            }
+            else
+            {
+                Debug.LogWarning(
+                    $"IronFlag: {ActionsPath} has no '{LevelEditorScene.UiActionMap}' action "
+                    + "map, so the pause menu will not respond to the mouse.");
+            }
         }
 
         /// <summary>

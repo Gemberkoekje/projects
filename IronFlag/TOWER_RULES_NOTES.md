@@ -164,8 +164,15 @@ one splash would both open to a single round. That is 9 m against the ASV's 4.5 
 shipped map has 36 m. Standing in one place and shelling both is fine — the tank reaches 36 m
 and repositioning was never the price.
 
-**Which tower is real is still authored, not rolled.** Unchanged from M6, and now more
-defensible: a second map is a second answer, and levels are files.
+**Which tower is real is authored in the file, but a match no longer plays what is
+authored.** True from M6 through this pass, and reversed afterwards: `FlagTower.Roll`
+rerolls the choice at random, per side, the instant a real match begins, so a raider who
+has already played a map cannot simply remember which pyramid was real last time. The
+authored value still means something - it is what the level editor shows and edits, and
+still the one thing `LevelValidation` insists a file name exactly one of. See
+`Objective/FlagTower.cs` and `Objective/Match.cs` (`OnEnable`); the fuller reasoning for why
+the roll lives in `Match` rather than `LevelLoader`/`LevelBuilder` is in
+[PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md), which landed in the same session.
 
 ---
 

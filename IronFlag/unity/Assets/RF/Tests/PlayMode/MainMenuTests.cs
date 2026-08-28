@@ -4,9 +4,11 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
+using IronFlag.Core;
 using IronFlag.Editing;
 using IronFlag.Levels;
 using IronFlag.Menu;
+using IronFlag.Objective;
 
 namespace IronFlag.Tests.PlayMode
 {
@@ -60,6 +62,11 @@ namespace IronFlag.Tests.PlayMode
         {
             LevelHandoff.Clear();
             QualitySettings.SetQualityLevel(tierOnTheWayIn, true);
+
+            // A test that fails between PauseMenu.Open() and the matching Close() or
+            // BackToMenu() would otherwise leave the engine paused for whatever the next
+            // test in the process runs, which is a failure that shows up far from here.
+            Time.timeScale = 1.0f;
             yield return null;
 
             foreach (string name in new[] { MenuSceneName, GameSceneName, EditorSceneName })
@@ -163,50 +170,109 @@ namespace IronFlag.Tests.PlayMode
         }
 
         /// <summary>
-        /// Escape throws away a match in progress, so it asks first - the same way the editor's
-        /// New, Open and Revert buttons do, and for the same reason.
+        /// Escape pauses a match in progress and offers a way out, rather than throwing it
+        /// away outright - a second press lets it keep going instead.
         /// </summary>
         [UnityTest]
-        public IEnumerator LeavingAMatchTakesTwoPressesAndEndsUpOnTheMenu()
+        public IEnumerator TheMenuPausesTheMatchAndASecondPressResumesIt()
         {
             yield return Open(GameSceneName);
 
-            var exit = Object.FindAnyObjectByType<MenuReturn>();
-            Assert.That(exit, Is.Not.Null, "a match has no way back to the menu");
-            Assert.That(exit.IsArmed, Is.False);
+            var menu = Object.FindAnyObjectByType<PauseMenu>();
+            Assert.That(menu, Is.Not.Null, "a match has no way back to the menu");
+            Assert.That(menu.IsOpen, Is.False);
 
-            Assert.That(exit.Press(), Is.False, "one press left the match");
-            Assert.That(exit.IsArmed, Is.True, "the first press did not arm anything");
+            menu.Open();
+            Assert.That(menu.IsOpen, Is.True, "opening the menu did not open it");
+            Assert.That(Time.timeScale, Is.EqualTo(0.0f), "opening the menu did not pause the match");
             Assert.That(
                 SceneManager.GetActiveScene().name,
                 Is.EqualTo(GameSceneName),
-                "one press of escape abandoned the match");
+                "opening the menu left the match");
 
-            Assert.That(exit.Press(), Is.True, "the second press did not leave");
+            menu.Close();
+            Assert.That(menu.IsOpen, Is.False, "closing the menu left it open");
+            Assert.That(Time.timeScale, Is.EqualTo(1.0f), "closing the menu left the match paused");
+        }
+
+        /// <summary>
+        /// A match left through the menu must not leave the map it was on lying in the
+        /// handoff, which is what a later scene would open without anybody choosing it, and
+        /// must not leave the engine paused for whatever scene loads next.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator TheMainMenuButtonLeavesAPausedMatchAndForgetsWhichMapItWas()
+        {
+            LevelHandoff.Play(LevelLibrary.DefaultLevel);
+            yield return Open(GameSceneName);
+
+            PauseMenu menu = Object.FindAnyObjectByType<PauseMenu>();
+            menu.Open();
+
+            menu.BackToMenu();
             yield return null;
             yield return null;
 
             Assert.That(
                 SceneManager.GetActiveScene().name,
                 Is.EqualTo(MenuSceneName),
-                "leaving a match did not reach the menu");
+                "leaving a paused match did not reach the menu");
+            Assert.That(LevelHandoff.IsAsked, Is.False, "the menu is still holding the last map");
+            Assert.That(Time.timeScale, Is.EqualTo(1.0f), "leaving a paused match left the engine paused");
         }
 
         /// <summary>
-        /// A match left through the menu must not leave the map it was on lying in the handoff,
-        /// which is what a later scene would open without anybody choosing it.
+        /// The pause menu's buttons are the whole of what it offers once it is open, and a
+        /// listener that was never attached looks exactly like a button that does nothing.
         /// </summary>
         [UnityTest]
-        public IEnumerator LeavingAMatchForgetsWhichMapItWas()
+        public IEnumerator ThePauseMenusButtonsAreWiredToSomething()
         {
-            LevelHandoff.Play(LevelLibrary.DefaultLevel);
             yield return Open(GameSceneName);
 
-            Object.FindAnyObjectByType<MenuReturn>().BackToMenu();
+            PauseMenu menu = Object.FindAnyObjectByType<PauseMenu>();
+            menu.Open();
+
+            Press(menu, "Continue");
+            Assert.That(menu.IsOpen, Is.False, "CONTINUE does not close the menu");
+
+            menu.Open();
+            Press(menu, "Main Menu");
             yield return null;
             yield return null;
 
-            Assert.That(LevelHandoff.IsAsked, Is.False, "the menu is still holding the last map");
+            Assert.That(
+                SceneManager.GetActiveScene().name,
+                Is.EqualTo(MenuSceneName),
+                "MAIN MENU does not reach the menu");
+        }
+
+        /// <summary>
+        /// A finished match has nothing left to continue, so the menu offers only the way
+        /// out - the result itself is already on screen, on both halves of the HUD.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator AFinishedMatchOffersOnlyTheWayOut()
+        {
+            yield return Open(GameSceneName);
+
+            Match match = Object.FindAnyObjectByType<Match>();
+            Assert.That(match, Is.Not.Null, "the match scene came up with no match in it");
+            match.Win(Team.Green, Team.Brown, MatchOutcome.FlagCaptured);
+
+            PauseMenu menu = Object.FindAnyObjectByType<PauseMenu>();
+            menu.Open();
+
+            bool continueShown = false;
+            bool mainMenuShown = false;
+            foreach (Button button in menu.GetComponentsInChildren<Button>(false))
+            {
+                continueShown |= button.name == "Continue";
+                mainMenuShown |= button.name == "Main Menu";
+            }
+
+            Assert.That(continueShown, Is.False, "a finished match still offers to continue it");
+            Assert.That(mainMenuShown, Is.True, "a finished match has no way out");
         }
 
         private static IEnumerator Open(string scene)
@@ -224,11 +290,13 @@ namespace IronFlag.Tests.PlayMode
         /// <remarks>
         /// By name rather than by held reference, because the point of the test is that the
         /// thing on the screen is wired - a reference handed out by the code that built it
-        /// would pass whether or not anybody could click it.
+        /// would pass whether or not anybody could click it. Takes any component rather than
+        /// specifically <see cref="MainMenuController"/> so <see cref="PauseMenu"/>'s own
+        /// buttons can be pressed the same way.
         /// </remarks>
-        private static void Press(MainMenuController menu, string name)
+        private static void Press(Component root, string name)
         {
-            foreach (Button button in menu.GetComponentsInChildren<Button>(true))
+            foreach (Button button in root.GetComponentsInChildren<Button>(true))
             {
                 if (button.name == name)
                 {
@@ -237,7 +305,7 @@ namespace IronFlag.Tests.PlayMode
                 }
             }
 
-            Assert.Fail($"the menu has no button called '{name}'");
+            Assert.Fail($"{root.GetType().Name} has no button called '{name}'");
         }
     }
 }

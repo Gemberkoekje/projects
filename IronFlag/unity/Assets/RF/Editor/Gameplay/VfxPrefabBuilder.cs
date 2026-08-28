@@ -46,11 +46,41 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Asset name of the spray a shell puts up out of the water.</summary>
         public const string SplashAssetName = "RF_Splash";
 
+        /// <summary>Asset name of the scorch a blast leaves on the ground.</summary>
+        /// <remarks>
+        /// A prefab like the smoke column and for the same reason: it outlives what made it.
+        /// An explosion is gone in half a second and its mark is still there twenty seconds
+        /// later, so the mark cannot be a child of the explosion.
+        /// </remarks>
+        public const string ScorchAssetName = "RF_Scorch";
+
         /// <summary>Name of the node a damaged thing's plume hangs off.</summary>
         public const string PlumeNodeName = "DamageSmoke";
 
         /// <summary>Name of the node a ground vehicle's dust trail hangs off.</summary>
         public const string DustNodeName = "DustTrail";
+
+        /// <summary>Names of the nodes a ground vehicle's two wheel tracks hang off.</summary>
+        public const string LeftTrackNodeName = "TrackLeft";
+        public const string RightTrackNodeName = "TrackRight";
+
+        /// <summary>Seconds of driving a wheel track stays on the ground for.</summary>
+        /// <remarks>
+        /// Long enough to still be behind you when you turn round and come back through your
+        /// own approach, and short enough that ten minutes of a match does not end up drawn
+        /// on the map. At the jeep's top speed it is a little over a hundred metres of
+        /// track, which is about half the width of the island.
+        /// </remarks>
+        public const float TrackSeconds = 9.0f;
+
+        /// <summary>Metres a wheel travels before its track puts down another point.</summary>
+        /// <remarks>
+        /// A trail renderer records a point whenever its transform has moved this far, so
+        /// this is the resolution of a corner. Small enough that a jeep's turning circle is a
+        /// curve rather than a polygon, large enough that a vehicle standing still and
+        /// jostling against a wall does not fill the buffer.
+        /// </remarks>
+        public const float TrackStep = 0.35f;
 
         /// <summary>Metres across the standalone prefabs' own numbers are written for.</summary>
         /// <remarks>
@@ -86,7 +116,10 @@ namespace IronFlag.Editor.Gameplay
             GeneratedMaterials.EnsureAssets();
             GeneratedMaterials.EnsureAssetFolder(PrefabFolder);
 
-            string[] built = { BuildSmokeColumn().name, BuildSplash().name };
+            string[] built =
+            {
+                BuildSmokeColumn().name, BuildSplash().name, BuildScorch().name,
+            };
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -102,7 +135,7 @@ namespace IronFlag.Editor.Gameplay
         /// </remarks>
         public static void EnsureAssets()
         {
-            if (LoadSmokeColumn() == null || LoadSplash() == null)
+            if (LoadSmokeColumn() == null || LoadSplash() == null || LoadScorch() == null)
             {
                 BuildAll();
             }
@@ -126,6 +159,178 @@ namespace IronFlag.Editor.Gameplay
         /// </summary>
         /// <returns>The burst, or <c>null</c> when it has not been built yet.</returns>
         public static ParticleBurst LoadSplash() => LoadBurst(SplashAssetName);
+
+        /// <summary>
+        /// Loads the scorch prefab.
+        /// </summary>
+        /// <returns>The mark, or <c>null</c> when it has not been built yet.</returns>
+        public static GroundMark LoadScorch()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                PrefabPathFor(ScorchAssetName));
+            return prefab == null ? null : prefab.GetComponent<GroundMark>();
+        }
+
+        /// <summary>
+        /// Builds the scorch a blast leaves on the ground.
+        /// </summary>
+        /// <returns>The saved prefab asset.</returns>
+        /// <remarks>
+        /// <para>
+        /// The only piece of geometry in the project generated here rather than in Blender,
+        /// and it is a square metre of nothing: four corners, two triangles, lying flat and
+        /// facing up. Putting that through the art pipeline would be a .glb with two
+        /// triangles in it and a step in the build for something completely described by the
+        /// eight numbers below.
+        /// </para>
+        /// <para>
+        /// Not <c>PrimitiveType.Quad</c>, which is nearly this and wrong in two ways: it
+        /// stands up in the x-y plane rather than lying in x-z, and it has no vertex colours,
+        /// which <c>RF_Mark.shader</c> reads as how much of the mark is left. A mesh with no
+        /// colour channel hands the shader whatever happens to be in that register.
+        /// </para>
+        /// </remarks>
+        public static GameObject BuildScorch()
+        {
+            var root = new GameObject(ScorchAssetName);
+            try
+            {
+                var mesh = new Mesh { name = $"{ScorchAssetName}Quad" };
+                mesh.SetVertices(new[]
+                {
+                    new Vector3(-0.5f, 0.0f, -0.5f),
+                    new Vector3(-0.5f, 0.0f, 0.5f),
+                    new Vector3(0.5f, 0.0f, 0.5f),
+                    new Vector3(0.5f, 0.0f, -0.5f),
+                });
+                mesh.SetUVs(0, new[]
+                {
+                    new Vector2(0.0f, 0.0f),
+                    new Vector2(0.0f, 1.0f),
+                    new Vector2(1.0f, 1.0f),
+                    new Vector2(1.0f, 0.0f),
+                });
+                mesh.SetColors(new[] { Color.white, Color.white, Color.white, Color.white });
+
+                // Clockwise seen from above is the way up in a left-handed world, which is
+                // the same winding SurfaceMesh uses and for the same reason.
+                mesh.SetTriangles(new[] { 0, 1, 2, 0, 2, 3 }, 0);
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+
+                root.AddComponent<MeshFilter>().sharedMesh = Save(mesh);
+                MeshRenderer face = root.AddComponent<MeshRenderer>();
+                face.sharedMaterial = GeneratedMaterials.Load(GeneratedMaterials.Scorch);
+                face.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                face.receiveShadows = false;
+
+                root.AddComponent<GroundMark>().Wire(face, 1.0f);
+
+                return PrefabUtility.SaveAsPrefabAsset(root, PrefabPathFor(ScorchAssetName));
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        /// <summary>
+        /// Writes the scorch's quad out as an asset of its own, keeping the one that is
+        /// already there.
+        /// </summary>
+        /// <param name="made">The freshly built mesh.</param>
+        /// <returns>The mesh asset, which is what the prefab may refer to.</returns>
+        /// <remarks>
+        /// <para>
+        /// A prefab cannot carry a mesh that is not an asset. Saving the prefab first and
+        /// adding the mesh to it afterwards looks like it would do and does not: the
+        /// <c>MeshFilter</c> is serialised before the mesh exists to be pointed at, so the
+        /// prefab on disk gets a null mesh and a spare mesh hanging off the side of it. That
+        /// is what the first build did, and it cost a test rather than an afternoon only
+        /// because the test asked whether the scorch had any geometry.
+        /// </para>
+        /// <para>
+        /// Copied into the existing asset rather than replacing it, for the reason
+        /// <c>GeneratedMaterials.EnsureAssets</c> updates materials in place:
+        /// <c>CreateAsset</c> over an existing path deletes the file and its meta, which
+        /// hands out a fresh GUID and unbinds everything that referred to the old one.
+        /// </para>
+        /// </remarks>
+        private static Mesh Save(Mesh made)
+        {
+            string path = $"{PrefabFolder}/{ScorchAssetName}Quad.asset";
+            Mesh already = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+
+            if (already == null)
+            {
+                AssetDatabase.CreateAsset(made, path);
+                return made;
+            }
+
+            EditorUtility.CopySerialized(made, already);
+            EditorUtility.SetDirty(already);
+            Object.DestroyImmediate(made);
+            return already;
+        }
+
+        /// <summary>
+        /// Gives a vehicle two wheel tracks to leave behind it.
+        /// </summary>
+        /// <param name="root">Prefab root the component goes on.</param>
+        /// <param name="halfWidth">Metres from the middle of the vehicle to its wheels.</param>
+        /// <param name="width">How wide one track is, in metres.</param>
+        /// <returns>The component.</returns>
+        /// <remarks>
+        /// A rig rather than a prefab, like the dust trail and for the same reason: a track
+        /// that comes off <em>these</em> wheels has nowhere else to live. The two trails are
+        /// children rather than components on the root, because a trail renderer emits at its
+        /// own transform and a vehicle has two sets of wheels a metre or so apart.
+        /// </remarks>
+        public static TyreTracks AddTyreTracks(GameObject root, float halfWidth, float width)
+        {
+            TrailRenderer left = Track(LeftTrackNodeName, root, -halfWidth, width);
+            TrailRenderer right = Track(RightTrackNodeName, root, halfWidth, width);
+
+            TyreTracks tracks = root.AddComponent<TyreTracks>();
+            tracks.Configure(left, right, halfWidth);
+            return tracks;
+        }
+
+        /// <summary>
+        /// Builds one wheel track.
+        /// </summary>
+        /// <param name="name">Object name.</param>
+        /// <param name="root">Object to hang it off.</param>
+        /// <param name="across">Where it sits across the vehicle, in metres.</param>
+        /// <param name="width">How wide the track is, in metres.</param>
+        /// <returns>The trail renderer.</returns>
+        /// <remarks>
+        /// <c>autodestruct</c> is deliberately off: a trail that removes its own GameObject
+        /// when it empties is a trail that takes a wheel off the vehicle the first time it
+        /// stops moving.
+        /// </remarks>
+        private static TrailRenderer Track(string name, GameObject root, float across, float width)
+        {
+            GameObject node = Node(name, root);
+            node.transform.localPosition = new Vector3(across, TyreTracks.Height, 0.0f);
+
+            TrailRenderer trail = node.AddComponent<TrailRenderer>();
+            trail.sharedMaterial = GeneratedMaterials.Load(GeneratedMaterials.Track);
+            trail.time = TrackSeconds;
+            trail.minVertexDistance = TrackStep;
+            trail.widthMultiplier = width;
+            trail.numCapVertices = 0;
+            trail.numCornerVertices = 2;
+            trail.alignment = LineAlignment.TransformZ;
+            trail.textureMode = LineTextureMode.Stretch;
+            trail.autodestruct = false;
+            trail.emitting = false;
+            trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            trail.receiveShadows = false;
+            trail.startColor = new Color(1.0f, 1.0f, 1.0f, TyreTracks.Darkest);
+            trail.endColor = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+            return trail;
+        }
 
         /// <summary>
         /// Builds the column of smoke a wreck throws up and leaves hanging.

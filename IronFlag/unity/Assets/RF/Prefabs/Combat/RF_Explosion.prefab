@@ -116,6 +116,7 @@ MonoBehaviour:
   duration: 0.55
   radius: 2
   peakIntensity: 40
+  scorch: {fileID: 1127769014511133692, guid: e7363abde8c18f14c856a0e6c7994b39, type: 3}
 --- !u!1 &7621746030435032016
 GameObject:
   m_ObjectHideFlags: 0

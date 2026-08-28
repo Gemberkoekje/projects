@@ -18,8 +18,11 @@ for the bunker you choose from and the fuel and ammunition you leave it with, [M
 [TOWER_RULES_NOTES.md](TOWER_RULES_NOTES.md) explains why you have to shell a pyramid before
 you can rob it, [RESERVES_NOTES.md](RESERVES_NOTES.md) how many vehicles you get to lose
 before you have lost, [TURRETS_NOTES.md](TURRETS_NOTES.md) why an emplacement watches you
-for twelve metres before it starts shooting, and [SOLO_NOTES.md](SOLO_NOTES.md) how to play
-on your own.
+for twelve metres before it starts shooting, [SOLO_NOTES.md](SOLO_NOTES.md) how to play
+on your own, [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md) how the sea came to move and
+what a shell leaves on the beach, and [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) what Escape
+does now. [AUDIO_NOTES.md](AUDIO_NOTES.md) covers the sound and music pipeline — built and
+rendered, but not yet wired into the game itself.
 
 ---
 
@@ -56,6 +59,10 @@ is what makes a built copy start there. The menu reaches the other two; the edit
 THIS MAP** button and the game's `F1` move between those; and `ESC` from a match or the
 editor's **MENU** button come back.
 
+Escape in a match doesn't leave it outright: it pauses (`Time.timeScale = 0`) and opens a
+CONTINUE / MAIN MENU panel — Escape again or CONTINUE resumes, MAIN MENU is the way out. See
+[PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md).
+
 `Assets/StreamingAssets/` sits outside `Assets/RF/` because Unity requires it there. It is
 the one exception to "all project content lives under `Assets/RF/`".
 
@@ -90,10 +97,10 @@ Open `unity/Assets/RF/Scenes/MainMenu.unity` and press Play. **PLAY** lists ever
 level folders — the ones that shipped and the ones you have drawn — with what each one is
 underneath its name; pick one and the match starts. **LEVEL EDITOR** goes straight to the
 editor and **SETTINGS** holds the window and the detail level, which are remembered between
-sessions. `ESC` backs out of either panel, and from inside a match it leaves the match: once to
-ask, again to go. In the editor the way back is the **MENU** button, which asks twice if you
-have unsaved work. (`Scenes/Sandbox.unity` still opens straight into a match if you would
-rather skip the menu.)
+sessions. `ESC` backs out of either panel, and from inside a match it pauses it — see
+[PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md). In the editor the way back is the **MENU** button,
+which asks twice if you have unsaved work. (`Scenes/Sandbox.unity` still opens straight into a
+match if you would rather skip the menu.)
 
 The screen splits in two: green on
 top, brown below — unless the map you picked is a **one-player** map, in which case there is
@@ -299,10 +306,14 @@ rebuilt from the file on the first frame of play.
 - **The main menu**: done. See [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md). The game starts in a
   menu rather than in a match — a map list read off the level folders, a direct door into the
   editor, three settings that are remembered between sessions, and a real map turning slowly
-  behind all of it. `ESC` twice leaves a match and a guarded **MENU** button leaves the editor,
-  which is what makes it a screen you use rather than one you pass through at boot.
-- **M8 - polish pass**: not started. Per-vehicle audio, a minimap, HUD readability and juice.
-  The minimap has a data source: a level is a list of rectangles.
+  behind all of it. `ESC` pauses a match — see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) — and
+  a guarded **MENU** button leaves the editor, which is what makes it a screen you use rather
+  than one you pass through at boot.
+- **M8 - polish pass**: not started as gameplay. The sound and music side has a build pipeline
+  now — 30 clips synthesised from committed SuperCollider source, see
+  [AUDIO_NOTES.md](AUDIO_NOTES.md) — but none of it is wired into the game yet. Per-vehicle
+  audio hookup, a minimap, HUD readability and juice are all still to do. The minimap has a
+  data source: a level is a list of rectangles.
 - **Surfaces**: done, all five phases. See [SURFACES_NOTES.md](SURFACES_NOTES.md). The map is
   made of more than one thing: a level file names a surface per piece of land, one table
   says what each surface is, and the crossings are grey roads through green country instead of

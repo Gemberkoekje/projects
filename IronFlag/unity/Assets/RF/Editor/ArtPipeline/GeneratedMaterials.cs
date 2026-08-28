@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -77,6 +77,20 @@ namespace IronFlag.Editor.ArtPipeline
         /// <summary>Asset name of the material a flying piece of a building wears.</summary>
         public const string Debris = "RF_Debris";
 
+        /// <summary>Asset name of the material a scorch on the ground wears.</summary>
+        /// <remarks>
+        /// Two assets rather than one for the two marks, because the shader has to be told
+        /// whether it is drawing a disc or a ribbon and that is a property rather than a
+        /// keyword. They are otherwise the same material with different numbers - which is
+        /// the same argument <see cref="Particle"/> makes for one material serving smoke,
+        /// dust and spray, arriving at two instead of one only because a wheel track has no
+        /// middle to fall off from.
+        /// </remarks>
+        public const string Scorch = "RF_Scorch";
+
+        /// <summary>Asset name of the material a wheel track wears.</summary>
+        public const string Track = "RF_Track";
+
         /// <summary>Asset name of the material every particle system wears.</summary>
         /// <remarks>
         /// One material for smoke, dust and spray alike. It is plain white and transparent,
@@ -113,6 +127,19 @@ namespace IronFlag.Editor.ArtPipeline
         private static readonly Color RearLightColor = new Color(0.62f, 0.09f, 0.07f);
         private static readonly Color TracerColor = new Color(1.00f, 0.72f, 0.30f);
         private static readonly Color BlastColor = new Color(1.00f, 0.86f, 0.58f);
+
+        /// <summary>
+        /// What the two ground marks multiply the ground by, and how hard their edges are.
+        /// </summary>
+        /// <remarks>
+        /// Multipliers rather than colours, which is why neither of them is in the palette:
+        /// white leaves the ground alone and these two take a share of it away, so the same
+        /// number is a burn on grass, a burn on sand and a burn on a road. A scorch takes
+        /// nearly two thirds and has a badly eaten edge; a track takes a bit over a third at
+        /// its deepest and is nearly straight-sided, because a rut is a shape a wheel made.
+        /// </remarks>
+        private static readonly Color ScorchColor = new Color(0.38f, 0.36f, 0.33f);
+        private static readonly Color TrackColor = new Color(0.62f, 0.60f, 0.56f);
 
         /// <summary>
         /// The asset spec's charred dark grey, which every destructible's damaged and
@@ -166,6 +193,22 @@ namespace IronFlag.Editor.ArtPipeline
         /// </remarks>
         private const string ParticleShaderName = "Universal Render Pipeline/Particles/Unlit";
 
+        /// <summary>This project's own shader, worn by scorches and wheel tracks.</summary>
+        public const string MarkShaderName = "IronFlag/Mark";
+
+        /// <summary>This project's own shader, worn by every sheet of land and every bank.</summary>
+        /// <remarks>
+        /// The first shader the project has ever had, and hand-written HLSL rather than a
+        /// Shader Graph for the reason <c>DebrisBurst.cs</c> gives for hand-rolling a debris
+        /// burst: a graph is a serialised asset nobody can review in a diff, and every line
+        /// of what these two do is an argument about how the map should read. See
+        /// <c>Assets/RF/Art/Shaders/RF_Surface.hlsl</c> for the half they share.
+        /// </remarks>
+        public const string GroundShaderName = "IronFlag/Ground";
+
+        /// <summary>This project's own shader, worn by the sea and by the shelf.</summary>
+        public const string WaterShaderName = "IronFlag/Water";
+
         /// <summary>Base color property used by URP's own shaders.</summary>
         private static readonly int UniversalBaseColor = Shader.PropertyToID("_BaseColor");
 
@@ -179,6 +222,39 @@ namespace IronFlag.Editor.ArtPipeline
         private static readonly int DestinationBlend = Shader.PropertyToID("_DstBlend");
         private static readonly int DepthWrite = Shader.PropertyToID("_ZWrite");
         private static readonly int AlphaClip = Shader.PropertyToID("_AlphaClip");
+
+        /// <summary>The properties of this project's own two surface shaders.</summary>
+        /// <remarks>
+        /// Every one of them, including the ones no surface disagrees with another surface
+        /// about, because a material keeps whatever a shader's default was on the day it was
+        /// created and never reads that default again. Leaving the shared ones to the shader
+        /// would make them constants nobody could ever change. See <see cref="SurfaceLook"/>,
+        /// which is where both kinds live.
+        /// </remarks>
+        private static readonly int DetailStrength = Shader.PropertyToID("_DetailStrength");
+        private static readonly int DetailScale = Shader.PropertyToID("_DetailScale");
+        private static readonly int SwellStrength = Shader.PropertyToID("_SwellStrength");
+        private static readonly int SwellScale = Shader.PropertyToID("_SwellScale");
+        private static readonly int SwellSpeed = Shader.PropertyToID("_SwellSpeed");
+        private static readonly int ChopStrength = Shader.PropertyToID("_ChopStrength");
+        private static readonly int ChopScale = Shader.PropertyToID("_ChopScale");
+        private static readonly int GlintColour = Shader.PropertyToID("_GlintColour");
+        private static readonly int Glint = Shader.PropertyToID("_Glint");
+        private static readonly int GlintSharpness = Shader.PropertyToID("_GlintSharpness");
+        private static readonly int FresnelColour = Shader.PropertyToID("_FresnelColour");
+        private static readonly int Fresnel = Shader.PropertyToID("_Fresnel");
+        private static readonly int FresnelPower = Shader.PropertyToID("_FresnelPower");
+        private static readonly int FoamColour = Shader.PropertyToID("_FoamColour");
+        private static readonly int FoamWidth = Shader.PropertyToID("_FoamWidth");
+        private static readonly int FoamEdge = Shader.PropertyToID("_FoamEdge");
+        private static readonly int FoamSpeed = Shader.PropertyToID("_FoamSpeed");
+        private static readonly int ShoreWash = Shader.PropertyToID("_ShoreWash");
+
+        /// <summary>The properties of the ground-mark shader.</summary>
+        private static readonly int MarkEdge = Shader.PropertyToID("_Edge");
+        private static readonly int MarkRagged = Shader.PropertyToID("_Ragged");
+        private static readonly int MarkRaggedScale = Shader.PropertyToID("_RaggedScale");
+        private static readonly int MarkRound = Shader.PropertyToID("_Round");
 
         /// <summary>
         /// Returns the project path of one generated material.
@@ -249,6 +325,8 @@ namespace IronFlag.Editor.ArtPipeline
             }
 
             EnsureSkies();
+            EnsureSurfaces();
+            EnsureMarks();
             EnsureParticle();
 
             AssetDatabase.SaveAssets();
@@ -348,6 +426,208 @@ namespace IronFlag.Editor.ArtPipeline
                 LightingRig.Paint(material, LightingTuning.For(mood));
                 EditorUtility.SetDirty(material);
             }
+        }
+
+        /// <summary>
+        /// Creates or refreshes the material every surface and every bank is painted with.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Separate from the loop above because these are the only generated materials that
+        /// do not wear URP's Lit shader. They are still generated rather than authored, and
+        /// still updated in place rather than recreated - a fresh GUID here would unbind
+        /// every level catalog row that names one.
+        /// </para>
+        /// <para>
+        /// Two colours come out of <see cref="SurfaceTuning"/> and everything else out of
+        /// <see cref="SurfaceLook"/>, which is the split those two tables are for: what a
+        /// surface is painted is a balance argument settled against a map shot, and how much
+        /// grain it has is not. Note in particular that the smoothness set here is still the
+        /// surfaces table's - zero on both waters - and that the sea gets its highlight from
+        /// the water shader's own glint instead. See <see cref="SurfaceLook.Glint"/>.
+        /// </para>
+        /// <para>
+        /// A bank is the same surface seen from the side, so it takes the same row: its own
+        /// colour taken down a step, and its own grain. That is the same derivation
+        /// <see cref="SurfaceTuning.BankShade"/> already makes for the colour, extended to
+        /// the one other thing a bank could disagree with its surface about.
+        /// </para>
+        /// </remarks>
+        private static void EnsureSurfaces()
+        {
+            Shader ground = Shader.Find(GroundShaderName);
+            Shader water = Shader.Find(WaterShaderName);
+
+            if (ground == null || water == null)
+            {
+                Debug.LogError($"IronFlag: the '{GroundShaderName}' and '{WaterShaderName}' "
+                    + "shaders are missing; every map will keep whatever it was painted with.");
+                return;
+            }
+
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                SurfaceTuning surface = SurfaceTuning.For(kind);
+                Paint(
+                    EnsureSurface(SurfaceMaterial(kind), surface.Drowns ? water : ground),
+                    surface.Colour,
+                    surface.Smoothness,
+                    SurfaceLook.For(kind),
+                    surface.Drowns);
+            }
+
+            foreach (SurfaceKind kind in SurfaceTuning.Stack(false))
+            {
+                SurfaceTuning surface = SurfaceTuning.For(kind);
+                Paint(
+                    EnsureSurface(BankMaterial(kind), ground),
+                    surface.Bank,
+                    surface.Smoothness,
+                    SurfaceLook.For(kind),
+                    false);
+            }
+        }
+
+        /// <summary>
+        /// Loads one surface material, creating it or moving it onto the right shader.
+        /// </summary>
+        /// <param name="name">Material asset name.</param>
+        /// <param name="shader">Shader it should be wearing.</param>
+        /// <returns>The material, on that shader.</returns>
+        /// <remarks>
+        /// Assigning the shader every time rather than only on creation, because every one of
+        /// these assets already exists wearing URP's Lit: this is the pass that moves them,
+        /// and it has to be able to move them again if a surface ever stops being water.
+        /// </remarks>
+        private static Material EnsureSurface(string name, Shader shader)
+        {
+            string path = PathOf(name);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            if (material.shader != shader)
+            {
+                material.shader = shader;
+            }
+
+            return material;
+        }
+
+        /// <summary>
+        /// Sets everything one surface material carries.
+        /// </summary>
+        /// <param name="material">Material to paint.</param>
+        /// <param name="colour">What it is painted, as URP takes a base colour.</param>
+        /// <param name="smoothness">How glossy it is, out of the surfaces table.</param>
+        /// <param name="look">How much detail it is drawn with.</param>
+        /// <param name="wet">Whether it is one of the two waters.</param>
+        /// <remarks>
+        /// The wet and dry sets are disjoint and each shader only has its own, so setting the
+        /// wrong one would be a silent no-op rather than an error - which is exactly the
+        /// failure <see cref="ApplyBaseColor"/> exists to stop happening quietly. Hence the
+        /// branch: a surface is asked which shader it is on once, here, and not once per
+        /// property.
+        /// </remarks>
+        private static void Paint(
+            Material material, Color colour, float smoothness, SurfaceLook look, bool wet)
+        {
+            ApplyBaseColor(material, colour);
+            ApplySmoothness(material, smoothness);
+
+            if (wet)
+            {
+                material.SetFloat(SwellStrength, look.Swell);
+                material.SetFloat(SwellScale, look.SwellScale);
+                material.SetFloat(SwellSpeed, SurfaceLook.SwellSpeed);
+                material.SetFloat(ChopStrength, look.Chop);
+                material.SetFloat(ChopScale, SurfaceLook.ChopScale);
+                material.SetColor(GlintColour, SurfaceLook.GlintColour);
+                material.SetFloat(Glint, look.Glint);
+                material.SetFloat(GlintSharpness, SurfaceLook.GlintSharpness);
+                material.SetColor(FresnelColour, SurfaceLook.FresnelColour);
+                material.SetFloat(Fresnel, look.Fresnel);
+                material.SetFloat(FresnelPower, SurfaceLook.FresnelPower);
+                material.SetColor(FoamColour, SurfaceLook.FoamColour);
+                material.SetFloat(FoamWidth, look.Foam);
+                material.SetFloat(FoamEdge, SurfaceLook.FoamEdge);
+                material.SetFloat(FoamSpeed, SurfaceLook.FoamSpeed);
+                material.SetFloat(ShoreWash, look.Wash);
+            }
+            else
+            {
+                material.SetFloat(DetailStrength, look.Grain);
+                material.SetFloat(DetailScale, look.GrainScale);
+            }
+
+            EditorUtility.SetDirty(material);
+        }
+
+        /// <summary>
+        /// Creates or refreshes the two materials a mark on the ground wears.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Built from <c>Shader.Find</c> and set up by hand, which the class summary warns
+        /// against for URP's Lit shader and which is safe here for the same reason it is safe
+        /// for the skies: the warning is about a shader whose keyword and property setup the
+        /// material inspector applies behind your back, and this is one of ours, with four
+        /// properties and no keywords at all.
+        /// </para>
+        /// <para>
+        /// Nothing sets a blend mode, a queue or a depth write here either, unlike
+        /// <see cref="EnsureParticle"/>. Those six lines exist there because URP's particle
+        /// shader is a general shader being asked to be a specific one; <c>RF_Mark</c> only
+        /// knows how to be a stain, so its render state is written into the pass and cannot
+        /// be got wrong by a material.
+        /// </para>
+        /// </remarks>
+        private static void EnsureMarks()
+        {
+            Shader shader = Shader.Find(MarkShaderName);
+            if (shader == null)
+            {
+                Debug.LogError($"IronFlag: the '{MarkShaderName}' shader is missing; "
+                    + "nothing will leave a scorch or a wheel track.");
+                return;
+            }
+
+            // A burn: badly eaten at the edge, at about the scale of the lumps a fireball
+            // leaves, and taking most of the ground's brightness away in the middle.
+            Mark(EnsureSurface(Scorch, shader), ScorchColor, 0.35f, 0.45f, 0.70f, round: true);
+
+            // A rut: nearly straight-sided, because a wheel is, and only nibbled at the
+            // edge so that it does not read as a painted line.
+            Mark(EnsureSurface(Track, shader), TrackColor, 0.15f, 0.18f, 0.35f, round: false);
+        }
+
+        /// <summary>
+        /// Sets everything a ground-mark material carries.
+        /// </summary>
+        /// <param name="material">Material to set.</param>
+        /// <param name="stain">What it multiplies the ground by at its darkest.</param>
+        /// <param name="edge">How far out from the middle the mark is at full strength.</param>
+        /// <param name="ragged">How much noise eats into that edge.</param>
+        /// <param name="raggedScale">How many metres one lump of that noise covers.</param>
+        /// <param name="round">Whether it is a disc or a ribbon.</param>
+        private static void Mark(
+            Material material,
+            Color stain,
+            float edge,
+            float ragged,
+            float raggedScale,
+            bool round)
+        {
+            ApplyBaseColor(material, stain);
+            material.SetFloat(MarkEdge, edge);
+            material.SetFloat(MarkRagged, ragged);
+            material.SetFloat(MarkRaggedScale, raggedScale);
+            material.SetFloat(MarkRound, round ? 1.0f : 0.0f);
+            EditorUtility.SetDirty(material);
         }
 
         /// <summary>
@@ -465,12 +745,12 @@ namespace IronFlag.Editor.ArtPipeline
         /// </summary>
         /// <returns>Asset name, base color and emission color for each material.</returns>
         /// <remarks>
-        /// The ground surfaces are read out of <see cref="SurfaceTuning"/> rather than
-        /// listed here, so that adding a surface is one enum member and one row of that
-        /// table - and so that the colour a level is painted and the colour a level is
-        /// balanced around are the same number. Everything else is a material Unity has to
-        /// supply because a baked vertex colour cannot express it, and those are still
-        /// listed by hand because there is no table for them to fall out of.
+        /// The ground and water surfaces are not here: they wear this project's own
+        /// shaders rather than URP's Lit, so they are built by <see cref="EnsureSurfaces"/>
+        /// out of <see cref="SurfaceTuning"/> and <see cref="SurfaceLook"/>. Everything
+        /// below is a material Unity has to supply because a baked vertex colour cannot
+        /// express it, and those are still listed by hand because there is no table for them
+        /// to fall out of.
         /// </remarks>
         private static List<(string Name, Color Color, Color Emission, float Smoothness)> MaterialSet()
         {
@@ -485,21 +765,6 @@ namespace IronFlag.Editor.ArtPipeline
                 (Blast, BlastColor, BlastEmission, DefaultSmoothness),
                 (Debris, DebrisColor, Color.black, DefaultSmoothness),
             };
-
-            foreach (SurfaceKind kind in SurfaceTuning.Roster())
-            {
-                SurfaceTuning surface = SurfaceTuning.For(kind);
-                set.Add((SurfaceMaterial(kind), surface.Colour, Color.black, surface.Smoothness));
-            }
-
-            // And a bank for every surface that is ground, painted the same colour taken
-            // down a step. Derived rather than listed, so that repainting a surface repaints
-            // its coastline with it and the map cannot grow a colour the ramp does not have.
-            foreach (SurfaceKind kind in SurfaceTuning.Stack(false))
-            {
-                SurfaceTuning surface = SurfaceTuning.For(kind);
-                set.Add((BankMaterial(kind), surface.Bank, Color.black, surface.Smoothness));
-            }
 
             return set;
         }

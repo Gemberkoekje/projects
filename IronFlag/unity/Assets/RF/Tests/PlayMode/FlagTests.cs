@@ -163,7 +163,15 @@ namespace IronFlag.Tests.PlayMode
             Assert.That(flag.CarriedBy, Is.EqualTo(Team.Brown));
             Assert.That(flag.IsVisible, Is.True, "a carried flag is invisible");
 
+            // Physics.SyncTransforms and a second frame, unlike every other reposition in
+            // this file: this is the one assertion that compares two *live* transforms
+            // against each other rather than reading a state enum, so it is the one place
+            // ConfigureBody's RigidbodyInterpolation.Interpolate is actually visible - a
+            // kinematic body's own transform briefly disagrees with where it was just put
+            // until physics has had a fixed step to settle the interpolation against it.
             jeep.transform.position = new Vector3(14.0f, 0.0f, -21.0f);
+            Physics.SyncTransforms();
+            yield return null;
             yield return null;
 
             Assert.That(
@@ -249,6 +257,71 @@ namespace IronFlag.Tests.PlayMode
             Assert.That(flag.IsVisible, Is.False, "breaking the decoy showed the real flag");
             Assert.That(flag.GiveTo(jeep), Is.False, "a jeep at the decoy was given the flag");
             Assert.That(FlagTower.RealFor(Team.Green), Is.EqualTo(real));
+        }
+
+        /// <summary>
+        /// Rolling picks exactly one of a side's towers, moves the flag to it, and - given
+        /// enough tries - picks both of them: it is not quietly always the one the level
+        /// file happened to author as real.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator RollingPicksExactlyOneTowerAndBothEventually()
+        {
+            FlagTower first = CreateTower(Team.Green, true, Vector3.zero);
+            FlagTower second = CreateTower(Team.Green, false, new Vector3(60.0f, 0.0f, 0.0f));
+            Flag flag = CreateFlag(Team.Green, first);
+            yield return null;
+
+            bool firstChosen = false;
+            bool secondChosen = false;
+
+            for (int attempt = 0; attempt < 40 && !(firstChosen && secondChosen); attempt++)
+            {
+                FlagTower.Roll();
+
+                Assert.That(
+                    first.HoldsTheFlag != second.HoldsTheFlag,
+                    Is.True,
+                    "rolling left both or neither tower real");
+
+                FlagTower chosen = first.HoldsTheFlag ? first : second;
+                Assert.That(
+                    flag.Home, Is.EqualTo(chosen), "the flag did not follow the roll to its tower");
+
+                firstChosen |= chosen == first;
+                secondChosen |= chosen == second;
+            }
+
+            Assert.That(firstChosen, Is.True, "the tower the level authored real was never picked");
+            Assert.That(secondChosen, Is.True, "the tower the level authored a decoy was never picked");
+        }
+
+        /// <summary>
+        /// Creating the match is "the beginning of a match" for the towers as well as for
+        /// the win condition - see <see cref="FlagTower.Roll"/> - so it has to already have
+        /// rolled by the time anybody can ask.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator CreatingTheMatchRollsTheTowersToo()
+        {
+            FlagTower first = CreateTower(Team.Green, true, Vector3.zero);
+            FlagTower second = CreateTower(Team.Green, false, new Vector3(60.0f, 0.0f, 0.0f));
+            CreateFlag(Team.Green, first);
+            yield return null;
+
+            bool firstChosen = false;
+            bool secondChosen = false;
+
+            for (int attempt = 0; attempt < 40 && !(firstChosen && secondChosen); attempt++)
+            {
+                CreateMatch();
+
+                firstChosen |= first.HoldsTheFlag;
+                secondChosen |= second.HoldsTheFlag;
+            }
+
+            Assert.That(firstChosen, Is.True, "starting a match never left the authored tower real");
+            Assert.That(secondChosen, Is.True, "starting a match never rolled the decoy real instead");
         }
 
         /// <summary>

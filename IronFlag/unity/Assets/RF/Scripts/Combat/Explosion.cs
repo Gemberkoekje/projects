@@ -1,4 +1,5 @@
 using UnityEngine;
+using IronFlag.Vfx;
 
 namespace IronFlag.Combat
 {
@@ -43,6 +44,10 @@ namespace IronFlag.Combat
         [Tooltip("Light intensity at the peak of the flash.")]
         private float peakIntensity = 40.0f;
 
+        [SerializeField]
+        [Tooltip("Scorch left on the ground underneath. Optional.")]
+        private GroundMark scorch;
+
         private float elapsed;
 
         /// <summary>Radius the ball reaches at its widest, in metres.</summary>
@@ -50,6 +55,9 @@ namespace IronFlag.Combat
 
         /// <summary>Seconds from ignition to gone.</summary>
         public float Duration => duration;
+
+        /// <summary>The scorch this leaves on the ground, or null when it leaves none.</summary>
+        public GroundMark Scorch => scorch;
 
         /// <summary>
         /// Puts an explosion in the world, sized to what went off.
@@ -59,8 +67,18 @@ namespace IronFlag.Combat
         /// <param name="blastRadius">Radius the flash should reach, in metres.</param>
         /// <returns>The explosion, or <c>null</c> when there was no prefab to spawn.</returns>
         /// <remarks>
+        /// <para>
         /// Null-tolerant on purpose: a vehicle assembled in a test has no explosion prefab
         /// bound, and blowing it up should still work.
+        /// </para>
+        /// <para>
+        /// The scorch is left here rather than at the call sites, and that is the whole
+        /// reason it is one line of wiring instead of six: every blast in the game - a shell,
+        /// a rocket, a wreck, a bunker's own defences - already comes through this method
+        /// with its radius, so a mark hung off it is the size of what made it without anybody
+        /// choosing a size. <see cref="GroundMark.Spawn"/> refuses the ones too small to be
+        /// events and the ones over water.
+        /// </para>
         /// </remarks>
         public static Explosion Spawn(Explosion prefab, Vector3 at, float blastRadius)
         {
@@ -71,6 +89,10 @@ namespace IronFlag.Combat
 
             Explosion burst = Instantiate(prefab, at, Quaternion.identity);
             burst.radius = Mathf.Max(0.1f, blastRadius);
+
+            GroundMark.Spawn(
+                burst.scorch, at, burst.radius * GroundMark.BlastShare * 2.0f, GroundMark.Fade);
+
             return burst;
         }
 
@@ -89,6 +111,18 @@ namespace IronFlag.Combat
             duration = Mathf.Max(0.01f, seconds);
             radius = Mathf.Max(0.1f, blastRadius);
         }
+
+        /// <summary>
+        /// Gives this explosion a scorch to leave on the ground under it.
+        /// </summary>
+        /// <param name="mark">The scorch prefab, or null for none.</param>
+        /// <remarks>
+        /// Its own setter rather than a fifth argument to <see cref="Configure"/>, for the
+        /// reason <see cref="IronFlag.Destruction.Destructible.Scorches"/> gives: a stain on
+        /// the floor is not one of the things an explosion cannot be built without, and
+        /// widening the method would have made every test that assembles one say so.
+        /// </remarks>
+        public void Scorches(GroundMark mark) => scorch = mark;
 
         /// <summary>
         /// Returns how big the flash is, as a fraction of its widest, at one moment.

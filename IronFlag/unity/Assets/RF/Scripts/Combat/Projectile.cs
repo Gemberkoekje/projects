@@ -341,7 +341,7 @@ namespace IronFlag.Combat
         {
             if (!TrySplash(at, direct))
             {
-                Explosion.Spawn(impact, at, Mathf.Max(weapon.SplashRadius, weapon.Radius * 4.0f));
+                Explosion.Spawn(impact, at, BlastRadius(weapon));
             }
 
             if (weapon.SplashRadius <= 0.0f)
@@ -425,6 +425,21 @@ namespace IronFlag.Combat
                 Mathf.Max(weapon.SplashRadius, weapon.Radius * 6.0f));
             return true;
         }
+
+        /// <summary>
+        /// Returns how wide a fireball one weapon's round makes.
+        /// </summary>
+        /// <param name="weapon">The weapon that fired it.</param>
+        /// <returns>The blast radius handed to <see cref="Explosion.Spawn"/>, in metres.</returns>
+        /// <remarks>
+        /// The bigger of what the weapon splashes and a few times the round itself, so a gun
+        /// with no splash at all still makes a flash you can see it land by. It is public
+        /// because it is also what decides whether a shot leaves a scorch - see
+        /// <see cref="IronFlag.Vfx.GroundMark.SmallestBlast"/> - and that relationship
+        /// between two tables is worth being able to check without firing anything.
+        /// </remarks>
+        public static float BlastRadius(WeaponTuning weapon)
+            => weapon == null ? 0.0f : Mathf.Max(weapon.SplashRadius, weapon.Radius * 4.0f);
 
         /// <summary>
         /// Throws sparks off a target this round struck and failed to kill.

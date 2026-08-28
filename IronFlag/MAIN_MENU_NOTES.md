@@ -45,9 +45,11 @@ honest place to apply a stored setting. It offers **Play** — a list of every m
 folders, each one read off disk so the row can say what the map is — **Level Editor**, which is
 the first direct door into the editor the project has ever had, **Settings**, which is three
 rows that all do something today, and **Quit**. Behind the column a real map turns slowly under
-the game's own lighting and grade. Getting back is **Escape twice** from a match and a **MENU**
-button in the editor, which were out of scope in the plan and are the reason the menu is a
-screen you use rather than a screen you pass.
+the game's own lighting and grade. Getting back is **Escape** from a match — which now pauses
+first and offers a panel, see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) for the mechanism that
+replaced the double-press described in decision 4 below — and a **MENU** button in the editor,
+which were out of scope in the plan and are the reason the menu is a screen you use rather than
+a screen you pass.
 
 | | |
 |---|---|
@@ -56,7 +58,7 @@ screen you use rather than a screen you pass.
 | Map list | 8 rows a page, paged; name, file, size, towers and props per row |
 | Settings | screen mode, window size, quality tier — `PlayerPrefs`, written through |
 | Backdrop | 52° down, 34° lens, 0.75 × half-extent back, a full turn every four minutes |
-| Out of a match | `ESC`, twice, within four seconds |
+| Out of a match | `ESC`, twice, within four seconds — superseded, see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) |
 | Out of the editor | the **MENU** button, guarded like New/Open/Revert |
 | Tests | EditMode 428/428, PlayMode 153/153 |
 
@@ -127,6 +129,13 @@ anything it does not know, rather than renaming them in `ProjectSettings`.
 
 ### 4. Escape twice out of a match; a button out of the editor
 
+> **Superseded.** The double-press strip this section describes was replaced outside the
+> roadmap: `PauseMenu.cs` now pauses the match on the first Escape and shows a panel (CONTINUE /
+> MAIN MENU) instead of arming a silent timer. `MenuReturn.cs`, the component this section is
+> about, is deleted. See [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) for the replacement and why
+> it happened; the reasoning below for *why the editor gets a button and a match gets a key* is
+> still the current design and is left as written.
+
 The plan put a return path out of scope. Without one the menu is a screen the game shows once
 per launch, so it is in.
 
@@ -174,6 +183,8 @@ settings in `Awake` — which meant pressing *Tools > Build Main Menu Scene* res
 editor's own game view and switched its quality tier. `MenuReturn` built its notice canvas the
 same way, so every saved copy of the game scene carried a strip that only means something
 during a match. Settings moved to `Start`; both are now guarded on `Application.isPlaying`.
+(`MenuReturn` is since deleted — `PauseMenu.cs`, its replacement, inherited the same guard on
+its own `Build`; see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md).)
 
 **A generated screen has to be rebuilt on the first frame of play, and forgetting it is
 silent.** The scene carries a baked copy of the menu so the still has something to photograph,
@@ -213,12 +224,12 @@ that is not on disk yet is left out rather than listed as missing.
 
 ## What is still open
 
-- **Nothing returns to the menu from a *finished* match.** `Match` ends and the game sits
-  there, exactly as it did before. Escape works, but "the match is over, here is the menu" is
-  not wired.
-- **No confirmation on Quit.** Escape out of a match asks twice; Quit from the menu does not,
-  because there is nothing to lose on that screen. If a session ever holds unsaved state, that
-  changes.
+- ~~**Nothing returns to the menu from a *finished* match.**~~ Resolved by `PauseMenu`: once
+  `Match.IsFinished`, its panel drops CONTINUE and offers only MAIN MENU. See
+  [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md).
+- **No confirmation on Quit.** Escape out of a match opens a pause panel to confirm through;
+  Quit from the menu does not, because there is nothing to lose on that screen. If a session
+  ever holds unsaved state, that changes.
 - **Settings apply on the menu's first frame only.** A player who never passes through the
   menu — there is no such path today — would get the defaults.
 - **The backdrop is always the default map.** It could be the map under the cursor in the list,
@@ -239,7 +250,7 @@ that is not on disk yet is left out rather than listed as missing.
 | `unity/Assets/RF/Scripts/Menu/MenuPanel.cs` | which of the three is up |
 | `unity/Assets/RF/Scripts/Menu/GameSettings.cs` | the three stored preferences and how they are applied |
 | `unity/Assets/RF/Scripts/Menu/MenuBackdrop.cs` | the slow orbit, and why it is framed the way it is |
-| `unity/Assets/RF/Scripts/Menu/MenuReturn.cs` | Escape twice, out of a match |
+| `unity/Assets/RF/Scripts/Menu/PauseMenu.cs` | Escape, out of (or paused inside) a match — see [PAUSE_MENU_NOTES.md](PAUSE_MENU_NOTES.md) |
 | `unity/Assets/RF/Editor/Gameplay/MainMenuScene.cs` | the scene generator and its still |
 | `unity/Assets/RF/Editor/Gameplay/BuildScenes.cs` | the build list, in the order the game needs it |
 | `unity/Assets/RF/Scenes/MainMenu.unity` | generated |
@@ -254,7 +265,7 @@ that is not on disk yet is left out rather than listed as missing.
 | `Scripts/Levels/LevelHandoff.cs` | `Play` — see decision 1 |
 | `Scripts/Editing/LevelEditorSession.cs` | `BackToMenu` |
 | `Scripts/Editing/EditorUi.cs` | the **MENU** button, and `PinRight` for the two buttons that leave |
-| `Editor/Gameplay/VehicleSandboxScene.cs` | adds `MenuReturn`; registers the build list |
+| `Editor/Gameplay/VehicleSandboxScene.cs` | adds `PauseMenu`; registers the build list |
 | `Editor/Gameplay/LevelEditorScene.cs` | its own `RegisterScenes` replaced by `BuildScenes` |
 | `Tests/EditMode/LevelEditorWiringTests.cs` | the game is no longer first on the build list |
 | `ProjectSettings/EditorBuildSettings.asset` | `MainMenu` at index 0 |

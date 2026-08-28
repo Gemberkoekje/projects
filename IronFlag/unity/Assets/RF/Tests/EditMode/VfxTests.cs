@@ -292,6 +292,186 @@ namespace IronFlag.Tests.EditMode
             }
         }
 
+        /// <summary>
+        /// A wheel track and a dust cloud are the same fact about loose ground, so they come
+        /// out of the same column and cannot disagree about which surface is soft.
+        /// </summary>
+        [Test]
+        public void TheGroundThatThrowsDustIsTheGroundThatTakesARut()
+        {
+            float sand = TyreTracks.Darkness(SurfaceTuning.For(SurfaceKind.Sand));
+            float grass = TyreTracks.Darkness(SurfaceTuning.For(SurfaceKind.Grass));
+            float road = TyreTracks.Darkness(SurfaceTuning.For(SurfaceKind.Asphalt));
+
+            Assert.That(sand, Is.GreaterThan(grass), "a beach takes no deeper a rut than a field");
+            Assert.That(grass, Is.GreaterThan(road), "a road takes as deep a rut as a field");
+            Assert.That(sand, Is.LessThanOrEqualTo(TyreTracks.Darkest), "a rut took more than it may");
+        }
+
+        /// <summary>
+        /// Nothing marks water. A vehicle over the sea is a vehicle about to drown, and two
+        /// lines drawn on the waves behind it would be cheerful about it.
+        /// </summary>
+        [Test]
+        public void NothingLeavesTracksOnWater()
+        {
+            foreach (SurfaceKind kind in SurfaceTuning.Roster())
+            {
+                if (!SurfaceTuning.For(kind).Drowns)
+                {
+                    continue;
+                }
+
+                Assert.That(TyreTracks.Darkness(SurfaceTuning.For(kind)), Is.EqualTo(0.0f), kind.ToString());
+            }
+        }
+
+        /// <summary>
+        /// The small guns leave nothing and the big ones leave a scorch.
+        /// </summary>
+        /// <remarks>
+        /// Without a floor on this a firefight would carpet the ground inside ten seconds:
+        /// the chaingun and the autocannon fire several rounds a second each and neither has
+        /// a splash radius at all.
+        /// </remarks>
+        [Test]
+        public void OnlyTheShotsThatAreEventsLeaveAScorch()
+        {
+            Assert.That(
+                Projectile.BlastRadius(WeaponTuning.For(VehicleKind.Helicopter)),
+                Is.LessThan(GroundMark.SmallestBlast),
+                "the helicopter's chaingun scorches the ground");
+            Assert.That(
+                Projectile.BlastRadius(WeaponTuning.For(VehicleKind.Tank)),
+                Is.GreaterThan(GroundMark.SmallestBlast),
+                "the tank's gun leaves no mark");
+            Assert.That(
+                Projectile.BlastRadius(WeaponTuning.For(VehicleKind.Asv)),
+                Is.GreaterThan(GroundMark.SmallestBlast),
+                "the ASV's rockets leave no mark");
+        }
+
+        /// <summary>
+        /// A mark spawned in the editor is a mark nothing will ever step, so nothing spawns
+        /// one there.
+        /// </summary>
+        /// <remarks>
+        /// The doors pass lost an afternoon to a <c>DebrisBurst</c> frozen at the origin of
+        /// every structure a preview had knocked down, which read in the still as the rubble
+        /// being a metre tall. A scorch would fail the same way and be harder to spot,
+        /// because a dark patch on the ground looks like a dark patch on the ground.
+        /// </remarks>
+        [Test]
+        public void NothingScorchesTheGroundOutsidePlayMode()
+        {
+            VfxPrefabBuilder.EnsureAssets();
+            GroundMark scorch = VfxPrefabBuilder.LoadScorch();
+
+            Assert.That(scorch, Is.Not.Null, "there is no scorch prefab");
+            Assert.That(
+                GroundMark.Spawn(scorch, Vector3.zero, 4.0f, GroundMark.Fade),
+                Is.Null,
+                "a scorch was left in a scene nothing is playing");
+        }
+
+        /// <summary>
+        /// The scorch prefab is a square metre of geometry with the vertex colours the mark
+        /// shader reads, and it is on that shader.
+        /// </summary>
+        /// <remarks>
+        /// The colours are the part worth checking. <c>RF_Mark.shader</c> reads vertex alpha
+        /// as how much of the mark is left, and a mesh with no colour channel hands it
+        /// whatever happens to be in that register - which is a scorch that is there or not
+        /// depending on the machine.
+        /// </remarks>
+        [Test]
+        public void TheScorchIsAFlatQuadOnTheMarkShader()
+        {
+            VfxPrefabBuilder.EnsureAssets();
+            GroundMark scorch = VfxPrefabBuilder.LoadScorch();
+            Assert.That(scorch, Is.Not.Null, "there is no scorch prefab");
+
+            Mesh quad = scorch.GetComponent<MeshFilter>().sharedMesh;
+            Assert.That(quad, Is.Not.Null, "the scorch has no geometry");
+            Assert.That(quad.vertexCount, Is.EqualTo(4), "a quad has four corners");
+            Assert.That(quad.colors.Length, Is.EqualTo(4), "the shader has no fade to read");
+            Assert.That(quad.bounds.size.y, Is.EqualTo(0.0f).Within(0.0001f), "the scorch stands up");
+
+            Assert.That(
+                scorch.GetComponent<Renderer>().sharedMaterial.shader.name,
+                Is.EqualTo(GeneratedMaterials.MarkShaderName));
+        }
+
+        /// <summary>
+        /// A mark is scaled to the thing that made it, so one prefab serves a grenade and a
+        /// wreck.
+        /// </summary>
+        [Test]
+        public void AMarkIsTheSizeItIsToldToBe()
+        {
+            var host = new GameObject("Mark");
+            try
+            {
+                GroundMark mark = host.AddComponent<GroundMark>();
+                mark.Wire(null, 1.0f);
+                mark.Configure(6.0f, GroundMark.Fade);
+
+                Assert.That(host.transform.localScale.x, Is.EqualTo(6.0f).Within(0.001f));
+                Assert.That(mark.Life, Is.EqualTo(GroundMark.Fade).Within(0.001f));
+
+                mark.Configure(6.0f, 0.0f);
+                Assert.That(mark.Life, Is.EqualTo(0.0f), "a collapse's burn is supposed to stay");
+            }
+            finally
+            {
+                Object.DestroyImmediate(host);
+            }
+        }
+
+        /// <summary>
+        /// Everything that drives leaves two lines behind it, and the one thing that flies
+        /// leaves none.
+        /// </summary>
+        [Test]
+        public void EveryGroundVehicleLeavesTracksAndTheHelicopterLeavesNone()
+        {
+            foreach (VehicleKind kind in VehiclePrefabBuilder.Roster())
+            {
+                GameObject prefab = LoadVehicle(kind);
+                var tracks = prefab.GetComponent<TyreTracks>();
+
+                if (prefab.GetComponent<GroundVehicle>() == null)
+                {
+                    Assert.That(tracks, Is.Null, $"{kind} flies and still leaves wheel tracks");
+                    continue;
+                }
+
+                Assert.That(tracks, Is.Not.Null, $"{kind} drives and leaves no tracks");
+                Assert.That(tracks.Left, Is.Not.Null, $"{kind} has no left track");
+                Assert.That(tracks.Right, Is.Not.Null, $"{kind} has no right track");
+                Assert.That(
+                    tracks.Left.transform.localPosition.x,
+                    Is.LessThan(tracks.Right.transform.localPosition.x),
+                    $"{kind}'s tracks are the wrong way round");
+                Assert.That(
+                    tracks.Left.emitting, Is.False, $"{kind} is marking the ground in its box");
+            }
+        }
+
+        /// <summary>
+        /// Every blast in the game comes through one factory, so binding the scorch to that
+        /// one prefab is what puts a mark under all of them.
+        /// </summary>
+        [Test]
+        public void TheExplosionCarriesTheScorchForEverything()
+        {
+            CombatPrefabBuilder.EnsureAssets();
+
+            Explosion blast = CombatPrefabBuilder.LoadExplosion();
+            Assert.That(blast, Is.Not.Null, "there is no explosion prefab");
+            Assert.That(blast.Scorch, Is.Not.Null, "no blast in the game marks the ground");
+        }
+
         private static GameObject LoadVehicle(VehicleKind kind)
             => AssetDatabase.LoadAssetAtPath<GameObject>(VehiclePrefabBuilder.PrefabPathFor(kind));
     }

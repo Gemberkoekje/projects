@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -66,12 +66,18 @@ namespace IronFlag.Levels
         /// <param name="field">The rasterised map.</param>
         /// <param name="kind">Surface whose layer to cut.</param>
         /// <param name="name">What to call the mesh.</param>
+        /// <param name="measureShore">
+        /// Whether to record each vertex's signed distance to the coastline in the second
+        /// texture channel. Wanted by the sheets drawn over water, whose shader draws foam
+        /// and the shoreward wash off it, and by nothing else - see <see cref="Coast"/>.
+        /// </param>
         /// <returns>
         /// The mesh, lying at <c>y = 0</c> and facing up, or <c>null</c> when the map has
         /// none of that layer on it - so a caller can leave the object out rather than hang
         /// an empty renderer off the map.
         /// </returns>
-        public static Mesh Build(SurfaceField field, SurfaceKind kind, string name)
+        public static Mesh Build(
+            SurfaceField field, SurfaceKind kind, string name, bool measureShore = false)
         {
             if (field == null || kind == SurfaceKind.None)
             {
@@ -109,7 +115,7 @@ namespace IronFlag.Levels
                 }
             }
 
-            return Finish(vertices, texture, triangles, name);
+            return Finish(vertices, texture, triangles, name, measureShore ? field : null);
         }
 
         /// <summary>
@@ -180,7 +186,7 @@ namespace IronFlag.Levels
                 }
             }
 
-            return Finish(vertices, texture, triangles, name);
+            return Finish(vertices, texture, triangles, name, null);
         }
 
         /// <summary>
@@ -567,6 +573,10 @@ namespace IronFlag.Levels
         /// <param name="texture">Texture coordinates gathered.</param>
         /// <param name="triangles">Triangles gathered.</param>
         /// <param name="name">What to call it.</param>
+        /// <param name="coast">
+        /// The map to measure each vertex's distance to the coastline against, or
+        /// <c>null</c> to leave the second texture channel off the mesh entirely.
+        /// </param>
         /// <returns>The mesh, or <c>null</c> when nothing was gathered.</returns>
         /// <remarks>
         /// Sixteen-bit indices run out at 65535 vertices. A coastline that wanders spends
@@ -575,7 +585,11 @@ namespace IronFlag.Levels
         /// to find out which map was the one that did.
         /// </remarks>
         private static Mesh Finish(
-            List<Vector3> vertices, List<Vector2> texture, List<int> triangles, string name)
+            List<Vector3> vertices,
+            List<Vector2> texture,
+            List<int> triangles,
+            string name,
+            SurfaceField coast)
         {
             if (vertices.Count == 0)
             {
@@ -590,10 +604,53 @@ namespace IronFlag.Levels
 
             mesh.SetVertices(vertices);
             mesh.SetUVs(0, texture);
+            if (coast != null)
+            {
+                mesh.SetUVs(1, Coast(coast, vertices));
+            }
+
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// <summary>
+        /// Measures how far every vertex is from the coastline.
+        /// </summary>
+        /// <param name="field">The rasterised map.</param>
+        /// <param name="vertices">Vertices gathered.</param>
+        /// <returns>
+        /// Signed metres to the coast per vertex, positive on land, in the x of a
+        /// coordinate pair; the y is unused and zero.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// Only the sheets drawn over water ask for this, and only the water shader reads
+        /// it. It is not put on the land for two reasons: nothing wants it there, and it
+        /// would be wrong if anything did - the interior of a sheet is merged into as few
+        /// rectangles as it will take, so a single quad can be sixty metres across, and a
+        /// distance interpolated over that is a distance to a coast a long way from where
+        /// the coast is. The water sheets are safe from that because the shelf is five
+        /// metres wide: a rectangle of it can only ever grow long <em>along</em> the coast,
+        /// which is the direction the distance does not change in.
+        /// </para>
+        /// <para>
+        /// <see cref="SurfaceField.Shore"/> rather than
+        /// <see cref="SurfaceField.ToTheCoast"/>, because this one is drawn: the cell-wise
+        /// answer would put a one-metre staircase in the foam, on exactly the grid the rest
+        /// of this file exists to cut across.
+        /// </para>
+        /// </remarks>
+        private static List<Vector2> Coast(SurfaceField field, List<Vector3> vertices)
+        {
+            var measured = new List<Vector2>(vertices.Count);
+            for (int at = 0; at < vertices.Count; at++)
+            {
+                measured.Add(new Vector2(field.Shore(vertices[at]), 0.0f));
+            }
+
+            return measured;
         }
     }
 }

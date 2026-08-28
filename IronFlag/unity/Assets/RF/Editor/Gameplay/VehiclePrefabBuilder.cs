@@ -80,6 +80,12 @@ namespace IronFlag.Editor.Gameplay
         /// <summary>Smallest explosion a wreck is allowed to make, in metres.</summary>
         private const float SmallestWreckBlast = 2.5f;
 
+        /// <summary>How far out towards the hull's edge a wheel track runs.</summary>
+        private const float TrackSpacing = 0.72f;
+
+        /// <summary>How wide a wheel track is, as a share of the hull's width.</summary>
+        private const float TrackWidth = 0.22f;
+
         /// <summary>Main rotor object name.</summary>
         private const string MainRotorName = "MainRotor";
 
@@ -208,6 +214,7 @@ namespace IronFlag.Editor.Gameplay
                 AddWeapon(root, instance, controller, kind);
                 AddSmoke(root, hull);
                 AddDust(root, controller, hull);
+                AddTracks(root, controller, hull);
                 root.AddComponent<VehicleBay>().Configure(RepairSeconds, DeployRideSeconds);
 
                 string prefabPath = PrefabPathFor(kind);
@@ -359,6 +366,30 @@ namespace IronFlag.Editor.Gameplay
                 hull.center.z - (hull.extents.z * 0.85f));
 
             VfxPrefabBuilder.AddDustTrail(root, at, hull.size.x);
+        }
+
+        /// <summary>
+        /// Gives a vehicle that drives on the ground two lines to leave on it.
+        /// </summary>
+        /// <param name="root">Prefab root the component goes on.</param>
+        /// <param name="controller">The movement component, to tell a driver from a pilot.</param>
+        /// <param name="hull">Bounds of the vehicle, for how far apart its wheels are.</param>
+        /// <remarks>
+        /// Sized off the hull rather than off the wheels, which are geometry inside a model
+        /// nothing out here can name: the tracks sit a little inside the widest part of the
+        /// vehicle and are about a fifth of its width, which comes out close enough on all
+        /// three of the things that drive. Excluded for the helicopter by the same question
+        /// the dust asks - is this a <see cref="GroundVehicle"/> - rather than by naming it.
+        /// </remarks>
+        private static void AddTracks(GameObject root, VehicleController controller, Bounds hull)
+        {
+            if (!(controller is GroundVehicle))
+            {
+                return;
+            }
+
+            VfxPrefabBuilder.AddTyreTracks(
+                root, hull.extents.x * TrackSpacing, hull.size.x * TrackWidth);
         }
 
         /// <summary>

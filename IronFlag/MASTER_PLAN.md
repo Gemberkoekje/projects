@@ -37,8 +37,8 @@ between.
 4. ~~[Main Menu](#4-main-menu)~~ — **done**, see [MAIN_MENU_NOTES.md](MAIN_MENU_NOTES.md).
 5. ~~[Combat & Movement VFX](#5-combat--movement-vfx)~~ — **done**, see [VFX_NOTES.md](VFX_NOTES.md).
 6. ~~[1-Player Mode](#6-1-player-mode)~~ — **done**, see [SOLO_NOTES.md](SOLO_NOTES.md).
-7. [Ground & Water Material Upgrade](#7-ground--water-material-upgrade) — bigger effort, still self-contained.
-8. [Sounds and Music](#8-sounds-and-music) — highest scope/ambiguity of everything here; first feature needing real external assets.
+7. ~~[Ground & Water Material Upgrade](#7-ground--water-material-upgrade)~~ — **done**, see [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md).
+8. [Sounds and Music](#8-sounds-and-music) — pipeline half **done** (see [AUDIO_NOTES.md](AUDIO_NOTES.md)); wiring into gameplay still to do.
 9. [UI Visual Identity](#9-ui-visual-identity) — determines the final skin for items 4 and 10.
 10. [Bunker View Rework](#10-bunker-view-rework) — polish pass on an already-functional screen.
 
@@ -72,7 +72,16 @@ rather than discarding them:
 > systems are in for cosmetic state-driven effects; the two high-frequency
 > combat effects stayed closed-form. Textures stayed out entirely — the
 > particles are meshes, not billboards. See [VFX_NOTES.md](VFX_NOTES.md).
-> Items 7 and 9 still have their own versions of this question open.
+>
+> **Settled for item 7**: custom shaders are in, and they are hand-written HLSL
+> rather than Shader Graph, on the "asset nobody can review in a diff" argument
+> — a serialised node graph is closer to that objection than a texture would be.
+> Textures stayed out again, but for a *different* reason this time: the
+> project's rule was never "no binary assets" (models and audio are both
+> generated binaries committed beside their source), it is that a tiling texture
+> has nothing to tile against on a 240 m map whose detail is measured in tens of
+> centimetres. See [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md).
+> Item 9 still has its own version of this question open.
 
 If this balance is wrong in either direction, redirect — this is a judgment
 call, not a rule extracted from anything said explicitly. Item 10 (Bunker
@@ -732,6 +741,13 @@ quickly.
 
 ## 7. Ground & Water Material Upgrade
 
+> **Done** — see [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md) and the entry in
+> [Completed](#completed). All four bullets shipped. Open question 1 was answered
+> hand-written HLSL; bullet 1's depth-texture shore fade was replaced by the
+> signed distance-to-coast field `SurfaceField` already computes, because there
+> is no submerged geometry on this map for a depth fade to work against. The
+> plan as written is left below unedited.
+
 **Why this priority**: significant visual payoff but the higher-effort
 item — real shader authoring, and it must respect the surface color ramp
 (a tested, deliberate decision from the finished Surfaces pass — this item
@@ -783,6 +799,14 @@ into a UV channel), new Decal Projector prefabs.
 ---
 
 ## 8. Sounds and Music
+
+> **Pipeline half done** — see [AUDIO_NOTES.md](AUDIO_NOTES.md). Open question 1 below is
+> answered: **synthesise**, not license or commission. Thirty clips (SFX, music, UI, engine
+> loops) render from committed SuperCollider `.scd` source via `Tools > IronFlag > Rebuild All
+> Audio from SuperCollider`, byte-identical on every re-render, measured non-silent and
+> un-clipped. **Nothing is wired into gameplay** — no `AudioCatalog`, no `Sfx`/`MusicPlayer`,
+> no call sites touched — so open questions 2 and 3 below, and the "Concrete wire-up points"
+> list, are all still open exactly as written.
 
 The design doc's own M8 "polish pass" has always listed "per-vehicle
 music/SFX hook" as its scope — this isn't new scope, it's finally starting
@@ -879,8 +903,9 @@ positional audio if flat 2D sound turns out to feel wrong in practice.
   clip files, once sourced
 
 ### Open questions
-1. **Sourcing** — license/curate existing clips (recommended above) vs.
-   commission vs. runtime-synthesize. Blocks everything else in this item.
+1. ~~**Sourcing**~~ — **answered: synthesise**, not license or commission. See
+   [AUDIO_NOTES.md](AUDIO_NOTES.md) for why the recommendation below was overridden and what
+   it cost.
 2. **Positional vs. non-positional** — confirm starting non-positional
    given the single-listener constraint, or accept the spatial compromise
    for one seat.
@@ -1081,6 +1106,43 @@ point).
 ---
 
 ## Completed
+
+### Ground & Water: the project's first shaders
+Finished — see [GROUND_WATER_NOTES.md](GROUND_WATER_NOTES.md). Item 7, all four bullets.
+`RF_Ground.shader`, `RF_Water.shader` and `RF_Mark.shader` are the first shaders this project
+has ever had, and they are hand-written HLSL: a serialised node graph is closer to
+`DebrisBurst.cs`'s *"an asset nobody can review in a diff"* objection than a texture would be.
+Every number they are handed is a row of `SurfaceLook`, a second table beside `SurfaceTuning`
+whose whole content could be zeroed to leave a game that plays identically — **no albedo
+anywhere in this pass changed**, so the measured value ramp the surfaces pass argued over
+survives it intact, both waters' smoothness included.
+
+Two of the plan's assumptions turned out to be wrong, and both were instructive. **The
+depth-texture shore fade cannot work on this map**: the sea is a slab whose top face *is* the
+surface, so a water pixel's depth and the scene depth behind it are the same number, and the
+band a transparent water plane would buy measures about half a metre. The soft edge came from
+`SurfaceField`'s signed distance-to-coast instead — already computed for every beach width and
+placement margin on the map, now written into UV1 of the water sheets — which costs no depth
+texture, works the same on `Mobile_Renderer`, and merges bullets 1c and 4 into one mechanism.
+And **the sun glint provably cannot reach the gameplay camera**: the sun's mirror direction is
+34 degrees off vertical there and a swell can only tilt a normal 19, so `pow(N·H, 220)` is
+1e-18 at any strength. From directly overhead it is 19 degrees and the swell reaches it
+exactly, which is why the map view sparkles and the game does not. Sun direction reads in the
+game through the fresnel sheen warming towards the reflected sun instead — which costs nothing
+in the overhead views, because fresnel is zero looking straight down.
+
+The measurement that decided the tuning: deep water in the coast still went from a standard
+deviation of **1.8 grey levels to 4.1** while its mean moved three, once the effect was
+carried by the additive terms rather than by diffuse shading. The two waters are simply too
+dark for a normal to do anything to them.
+
+Ground marks are multiply-blended flat quads rather than URP Decal Projectors — the ground is
+exactly flat at `y = 0` because `CombatPlane` says so, and a multiply is what makes one stain
+the right colour on grass, sand and asphalt at once. One hook does all of it: every blast in
+the game already passes through `Explosion.Spawn`, so a scorch hung there is the size of what
+made it. Wheel tracks are the one thing in this pass with no still: a `TrailRenderer` builds
+its ribbon during the game loop and a headless render never runs one. EditMode 498/498,
+PlayMode 176/176.
 
 ### 1-Player Mode: one seat, and a map that says so
 Finished — see [SOLO_NOTES.md](SOLO_NOTES.md). Item 6. There is no toggle: a level with one

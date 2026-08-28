@@ -331,6 +331,55 @@ namespace IronFlag.Levels
         }
 
         /// <summary>
+        /// Measures how far a point is from the water's edge, read between the cells rather
+        /// than at them.
+        /// </summary>
+        /// <param name="at">Point to measure; its height is ignored.</param>
+        /// <returns>
+        /// Metres to the nearest coastline: positive on land, negative in the water, and off
+        /// the map as negative as the world is wide.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// The same field <see cref="ToTheCoast"/> reads, bilinearly sampled instead of
+        /// looked up. That is the whole difference, and it is a difference of purpose rather
+        /// than of accuracy: a margin wants to know which cell it is in and how far inside
+        /// that cell is, and cannot see the metre-wide step between one cell and the next.
+        /// Something being <em>drawn</em> can - a foam line taken from
+        /// <see cref="ToTheCoast"/> comes out as a staircase on exactly the grid the whole
+        /// of <see cref="SurfaceMesh"/> exists to hide.
+        /// </para>
+        /// <para>
+        /// Deliberately not a replacement for the other one. Every gameplay margin on this
+        /// map is measured against <see cref="ToTheCoast"/> and has been tested at those
+        /// numbers; making that method smooth would move all of them by up to half a cell to
+        /// buy nothing any rule can see.
+        /// </para>
+        /// </remarks>
+        public float Shore(Vector3 at)
+        {
+            // Cell centres sit half a cell in from each edge, so the point's position in
+            // "which centre" space is half a cell behind its position in "which cell" space.
+            float acrossX = ((at.x + extent) / cell) - 0.5f;
+            float acrossZ = ((at.z + extent) / cell) - 0.5f;
+
+            int west = Mathf.FloorToInt(acrossX);
+            int south = Mathf.FloorToInt(acrossZ);
+            float alongX = acrossX - west;
+            float alongZ = acrossZ - south;
+
+            float southWest = Nearest(west, south);
+            float southEast = Nearest(west + 1, south);
+            float northWest = Nearest(west, south + 1);
+            float northEast = Nearest(west + 1, south + 1);
+
+            return Mathf.Lerp(
+                Mathf.Lerp(southWest, southEast, alongX),
+                Mathf.Lerp(northWest, northEast, alongX),
+                alongZ);
+        }
+
+        /// <summary>
         /// Returns the drawn-and-displaced shape of the land, one number per cell.
         /// </summary>
         /// <returns>
@@ -985,5 +1034,21 @@ namespace IronFlag.Levels
         private bool Holds(int x, int z) => x >= 0 && z >= 0 && x < side && z < side;
 
         private int ColumnOf(float world) => Mathf.FloorToInt((world + extent) / cell);
+
+        /// <summary>
+        /// Reads one cell of the coast field, clamped to the edge of the grid.
+        /// </summary>
+        /// <param name="x">Cell across the map.</param>
+        /// <param name="z">Cell up the map.</param>
+        /// <returns>Signed metres to the coast at that cell.</returns>
+        /// <remarks>
+        /// Clamped rather than answered with the off-the-map sentinel that
+        /// <see cref="ToTheCoast"/> uses, because this one is only ever sampled by
+        /// <see cref="Shore"/> for the four cells around a point that is on the map. An
+        /// abrupt drop to minus-the-world at the last cell would put a bright foam line
+        /// around the outer rim of every sea slab.
+        /// </remarks>
+        private float Nearest(int x, int z)
+            => coast[(Mathf.Clamp(z, 0, side - 1) * side) + Mathf.Clamp(x, 0, side - 1)];
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using IronFlag.Core;
 using IronFlag.Destruction;
@@ -150,6 +150,11 @@ namespace IronFlag.Levels
         /// however many colours it is drawn in, which is what keeps a shelf from being a
         /// thing a vehicle could be standing on.
         /// </para>
+        /// <para>
+        /// It also carries the <see cref="WaterClock"/>, which is the only thing that makes
+        /// the water move. One per level and on the sea itself, so a map with no sea has a
+        /// still one by construction rather than by a check.
+        /// </para>
         /// </remarks>
         private static void BuildSea(LevelDefinition level, LevelCatalog catalog, Transform parent)
         {
@@ -166,6 +171,7 @@ namespace IronFlag.Levels
                 0.0f, bounds.WaterLevel - (bounds.SeaThickness * 0.5f), 0.0f);
 
             sea.AddComponent<WaterLine>().Configure(bounds.WaterLevel, bounds.DrownDepth);
+            sea.AddComponent<WaterClock>();
         }
 
         /// <summary>
@@ -291,7 +297,8 @@ namespace IronFlag.Levels
             for (int layer = 1; layer < stack.Length; layer++)
             {
                 SurfaceKind kind = stack[layer];
-                Mesh sheet = SurfaceMesh.Build(field, kind, $"{CoastName} ({kind})");
+                Mesh sheet = SurfaceMesh.Build(
+                    field, kind, $"{CoastName} ({kind})", measureShore: true);
                 if (sheet == null)
                 {
                     continue;
